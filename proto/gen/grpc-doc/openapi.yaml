@@ -1,0 +1,537 @@
+# Generated with protoc-gen-openapi
+# https://github.com/google/gnostic/tree/master/cmd/protoc-gen-openapi
+
+openapi: 3.0.3
+info:
+    title: ""
+    version: 0.0.1
+paths:
+    /v1/agent/hello:
+        post:
+            tags:
+                - AgentService
+            description: 'Permissions required: None'
+            operationId: AgentService_Hello
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/HelloRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/HelloResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/auth/login:
+        post:
+            tags:
+                - AuthService
+            description: 'Permissions required: None'
+            operationId: AuthService_Login
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/LoginRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/LoginResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/auth/logout:
+        post:
+            tags:
+                - AuthService
+            description: 'Permissions required: None'
+            operationId: AuthService_Logout
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/LogoutRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/users:
+        get:
+            tags:
+                - UserService
+            description: |-
+                List all users.
+                 Any authenticated user can list users.
+            operationId: UserService_ListUsers
+            parameters:
+                - name: pageSize
+                  in: query
+                  description: |-
+                    The maximum number of users to return. The service may return fewer than
+                     this value.
+                     If unspecified, at most 10 users will be returned.
+                     The maximum value is 1000; values above 1000 will be coerced to 1000.
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  description: |-
+                    A page token, received from a previous `ListUsers` call.
+                     Provide this to retrieve the subsequent page.
+
+                     When paginating, all other parameters provided to `ListUsers` must match
+                     the call that provided the page token.
+                  schema:
+                    type: string
+                - name: showDeleted
+                  in: query
+                  description: Show deleted users if specified.
+                  schema:
+                    type: boolean
+                - name: filter
+                  in: query
+                  description: |-
+                    Filter is used to filter users returned in the list.
+                     The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+
+                     Supported filter:
+                     - name: the user name, support "==" and ".matches()" operator.
+                     - email: the user email, support "==" and ".matches()" operator.
+                     - user_type: the type, check UserType enum for values, support "==", "in [xx]", "!(in [xx])" operator.
+                     - state: check State enum for values, support "==" operator.
+                     - project: the project full name in "projects/{id}" format, support "==" operator.
+
+                     For example:
+                     name == "ed"
+                     name.matches("ed")
+                     email == "ed@example.com"
+                     email.matches("ed")
+                     user_type == "SERVICE_ACCOUNT"
+                     user_type in ["SERVICE_ACCOUNT", "USER"]
+                     !(user_type in ["SERVICE_ACCOUNT", "USER"])
+                     state == "DELETED"
+                     project == "projects/sample-project"
+                     You can combine filter conditions like:
+                     name.matches("ed") && project == "projects/sample-project"
+                     (name == "ed" || email == "ed@example.com") && project == "projects/sample-project"
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListUsersResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - UserService
+            description: Create a user.
+            operationId: UserService_CreateUser
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/User'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/User'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/users/me:
+        get:
+            tags:
+                - UserService
+            description: |-
+                Get the current authenticated user.
+                 Permissions required: None
+            operationId: UserService_GetCurrentUser
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/User'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/users/{user}:
+        get:
+            tags:
+                - UserService
+            description: |-
+                Get the user.
+                 Any authenticated user can get the user.
+            operationId: UserService_GetUser
+            parameters:
+                - name: user
+                  in: path
+                  description: The user id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/User'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        delete:
+            tags:
+                - UserService
+            description: |-
+                Only the user with permission on the workspace can delete the user.
+                 The last remaining workspace admin cannot be deleted.
+            operationId: UserService_DeleteUser
+            parameters:
+                - name: user
+                  in: path
+                  description: The user id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - UserService
+            description: Only the user itself and the user with permission on the workspace can update the user.
+            operationId: UserService_UpdateUser
+            parameters:
+                - name: user
+                  in: path
+                  description: The user id.
+                  required: true
+                  schema:
+                    type: string
+                - name: updateMask
+                  in: query
+                  description: The list of fields to update.
+                  schema:
+                    type: string
+                    format: field-mask
+                - name: allowMissing
+                  in: query
+                  description: |-
+                    If set to true, and the user is not found, a new user will be created.
+                     In this situation, `update_mask` is ignored.
+                  schema:
+                    type: boolean
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/User'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/User'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/users/{user}:undelete:
+        post:
+            tags:
+                - UserService
+            description: Only the user with permission on the workspace can undelete the user.
+            operationId: UserService_UndeleteUser
+            parameters:
+                - name: user
+                  in: path
+                  description: The user id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UndeleteUserRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/User'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/users:batchGet:
+        get:
+            tags:
+                - UserService
+            description: |-
+                Get the users in batch.
+                 Any authenticated user can batch get users.
+            operationId: UserService_BatchGetUsers
+            parameters:
+                - name: names
+                  in: query
+                  description: |-
+                    The user names to retrieve.
+                     Format: users/{user uid or user email}
+                  schema:
+                    type: array
+                    items:
+                        type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BatchGetUsersResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+components:
+    schemas:
+        BatchGetUsersResponse:
+            type: object
+            properties:
+                users:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/User'
+                    description: The users from the specified request.
+        GoogleProtobufAny:
+            type: object
+            properties:
+                '@type':
+                    type: string
+                    description: The type of the serialized message.
+            additionalProperties: true
+            description: Contains an arbitrary serialized message along with a @type that describes the type of the serialized message.
+        HelloRequest:
+            type: object
+            properties: {}
+        HelloResponse:
+            type: object
+            properties:
+                currentTime:
+                    type: string
+        IdentityProviderContext:
+            type: object
+            properties:
+                oauth2Context:
+                    $ref: '#/components/schemas/OAuth2IdentityProviderContext'
+        ListUsersResponse:
+            type: object
+            properties:
+                users:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/User'
+                    description: The users from the specified request.
+                nextPageToken:
+                    type: string
+                    description: |-
+                        A token, which can be sent as `page_token` to retrieve the next page.
+                         If this field is omitted, there are no subsequent pages.
+        LoginRequest:
+            type: object
+            properties:
+                email:
+                    type: string
+                password:
+                    type: string
+                web:
+                    type: boolean
+                    description: If web is set, we will set access token, refresh token, and user to the cookie.
+                idpName:
+                    type: string
+                    description: |-
+                        The name of the identity provider.
+                         Format: idps/{idp}
+                idpContext:
+                    allOf:
+                        - $ref: '#/components/schemas/IdentityProviderContext'
+                    description: The idp_context is using to get the user information from identity provider.
+        LoginResponse:
+            type: object
+            properties:
+                token:
+                    type: string
+                requireResetPassword:
+                    type: boolean
+                user:
+                    allOf:
+                        - $ref: '#/components/schemas/User'
+                    description: The user of successful login.
+        LogoutRequest:
+            type: object
+            properties: {}
+        OAuth2IdentityProviderContext:
+            type: object
+            properties:
+                code:
+                    type: string
+        Status:
+            type: object
+            properties:
+                code:
+                    type: integer
+                    description: The status code, which should be an enum value of [google.rpc.Code][google.rpc.Code].
+                    format: int32
+                message:
+                    type: string
+                    description: A developer-facing error message, which should be in English. Any user-facing error message should be localized and sent in the [google.rpc.Status.details][google.rpc.Status.details] field, or localized by the client.
+                details:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/GoogleProtobufAny'
+                    description: A list of messages that carry the error details.  There is a common set of message types for APIs to use.
+            description: 'The `Status` type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by [gRPC](https://github.com/grpc). Each `Status` message contains three pieces of data: error code, error message, and error details. You can find out more about this error model and how to work with it in the [API Design Guide](https://cloud.google.com/apis/design/errors).'
+        UndeleteUserRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: |-
+                        The name of the deleted user.
+                         Format: users/{user}
+        User:
+            type: object
+            properties:
+                name:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        The name of the user.
+                         Format: users/{user}. {user} is a system-generated unique ID.
+                state:
+                    enum:
+                        - STATE_UNSPECIFIED
+                        - ACTIVE
+                        - DELETED
+                    type: string
+                    format: enum
+                email:
+                    type: string
+                title:
+                    type: string
+                userType:
+                    enum:
+                        - USER_TYPE_UNSPECIFIED
+                        - USER
+                        - SERVICE_ACCOUNT
+                        - SYSTEM_BOT
+                    type: string
+                    format: enum
+                password:
+                    writeOnly: true
+                    type: string
+                serviceKey:
+                    writeOnly: true
+                    type: string
+                recoveryCodes:
+                    type: array
+                    items:
+                        type: string
+                    description: The recovery_codes is the temporary recovery codes using in two phase verification.
+                phone:
+                    type: string
+                    description: |-
+                        Should be a valid E.164 compliant phone number.
+                         Could be empty.
+                profile:
+                    $ref: '#/components/schemas/UserProfile'
+                groups:
+                    readOnly: true
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        The groups for the user.
+                         Format: groups/{email}
+        UserProfile:
+            type: object
+            properties:
+                lastLoginTime:
+                    type: string
+                    format: date-time
+                lastChangePasswordTime:
+                    type: string
+                    format: date-time
+                source:
+                    type: string
+                    description: source means where the user comes from. For now we support Entra ID SCIM sync, so the source could be Entra ID.
+tags:
+    - name: AgentService
+    - name: AuthService
+    - name: UserService

@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+enum State {
+  STATE_UNSPECIFIED = 0;
+  ACTIVE = 1;
+  DELETED = 2;
+}
+
+
+// Position in a text expressed as zero-based line and zero-based column byte
+// offset.
+message Position {
+  // Line position in a text (zero-based).
+  int32 line = 1;
+  // Column position in a text (zero-based), equivalent to byte offset.
+  int32 column = 2;
+}
+
+message Range {
+  int32 start = 1;
+  int32 end = 2;
+}
+
+// RiskLevel is the risk level.
+enum RiskLevel {
+  RISK_LEVEL_UNSPECIFIED = 0;
+  LOW = 1;
+  MODERATE = 2;
+  HIGH = 3;
+}

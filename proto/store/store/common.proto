@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package laelia.store;
+
+option go_package = "generated-go/store";
+
+// Used internally for obfuscating the page token.
+message PageToken {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+// Position in a text expressed as zero-based line and zero-based column byte
+// offset.
+message Position {
+  // Line position in a text (zero-based).
+  int32 line = 1;
+  // Column position in a text (zero-based), equivalent to byte offset.
+  int32 column = 2;
+}
+
+message Range {
+  int32 start = 1;
+  int32 end = 2;
+}

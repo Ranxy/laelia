@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package laelia.store;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "generated-go/store";
+
+// PrincipalType is the type of a principal.
+enum PrincipalType {
+  PRINCIPAL_TYPE_UNSPECIFIED = 0;
+  // END_USER represents the human being.
+  END_USER = 1;
+  // SERVICE_ACCOUNT represents the external service calling OpenAPI.
+  SERVICE_ACCOUNT = 2;
+  // SYSTEM_BOT represents the internal system bot performing operations.
+  SYSTEM_BOT = 3;
+}
+
+message UserProfile {
+  google.protobuf.Timestamp last_login_time = 1;
+  google.protobuf.Timestamp last_change_password_time = 2;
+  // source means where the user comes from. For now we support Entra ID SCIM sync, so the source could be Entra ID.
+  string source = 3;
+}

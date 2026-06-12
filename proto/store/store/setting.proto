@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package laelia.store;
+
+import "google/protobuf/duration.proto";
+
+option go_package = "generated-go/store";
+
+enum SettingName {
+  SETTING_NAME_UNSPECIFIED = 0;
+  AUTH_SECRET = 1;
+  BRANDING_LOGO = 2;
+  WORKSPACE_ID = 3;
+  WORKSPACE_PROFILE = 4;
+  WORKSPACE_APPROVAL = 5;
+  WORKSPACE_EXTERNAL_APPROVAL = 6;
+  PASSWORD_RESTRICTION = 7;
+  ENVIRONMENT = 8;
+}
+
+message WorkspaceProfileSetting {
+  // The external URL is used for sso authentication callback.
+  string external_url = 1;
+
+  // Disallow self-service signup, users can only be invited by the owner.
+  bool disallow_signup = 2;
+
+  // Require 2FA for all users.
+  bool require_2fa = 3;
+
+  // The duration for token.
+  google.protobuf.Duration token_duration = 4;
+
+  // The max duration for role expired.
+  google.protobuf.Duration maximum_role_expiration = 5;
+
+  // The workspace domain, e.g. example.com.
+  repeated string domains = 6;
+
+  // Only user and group from the domains can be created and login.
+  bool enforce_identity_domain = 7;
+
+  // Whether to disallow password signin. (Except workspace admins)
+  bool disallow_password_signin = 8;
+
+  // Whether to enable metric collection for the workspace.
+  bool enable_metric_collection = 9;
+}
+
+message PasswordRestrictionSetting {
+  // min_length is the minimum length for password, should no less than 8.
+  int32 min_length = 1;
+  // require_number requires the password must contains at least one number.
+  bool require_number = 2;
+  // require_letter requires the password must contains at least one letter, regardless of upper case or lower case
+  bool require_letter = 3;
+  // require_uppercase_letter requires the password must contains at least one upper case letter.
+  bool require_uppercase_letter = 4;
+  // require_uppercase_letter requires the password must contains at least one special character.
+  bool require_special_character = 5;
+  // require_reset_password_for_first_login requires users to reset their password after the 1st login.
+  bool require_reset_password_for_first_login = 6;
+  // password_rotation requires users to reset their password after the duration.
+  google.protobuf.Duration password_rotation = 7;
+}
+
+message EnvironmentSetting {
+  repeated Environment environments = 1;
+
+  message Environment {
+    // The resource id of the environment.
+    // This value should be 4-63 characters, and valid characters
+    // are /[a-z][0-9]-/.
+    string id = 1;
+    // The display name of the environment.
+    string title = 2;
+    map<string, string> tags = 3;
+    string color = 4;
+  }
+}

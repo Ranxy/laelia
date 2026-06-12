@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "v1/annotation.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+
+service AgentService {
+  // Permissions required: None
+  rpc Hello(HelloRequest) returns (HelloResponse) {
+    option (google.api.http) = {
+      post: "/v1/agent/hello"
+      body: "*"
+    };
+    option (laelia.v1.audit) = false;
+  }
+}
+
+message HelloRequest{
+
+}
+
+message HelloResponse{
+    int64 current_time = 1;
+}

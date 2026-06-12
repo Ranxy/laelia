@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "v1/annotation.proto";
+import "v1/user_service.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+service AuthService {
+  // Permissions required: None
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/login"
+      body: "*"
+    };
+    option (laelia.v1.allow_without_credential) = true;
+    option (laelia.v1.audit) = true;
+  }
+
+  // Permissions required: None
+  rpc Logout(LogoutRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/auth/logout"
+      body: "*"
+    };
+    option (laelia.v1.allow_without_credential) = true;
+    option (laelia.v1.audit) = true;
+  }
+}
+
+message LoginRequest {
+  string email = 1;
+
+  string password = 2;
+
+  // If web is set, we will set access token, refresh token, and user to the cookie.
+  bool web = 3;
+
+  // The name of the identity provider.
+  // Format: idps/{idp}
+  string idp_name = 4;
+
+  // The idp_context is using to get the user information from identity provider.
+  IdentityProviderContext idp_context = 5;
+}
+
+message IdentityProviderContext {
+  oneof context {
+    OAuth2IdentityProviderContext oauth2_context = 1;
+  }
+}
+
+message OAuth2IdentityProviderContext {
+  string code = 1;
+}
+
+message LoginResponse {
+  string token = 1;
+
+  bool require_reset_password = 3;
+
+  // The user of successful login.
+  User user = 4;
+}
+
+message LogoutRequest {}

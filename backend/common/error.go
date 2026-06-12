@@ -1,0 +1,98 @@
+//nolint:revive
+package common
+
+import (
+	"errors"
+
+	pkgerrors "github.com/pkg/errors"
+)
+
+// Code is the error code.
+type Code int
+
+// Application error codes.
+const (
+	// 0 ~ 99 general error.
+	Ok             Code = 0
+	Internal       Code = 1
+	NotAuthorized  Code = 2
+	Invalid        Code = 3
+	NotFound       Code = 4
+	Conflict       Code = 5
+	NotImplemented Code = 6
+	SizeExceeded   Code = 7
+
+	// 101 ~ 199 db error.
+	DBConnectionFailure Code = 101
+	DBExecutionError    Code = 102
+)
+
+// Int returns the int type of code.
+func (c Code) Int() int {
+	return int(c)
+}
+
+// Int32 returns the int32 type of code.
+func (c Code) Int32() int32 {
+	return int32(c)
+}
+
+// Error represents an application-specific error. Application errors can be
+// unwrapped by the caller to extract out the code & message.
+//
+// Any non-application error (such as a disk error) should be reported as an
+// Internal error and the human user should only see "Internal error" as the
+// message. These low-level internal error details should only be logged and
+// reported to the operator of the application (not the end user).
+type Error struct {
+	// Machine-readable error code.
+	Code Code
+
+	// Embedded error.
+	Err error
+}
+
+// Error implements the error interface. Not used by the application otherwise.
+func (e *Error) Error() string {
+	return e.Err.Error()
+}
+
+// ErrorCode unwraps an application error and returns its code.
+// Non-application errors always return EINTERNAL.
+func ErrorCode(err error) Code {
+	if err == nil {
+		return Ok
+	} else if e, ok := errors.AsType[*Error](err); ok {
+		return e.Code
+	}
+	return Internal
+}
+
+// Wrapf is a helper function to wrap an Error with given code and formatted message.
+func Wrapf(err error, code Code, format string, args ...any) *Error {
+	return &Error{
+		Code: code,
+		Err:  pkgerrors.Wrapf(err, format, args...),
+	}
+}
+
+// Errorf is a helper function to create an Error with given code and formatted message.
+func Errorf(code Code, format string, args ...any) *Error {
+	return &Error{
+		Code: code,
+		Err:  pkgerrors.Errorf(format, args...),
+	}
+}
+
+// Wrap is a helper function to wrap an Error with given code.
+func Wrap(err error, code Code) *Error {
+	return &Error{
+		Code: code,
+		Err:  err,
+	}
+}
+
+// FormatDBErrorEmptyRowWithQuery formats database error that query returns empty row.
+func FormatDBErrorEmptyRowWithQuery(query string) error {
+	return Errorf(DBExecutionError, "query %q returned empty row", query)
+}

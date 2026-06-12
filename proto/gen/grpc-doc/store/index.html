@@ -1,0 +1,1995 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <title>Protocol Documentation</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Ubuntu:400,700,400italic"/>
+    <style>
+      body {
+        width: 60em;
+        margin: 1em auto;
+        color: #222;
+        font-family: "Ubuntu", sans-serif;
+        padding-bottom: 4em;
+      }
+
+      h1 {
+        font-weight: normal;
+        border-bottom: 1px solid #aaa;
+        padding-bottom: 0.5ex;
+      }
+
+      h2 {
+        border-bottom: 1px solid #aaa;
+        padding-bottom: 0.5ex;
+        margin: 1.5em 0;
+      }
+
+      h3 {
+        font-weight: normal;
+        border-bottom: 1px solid #aaa;
+        padding-bottom: 0.5ex;
+      }
+
+      a {
+        text-decoration: none;
+        color: #567e25;
+      }
+
+      table {
+        width: 100%;
+        font-size: 80%;
+        border-collapse: collapse;
+      }
+
+      thead {
+        font-weight: 700;
+        background-color: #dcdcdc;
+      }
+
+      tbody tr:nth-child(even) {
+        background-color: #fbfbfb;
+      }
+
+      td {
+        border: 1px solid #ccc;
+        padding: 0.5ex 2ex;
+      }
+
+      td p {
+        text-indent: 1em;
+        margin: 0;
+      }
+
+      td p:nth-child(1) {
+        text-indent: 0;  
+      }
+
+       
+      .field-table td:nth-child(1) {  
+        width: 10em;
+      }
+      .field-table td:nth-child(2) {  
+        width: 10em;
+      }
+      .field-table td:nth-child(3) {  
+        width: 6em;
+      }
+      .field-table td:nth-child(4) {  
+        width: auto;
+      }
+
+       
+      .extension-table td:nth-child(1) {  
+        width: 10em;
+      }
+      .extension-table td:nth-child(2) {  
+        width: 10em;
+      }
+      .extension-table td:nth-child(3) {  
+        width: 10em;
+      }
+      .extension-table td:nth-child(4) {  
+        width: 5em;
+      }
+      .extension-table td:nth-child(5) {  
+        width: auto;
+      }
+
+       
+      .enum-table td:nth-child(1) {  
+        width: 10em;
+      }
+      .enum-table td:nth-child(2) {  
+        width: 10em;
+      }
+      .enum-table td:nth-child(3) {  
+        width: auto;
+      }
+
+       
+      .scalar-value-types-table tr {
+        height: 3em;
+      }
+
+       
+      #toc-container ul {
+        list-style-type: none;
+        padding-left: 1em;
+        line-height: 180%;
+        margin: 0;
+      }
+      #toc > li > a {
+        font-weight: bold;
+      }
+
+       
+      .file-heading {
+        width: 100%;
+        display: table;
+        border-bottom: 1px solid #aaa;
+        margin: 4em 0 1.5em 0;
+      }
+      .file-heading h2 {
+        border: none;
+        display: table-cell;
+      }
+      .file-heading a {
+        text-align: right;
+        display: table-cell;
+      }
+
+       
+      .badge {
+        width: 1.6em;
+        height: 1.6em;
+        display: inline-block;
+
+        line-height: 1.6em;
+        text-align: center;
+        font-weight: bold;
+        font-size: 60%;
+
+        color: #89ba48;
+        background-color: #dff0c8;
+
+        margin: 0.5ex 1em 0.5ex -1em;
+        border: 1px solid #fbfbfb;
+        border-radius: 1ex;
+      }
+    </style>
+
+    
+    <link rel="stylesheet" type="text/css" href="stylesheet.css"/>
+  </head>
+
+  <body>
+
+    <h1 id="title">Protocol Documentation</h1>
+
+    <h2>Table of Contents</h2>
+
+    <div id="toc-container">
+      <ul id="toc">
+        
+          
+          <li>
+            <a href="#store%2fcommon.proto">store/common.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.store.PageToken"><span class="badge">M</span>PageToken</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.Position"><span class="badge">M</span>Position</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.Range"><span class="badge">M</span>Range</a>
+                </li>
+              
+              
+              
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#store%2fgroup.proto">store/group.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.store.GroupMember"><span class="badge">M</span>GroupMember</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.GroupPayload"><span class="badge">M</span>GroupPayload</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#laelia.store.GroupMember.Role"><span class="badge">E</span>GroupMember.Role</a>
+                </li>
+              
+              
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#store%2fidp.proto">store/idp.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.store.FieldMapping"><span class="badge">M</span>FieldMapping</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.IdentityProviderConfig"><span class="badge">M</span>IdentityProviderConfig</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.IdentityProviderUserInfo"><span class="badge">M</span>IdentityProviderUserInfo</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.LDAPIdentityProviderConfig"><span class="badge">M</span>LDAPIdentityProviderConfig</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.OAuth2IdentityProviderConfig"><span class="badge">M</span>OAuth2IdentityProviderConfig</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.OIDCIdentityProviderConfig"><span class="badge">M</span>OIDCIdentityProviderConfig</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#laelia.store.IdentityProviderType"><span class="badge">E</span>IdentityProviderType</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.LDAPIdentityProviderConfig.SecurityProtocol"><span class="badge">E</span>LDAPIdentityProviderConfig.SecurityProtocol</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.OAuth2AuthStyle"><span class="badge">E</span>OAuth2AuthStyle</a>
+                </li>
+              
+              
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#store%2fpolicy.proto">store/policy.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.store.Binding"><span class="badge">M</span>Binding</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.EnvironmentTierPolicy"><span class="badge">M</span>EnvironmentTierPolicy</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.IamPolicy"><span class="badge">M</span>IamPolicy</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.Policy"><span class="badge">M</span>Policy</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.TagPolicy"><span class="badge">M</span>TagPolicy</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.TagPolicy.TagsEntry"><span class="badge">M</span>TagPolicy.TagsEntry</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#laelia.store.EnvironmentTierPolicy.EnvironmentTier"><span class="badge">E</span>EnvironmentTierPolicy.EnvironmentTier</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.Policy.Resource"><span class="badge">E</span>Policy.Resource</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.Policy.Type"><span class="badge">E</span>Policy.Type</a>
+                </li>
+              
+              
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#store%2frole.proto">store/role.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.store.RolePermissions"><span class="badge">M</span>RolePermissions</a>
+                </li>
+              
+              
+              
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#store%2fsetting.proto">store/setting.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.store.EnvironmentSetting"><span class="badge">M</span>EnvironmentSetting</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.EnvironmentSetting.Environment"><span class="badge">M</span>EnvironmentSetting.Environment</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.EnvironmentSetting.Environment.TagsEntry"><span class="badge">M</span>EnvironmentSetting.Environment.TagsEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.PasswordRestrictionSetting"><span class="badge">M</span>PasswordRestrictionSetting</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.WorkspaceProfileSetting"><span class="badge">M</span>WorkspaceProfileSetting</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#laelia.store.SettingName"><span class="badge">E</span>SettingName</a>
+                </li>
+              
+              
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#store%2fuser.proto">store/user.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.store.UserProfile"><span class="badge">M</span>UserProfile</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#laelia.store.PrincipalType"><span class="badge">E</span>PrincipalType</a>
+                </li>
+              
+              
+              
+            </ul>
+          </li>
+        
+        <li><a href="#scalar-value-types">Scalar Value Types</a></li>
+      </ul>
+    </div>
+
+    
+      
+      <div class="file-heading">
+        <h2 id="store/common.proto">store/common.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.store.PageToken">PageToken</h3>
+        <p>Used internally for obfuscating the page token.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>limit</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>offset</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.Position">Position</h3>
+        <p>Position in a text expressed as zero-based line and zero-based column byte</p><p>offset.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>line</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>Line position in a text (zero-based). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>column</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>Column position in a text (zero-based), equivalent to byte offset. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.Range">Range</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>start</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>end</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+    
+      
+      <div class="file-heading">
+        <h2 id="store/group.proto">store/group.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.store.GroupMember">GroupMember</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>member</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Member is the principal who belong to this group.
+
+Format: users/{userUID}. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>role</td>
+                  <td><a href="#laelia.store.GroupMember.Role">GroupMember.Role</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.GroupPayload">GroupPayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>members</td>
+                  <td><a href="#laelia.store.GroupMember">GroupMember</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>source</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>source means where the group comes from. For now we support Entra ID SCIM sync, so the source could be Entra ID. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="laelia.store.GroupMember.Role">GroupMember.Role</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>ROLE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>OWNER</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>MEMBER</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+    
+      
+      <div class="file-heading">
+        <h2 id="store/idp.proto">store/idp.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.store.FieldMapping">FieldMapping</h3>
+        <p>FieldMapping saves the field names from user info API of identity provider.</p><p>As we save all raw json string of user info response data into `principal.idp_user_info`,</p><p>we can extract the relevant data based with `FieldMapping`.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>identifier</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Identifier is the field name of the unique identifier in 3rd-party idp user info. Required. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>display_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>DisplayName is the field name of display name in 3rd-party idp user info. Optional. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>phone</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Phone is the field name of primary phone in 3rd-party idp user info. Optional. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>groups</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Groups is the field name of groups in 3rd-party idp user info. Optional.
+Mainly used for OIDC: https://developer.okta.com/docs/guides/customize-tokens-groups-claim/main/ </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.IdentityProviderConfig">IdentityProviderConfig</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>oauth2_config</td>
+                  <td><a href="#laelia.store.OAuth2IdentityProviderConfig">OAuth2IdentityProviderConfig</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>oidc_config</td>
+                  <td><a href="#laelia.store.OIDCIdentityProviderConfig">OIDCIdentityProviderConfig</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>ldap_config</td>
+                  <td><a href="#laelia.store.LDAPIdentityProviderConfig">LDAPIdentityProviderConfig</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.IdentityProviderUserInfo">IdentityProviderUserInfo</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>identifier</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Identifier is the value of the unique identifier in 3rd-party idp user info. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>display_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>DisplayName is the value of display name in 3rd-party idp user info. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>phone</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Phone is the value of primary phone in 3rd-party idp user info. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>groups</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>Groups is the value of groups in 3rd-party idp user info.
+Mainly used for OIDC: https://developer.okta.com/docs/guides/customize-tokens-groups-claim/main/ </p></td>
+                </tr>
+              
+                <tr>
+                  <td>has_groups</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.LDAPIdentityProviderConfig">LDAPIdentityProviderConfig</h3>
+        <p>LDAPIdentityProviderConfig is the structure for LDAP identity provider config.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>host</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Host is the hostname or IP address of the LDAP server, e.g.
+&#34;ldap.example.com&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>port</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>Port is the port number of the LDAP server, e.g. 389. When not set, the
+default port of the corresponding security protocol will be used, i.e. 389
+for StartTLS and 636 for LDAPS. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>skip_tls_verify</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>SkipTLSVerify controls whether to skip TLS certificate verification. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>bind_dn</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>BindDN is the DN of the user to bind as a service account to perform
+search requests. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>bind_password</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>BindPassword is the password of the user to bind as a service account. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>base_dn</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>BaseDN is the base DN to search for users, e.g. &#34;ou=users,dc=example,dc=com&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>user_filter</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>UserFilter is the filter to search for users, e.g. &#34;(uid=%s)&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>security_protocol</td>
+                  <td><a href="#laelia.store.LDAPIdentityProviderConfig.SecurityProtocol">LDAPIdentityProviderConfig.SecurityProtocol</a></td>
+                  <td></td>
+                  <td><p>SecurityProtocol is the security protocol to be used for establishing
+connections with the LDAP server. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>field_mapping</td>
+                  <td><a href="#laelia.store.FieldMapping">FieldMapping</a></td>
+                  <td></td>
+                  <td><p>FieldMapping is the mapping of the user attributes returned by the LDAP
+server. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.OAuth2IdentityProviderConfig">OAuth2IdentityProviderConfig</h3>
+        <p>OAuth2IdentityProviderConfig is the structure for OAuth2 identity provider config.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>auth_url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>token_url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>user_info_url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>client_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>client_secret</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>scopes</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>field_mapping</td>
+                  <td><a href="#laelia.store.FieldMapping">FieldMapping</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>skip_tls_verify</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>auth_style</td>
+                  <td><a href="#laelia.store.OAuth2AuthStyle">OAuth2AuthStyle</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.OIDCIdentityProviderConfig">OIDCIdentityProviderConfig</h3>
+        <p>OIDCIdentityProviderConfig is the structure for OIDC identity provider config.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>issuer</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>client_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>client_secret</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>field_mapping</td>
+                  <td><a href="#laelia.store.FieldMapping">FieldMapping</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>skip_tls_verify</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>auth_style</td>
+                  <td><a href="#laelia.store.OAuth2AuthStyle">OAuth2AuthStyle</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>scopes</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="laelia.store.IdentityProviderType">IdentityProviderType</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>IDENTITY_PROVIDER_TYPE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>OAUTH2</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>OIDC</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>LDAP</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+        <h3 id="laelia.store.LDAPIdentityProviderConfig.SecurityProtocol">LDAPIdentityProviderConfig.SecurityProtocol</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>SECURITY_PROTOCOL_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>START_TLS</td>
+                <td>1</td>
+                <td><p>StartTLS is the security protocol that starts with an unencrypted connection and then upgrades to TLS.</p></td>
+              </tr>
+            
+              <tr>
+                <td>LDAPS</td>
+                <td>2</td>
+                <td><p>LDAPS is the security protocol that uses TLS from the beginning.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+        <h3 id="laelia.store.OAuth2AuthStyle">OAuth2AuthStyle</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>OAUTH2_AUTH_STYLE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>IN_PARAMS</td>
+                <td>1</td>
+                <td><p>IN_PARAMS sends the &#34;client_id&#34; and &#34;client_secret&#34; in the POST body
+as application/x-www-form-urlencoded parameters.</p></td>
+              </tr>
+            
+              <tr>
+                <td>IN_HEADER</td>
+                <td>2</td>
+                <td><p>IN_HEADER sends the client_id and client_password using HTTP Basic Authorization.
+This is an optional style described in the OAuth2 RFC 6749 section 2.3.1.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+    
+      
+      <div class="file-heading">
+        <h2 id="store/policy.proto">store/policy.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.store.Binding">Binding</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>role</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The role that is assigned to the members.
+Format: roles/{role} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>members</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>Specifies the principals requesting access for a resource.
+For users, the member should be: users/{userUID}
+For groups, the member should be: groups/{email} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>condition</td>
+                  <td><a href="#google.type.Expr">google.type.Expr</a></td>
+                  <td></td>
+                  <td><p>The condition that is associated with this binding.
+If the condition evaluates to true, then this binding applies to the current request.
+If the condition evaluates to false, then this binding does not apply to the current request. However, a different role binding might grant the same role to one or more of the principals in this binding. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.EnvironmentTierPolicy">EnvironmentTierPolicy</h3>
+        <p>EnvironmentTierPolicy is the tier of an environment.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>environment_tier</td>
+                  <td><a href="#laelia.store.EnvironmentTierPolicy.EnvironmentTier">EnvironmentTierPolicy.EnvironmentTier</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>color</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.IamPolicy">IamPolicy</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>bindings</td>
+                  <td><a href="#laelia.store.Binding">Binding</a></td>
+                  <td>repeated</td>
+                  <td><p>Collection of binding.
+A binding binds one or more members or groups to a single role. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.Policy">Policy</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.store.TagPolicy">TagPolicy</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>tags</td>
+                  <td><a href="#laelia.store.TagPolicy.TagsEntry">TagPolicy.TagsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p>tags is the key - value map for resources.
+for example, the environment resource can have the sql review config tag, like &#34;ll.tag.review_config&#34;: &#34;reviewConfigs/{review config resource id}&#34; </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.TagPolicy.TagsEntry">TagPolicy.TagsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="laelia.store.EnvironmentTierPolicy.EnvironmentTier">EnvironmentTierPolicy.EnvironmentTier</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>ENVIRONMENT_TIER_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PROTECTED</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>UNPROTECTED</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+        <h3 id="laelia.store.Policy.Resource">Policy.Resource</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>RESOURCE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>WORKSPACE</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ENVIRONMENT</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PROJECT</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+        <h3 id="laelia.store.Policy.Type">Policy.Type</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>TYPE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>IAM</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>TAG</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+    
+      
+      <div class="file-heading">
+        <h2 id="store/role.proto">store/role.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.store.RolePermissions">RolePermissions</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>permissions</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+    
+      
+      <div class="file-heading">
+        <h2 id="store/setting.proto">store/setting.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.store.EnvironmentSetting">EnvironmentSetting</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>environments</td>
+                  <td><a href="#laelia.store.EnvironmentSetting.Environment">EnvironmentSetting.Environment</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.EnvironmentSetting.Environment">EnvironmentSetting.Environment</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The resource id of the environment.
+This value should be 4-63 characters, and valid characters
+are /[a-z][0-9]-/. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The display name of the environment. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>tags</td>
+                  <td><a href="#laelia.store.EnvironmentSetting.Environment.TagsEntry">EnvironmentSetting.Environment.TagsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>color</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.EnvironmentSetting.Environment.TagsEntry">EnvironmentSetting.Environment.TagsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.PasswordRestrictionSetting">PasswordRestrictionSetting</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>min_length</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>min_length is the minimum length for password, should no less than 8. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>require_number</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>require_number requires the password must contains at least one number. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>require_letter</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>require_letter requires the password must contains at least one letter, regardless of upper case or lower case </p></td>
+                </tr>
+              
+                <tr>
+                  <td>require_uppercase_letter</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>require_uppercase_letter requires the password must contains at least one upper case letter. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>require_special_character</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>require_uppercase_letter requires the password must contains at least one special character. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>require_reset_password_for_first_login</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>require_reset_password_for_first_login requires users to reset their password after the 1st login. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>password_rotation</td>
+                  <td><a href="#google.protobuf.Duration">google.protobuf.Duration</a></td>
+                  <td></td>
+                  <td><p>password_rotation requires users to reset their password after the duration. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.WorkspaceProfileSetting">WorkspaceProfileSetting</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>external_url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The external URL is used for sso authentication callback. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>disallow_signup</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Disallow self-service signup, users can only be invited by the owner. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>require_2fa</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Require 2FA for all users. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>token_duration</td>
+                  <td><a href="#google.protobuf.Duration">google.protobuf.Duration</a></td>
+                  <td></td>
+                  <td><p>The duration for token. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>maximum_role_expiration</td>
+                  <td><a href="#google.protobuf.Duration">google.protobuf.Duration</a></td>
+                  <td></td>
+                  <td><p>The max duration for role expired. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>domains</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>The workspace domain, e.g. example.com. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>enforce_identity_domain</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Only user and group from the domains can be created and login. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>disallow_password_signin</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Whether to disallow password signin. (Except workspace admins) </p></td>
+                </tr>
+              
+                <tr>
+                  <td>enable_metric_collection</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Whether to enable metric collection for the workspace. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="laelia.store.SettingName">SettingName</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>SETTING_NAME_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>AUTH_SECRET</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>BRANDING_LOGO</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>WORKSPACE_ID</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>WORKSPACE_PROFILE</td>
+                <td>4</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>WORKSPACE_APPROVAL</td>
+                <td>5</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>WORKSPACE_EXTERNAL_APPROVAL</td>
+                <td>6</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PASSWORD_RESTRICTION</td>
+                <td>7</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ENVIRONMENT</td>
+                <td>8</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+    
+      
+      <div class="file-heading">
+        <h2 id="store/user.proto">store/user.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.store.UserProfile">UserProfile</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>last_login_time</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_change_password_time</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>source</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>source means where the user comes from. For now we support Entra ID SCIM sync, so the source could be Entra ID. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="laelia.store.PrincipalType">PrincipalType</h3>
+        <p>PrincipalType is the type of a principal.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>PRINCIPAL_TYPE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>END_USER</td>
+                <td>1</td>
+                <td><p>END_USER represents the human being.</p></td>
+              </tr>
+            
+              <tr>
+                <td>SERVICE_ACCOUNT</td>
+                <td>2</td>
+                <td><p>SERVICE_ACCOUNT represents the external service calling OpenAPI.</p></td>
+              </tr>
+            
+              <tr>
+                <td>SYSTEM_BOT</td>
+                <td>3</td>
+                <td><p>SYSTEM_BOT represents the internal system bot performing operations.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+    
+
+    <h2 id="scalar-value-types">Scalar Value Types</h2>
+    <table class="scalar-value-types-table">
+      <thead>
+        <tr><td>.proto Type</td><td>Notes</td><td>C++</td><td>Java</td><td>Python</td><td>Go</td><td>C#</td><td>PHP</td><td>Ruby</td></tr>
+      </thead>
+      <tbody>
+        
+          <tr id="double">
+            <td>double</td>
+            <td></td>
+            <td>double</td>
+            <td>double</td>
+            <td>float</td>
+            <td>float64</td>
+            <td>double</td>
+            <td>float</td>
+            <td>Float</td>
+          </tr>
+        
+          <tr id="float">
+            <td>float</td>
+            <td></td>
+            <td>float</td>
+            <td>float</td>
+            <td>float</td>
+            <td>float32</td>
+            <td>float</td>
+            <td>float</td>
+            <td>Float</td>
+          </tr>
+        
+          <tr id="int32">
+            <td>int32</td>
+            <td>Uses variable-length encoding. Inefficient for encoding negative numbers – if your field is likely to have negative values, use sint32 instead.</td>
+            <td>int32</td>
+            <td>int</td>
+            <td>int</td>
+            <td>int32</td>
+            <td>int</td>
+            <td>integer</td>
+            <td>Bignum or Fixnum (as required)</td>
+          </tr>
+        
+          <tr id="int64">
+            <td>int64</td>
+            <td>Uses variable-length encoding. Inefficient for encoding negative numbers – if your field is likely to have negative values, use sint64 instead.</td>
+            <td>int64</td>
+            <td>long</td>
+            <td>int/long</td>
+            <td>int64</td>
+            <td>long</td>
+            <td>integer/string</td>
+            <td>Bignum</td>
+          </tr>
+        
+          <tr id="uint32">
+            <td>uint32</td>
+            <td>Uses variable-length encoding.</td>
+            <td>uint32</td>
+            <td>int</td>
+            <td>int/long</td>
+            <td>uint32</td>
+            <td>uint</td>
+            <td>integer</td>
+            <td>Bignum or Fixnum (as required)</td>
+          </tr>
+        
+          <tr id="uint64">
+            <td>uint64</td>
+            <td>Uses variable-length encoding.</td>
+            <td>uint64</td>
+            <td>long</td>
+            <td>int/long</td>
+            <td>uint64</td>
+            <td>ulong</td>
+            <td>integer/string</td>
+            <td>Bignum or Fixnum (as required)</td>
+          </tr>
+        
+          <tr id="sint32">
+            <td>sint32</td>
+            <td>Uses variable-length encoding. Signed int value. These more efficiently encode negative numbers than regular int32s.</td>
+            <td>int32</td>
+            <td>int</td>
+            <td>int</td>
+            <td>int32</td>
+            <td>int</td>
+            <td>integer</td>
+            <td>Bignum or Fixnum (as required)</td>
+          </tr>
+        
+          <tr id="sint64">
+            <td>sint64</td>
+            <td>Uses variable-length encoding. Signed int value. These more efficiently encode negative numbers than regular int64s.</td>
+            <td>int64</td>
+            <td>long</td>
+            <td>int/long</td>
+            <td>int64</td>
+            <td>long</td>
+            <td>integer/string</td>
+            <td>Bignum</td>
+          </tr>
+        
+          <tr id="fixed32">
+            <td>fixed32</td>
+            <td>Always four bytes. More efficient than uint32 if values are often greater than 2^28.</td>
+            <td>uint32</td>
+            <td>int</td>
+            <td>int</td>
+            <td>uint32</td>
+            <td>uint</td>
+            <td>integer</td>
+            <td>Bignum or Fixnum (as required)</td>
+          </tr>
+        
+          <tr id="fixed64">
+            <td>fixed64</td>
+            <td>Always eight bytes. More efficient than uint64 if values are often greater than 2^56.</td>
+            <td>uint64</td>
+            <td>long</td>
+            <td>int/long</td>
+            <td>uint64</td>
+            <td>ulong</td>
+            <td>integer/string</td>
+            <td>Bignum</td>
+          </tr>
+        
+          <tr id="sfixed32">
+            <td>sfixed32</td>
+            <td>Always four bytes.</td>
+            <td>int32</td>
+            <td>int</td>
+            <td>int</td>
+            <td>int32</td>
+            <td>int</td>
+            <td>integer</td>
+            <td>Bignum or Fixnum (as required)</td>
+          </tr>
+        
+          <tr id="sfixed64">
+            <td>sfixed64</td>
+            <td>Always eight bytes.</td>
+            <td>int64</td>
+            <td>long</td>
+            <td>int/long</td>
+            <td>int64</td>
+            <td>long</td>
+            <td>integer/string</td>
+            <td>Bignum</td>
+          </tr>
+        
+          <tr id="bool">
+            <td>bool</td>
+            <td></td>
+            <td>bool</td>
+            <td>boolean</td>
+            <td>boolean</td>
+            <td>bool</td>
+            <td>bool</td>
+            <td>boolean</td>
+            <td>TrueClass/FalseClass</td>
+          </tr>
+        
+          <tr id="string">
+            <td>string</td>
+            <td>A string must always contain UTF-8 encoded or 7-bit ASCII text.</td>
+            <td>string</td>
+            <td>String</td>
+            <td>str/unicode</td>
+            <td>string</td>
+            <td>string</td>
+            <td>string</td>
+            <td>String (UTF-8)</td>
+          </tr>
+        
+          <tr id="bytes">
+            <td>bytes</td>
+            <td>May contain any arbitrary sequence of bytes.</td>
+            <td>string</td>
+            <td>ByteString</td>
+            <td>str</td>
+            <td>[]byte</td>
+            <td>ByteString</td>
+            <td>string</td>
+            <td>String (ASCII-8BIT)</td>
+          </tr>
+        
+      </tbody>
+    </table>
+  </body>
+</html>
+

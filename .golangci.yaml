@@ -1,0 +1,136 @@
+version: "2"
+linters:
+  enable:
+    - bodyclose
+    - exhaustive
+    - forbidigo
+    - gocritic
+    - mirror
+    - misspell
+    - nilerr
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - tparallel
+    - unparam
+    - unused
+  settings:
+    exhaustive:
+      explicit-exhaustive-switch: true
+    forbidigo:
+      forbid:
+        - pattern: fmt\.Errorf
+          msg: Please use errors\.Wrap\|Wrapf\|Errorf instead
+        - pattern: ioutil\.ReadDir
+          msg: Please use os\.ReadDir instead
+        - pattern: protojson\.Unmarshal?
+          msg: Please use ProtojsonUnmarshaler instead
+        # Prohibit old sort functions in favor of new slices package (Go 1.21+)
+        - pattern: sort\.Slice
+          msg: Please use slices\.SortFunc instead
+        - pattern: sort\.SliceStable
+          msg: Please use slices\.SortStableFunc instead
+        - pattern: sort\.SliceIsSorted
+          msg: Please use slices\.IsSortedFunc instead
+        - pattern: sort\.Strings
+          msg: Please use slices\.Sort instead
+        - pattern: sort\.Ints
+          msg: Please use slices\.Sort instead
+    gocritic:
+      disabled-checks:
+        - ifElseChain
+    govet:
+      disable:
+        - fieldalignment
+        - shadow
+      enable-all: true
+      settings:
+        printf:
+          funcs:
+            - common.Errorf
+    revive:
+      enable-all-rules: true
+      rules:
+        - name: file-header
+          disabled: true
+        - name: line-length-limit
+          disabled: true
+        - name: function-length
+          disabled: true
+        - name: max-public-structs
+          disabled: true
+        - name: function-result-limit
+          disabled: true
+        - name: banned-characters
+          disabled: true
+        - name: argument-limit
+          disabled: true
+        - name: cognitive-complexity
+          disabled: true
+        - name: cyclomatic
+          disabled: true
+        - name: confusing-results
+          disabled: true
+        - name: add-constant
+          disabled: true
+        - name: flag-parameter
+          disabled: true
+        - name: nested-structs
+          disabled: true
+        - name: import-shadowing
+          disabled: true
+        - name: early-return
+          disabled: true
+        - name: max-control-nesting
+          disabled: true
+        - name: identical-switch-branches
+          disabled: true
+        - name: identical-ifelseif-branches
+          disabled: true
+        - name: comment-spacings
+          arguments:
+            - exhaustive
+    staticcheck:
+      checks:
+        - -SA1019
+        - all
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - std-error-handling
+    rules:
+      - path: (.+)\.go$
+        text: Rollback
+      - path: (.+)\.go$
+        text: logger.Sync
+      - path: (.+)\.go$
+        text: pgInstance.Stop
+      - path: (.+)\.go$
+        text: fmt.Printf
+      - path: (.+)\.go$
+        text: Enter(.*)_(.*)
+      - path: (.+)\.go$
+        text: Exit(.*)_(.*)
+    paths:
+      - proto/generated-go
+      - frontend
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/Ranxy/laelia
+  exclusions:
+    generated: lax
+    paths:
+      - proto/generated-go
+      - frontend
+      - third_party$
+      - builtin$
+      - examples$

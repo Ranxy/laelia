@@ -1,0 +1,247 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "v1/annotation.proto";
+import "v1/common.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+service UserService {
+  // Get the user.
+  // Any authenticated user can get the user.
+  rpc GetUser(GetUserRequest) returns (User) {
+    option (google.api.http) = {get: "/v1/{name=users/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Get the users in batch.
+  // Any authenticated user can batch get users.
+  rpc BatchGetUsers(BatchGetUsersRequest) returns (BatchGetUsersResponse) {
+    option (google.api.http) = {get: "/v1/users:batchGet"};
+  }
+
+  // Get the current authenticated user.
+  // Permissions required: None
+  rpc GetCurrentUser(google.protobuf.Empty) returns (User) {
+    option (google.api.http) = {get: "/v1/users/me"};
+    option (laelia.v1.allow_without_credential) = true;
+    option (laelia.v1.auth_method) = CUSTOM;
+  }
+
+  // List all users.
+  // Any authenticated user can list users.
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
+    option (google.api.http) = {get: "/v1/users"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Create a user.
+  rpc CreateUser(CreateUserRequest) returns (User) {
+    option (google.api.http) = {
+      post: "/v1/users"
+      body: "user"
+    };
+    option (google.api.method_signature) = "user";
+    option (laelia.v1.allow_without_credential) = true;
+    option (laelia.v1.auth_method) = CUSTOM;
+    option (laelia.v1.audit) = true;
+  }
+
+  // Only the user itself and the user with permission on the workspace can update the user.
+  rpc UpdateUser(UpdateUserRequest) returns (User) {
+    option (google.api.http) = {
+      patch: "/v1/{user.name=users/*}"
+      body: "user"
+    };
+    option (google.api.method_signature) = "user,update_mask";
+    option (laelia.v1.audit) = true;
+  }
+
+  // Only the user with permission on the workspace can delete the user.
+  // The last remaining workspace admin cannot be deleted.
+  rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/{name=users/*}"};
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.audit) = true;
+  }
+
+  // Only the user with permission on the workspace can undelete the user.
+  rpc UndeleteUser(UndeleteUserRequest) returns (User) {
+    option (google.api.http) = {
+      post: "/v1/{name=users/*}:undelete"
+      body: "*"
+    };
+    option (laelia.v1.audit) = true;
+  }
+}
+
+message GetUserRequest {
+  // The name of the user to retrieve.
+  // Format: users/{user uid or user email}
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/User"}
+  ];
+}
+
+message BatchGetUsersRequest {
+  // The user names to retrieve.
+  // Format: users/{user uid or user email}
+  repeated string names = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/User"}
+  ];
+}
+
+message BatchGetUsersResponse {
+  // The users from the specified request.
+  repeated User users = 1;
+}
+
+message ListUsersRequest {
+  // The maximum number of users to return. The service may return fewer than
+  // this value.
+  // If unspecified, at most 10 users will be returned.
+  // The maximum value is 1000; values above 1000 will be coerced to 1000.
+  int32 page_size = 1;
+
+  // A page token, received from a previous `ListUsers` call.
+  // Provide this to retrieve the subsequent page.
+  //
+  // When paginating, all other parameters provided to `ListUsers` must match
+  // the call that provided the page token.
+  string page_token = 2;
+
+  // Show deleted users if specified.
+  bool show_deleted = 3;
+
+  // Filter is used to filter users returned in the list.
+  // The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+  //
+  // Supported filter:
+  // - name: the user name, support "==" and ".matches()" operator.
+  // - email: the user email, support "==" and ".matches()" operator.
+  // - user_type: the type, check UserType enum for values, support "==", "in [xx]", "!(in [xx])" operator.
+  // - state: check State enum for values, support "==" operator.
+  // - project: the project full name in "projects/{id}" format, support "==" operator.
+  //
+  // For example:
+  // name == "ed"
+  // name.matches("ed")
+  // email == "ed@example.com"
+  // email.matches("ed")
+  // user_type == "SERVICE_ACCOUNT"
+  // user_type in ["SERVICE_ACCOUNT", "USER"]
+  // !(user_type in ["SERVICE_ACCOUNT", "USER"])
+  // state == "DELETED"
+  // project == "projects/sample-project"
+  // You can combine filter conditions like:
+  // name.matches("ed") && project == "projects/sample-project"
+  // (name == "ed" || email == "ed@example.com") && project == "projects/sample-project"
+  string filter = 4;
+}
+
+message ListUsersResponse {
+  // The users from the specified request.
+  repeated User users = 1;
+
+  // A token, which can be sent as `page_token` to retrieve the next page.
+  // If this field is omitted, there are no subsequent pages.
+  string next_page_token = 2;
+}
+
+message CreateUserRequest {
+  // The user to create.
+  User user = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateUserRequest {
+  // The user to update.
+  //
+  // The user's `name` field is used to identify the user to update.
+  // Format: users/{user}
+  User user = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The list of fields to update.
+  google.protobuf.FieldMask update_mask = 2;
+
+  // If set to true, and the user is not found, a new user will be created.
+  // In this situation, `update_mask` is ignored.
+  bool allow_missing = 6;
+}
+
+message DeleteUserRequest {
+  // The name of the user to delete.
+  // Format: users/{user}
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/User"}
+  ];
+}
+
+message UndeleteUserRequest {
+  // The name of the deleted user.
+  // Format: users/{user}
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/User"}
+  ];
+}
+
+message User {
+  option (google.api.resource) = {
+    type: "laelia/User"
+    pattern: "users/{user}"
+  };
+
+  // The name of the user.
+  // Format: users/{user}. {user} is a system-generated unique ID.
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  State state = 2;
+
+  string email = 3;
+
+  string title = 4;
+
+  UserType user_type = 5;
+
+  string password = 7 [(google.api.field_behavior) = INPUT_ONLY];
+
+  string service_key = 8 [(google.api.field_behavior) = INPUT_ONLY];
+
+  // The recovery_codes is the temporary recovery codes using in two phase verification.
+  repeated string recovery_codes = 11;
+
+  // Should be a valid E.164 compliant phone number.
+  // Could be empty.
+  string phone = 12;
+
+  UserProfile profile = 13;
+
+  // The groups for the user.
+  // Format: groups/{email}
+  repeated string groups = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+enum UserType {
+  USER_TYPE_UNSPECIFIED = 0;
+  USER = 1;
+  SERVICE_ACCOUNT = 2;
+  SYSTEM_BOT = 3;
+}
+
+message UserProfile {
+  google.protobuf.Timestamp last_login_time = 1;
+  google.protobuf.Timestamp last_change_password_time = 2;
+  // source means where the user comes from. For now we support Entra ID SCIM sync, so the source could be Entra ID.
+  string source = 3;
+}

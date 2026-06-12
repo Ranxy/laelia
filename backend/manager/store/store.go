@@ -1,0 +1,84 @@
+package store
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+
+	models "github.com/Ranxy/laelia/backend/generated-go/store"
+	lru "github.com/hashicorp/golang-lru/v2"
+)
+
+type Store struct {
+	dbConnManager *DBConnectionManager
+	enableCache   bool
+
+	userIDCache    *lru.Cache[int, *UserMessage]
+	userEmailCache *lru.Cache[string, *UserMessage]
+	settingCache   *lru.Cache[models.SettingName, *SettingMessage]
+	policyCache    *lru.Cache[string, *PolicyMessage]
+	idpCache       *lru.Cache[string, *IdentityProviderMessage]
+	groupCache     *lru.Cache[string, *GroupMessage]
+}
+
+func New(ctx context.Context, pgURL string, enableCache bool) (*Store, error) {
+	userIDCache, err := lru.New[int, *UserMessage](32768)
+	if err != nil {
+		return nil, err
+	}
+	userEmailCache, err := lru.New[string, *UserMessage](32768)
+	if err != nil {
+		return nil, err
+	}
+
+	dbConnManager := NewDBConnectionManager(pgURL)
+	if err := dbConnManager.Initialize(ctx); err != nil {
+		return nil, err
+	}
+	settingCache, err := lru.New[models.SettingName, *SettingMessage](32768)
+	if err != nil {
+		return nil, err
+	}
+	policyCache, err := lru.New[string, *PolicyMessage](32768)
+	if err != nil {
+		return nil, err
+	}
+	idpCache, err := lru.New[string, *IdentityProviderMessage](32768)
+	if err != nil {
+		return nil, err
+	}
+	groupCache, err := lru.New[string, *GroupMessage](32768)
+	if err != nil {
+		return nil, err
+	}
+	s := &Store{
+		dbConnManager:  dbConnManager,
+		enableCache:    enableCache,
+		userIDCache:    userIDCache,
+		userEmailCache: userEmailCache,
+		settingCache:   settingCache,
+		policyCache:    policyCache,
+		idpCache:       idpCache,
+		groupCache:     groupCache,
+	}
+
+	return s, nil
+}
+
+func (s *Store) Close() error {
+	return s.dbConnManager.Close()
+}
+
+func (s *Store) GetDB() *sql.DB {
+	return s.dbConnManager.GetDB()
+}
+
+// DeleteCache deletes the cache.
+func (s *Store) DeleteCache() {
+	s.userEmailCache.Purge()
+	s.userIDCache.Purge()
+}
+
+func getPolicyCacheKey(resourceType models.Policy_Resource, resource string, policyType models.Policy_Type) string {
+	return fmt.Sprintf("policies/%s/%s/%s", resourceType, resource, policyType)
+}

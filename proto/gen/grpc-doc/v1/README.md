@@ -1,0 +1,584 @@
+# Protocol Documentation
+<a name="top"></a>
+
+## Table of Contents
+
+- [v1/annotation.proto](#v1_annotation-proto)
+    - [AuthMethod](#laelia-v1-AuthMethod)
+  
+    - [File-level Extensions](#v1_annotation-proto-extensions)
+    - [File-level Extensions](#v1_annotation-proto-extensions)
+    - [File-level Extensions](#v1_annotation-proto-extensions)
+    - [File-level Extensions](#v1_annotation-proto-extensions)
+  
+- [v1/agent.proto](#v1_agent-proto)
+    - [HelloRequest](#laelia-v1-HelloRequest)
+    - [HelloResponse](#laelia-v1-HelloResponse)
+  
+    - [AgentService](#laelia-v1-AgentService)
+  
+- [v1/common.proto](#v1_common-proto)
+    - [Position](#laelia-v1-Position)
+    - [Range](#laelia-v1-Range)
+  
+    - [RiskLevel](#laelia-v1-RiskLevel)
+    - [State](#laelia-v1-State)
+  
+- [v1/user_service.proto](#v1_user_service-proto)
+    - [BatchGetUsersRequest](#laelia-v1-BatchGetUsersRequest)
+    - [BatchGetUsersResponse](#laelia-v1-BatchGetUsersResponse)
+    - [CreateUserRequest](#laelia-v1-CreateUserRequest)
+    - [DeleteUserRequest](#laelia-v1-DeleteUserRequest)
+    - [GetUserRequest](#laelia-v1-GetUserRequest)
+    - [ListUsersRequest](#laelia-v1-ListUsersRequest)
+    - [ListUsersResponse](#laelia-v1-ListUsersResponse)
+    - [UndeleteUserRequest](#laelia-v1-UndeleteUserRequest)
+    - [UpdateUserRequest](#laelia-v1-UpdateUserRequest)
+    - [User](#laelia-v1-User)
+    - [UserProfile](#laelia-v1-UserProfile)
+  
+    - [UserType](#laelia-v1-UserType)
+  
+    - [UserService](#laelia-v1-UserService)
+  
+- [v1/auth_service.proto](#v1_auth_service-proto)
+    - [IdentityProviderContext](#laelia-v1-IdentityProviderContext)
+    - [LoginRequest](#laelia-v1-LoginRequest)
+    - [LoginResponse](#laelia-v1-LoginResponse)
+    - [LogoutRequest](#laelia-v1-LogoutRequest)
+    - [OAuth2IdentityProviderContext](#laelia-v1-OAuth2IdentityProviderContext)
+  
+    - [AuthService](#laelia-v1-AuthService)
+  
+- [Scalar Value Types](#scalar-value-types)
+
+
+
+<a name="v1_annotation-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/annotation.proto
+
+
+ 
+
+
+<a name="laelia-v1-AuthMethod"></a>
+
+### AuthMethod
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| AUTH_METHOD_UNSPECIFIED | 0 |  |
+| IAM | 1 | IAM uses the standard IAM authorization check on the organizational resources. |
+| CUSTOM | 2 | Custom authorization method. |
+
+
+ 
+
+
+<a name="v1_annotation-proto-extensions"></a>
+
+### File-level Extensions
+| Extension | Type | Base | Number | Description |
+| --------- | ---- | ---- | ------ | ----------- |
+| allow_without_credential | bool | .google.protobuf.MethodOptions | 100000 |  |
+| audit | bool | .google.protobuf.MethodOptions | 100003 |  |
+| auth_method | AuthMethod | .google.protobuf.MethodOptions | 100002 |  |
+| permission | string | .google.protobuf.MethodOptions | 100001 |  |
+
+ 
+
+ 
+
+
+
+<a name="v1_agent-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/agent.proto
+
+
+
+<a name="laelia-v1-HelloRequest"></a>
+
+### HelloRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-HelloResponse"></a>
+
+### HelloResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| current_time | [int64](#int64) |  |  |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="laelia-v1-AgentService"></a>
+
+### AgentService
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| Hello | [HelloRequest](#laelia-v1-HelloRequest) | [HelloResponse](#laelia-v1-HelloResponse) | Permissions required: None |
+
+ 
+
+
+
+<a name="v1_common-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/common.proto
+
+
+
+<a name="laelia-v1-Position"></a>
+
+### Position
+Position in a text expressed as zero-based line and zero-based column byte
+offset.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| line | [int32](#int32) |  | Line position in a text (zero-based). |
+| column | [int32](#int32) |  | Column position in a text (zero-based), equivalent to byte offset. |
+
+
+
+
+
+
+<a name="laelia-v1-Range"></a>
+
+### Range
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| start | [int32](#int32) |  |  |
+| end | [int32](#int32) |  |  |
+
+
+
+
+
+ 
+
+
+<a name="laelia-v1-RiskLevel"></a>
+
+### RiskLevel
+RiskLevel is the risk level.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| RISK_LEVEL_UNSPECIFIED | 0 |  |
+| LOW | 1 |  |
+| MODERATE | 2 |  |
+| HIGH | 3 |  |
+
+
+
+<a name="laelia-v1-State"></a>
+
+### State
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| STATE_UNSPECIFIED | 0 |  |
+| ACTIVE | 1 |  |
+| DELETED | 2 |  |
+
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="v1_user_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/user_service.proto
+
+
+
+<a name="laelia-v1-BatchGetUsersRequest"></a>
+
+### BatchGetUsersRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| names | [string](#string) | repeated | The user names to retrieve. Format: users/{user uid or user email} |
+
+
+
+
+
+
+<a name="laelia-v1-BatchGetUsersResponse"></a>
+
+### BatchGetUsersResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| users | [User](#laelia-v1-User) | repeated | The users from the specified request. |
+
+
+
+
+
+
+<a name="laelia-v1-CreateUserRequest"></a>
+
+### CreateUserRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| user | [User](#laelia-v1-User) |  | The user to create. |
+
+
+
+
+
+
+<a name="laelia-v1-DeleteUserRequest"></a>
+
+### DeleteUserRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the user to delete. Format: users/{user} |
+
+
+
+
+
+
+<a name="laelia-v1-GetUserRequest"></a>
+
+### GetUserRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the user to retrieve. Format: users/{user uid or user email} |
+
+
+
+
+
+
+<a name="laelia-v1-ListUsersRequest"></a>
+
+### ListUsersRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| page_size | [int32](#int32) |  | The maximum number of users to return. The service may return fewer than this value. If unspecified, at most 10 users will be returned. The maximum value is 1000; values above 1000 will be coerced to 1000. |
+| page_token | [string](#string) |  | A page token, received from a previous `ListUsers` call. Provide this to retrieve the subsequent page.
+
+When paginating, all other parameters provided to `ListUsers` must match the call that provided the page token. |
+| show_deleted | [bool](#bool) |  | Show deleted users if specified. |
+| filter | [string](#string) |  | Filter is used to filter users returned in the list. The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+
+Supported filter: - name: the user name, support &#34;==&#34; and &#34;.matches()&#34; operator. - email: the user email, support &#34;==&#34; and &#34;.matches()&#34; operator. - user_type: the type, check UserType enum for values, support &#34;==&#34;, &#34;in [xx]&#34;, &#34;!(in [xx])&#34; operator. - state: check State enum for values, support &#34;==&#34; operator. - project: the project full name in &#34;projects/{id}&#34; format, support &#34;==&#34; operator.
+
+For example: name == &#34;ed&#34; name.matches(&#34;ed&#34;) email == &#34;ed@example.com&#34; email.matches(&#34;ed&#34;) user_type == &#34;SERVICE_ACCOUNT&#34; user_type in [&#34;SERVICE_ACCOUNT&#34;, &#34;USER&#34;] !(user_type in [&#34;SERVICE_ACCOUNT&#34;, &#34;USER&#34;]) state == &#34;DELETED&#34; project == &#34;projects/sample-project&#34; You can combine filter conditions like: name.matches(&#34;ed&#34;) &amp;&amp; project == &#34;projects/sample-project&#34; (name == &#34;ed&#34; || email == &#34;ed@example.com&#34;) &amp;&amp; project == &#34;projects/sample-project&#34; |
+
+
+
+
+
+
+<a name="laelia-v1-ListUsersResponse"></a>
+
+### ListUsersResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| users | [User](#laelia-v1-User) | repeated | The users from the specified request. |
+| next_page_token | [string](#string) |  | A token, which can be sent as `page_token` to retrieve the next page. If this field is omitted, there are no subsequent pages. |
+
+
+
+
+
+
+<a name="laelia-v1-UndeleteUserRequest"></a>
+
+### UndeleteUserRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the deleted user. Format: users/{user} |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateUserRequest"></a>
+
+### UpdateUserRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| user | [User](#laelia-v1-User) |  | The user to update.
+
+The user&#39;s `name` field is used to identify the user to update. Format: users/{user} |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | The list of fields to update. |
+| allow_missing | [bool](#bool) |  | If set to true, and the user is not found, a new user will be created. In this situation, `update_mask` is ignored. |
+
+
+
+
+
+
+<a name="laelia-v1-User"></a>
+
+### User
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the user. Format: users/{user}. {user} is a system-generated unique ID. |
+| state | [State](#laelia-v1-State) |  |  |
+| email | [string](#string) |  |  |
+| title | [string](#string) |  |  |
+| user_type | [UserType](#laelia-v1-UserType) |  |  |
+| password | [string](#string) |  |  |
+| service_key | [string](#string) |  |  |
+| recovery_codes | [string](#string) | repeated | The recovery_codes is the temporary recovery codes using in two phase verification. |
+| phone | [string](#string) |  | Should be a valid E.164 compliant phone number. Could be empty. |
+| profile | [UserProfile](#laelia-v1-UserProfile) |  |  |
+| groups | [string](#string) | repeated | The groups for the user. Format: groups/{email} |
+
+
+
+
+
+
+<a name="laelia-v1-UserProfile"></a>
+
+### UserProfile
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| last_login_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| last_change_password_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| source | [string](#string) |  | source means where the user comes from. For now we support Entra ID SCIM sync, so the source could be Entra ID. |
+
+
+
+
+
+ 
+
+
+<a name="laelia-v1-UserType"></a>
+
+### UserType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| USER_TYPE_UNSPECIFIED | 0 |  |
+| USER | 1 |  |
+| SERVICE_ACCOUNT | 2 |  |
+| SYSTEM_BOT | 3 |  |
+
+
+ 
+
+ 
+
+
+<a name="laelia-v1-UserService"></a>
+
+### UserService
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetUser | [GetUserRequest](#laelia-v1-GetUserRequest) | [User](#laelia-v1-User) | Get the user. Any authenticated user can get the user. |
+| BatchGetUsers | [BatchGetUsersRequest](#laelia-v1-BatchGetUsersRequest) | [BatchGetUsersResponse](#laelia-v1-BatchGetUsersResponse) | Get the users in batch. Any authenticated user can batch get users. |
+| GetCurrentUser | [.google.protobuf.Empty](#google-protobuf-Empty) | [User](#laelia-v1-User) | Get the current authenticated user. Permissions required: None |
+| ListUsers | [ListUsersRequest](#laelia-v1-ListUsersRequest) | [ListUsersResponse](#laelia-v1-ListUsersResponse) | List all users. Any authenticated user can list users. |
+| CreateUser | [CreateUserRequest](#laelia-v1-CreateUserRequest) | [User](#laelia-v1-User) | Create a user. |
+| UpdateUser | [UpdateUserRequest](#laelia-v1-UpdateUserRequest) | [User](#laelia-v1-User) | Only the user itself and the user with permission on the workspace can update the user. |
+| DeleteUser | [DeleteUserRequest](#laelia-v1-DeleteUserRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Only the user with permission on the workspace can delete the user. The last remaining workspace admin cannot be deleted. |
+| UndeleteUser | [UndeleteUserRequest](#laelia-v1-UndeleteUserRequest) | [User](#laelia-v1-User) | Only the user with permission on the workspace can undelete the user. |
+
+ 
+
+
+
+<a name="v1_auth_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/auth_service.proto
+
+
+
+<a name="laelia-v1-IdentityProviderContext"></a>
+
+### IdentityProviderContext
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| oauth2_context | [OAuth2IdentityProviderContext](#laelia-v1-OAuth2IdentityProviderContext) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-LoginRequest"></a>
+
+### LoginRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| email | [string](#string) |  |  |
+| password | [string](#string) |  |  |
+| web | [bool](#bool) |  | If web is set, we will set access token, refresh token, and user to the cookie. |
+| idp_name | [string](#string) |  | The name of the identity provider. Format: idps/{idp} |
+| idp_context | [IdentityProviderContext](#laelia-v1-IdentityProviderContext) |  | The idp_context is using to get the user information from identity provider. |
+
+
+
+
+
+
+<a name="laelia-v1-LoginResponse"></a>
+
+### LoginResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| token | [string](#string) |  |  |
+| require_reset_password | [bool](#bool) |  |  |
+| user | [User](#laelia-v1-User) |  | The user of successful login. |
+
+
+
+
+
+
+<a name="laelia-v1-LogoutRequest"></a>
+
+### LogoutRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-OAuth2IdentityProviderContext"></a>
+
+### OAuth2IdentityProviderContext
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| code | [string](#string) |  |  |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="laelia-v1-AuthService"></a>
+
+### AuthService
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| Login | [LoginRequest](#laelia-v1-LoginRequest) | [LoginResponse](#laelia-v1-LoginResponse) | Permissions required: None |
+| Logout | [LogoutRequest](#laelia-v1-LogoutRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Permissions required: None |
+
+ 
+
+
+
+## Scalar Value Types
+
+| .proto Type | Notes | C++ | Java | Python | Go | C# | PHP | Ruby |
+| ----------- | ----- | --- | ---- | ------ | -- | -- | --- | ---- |
+| <a name="double" /> double |  | double | double | float | float64 | double | float | Float |
+| <a name="float" /> float |  | float | float | float | float32 | float | float | Float |
+| <a name="int32" /> int32 | Uses variable-length encoding. Inefficient for encoding negative numbers – if your field is likely to have negative values, use sint32 instead. | int32 | int | int | int32 | int | integer | Bignum or Fixnum (as required) |
+| <a name="int64" /> int64 | Uses variable-length encoding. Inefficient for encoding negative numbers – if your field is likely to have negative values, use sint64 instead. | int64 | long | int/long | int64 | long | integer/string | Bignum |
+| <a name="uint32" /> uint32 | Uses variable-length encoding. | uint32 | int | int/long | uint32 | uint | integer | Bignum or Fixnum (as required) |
+| <a name="uint64" /> uint64 | Uses variable-length encoding. | uint64 | long | int/long | uint64 | ulong | integer/string | Bignum or Fixnum (as required) |
+| <a name="sint32" /> sint32 | Uses variable-length encoding. Signed int value. These more efficiently encode negative numbers than regular int32s. | int32 | int | int | int32 | int | integer | Bignum or Fixnum (as required) |
+| <a name="sint64" /> sint64 | Uses variable-length encoding. Signed int value. These more efficiently encode negative numbers than regular int64s. | int64 | long | int/long | int64 | long | integer/string | Bignum |
+| <a name="fixed32" /> fixed32 | Always four bytes. More efficient than uint32 if values are often greater than 2^28. | uint32 | int | int | uint32 | uint | integer | Bignum or Fixnum (as required) |
+| <a name="fixed64" /> fixed64 | Always eight bytes. More efficient than uint64 if values are often greater than 2^56. | uint64 | long | int/long | uint64 | ulong | integer/string | Bignum |
+| <a name="sfixed32" /> sfixed32 | Always four bytes. | int32 | int | int | int32 | int | integer | Bignum or Fixnum (as required) |
+| <a name="sfixed64" /> sfixed64 | Always eight bytes. | int64 | long | int/long | int64 | long | integer/string | Bignum |
+| <a name="bool" /> bool |  | bool | boolean | boolean | bool | bool | boolean | TrueClass/FalseClass |
+| <a name="string" /> string | A string must always contain UTF-8 encoded or 7-bit ASCII text. | string | String | str/unicode | string | string | string | String (UTF-8) |
+| <a name="bytes" /> bytes | May contain any arbitrary sequence of bytes. | string | ByteString | str | []byte | ByteString | string | String (ASCII-8BIT) |
+
