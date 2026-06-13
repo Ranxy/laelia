@@ -34,9 +34,13 @@ const (
 	keyID = "v1"
 	// AccessTokenAudienceFmt is the format of the acccess token audience.
 	AccessTokenAudienceFmt = "ll.user.access.%s"
-	apiTokenDuration       = 1 * time.Hour
+	// AgentAccessTokenAudienceFmt is the format of the agent access token audience.
+	AgentAccessTokenAudienceFmt = "ll.agent.access.%s"
+	apiTokenDuration           = 1 * time.Hour
 	// DefaultTokenDuration is the default token expiration duration.
 	DefaultTokenDuration = 7 * 24 * time.Hour
+	// DefaultAgentTokenDuration is the default agent token expiration duration.
+	DefaultAgentTokenDuration = 365 * 24 * time.Hour
 
 	// AccessTokenCookieName is the cookie name of access token.
 	AccessTokenCookieName = "access-token"
@@ -64,6 +68,7 @@ func New(
 ) *APIAuthInterceptor {
 	return &APIAuthInterceptor{
 		store:    store,
+		secret:   secret,
 		stateCfg: stateCfg,
 		profile:  profile,
 	}
@@ -83,7 +88,7 @@ func (in *APIAuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFun
 		}
 		ctx = context.WithValue(ctx, common.AuthContextKey, authContext)
 
-		user, err := in.getUserConnect(ctx, accessTokenStr)
+		user, err := in.getUserOrAgentConnect(ctx, accessTokenStr)
 		if err != nil {
 			if IsAuthenticationAllowed(req.Spec().Procedure, authContext) {
 				return next(ctx, req)
@@ -91,7 +96,9 @@ func (in *APIAuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFun
 			return nil, err
 		}
 
-		ctx = context.WithValue(ctx, common.UserContextKey, user)
+		if user != nil {
+			ctx = context.WithValue(ctx, common.UserContextKey, user)
+		}
 		return next(ctx, req)
 	}
 }
@@ -117,7 +124,7 @@ func (in *APIAuthInterceptor) WrapStreamingHandler(next connect.StreamingHandler
 		}
 		ctx = context.WithValue(ctx, common.AuthContextKey, authContext)
 
-		user, err := in.getUserConnect(ctx, accessTokenStr)
+		user, err := in.getUserOrAgentConnect(ctx, accessTokenStr)
 		if err != nil {
 			if IsAuthenticationAllowed(conn.Spec().Procedure, authContext) {
 				return next(ctx, conn)
@@ -125,22 +132,25 @@ func (in *APIAuthInterceptor) WrapStreamingHandler(next connect.StreamingHandler
 			return err
 		}
 
-		ctx = context.WithValue(ctx, common.UserContextKey, user)
+		if user != nil {
+			ctx = context.WithValue(ctx, common.UserContextKey, user)
+		}
 
 		return next(ctx, conn)
 	}
 }
 
-// authenticateConnect is a ConnectRPC-specific version that returns ConnectRPC errors.
-func (in *APIAuthInterceptor) authenticateConnect(ctx context.Context, accessTokenStr string) (*store.UserMessage, error) {
+// getUserOrAgentConnect authenticates using either a user or agent JWT token.
+// Returns user=nil for agent-authenticated requests.
+func (in *APIAuthInterceptor) getUserOrAgentConnect(ctx context.Context, accessTokenStr string) (*store.UserMessage, error) {
 	if accessTokenStr == "" {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errs.New("access token not found"))
 	}
 	if _, ok := in.stateCfg.TokenExpireCache.Get(accessTokenStr); ok {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errs.New("access token expired"))
 	}
-	claims := &claimsMessage{}
-	if _, err := jwt.ParseWithClaims(accessTokenStr, claims, func(t *jwt.Token) (any, error) {
+
+	keyFunc := func(t *jwt.Token) (any, error) {
 		if t.Method.Alg() != jwt.SigningMethodHS256.Name {
 			return nil, errs.Errorf("unexpected access token signing method=%v, expect %v", t.Header["alg"], jwt.SigningMethodHS256)
 		}
@@ -150,20 +160,38 @@ func (in *APIAuthInterceptor) authenticateConnect(ctx context.Context, accessTok
 			}
 		}
 		return nil, errs.Errorf("unexpected access token kid=%v", t.Header["kid"])
-	}); err != nil {
-		if errors.Is(err, jwt.ErrTokenExpired) {
-			return nil, connect.NewError(connect.CodeUnauthenticated, errs.New("access token expired"))
-		}
-		return nil, connect.NewError(connect.CodeUnauthenticated, errs.New("failed to parse claim"))
-	}
-	if !audienceContains(claims.Audience, fmt.Sprintf(AccessTokenAudienceFmt, in.profile.Mode)) {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf(
-			"invalid access token, audience mismatch, got %q, expected %q. you may send request to the wrong environment",
-			claims.Audience,
-			fmt.Sprintf(AccessTokenAudienceFmt, in.profile.Mode),
-		))
 	}
 
+	agentClaims := &agentClaimsMessage{}
+	agentToken, agentErr := jwt.ParseWithClaims(accessTokenStr, agentClaims, keyFunc)
+
+	userClaims := &claimsMessage{}
+	userToken, userErr := jwt.ParseWithClaims(accessTokenStr, userClaims, keyFunc)
+
+	if agentErr == nil && agentToken != nil && agentToken.Valid {
+		if audienceContains(agentClaims.Audience, fmt.Sprintf(AgentAccessTokenAudienceFmt, in.profile.Mode)) {
+			return in.authenticateAgentByClaims(ctx, agentClaims)
+		}
+	}
+
+	if userErr == nil && userToken != nil && userToken.Valid {
+		if audienceContains(userClaims.Audience, fmt.Sprintf(AccessTokenAudienceFmt, in.profile.Mode)) {
+			return in.authenticateUserByClaims(ctx, userClaims)
+		}
+	}
+
+	if agentErr != nil && userErr != nil {
+		if errors.Is(agentErr, jwt.ErrTokenExpired) || errors.Is(userErr, jwt.ErrTokenExpired) {
+			return nil, connect.NewError(connect.CodeUnauthenticated, errs.New("access token expired"))
+		}
+	}
+	return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("invalid access token, audience mismatch, expected %q or %q",
+		fmt.Sprintf(AccessTokenAudienceFmt, in.profile.Mode),
+		fmt.Sprintf(AgentAccessTokenAudienceFmt, in.profile.Mode),
+	))
+}
+
+func (in *APIAuthInterceptor) authenticateUserByClaims(ctx context.Context, claims *claimsMessage) (*store.UserMessage, error) {
 	principalID, err := strconv.Atoi(claims.Subject)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("malformed ID %s in the access token", claims.Subject))
@@ -179,19 +207,32 @@ func (in *APIAuthInterceptor) authenticateConnect(ctx context.Context, accessTok
 		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("user ID %d has been deactivated by administrators", user.ID))
 	}
 
+	in.profile.LastActiveTS.Store(time.Now().Unix())
 	return user, nil
 }
 
-// getUserConnect is a ConnectRPC-specific version that returns ConnectRPC errors.
-func (in *APIAuthInterceptor) getUserConnect(ctx context.Context, accessTokenStr string) (*store.UserMessage, error) {
-	user, err := in.authenticateConnect(ctx, accessTokenStr)
+func (in *APIAuthInterceptor) authenticateAgentByClaims(ctx context.Context, claims *agentClaimsMessage) (*store.UserMessage, error) {
+	agentID, err := strconv.Atoi(claims.Subject)
 	if err != nil {
-		return nil, err
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("malformed agent ID %s in the token", claims.Subject))
+	}
+	agent, err := in.store.GetAgent(ctx, agentID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("failed to find agent ID %d", agentID))
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("agent ID %d not exists", agentID))
+	}
+	if agent.Deleted {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("agent ID %d has been deactivated", agent.ID))
+	}
+	if agent.TokenVersion != claims.TokenVersion {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("agent token version mismatch"))
 	}
 
-	// Only update for authorized request.
+	ctx = context.WithValue(ctx, common.AgentContextKey, agent)
 	in.profile.LastActiveTS.Store(time.Now().Unix())
-	return user, nil
+	return nil, nil
 }
 
 func GetTokenFromMetadata(md metadata.MD) (string, error) {
@@ -257,6 +298,12 @@ type claimsMessage struct {
 	jwt.RegisteredClaims
 }
 
+type agentClaimsMessage struct {
+	Name         string `json:"name"`
+	TokenVersion int    `json:"token_version"`
+	jwt.RegisteredClaims
+}
+
 // GenerateAPIToken generates an API token.
 func GenerateAPIToken(userName string, userID int, mode common.ReleaseMode, secret string) (string, error) {
 	expirationTime := time.Now().Add(apiTokenDuration)
@@ -267,6 +314,36 @@ func GenerateAPIToken(userName string, userID int, mode common.ReleaseMode, secr
 func GenerateAccessToken(userName string, userID int, mode common.ReleaseMode, secret string, tokenDuration time.Duration) (string, error) {
 	expirationTime := time.Now().Add(tokenDuration)
 	return generateToken(userName, userID, fmt.Sprintf(AccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
+}
+
+// GenerateAgentToken generates an agent connection token.
+func GenerateAgentToken(agentName string, agentID int, tokenVersion int, mode common.ReleaseMode, secret string) (string, error) {
+	expirationTime := time.Now().Add(DefaultAgentTokenDuration)
+	return generateAgentToken(agentName, agentID, tokenVersion, fmt.Sprintf(AgentAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
+}
+
+func generateAgentToken(agentName string, agentID int, tokenVersion int, aud string, expirationTime time.Time, secret []byte) (string, error) {
+	claims := &agentClaimsMessage{
+		Name:         agentName,
+		TokenVersion: tokenVersion,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Audience:  jwt.ClaimStrings{aud},
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    issuer,
+			Subject:   strconv.Itoa(agentID),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token.Header["kid"] = keyID
+
+	tokenString, err := token.SignedString(secret)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
 }
 
 // Pay attention to this function. It holds the main JWT token generation logic.

@@ -250,6 +250,11 @@ func GetUserFromContext(ctx context.Context) (*store.UserMessage, bool) {
 	return user, ok
 }
 
+func GetAgentFromContext(ctx context.Context) (*store.AgentMessage, bool) {
+	agent, ok := ctx.Value(common.AgentContextKey).(*store.AgentMessage)
+	return agent, ok
+}
+
 func getSubConditionFromExpr(expr celast.Expr, getFilter func(expr celast.Expr) (string, error), join string) (string, error) {
 	var args []string
 	for _, arg := range expr.AsCall().Args() {
