@@ -321,8 +321,14 @@ function ConnectionBadge({ state }: { state?: AgentStatus_ConnectionState }) {
 
 function formatTimestamp(ts: Timestamp): string {
   const seconds = Number(ts.seconds);
-  const millis = seconds * 1000;
-  return new Date(millis).toLocaleString();
+  const date = new Date(seconds * 1000);
+  const y = date.getFullYear();
+  const mo = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const h = String(date.getHours()).padStart(2, "0");
+  const mi = String(date.getMinutes()).padStart(2, "0");
+  const s = String(date.getSeconds()).padStart(2, "0");
+  return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
 }
 
 function formatToken(token: string): string {
