@@ -134,10 +134,14 @@ func FormatGroupEmail(email string) string {
 	return fmt.Sprintf("%s%s", GroupPrefix, email)
 }
 
-func GetAgentID(name string) (int, error) {
-	return GetUIDFromName(name, AgentNamePrefix)
+func GetAgentResourceID(name string) (string, error) {
+	tokens, err := GetNameParentTokens(name, AgentNamePrefix)
+	if err != nil {
+		return "", err
+	}
+	return tokens[0], nil
 }
 
-func FormatAgentUID(uid int) string {
-	return fmt.Sprintf("%s%d", AgentNamePrefix, uid)
+func FormatAgentUID(uid string) string {
+	return fmt.Sprintf("%s%s", AgentNamePrefix, uid)
 }

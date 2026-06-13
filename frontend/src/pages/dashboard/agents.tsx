@@ -111,23 +111,33 @@ export function AgentsPage() {
         open={tokenOpen}
         onOpenChange={(next) => !next && setTokenOpen(false)}
       >
-        <DialogContent className="max-w-md">
-          <DialogTitle>Agent Token</DialogTitle>
+        <DialogContent className="max-w-lg">
+          <DialogTitle>Agent Created</DialogTitle>
           <DialogDescription>
-            Copy this token now. It won't be shown again.
+            Use the command below to connect your agent to the manager. The
+            token is only shown once.
           </DialogDescription>
-          <div className="mt-4 rounded bg-overlay p-3 font-mono text-xs break-all">
-            {token}
+          <div className="mt-4 space-y-3">
+            <p className="text-sm text-control-light">
+              Run this on the target machine:
+            </p>
+            <div className="rounded bg-white border border-control-border p-3 font-mono text-xs break-all text-black dark:bg-zinc-900 dark:text-white">
+              {token &&
+                `laelia-agent run --manager ${getManagerURL()} --token ${formatToken(token)}`}
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                if (token) {
+                  const cmd = `laelia-agent run --manager ${getManagerURL()} --token ${token}`;
+                  navigator.clipboard.writeText(cmd).catch(() => {});
+                }
+              }}
+            >
+              Copy Command
+            </Button>
           </div>
-          <Button
-            variant="outline"
-            className="mt-2"
-            onClick={() => {
-              if (token) navigator.clipboard.writeText(token);
-            }}
-          >
-            Copy
-          </Button>
         </DialogContent>
       </Dialog>
 
@@ -277,4 +287,18 @@ function ConnectionBadge({ state }: { state?: AgentStatus_ConnectionState }) {
 
 function formatTimestamp(ts: Timestamp): string {
   return new Date(Number(ts)).toLocaleString();
+}
+
+function formatToken(token: string): string {
+  if (token.length <= 20) {
+    return token.slice(0, 6) + "*".repeat(token.length - 6);
+  }
+  return `${token.slice(0, 10)}${"*".repeat(20)}${token.slice(-6)}`;
+}
+
+function getManagerURL(): string {
+  return (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(
+    /\/+$/,
+    ""
+  );
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	models "github.com/Ranxy/laelia/backend/generated-go/store"
@@ -35,6 +36,7 @@ type FindAgentMessage struct {
 }
 
 type UpdateAgentMessage struct {
+	ResourceID   *string
 	Name         *string
 	Info         *models.AgentInfo
 	Status       *models.AgentStatus
@@ -52,6 +54,19 @@ func (s *Store) GetAgent(ctx context.Context, id int) (*AgentMessage, error) {
 	}
 
 	agent, _ := s.agentIDCache.Get(id)
+	return agent, nil
+}
+
+func (s *Store) GetAgentByResourceID(ctx context.Context, resourceID string) (*AgentMessage, error) {
+	if v, ok := s.agentResourceIDCache.Get(resourceID); ok && s.enableCache {
+		return v, nil
+	}
+
+	if err := s.listAndCacheAllAgents(ctx); err != nil {
+		return nil, err
+	}
+
+	agent, _ := s.agentResourceIDCache.Get(resourceID)
 	return agent, nil
 }
 
@@ -199,6 +214,8 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 		return nil, err
 	}
 
+	resourceID := uuid.New().String()
+
 	var agentID int
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO agent (
@@ -207,7 +224,7 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, created_at
 	`,
-		create.ResourceID,
+		resourceID,
 		create.Name,
 		create.TokenVersion,
 		infoBytes,
@@ -222,7 +239,7 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 
 	agent := &AgentMessage{
 		ID:           agentID,
-		ResourceID:   create.ResourceID,
+		ResourceID:   resourceID,
 		Name:         create.Name,
 		TokenVersion: create.TokenVersion,
 		CreatedAt:    create.CreatedAt,
@@ -236,6 +253,9 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 
 func (s *Store) UpdateAgent(ctx context.Context, current *AgentMessage, patch *UpdateAgentMessage) (*AgentMessage, error) {
 	sets, args := []string{}, []any{}
+	if v := patch.ResourceID; v != nil {
+		sets, args = append(sets, fmt.Sprintf("resource_id = $%d", len(args)+1)), append(args, *v)
+	}
 	if v := patch.Name; v != nil {
 		sets, args = append(sets, fmt.Sprintf("name = $%d", len(args)+1)), append(args, *v)
 	}
@@ -298,13 +318,13 @@ func (s *Store) UpdateAgent(ctx context.Context, current *AgentMessage, patch *U
 	return agent, nil
 }
 
-func (s *Store) DeleteAgent(ctx context.Context, id int) error {
-	agent, err := s.GetAgent(ctx, id)
+func (s *Store) DeleteAgent(ctx context.Context, resourceID string) error {
+	agent, err := s.GetAgentByResourceID(ctx, resourceID)
 	if err != nil {
 		return err
 	}
 	if agent == nil {
-		return errors.Errorf("agent %d not found", id)
+		return errors.Errorf("agent %s not found", resourceID)
 	}
 
 	if _, err := s.UpdateAgent(ctx, agent, &UpdateAgentMessage{Delete: &agentDeleteTrue}); err != nil {

@@ -60,16 +60,7 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to create agent, error: %v", err))
 	}
 
-	resourceID := common.FormatAgentUID(created.ID)
-	_, err = s.store.UpdateAgent(ctx, created, &store.UpdateAgentMessage{
-		Name: &resourceID,
-	})
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent resource_id, error: %v", err))
-	}
-	created.ResourceID = resourceID
-
-	token, err := auth.GenerateAgentToken(created.Name, created.ID, created.TokenVersion, s.profile.Mode, s.secret)
+	token, err := auth.GenerateAgentToken(created.Name, created.ResourceID, created.TokenVersion, s.profile.Mode, s.secret)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate agent token, error: %v", err))
 	}
@@ -119,26 +110,26 @@ func (s *AgentService) ListAgents(ctx context.Context, req *connect.Request[v1pb
 }
 
 func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.GetAgentRequest]) (*connect.Response[v1pb.Agent], error) {
-	agentID, err := common.GetAgentID(req.Msg.Name)
+	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	agent, err := s.store.GetAgent(ctx, agentID)
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get agent, error: %v", err))
 	}
 	if agent == nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %d not found", agentID))
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
 	}
 	return connect.NewResponse(convertToAgent(agent)), nil
 }
 
 func (s *AgentService) DeleteAgent(ctx context.Context, req *connect.Request[v1pb.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error) {
-	agentID, err := common.GetAgentID(req.Msg.Name)
+	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	if err := s.store.DeleteAgent(ctx, agentID); err != nil {
+	if err := s.store.DeleteAgent(ctx, resourceID); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to delete agent, error: %v", err))
 	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
@@ -199,11 +190,7 @@ func (*AgentService) Hello(_ context.Context, _ *connect.Request[v1pb.HelloReque
 }
 
 func convertToAgent(agent *store.AgentMessage) *v1pb.Agent {
-	name := agent.ResourceID
-	if name == "" {
-		name = common.FormatAgentUID(agent.ID)
-	}
-
+	name := common.FormatAgentUID(agent.ResourceID)
 	state := v1pb.State_ACTIVE
 	if agent.Deleted {
 		state = v1pb.State_DELETED

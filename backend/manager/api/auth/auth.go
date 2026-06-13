@@ -229,19 +229,15 @@ func (in *APIAuthInterceptor) authenticateUserByClaims(ctx context.Context, clai
 }
 
 func (in *APIAuthInterceptor) authenticateAgentByClaims(ctx context.Context, claims *agentClaimsMessage) (*store.AgentMessage, error) {
-	agentID, err := strconv.Atoi(claims.Subject)
+	agent, err := in.store.GetAgentByResourceID(ctx, claims.Subject)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("malformed agent ID %s in the token", claims.Subject))
-	}
-	agent, err := in.store.GetAgent(ctx, agentID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("failed to find agent ID %d", agentID))
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("failed to find agent %s", claims.Subject))
 	}
 	if agent == nil {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("agent ID %d not exists", agentID))
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("agent %s not exists", claims.Subject))
 	}
 	if agent.Deleted {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("agent ID %d has been deactivated", agent.ID))
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("agent %s has been deactivated", claims.Subject))
 	}
 	if agent.TokenVersion != claims.TokenVersion {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("agent token version mismatch"))
@@ -333,12 +329,12 @@ func GenerateAccessToken(userName string, userID int, mode common.ReleaseMode, s
 }
 
 // GenerateAgentToken generates an agent connection token.
-func GenerateAgentToken(agentName string, agentID int, tokenVersion int, mode common.ReleaseMode, secret string) (string, error) {
+func GenerateAgentToken(agentName string, resourceID string, tokenVersion int, mode common.ReleaseMode, secret string) (string, error) {
 	expirationTime := time.Now().Add(DefaultAgentTokenDuration)
-	return signAgentToken(agentName, agentID, tokenVersion, fmt.Sprintf(AgentAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
+	return signAgentToken(agentName, resourceID, tokenVersion, fmt.Sprintf(AgentAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
 }
 
-func signAgentToken(agentName string, agentID int, tokenVersion int, aud string, expirationTime time.Time, secret []byte) (string, error) {
+func signAgentToken(agentName string, resourceID string, tokenVersion int, aud string, expirationTime time.Time, secret []byte) (string, error) {
 	claims := &agentClaimsMessage{
 		Name:         agentName,
 		TokenVersion: tokenVersion,
@@ -347,7 +343,7 @@ func signAgentToken(agentName string, agentID int, tokenVersion int, aud string,
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    issuer,
-			Subject:   strconv.Itoa(agentID),
+			Subject:   resourceID,
 		},
 	}
 

@@ -91,6 +91,13 @@ buf lint proto
 cd proto && buf generate
 ```
 
+### Database
+
+```bash
+# Connect to Postgres
+psql -h localhost -p 5432 -U dev -d laelia -c "sql"
+```
+
 
 ## Code Style
 - **General**: Follow Google style guides for all languages
