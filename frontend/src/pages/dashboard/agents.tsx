@@ -149,60 +149,86 @@ export function AgentsPage() {
           <DialogTitle>Agent Details</DialogTitle>
           {selectedAgent && (
             <div className="flex flex-col gap-2 text-sm mt-2">
-              <p>
-                <span className="text-control-light">Name:</span>{" "}
-                {selectedAgent.title}
-              </p>
-              <p>
-                <span className="text-control-light">Status:</span>{" "}
-                <ConnectionBadge state={selectedAgent.status?.state} />
-              </p>
-              {selectedAgent.info && (
-                <>
-                  {selectedAgent.info.hostname && (
-                    <p>
-                      <span className="text-control-light">Hostname:</span>{" "}
-                      {selectedAgent.info.hostname}
-                    </p>
-                  )}
-                  {selectedAgent.info.os && (
-                    <p>
-                      <span className="text-control-light">OS:</span>{" "}
-                      {selectedAgent.info.os}/{selectedAgent.info.arch}
-                    </p>
-                  )}
-                  {selectedAgent.info.ip && (
-                    <p>
-                      <span className="text-control-light">IP:</span>{" "}
-                      {selectedAgent.info.ip}
-                    </p>
-                  )}
-                  {selectedAgent.info.version && (
-                    <p>
-                      <span className="text-control-light">Version:</span>{" "}
-                      {selectedAgent.info.version}
-                    </p>
-                  )}
-                </>
-              )}
-              {selectedAgent.status?.connectedTime && (
-                <p>
-                  <span className="text-control-light">Connected:</span>{" "}
-                  {formatTimestamp(selectedAgent.status.connectedTime)}
-                </p>
-              )}
-              {selectedAgent.status?.lastHeartbeatTime && (
-                <p>
-                  <span className="text-control-light">Last Heartbeat:</span>{" "}
-                  {formatTimestamp(selectedAgent.status.lastHeartbeatTime)}
-                </p>
-              )}
-              {selectedAgent.createdAt && (
-                <p>
-                  <span className="text-control-light">Created:</span>{" "}
-                  {formatTimestamp(selectedAgent.createdAt)}
-                </p>
-              )}
+              <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+                <span className="text-control-light whitespace-nowrap">
+                  Name
+                </span>
+                <span>{selectedAgent.title}</span>
+
+                <span className="text-control-light whitespace-nowrap">
+                  Status
+                </span>
+                <span>
+                  <ConnectionBadge state={selectedAgent.status?.state} />
+                </span>
+
+                {selectedAgent.info && (
+                  <>
+                    {selectedAgent.info.hostname && (
+                      <>
+                        <span className="text-control-light whitespace-nowrap">
+                          Hostname
+                        </span>
+                        <span>{selectedAgent.info.hostname}</span>
+                      </>
+                    )}
+                    {selectedAgent.info.os && (
+                      <>
+                        <span className="text-control-light whitespace-nowrap">
+                          OS
+                        </span>
+                        <span>
+                          {selectedAgent.info.os}/{selectedAgent.info.arch}
+                        </span>
+                      </>
+                    )}
+                    {selectedAgent.info.ip && (
+                      <>
+                        <span className="text-control-light whitespace-nowrap">
+                          IP
+                        </span>
+                        <span>{selectedAgent.info.ip}</span>
+                      </>
+                    )}
+                    {selectedAgent.info.version && (
+                      <>
+                        <span className="text-control-light whitespace-nowrap">
+                          Version
+                        </span>
+                        <span>{selectedAgent.info.version}</span>
+                      </>
+                    )}
+                  </>
+                )}
+                {selectedAgent.status?.connectedTime && (
+                  <>
+                    <span className="text-control-light whitespace-nowrap">
+                      Connected
+                    </span>
+                    <span>
+                      {formatTimestamp(selectedAgent.status.connectedTime)}
+                    </span>
+                  </>
+                )}
+                {selectedAgent.status?.lastHeartbeatTime && (
+                  <>
+                    <span className="text-control-light whitespace-nowrap">
+                      Last Heartbeat
+                    </span>
+                    <span>
+                      {formatTimestamp(selectedAgent.status.lastHeartbeatTime)}
+                    </span>
+                  </>
+                )}
+                {selectedAgent.createdAt && (
+                  <>
+                    <span className="text-control-light whitespace-nowrap">
+                      Created
+                    </span>
+                    <span>{formatTimestamp(selectedAgent.createdAt)}</span>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>
@@ -286,7 +312,9 @@ function ConnectionBadge({ state }: { state?: AgentStatus_ConnectionState }) {
 }
 
 function formatTimestamp(ts: Timestamp): string {
-  return new Date(Number(ts)).toLocaleString();
+  const seconds = Number(ts.seconds);
+  const millis = seconds * 1000;
+  return new Date(millis).toLocaleString();
 }
 
 function formatToken(token: string): string {
