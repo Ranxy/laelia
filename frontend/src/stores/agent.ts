@@ -29,9 +29,7 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set) => ({
   },
 
   async createAgent(title: string, labels?: Record<string, string>) {
-    const res = await api.post<ApiAgent>("/agents", {
-      agent: { title, labels },
-    });
+    const res = await api.post<ApiAgent>("/agents", { title, labels });
     return res;
   },
 
