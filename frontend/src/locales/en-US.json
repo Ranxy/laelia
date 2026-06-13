@@ -8,7 +8,15 @@
     "sign-out": "Sign out",
     "or": "or",
     "close": "Close",
-    "language": "Language"
+    "language": "Language",
+    "create": "Create",
+    "creating": "Creating...",
+    "delete": "Delete",
+    "copy": "Copy Command",
+    "loading": "Loading...",
+    "actions": "Actions",
+    "no-data": "No agents yet.",
+    "confirm-delete": "Delete agent {name}?"
   },
   "auth": {
     "sign-in": {
@@ -35,5 +43,34 @@
   "landing": {
     "welcome": "Welcome",
     "description": "You are now signed in to Laelia AI. More features coming soon."
+  },
+  "agent": {
+    "title": "Agents",
+    "create": "Create Agent",
+    "create-title": "Create Agent",
+    "create-description": "Enter a name for the new agent.",
+    "create-name-placeholder": "Agent name",
+    "created-title": "Agent Created",
+    "created-description": "Use the command below to connect your agent to the manager. The token is only shown once.",
+    "created-run-hint": "Run this on the target machine:",
+    "detail-title": "Agent Details",
+    "detail-name": "Name",
+    "detail-status": "Status",
+    "detail-hostname": "Hostname",
+    "detail-os": "OS",
+    "detail-ip": "IP",
+    "detail-version": "Version",
+    "detail-connected": "Connected",
+    "detail-last-heartbeat": "Last Heartbeat",
+    "detail-created": "Created",
+    "status-online": "Online",
+    "status-offline": "Offline",
+    "status-error": "Error",
+    "header-name": "Name",
+    "header-status": "Status",
+    "header-hostname": "Hostname",
+    "header-os": "OS",
+    "header-ip": "IP",
+    "header-actions": "Actions"
   }
 }

@@ -1,5 +1,6 @@
 import { Timestamp } from "@bufbuild/protobuf/wkt";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/react/components/ui/badge";
 import { Button } from "@/react/components/ui/button";
 import {
@@ -28,6 +29,7 @@ import type { Agent } from "@/types/proto-es/v1/agent_pb";
 import { AgentStatus_ConnectionState } from "@/types/proto-es/v1/agent_pb";
 
 export function AgentsPage() {
+  const { t } = useTranslation();
   const fetchAgents = useAppStore((s) => s.fetchAgents);
   const agents = useAppStore((s) => s.agents);
   const loading = useAppStore((s) => s.agentsLoading);
@@ -83,8 +85,8 @@ export function AgentsPage() {
   return (
     <div className="p-6 flex flex-col gap-4 w-full">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-main">Agents</h1>
-        <Button onClick={() => setCreateOpen(true)}>Create Agent</Button>
+        <h1 className="text-xl font-semibold text-main">{t("agent.title")}</h1>
+        <Button onClick={() => setCreateOpen(true)}>{t("agent.create")}</Button>
       </div>
 
       <Sheet
@@ -92,16 +94,16 @@ export function AgentsPage() {
         onOpenChange={(next) => !next && setCreateOpen(false)}
       >
         <SheetContent width="narrow">
-          <SheetTitle>Create Agent</SheetTitle>
-          <SheetDescription>Enter a name for the new agent.</SheetDescription>
+          <SheetTitle>{t("agent.create-title")}</SheetTitle>
+          <SheetDescription>{t("agent.create-description")}</SheetDescription>
           <div className="flex flex-col gap-4 pt-4">
             <Input
-              placeholder="Agent name"
+              placeholder={t("agent.create-name-placeholder")}
               value={name}
               onChange={(e) => setName((e.target as HTMLInputElement).value)}
             />
             <Button disabled={creating || !name.trim()} onClick={handleCreate}>
-              {creating ? "Creating..." : "Create"}
+              {creating ? t("common.creating") : t("common.create")}
             </Button>
           </div>
         </SheetContent>
@@ -112,14 +114,13 @@ export function AgentsPage() {
         onOpenChange={(next) => !next && setTokenOpen(false)}
       >
         <DialogContent className="max-w-lg">
-          <DialogTitle>Agent Created</DialogTitle>
+          <DialogTitle>{t("agent.created-title")}</DialogTitle>
           <DialogDescription>
-            Use the command below to connect your agent to the manager. The
-            token is only shown once.
+            {t("agent.created-description")}
           </DialogDescription>
           <div className="mt-4 space-y-3">
             <p className="text-sm text-control-light">
-              Run this on the target machine:
+              {t("agent.created-run-hint")}
             </p>
             <div className="rounded bg-white border border-control-border p-3 font-mono text-xs break-all text-black dark:bg-zinc-900 dark:text-white">
               {token &&
@@ -135,7 +136,7 @@ export function AgentsPage() {
                 }
               }}
             >
-              Copy Command
+              {t("common.copy")}
             </Button>
           </div>
         </DialogContent>
@@ -146,17 +147,17 @@ export function AgentsPage() {
         onOpenChange={(next) => !next && setDetailOpen(false)}
       >
         <DialogContent className="max-w-md">
-          <DialogTitle>Agent Details</DialogTitle>
+          <DialogTitle>{t("agent.detail-title")}</DialogTitle>
           {selectedAgent && (
             <div className="flex flex-col gap-2 text-sm mt-2">
               <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
                 <span className="text-control-light whitespace-nowrap">
-                  Name
+                  {t("agent.detail-name")}
                 </span>
                 <span>{selectedAgent.title}</span>
 
                 <span className="text-control-light whitespace-nowrap">
-                  Status
+                  {t("agent.detail-status")}
                 </span>
                 <span>
                   <ConnectionBadge state={selectedAgent.status?.state} />
@@ -167,7 +168,7 @@ export function AgentsPage() {
                     {selectedAgent.info.hostname && (
                       <>
                         <span className="text-control-light whitespace-nowrap">
-                          Hostname
+                          {t("agent.detail-hostname")}
                         </span>
                         <span>{selectedAgent.info.hostname}</span>
                       </>
@@ -175,7 +176,7 @@ export function AgentsPage() {
                     {selectedAgent.info.os && (
                       <>
                         <span className="text-control-light whitespace-nowrap">
-                          OS
+                          {t("agent.detail-os")}
                         </span>
                         <span>
                           {selectedAgent.info.os}/{selectedAgent.info.arch}
@@ -185,7 +186,7 @@ export function AgentsPage() {
                     {selectedAgent.info.ip && (
                       <>
                         <span className="text-control-light whitespace-nowrap">
-                          IP
+                          {t("agent.detail-ip")}
                         </span>
                         <span>{selectedAgent.info.ip}</span>
                       </>
@@ -193,7 +194,7 @@ export function AgentsPage() {
                     {selectedAgent.info.version && (
                       <>
                         <span className="text-control-light whitespace-nowrap">
-                          Version
+                          {t("agent.detail-version")}
                         </span>
                         <span>{selectedAgent.info.version}</span>
                       </>
@@ -203,7 +204,7 @@ export function AgentsPage() {
                 {selectedAgent.status?.connectedTime && (
                   <>
                     <span className="text-control-light whitespace-nowrap">
-                      Connected
+                      {t("agent.detail-connected")}
                     </span>
                     <span>
                       {formatTimestamp(selectedAgent.status.connectedTime)}
@@ -213,7 +214,7 @@ export function AgentsPage() {
                 {selectedAgent.status?.lastHeartbeatTime && (
                   <>
                     <span className="text-control-light whitespace-nowrap">
-                      Last Heartbeat
+                      {t("agent.detail-last-heartbeat")}
                     </span>
                     <span>
                       {formatTimestamp(selectedAgent.status.lastHeartbeatTime)}
@@ -223,7 +224,7 @@ export function AgentsPage() {
                 {selectedAgent.createdAt && (
                   <>
                     <span className="text-control-light whitespace-nowrap">
-                      Created
+                      {t("agent.detail-created")}
                     </span>
                     <span>{formatTimestamp(selectedAgent.createdAt)}</span>
                   </>
@@ -235,17 +236,17 @@ export function AgentsPage() {
       </Dialog>
 
       {loading ? (
-        <p className="text-control-light">Loading...</p>
+        <p className="text-control-light">{t("common.loading")}</p>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Hostname</TableHead>
-              <TableHead>OS</TableHead>
-              <TableHead>IP</TableHead>
-              <TableHead>Actions</TableHead>
+              <TableHead>{t("agent.header-name")}</TableHead>
+              <TableHead>{t("agent.header-status")}</TableHead>
+              <TableHead>{t("agent.header-hostname")}</TableHead>
+              <TableHead>{t("agent.header-os")}</TableHead>
+              <TableHead>{t("agent.header-ip")}</TableHead>
+              <TableHead>{t("agent.header-actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -255,7 +256,7 @@ export function AgentsPage() {
                   colSpan={6}
                   className="text-center text-control-light"
                 >
-                  No agents yet.
+                  {t("common.no-data")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -282,12 +283,18 @@ export function AgentsPage() {
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (window.confirm(`Delete agent ${agent.title}?`)) {
+                        if (
+                          window.confirm(
+                            t("common.confirm-delete", {
+                              name: agent.title,
+                            })
+                          )
+                        ) {
                           handleDelete(agent.name);
                         }
                       }}
                     >
-                      Delete
+                      {t("common.delete")}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -301,13 +308,14 @@ export function AgentsPage() {
 }
 
 function ConnectionBadge({ state }: { state?: AgentStatus_ConnectionState }) {
+  const { t } = useTranslation();
   switch (state) {
     case AgentStatus_ConnectionState.ONLINE:
-      return <Badge variant="success">Online</Badge>;
+      return <Badge variant="success">{t("agent.status-online")}</Badge>;
     case AgentStatus_ConnectionState.ERROR:
-      return <Badge variant="destructive">Error</Badge>;
+      return <Badge variant="destructive">{t("agent.status-error")}</Badge>;
     default:
-      return <Badge variant="secondary">Offline</Badge>;
+      return <Badge variant="secondary">{t("agent.status-offline")}</Badge>;
   }
 }
 
