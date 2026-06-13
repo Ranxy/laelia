@@ -77,7 +77,7 @@ func configureGrpcRouters(
 
 	userService := apiv1.NewUserService(stores, profile, stateCfg)
 	authService := apiv1.NewAuthService(stores, secret, profile, stateCfg)
-	agentService := apiv1.NewAgentService(stores, profile, stateCfg)
+	agentService := apiv1.NewAgentService(stores, secret, profile, stateCfg)
 
 	onPanic := func(_ context.Context, s connect.Spec, _ http.Header, p any) error {
 		stack := stacktrace.TakeStacktrace(20 /* n */, 5 /* skip */)
