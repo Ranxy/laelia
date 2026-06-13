@@ -9,6 +9,7 @@ import (
 	context "context"
 	errors "errors"
 	v1 "github.com/Ranxy/laelia/backend/generated-go/v1"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	http "net/http"
 	strings "strings"
 )
@@ -33,13 +34,34 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// AgentServiceCreateAgentProcedure is the fully-qualified name of the AgentService's CreateAgent
+	// RPC.
+	AgentServiceCreateAgentProcedure = "/laelia.v1.AgentService/CreateAgent"
+	// AgentServiceListAgentsProcedure is the fully-qualified name of the AgentService's ListAgents RPC.
+	AgentServiceListAgentsProcedure = "/laelia.v1.AgentService/ListAgents"
+	// AgentServiceGetAgentProcedure is the fully-qualified name of the AgentService's GetAgent RPC.
+	AgentServiceGetAgentProcedure = "/laelia.v1.AgentService/GetAgent"
+	// AgentServiceDeleteAgentProcedure is the fully-qualified name of the AgentService's DeleteAgent
+	// RPC.
+	AgentServiceDeleteAgentProcedure = "/laelia.v1.AgentService/DeleteAgent"
+	// AgentServiceConnectAgentProcedure is the fully-qualified name of the AgentService's ConnectAgent
+	// RPC.
+	AgentServiceConnectAgentProcedure = "/laelia.v1.AgentService/ConnectAgent"
+	// AgentServiceAgentHeartbeatProcedure is the fully-qualified name of the AgentService's
+	// AgentHeartbeat RPC.
+	AgentServiceAgentHeartbeatProcedure = "/laelia.v1.AgentService/AgentHeartbeat"
 	// AgentServiceHelloProcedure is the fully-qualified name of the AgentService's Hello RPC.
 	AgentServiceHelloProcedure = "/laelia.v1.AgentService/Hello"
 )
 
 // AgentServiceClient is a client for the laelia.v1.AgentService service.
 type AgentServiceClient interface {
-	// Permissions required: None
+	CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.Agent], error)
+	ListAgents(context.Context, *connect.Request[v1.ListAgentsRequest]) (*connect.Response[v1.ListAgentsResponse], error)
+	GetAgent(context.Context, *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error)
+	DeleteAgent(context.Context, *connect.Request[v1.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error)
+	ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error)
+	AgentHeartbeat(context.Context, *connect.Request[v1.AgentHeartbeatRequest]) (*connect.Response[v1.AgentHeartbeatResponse], error)
 	Hello(context.Context, *connect.Request[v1.HelloRequest]) (*connect.Response[v1.HelloResponse], error)
 }
 
@@ -54,6 +76,42 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 	baseURL = strings.TrimRight(baseURL, "/")
 	agentServiceMethods := v1.File_v1_agent_proto.Services().ByName("AgentService").Methods()
 	return &agentServiceClient{
+		createAgent: connect.NewClient[v1.CreateAgentRequest, v1.Agent](
+			httpClient,
+			baseURL+AgentServiceCreateAgentProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("CreateAgent")),
+			connect.WithClientOptions(opts...),
+		),
+		listAgents: connect.NewClient[v1.ListAgentsRequest, v1.ListAgentsResponse](
+			httpClient,
+			baseURL+AgentServiceListAgentsProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("ListAgents")),
+			connect.WithClientOptions(opts...),
+		),
+		getAgent: connect.NewClient[v1.GetAgentRequest, v1.Agent](
+			httpClient,
+			baseURL+AgentServiceGetAgentProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("GetAgent")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteAgent: connect.NewClient[v1.DeleteAgentRequest, emptypb.Empty](
+			httpClient,
+			baseURL+AgentServiceDeleteAgentProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("DeleteAgent")),
+			connect.WithClientOptions(opts...),
+		),
+		connectAgent: connect.NewClient[v1.ConnectAgentRequest, v1.ConnectAgentResponse](
+			httpClient,
+			baseURL+AgentServiceConnectAgentProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("ConnectAgent")),
+			connect.WithClientOptions(opts...),
+		),
+		agentHeartbeat: connect.NewClient[v1.AgentHeartbeatRequest, v1.AgentHeartbeatResponse](
+			httpClient,
+			baseURL+AgentServiceAgentHeartbeatProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("AgentHeartbeat")),
+			connect.WithClientOptions(opts...),
+		),
 		hello: connect.NewClient[v1.HelloRequest, v1.HelloResponse](
 			httpClient,
 			baseURL+AgentServiceHelloProcedure,
@@ -65,7 +123,43 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 
 // agentServiceClient implements AgentServiceClient.
 type agentServiceClient struct {
-	hello *connect.Client[v1.HelloRequest, v1.HelloResponse]
+	createAgent    *connect.Client[v1.CreateAgentRequest, v1.Agent]
+	listAgents     *connect.Client[v1.ListAgentsRequest, v1.ListAgentsResponse]
+	getAgent       *connect.Client[v1.GetAgentRequest, v1.Agent]
+	deleteAgent    *connect.Client[v1.DeleteAgentRequest, emptypb.Empty]
+	connectAgent   *connect.Client[v1.ConnectAgentRequest, v1.ConnectAgentResponse]
+	agentHeartbeat *connect.Client[v1.AgentHeartbeatRequest, v1.AgentHeartbeatResponse]
+	hello          *connect.Client[v1.HelloRequest, v1.HelloResponse]
+}
+
+// CreateAgent calls laelia.v1.AgentService.CreateAgent.
+func (c *agentServiceClient) CreateAgent(ctx context.Context, req *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.Agent], error) {
+	return c.createAgent.CallUnary(ctx, req)
+}
+
+// ListAgents calls laelia.v1.AgentService.ListAgents.
+func (c *agentServiceClient) ListAgents(ctx context.Context, req *connect.Request[v1.ListAgentsRequest]) (*connect.Response[v1.ListAgentsResponse], error) {
+	return c.listAgents.CallUnary(ctx, req)
+}
+
+// GetAgent calls laelia.v1.AgentService.GetAgent.
+func (c *agentServiceClient) GetAgent(ctx context.Context, req *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error) {
+	return c.getAgent.CallUnary(ctx, req)
+}
+
+// DeleteAgent calls laelia.v1.AgentService.DeleteAgent.
+func (c *agentServiceClient) DeleteAgent(ctx context.Context, req *connect.Request[v1.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.deleteAgent.CallUnary(ctx, req)
+}
+
+// ConnectAgent calls laelia.v1.AgentService.ConnectAgent.
+func (c *agentServiceClient) ConnectAgent(ctx context.Context, req *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error) {
+	return c.connectAgent.CallUnary(ctx, req)
+}
+
+// AgentHeartbeat calls laelia.v1.AgentService.AgentHeartbeat.
+func (c *agentServiceClient) AgentHeartbeat(ctx context.Context, req *connect.Request[v1.AgentHeartbeatRequest]) (*connect.Response[v1.AgentHeartbeatResponse], error) {
+	return c.agentHeartbeat.CallUnary(ctx, req)
 }
 
 // Hello calls laelia.v1.AgentService.Hello.
@@ -75,7 +169,12 @@ func (c *agentServiceClient) Hello(ctx context.Context, req *connect.Request[v1.
 
 // AgentServiceHandler is an implementation of the laelia.v1.AgentService service.
 type AgentServiceHandler interface {
-	// Permissions required: None
+	CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.Agent], error)
+	ListAgents(context.Context, *connect.Request[v1.ListAgentsRequest]) (*connect.Response[v1.ListAgentsResponse], error)
+	GetAgent(context.Context, *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error)
+	DeleteAgent(context.Context, *connect.Request[v1.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error)
+	ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error)
+	AgentHeartbeat(context.Context, *connect.Request[v1.AgentHeartbeatRequest]) (*connect.Response[v1.AgentHeartbeatResponse], error)
 	Hello(context.Context, *connect.Request[v1.HelloRequest]) (*connect.Response[v1.HelloResponse], error)
 }
 
@@ -86,6 +185,42 @@ type AgentServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	agentServiceMethods := v1.File_v1_agent_proto.Services().ByName("AgentService").Methods()
+	agentServiceCreateAgentHandler := connect.NewUnaryHandler(
+		AgentServiceCreateAgentProcedure,
+		svc.CreateAgent,
+		connect.WithSchema(agentServiceMethods.ByName("CreateAgent")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceListAgentsHandler := connect.NewUnaryHandler(
+		AgentServiceListAgentsProcedure,
+		svc.ListAgents,
+		connect.WithSchema(agentServiceMethods.ByName("ListAgents")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceGetAgentHandler := connect.NewUnaryHandler(
+		AgentServiceGetAgentProcedure,
+		svc.GetAgent,
+		connect.WithSchema(agentServiceMethods.ByName("GetAgent")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceDeleteAgentHandler := connect.NewUnaryHandler(
+		AgentServiceDeleteAgentProcedure,
+		svc.DeleteAgent,
+		connect.WithSchema(agentServiceMethods.ByName("DeleteAgent")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceConnectAgentHandler := connect.NewUnaryHandler(
+		AgentServiceConnectAgentProcedure,
+		svc.ConnectAgent,
+		connect.WithSchema(agentServiceMethods.ByName("ConnectAgent")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceAgentHeartbeatHandler := connect.NewUnaryHandler(
+		AgentServiceAgentHeartbeatProcedure,
+		svc.AgentHeartbeat,
+		connect.WithSchema(agentServiceMethods.ByName("AgentHeartbeat")),
+		connect.WithHandlerOptions(opts...),
+	)
 	agentServiceHelloHandler := connect.NewUnaryHandler(
 		AgentServiceHelloProcedure,
 		svc.Hello,
@@ -94,6 +229,18 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 	)
 	return "/laelia.v1.AgentService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case AgentServiceCreateAgentProcedure:
+			agentServiceCreateAgentHandler.ServeHTTP(w, r)
+		case AgentServiceListAgentsProcedure:
+			agentServiceListAgentsHandler.ServeHTTP(w, r)
+		case AgentServiceGetAgentProcedure:
+			agentServiceGetAgentHandler.ServeHTTP(w, r)
+		case AgentServiceDeleteAgentProcedure:
+			agentServiceDeleteAgentHandler.ServeHTTP(w, r)
+		case AgentServiceConnectAgentProcedure:
+			agentServiceConnectAgentHandler.ServeHTTP(w, r)
+		case AgentServiceAgentHeartbeatProcedure:
+			agentServiceAgentHeartbeatHandler.ServeHTTP(w, r)
 		case AgentServiceHelloProcedure:
 			agentServiceHelloHandler.ServeHTTP(w, r)
 		default:
@@ -104,6 +251,30 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 
 // UnimplementedAgentServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedAgentServiceHandler struct{}
+
+func (UnimplementedAgentServiceHandler) CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.Agent], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.CreateAgent is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) ListAgents(context.Context, *connect.Request[v1.ListAgentsRequest]) (*connect.Response[v1.ListAgentsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.ListAgents is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) GetAgent(context.Context, *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.GetAgent is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) DeleteAgent(context.Context, *connect.Request[v1.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.DeleteAgent is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.ConnectAgent is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) AgentHeartbeat(context.Context, *connect.Request[v1.AgentHeartbeatRequest]) (*connect.Response[v1.AgentHeartbeatResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.AgentHeartbeat is not implemented"))
+}
 
 func (UnimplementedAgentServiceHandler) Hello(context.Context, *connect.Request[v1.HelloRequest]) (*connect.Response[v1.HelloResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.Hello is not implemented"))

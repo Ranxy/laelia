@@ -3,6 +3,13 @@
 
 ## Table of Contents
 
+- [store/agent.proto](#store_agent-proto)
+    - [AgentInfo](#laelia-store-AgentInfo)
+    - [AgentInfo.LabelsEntry](#laelia-store-AgentInfo-LabelsEntry)
+    - [AgentStatus](#laelia-store-AgentStatus)
+  
+    - [AgentStatus.ConnectionState](#laelia-store-AgentStatus-ConnectionState)
+  
 - [store/common.proto](#store_common-proto)
     - [PageToken](#laelia-store-PageToken)
     - [Position](#laelia-store-Position)
@@ -56,6 +63,91 @@
     - [PrincipalType](#laelia-store-PrincipalType)
   
 - [Scalar Value Types](#scalar-value-types)
+
+
+
+<a name="store_agent-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## store/agent.proto
+
+
+
+<a name="laelia-store-AgentInfo"></a>
+
+### AgentInfo
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_type | [string](#string) |  |  |
+| hostname | [string](#string) |  |  |
+| os | [string](#string) |  |  |
+| arch | [string](#string) |  |  |
+| ip | [string](#string) |  |  |
+| version | [string](#string) |  |  |
+| labels | [AgentInfo.LabelsEntry](#laelia-store-AgentInfo-LabelsEntry) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-store-AgentInfo-LabelsEntry"></a>
+
+### AgentInfo.LabelsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-store-AgentStatus"></a>
+
+### AgentStatus
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| state | [AgentStatus.ConnectionState](#laelia-store-AgentStatus-ConnectionState) |  |  |
+| last_heartbeat_at | [int64](#int64) |  |  |
+| connected_at | [int64](#int64) |  |  |
+| error_message | [string](#string) |  |  |
+
+
+
+
+
+ 
+
+
+<a name="laelia-store-AgentStatus-ConnectionState"></a>
+
+### AgentStatus.ConnectionState
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| CONNECTION_STATE_UNSPECIFIED | 0 |  |
+| ONLINE | 1 |  |
+| OFFLINE | 2 |  |
+| ERROR | 3 |  |
+
+
+ 
+
+ 
+
+ 
 
 
 

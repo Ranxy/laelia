@@ -2,13 +2,162 @@
 // @generated from file v1/agent.proto (package laelia.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
+import type { State } from "./common_pb";
+import type { EmptySchema, Timestamp } from "@bufbuild/protobuf/wkt";
 
 /**
  * Describes the file v1/agent.proto.
  */
 export declare const file_v1_agent: GenFile;
+
+/**
+ * @generated from message laelia.v1.CreateAgentRequest
+ */
+export declare type CreateAgentRequest = Message<"laelia.v1.CreateAgentRequest"> & {
+  /**
+   * @generated from field: laelia.v1.Agent agent = 1;
+   */
+  agent?: Agent | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.CreateAgentRequest.
+ * Use `create(CreateAgentRequestSchema)` to create a new message.
+ */
+export declare const CreateAgentRequestSchema: GenMessage<CreateAgentRequest>;
+
+/**
+ * @generated from message laelia.v1.ListAgentsRequest
+ */
+export declare type ListAgentsRequest = Message<"laelia.v1.ListAgentsRequest"> & {
+  /**
+   * @generated from field: int32 page_size = 1;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 2;
+   */
+  pageToken: string;
+
+  /**
+   * @generated from field: bool show_deleted = 3;
+   */
+  showDeleted: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.ListAgentsRequest.
+ * Use `create(ListAgentsRequestSchema)` to create a new message.
+ */
+export declare const ListAgentsRequestSchema: GenMessage<ListAgentsRequest>;
+
+/**
+ * @generated from message laelia.v1.ListAgentsResponse
+ */
+export declare type ListAgentsResponse = Message<"laelia.v1.ListAgentsResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.Agent agents = 1;
+   */
+  agents: Agent[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListAgentsResponse.
+ * Use `create(ListAgentsResponseSchema)` to create a new message.
+ */
+export declare const ListAgentsResponseSchema: GenMessage<ListAgentsResponse>;
+
+/**
+ * @generated from message laelia.v1.GetAgentRequest
+ */
+export declare type GetAgentRequest = Message<"laelia.v1.GetAgentRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetAgentRequest.
+ * Use `create(GetAgentRequestSchema)` to create a new message.
+ */
+export declare const GetAgentRequestSchema: GenMessage<GetAgentRequest>;
+
+/**
+ * @generated from message laelia.v1.DeleteAgentRequest
+ */
+export declare type DeleteAgentRequest = Message<"laelia.v1.DeleteAgentRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.DeleteAgentRequest.
+ * Use `create(DeleteAgentRequestSchema)` to create a new message.
+ */
+export declare const DeleteAgentRequestSchema: GenMessage<DeleteAgentRequest>;
+
+/**
+ * @generated from message laelia.v1.ConnectAgentRequest
+ */
+export declare type ConnectAgentRequest = Message<"laelia.v1.ConnectAgentRequest"> & {
+  /**
+   * @generated from field: laelia.v1.AgentInfo info = 1;
+   */
+  info?: AgentInfo | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.ConnectAgentRequest.
+ * Use `create(ConnectAgentRequestSchema)` to create a new message.
+ */
+export declare const ConnectAgentRequestSchema: GenMessage<ConnectAgentRequest>;
+
+/**
+ * @generated from message laelia.v1.ConnectAgentResponse
+ */
+export declare type ConnectAgentResponse = Message<"laelia.v1.ConnectAgentResponse"> & {
+};
+
+/**
+ * Describes the message laelia.v1.ConnectAgentResponse.
+ * Use `create(ConnectAgentResponseSchema)` to create a new message.
+ */
+export declare const ConnectAgentResponseSchema: GenMessage<ConnectAgentResponse>;
+
+/**
+ * @generated from message laelia.v1.AgentHeartbeatRequest
+ */
+export declare type AgentHeartbeatRequest = Message<"laelia.v1.AgentHeartbeatRequest"> & {
+};
+
+/**
+ * Describes the message laelia.v1.AgentHeartbeatRequest.
+ * Use `create(AgentHeartbeatRequestSchema)` to create a new message.
+ */
+export declare const AgentHeartbeatRequestSchema: GenMessage<AgentHeartbeatRequest>;
+
+/**
+ * @generated from message laelia.v1.AgentHeartbeatResponse
+ */
+export declare type AgentHeartbeatResponse = Message<"laelia.v1.AgentHeartbeatResponse"> & {
+};
+
+/**
+ * Describes the message laelia.v1.AgentHeartbeatResponse.
+ * Use `create(AgentHeartbeatResponseSchema)` to create a new message.
+ */
+export declare const AgentHeartbeatResponseSchema: GenMessage<AgentHeartbeatResponse>;
 
 /**
  * @generated from message laelia.v1.HelloRequest
@@ -39,12 +188,216 @@ export declare type HelloResponse = Message<"laelia.v1.HelloResponse"> & {
 export declare const HelloResponseSchema: GenMessage<HelloResponse>;
 
 /**
+ * @generated from message laelia.v1.Agent
+ */
+export declare type Agent = Message<"laelia.v1.Agent"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: laelia.v1.State state = 2;
+   */
+  state: State;
+
+  /**
+   * @generated from field: string title = 3;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string token = 4;
+   */
+  token: string;
+
+  /**
+   * @generated from field: laelia.v1.AgentInfo info = 5;
+   */
+  info?: AgentInfo | undefined;
+
+  /**
+   * @generated from field: laelia.v1.AgentStatus status = 6;
+   */
+  status?: AgentStatus | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 7;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: map<string, string> labels = 8;
+   */
+  labels: { [key: string]: string };
+};
+
+/**
+ * Describes the message laelia.v1.Agent.
+ * Use `create(AgentSchema)` to create a new message.
+ */
+export declare const AgentSchema: GenMessage<Agent>;
+
+/**
+ * @generated from message laelia.v1.AgentInfo
+ */
+export declare type AgentInfo = Message<"laelia.v1.AgentInfo"> & {
+  /**
+   * @generated from field: string agent_type = 1;
+   */
+  agentType: string;
+
+  /**
+   * @generated from field: string hostname = 2;
+   */
+  hostname: string;
+
+  /**
+   * @generated from field: string os = 3;
+   */
+  os: string;
+
+  /**
+   * @generated from field: string arch = 4;
+   */
+  arch: string;
+
+  /**
+   * @generated from field: string ip = 5;
+   */
+  ip: string;
+
+  /**
+   * @generated from field: string version = 6;
+   */
+  version: string;
+
+  /**
+   * @generated from field: map<string, string> labels = 7;
+   */
+  labels: { [key: string]: string };
+};
+
+/**
+ * Describes the message laelia.v1.AgentInfo.
+ * Use `create(AgentInfoSchema)` to create a new message.
+ */
+export declare const AgentInfoSchema: GenMessage<AgentInfo>;
+
+/**
+ * @generated from message laelia.v1.AgentStatus
+ */
+export declare type AgentStatus = Message<"laelia.v1.AgentStatus"> & {
+  /**
+   * @generated from field: laelia.v1.AgentStatus.ConnectionState state = 1;
+   */
+  state: AgentStatus_ConnectionState;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp last_heartbeat_time = 2;
+   */
+  lastHeartbeatTime?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp connected_time = 3;
+   */
+  connectedTime?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string error_message = 4;
+   */
+  errorMessage: string;
+};
+
+/**
+ * Describes the message laelia.v1.AgentStatus.
+ * Use `create(AgentStatusSchema)` to create a new message.
+ */
+export declare const AgentStatusSchema: GenMessage<AgentStatus>;
+
+/**
+ * @generated from enum laelia.v1.AgentStatus.ConnectionState
+ */
+export enum AgentStatus_ConnectionState {
+  /**
+   * @generated from enum value: CONNECTION_STATE_UNSPECIFIED = 0;
+   */
+  CONNECTION_STATE_UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ONLINE = 1;
+   */
+  ONLINE = 1,
+
+  /**
+   * @generated from enum value: OFFLINE = 2;
+   */
+  OFFLINE = 2,
+
+  /**
+   * @generated from enum value: ERROR = 3;
+   */
+  ERROR = 3,
+}
+
+/**
+ * Describes the enum laelia.v1.AgentStatus.ConnectionState.
+ */
+export declare const AgentStatus_ConnectionStateSchema: GenEnum<AgentStatus_ConnectionState>;
+
+/**
  * @generated from service laelia.v1.AgentService
  */
 export declare const AgentService: GenService<{
   /**
-   * Permissions required: None
-   *
+   * @generated from rpc laelia.v1.AgentService.CreateAgent
+   */
+  createAgent: {
+    methodKind: "unary";
+    input: typeof CreateAgentRequestSchema;
+    output: typeof AgentSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.AgentService.ListAgents
+   */
+  listAgents: {
+    methodKind: "unary";
+    input: typeof ListAgentsRequestSchema;
+    output: typeof ListAgentsResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.AgentService.GetAgent
+   */
+  getAgent: {
+    methodKind: "unary";
+    input: typeof GetAgentRequestSchema;
+    output: typeof AgentSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.AgentService.DeleteAgent
+   */
+  deleteAgent: {
+    methodKind: "unary";
+    input: typeof DeleteAgentRequestSchema;
+    output: typeof EmptySchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.AgentService.ConnectAgent
+   */
+  connectAgent: {
+    methodKind: "unary";
+    input: typeof ConnectAgentRequestSchema;
+    output: typeof ConnectAgentResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.AgentService.AgentHeartbeat
+   */
+  agentHeartbeat: {
+    methodKind: "unary";
+    input: typeof AgentHeartbeatRequestSchema;
+    output: typeof AgentHeartbeatResponseSchema;
+  },
+  /**
    * @generated from rpc laelia.v1.AgentService.Hello
    */
   hello: {

@@ -2,29 +2,130 @@
 // @generated from file v1/agent.proto (package laelia.v1, syntax proto3)
 /* eslint-disable */
 
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc, tsEnum } from "@bufbuild/protobuf/codegenv2";
 import { file_google_api_annotations } from "../google/api/annotations_pb";
+import { file_google_api_client } from "../google/api/client_pb";
+import { file_google_api_field_behavior } from "../google/api/field_behavior_pb";
+import { file_google_api_resource } from "../google/api/resource_pb";
+import { file_google_protobuf_empty, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import { file_v1_annotation } from "./annotation_pb";
+import { file_v1_common } from "./common_pb";
 
 /**
  * Describes the file v1/agent.proto.
  */
 export const file_v1_agent = /*@__PURE__*/
-  fileDesc("Cg52MS9hZ2VudC5wcm90bxIJbGFlbGlhLnYxIg4KDEhlbGxvUmVxdWVzdCIlCg1IZWxsb1Jlc3BvbnNlEhQKDGN1cnJlbnRfdGltZRgBIAEoAzJqCgxBZ2VudFNlcnZpY2USWgoFSGVsbG8SFy5sYWVsaWEudjEuSGVsbG9SZXF1ZXN0GhgubGFlbGlhLnYxLkhlbGxvUmVzcG9uc2UiHpjqMACC0+STAhQ6ASoiDy92MS9hZ2VudC9oZWxsb0IxWi9naXRodWIuY29tL1Jhbnh5L2xhZWxpYS9iYWNrZW5kL2dlbmVyYXRlZC1nby92MWIGcHJvdG8z", [file_google_api_annotations, file_v1_annotation]);
+  fileDesc("Cg52MS9hZ2VudC5wcm90bxIJbGFlbGlhLnYxIjoKEkNyZWF0ZUFnZW50UmVxdWVzdBIkCgVhZ2VudBgBIAEoCzIQLmxhZWxpYS52MS5BZ2VudEID4EECIlAKEUxpc3RBZ2VudHNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJEhQKDHNob3dfZGVsZXRlZBgDIAEoCCJPChJMaXN0QWdlbnRzUmVzcG9uc2USIAoGYWdlbnRzGAEgAygLMhAubGFlbGlhLnYxLkFnZW50EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSI1Cg9HZXRBZ2VudFJlcXVlc3QSIgoEbmFtZRgBIAEoCUIU4EEC+kEOCgxsYWVsaWEvQWdlbnQiOAoSRGVsZXRlQWdlbnRSZXF1ZXN0EiIKBG5hbWUYASABKAlCFOBBAvpBDgoMbGFlbGlhL0FnZW50IjkKE0Nvbm5lY3RBZ2VudFJlcXVlc3QSIgoEaW5mbxgBIAEoCzIULmxhZWxpYS52MS5BZ2VudEluZm8iFgoUQ29ubmVjdEFnZW50UmVzcG9uc2UiFwoVQWdlbnRIZWFydGJlYXRSZXF1ZXN0IhgKFkFnZW50SGVhcnRiZWF0UmVzcG9uc2UiDgoMSGVsbG9SZXF1ZXN0IiUKDUhlbGxvUmVzcG9uc2USFAoMY3VycmVudF90aW1lGAEgASgDItACCgVBZ2VudBIMCgRuYW1lGAEgASgJEh8KBXN0YXRlGAIgASgOMhAubGFlbGlhLnYxLlN0YXRlEg0KBXRpdGxlGAMgASgJEg0KBXRva2VuGAQgASgJEiIKBGluZm8YBSABKAsyFC5sYWVsaWEudjEuQWdlbnRJbmZvEiYKBnN0YXR1cxgGIAEoCzIWLmxhZWxpYS52MS5BZ2VudFN0YXR1cxIuCgpjcmVhdGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCgZsYWJlbHMYCCADKAsyHC5sYWVsaWEudjEuQWdlbnQuTGFiZWxzRW50cnkaLQoLTGFiZWxzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AToh6kEeCgxsYWVsaWEvQWdlbnQSDmFnZW50cy97YWdlbnR9IskBCglBZ2VudEluZm8SEgoKYWdlbnRfdHlwZRgBIAEoCRIQCghob3N0bmFtZRgCIAEoCRIKCgJvcxgDIAEoCRIMCgRhcmNoGAQgASgJEgoKAmlwGAUgASgJEg8KB3ZlcnNpb24YBiABKAkSMAoGbGFiZWxzGAcgAygLMiAubGFlbGlhLnYxLkFnZW50SW5mby5MYWJlbHNFbnRyeRotCgtMYWJlbHNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIqECCgtBZ2VudFN0YXR1cxI1CgVzdGF0ZRgBIAEoDjImLmxhZWxpYS52MS5BZ2VudFN0YXR1cy5Db25uZWN0aW9uU3RhdGUSNwoTbGFzdF9oZWFydGJlYXRfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMgoOY29ubmVjdGVkX3RpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhUKDWVycm9yX21lc3NhZ2UYBCABKAkiVwoPQ29ubmVjdGlvblN0YXRlEiAKHENPTk5FQ1RJT05fU1RBVEVfVU5TUEVDSUZJRUQQABIKCgZPTkxJTkUQARILCgdPRkZMSU5FEAISCQoFRVJST1IQAzLdBQoMQWdlbnRTZXJ2aWNlEl0KC0NyZWF0ZUFnZW50Eh0ubGFlbGlhLnYxLkNyZWF0ZUFnZW50UmVxdWVzdBoQLmxhZWxpYS52MS5BZ2VudCIdmOowAYLT5JMCEzoFYWdlbnQiCi92MS9hZ2VudHMSXQoKTGlzdEFnZW50cxIcLmxhZWxpYS52MS5MaXN0QWdlbnRzUmVxdWVzdBodLmxhZWxpYS52MS5MaXN0QWdlbnRzUmVzcG9uc2UiEoLT5JMCDBIKL3YxL2FnZW50cxJcCghHZXRBZ2VudBIaLmxhZWxpYS52MS5HZXRBZ2VudFJlcXVlc3QaEC5sYWVsaWEudjEuQWdlbnQiItpBBG5hbWWC0+STAhUSEy92MS97bmFtZT1hZ2VudHMvKn0SZQoLRGVsZXRlQWdlbnQSHS5sYWVsaWEudjEuRGVsZXRlQWdlbnRSZXF1ZXN0GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5Ih+Y6jABgtPkkwIVKhMvdjEve25hbWU9YWdlbnRzLyp9EnIKDENvbm5lY3RBZ2VudBIeLmxhZWxpYS52MS5Db25uZWN0QWdlbnRSZXF1ZXN0Gh8ubGFlbGlhLnYxLkNvbm5lY3RBZ2VudFJlc3BvbnNlIiGQ6jACgtPkkwIXOgEqIhIvdjEvYWdlbnRzOmNvbm5lY3QSegoOQWdlbnRIZWFydGJlYXQSIC5sYWVsaWEudjEuQWdlbnRIZWFydGJlYXRSZXF1ZXN0GiEubGFlbGlhLnYxLkFnZW50SGVhcnRiZWF0UmVzcG9uc2UiI5DqMAKC0+STAhk6ASoiFC92MS9hZ2VudHM6aGVhcnRiZWF0EloKBUhlbGxvEhcubGFlbGlhLnYxLkhlbGxvUmVxdWVzdBoYLmxhZWxpYS52MS5IZWxsb1Jlc3BvbnNlIh6Y6jAAgtPkkwIUOgEqIg8vdjEvYWdlbnQvaGVsbG9CMVovZ2l0aHViLmNvbS9SYW54eS9sYWVsaWEvYmFja2VuZC9nZW5lcmF0ZWQtZ28vdjFiBnByb3RvMw", [file_google_api_annotations, file_google_api_client, file_google_api_field_behavior, file_google_api_resource, file_google_protobuf_empty, file_google_protobuf_timestamp, file_v1_annotation, file_v1_common]);
+
+/**
+ * Describes the message laelia.v1.CreateAgentRequest.
+ * Use `create(CreateAgentRequestSchema)` to create a new message.
+ */
+export const CreateAgentRequestSchema = /*@__PURE__*/
+  messageDesc(file_v1_agent, 0);
+
+/**
+ * Describes the message laelia.v1.ListAgentsRequest.
+ * Use `create(ListAgentsRequestSchema)` to create a new message.
+ */
+export const ListAgentsRequestSchema = /*@__PURE__*/
+  messageDesc(file_v1_agent, 1);
+
+/**
+ * Describes the message laelia.v1.ListAgentsResponse.
+ * Use `create(ListAgentsResponseSchema)` to create a new message.
+ */
+export const ListAgentsResponseSchema = /*@__PURE__*/
+  messageDesc(file_v1_agent, 2);
+
+/**
+ * Describes the message laelia.v1.GetAgentRequest.
+ * Use `create(GetAgentRequestSchema)` to create a new message.
+ */
+export const GetAgentRequestSchema = /*@__PURE__*/
+  messageDesc(file_v1_agent, 3);
+
+/**
+ * Describes the message laelia.v1.DeleteAgentRequest.
+ * Use `create(DeleteAgentRequestSchema)` to create a new message.
+ */
+export const DeleteAgentRequestSchema = /*@__PURE__*/
+  messageDesc(file_v1_agent, 4);
+
+/**
+ * Describes the message laelia.v1.ConnectAgentRequest.
+ * Use `create(ConnectAgentRequestSchema)` to create a new message.
+ */
+export const ConnectAgentRequestSchema = /*@__PURE__*/
+  messageDesc(file_v1_agent, 5);
+
+/**
+ * Describes the message laelia.v1.ConnectAgentResponse.
+ * Use `create(ConnectAgentResponseSchema)` to create a new message.
+ */
+export const ConnectAgentResponseSchema = /*@__PURE__*/
+  messageDesc(file_v1_agent, 6);
+
+/**
+ * Describes the message laelia.v1.AgentHeartbeatRequest.
+ * Use `create(AgentHeartbeatRequestSchema)` to create a new message.
+ */
+export const AgentHeartbeatRequestSchema = /*@__PURE__*/
+  messageDesc(file_v1_agent, 7);
+
+/**
+ * Describes the message laelia.v1.AgentHeartbeatResponse.
+ * Use `create(AgentHeartbeatResponseSchema)` to create a new message.
+ */
+export const AgentHeartbeatResponseSchema = /*@__PURE__*/
+  messageDesc(file_v1_agent, 8);
 
 /**
  * Describes the message laelia.v1.HelloRequest.
  * Use `create(HelloRequestSchema)` to create a new message.
  */
 export const HelloRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_agent, 0);
+  messageDesc(file_v1_agent, 9);
 
 /**
  * Describes the message laelia.v1.HelloResponse.
  * Use `create(HelloResponseSchema)` to create a new message.
  */
 export const HelloResponseSchema = /*@__PURE__*/
-  messageDesc(file_v1_agent, 1);
+  messageDesc(file_v1_agent, 10);
+
+/**
+ * Describes the message laelia.v1.Agent.
+ * Use `create(AgentSchema)` to create a new message.
+ */
+export const AgentSchema = /*@__PURE__*/
+  messageDesc(file_v1_agent, 11);
+
+/**
+ * Describes the message laelia.v1.AgentInfo.
+ * Use `create(AgentInfoSchema)` to create a new message.
+ */
+export const AgentInfoSchema = /*@__PURE__*/
+  messageDesc(file_v1_agent, 12);
+
+/**
+ * Describes the message laelia.v1.AgentStatus.
+ * Use `create(AgentStatusSchema)` to create a new message.
+ */
+export const AgentStatusSchema = /*@__PURE__*/
+  messageDesc(file_v1_agent, 13);
+
+/**
+ * Describes the enum laelia.v1.AgentStatus.ConnectionState.
+ */
+export const AgentStatus_ConnectionStateSchema = /*@__PURE__*/
+  enumDesc(file_v1_agent, 13, 0);
+
+/**
+ * @generated from enum laelia.v1.AgentStatus.ConnectionState
+ */
+export const AgentStatus_ConnectionState = /*@__PURE__*/
+  tsEnum(AgentStatus_ConnectionStateSchema);
 
 /**
  * @generated from service laelia.v1.AgentService

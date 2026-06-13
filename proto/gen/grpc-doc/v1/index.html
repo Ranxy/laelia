@@ -206,29 +206,6 @@
         
           
           <li>
-            <a href="#v1%2fagent.proto">v1/agent.proto</a>
-            <ul>
-              
-                <li>
-                  <a href="#laelia.v1.HelloRequest"><span class="badge">M</span>HelloRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.HelloResponse"><span class="badge">M</span>HelloResponse</a>
-                </li>
-              
-              
-              
-              
-                <li>
-                  <a href="#laelia.v1.AgentService"><span class="badge">S</span>AgentService</a>
-                </li>
-              
-            </ul>
-          </li>
-        
-          
-          <li>
             <a href="#v1%2fcommon.proto">v1/common.proto</a>
             <ul>
               
@@ -250,6 +227,89 @@
                 </li>
               
               
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#v1%2fagent.proto">v1/agent.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.v1.Agent"><span class="badge">M</span>Agent</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.Agent.LabelsEntry"><span class="badge">M</span>Agent.LabelsEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AgentHeartbeatRequest"><span class="badge">M</span>AgentHeartbeatRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AgentHeartbeatResponse"><span class="badge">M</span>AgentHeartbeatResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AgentInfo"><span class="badge">M</span>AgentInfo</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AgentInfo.LabelsEntry"><span class="badge">M</span>AgentInfo.LabelsEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AgentStatus"><span class="badge">M</span>AgentStatus</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ConnectAgentRequest"><span class="badge">M</span>ConnectAgentRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ConnectAgentResponse"><span class="badge">M</span>ConnectAgentResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.CreateAgentRequest"><span class="badge">M</span>CreateAgentRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DeleteAgentRequest"><span class="badge">M</span>DeleteAgentRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetAgentRequest"><span class="badge">M</span>GetAgentRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.HelloRequest"><span class="badge">M</span>HelloRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.HelloResponse"><span class="badge">M</span>HelloResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListAgentsRequest"><span class="badge">M</span>ListAgentsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListAgentsResponse"><span class="badge">M</span>ListAgentsResponse</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#laelia.v1.AgentStatus.ConnectionState"><span class="badge">E</span>AgentStatus.ConnectionState</a>
+                </li>
+              
+              
+              
+                <li>
+                  <a href="#laelia.v1.AgentService"><span class="badge">S</span>AgentService</a>
+                </li>
               
             </ul>
           </li>
@@ -444,98 +504,6 @@
     
       
       <div class="file-heading">
-        <h2 id="v1/agent.proto">v1/agent.proto</h2><a href="#title">Top</a>
-      </div>
-      <p></p>
-
-      
-        <h3 id="laelia.v1.HelloRequest">HelloRequest</h3>
-        <p></p>
-
-        
-
-        
-      
-        <h3 id="laelia.v1.HelloResponse">HelloResponse</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>current_time</td>
-                  <td><a href="#int64">int64</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-
-      
-
-      
-
-      
-        <h3 id="laelia.v1.AgentService">AgentService</h3>
-        <p></p>
-        <table class="enum-table">
-          <thead>
-            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
-          </thead>
-          <tbody>
-            
-              <tr>
-                <td>Hello</td>
-                <td><a href="#laelia.v1.HelloRequest">HelloRequest</a></td>
-                <td><a href="#laelia.v1.HelloResponse">HelloResponse</a></td>
-                <td><p>Permissions required: None</p></td>
-              </tr>
-            
-          </tbody>
-        </table>
-
-        
-          
-          
-          <h4>Methods with HTTP bindings</h4>
-          <table>
-            <thead>
-              <tr>
-                <td>Method Name</td>
-                <td>Method</td>
-                <td>Pattern</td>
-                <td>Body</td>
-              </tr>
-            </thead>
-            <tbody>
-            
-              
-              
-              <tr>
-                <td>Hello</td>
-                <td>POST</td>
-                <td>/v1/agent/hello</td>
-                <td>*</td>
-              </tr>
-              
-            
-            </tbody>
-          </table>
-          
-        
-    
-      
-      <div class="file-heading">
         <h2 id="v1/common.proto">v1/common.proto</h2><a href="#title">Top</a>
       </div>
       <p></p>
@@ -673,6 +641,667 @@
       
 
       
+    
+      
+      <div class="file-heading">
+        <h2 id="v1/agent.proto">v1/agent.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.v1.Agent">Agent</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>state</td>
+                  <td><a href="#laelia.v1.State">State</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>info</td>
+                  <td><a href="#laelia.v1.AgentInfo">AgentInfo</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>status</td>
+                  <td><a href="#laelia.v1.AgentStatus">AgentStatus</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>labels</td>
+                  <td><a href="#laelia.v1.Agent.LabelsEntry">Agent.LabelsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.Agent.LabelsEntry">Agent.LabelsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.AgentHeartbeatRequest">AgentHeartbeatRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.AgentHeartbeatResponse">AgentHeartbeatResponse</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.AgentInfo">AgentInfo</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>hostname</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>os</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>arch</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>ip</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>labels</td>
+                  <td><a href="#laelia.v1.AgentInfo.LabelsEntry">AgentInfo.LabelsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.AgentInfo.LabelsEntry">AgentInfo.LabelsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.AgentStatus">AgentStatus</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>state</td>
+                  <td><a href="#laelia.v1.AgentStatus.ConnectionState">AgentStatus.ConnectionState</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_heartbeat_time</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>connected_time</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>error_message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ConnectAgentRequest">ConnectAgentRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>info</td>
+                  <td><a href="#laelia.v1.AgentInfo">AgentInfo</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ConnectAgentResponse">ConnectAgentResponse</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.CreateAgentRequest">CreateAgentRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent</td>
+                  <td><a href="#laelia.v1.Agent">Agent</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DeleteAgentRequest">DeleteAgentRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetAgentRequest">GetAgentRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.HelloRequest">HelloRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.HelloResponse">HelloResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>current_time</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListAgentsRequest">ListAgentsRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>show_deleted</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListAgentsResponse">ListAgentsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agents</td>
+                  <td><a href="#laelia.v1.Agent">Agent</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="laelia.v1.AgentStatus.ConnectionState">AgentStatus.ConnectionState</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>CONNECTION_STATE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ONLINE</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>OFFLINE</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ERROR</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+        <h3 id="laelia.v1.AgentService">AgentService</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>CreateAgent</td>
+                <td><a href="#laelia.v1.CreateAgentRequest">CreateAgentRequest</a></td>
+                <td><a href="#laelia.v1.Agent">Agent</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ListAgents</td>
+                <td><a href="#laelia.v1.ListAgentsRequest">ListAgentsRequest</a></td>
+                <td><a href="#laelia.v1.ListAgentsResponse">ListAgentsResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>GetAgent</td>
+                <td><a href="#laelia.v1.GetAgentRequest">GetAgentRequest</a></td>
+                <td><a href="#laelia.v1.Agent">Agent</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>DeleteAgent</td>
+                <td><a href="#laelia.v1.DeleteAgentRequest">DeleteAgentRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ConnectAgent</td>
+                <td><a href="#laelia.v1.ConnectAgentRequest">ConnectAgentRequest</a></td>
+                <td><a href="#laelia.v1.ConnectAgentResponse">ConnectAgentResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>AgentHeartbeat</td>
+                <td><a href="#laelia.v1.AgentHeartbeatRequest">AgentHeartbeatRequest</a></td>
+                <td><a href="#laelia.v1.AgentHeartbeatResponse">AgentHeartbeatResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>Hello</td>
+                <td><a href="#laelia.v1.HelloRequest">HelloRequest</a></td>
+                <td><a href="#laelia.v1.HelloResponse">HelloResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+          
+          
+          <h4>Methods with HTTP bindings</h4>
+          <table>
+            <thead>
+              <tr>
+                <td>Method Name</td>
+                <td>Method</td>
+                <td>Pattern</td>
+                <td>Body</td>
+              </tr>
+            </thead>
+            <tbody>
+            
+              
+              
+              <tr>
+                <td>CreateAgent</td>
+                <td>POST</td>
+                <td>/v1/agents</td>
+                <td>agent</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListAgents</td>
+                <td>GET</td>
+                <td>/v1/agents</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetAgent</td>
+                <td>GET</td>
+                <td>/v1/{name=agents/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>DeleteAgent</td>
+                <td>DELETE</td>
+                <td>/v1/{name=agents/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ConnectAgent</td>
+                <td>POST</td>
+                <td>/v1/agents:connect</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>AgentHeartbeat</td>
+                <td>POST</td>
+                <td>/v1/agents:heartbeat</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>Hello</td>
+                <td>POST</td>
+                <td>/v1/agent/hello</td>
+                <td>*</td>
+              </tr>
+              
+            
+            </tbody>
+          </table>
+          
+        
     
       
       <div class="file-heading">

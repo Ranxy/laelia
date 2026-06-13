@@ -10,7 +10,6 @@ paths:
         post:
             tags:
                 - AgentService
-            description: 'Permissions required: None'
             operationId: AgentService_Hello
             requestBody:
                 content:
@@ -25,6 +24,155 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/HelloResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents:
+        get:
+            tags:
+                - AgentService
+            operationId: AgentService_ListAgents
+            parameters:
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+                - name: showDeleted
+                  in: query
+                  schema:
+                    type: boolean
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListAgentsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - AgentService
+            operationId: AgentService_CreateAgent
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/Agent'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Agent'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}:
+        get:
+            tags:
+                - AgentService
+            operationId: AgentService_GetAgent
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Agent'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        delete:
+            tags:
+                - AgentService
+            operationId: AgentService_DeleteAgent
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents:connect:
+        post:
+            tags:
+                - AgentService
+            operationId: AgentService_ConnectAgent
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ConnectAgentRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ConnectAgentResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents:heartbeat:
+        post:
+            tags:
+                - AgentService
+            operationId: AgentService_AgentHeartbeat
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/AgentHeartbeatRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AgentHeartbeatResponse'
                 default:
                     description: Default error response
                     content:
@@ -359,6 +507,77 @@ paths:
                                 $ref: '#/components/schemas/Status'
 components:
     schemas:
+        Agent:
+            type: object
+            properties:
+                name:
+                    type: string
+                state:
+                    enum:
+                        - STATE_UNSPECIFIED
+                        - ACTIVE
+                        - DELETED
+                    type: string
+                    format: enum
+                title:
+                    type: string
+                token:
+                    type: string
+                info:
+                    $ref: '#/components/schemas/AgentInfo'
+                status:
+                    $ref: '#/components/schemas/AgentStatus'
+                createdAt:
+                    type: string
+                    format: date-time
+                labels:
+                    type: object
+                    additionalProperties:
+                        type: string
+        AgentHeartbeatRequest:
+            type: object
+            properties: {}
+        AgentHeartbeatResponse:
+            type: object
+            properties: {}
+        AgentInfo:
+            type: object
+            properties:
+                agentType:
+                    type: string
+                hostname:
+                    type: string
+                os:
+                    type: string
+                arch:
+                    type: string
+                ip:
+                    type: string
+                version:
+                    type: string
+                labels:
+                    type: object
+                    additionalProperties:
+                        type: string
+        AgentStatus:
+            type: object
+            properties:
+                state:
+                    enum:
+                        - CONNECTION_STATE_UNSPECIFIED
+                        - ONLINE
+                        - OFFLINE
+                        - ERROR
+                    type: string
+                    format: enum
+                lastHeartbeatTime:
+                    type: string
+                    format: date-time
+                connectedTime:
+                    type: string
+                    format: date-time
+                errorMessage:
+                    type: string
         BatchGetUsersResponse:
             type: object
             properties:
@@ -367,6 +586,14 @@ components:
                     items:
                         $ref: '#/components/schemas/User'
                     description: The users from the specified request.
+        ConnectAgentRequest:
+            type: object
+            properties:
+                info:
+                    $ref: '#/components/schemas/AgentInfo'
+        ConnectAgentResponse:
+            type: object
+            properties: {}
         GoogleProtobufAny:
             type: object
             properties:
@@ -388,6 +615,15 @@ components:
             properties:
                 oauth2Context:
                     $ref: '#/components/schemas/OAuth2IdentityProviderContext'
+        ListAgentsResponse:
+            type: object
+            properties:
+                agents:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Agent'
+                nextPageToken:
+                    type: string
         ListUsersResponse:
             type: object
             properties:

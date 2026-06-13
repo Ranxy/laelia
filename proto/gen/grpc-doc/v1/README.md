@@ -11,18 +11,34 @@
     - [File-level Extensions](#v1_annotation-proto-extensions)
     - [File-level Extensions](#v1_annotation-proto-extensions)
   
-- [v1/agent.proto](#v1_agent-proto)
-    - [HelloRequest](#laelia-v1-HelloRequest)
-    - [HelloResponse](#laelia-v1-HelloResponse)
-  
-    - [AgentService](#laelia-v1-AgentService)
-  
 - [v1/common.proto](#v1_common-proto)
     - [Position](#laelia-v1-Position)
     - [Range](#laelia-v1-Range)
   
     - [RiskLevel](#laelia-v1-RiskLevel)
     - [State](#laelia-v1-State)
+  
+- [v1/agent.proto](#v1_agent-proto)
+    - [Agent](#laelia-v1-Agent)
+    - [Agent.LabelsEntry](#laelia-v1-Agent-LabelsEntry)
+    - [AgentHeartbeatRequest](#laelia-v1-AgentHeartbeatRequest)
+    - [AgentHeartbeatResponse](#laelia-v1-AgentHeartbeatResponse)
+    - [AgentInfo](#laelia-v1-AgentInfo)
+    - [AgentInfo.LabelsEntry](#laelia-v1-AgentInfo-LabelsEntry)
+    - [AgentStatus](#laelia-v1-AgentStatus)
+    - [ConnectAgentRequest](#laelia-v1-ConnectAgentRequest)
+    - [ConnectAgentResponse](#laelia-v1-ConnectAgentResponse)
+    - [CreateAgentRequest](#laelia-v1-CreateAgentRequest)
+    - [DeleteAgentRequest](#laelia-v1-DeleteAgentRequest)
+    - [GetAgentRequest](#laelia-v1-GetAgentRequest)
+    - [HelloRequest](#laelia-v1-HelloRequest)
+    - [HelloResponse](#laelia-v1-HelloResponse)
+    - [ListAgentsRequest](#laelia-v1-ListAgentsRequest)
+    - [ListAgentsResponse](#laelia-v1-ListAgentsResponse)
+  
+    - [AgentStatus.ConnectionState](#laelia-v1-AgentStatus-ConnectionState)
+  
+    - [AgentService](#laelia-v1-AgentService)
   
 - [v1/user_service.proto](#v1_user_service-proto)
     - [BatchGetUsersRequest](#laelia-v1-BatchGetUsersRequest)
@@ -89,57 +105,6 @@
 | permission | string | .google.protobuf.MethodOptions | 100001 |  |
 
  
-
- 
-
-
-
-<a name="v1_agent-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## v1/agent.proto
-
-
-
-<a name="laelia-v1-HelloRequest"></a>
-
-### HelloRequest
-
-
-
-
-
-
-
-<a name="laelia-v1-HelloResponse"></a>
-
-### HelloResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| current_time | [int64](#int64) |  |  |
-
-
-
-
-
- 
-
- 
-
- 
-
-
-<a name="laelia-v1-AgentService"></a>
-
-### AgentService
-
-
-| Method Name | Request Type | Response Type | Description |
-| ----------- | ------------ | ------------- | ------------|
-| Hello | [HelloRequest](#laelia-v1-HelloRequest) | [HelloResponse](#laelia-v1-HelloResponse) | Permissions required: None |
 
  
 
@@ -216,6 +181,293 @@ RiskLevel is the risk level.
  
 
  
+
+ 
+
+
+
+<a name="v1_agent-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/agent.proto
+
+
+
+<a name="laelia-v1-Agent"></a>
+
+### Agent
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| state | [State](#laelia-v1-State) |  |  |
+| title | [string](#string) |  |  |
+| token | [string](#string) |  |  |
+| info | [AgentInfo](#laelia-v1-AgentInfo) |  |  |
+| status | [AgentStatus](#laelia-v1-AgentStatus) |  |  |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| labels | [Agent.LabelsEntry](#laelia-v1-Agent-LabelsEntry) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-Agent-LabelsEntry"></a>
+
+### Agent.LabelsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-AgentHeartbeatRequest"></a>
+
+### AgentHeartbeatRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-AgentHeartbeatResponse"></a>
+
+### AgentHeartbeatResponse
+
+
+
+
+
+
+
+<a name="laelia-v1-AgentInfo"></a>
+
+### AgentInfo
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_type | [string](#string) |  |  |
+| hostname | [string](#string) |  |  |
+| os | [string](#string) |  |  |
+| arch | [string](#string) |  |  |
+| ip | [string](#string) |  |  |
+| version | [string](#string) |  |  |
+| labels | [AgentInfo.LabelsEntry](#laelia-v1-AgentInfo-LabelsEntry) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-AgentInfo-LabelsEntry"></a>
+
+### AgentInfo.LabelsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-AgentStatus"></a>
+
+### AgentStatus
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| state | [AgentStatus.ConnectionState](#laelia-v1-AgentStatus-ConnectionState) |  |  |
+| last_heartbeat_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| connected_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| error_message | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ConnectAgentRequest"></a>
+
+### ConnectAgentRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| info | [AgentInfo](#laelia-v1-AgentInfo) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ConnectAgentResponse"></a>
+
+### ConnectAgentResponse
+
+
+
+
+
+
+
+<a name="laelia-v1-CreateAgentRequest"></a>
+
+### CreateAgentRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent | [Agent](#laelia-v1-Agent) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-DeleteAgentRequest"></a>
+
+### DeleteAgentRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetAgentRequest"></a>
+
+### GetAgentRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-HelloRequest"></a>
+
+### HelloRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-HelloResponse"></a>
+
+### HelloResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| current_time | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListAgentsRequest"></a>
+
+### ListAgentsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+| show_deleted | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListAgentsResponse"></a>
+
+### ListAgentsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agents | [Agent](#laelia-v1-Agent) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+ 
+
+
+<a name="laelia-v1-AgentStatus-ConnectionState"></a>
+
+### AgentStatus.ConnectionState
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| CONNECTION_STATE_UNSPECIFIED | 0 |  |
+| ONLINE | 1 |  |
+| OFFLINE | 2 |  |
+| ERROR | 3 |  |
+
+
+ 
+
+ 
+
+
+<a name="laelia-v1-AgentService"></a>
+
+### AgentService
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| CreateAgent | [CreateAgentRequest](#laelia-v1-CreateAgentRequest) | [Agent](#laelia-v1-Agent) |  |
+| ListAgents | [ListAgentsRequest](#laelia-v1-ListAgentsRequest) | [ListAgentsResponse](#laelia-v1-ListAgentsResponse) |  |
+| GetAgent | [GetAgentRequest](#laelia-v1-GetAgentRequest) | [Agent](#laelia-v1-Agent) |  |
+| DeleteAgent | [DeleteAgentRequest](#laelia-v1-DeleteAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+| ConnectAgent | [ConnectAgentRequest](#laelia-v1-ConnectAgentRequest) | [ConnectAgentResponse](#laelia-v1-ConnectAgentResponse) |  |
+| AgentHeartbeat | [AgentHeartbeatRequest](#laelia-v1-AgentHeartbeatRequest) | [AgentHeartbeatResponse](#laelia-v1-AgentHeartbeatResponse) |  |
+| Hello | [HelloRequest](#laelia-v1-HelloRequest) | [HelloResponse](#laelia-v1-HelloResponse) |  |
 
  
 

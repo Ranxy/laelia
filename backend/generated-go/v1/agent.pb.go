@@ -10,7 +10,8 @@ import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	_ "google.golang.org/protobuf/types/known/emptypb"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -23,6 +24,454 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type AgentStatus_ConnectionState int32
+
+const (
+	AgentStatus_CONNECTION_STATE_UNSPECIFIED AgentStatus_ConnectionState = 0
+	AgentStatus_ONLINE                       AgentStatus_ConnectionState = 1
+	AgentStatus_OFFLINE                      AgentStatus_ConnectionState = 2
+	AgentStatus_ERROR                        AgentStatus_ConnectionState = 3
+)
+
+// Enum value maps for AgentStatus_ConnectionState.
+var (
+	AgentStatus_ConnectionState_name = map[int32]string{
+		0: "CONNECTION_STATE_UNSPECIFIED",
+		1: "ONLINE",
+		2: "OFFLINE",
+		3: "ERROR",
+	}
+	AgentStatus_ConnectionState_value = map[string]int32{
+		"CONNECTION_STATE_UNSPECIFIED": 0,
+		"ONLINE":                       1,
+		"OFFLINE":                      2,
+		"ERROR":                        3,
+	}
+)
+
+func (x AgentStatus_ConnectionState) Enum() *AgentStatus_ConnectionState {
+	p := new(AgentStatus_ConnectionState)
+	*p = x
+	return p
+}
+
+func (x AgentStatus_ConnectionState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AgentStatus_ConnectionState) Descriptor() protoreflect.EnumDescriptor {
+	return file_v1_agent_proto_enumTypes[0].Descriptor()
+}
+
+func (AgentStatus_ConnectionState) Type() protoreflect.EnumType {
+	return &file_v1_agent_proto_enumTypes[0]
+}
+
+func (x AgentStatus_ConnectionState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AgentStatus_ConnectionState.Descriptor instead.
+func (AgentStatus_ConnectionState) EnumDescriptor() ([]byte, []int) {
+	return file_v1_agent_proto_rawDescGZIP(), []int{13, 0}
+}
+
+type CreateAgentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Agent         *Agent                 `protobuf:"bytes,1,opt,name=agent,proto3" json:"agent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateAgentRequest) Reset() {
+	*x = CreateAgentRequest{}
+	mi := &file_v1_agent_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAgentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAgentRequest) ProtoMessage() {}
+
+func (x *CreateAgentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_agent_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAgentRequest.ProtoReflect.Descriptor instead.
+func (*CreateAgentRequest) Descriptor() ([]byte, []int) {
+	return file_v1_agent_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *CreateAgentRequest) GetAgent() *Agent {
+	if x != nil {
+		return x.Agent
+	}
+	return nil
+}
+
+type ListAgentsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PageSize      int32                  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	ShowDeleted   bool                   `protobuf:"varint,3,opt,name=show_deleted,json=showDeleted,proto3" json:"show_deleted,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAgentsRequest) Reset() {
+	*x = ListAgentsRequest{}
+	mi := &file_v1_agent_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAgentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAgentsRequest) ProtoMessage() {}
+
+func (x *ListAgentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_agent_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAgentsRequest.ProtoReflect.Descriptor instead.
+func (*ListAgentsRequest) Descriptor() ([]byte, []int) {
+	return file_v1_agent_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ListAgentsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListAgentsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+func (x *ListAgentsRequest) GetShowDeleted() bool {
+	if x != nil {
+		return x.ShowDeleted
+	}
+	return false
+}
+
+type ListAgentsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Agents        []*Agent               `protobuf:"bytes,1,rep,name=agents,proto3" json:"agents,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAgentsResponse) Reset() {
+	*x = ListAgentsResponse{}
+	mi := &file_v1_agent_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAgentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAgentsResponse) ProtoMessage() {}
+
+func (x *ListAgentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_agent_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAgentsResponse.ProtoReflect.Descriptor instead.
+func (*ListAgentsResponse) Descriptor() ([]byte, []int) {
+	return file_v1_agent_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ListAgentsResponse) GetAgents() []*Agent {
+	if x != nil {
+		return x.Agents
+	}
+	return nil
+}
+
+func (x *ListAgentsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+type GetAgentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAgentRequest) Reset() {
+	*x = GetAgentRequest{}
+	mi := &file_v1_agent_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAgentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAgentRequest) ProtoMessage() {}
+
+func (x *GetAgentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_agent_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAgentRequest.ProtoReflect.Descriptor instead.
+func (*GetAgentRequest) Descriptor() ([]byte, []int) {
+	return file_v1_agent_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetAgentRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type DeleteAgentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAgentRequest) Reset() {
+	*x = DeleteAgentRequest{}
+	mi := &file_v1_agent_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAgentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAgentRequest) ProtoMessage() {}
+
+func (x *DeleteAgentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_agent_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAgentRequest.ProtoReflect.Descriptor instead.
+func (*DeleteAgentRequest) Descriptor() ([]byte, []int) {
+	return file_v1_agent_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *DeleteAgentRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type ConnectAgentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Info          *AgentInfo             `protobuf:"bytes,1,opt,name=info,proto3" json:"info,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConnectAgentRequest) Reset() {
+	*x = ConnectAgentRequest{}
+	mi := &file_v1_agent_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConnectAgentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConnectAgentRequest) ProtoMessage() {}
+
+func (x *ConnectAgentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_agent_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConnectAgentRequest.ProtoReflect.Descriptor instead.
+func (*ConnectAgentRequest) Descriptor() ([]byte, []int) {
+	return file_v1_agent_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ConnectAgentRequest) GetInfo() *AgentInfo {
+	if x != nil {
+		return x.Info
+	}
+	return nil
+}
+
+type ConnectAgentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConnectAgentResponse) Reset() {
+	*x = ConnectAgentResponse{}
+	mi := &file_v1_agent_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConnectAgentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConnectAgentResponse) ProtoMessage() {}
+
+func (x *ConnectAgentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_agent_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConnectAgentResponse.ProtoReflect.Descriptor instead.
+func (*ConnectAgentResponse) Descriptor() ([]byte, []int) {
+	return file_v1_agent_proto_rawDescGZIP(), []int{6}
+}
+
+type AgentHeartbeatRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentHeartbeatRequest) Reset() {
+	*x = AgentHeartbeatRequest{}
+	mi := &file_v1_agent_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentHeartbeatRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentHeartbeatRequest) ProtoMessage() {}
+
+func (x *AgentHeartbeatRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_agent_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentHeartbeatRequest.ProtoReflect.Descriptor instead.
+func (*AgentHeartbeatRequest) Descriptor() ([]byte, []int) {
+	return file_v1_agent_proto_rawDescGZIP(), []int{7}
+}
+
+type AgentHeartbeatResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentHeartbeatResponse) Reset() {
+	*x = AgentHeartbeatResponse{}
+	mi := &file_v1_agent_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentHeartbeatResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentHeartbeatResponse) ProtoMessage() {}
+
+func (x *AgentHeartbeatResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_agent_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentHeartbeatResponse.ProtoReflect.Descriptor instead.
+func (*AgentHeartbeatResponse) Descriptor() ([]byte, []int) {
+	return file_v1_agent_proto_rawDescGZIP(), []int{8}
+}
+
 type HelloRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -31,7 +480,7 @@ type HelloRequest struct {
 
 func (x *HelloRequest) Reset() {
 	*x = HelloRequest{}
-	mi := &file_v1_agent_proto_msgTypes[0]
+	mi := &file_v1_agent_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +492,7 @@ func (x *HelloRequest) String() string {
 func (*HelloRequest) ProtoMessage() {}
 
 func (x *HelloRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[0]
+	mi := &file_v1_agent_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +505,7 @@ func (x *HelloRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HelloRequest.ProtoReflect.Descriptor instead.
 func (*HelloRequest) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{0}
+	return file_v1_agent_proto_rawDescGZIP(), []int{9}
 }
 
 type HelloResponse struct {
@@ -68,7 +517,7 @@ type HelloResponse struct {
 
 func (x *HelloResponse) Reset() {
 	*x = HelloResponse{}
-	mi := &file_v1_agent_proto_msgTypes[1]
+	mi := &file_v1_agent_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -80,7 +529,7 @@ func (x *HelloResponse) String() string {
 func (*HelloResponse) ProtoMessage() {}
 
 func (x *HelloResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[1]
+	mi := &file_v1_agent_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -93,7 +542,7 @@ func (x *HelloResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HelloResponse.ProtoReflect.Descriptor instead.
 func (*HelloResponse) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{1}
+	return file_v1_agent_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *HelloResponse) GetCurrentTime() int64 {
@@ -103,15 +552,342 @@ func (x *HelloResponse) GetCurrentTime() int64 {
 	return 0
 }
 
+type Agent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	State         State                  `protobuf:"varint,2,opt,name=state,proto3,enum=laelia.v1.State" json:"state,omitempty"`
+	Title         string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Token         string                 `protobuf:"bytes,4,opt,name=token,proto3" json:"token,omitempty"`
+	Info          *AgentInfo             `protobuf:"bytes,5,opt,name=info,proto3" json:"info,omitempty"`
+	Status        *AgentStatus           `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Labels        map[string]string      `protobuf:"bytes,8,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Agent) Reset() {
+	*x = Agent{}
+	mi := &file_v1_agent_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Agent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Agent) ProtoMessage() {}
+
+func (x *Agent) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_agent_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Agent.ProtoReflect.Descriptor instead.
+func (*Agent) Descriptor() ([]byte, []int) {
+	return file_v1_agent_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *Agent) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Agent) GetState() State {
+	if x != nil {
+		return x.State
+	}
+	return State_STATE_UNSPECIFIED
+}
+
+func (x *Agent) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *Agent) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *Agent) GetInfo() *AgentInfo {
+	if x != nil {
+		return x.Info
+	}
+	return nil
+}
+
+func (x *Agent) GetStatus() *AgentStatus {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *Agent) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Agent) GetLabels() map[string]string {
+	if x != nil {
+		return x.Labels
+	}
+	return nil
+}
+
+type AgentInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentType     string                 `protobuf:"bytes,1,opt,name=agent_type,json=agentType,proto3" json:"agent_type,omitempty"`
+	Hostname      string                 `protobuf:"bytes,2,opt,name=hostname,proto3" json:"hostname,omitempty"`
+	Os            string                 `protobuf:"bytes,3,opt,name=os,proto3" json:"os,omitempty"`
+	Arch          string                 `protobuf:"bytes,4,opt,name=arch,proto3" json:"arch,omitempty"`
+	Ip            string                 `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"`
+	Version       string                 `protobuf:"bytes,6,opt,name=version,proto3" json:"version,omitempty"`
+	Labels        map[string]string      `protobuf:"bytes,7,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentInfo) Reset() {
+	*x = AgentInfo{}
+	mi := &file_v1_agent_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentInfo) ProtoMessage() {}
+
+func (x *AgentInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_agent_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentInfo.ProtoReflect.Descriptor instead.
+func (*AgentInfo) Descriptor() ([]byte, []int) {
+	return file_v1_agent_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *AgentInfo) GetAgentType() string {
+	if x != nil {
+		return x.AgentType
+	}
+	return ""
+}
+
+func (x *AgentInfo) GetHostname() string {
+	if x != nil {
+		return x.Hostname
+	}
+	return ""
+}
+
+func (x *AgentInfo) GetOs() string {
+	if x != nil {
+		return x.Os
+	}
+	return ""
+}
+
+func (x *AgentInfo) GetArch() string {
+	if x != nil {
+		return x.Arch
+	}
+	return ""
+}
+
+func (x *AgentInfo) GetIp() string {
+	if x != nil {
+		return x.Ip
+	}
+	return ""
+}
+
+func (x *AgentInfo) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *AgentInfo) GetLabels() map[string]string {
+	if x != nil {
+		return x.Labels
+	}
+	return nil
+}
+
+type AgentStatus struct {
+	state             protoimpl.MessageState      `protogen:"open.v1"`
+	State             AgentStatus_ConnectionState `protobuf:"varint,1,opt,name=state,proto3,enum=laelia.v1.AgentStatus_ConnectionState" json:"state,omitempty"`
+	LastHeartbeatTime *timestamppb.Timestamp      `protobuf:"bytes,2,opt,name=last_heartbeat_time,json=lastHeartbeatTime,proto3" json:"last_heartbeat_time,omitempty"`
+	ConnectedTime     *timestamppb.Timestamp      `protobuf:"bytes,3,opt,name=connected_time,json=connectedTime,proto3" json:"connected_time,omitempty"`
+	ErrorMessage      string                      `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *AgentStatus) Reset() {
+	*x = AgentStatus{}
+	mi := &file_v1_agent_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentStatus) ProtoMessage() {}
+
+func (x *AgentStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_agent_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentStatus.ProtoReflect.Descriptor instead.
+func (*AgentStatus) Descriptor() ([]byte, []int) {
+	return file_v1_agent_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *AgentStatus) GetState() AgentStatus_ConnectionState {
+	if x != nil {
+		return x.State
+	}
+	return AgentStatus_CONNECTION_STATE_UNSPECIFIED
+}
+
+func (x *AgentStatus) GetLastHeartbeatTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastHeartbeatTime
+	}
+	return nil
+}
+
+func (x *AgentStatus) GetConnectedTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ConnectedTime
+	}
+	return nil
+}
+
+func (x *AgentStatus) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
 var File_v1_agent_proto protoreflect.FileDescriptor
 
 const file_v1_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x0ev1/agent.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x13v1/annotation.proto\"\x0e\n" +
+	"\x0ev1/agent.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13v1/annotation.proto\x1a\x0fv1/common.proto\"A\n" +
+	"\x12CreateAgentRequest\x12+\n" +
+	"\x05agent\x18\x01 \x01(\v2\x10.laelia.v1.AgentB\x03\xe0A\x02R\x05agent\"r\n" +
+	"\x11ListAgentsRequest\x12\x1b\n" +
+	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x02 \x01(\tR\tpageToken\x12!\n" +
+	"\fshow_deleted\x18\x03 \x01(\bR\vshowDeleted\"f\n" +
+	"\x12ListAgentsResponse\x12(\n" +
+	"\x06agents\x18\x01 \x03(\v2\x10.laelia.v1.AgentR\x06agents\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\";\n" +
+	"\x0fGetAgentRequest\x12(\n" +
+	"\x04name\x18\x01 \x01(\tB\x14\xe0A\x02\xfaA\x0e\n" +
+	"\flaelia/AgentR\x04name\">\n" +
+	"\x12DeleteAgentRequest\x12(\n" +
+	"\x04name\x18\x01 \x01(\tB\x14\xe0A\x02\xfaA\x0e\n" +
+	"\flaelia/AgentR\x04name\"?\n" +
+	"\x13ConnectAgentRequest\x12(\n" +
+	"\x04info\x18\x01 \x01(\v2\x14.laelia.v1.AgentInfoR\x04info\"\x16\n" +
+	"\x14ConnectAgentResponse\"\x17\n" +
+	"\x15AgentHeartbeatRequest\"\x18\n" +
+	"\x16AgentHeartbeatResponse\"\x0e\n" +
 	"\fHelloRequest\"2\n" +
 	"\rHelloResponse\x12!\n" +
-	"\fcurrent_time\x18\x01 \x01(\x03R\vcurrentTime2j\n" +
-	"\fAgentService\x12Z\n" +
+	"\fcurrent_time\x18\x01 \x01(\x03R\vcurrentTime\"\x98\x03\n" +
+	"\x05Agent\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
+	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12\x14\n" +
+	"\x05token\x18\x04 \x01(\tR\x05token\x12(\n" +
+	"\x04info\x18\x05 \x01(\v2\x14.laelia.v1.AgentInfoR\x04info\x12.\n" +
+	"\x06status\x18\x06 \x01(\v2\x16.laelia.v1.AgentStatusR\x06status\x129\n" +
+	"\n" +
+	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x124\n" +
+	"\x06labels\x18\b \x03(\v2\x1c.laelia.v1.Agent.LabelsEntryR\x06labels\x1a9\n" +
+	"\vLabelsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:!\xeaA\x1e\n" +
+	"\flaelia/Agent\x12\x0eagents/{agent}\"\x89\x02\n" +
+	"\tAgentInfo\x12\x1d\n" +
+	"\n" +
+	"agent_type\x18\x01 \x01(\tR\tagentType\x12\x1a\n" +
+	"\bhostname\x18\x02 \x01(\tR\bhostname\x12\x0e\n" +
+	"\x02os\x18\x03 \x01(\tR\x02os\x12\x12\n" +
+	"\x04arch\x18\x04 \x01(\tR\x04arch\x12\x0e\n" +
+	"\x02ip\x18\x05 \x01(\tR\x02ip\x12\x18\n" +
+	"\aversion\x18\x06 \x01(\tR\aversion\x128\n" +
+	"\x06labels\x18\a \x03(\v2 .laelia.v1.AgentInfo.LabelsEntryR\x06labels\x1a9\n" +
+	"\vLabelsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd8\x02\n" +
+	"\vAgentStatus\x12<\n" +
+	"\x05state\x18\x01 \x01(\x0e2&.laelia.v1.AgentStatus.ConnectionStateR\x05state\x12J\n" +
+	"\x13last_heartbeat_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x11lastHeartbeatTime\x12A\n" +
+	"\x0econnected_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\rconnectedTime\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"W\n" +
+	"\x0fConnectionState\x12 \n" +
+	"\x1cCONNECTION_STATE_UNSPECIFIED\x10\x00\x12\n" +
+	"\n" +
+	"\x06ONLINE\x10\x01\x12\v\n" +
+	"\aOFFLINE\x10\x02\x12\t\n" +
+	"\x05ERROR\x10\x032\xdd\x05\n" +
+	"\fAgentService\x12]\n" +
+	"\vCreateAgent\x12\x1d.laelia.v1.CreateAgentRequest\x1a\x10.laelia.v1.Agent\"\x1d\x98\xea0\x01\x82\xd3\xe4\x93\x02\x13:\x05agent\"\n" +
+	"/v1/agents\x12]\n" +
+	"\n" +
+	"ListAgents\x12\x1c.laelia.v1.ListAgentsRequest\x1a\x1d.laelia.v1.ListAgentsResponse\"\x12\x82\xd3\xe4\x93\x02\f\x12\n" +
+	"/v1/agents\x12\\\n" +
+	"\bGetAgent\x12\x1a.laelia.v1.GetAgentRequest\x1a\x10.laelia.v1.Agent\"\"\xdaA\x04name\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/{name=agents/*}\x12e\n" +
+	"\vDeleteAgent\x12\x1d.laelia.v1.DeleteAgentRequest\x1a\x16.google.protobuf.Empty\"\x1f\x98\xea0\x01\x82\xd3\xe4\x93\x02\x15*\x13/v1/{name=agents/*}\x12r\n" +
+	"\fConnectAgent\x12\x1e.laelia.v1.ConnectAgentRequest\x1a\x1f.laelia.v1.ConnectAgentResponse\"!\x90\xea0\x02\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/v1/agents:connect\x12z\n" +
+	"\x0eAgentHeartbeat\x12 .laelia.v1.AgentHeartbeatRequest\x1a!.laelia.v1.AgentHeartbeatResponse\"#\x90\xea0\x02\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/v1/agents:heartbeat\x12Z\n" +
 	"\x05Hello\x12\x17.laelia.v1.HelloRequest\x1a\x18.laelia.v1.HelloResponse\"\x1e\x98\xea0\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/agent/helloB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
@@ -126,19 +902,62 @@ func file_v1_agent_proto_rawDescGZIP() []byte {
 	return file_v1_agent_proto_rawDescData
 }
 
-var file_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_v1_agent_proto_goTypes = []any{
-	(*HelloRequest)(nil),  // 0: laelia.v1.HelloRequest
-	(*HelloResponse)(nil), // 1: laelia.v1.HelloResponse
+	(AgentStatus_ConnectionState)(0), // 0: laelia.v1.AgentStatus.ConnectionState
+	(*CreateAgentRequest)(nil),       // 1: laelia.v1.CreateAgentRequest
+	(*ListAgentsRequest)(nil),        // 2: laelia.v1.ListAgentsRequest
+	(*ListAgentsResponse)(nil),       // 3: laelia.v1.ListAgentsResponse
+	(*GetAgentRequest)(nil),          // 4: laelia.v1.GetAgentRequest
+	(*DeleteAgentRequest)(nil),       // 5: laelia.v1.DeleteAgentRequest
+	(*ConnectAgentRequest)(nil),      // 6: laelia.v1.ConnectAgentRequest
+	(*ConnectAgentResponse)(nil),     // 7: laelia.v1.ConnectAgentResponse
+	(*AgentHeartbeatRequest)(nil),    // 8: laelia.v1.AgentHeartbeatRequest
+	(*AgentHeartbeatResponse)(nil),   // 9: laelia.v1.AgentHeartbeatResponse
+	(*HelloRequest)(nil),             // 10: laelia.v1.HelloRequest
+	(*HelloResponse)(nil),            // 11: laelia.v1.HelloResponse
+	(*Agent)(nil),                    // 12: laelia.v1.Agent
+	(*AgentInfo)(nil),                // 13: laelia.v1.AgentInfo
+	(*AgentStatus)(nil),              // 14: laelia.v1.AgentStatus
+	nil,                              // 15: laelia.v1.Agent.LabelsEntry
+	nil,                              // 16: laelia.v1.AgentInfo.LabelsEntry
+	(State)(0),                       // 17: laelia.v1.State
+	(*timestamppb.Timestamp)(nil),    // 18: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),            // 19: google.protobuf.Empty
 }
 var file_v1_agent_proto_depIdxs = []int32{
-	0, // 0: laelia.v1.AgentService.Hello:input_type -> laelia.v1.HelloRequest
-	1, // 1: laelia.v1.AgentService.Hello:output_type -> laelia.v1.HelloResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	12, // 0: laelia.v1.CreateAgentRequest.agent:type_name -> laelia.v1.Agent
+	12, // 1: laelia.v1.ListAgentsResponse.agents:type_name -> laelia.v1.Agent
+	13, // 2: laelia.v1.ConnectAgentRequest.info:type_name -> laelia.v1.AgentInfo
+	17, // 3: laelia.v1.Agent.state:type_name -> laelia.v1.State
+	13, // 4: laelia.v1.Agent.info:type_name -> laelia.v1.AgentInfo
+	14, // 5: laelia.v1.Agent.status:type_name -> laelia.v1.AgentStatus
+	18, // 6: laelia.v1.Agent.created_at:type_name -> google.protobuf.Timestamp
+	15, // 7: laelia.v1.Agent.labels:type_name -> laelia.v1.Agent.LabelsEntry
+	16, // 8: laelia.v1.AgentInfo.labels:type_name -> laelia.v1.AgentInfo.LabelsEntry
+	0,  // 9: laelia.v1.AgentStatus.state:type_name -> laelia.v1.AgentStatus.ConnectionState
+	18, // 10: laelia.v1.AgentStatus.last_heartbeat_time:type_name -> google.protobuf.Timestamp
+	18, // 11: laelia.v1.AgentStatus.connected_time:type_name -> google.protobuf.Timestamp
+	1,  // 12: laelia.v1.AgentService.CreateAgent:input_type -> laelia.v1.CreateAgentRequest
+	2,  // 13: laelia.v1.AgentService.ListAgents:input_type -> laelia.v1.ListAgentsRequest
+	4,  // 14: laelia.v1.AgentService.GetAgent:input_type -> laelia.v1.GetAgentRequest
+	5,  // 15: laelia.v1.AgentService.DeleteAgent:input_type -> laelia.v1.DeleteAgentRequest
+	6,  // 16: laelia.v1.AgentService.ConnectAgent:input_type -> laelia.v1.ConnectAgentRequest
+	8,  // 17: laelia.v1.AgentService.AgentHeartbeat:input_type -> laelia.v1.AgentHeartbeatRequest
+	10, // 18: laelia.v1.AgentService.Hello:input_type -> laelia.v1.HelloRequest
+	12, // 19: laelia.v1.AgentService.CreateAgent:output_type -> laelia.v1.Agent
+	3,  // 20: laelia.v1.AgentService.ListAgents:output_type -> laelia.v1.ListAgentsResponse
+	12, // 21: laelia.v1.AgentService.GetAgent:output_type -> laelia.v1.Agent
+	19, // 22: laelia.v1.AgentService.DeleteAgent:output_type -> google.protobuf.Empty
+	7,  // 23: laelia.v1.AgentService.ConnectAgent:output_type -> laelia.v1.ConnectAgentResponse
+	9,  // 24: laelia.v1.AgentService.AgentHeartbeat:output_type -> laelia.v1.AgentHeartbeatResponse
+	11, // 25: laelia.v1.AgentService.Hello:output_type -> laelia.v1.HelloResponse
+	19, // [19:26] is the sub-list for method output_type
+	12, // [12:19] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_v1_agent_proto_init() }
@@ -147,18 +966,20 @@ func file_v1_agent_proto_init() {
 		return
 	}
 	file_v1_annotation_proto_init()
+	file_v1_common_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_agent_proto_rawDesc), len(file_v1_agent_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   2,
+			NumEnums:      1,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_v1_agent_proto_goTypes,
 		DependencyIndexes: file_v1_agent_proto_depIdxs,
+		EnumInfos:         file_v1_agent_proto_enumTypes,
 		MessageInfos:      file_v1_agent_proto_msgTypes,
 	}.Build()
 	File_v1_agent_proto = out.File

@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package laelia.store;
+
+option go_package = "generated-go/store";
+
+message AgentInfo {
+  string agent_type = 1;
+  string hostname = 2;
+  string os = 3;
+  string arch = 4;
+  string ip = 5;
+  string version = 6;
+  map<string, string> labels = 7;
+}
+
+message AgentStatus {
+  enum ConnectionState {
+    CONNECTION_STATE_UNSPECIFIED = 0;
+    ONLINE = 1;
+    OFFLINE = 2;
+    ERROR = 3;
+  }
+  ConnectionState state = 1;
+  int64 last_heartbeat_at = 2;
+  int64 connected_at = 3;
+  string error_message = 4;
+}

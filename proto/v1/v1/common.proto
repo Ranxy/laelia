@@ -10,7 +10,6 @@ enum State {
   DELETED = 2;
 }
 
-
 // Position in a text expressed as zero-based line and zero-based column byte
 // offset.
 message Position {

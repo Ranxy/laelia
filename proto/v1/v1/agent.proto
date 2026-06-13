@@ -3,14 +3,55 @@ syntax = "proto3";
 package laelia.v1;
 
 import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 import "v1/annotation.proto";
+import "v1/common.proto";
 
 option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
 
-
 service AgentService {
-  // Permissions required: None
+  rpc CreateAgent(CreateAgentRequest) returns (Agent) {
+    option (google.api.http) = {
+      post: "/v1/agents"
+      body: "agent"
+    };
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse) {
+    option (google.api.http) = {get: "/v1/agents"};
+  }
+
+  rpc GetAgent(GetAgentRequest) returns (Agent) {
+    option (google.api.http) = {get: "/v1/{name=agents/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  rpc DeleteAgent(DeleteAgentRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/{name=agents/*}"};
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc ConnectAgent(ConnectAgentRequest) returns (ConnectAgentResponse) {
+    option (google.api.http) = {
+      post: "/v1/agents:connect"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = CUSTOM;
+  }
+
+  rpc AgentHeartbeat(AgentHeartbeatRequest) returns (AgentHeartbeatResponse) {
+    option (google.api.http) = {
+      post: "/v1/agents:heartbeat"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = CUSTOM;
+  }
+
   rpc Hello(HelloRequest) returns (HelloResponse) {
     option (google.api.http) = {
       post: "/v1/agent/hello"
@@ -20,10 +61,86 @@ service AgentService {
   }
 }
 
-message HelloRequest{
-
+message CreateAgentRequest {
+  Agent agent = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
-message HelloResponse{
-    int64 current_time = 1;
+message ListAgentsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+  bool show_deleted = 3;
+}
+
+message ListAgentsResponse {
+  repeated Agent agents = 1;
+  string next_page_token = 2;
+}
+
+message GetAgentRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+}
+
+message DeleteAgentRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+}
+
+message ConnectAgentRequest {
+  AgentInfo info = 1;
+}
+
+message ConnectAgentResponse {}
+
+message AgentHeartbeatRequest {}
+
+message AgentHeartbeatResponse {}
+
+message HelloRequest {}
+
+message HelloResponse {
+  int64 current_time = 1;
+}
+
+message Agent {
+  option (google.api.resource) = {
+    type: "laelia/Agent"
+    pattern: "agents/{agent}"
+  };
+
+  string name = 1;
+  State state = 2;
+  string title = 3;
+  string token = 4;
+  AgentInfo info = 5;
+  AgentStatus status = 6;
+  google.protobuf.Timestamp created_at = 7;
+  map<string, string> labels = 8;
+}
+
+message AgentInfo {
+  string agent_type = 1;
+  string hostname = 2;
+  string os = 3;
+  string arch = 4;
+  string ip = 5;
+  string version = 6;
+  map<string, string> labels = 7;
+}
+
+message AgentStatus {
+  enum ConnectionState {
+    CONNECTION_STATE_UNSPECIFIED = 0;
+    ONLINE = 1;
+    OFFLINE = 2;
+    ERROR = 3;
+  }
+  ConnectionState state = 1;
+  google.protobuf.Timestamp last_heartbeat_time = 2;
+  google.protobuf.Timestamp connected_time = 3;
+  string error_message = 4;
 }
