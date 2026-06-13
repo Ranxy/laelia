@@ -32,6 +32,7 @@ func configureGrpcRouters(
 	ctx context.Context,
 	e *echo.Echo,
 	stores *store.Store,
+	secret string,
 	profile *config.Profile,
 	stateCfg *state.State,
 ) error {
@@ -75,7 +76,7 @@ func configureGrpcRouters(
 	)
 
 	userService := apiv1.NewUserService(stores, profile, stateCfg)
-	authService := apiv1.NewAuthService(stores, profile, stateCfg)
+	authService := apiv1.NewAuthService(stores, secret, profile, stateCfg)
 	agentService := apiv1.NewAgentService(stores, profile, stateCfg)
 
 	onPanic := func(_ context.Context, s connect.Spec, _ http.Header, p any) error {
@@ -88,7 +89,7 @@ func configureGrpcRouters(
 	handlerOpts := connect.WithHandlerOptions(
 		connect.WithInterceptors(
 			apiv1.NewDebugInterceptor(),
-			auth.New(stores, stateCfg, profile),
+			auth.New(stores, secret, stateCfg, profile),
 			// apiv1.NewAuditInterceptor(stores),
 			// apiv1.NewACLInterceptor(stores, secret, iamManager, profile),
 		),

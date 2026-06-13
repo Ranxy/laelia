@@ -10,6 +10,7 @@ import (
 )
 
 type Store struct {
+	Secret        string
 	dbConnManager *DBConnectionManager
 	enableCache   bool
 

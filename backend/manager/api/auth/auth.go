@@ -58,6 +58,7 @@ type APIAuthInterceptor struct {
 // New returns a new API auth interceptor.
 func New(
 	store *store.Store,
+	secret string,
 	stateCfg *state.State,
 	profile *config.Profile,
 ) *APIAuthInterceptor {

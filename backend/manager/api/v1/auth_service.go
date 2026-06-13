@@ -44,9 +44,10 @@ type AuthService struct {
 }
 
 // NewAuthService creates a new AuthService.
-func NewAuthService(store *store.Store, profile *config.Profile, stateCfg *state.State) *AuthService {
+func NewAuthService(store *store.Store, secret string, profile *config.Profile, stateCfg *state.State) *AuthService {
 	return &AuthService{
 		store:    store,
+		secret:   secret,
 		profile:  profile,
 		stateCfg: stateCfg,
 	}

@@ -79,7 +79,12 @@ func NewServer(ctx context.Context, profile *config.Profile) (*Server, error) {
 	// Configure echo server.
 	s.echoServer = echo.New()
 
-	if err := configureGrpcRouters(ctx, s.echoServer, s.store, s.profile, s.stateCfg); err != nil {
+	secret, err := s.store.GetSecret(ctx)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get secret")
+	}
+
+	if err := configureGrpcRouters(ctx, s.echoServer, s.store, secret, s.profile, s.stateCfg); err != nil {
 		return nil, errors.Wrapf(err, "failed to configure gRPC routers")
 	}
 
