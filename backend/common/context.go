@@ -10,6 +10,7 @@ const (
 	UserContextKey ContextKey = iota
 	AuthContextKey
 	ServiceDataKey
+	AgentContextKey
 )
 
 type AuthMethod int

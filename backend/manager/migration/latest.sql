@@ -117,3 +117,21 @@ INSERT INTO project (id, name, resource_id) VALUES (1, 'Default', 'default');
 
 ALTER SEQUENCE project_id_seq RESTART WITH 101;
 
+-- Agent
+CREATE TABLE agent (
+    id serial PRIMARY KEY,
+    resource_id text NOT NULL,
+    name text NOT NULL,
+    token_version int NOT NULL DEFAULT 1,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    deleted boolean NOT NULL DEFAULT FALSE,
+    -- Stored as AgentInfo (proto/store/store/agent.proto)
+    info jsonb NOT NULL DEFAULT '{}',
+    -- Stored as AgentStatus (proto/store/store/agent.proto)
+    status jsonb NOT NULL DEFAULT '{}'
+);
+
+CREATE UNIQUE INDEX idx_agent_unique_resource_id ON agent(resource_id);
+
+ALTER SEQUENCE agent_id_seq RESTART WITH 101;
+

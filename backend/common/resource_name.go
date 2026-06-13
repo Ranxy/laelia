@@ -18,6 +18,7 @@ const (
 	SettingNamePrefix          = "settings/"
 	RolePrefix                 = "roles/"
 	GroupPrefix                = "groups/"
+	AgentNamePrefix            = "agents/"
 )
 
 // GetUserID returns the user ID from a resource name.
@@ -131,4 +132,12 @@ func FormatRole(role string) string {
 
 func FormatGroupEmail(email string) string {
 	return fmt.Sprintf("%s%s", GroupPrefix, email)
+}
+
+func GetAgentID(name string) (int, error) {
+	return GetUIDFromName(name, AgentNamePrefix)
+}
+
+func FormatAgentUID(uid int) string {
+	return fmt.Sprintf("%s%d", AgentNamePrefix, uid)
 }
