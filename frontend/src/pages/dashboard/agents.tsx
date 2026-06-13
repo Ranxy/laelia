@@ -1,3 +1,4 @@
+import { Timestamp } from "@bufbuild/protobuf/wkt";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/react/components/ui/badge";
 import { Button } from "@/react/components/ui/button";
@@ -23,7 +24,8 @@ import {
   TableRow,
 } from "@/react/components/ui/table";
 import { useAppStore } from "@/react/stores";
-import type { ApiAgent } from "@/react/stores/types";
+import type { Agent } from "@/types/proto-es/v1/agent_pb";
+import { AgentStatus_ConnectionState } from "@/types/proto-es/v1/agent_pb";
 
 export function AgentsPage() {
   const fetchAgents = useAppStore((s) => s.fetchAgents);
@@ -33,7 +35,7 @@ export function AgentsPage() {
   const [name, setName] = useState("");
   const [token, setToken] = useState<string | null>(null);
   const [tokenOpen, setTokenOpen] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState<ApiAgent | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -73,7 +75,7 @@ export function AgentsPage() {
     }
   }
 
-  function handleRowClick(agent: ApiAgent) {
+  function handleRowClick(agent: Agent) {
     setSelectedAgent(agent);
     setDetailOpen(true);
   }
@@ -176,23 +178,19 @@ export function AgentsPage() {
               {selectedAgent.status?.connectedTime && (
                 <p>
                   <span className="text-control-light">Connected:</span>{" "}
-                  {new Date(
-                    selectedAgent.status.connectedTime
-                  ).toLocaleString()}
+                  {formatTimestamp(selectedAgent.status.connectedTime)}
                 </p>
               )}
               {selectedAgent.status?.lastHeartbeatTime && (
                 <p>
                   <span className="text-control-light">Last Heartbeat:</span>{" "}
-                  {new Date(
-                    selectedAgent.status.lastHeartbeatTime
-                  ).toLocaleString()}
+                  {formatTimestamp(selectedAgent.status.lastHeartbeatTime)}
                 </p>
               )}
               {selectedAgent.createdAt && (
                 <p>
                   <span className="text-control-light">Created:</span>{" "}
-                  {new Date(selectedAgent.createdAt).toLocaleString()}
+                  {formatTimestamp(selectedAgent.createdAt)}
                 </p>
               )}
             </div>
@@ -266,13 +264,17 @@ export function AgentsPage() {
   );
 }
 
-function ConnectionBadge({ state }: { state?: string }) {
+function ConnectionBadge({ state }: { state?: AgentStatus_ConnectionState }) {
   switch (state) {
-    case "ONLINE":
+    case AgentStatus_ConnectionState.ONLINE:
       return <Badge variant="success">Online</Badge>;
-    case "ERROR":
+    case AgentStatus_ConnectionState.ERROR:
       return <Badge variant="destructive">Error</Badge>;
     default:
       return <Badge variant="secondary">Offline</Badge>;
   }
+}
+
+function formatTimestamp(ts: Timestamp): string {
+  return new Date(Number(ts)).toLocaleString();
 }

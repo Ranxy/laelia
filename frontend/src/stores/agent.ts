@@ -1,5 +1,11 @@
-import { api } from "@/react/api/client";
-import type { AgentSlice, ApiAgent, AppSliceCreator } from "./types";
+import { create } from "@bufbuild/protobuf";
+import { agentServiceClient } from "@/connect";
+import {
+  AgentSchema,
+  CreateAgentRequestSchema,
+  DeleteAgentRequestSchema,
+} from "@/types/proto-es/v1/agent_pb";
+import type { AgentSlice, AppSliceCreator } from "./types";
 
 export const createAgentSlice: AppSliceCreator<AgentSlice> = (set) => ({
   agents: [],
@@ -8,19 +14,11 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set) => ({
   async fetchAgents(params) {
     set({ agentsLoading: true });
     try {
-      const searchParams = new URLSearchParams();
-      if (params?.pageSize) {
-        searchParams.set("pageSize", String(params.pageSize));
-      }
-      if (params?.pageToken) {
-        searchParams.set("pageToken", params.pageToken);
-      }
-      const qs = searchParams.toString();
-      const res = await api.get<{
-        agents: ApiAgent[];
-        nextPageToken: string;
-      }>(`/agents${qs ? `?${qs}` : ""}`);
-      set({ agents: res.agents ?? [], agentsLoading: false });
+      const res = await agentServiceClient.listAgents({
+        pageSize: params?.pageSize ?? 100,
+        pageToken: params?.pageToken ?? "",
+      });
+      set({ agents: res.agents, agentsLoading: false });
       return { nextPageToken: res.nextPageToken };
     } catch {
       set({ agents: [], agentsLoading: false });
@@ -29,12 +27,18 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set) => ({
   },
 
   async createAgent(title: string, labels?: Record<string, string>) {
-    const res = await api.post<ApiAgent>("/agents", { title, labels });
+    const res = await agentServiceClient.createAgent(
+      create(CreateAgentRequestSchema, {
+        agent: create(AgentSchema, { title, labels }),
+      })
+    );
     return res;
   },
 
   async deleteAgent(name: string) {
-    await api.delete<void>(`/${name}`);
+    await agentServiceClient.deleteAgent(
+      create(DeleteAgentRequestSchema, { name })
+    );
     set((state) => ({
       agents: state.agents.filter((a) => a.name !== name),
     }));

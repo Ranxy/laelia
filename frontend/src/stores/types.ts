@@ -1,48 +1,9 @@
 import type { StateCreator } from "zustand";
-
-export interface ApiUser {
-  name: string;
-  state: string;
-  email: string;
-  title: string;
-  userType: string;
-  password?: string;
-  serviceKey?: string;
-  phone?: string;
-  profile?: {
-    lastLoginTime?: string;
-    lastChangePasswordTime?: string;
-    source?: string;
-  };
-  groups?: string[];
-}
-
-export interface ApiAgent {
-  name: string;
-  state: string;
-  title: string;
-  token?: string;
-  info?: {
-    agentType?: string;
-    hostname?: string;
-    os?: string;
-    arch?: string;
-    ip?: string;
-    version?: string;
-    labels?: Record<string, string>;
-  };
-  status?: {
-    state: string;
-    lastHeartbeatTime?: string;
-    connectedTime?: string;
-    errorMessage?: string;
-  };
-  createdAt?: string;
-  labels?: Record<string, string>;
-}
+import type { Agent } from "@/types/proto-es/v1/agent_pb";
+import type { User } from "@/types/proto-es/v1/user_service_pb";
 
 export interface AuthSlice {
-  currentUser: ApiUser | null;
+  currentUser: User | null;
   token: string | null;
   isLoggedIn: boolean;
   sessionLoaded: boolean;
@@ -55,7 +16,7 @@ export interface AuthSlice {
 }
 
 export interface AgentSlice {
-  agents: ApiAgent[];
+  agents: Agent[];
   agentsLoading: boolean;
 
   fetchAgents: (params?: {
@@ -63,9 +24,9 @@ export interface AgentSlice {
     pageToken?: string;
   }) => Promise<{ nextPageToken: string } | undefined>;
   createAgent: (
-    name: string,
+    title: string,
     labels?: Record<string, string>
-  ) => Promise<ApiAgent>;
+  ) => Promise<Agent>;
   deleteAgent: (name: string) => Promise<void>;
 }
 

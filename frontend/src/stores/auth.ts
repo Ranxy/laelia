@@ -1,5 +1,15 @@
-import { api } from "@/react/api/client";
-import type { ApiUser, AppSliceCreator, AuthSlice } from "./types";
+import { create } from "@bufbuild/protobuf";
+import { authServiceClient, userServiceClient } from "@/connect";
+import {
+  LoginRequestSchema,
+  LogoutRequestSchema,
+} from "@/types/proto-es/v1/auth_service_pb";
+import {
+  CreateUserRequestSchema,
+  UserSchema,
+  UserType,
+} from "@/types/proto-es/v1/user_service_pb";
+import type { AppSliceCreator, AuthSlice } from "./types";
 
 export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
   currentUser: null,
@@ -8,11 +18,9 @@ export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
   sessionLoaded: false,
 
   async login(email: string, password: string) {
-    const res = await api.post<{
-      token: string;
-      user?: ApiUser;
-      requireResetPassword?: boolean;
-    }>("/auth/login", { email, password, web: true });
+    const res = await authServiceClient.login(
+      create(LoginRequestSchema, { email, password, web: true })
+    );
 
     set({
       token: res.token,
@@ -23,27 +31,29 @@ export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
 
   async logout() {
     try {
-      await api.post("/auth/logout");
+      await authServiceClient.logout(create(LogoutRequestSchema));
     } finally {
       set({ token: null, currentUser: null, isLoggedIn: false });
     }
   },
 
   async register(email: string, title: string, password: string) {
-    // proto: body:"user" → request body is the User object directly
-    await api.post("/users", {
-      email,
-      title,
-      password,
-      userType: "USER",
-    });
-    // Auto-login after registration
+    await userServiceClient.createUser(
+      create(CreateUserRequestSchema, {
+        user: create(UserSchema, {
+          email,
+          title,
+          password,
+          userType: UserType.USER,
+        }),
+      })
+    );
     await get().login(email, password);
   },
 
   async fetchCurrentUser() {
     try {
-      const user = await api.get<ApiUser>("/users/me");
+      const user = await userServiceClient.getCurrentUser({});
       set({ currentUser: user, isLoggedIn: true });
     } catch {
       set({ currentUser: null, isLoggedIn: false });
