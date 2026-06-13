@@ -84,3 +84,36 @@ CREATE TABLE policy (
 CREATE UNIQUE INDEX idx_policy_unique_resource_type_resource_type ON policy(resource_type, resource, type);
 
 ALTER SEQUENCE policy_id_seq RESTART WITH 101;
+
+-- Project
+CREATE TABLE project (
+    id serial PRIMARY KEY,
+    deleted boolean NOT NULL DEFAULT FALSE,
+    name text NOT NULL,
+    resource_id text NOT NULL,
+    data_classification_config_id text NOT NULL DEFAULT '',
+    -- Stored as Project (proto/store/store/project.proto)
+    setting jsonb NOT NULL DEFAULT '{}'
+);
+
+CREATE UNIQUE INDEX idx_project_unique_resource_id ON project(resource_id);
+
+
+CREATE TABLE user_group (
+  email text PRIMARY KEY,
+  name text NOT NULL,
+  description text NOT NULL DEFAULT '',
+  -- Stored as GroupPayload (proto/store/store/group.proto)
+  payload jsonb NOT NULL DEFAULT '{}'
+);
+
+-- Default system account id is 1.
+INSERT INTO principal (id, type, name, email, password_hash) VALUES (1, 'SYSTEM_BOT', 'SYSTEM', 'support@example.com', '');
+
+ALTER SEQUENCE principal_id_seq RESTART WITH 101;
+
+-- Default project.
+INSERT INTO project (id, name, resource_id) VALUES (1, 'Default', 'default');
+
+ALTER SEQUENCE project_id_seq RESTART WITH 101;
+

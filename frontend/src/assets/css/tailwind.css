@@ -1,0 +1,423 @@
+@import "tailwindcss";
+
+/*
+  Colors for dark theme
+  Only used by Web Terminal now
+*/
+@config "../../../tailwind.config.js";
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+
+  /* Thin scrollbars globally */
+  * {
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: #d1d5db transparent; /* gray-300 */
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: #d1d5db; /* gray-300 */
+    border-radius: 3px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: #9ca3af; /* gray-400 */
+  }
+
+  /* All disabled form elements should show not-allowed cursor */
+  input:disabled,
+  select:disabled,
+  textarea:disabled,
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+@utility hide-scrollbar {
+  /* Chrome, Safari and Opera */
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+@utility thumb-up {
+  transform-origin: bottom left;
+  animation: thumb-up 1s ease-in-out infinite;
+}
+
+@utility hide-ticker {
+  /* Remove the ticker in the number field for webkit */
+  &input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  & input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /* Remove the ticker in the number field for Firefox */
+  &input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
+
+@utility fix-scrollbar-z-index {
+  transform: translate3d(0, 0, 0);
+}
+
+@utility writing-vertical-rl {
+  writing-mode: vertical-rl;
+}
+
+@utility writing-vertical-lr {
+  writing-mode: vertical-lr;
+}
+
+@utility text-size-adjust-none {
+  text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  -moz-text-size-adjust: none;
+  -ms-text-size-adjust: none;
+}
+
+@layer base {
+  :root {
+    /* indigo-600 */
+    --color-accent: 79 70 229; /* #4f46e5 */
+    /* indigo-300 */
+    --color-accent-disabled: 165 180 252; /* #a5b4fc */
+    /* indigo-800 */
+    --color-accent-hover: 55 48 163; /* #3730a3 */
+    /* white */
+    --color-accent-text: 255 255 255; /* #ffffff */
+
+    /* gray-900 */
+    --color-main: 24 24 27; /* #18181b */
+    /* gray-700 */
+    --color-main-hover: 63 63 70; /* #3f3f46 */
+    /* white */
+    --color-main-text: 255 255 255; /* #ffffff */
+
+    /* gray-700 */
+    --color-control: 82 82 91; /* #52525b */
+    /* gray-900 */
+    --color-control-hover: 24 24 27; /* #18181b */
+
+    /* gray-500 */
+    --color-control-light: 113 113 122; /* #71717a */
+    /* gray-600 */
+    --color-control-light-hover: 82 82 91; /* #52525b */
+
+    /* gray-100 */
+    --color-control-bg: 243 244 246; /* #f3f4f6 */
+    /* gray-200 */
+    --color-control-bg-hover: 229 231 235; /* #e5e7eb */
+
+    /* gray-400 */
+    --color-control-placeholder: 161 161 170; /* #a1a1aa */
+
+    /* blue-600 */
+    --color-info: 37 99 235; /* #2563eb */
+    /* blue-700 */
+    --color-info-hover: 29 78 216; /* #1d4ed8 */
+
+    /* yellow-500 */
+    --color-warning: 245 158 11; /* #f59e0b */
+    /* yellow-700 */
+    --color-warning-hover: 180 83 9; /* #b45309 */
+
+    /* red-600 */
+    --color-error: 220 38 38; /* #dc2626 */
+    /* red-700 */
+    --color-error-hover: 185 28 28; /* #b91c1c */
+
+    /* green-600 */
+    --color-success: 22 163 74; /* #16a34a */
+    /* green-700 */
+    --color-success-hover: 21 128 61; /* #15803d */
+
+    /* gray-200 */
+    --color-link-hover: 229 231 235; /* #e5e7eb */
+
+    /* gray-200 */
+    --color-block-border: 229 231 235; /* #e5e7eb */
+    /* gray-300 */
+    --color-control-border: 209 213 219; /* #d1d5db */
+
+    /* white - page/card/panel background */
+    --color-background: 255 255 255; /* #ffffff */
+    /* black - overlay backdrop, use with opacity e.g. bg-overlay/50 */
+    --color-overlay: 0 0 0; /* #000000 */
+  }
+  :root {
+    /* same as vs-dark theme's bg, not pure black. */
+    --color-dark-bg: 30 30 30; /* #1e1e1e */
+
+    /* The Matrix green */
+    --color-matrix-green: 0 204 0; /* #00cc00 */
+    /* The matrix green lighter */
+    --color-matrix-green-hover: 136 255 136; /* #88ff88 */
+  }
+}
+
+@layer utilities {
+  .btn-primary {
+    @apply select-none inline-flex border border-transparent rounded-sm text-accent-text bg-accent hover:bg-accent-hover disabled:bg-accent disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm leading-5 font-medium focus:ring-control focus:outline-hidden focus-visible:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-normal {
+    @apply select-none inline-flex border border-control-border rounded-sm text-control bg-white hover:bg-control-bg-hover disabled:bg-control-bg disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm leading-5 font-medium focus:ring-control focus:outline-hidden focus-visible:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-secondary {
+    @apply select-none inline-flex items-center text-main hover:text-control-hover disabled:opacity-50 disabled:cursor-not-allowed text-sm leading-5 font-normal focus:ring-control focus:outline-hidden focus-visible:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-small {
+    @apply select-none inline-flex border border-control-border rounded-sm text-control bg-white hover:bg-control-bg-hover disabled:bg-control-bg disabled:opacity-50 disabled:cursor-not-allowed px-2 text-xs leading-5 focus:ring-control focus:outline-hidden focus-visible:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-select {
+    @apply text-sm select-none text-main bg-white border border-control-border disabled:bg-control-bg disabled:opacity-50 disabled:cursor-not-allowed rounded-sm shadow-xs text-left cursor-default focus:outline-hidden focus:ring-1 focus:ring-control focus:border-control;
+  }
+
+  .btn-cancel {
+    @apply select-none inline-flex text-control rounded-sm hover:bg-control-bg-hover disabled:bg-control-bg disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm leading-5 font-medium focus:ring-control focus:outline-hidden focus-visible:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-icon {
+    @apply cursor-pointer flex flex-row items-center select-none rounded-full text-control bg-transparent hover:text-control-hover disabled:opacity-50 disabled:cursor-not-allowed focus:ring-control focus:outline-hidden focus-visible:ring-2 focus:ring-offset-1;
+  }
+
+  .btn-icon-primary {
+    @apply select-none rounded-full text-white bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed focus:ring-control focus:outline-hidden focus-visible:ring-2 focus:ring-offset-1;
+  }
+
+  .btn-danger {
+    @apply select-none inline-flex border border-transparent rounded-sm text-accent-text bg-error hover:bg-error-hover disabled:bg-error disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm leading-5 font-medium focus:ring-control focus:outline-hidden focus-visible:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-success {
+    @apply select-none inline-flex border border-transparent rounded-sm text-accent-text bg-success hover:bg-success-hover disabled:bg-success disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm leading-5 font-medium focus:ring-control focus:outline-hidden focus-visible:ring-2 focus:ring-offset-2;
+  }
+
+  .tab {
+    @apply rounded-sm text-control font-normal text-sm focus:ring-control focus:outline-hidden focus-visible:ring-2 focus:ring-offset-2;
+  }
+
+  .control {
+    @apply focus:ring-control focus:border-control border-control-border rounded-sm select-none;
+  }
+
+  .textlabel {
+    @apply text-sm font-medium text-control;
+  }
+
+  .textinfolabel {
+    @apply text-sm font-normal text-control-light;
+  }
+
+  .textlabeltip {
+    @apply text-xs font-normal text-error ml-2;
+  }
+
+  .textfield {
+    @apply text-main disabled:text-control disabled:bg-control-bg disabled:cursor-not-allowed disabled:opacity-70 focus:ring-control focus:border-control sm:text-sm border-control-border rounded-sm;
+  }
+
+  .textarea {
+    @apply text-main focus:ring-control focus:border-control sm:text-sm border-control-border shadow-xs;
+  }
+
+  .radio-set-row {
+    @apply flex flex-row items-center gap-x-4;
+  }
+
+  .radio-set-col {
+    @apply flex flex-col gap-y-2;
+  }
+
+  .radio {
+    @apply flex items-center;
+  }
+
+  .radio .btn {
+    @apply focus:ring-accent size-4 text-accent select-none;
+  }
+
+  .radio .label {
+    @apply ml-1.5 block text-sm font-medium text-control select-none;
+  }
+
+  .outline-title {
+    @apply text-main w-full items-center text-xs leading-5 font-semibold focus:outline-hidden select-none tracking-wider;
+  }
+
+  .outline-title.toplevel {
+    @apply text-control-light text-sm font-normal tracking-tight;
+  }
+
+  .outline-title.collapsible {
+    @apply cursor-pointer hover:bg-link-hover;
+  }
+
+  .outline-item {
+    @apply text-control cursor-pointer w-full items-center hover:bg-link-hover text-sm leading-5 focus:outline-hidden select-none;
+  }
+
+  .menu-item {
+    @apply cursor-pointer block px-4 py-2 text-sm leading-5 text-control hover:bg-control-bg hover:text-control-hover focus:outline-hidden focus:bg-control-bg focus:text-control-hover;
+  }
+
+  .bar-link {
+    @apply cursor-pointer text-main hover:bg-link-hover focus:outline-hidden;
+  }
+
+  .accent-link {
+    @apply cursor-pointer text-accent font-medium hover:underline focus:outline-hidden;
+  }
+
+  .normal-link {
+    @apply cursor-pointer text-info hover:underline hover:text-info-hover focus:outline-hidden;
+  }
+
+  .light-link {
+    @apply cursor-pointer text-blue-400 hover:underline hover:text-blue-200 focus:outline-hidden;
+  }
+
+  .icon-link {
+    @apply cursor-pointer text-control hover:bg-link-hover focus:outline-hidden;
+  }
+
+  .anchor-link {
+    @apply cursor-pointer hover:underline focus:outline-hidden;
+  }
+}
+
+.fade-enter-active,
+.fade-leave-active,
+.fade-fast-enter-active,
+.fade-fast-leave-active,
+.fade-slow-enter-active,
+.fade-slow-leave-active {
+  transition-property: opacity;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
+}
+
+.fade-fast-enter-active,
+.fade-fast-leave-active {
+  transition-duration: 100ms;
+}
+
+.fade-slow-enter-active,
+.fade-slow-leave-active {
+  transition-duration: 500ms;
+}
+
+.fade-enter-from,
+.fade-leave-to,
+.fade-fast-enter-from,
+.fade-fast-leave-to,
+.fade-slow-enter-from,
+.fade-slow-leave-to {
+  opacity: 0;
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(100%);
+}
+
+@keyframes thumb-up {
+  33% {
+    transform: rotate(-15deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+  66% {
+    transform: rotate(0deg);
+  }
+}
+
+.bb-banner-scroll {
+  display: inline-block;
+  animation: bb-banner-scroll 4s ease-in-out infinite;
+}
+
+@keyframes bb-banner-scroll {
+  0% {
+    transform: translateY(100%);
+  }
+  25% {
+    transform: translateY(0);
+  }
+  80% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-100%);
+  }
+}
+
+.fade-slide-up-leave-active {
+  transition-property: opacity, transform;
+  transition-duration: 100ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-slide-up-enter-active {
+  transition-property: opacity, transform;
+  transition-duration: 100ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-slide-up-enter-from,
+.fade-slide-up-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.fade-slide-up-leave-from,
+.fade-slide-up-enter-to {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* SchemaDiagram screenshot capture: while `useScreenshot` flips this
+   attribute on <body>, any element marked `data-screenshot-hide` is
+   omitted from the html-to-image pass. Used for chrome affordances
+   (zoom buttons, schema selector, etc.) that shouldn't appear in
+   the exported PNG. */
+body[data-bb-screenshot-active] [data-screenshot-hide] {
+  display: none !important;
+}
