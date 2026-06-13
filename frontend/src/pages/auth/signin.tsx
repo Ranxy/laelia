@@ -1,5 +1,6 @@
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/react/components/ui/button";
 import { Input } from "@/react/components/ui/input";
@@ -7,6 +8,7 @@ import { toastManager } from "@/react/lib/toast";
 import { useAppStore } from "@/react/stores";
 
 export function SignInPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const login = useAppStore((s) => s.login);
@@ -29,9 +31,11 @@ export function SignInPage() {
     } catch (err) {
       toastManager.add({
         type: "error",
-        title: "Sign in failed",
+        title: t("auth.sign-in.failed"),
         description:
-          err instanceof Error ? err.message : "Please check your credentials.",
+          err instanceof Error
+            ? err.message
+            : t("auth.sign-in.failed-description"),
       });
     } finally {
       setLoading(false);
@@ -43,7 +47,7 @@ export function SignInPage() {
       <div className="text-center">
         <h1 className="text-2xl font-semibold text-main">Laelia</h1>
         <p className="mt-1 text-sm text-control-light">
-          Sign in to your account
+          {t("auth.sign-in.title")}
         </p>
       </div>
 
@@ -53,7 +57,7 @@ export function SignInPage() {
             htmlFor="signin-email"
             className="block text-sm font-medium leading-5 text-control"
           >
-            Email
+            {t("common.email")}
             <span className="ml-0.5 text-error">*</span>
           </label>
           <div className="mt-1 rounded-md shadow-xs">
@@ -74,7 +78,7 @@ export function SignInPage() {
             htmlFor="signin-password"
             className="block text-sm font-medium leading-5 text-control"
           >
-            Password
+            {t("common.password")}
             <span className="ml-0.5 text-error">*</span>
           </label>
           <div className="relative mt-1 flex flex-row items-center rounded-md shadow-xs">
@@ -108,13 +112,13 @@ export function SignInPage() {
             className="w-full"
             disabled={!allowSubmit}
           >
-            {loading ? "Signing in…" : "Sign in"}
+            {loading ? "…" : t("common.sign-in")}
           </Button>
         </div>
       </form>
 
       <p className="text-center text-sm text-control-light">
-        Don&apos;t have an account?{" "}
+        {t("auth.sign-in.new-user")}{" "}
         <button
           type="button"
           className="text-accent hover:underline"
@@ -124,7 +128,7 @@ export function SignInPage() {
             )
           }
         >
-          Sign up
+          {t("common.sign-up")}
         </button>
       </p>
     </div>

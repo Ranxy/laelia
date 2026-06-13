@@ -1,0 +1,39 @@
+{
+  "common": {
+    "email": "邮箱",
+    "password": "密码",
+    "name": "名称",
+    "sign-in": "登录",
+    "sign-up": "注册",
+    "sign-out": "退出登录",
+    "or": "或",
+    "close": "关闭",
+    "language": "语言"
+  },
+  "auth": {
+    "sign-in": {
+      "title": "登录您的账户",
+      "new-user": "还没有账户？",
+      "forget-password": "忘记密码？",
+      "failed": "登录失败",
+      "failed-description": "请检查您的登录凭据。"
+    },
+    "sign-up": {
+      "title": "创建您的账户",
+      "existing-user": "已有账户？",
+      "failed": "注册失败",
+      "failed-description": "请重试。",
+      "email-invalid": "请输入有效的邮箱地址。",
+      "password-hint": "至少 8 个字符，包含字母和数字。",
+      "password-mismatch": "两次输入的密码不一致。",
+      "password-confirm": "确认密码",
+      "password-min-length": "至少 8 个字符",
+      "password-require-letter": "至少包含 1 个字母",
+      "password-require-number": "至少包含 1 个数字"
+    }
+  },
+  "landing": {
+    "welcome": "欢迎",
+    "description": "您已登录 Laelia AI。更多功能即将上线。"
+  }
+}

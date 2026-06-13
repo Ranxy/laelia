@@ -6,6 +6,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/react/components/ui/button";
 import { Input } from "@/react/components/ui/input";
@@ -23,17 +24,17 @@ type PasswordCheckResult = PasswordCheck & { matched: boolean };
 const PASSWORD_CHECKS: PasswordCheck[] = [
   {
     key: "min-length",
-    label: "At least 8 characters",
+    label: "min-length",
     test: (p) => p.length >= 8,
   },
   {
     key: "require-letter",
-    label: "At least 1 letter",
+    label: "require-letter",
     test: (p) => /[a-zA-Z]/.test(p),
   },
   {
     key: "require-number",
-    label: "At least 1 number",
+    label: "require-number",
     test: (p) => /[0-9]/.test(p),
   },
 ];
@@ -47,6 +48,7 @@ function isValidEmail(value: string): boolean {
 }
 
 export function SignUpPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const register = useAppStore((s) => s.register);
 
@@ -98,8 +100,11 @@ export function SignUpPage() {
     } catch (err) {
       toastManager.add({
         type: "error",
-        title: "Registration failed",
-        description: err instanceof Error ? err.message : "Please try again.",
+        title: t("auth.sign-up.failed"),
+        description:
+          err instanceof Error
+            ? err.message
+            : t("auth.sign-up.failed-description"),
       });
     } finally {
       setLoading(false);
@@ -110,7 +115,9 @@ export function SignUpPage() {
     <div className="flex w-full max-w-sm flex-col gap-y-6">
       <div className="text-center">
         <h1 className="text-2xl font-semibold text-main">Laelia</h1>
-        <p className="mt-1 text-sm text-control-light">Create your account</p>
+        <p className="mt-1 text-sm text-control-light">
+          {t("auth.sign-up.title")}
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-y-6 px-1">
@@ -120,7 +127,7 @@ export function SignUpPage() {
             htmlFor="signup-email"
             className="block text-sm font-medium leading-5 text-control"
           >
-            Email
+            {t("common.email")}
             <span className="ml-0.5 text-error">*</span>
           </label>
           <div className="mt-1 rounded-md shadow-xs">
@@ -137,7 +144,7 @@ export function SignUpPage() {
           </div>
           {touched && !emailValid && (
             <p className="mt-1 pl-1 text-sm text-error">
-              Please enter a valid email address.
+              {t("auth.sign-up.email-invalid")}
             </p>
           )}
         </div>
@@ -148,7 +155,7 @@ export function SignUpPage() {
             htmlFor="signup-name"
             className="block text-sm font-medium leading-5 text-control"
           >
-            Name
+            {t("common.name")}
             <span className="ml-0.5 text-error">*</span>
           </label>
           <div className="mt-1 rounded-md shadow-xs">
@@ -156,7 +163,7 @@ export function SignUpPage() {
               id="signup-name"
               type="text"
               autoComplete="name"
-              placeholder="example: John Doe"
+              placeholder="Jim Gray"
               required
               value={name}
               onChange={(e) => {
@@ -173,7 +180,7 @@ export function SignUpPage() {
             htmlFor="signup-password"
             className="block text-sm font-medium leading-5 text-control"
           >
-            Password
+            {t("common.password")}
             <span className="ml-0.5 text-error">*</span>
           </label>
           <div className="relative mt-1 flex flex-row items-center rounded-md shadow-xs">
@@ -200,7 +207,6 @@ export function SignUpPage() {
               )}
             </button>
           </div>
-          {/* Password requirement checks */}
           {touched && password.length > 0 && (
             <ul className="mt-1 space-y-0.5 pl-1">
               {checks.map((check) => (
@@ -218,17 +224,16 @@ export function SignUpPage() {
                       check.matched ? "text-control-light" : "text-error"
                     }
                   >
-                    {check.label}
+                    {t(`auth.sign-up.password-${check.label}`)}
                   </span>
                 </li>
               ))}
             </ul>
           )}
-          {/* Password hint icon when collapsed */}
           {!touched && (
             <p className="mt-1 flex items-center gap-x-1 pl-1 text-sm text-control-light">
               <CircleHelp className="size-4" />
-              Must be at least 8 characters with letters and numbers.
+              {t("auth.sign-up.password-hint")}
             </p>
           )}
         </div>
@@ -239,7 +244,7 @@ export function SignUpPage() {
             htmlFor="signup-password-confirm"
             className="block text-sm font-medium leading-5 text-control"
           >
-            Confirm password
+            {t("auth.sign-up.password-confirm")}
             <span className="ml-0.5 text-error">*</span>
           </label>
           <div className="relative mt-1 flex flex-row items-center rounded-md shadow-xs">
@@ -256,7 +261,7 @@ export function SignUpPage() {
           </div>
           {mismatch && (
             <p className="mt-1 pl-1 text-sm text-error">
-              Passwords do not match.
+              {t("auth.sign-up.password-mismatch")}
             </p>
           )}
         </div>
@@ -268,19 +273,19 @@ export function SignUpPage() {
             className="w-full"
             disabled={!allowSubmit}
           >
-            {loading ? "Creating account…" : "Create account"}
+            {loading ? "…" : t("common.sign-up")}
           </Button>
         </div>
       </form>
 
       <p className="text-center text-sm text-control-light">
-        Already have an account?{" "}
+        {t("auth.sign-up.existing-user")}{" "}
         <button
           type="button"
           className="text-accent hover:underline"
           onClick={() => navigate("/auth/signin")}
         >
-          Sign in
+          {t("common.sign-in")}
         </button>
       </p>
     </div>

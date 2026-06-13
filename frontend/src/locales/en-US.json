@@ -1,0 +1,39 @@
+{
+  "common": {
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "sign-in": "Sign in",
+    "sign-up": "Sign up",
+    "sign-out": "Sign out",
+    "or": "or",
+    "close": "Close",
+    "language": "Language"
+  },
+  "auth": {
+    "sign-in": {
+      "title": "Sign in to your account",
+      "new-user": "Don't have an account?",
+      "forget-password": "Forgot your password?",
+      "failed": "Sign in failed",
+      "failed-description": "Please check your credentials."
+    },
+    "sign-up": {
+      "title": "Create your account",
+      "existing-user": "Already have an account?",
+      "failed": "Registration failed",
+      "failed-description": "Please try again.",
+      "email-invalid": "Please enter a valid email address.",
+      "password-hint": "Must be at least 8 characters with letters and numbers.",
+      "password-mismatch": "Passwords do not match.",
+      "password-confirm": "Confirm password",
+      "password-min-length": "At least 8 characters",
+      "password-require-letter": "At least 1 letter",
+      "password-require-number": "At least 1 number"
+    }
+  },
+  "landing": {
+    "welcome": "Welcome",
+    "description": "You are now signed in to Laelia AI. More features coming soon."
+  }
+}
