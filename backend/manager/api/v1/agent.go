@@ -150,12 +150,12 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent not authenticated"))
 	}
 
-	now := time.Now().Unix()
+	nowSec := time.Now().Unix()
 	patch := &store.UpdateAgentMessage{
 		Status: &storepb.AgentStatus{
 			State:           storepb.AgentStatus_ONLINE,
-			ConnectedAt:     now,
-			LastHeartbeatAt: now,
+			ConnectedAt:     nowSec,
+			LastHeartbeatAt: nowSec,
 		},
 	}
 
@@ -176,11 +176,11 @@ func (s *AgentService) AgentHeartbeat(ctx context.Context, _ *connect.Request[v1
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent not authenticated"))
 	}
 
-	now := time.Now().Unix()
+	nowSec := time.Now().Unix()
 	patch := &store.UpdateAgentMessage{
 		Status: &storepb.AgentStatus{
 			State:           storepb.AgentStatus_ONLINE,
-			LastHeartbeatAt: now,
+			LastHeartbeatAt: nowSec,
 			ConnectedAt:     agent.Status.GetConnectedAt(),
 		},
 	}
@@ -192,7 +192,7 @@ func (s *AgentService) AgentHeartbeat(ctx context.Context, _ *connect.Request[v1
 	return connect.NewResponse(&v1pb.AgentHeartbeatResponse{}), nil
 }
 
-func (s *AgentService) Hello(_ context.Context, _ *connect.Request[v1pb.HelloRequest]) (*connect.Response[v1pb.HelloResponse], error) {
+func (*AgentService) Hello(_ context.Context, _ *connect.Request[v1pb.HelloRequest]) (*connect.Response[v1pb.HelloResponse], error) {
 	return connect.NewResponse(&v1pb.HelloResponse{
 		CurrentTime: time.Now().Unix(),
 	}), nil

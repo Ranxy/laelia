@@ -14,13 +14,13 @@ type Store struct {
 	dbConnManager *DBConnectionManager
 	enableCache   bool
 
-	userIDCache    *lru.Cache[int, *UserMessage]
-	userEmailCache *lru.Cache[string, *UserMessage]
-	settingCache   *lru.Cache[models.SettingName, *SettingMessage]
-	policyCache    *lru.Cache[string, *PolicyMessage]
-	idpCache       *lru.Cache[string, *IdentityProviderMessage]
-	groupCache     *lru.Cache[string, *GroupMessage]
-	agentIDCache   *lru.Cache[int, *AgentMessage]
+	userIDCache          *lru.Cache[int, *UserMessage]
+	userEmailCache       *lru.Cache[string, *UserMessage]
+	settingCache         *lru.Cache[models.SettingName, *SettingMessage]
+	policyCache          *lru.Cache[string, *PolicyMessage]
+	idpCache             *lru.Cache[string, *IdentityProviderMessage]
+	groupCache           *lru.Cache[string, *GroupMessage]
+	agentIDCache         *lru.Cache[int, *AgentMessage]
 	agentResourceIDCache *lru.Cache[string, *AgentMessage]
 }
 
@@ -63,15 +63,15 @@ func New(ctx context.Context, pgURL string, enableCache bool) (*Store, error) {
 		return nil, err
 	}
 	s := &Store{
-		dbConnManager:  dbConnManager,
-		enableCache:    enableCache,
-		userIDCache:    userIDCache,
-		userEmailCache: userEmailCache,
-		settingCache:   settingCache,
-		policyCache:    policyCache,
-		idpCache:       idpCache,
-		groupCache:     groupCache,
-		agentIDCache:   agentIDCache,
+		dbConnManager:        dbConnManager,
+		enableCache:          enableCache,
+		userIDCache:          userIDCache,
+		userEmailCache:       userEmailCache,
+		settingCache:         settingCache,
+		policyCache:          policyCache,
+		idpCache:             idpCache,
+		groupCache:           groupCache,
+		agentIDCache:         agentIDCache,
 		agentResourceIDCache: agentResourceIDCache,
 	}
 

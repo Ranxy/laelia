@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/Ranxy/laelia/backend/agent/client"
@@ -23,12 +24,12 @@ func init() {
 var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Connect to the manager and start the agent",
-	Run: func(_ *cobra.Command, _ []string) {
-		run()
+	RunE: func(_ *cobra.Command, _ []string) error {
+		return run()
 	},
 }
 
-func run() {
+func run() error {
 	slog.Info("laelia-agent starting", "manager", flags.managerURL)
 
 	info := collectAgentInfo()
@@ -37,14 +38,13 @@ func run() {
 		"os", info.Os,
 		"arch", info.Arch,
 		"version", info.Version,
-		"ip", info.Ip,
+		"ip", info.IP,
 	)
 
 	apiClient := client.New(flags.managerURL, flags.token)
 
 	if err := apiClient.Connect(info); err != nil {
-		slog.Error("failed to connect to manager", "error", err)
-		os.Exit(1)
+		return errors.Errorf("failed to connect to manager: %v", err)
 	}
 	slog.Info("connected to manager")
 
@@ -66,7 +66,7 @@ func run() {
 		select {
 		case <-ctx.Done():
 			slog.Info("agent stopped")
-			return
+			return nil
 		case <-ticker.C:
 			if err := apiClient.Heartbeat(); err != nil {
 				slog.Error("heartbeat failed", "error", err)
@@ -84,7 +84,7 @@ func collectAgentInfo() *client.AgentInfo {
 		Os:       runtime.GOOS,
 		Arch:     runtime.GOARCH,
 		Version:  "0.1.0",
-		Ip:       getOutboundIP(),
+		IP:       getOutboundIP(),
 	}
 }
 
@@ -94,6 +94,9 @@ func getOutboundIP() string {
 		return ""
 	}
 	defer conn.Close()
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	localAddr, ok := conn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		return ""
+	}
 	return localAddr.IP.String()
 }

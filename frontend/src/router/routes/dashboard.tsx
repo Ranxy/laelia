@@ -13,6 +13,14 @@ export const dashboardRoutes: RouteObject[] = [
             Component: m.LandingPage,
           })),
       },
+      {
+        path: "agents",
+        handle: { name: "agent.list" },
+        lazy: () =>
+          import("@/react/pages/dashboard/agents").then((m) => ({
+            Component: m.AgentsPage,
+          })),
+      },
     ],
   },
 ];

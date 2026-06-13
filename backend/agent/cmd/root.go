@@ -21,5 +21,5 @@ func Execute() error {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&flags.managerURL, "manager", "http://localhost:8111", "manager server URL")
 	rootCmd.PersistentFlags().StringVar(&flags.token, "token", "", "agent connection token (required)")
-	rootCmd.MarkPersistentFlagRequired("token")
+	_ = rootCmd.MarkPersistentFlagRequired("token")
 }

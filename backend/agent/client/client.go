@@ -3,11 +3,12 @@ package client
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 type Client struct {
@@ -21,7 +22,7 @@ type AgentInfo struct {
 	Hostname  string            `json:"hostname,omitempty"`
 	Os        string            `json:"os,omitempty"`
 	Arch      string            `json:"arch,omitempty"`
-	Ip        string            `json:"ip,omitempty"`
+	IP        string            `json:"ip,omitempty"`
 	Version   string            `json:"version,omitempty"`
 	Labels    map[string]string `json:"labels,omitempty"`
 }
@@ -51,25 +52,25 @@ func (c *Client) Heartbeat() error {
 func (c *Client) doPost(path string, body any) error {
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(body); err != nil {
-		return fmt.Errorf("failed to encode request: %w", err)
+		return errors.Wrapf(err, "failed to encode request")
 	}
 
 	req, err := http.NewRequest(http.MethodPost, c.managerURL+path, &buf)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errors.Wrapf(err, "failed to create request")
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.token)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return errors.Wrapf(err, "request failed")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(bodyBytes))
+		return errors.Errorf("unexpected status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	return nil

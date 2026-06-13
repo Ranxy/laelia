@@ -17,6 +17,30 @@ export interface ApiUser {
   groups?: string[];
 }
 
+export interface ApiAgent {
+  name: string;
+  state: string;
+  title: string;
+  token?: string;
+  info?: {
+    agentType?: string;
+    hostname?: string;
+    os?: string;
+    arch?: string;
+    ip?: string;
+    version?: string;
+    labels?: Record<string, string>;
+  };
+  status?: {
+    state: string;
+    lastHeartbeatTime?: string;
+    connectedTime?: string;
+    errorMessage?: string;
+  };
+  createdAt?: string;
+  labels?: Record<string, string>;
+}
+
 export interface AuthSlice {
   currentUser: ApiUser | null;
   token: string | null;
@@ -30,6 +54,21 @@ export interface AuthSlice {
   loadSession: () => Promise<void>;
 }
 
-export type AppStoreState = AuthSlice;
+export interface AgentSlice {
+  agents: ApiAgent[];
+  agentsLoading: boolean;
+
+  fetchAgents: (params?: {
+    pageSize?: number;
+    pageToken?: string;
+  }) => Promise<{ nextPageToken: string } | undefined>;
+  createAgent: (
+    name: string,
+    labels?: Record<string, string>
+  ) => Promise<ApiAgent>;
+  deleteAgent: (name: string) => Promise<void>;
+}
+
+export type AppStoreState = AuthSlice & AgentSlice;
 
 export type AppSliceCreator<Slice> = StateCreator<AppStoreState, [], [], Slice>;

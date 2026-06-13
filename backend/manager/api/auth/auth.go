@@ -36,7 +36,7 @@ const (
 	AccessTokenAudienceFmt = "ll.user.access.%s"
 	// AgentAccessTokenAudienceFmt is the format of the agent access token audience.
 	AgentAccessTokenAudienceFmt = "ll.agent.access.%s"
-	apiTokenDuration           = 1 * time.Hour
+	apiTokenDuration            = 1 * time.Hour
 	// DefaultTokenDuration is the default token expiration duration.
 	DefaultTokenDuration = 7 * 24 * time.Hour
 	// DefaultAgentTokenDuration is the default agent token expiration duration.
@@ -74,6 +74,11 @@ func New(
 	}
 }
 
+type authResult struct {
+	user  *store.UserMessage
+	agent *store.AgentMessage
+}
+
 // WrapUnary implements the ConnectRPC interceptor interface for unary RPCs.
 func (in *APIAuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
@@ -88,7 +93,7 @@ func (in *APIAuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFun
 		}
 		ctx = context.WithValue(ctx, common.AuthContextKey, authContext)
 
-		user, err := in.getUserOrAgentConnect(ctx, accessTokenStr)
+		result, err := in.getUserOrAgentConnect(ctx, accessTokenStr)
 		if err != nil {
 			if IsAuthenticationAllowed(req.Spec().Procedure, authContext) {
 				return next(ctx, req)
@@ -96,8 +101,11 @@ func (in *APIAuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFun
 			return nil, err
 		}
 
-		if user != nil {
-			ctx = context.WithValue(ctx, common.UserContextKey, user)
+		if result.user != nil {
+			ctx = context.WithValue(ctx, common.UserContextKey, result.user)
+		}
+		if result.agent != nil {
+			ctx = context.WithValue(ctx, common.AgentContextKey, result.agent)
 		}
 		return next(ctx, req)
 	}
@@ -124,7 +132,7 @@ func (in *APIAuthInterceptor) WrapStreamingHandler(next connect.StreamingHandler
 		}
 		ctx = context.WithValue(ctx, common.AuthContextKey, authContext)
 
-		user, err := in.getUserOrAgentConnect(ctx, accessTokenStr)
+		result, err := in.getUserOrAgentConnect(ctx, accessTokenStr)
 		if err != nil {
 			if IsAuthenticationAllowed(conn.Spec().Procedure, authContext) {
 				return next(ctx, conn)
@@ -132,17 +140,18 @@ func (in *APIAuthInterceptor) WrapStreamingHandler(next connect.StreamingHandler
 			return err
 		}
 
-		if user != nil {
-			ctx = context.WithValue(ctx, common.UserContextKey, user)
+		if result.user != nil {
+			ctx = context.WithValue(ctx, common.UserContextKey, result.user)
+		}
+		if result.agent != nil {
+			ctx = context.WithValue(ctx, common.AgentContextKey, result.agent)
 		}
 
 		return next(ctx, conn)
 	}
 }
 
-// getUserOrAgentConnect authenticates using either a user or agent JWT token.
-// Returns user=nil for agent-authenticated requests.
-func (in *APIAuthInterceptor) getUserOrAgentConnect(ctx context.Context, accessTokenStr string) (*store.UserMessage, error) {
+func (in *APIAuthInterceptor) getUserOrAgentConnect(ctx context.Context, accessTokenStr string) (*authResult, error) {
 	if accessTokenStr == "" {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errs.New("access token not found"))
 	}
@@ -170,13 +179,21 @@ func (in *APIAuthInterceptor) getUserOrAgentConnect(ctx context.Context, accessT
 
 	if agentErr == nil && agentToken != nil && agentToken.Valid {
 		if audienceContains(agentClaims.Audience, fmt.Sprintf(AgentAccessTokenAudienceFmt, in.profile.Mode)) {
-			return in.authenticateAgentByClaims(ctx, agentClaims)
+			agent, err := in.authenticateAgentByClaims(ctx, agentClaims)
+			if err != nil {
+				return nil, err
+			}
+			return &authResult{agent: agent}, nil
 		}
 	}
 
 	if userErr == nil && userToken != nil && userToken.Valid {
 		if audienceContains(userClaims.Audience, fmt.Sprintf(AccessTokenAudienceFmt, in.profile.Mode)) {
-			return in.authenticateUserByClaims(ctx, userClaims)
+			user, err := in.authenticateUserByClaims(ctx, userClaims)
+			if err != nil {
+				return nil, err
+			}
+			return &authResult{user: user}, nil
 		}
 	}
 
@@ -211,7 +228,7 @@ func (in *APIAuthInterceptor) authenticateUserByClaims(ctx context.Context, clai
 	return user, nil
 }
 
-func (in *APIAuthInterceptor) authenticateAgentByClaims(ctx context.Context, claims *agentClaimsMessage) (*store.UserMessage, error) {
+func (in *APIAuthInterceptor) authenticateAgentByClaims(ctx context.Context, claims *agentClaimsMessage) (*store.AgentMessage, error) {
 	agentID, err := strconv.Atoi(claims.Subject)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("malformed agent ID %s in the token", claims.Subject))
@@ -230,9 +247,8 @@ func (in *APIAuthInterceptor) authenticateAgentByClaims(ctx context.Context, cla
 		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("agent token version mismatch"))
 	}
 
-	ctx = context.WithValue(ctx, common.AgentContextKey, agent)
 	in.profile.LastActiveTS.Store(time.Now().Unix())
-	return nil, nil
+	return agent, nil
 }
 
 func GetTokenFromMetadata(md metadata.MD) (string, error) {
@@ -319,10 +335,10 @@ func GenerateAccessToken(userName string, userID int, mode common.ReleaseMode, s
 // GenerateAgentToken generates an agent connection token.
 func GenerateAgentToken(agentName string, agentID int, tokenVersion int, mode common.ReleaseMode, secret string) (string, error) {
 	expirationTime := time.Now().Add(DefaultAgentTokenDuration)
-	return generateAgentToken(agentName, agentID, tokenVersion, fmt.Sprintf(AgentAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
+	return signAgentToken(agentName, agentID, tokenVersion, fmt.Sprintf(AgentAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
 }
 
-func generateAgentToken(agentName string, agentID int, tokenVersion int, aud string, expirationTime time.Time, secret []byte) (string, error) {
+func signAgentToken(agentName string, agentID int, tokenVersion int, aud string, expirationTime time.Time, secret []byte) (string, error) {
 	claims := &agentClaimsMessage{
 		Name:         agentName,
 		TokenVersion: tokenVersion,
