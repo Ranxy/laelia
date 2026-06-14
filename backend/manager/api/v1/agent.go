@@ -21,6 +21,7 @@ import (
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
+	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -41,16 +42,18 @@ type AgentService struct {
 	secret         string
 	profile        *config.Profile
 	stateCfg       *state.State
+	dispatcher     *dispatcher.Dispatcher
 	consumedTimers map[int]*time.Timer
 	consumedMu     sync.Mutex
 }
 
-func NewAgentService(store *store.Store, secret string, profile *config.Profile, stateCfg *state.State) *AgentService {
+func NewAgentService(store *store.Store, secret string, profile *config.Profile, stateCfg *state.State, d *dispatcher.Dispatcher) *AgentService {
 	return &AgentService{
 		store:          store,
 		secret:         secret,
 		profile:        profile,
 		stateCfg:       stateCfg,
+		dispatcher:     d,
 		consumedTimers: make(map[int]*time.Timer),
 	}
 }
@@ -469,6 +472,21 @@ func (s *AgentService) AgentHeartbeat(ctx context.Context, req *connect.Request[
 			} else {
 				resp.AccessToken = newAccessToken
 				resp.AccessTokenExpiresAt = timestamppb.New(time.Now().Add(accessTokenDuration))
+			}
+		}
+	}
+
+	if s.dispatcher != nil && !s.dispatcher.IsAgentConnected(agent.ID) {
+		pending, err := s.store.GetNextPendingCommand(ctx, agent.ID)
+		if err != nil {
+			slog.Warn("failed to check pending commands during heartbeat", "error", err)
+		} else if pending != nil {
+			resp.CommandStreamRequired = true
+			resp.PendingCommandHint = &v1pb.PendingCommandHint{
+				CommandId:      pending.ID.String(),
+				Command:        pending.Command,
+				WorkingDir:     pending.WorkingDir,
+				TimeoutSeconds: pending.TimeoutSeconds,
 			}
 		}
 	}
