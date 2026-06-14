@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -301,7 +302,14 @@ func (s *AgentService) ListAgentSessions(ctx context.Context, req *connect.Reque
 func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1pb.ConnectAgentRequest]) (*connect.Response[v1pb.ConnectAgentResponse], error) {
 	agent, ok := GetAgentFromContext(ctx)
 	if !ok || agent == nil {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent not authenticated"))
+		if req.Msg.BootstrapToken == "" {
+			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent not authenticated and no bootstrap token provided"))
+		}
+		var err error
+		agent, err = s.authenticateBootstrapToken(req.Msg.BootstrapToken)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	sessionID := generateRandomString(sessionIDLength)
@@ -576,6 +584,63 @@ func (*AgentService) Hello(_ context.Context, _ *connect.Request[v1pb.HelloReque
 		CurrentTime:   time.Now().Unix(),
 		ServerVersion: "0.1.0",
 	}), nil
+}
+
+type bootstrapClaims struct {
+	Name         string `json:"name"`
+	TokenVersion int    `json:"token_version"`
+	TokenType    string `json:"token_type"`
+	jwt.RegisteredClaims
+}
+
+func (s *AgentService) authenticateBootstrapToken(tokenStr string) (*store.AgentMessage, error) {
+	claims := &bootstrapClaims{}
+	parsedToken, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
+		if t.Method.Alg() != jwt.SigningMethodHS256.Name {
+			return nil, errors.Errorf("unexpected signing method %v", t.Header["alg"])
+		}
+		if kid, ok := t.Header["kid"].(string); ok && kid == "v1" {
+			return []byte(s.secret), nil
+		}
+		return nil, errors.Errorf("unexpected kid %v", t.Header["kid"])
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.Errorf("invalid bootstrap token: %v", err))
+	}
+	if !parsedToken.Valid {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("bootstrap token is invalid"))
+	}
+	if claims.TokenType != auth.TokenTypeBootstrap {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.Errorf("expected bootstrap token, got %s", claims.TokenType))
+	}
+
+	agent, err := s.store.GetAgentByResourceID(context.Background(), claims.Subject)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to find agent: %v", err))
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.Errorf("agent %s not found", claims.Subject))
+	}
+	if agent.Deleted {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.Errorf("agent %s has been deactivated", claims.Subject))
+	}
+	if agent.TokenVersion != claims.TokenVersion {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent token version mismatch"))
+	}
+
+	tokenHash := hashToken(tokenStr)
+	storedToken, err := s.store.GetAgentTokenByHash(context.Background(), tokenHash)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to look up token: %v", err))
+	}
+	if storedToken == nil || storedToken.State != storepb.AgentTokenState_ACTIVE {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("bootstrap token is not active"))
+	}
+	if time.Now().After(storedToken.ExpiresAt) {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("bootstrap token expired"))
+	}
+
+	return agent, nil
 }
 
 func convertToAgent(agent *store.AgentMessage) *v1pb.Agent {
