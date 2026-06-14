@@ -8,6 +8,7 @@ var flags struct {
 	managerURL string
 	token      string
 	insecure   bool
+	allowHTTP  bool
 }
 
 var rootCmd = &cobra.Command{
@@ -20,8 +21,9 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&flags.managerURL, "manager", "http://localhost:8111", "manager server URL")
+	rootCmd.PersistentFlags().StringVar(&flags.managerURL, "manager", "https://localhost:8181", "manager server URL")
 	rootCmd.PersistentFlags().StringVar(&flags.token, "token", "", "agent connection token (required)")
 	rootCmd.PersistentFlags().BoolVar(&flags.insecure, "insecure", false, "skip TLS certificate verification")
+	rootCmd.PersistentFlags().BoolVar(&flags.allowHTTP, "allow-http", false, "allow plain HTTP connections (insecure, dev only)")
 	_ = rootCmd.MarkPersistentFlagRequired("token")
 }

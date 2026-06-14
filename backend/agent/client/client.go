@@ -80,8 +80,16 @@ func (eb *ExponentialBackoff) Reset() {
 	eb.attempt = 0
 }
 
-func New(managerURL, token string, insecure bool) *Client {
+func New(managerURL, token string, insecure bool, allowHTTP bool) (*Client, error) {
 	managerURL = strings.TrimRight(managerURL, "/")
+
+	if strings.HasPrefix(managerURL, "http://") {
+		if !allowHTTP {
+			return nil, errors.New("plain HTTP connections are not allowed by default, use --allow-http flag or switch to https://")
+		}
+		slog.Warn("plain HTTP connection enabled, traffic will not be encrypted")
+	}
+
 	tokenDir := filepath.Join(os.Getenv("HOME"), ".laelia")
 	httpClient := &http.Client{Timeout: defaultConnectTimeout}
 
@@ -102,7 +110,7 @@ func New(managerURL, token string, insecure bool) *Client {
 		client:     client,
 		credential: credential.New(filepath.Join(tokenDir, "agent-token"), token),
 		backoff:    NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
-	}
+	}, nil
 }
 
 func (c *Client) Connect(ctx context.Context, info *v1pb.AgentInfo) error {

@@ -27,7 +27,10 @@ var runCmd = &cobra.Command{
 func run() error {
 	slog.Info("laelia-agent starting", "manager", flags.managerURL)
 
-	apiClient := client.New(flags.managerURL, flags.token, flags.insecure)
+	apiClient, err := client.New(flags.managerURL, flags.token, flags.insecure, flags.allowHTTP)
+	if err != nil {
+		return err
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
