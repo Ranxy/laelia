@@ -42,11 +42,12 @@ const (
 )
 
 type Client struct {
-	managerURL string
-	httpClient *http.Client
-	client     v1connect.AgentServiceClient
-	credential *credential.Manager
-	mu         sync.RWMutex
+	managerURL   string
+	httpClient   *http.Client
+	streamClient *http.Client
+	client       v1connect.AgentServiceClient
+	credential   *credential.Manager
+	mu           sync.RWMutex
 
 	connState   ConnState
 	sessionID   string
@@ -94,23 +95,39 @@ func New(managerURL, token string, insecure bool, allowHTTP bool) (*Client, erro
 	tokenDir := filepath.Join(os.Getenv("HOME"), ".laelia")
 	httpClient := &http.Client{Timeout: defaultConnectTimeout}
 
+	// Separate HTTP client for the bidi command stream: no global timeout
+	// (the stream is long-lived), but explicit HTTP/2 support to ensure
+	// gRPC bidi streams work through proxies and TLS terminators.
+	streamClient := &http.Client{}
+
 	if strings.HasPrefix(managerURL, "https://") {
+		tlsCfg := &tls.Config{
+			MinVersion:         tls.VersionTLS13,
+			InsecureSkipVerify: insecure,
+		}
 		httpClient.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
-				MinVersion:         tls.VersionTLS13,
-				InsecureSkipVerify: insecure,
-			},
+			TLSClientConfig: tlsCfg,
+		}
+		// Separate transport for the bidi command stream:
+		// - ForceAttemptHTTP2 ensures gRPC bidi streams work through proxies
+		// - ResponseHeaderTimeout bounds only the initial handshake, not the stream
+		// - No http.Client.Timeout so the long-lived stream is not killed prematurely
+		streamClient.Transport = &http.Transport{
+			TLSClientConfig:       tlsCfg,
+			ForceAttemptHTTP2:     true,
+			ResponseHeaderTimeout: 60 * time.Second,
 		}
 	}
 
 	client := v1connect.NewAgentServiceClient(httpClient, managerURL)
 
 	return &Client{
-		managerURL: managerURL,
-		httpClient: httpClient,
-		client:     client,
-		credential: credential.New(filepath.Join(tokenDir, "agent-token"), token),
-		backoff:    NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
+		managerURL:   managerURL,
+		httpClient:   httpClient,
+		streamClient: streamClient,
+		client:       client,
+		credential:   credential.New(filepath.Join(tokenDir, "agent-token"), token),
+		backoff:      NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
 	}, nil
 }
 
@@ -236,7 +253,7 @@ func (c *Client) Run(ctx context.Context) error {
 	info := collectAgentInfo()
 	slog.Info("connecting to manager", "url", c.managerURL)
 
-	c.cmdStream = newCommandStream(c.httpClient, c.managerURL)
+	c.cmdStream = newCommandStream(c.streamClient, c.managerURL)
 	c.cmdStream.getToken = func() string {
 		c.mu.RLock()
 		defer c.mu.RUnlock()
