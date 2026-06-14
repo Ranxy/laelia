@@ -40,6 +40,10 @@
       "password-require-number": "至少包含 1 个数字"
     }
   },
+  "sidebar": {
+    "home": "首页",
+    "agents": "Agent 管理"
+  },
   "landing": {
     "welcome": "欢迎",
     "description": "您已登录 Laelia AI。更多功能即将上线。"

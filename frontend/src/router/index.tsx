@@ -5,6 +5,7 @@ import {
 } from "react-router-dom";
 import { RootLayout } from "@/react/app/root-layout";
 import { rootGuard } from "./guard";
+import { buildRouteNameIndex, setRouteNameIndex } from "./route-index";
 import { authRoutes } from "./routes/auth";
 import { dashboardRoutes } from "./routes/dashboard";
 
@@ -21,5 +22,7 @@ const allRoutes: RouteObject[] = [
     ],
   },
 ];
+
+setRouteNameIndex(buildRouteNameIndex(allRoutes));
 
 export const router = createBrowserRouter(allRoutes);

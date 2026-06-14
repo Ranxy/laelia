@@ -40,6 +40,10 @@
       "password-require-number": "At least 1 number"
     }
   },
+  "sidebar": {
+    "home": "Home",
+    "agents": "Agents"
+  },
   "landing": {
     "welcome": "Welcome",
     "description": "You are now signed in to Laelia AI. More features coming soon."

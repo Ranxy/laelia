@@ -1,5 +1,11 @@
 import type { RouteObject } from "react-router-dom";
 import { DashboardLayout } from "@/react/app/layouts/dashboard-layout";
+import {
+  AGENT_ROUTE_LIST,
+  COMMAND_ROUTE_DETAIL,
+  COMMAND_ROUTE_LIST,
+  WORKSPACE_ROUTE_LANDING,
+} from "../handles";
 
 export const dashboardRoutes: RouteObject[] = [
   {
@@ -7,7 +13,7 @@ export const dashboardRoutes: RouteObject[] = [
     children: [
       {
         index: true,
-        handle: { name: "workspace.landing" },
+        handle: { name: WORKSPACE_ROUTE_LANDING },
         lazy: () =>
           import("@/react/pages/dashboard/landing").then((m) => ({
             Component: m.LandingPage,
@@ -15,7 +21,7 @@ export const dashboardRoutes: RouteObject[] = [
       },
       {
         path: "agents",
-        handle: { name: "agent.list" },
+        handle: { name: AGENT_ROUTE_LIST },
         lazy: () =>
           import("@/react/pages/dashboard/agents").then((m) => ({
             Component: m.AgentsPage,
@@ -23,7 +29,7 @@ export const dashboardRoutes: RouteObject[] = [
       },
       {
         path: "agents/:agentId/commands",
-        handle: { name: "command.list" },
+        handle: { name: COMMAND_ROUTE_LIST },
         lazy: () =>
           import("@/react/pages/dashboard/command-list").then((m) => ({
             Component: m.CommandListPage,
@@ -31,7 +37,7 @@ export const dashboardRoutes: RouteObject[] = [
       },
       {
         path: "agents/:agentId/commands/:commandId",
-        handle: { name: "command.detail" },
+        handle: { name: COMMAND_ROUTE_DETAIL },
         lazy: () =>
           import("@/react/pages/dashboard/command-detail").then((m) => ({
             Component: m.CommandDetailPage,

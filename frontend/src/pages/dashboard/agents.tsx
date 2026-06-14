@@ -1,6 +1,7 @@
 import { Timestamp } from "@bufbuild/protobuf/wkt";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/react/components/ui/badge";
 import { Button } from "@/react/components/ui/button";
 import {
@@ -30,6 +31,7 @@ import { AgentStatus_ConnectionState } from "@/types/proto-es/v1/agent_pb";
 
 export function AgentsPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const fetchAgents = useAppStore((s) => s.fetchAgents);
   const agents = useAppStore((s) => s.agents);
   const loading = useAppStore((s) => s.agentsLoading);
@@ -278,24 +280,40 @@ export function AgentsPage() {
                   </TableCell>
                   <TableCell>{agent.info?.ip ?? "-"}</TableCell>
                   <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (
-                          window.confirm(
-                            t("common.confirm-delete", {
-                              name: agent.title,
-                            })
-                          )
-                        ) {
-                          handleDelete(agent.name);
-                        }
-                      }}
-                    >
-                      {t("common.delete")}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const resourceId = agent.name.replace(
+                            /^agents\//,
+                            ""
+                          );
+                          navigate(`/agents/${resourceId}/commands`);
+                        }}
+                      >
+                        Commands
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (
+                            window.confirm(
+                              t("common.confirm-delete", {
+                                name: agent.title,
+                              })
+                            )
+                          ) {
+                            handleDelete(agent.name);
+                          }
+                        }}
+                      >
+                        {t("common.delete")}
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
