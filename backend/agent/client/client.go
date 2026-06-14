@@ -1,14 +1,11 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"math"
 	"net"
@@ -20,9 +17,12 @@ import (
 	"sync"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/pkg/errors"
 
 	"github.com/Ranxy/laelia/backend/agent/credential"
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
+	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
 
 const (
@@ -41,45 +41,10 @@ const (
 	StateDisconnecting
 )
 
-type AgentInfo struct {
-	AgentType string            `json:"agent_type,omitempty"`
-	Hostname  string            `json:"hostname,omitempty"`
-	Os        string            `json:"os,omitempty"`
-	Arch      string            `json:"arch,omitempty"`
-	IP        string            `json:"ip,omitempty"`
-	Version   string            `json:"version,omitempty"`
-	Labels    map[string]string `json:"labels,omitempty"`
-}
-
-type ConnectResponse struct {
-	AccessToken          string `json:"accessToken"`
-	RefreshToken         string `json:"refreshToken"`
-	SessionID            string `json:"sessionId"`
-	NextNonce            string `json:"nextNonce"`
-	AccessTokenExpiresAt int64  `json:"accessTokenExpiresAt"`
-}
-
-type HeartbeatResponse struct {
-	NextNonce            string `json:"nextNonce"`
-	NextHeartbeatAt      int64  `json:"nextHeartbeatAt"`
-	AccessToken          string `json:"accessToken,omitempty"`
-	AccessTokenExpiresAt int64  `json:"accessTokenExpiresAt,omitempty"`
-}
-
-type RefreshResponse struct {
-	AccessToken          string `json:"accessToken"`
-	RefreshToken         string `json:"refreshToken"`
-	AccessTokenExpiresAt int64  `json:"accessTokenExpiresAt"`
-}
-
-type HelloResponse struct {
-	CurrentTime   int64  `json:"currentTime"`
-	ServerVersion string `json:"serverVersion"`
-}
-
 type Client struct {
 	managerURL string
 	httpClient *http.Client
+	client     v1connect.AgentServiceClient
 	credential *credential.Manager
 	mu         sync.RWMutex
 
@@ -88,7 +53,6 @@ type Client struct {
 	serverNonce string
 	accessToken string
 	backoff     *ExponentialBackoff
-	insecure    bool
 }
 
 type ExponentialBackoff struct {
@@ -130,16 +94,18 @@ func New(managerURL, token string, insecure bool) *Client {
 		}
 	}
 
+	client := v1connect.NewAgentServiceClient(httpClient, managerURL)
+
 	return &Client{
 		managerURL: managerURL,
 		httpClient: httpClient,
+		client:     client,
 		credential: credential.New(filepath.Join(tokenDir, "agent-token"), token),
 		backoff:    NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
-		insecure:   insecure,
 	}
 }
 
-func (c *Client) Connect(ctx context.Context, info *AgentInfo) error {
+func (c *Client) Connect(ctx context.Context, info *v1pb.AgentInfo) error {
 	c.mu.Lock()
 	c.connState = StateConnecting
 	c.mu.Unlock()
@@ -148,12 +114,12 @@ func (c *Client) Connect(ctx context.Context, info *AgentInfo) error {
 
 	refreshToken := c.credential.LoadRefreshToken()
 	if refreshToken != "" {
-		resp, err := c.refreshToken(ctx, refreshToken, fingerprint)
+		refreshResp, err := c.refreshToken(ctx, refreshToken, fingerprint)
 		if err != nil {
 			slog.Warn("refresh token failed, falling back to bootstrap token", "error", err)
 		} else {
-			c.accessToken = resp.AccessToken
-			c.credential.SaveRefreshToken(resp.RefreshToken)
+			c.accessToken = refreshResp.AccessToken
+			c.credential.SaveRefreshToken(refreshResp.RefreshToken)
 
 			connectResp, err := c.connectWithAccessToken(ctx, info, fingerprint)
 			if err != nil {
@@ -161,7 +127,7 @@ func (c *Client) Connect(ctx context.Context, info *AgentInfo) error {
 			} else {
 				c.mu.Lock()
 				c.connState = StateConnected
-				c.sessionID = connectResp.SessionID
+				c.sessionID = connectResp.SessionId
 				c.serverNonce = connectResp.NextNonce
 				c.mu.Unlock()
 				c.backoff.Reset()
@@ -184,7 +150,7 @@ func (c *Client) Connect(ctx context.Context, info *AgentInfo) error {
 	c.credential.SaveRefreshToken(resp.RefreshToken)
 	c.mu.Lock()
 	c.connState = StateConnected
-	c.sessionID = resp.SessionID
+	c.sessionID = resp.SessionId
 	c.serverNonce = resp.NextNonce
 	c.mu.Unlock()
 	c.backoff.Reset()
@@ -196,22 +162,24 @@ func (c *Client) Heartbeat(ctx context.Context) error {
 	c.mu.RLock()
 	sessionID := c.sessionID
 	nonce := c.serverNonce
+	token := c.accessToken
 	c.mu.RUnlock()
 
-	reqBody := map[string]any{
-		"session_id":     sessionID,
-		"previous_nonce": nonce,
-	}
+	req := connect.NewRequest(&v1pb.AgentHeartbeatRequest{
+		SessionId:     sessionID,
+		PreviousNonce: nonce,
+	})
+	req.Header().Set("Authorization", "Bearer "+token)
 
-	var heartbeatResp HeartbeatResponse
-	if err := c.doPostWithAuth(ctx, "/v1/agents:heartbeat", reqBody, &heartbeatResp); err != nil {
+	resp, err := c.client.AgentHeartbeat(ctx, req)
+	if err != nil {
 		return err
 	}
 
 	c.mu.Lock()
-	c.serverNonce = heartbeatResp.NextNonce
-	if heartbeatResp.AccessToken != "" {
-		c.accessToken = heartbeatResp.AccessToken
+	c.serverNonce = resp.Msg.NextNonce
+	if resp.Msg.AccessToken != "" {
+		c.accessToken = resp.Msg.AccessToken
 	}
 	c.mu.Unlock()
 
@@ -221,14 +189,16 @@ func (c *Client) Heartbeat(ctx context.Context) error {
 func (c *Client) Disconnect(ctx context.Context) error {
 	c.mu.RLock()
 	sessionID := c.sessionID
+	token := c.accessToken
 	c.mu.RUnlock()
 
-	reqBody := map[string]any{
-		"session_id": sessionID,
-		"reason":     "shutdown",
-	}
+	req := connect.NewRequest(&v1pb.AgentDisconnectRequest{
+		SessionId: sessionID,
+		Reason:    "shutdown",
+	})
+	req.Header().Set("Authorization", "Bearer "+token)
 
-	err := c.doPostWithAuth(ctx, "/v1/agents:disconnect", reqBody, nil)
+	_, err := c.client.AgentDisconnect(ctx, req)
 	c.credential.DeleteRefreshToken()
 
 	c.mu.Lock()
@@ -238,12 +208,13 @@ func (c *Client) Disconnect(ctx context.Context) error {
 	return err
 }
 
-func (c *Client) Hello(ctx context.Context) (*HelloResponse, error) {
-	var resp HelloResponse
-	if err := c.doPostNoAuth(ctx, "/v1/agent/hello", map[string]any{}, &resp); err != nil {
+func (c *Client) Hello(ctx context.Context) (*v1pb.HelloResponse, error) {
+	req := connect.NewRequest(&v1pb.HelloRequest{})
+	resp, err := c.client.Hello(ctx, req)
+	if err != nil {
 		return nil, err
 	}
-	return &resp, nil
+	return resp.Msg, nil
 }
 
 func (c *Client) State() ConnState {
@@ -301,135 +272,63 @@ func (c *Client) Run(ctx context.Context) error {
 	}
 }
 
-func (c *Client) connectWithBootstrapToken(ctx context.Context, bootstrapToken string, info *AgentInfo, fingerprint string) (*ConnectResponse, error) {
-	reqBody := map[string]any{
-		"bootstrap_token": bootstrapToken,
-		"info":            info,
-		"fingerprint":     fingerprint,
-	}
-
-	var resp ConnectResponse
-	if err := c.doPostNoAuth(ctx, "/v1/agents:connect", reqBody, &resp); err != nil {
+func (c *Client) connectWithBootstrapToken(ctx context.Context, bootstrapToken string, info *v1pb.AgentInfo, fingerprint string) (*v1pb.ConnectAgentResponse, error) {
+	req := connect.NewRequest(&v1pb.ConnectAgentRequest{
+		BootstrapToken: bootstrapToken,
+		Info:           info,
+		Fingerprint:    fingerprint,
+	})
+	resp, err := c.client.ConnectAgent(ctx, req)
+	if err != nil {
 		return nil, err
 	}
-	return &resp, nil
+	return resp.Msg, nil
 }
 
-func (c *Client) connectWithAccessToken(ctx context.Context, info *AgentInfo, fingerprint string) (*ConnectResponse, error) {
-	reqBody := map[string]any{
-		"info":        info,
-		"fingerprint": fingerprint,
-	}
-
-	var resp ConnectResponse
-	if err := c.doPostWithAuth(ctx, "/v1/agents:connect", reqBody, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-func (c *Client) refreshToken(ctx context.Context, refreshToken string, fingerprint string) (*RefreshResponse, error) {
-	reqBody := map[string]any{
-		"refresh_token": refreshToken,
-		"fingerprint":   fingerprint,
-	}
-
-	var resp RefreshResponse
-	if err := c.doPostNoAuth(ctx, "/v1/agents:refreshToken", reqBody, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-func (c *Client) doPostWithAuth(ctx context.Context, path string, body any, result any) error {
+func (c *Client) connectWithAccessToken(ctx context.Context, info *v1pb.AgentInfo, fingerprint string) (*v1pb.ConnectAgentResponse, error) {
 	c.mu.RLock()
 	token := c.accessToken
 	c.mu.RUnlock()
 
-	var buf bytes.Buffer
-	if body != nil {
-		if err := json.NewEncoder(&buf).Encode(body); err != nil {
-			return errors.Wrapf(err, "failed to encode request")
-		}
-	}
+	req := connect.NewRequest(&v1pb.ConnectAgentRequest{
+		Info:        info,
+		Fingerprint: fingerprint,
+	})
+	req.Header().Set("Authorization", "Bearer "+token)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.managerURL+path, &buf)
+	resp, err := c.client.ConnectAgent(ctx, req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create request")
+		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return errors.Wrapf(err, "request failed")
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		return errors.New("unauthorized: token may be expired or invalid")
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return errors.Errorf("unexpected status %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	if result != nil {
-		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
-			return errors.Wrapf(err, "failed to decode response")
-		}
-	}
-	return nil
+	return resp.Msg, nil
 }
 
-func (c *Client) doPostNoAuth(ctx context.Context, path string, body any, result any) error {
-	var buf bytes.Buffer
-	if body != nil {
-		if err := json.NewEncoder(&buf).Encode(body); err != nil {
-			return errors.Wrapf(err, "failed to encode request")
-		}
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.managerURL+path, &buf)
+func (c *Client) refreshToken(ctx context.Context, refreshToken string, fingerprint string) (*v1pb.RefreshAgentTokenResponse, error) {
+	req := connect.NewRequest(&v1pb.RefreshAgentTokenRequest{
+		RefreshToken: refreshToken,
+		Fingerprint:  fingerprint,
+	})
+	resp, err := c.client.RefreshAgentToken(ctx, req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create request")
+		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return errors.Wrapf(err, "request failed")
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return errors.Errorf("unexpected status %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	if result != nil {
-		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
-			return errors.Wrapf(err, "failed to decode response")
-		}
-	}
-	return nil
+	return resp.Msg, nil
 }
 
-func computeFingerprint(info *AgentInfo) string {
+func computeFingerprint(info *v1pb.AgentInfo) string {
 	data := fmt.Sprintf("%s:%s:%s", info.Hostname, info.Os, info.Arch)
 	h := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(h[:])[:16]
 }
 
-func collectAgentInfo() *AgentInfo {
+func collectAgentInfo() *v1pb.AgentInfo {
 	hostname, _ := os.Hostname()
-	return &AgentInfo{
+	return &v1pb.AgentInfo{
 		Hostname: hostname,
 		Os:       runtime.GOOS,
 		Arch:     runtime.GOARCH,
 		Version:  "0.2.0",
-		IP:       getOutboundIP(),
+		Ip:       getOutboundIP(),
 	}
 }
 
