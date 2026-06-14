@@ -92,10 +92,13 @@ func configureGrpcRouters(
 		return connect.NewError(connect.CodeInternal, errors.Errorf("error: %v\n%s", p, stack))
 	}
 
+	ipValidator := auth.NewIPValidator(auth.IPValidationWarn, false)
+
 	handlerOpts := connect.WithHandlerOptions(
 		connect.WithInterceptors(
 			apiv1.NewDebugInterceptor(),
 			rateLimiter,
+			ipValidator,
 			auth.New(stores, secret, stateCfg, profile),
 			apiv1.NewAuditInterceptor(),
 		),

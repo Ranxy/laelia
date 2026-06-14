@@ -344,6 +344,14 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 		sourceIP = ip
 	}
 
+	reportedIP := ""
+	if req.Msg.Info != nil {
+		reportedIP = req.Msg.Info.Ip
+	}
+	if err := auth.ValidateAgentIP(reportedIP, sourceIP, auth.IPValidationWarn); err != nil {
+		return nil, err
+	}
+
 	if err := s.store.CreateAgentSession(ctx, &store.AgentSessionMessage{
 		SessionID:    sessionID,
 		AgentID:      agent.ID,
