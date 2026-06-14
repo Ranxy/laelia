@@ -4,6 +4,20 @@ package laelia.store;
 
 option go_package = "generated-go/store";
 
+enum AgentTokenType {
+  TOKEN_TYPE_UNSPECIFIED = 0;
+  BOOTSTRAP = 1;
+  ACCESS = 2;
+  REFRESH = 3;
+}
+
+enum AgentTokenState {
+  STATE_UNSPECIFIED = 0;
+  ACTIVE = 1;
+  CONSUMED = 2;
+  REVOKED = 3;
+}
+
 message AgentInfo {
   string agent_type = 1;
   string hostname = 2;
@@ -20,9 +34,11 @@ message AgentStatus {
     ONLINE = 1;
     OFFLINE = 2;
     ERROR = 3;
+    KICKED = 4;
   }
   ConnectionState state = 1;
   int64 last_heartbeat_at = 2;
   int64 connected_at = 3;
   string error_message = 4;
+  string active_session_id = 5;
 }

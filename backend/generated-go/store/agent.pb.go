@@ -21,6 +21,110 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type AgentTokenType int32
+
+const (
+	AgentTokenType_TOKEN_TYPE_UNSPECIFIED AgentTokenType = 0
+	AgentTokenType_BOOTSTRAP              AgentTokenType = 1
+	AgentTokenType_ACCESS                 AgentTokenType = 2
+	AgentTokenType_REFRESH                AgentTokenType = 3
+)
+
+// Enum value maps for AgentTokenType.
+var (
+	AgentTokenType_name = map[int32]string{
+		0: "TOKEN_TYPE_UNSPECIFIED",
+		1: "BOOTSTRAP",
+		2: "ACCESS",
+		3: "REFRESH",
+	}
+	AgentTokenType_value = map[string]int32{
+		"TOKEN_TYPE_UNSPECIFIED": 0,
+		"BOOTSTRAP":              1,
+		"ACCESS":                 2,
+		"REFRESH":                3,
+	}
+)
+
+func (x AgentTokenType) Enum() *AgentTokenType {
+	p := new(AgentTokenType)
+	*p = x
+	return p
+}
+
+func (x AgentTokenType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AgentTokenType) Descriptor() protoreflect.EnumDescriptor {
+	return file_store_agent_proto_enumTypes[0].Descriptor()
+}
+
+func (AgentTokenType) Type() protoreflect.EnumType {
+	return &file_store_agent_proto_enumTypes[0]
+}
+
+func (x AgentTokenType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AgentTokenType.Descriptor instead.
+func (AgentTokenType) EnumDescriptor() ([]byte, []int) {
+	return file_store_agent_proto_rawDescGZIP(), []int{0}
+}
+
+type AgentTokenState int32
+
+const (
+	AgentTokenState_STATE_UNSPECIFIED AgentTokenState = 0
+	AgentTokenState_ACTIVE            AgentTokenState = 1
+	AgentTokenState_CONSUMED          AgentTokenState = 2
+	AgentTokenState_REVOKED           AgentTokenState = 3
+)
+
+// Enum value maps for AgentTokenState.
+var (
+	AgentTokenState_name = map[int32]string{
+		0: "STATE_UNSPECIFIED",
+		1: "ACTIVE",
+		2: "CONSUMED",
+		3: "REVOKED",
+	}
+	AgentTokenState_value = map[string]int32{
+		"STATE_UNSPECIFIED": 0,
+		"ACTIVE":            1,
+		"CONSUMED":          2,
+		"REVOKED":           3,
+	}
+)
+
+func (x AgentTokenState) Enum() *AgentTokenState {
+	p := new(AgentTokenState)
+	*p = x
+	return p
+}
+
+func (x AgentTokenState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AgentTokenState) Descriptor() protoreflect.EnumDescriptor {
+	return file_store_agent_proto_enumTypes[1].Descriptor()
+}
+
+func (AgentTokenState) Type() protoreflect.EnumType {
+	return &file_store_agent_proto_enumTypes[1]
+}
+
+func (x AgentTokenState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AgentTokenState.Descriptor instead.
+func (AgentTokenState) EnumDescriptor() ([]byte, []int) {
+	return file_store_agent_proto_rawDescGZIP(), []int{1}
+}
+
 type AgentStatus_ConnectionState int32
 
 const (
@@ -28,6 +132,7 @@ const (
 	AgentStatus_ONLINE                       AgentStatus_ConnectionState = 1
 	AgentStatus_OFFLINE                      AgentStatus_ConnectionState = 2
 	AgentStatus_ERROR                        AgentStatus_ConnectionState = 3
+	AgentStatus_KICKED                       AgentStatus_ConnectionState = 4
 )
 
 // Enum value maps for AgentStatus_ConnectionState.
@@ -37,12 +142,14 @@ var (
 		1: "ONLINE",
 		2: "OFFLINE",
 		3: "ERROR",
+		4: "KICKED",
 	}
 	AgentStatus_ConnectionState_value = map[string]int32{
 		"CONNECTION_STATE_UNSPECIFIED": 0,
 		"ONLINE":                       1,
 		"OFFLINE":                      2,
 		"ERROR":                        3,
+		"KICKED":                       4,
 	}
 )
 
@@ -57,11 +164,11 @@ func (x AgentStatus_ConnectionState) String() string {
 }
 
 func (AgentStatus_ConnectionState) Descriptor() protoreflect.EnumDescriptor {
-	return file_store_agent_proto_enumTypes[0].Descriptor()
+	return file_store_agent_proto_enumTypes[2].Descriptor()
 }
 
 func (AgentStatus_ConnectionState) Type() protoreflect.EnumType {
-	return &file_store_agent_proto_enumTypes[0]
+	return &file_store_agent_proto_enumTypes[2]
 }
 
 func (x AgentStatus_ConnectionState) Number() protoreflect.EnumNumber {
@@ -171,6 +278,7 @@ type AgentStatus struct {
 	LastHeartbeatAt int64                       `protobuf:"varint,2,opt,name=last_heartbeat_at,json=lastHeartbeatAt,proto3" json:"last_heartbeat_at,omitempty"`
 	ConnectedAt     int64                       `protobuf:"varint,3,opt,name=connected_at,json=connectedAt,proto3" json:"connected_at,omitempty"`
 	ErrorMessage    string                      `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	ActiveSessionId string                      `protobuf:"bytes,5,opt,name=active_session_id,json=activeSessionId,proto3" json:"active_session_id,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -233,6 +341,13 @@ func (x *AgentStatus) GetErrorMessage() string {
 	return ""
 }
 
+func (x *AgentStatus) GetActiveSessionId() string {
+	if x != nil {
+		return x.ActiveSessionId
+	}
+	return ""
+}
+
 var File_store_agent_proto protoreflect.FileDescriptor
 
 const file_store_agent_proto_rawDesc = "" +
@@ -249,18 +364,33 @@ const file_store_agent_proto_rawDesc = "" +
 	"\x06labels\x18\a \x03(\v2#.laelia.store.AgentInfo.LabelsEntryR\x06labels\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9b\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd3\x02\n" +
 	"\vAgentStatus\x12?\n" +
 	"\x05state\x18\x01 \x01(\x0e2).laelia.store.AgentStatus.ConnectionStateR\x05state\x12*\n" +
 	"\x11last_heartbeat_at\x18\x02 \x01(\x03R\x0flastHeartbeatAt\x12!\n" +
 	"\fconnected_at\x18\x03 \x01(\x03R\vconnectedAt\x12#\n" +
-	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"W\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\x12*\n" +
+	"\x11active_session_id\x18\x05 \x01(\tR\x0factiveSessionId\"c\n" +
 	"\x0fConnectionState\x12 \n" +
 	"\x1cCONNECTION_STATE_UNSPECIFIED\x10\x00\x12\n" +
 	"\n" +
 	"\x06ONLINE\x10\x01\x12\v\n" +
 	"\aOFFLINE\x10\x02\x12\t\n" +
-	"\x05ERROR\x10\x03B\x14Z\x12generated-go/storeb\x06proto3"
+	"\x05ERROR\x10\x03\x12\n" +
+	"\n" +
+	"\x06KICKED\x10\x04*T\n" +
+	"\x0eAgentTokenType\x12\x1a\n" +
+	"\x16TOKEN_TYPE_UNSPECIFIED\x10\x00\x12\r\n" +
+	"\tBOOTSTRAP\x10\x01\x12\n" +
+	"\n" +
+	"\x06ACCESS\x10\x02\x12\v\n" +
+	"\aREFRESH\x10\x03*O\n" +
+	"\x0fAgentTokenState\x12\x15\n" +
+	"\x11STATE_UNSPECIFIED\x10\x00\x12\n" +
+	"\n" +
+	"\x06ACTIVE\x10\x01\x12\f\n" +
+	"\bCONSUMED\x10\x02\x12\v\n" +
+	"\aREVOKED\x10\x03B\x14Z\x12generated-go/storeb\x06proto3"
 
 var (
 	file_store_agent_proto_rawDescOnce sync.Once
@@ -274,17 +404,19 @@ func file_store_agent_proto_rawDescGZIP() []byte {
 	return file_store_agent_proto_rawDescData
 }
 
-var file_store_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_store_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_store_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_store_agent_proto_goTypes = []any{
-	(AgentStatus_ConnectionState)(0), // 0: laelia.store.AgentStatus.ConnectionState
-	(*AgentInfo)(nil),                // 1: laelia.store.AgentInfo
-	(*AgentStatus)(nil),              // 2: laelia.store.AgentStatus
-	nil,                              // 3: laelia.store.AgentInfo.LabelsEntry
+	(AgentTokenType)(0),              // 0: laelia.store.AgentTokenType
+	(AgentTokenState)(0),             // 1: laelia.store.AgentTokenState
+	(AgentStatus_ConnectionState)(0), // 2: laelia.store.AgentStatus.ConnectionState
+	(*AgentInfo)(nil),                // 3: laelia.store.AgentInfo
+	(*AgentStatus)(nil),              // 4: laelia.store.AgentStatus
+	nil,                              // 5: laelia.store.AgentInfo.LabelsEntry
 }
 var file_store_agent_proto_depIdxs = []int32{
-	3, // 0: laelia.store.AgentInfo.labels:type_name -> laelia.store.AgentInfo.LabelsEntry
-	0, // 1: laelia.store.AgentStatus.state:type_name -> laelia.store.AgentStatus.ConnectionState
+	5, // 0: laelia.store.AgentInfo.labels:type_name -> laelia.store.AgentInfo.LabelsEntry
+	2, // 1: laelia.store.AgentStatus.state:type_name -> laelia.store.AgentStatus.ConnectionState
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
@@ -302,7 +434,7 @@ func file_store_agent_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_store_agent_proto_rawDesc), len(file_store_agent_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      3,
 			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,

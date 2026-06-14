@@ -14,7 +14,9 @@ import "v1/common.proto";
 option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
 
 service AgentService {
-  rpc CreateAgent(CreateAgentRequest) returns (Agent) {
+  // ========== Management APIs (IAM auth, admin only) ==========
+
+  rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse) {
     option (google.api.http) = {
       post: "/v1/agents"
       body: "agent"
@@ -36,14 +38,51 @@ service AgentService {
     option (laelia.v1.audit) = true;
   }
 
+  // Token rotation: generate a new bootstrap token, old token invalid after grace period
+  rpc RotateAgentToken(RotateAgentTokenRequest) returns (RotateAgentTokenResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=agents/*}:rotateToken"
+      body: "*"
+    };
+    option (laelia.v1.audit) = true;
+  }
+
+  // Token revocation: revoke all tokens for the agent
+  rpc RevokeAgentToken(RevokeAgentTokenRequest) returns (RevokeAgentTokenResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=agents/*}:revokeToken"
+      body: "*"
+    };
+    option (laelia.v1.audit) = true;
+  }
+
+  // Admin force disconnects an agent connection
+  rpc ForceDisconnectAgent(ForceDisconnectAgentRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/{name=agents/*}:forceDisconnect"
+      body: "*"
+    };
+    option (laelia.v1.audit) = true;
+  }
+
+  // List agent sessions
+  rpc ListAgentSessions(ListAgentSessionsRequest) returns (ListAgentSessionsResponse) {
+    option (google.api.http) = {get: "/v1/{name=agents/*}/sessions"};
+  }
+
+  // ========== Agent Connection APIs (CUSTOM auth, agent tokens) ==========
+
+  // Agent initial connection using bootstrap token
   rpc ConnectAgent(ConnectAgentRequest) returns (ConnectAgentResponse) {
     option (google.api.http) = {
       post: "/v1/agents:connect"
       body: "*"
     };
     option (laelia.v1.auth_method) = CUSTOM;
+    option (laelia.v1.audit) = true;
   }
 
+  // Agent heartbeat
   rpc AgentHeartbeat(AgentHeartbeatRequest) returns (AgentHeartbeatResponse) {
     option (google.api.http) = {
       post: "/v1/agents:heartbeat"
@@ -52,18 +91,167 @@ service AgentService {
     option (laelia.v1.auth_method) = CUSTOM;
   }
 
+  // Agent graceful disconnect
+  rpc AgentDisconnect(AgentDisconnectRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/agents:disconnect"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = CUSTOM;
+    option (laelia.v1.audit) = true;
+  }
+
+  // Agent refreshes access token
+  rpc RefreshAgentToken(RefreshAgentTokenRequest) returns (RefreshAgentTokenResponse) {
+    option (google.api.http) = {
+      post: "/v1/agents:refreshToken"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = CUSTOM;
+    option (laelia.v1.audit) = true;
+  }
+
+  // Health check (no auth required)
   rpc Hello(HelloRequest) returns (HelloResponse) {
     option (google.api.http) = {
       post: "/v1/agent/hello"
       body: "*"
     };
+    option (laelia.v1.allow_without_credential) = true;
     option (laelia.v1.audit) = false;
   }
 }
 
+// ========== Request/Response Messages ==========
+
+// --- Create Agent ---
+
 message CreateAgentRequest {
   Agent agent = 1 [(google.api.field_behavior) = REQUIRED];
 }
+
+message CreateAgentResponse {
+  Agent agent = 1;
+  string bootstrap_token = 2; // 7-day validity, reusable until rotated/revoked
+}
+
+// --- Token Management ---
+
+message RotateAgentTokenRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+  string reason = 2; // audit purpose
+}
+
+message RotateAgentTokenResponse {
+  string bootstrap_token = 1; // new bootstrap token
+}
+
+message RevokeAgentTokenRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+  string reason = 2;
+}
+
+message RevokeAgentTokenResponse {}
+
+// --- Force Disconnect ---
+
+message ForceDisconnectAgentRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+  string reason = 2;
+}
+
+// --- Session Management ---
+
+message ListAgentSessionsRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+  int32 page_size = 2;
+  string page_token = 3;
+  bool include_terminated = 4; // default: only active sessions
+}
+
+message ListAgentSessionsResponse {
+  repeated AgentSession sessions = 1;
+  string next_page_token = 2;
+}
+
+message AgentSession {
+  string session_id = 1;
+  string agent_name = 2;
+  string source_ip = 3;
+  string agent_version = 4;
+  string fingerprint = 5;
+  google.protobuf.Timestamp connected_at = 6;
+  google.protobuf.Timestamp last_heartbeat_at = 7;
+  google.protobuf.Timestamp disconnected_at = 8;
+  string disconnect_reason = 9;
+  AgentStatus.ConnectionState state = 10;
+}
+
+// --- Agent Connection ---
+
+message ConnectAgentRequest {
+  string bootstrap_token = 1; // first connection or after refresh failure
+  AgentInfo info = 2;
+  string fingerprint = 3; // client-generated connection fingerprint (hostname:os:arch)
+}
+
+message ConnectAgentResponse {
+  string access_token = 1; // 15-minute validity
+  string refresh_token = 2; // 24-hour validity, single-use rotation
+  string session_id = 3; // session identifier
+  string next_nonce = 4; // server-signed nonce for next heartbeat
+  google.protobuf.Timestamp access_token_expires_at = 5;
+  AgentStatus initial_status = 6;
+}
+
+// --- Agent Heartbeat ---
+
+message AgentHeartbeatRequest {
+  string session_id = 1;
+  string previous_nonce = 2; // nonce from previous response (replay protection)
+  AgentMetrics metrics = 3; // optional agent metrics
+}
+
+message AgentHeartbeatResponse {
+  string next_nonce = 1; // nonce for next request
+  google.protobuf.Timestamp next_heartbeat_at = 2; // expected next heartbeat time
+  string access_token = 3; // new access token (only if expiring soon)
+  google.protobuf.Timestamp access_token_expires_at = 4;
+}
+
+// --- Agent Disconnect ---
+
+message AgentDisconnectRequest {
+  string session_id = 1;
+  string reason = 2; // "shutdown", "upgrade" etc.
+}
+
+// --- Token Refresh ---
+
+message RefreshAgentTokenRequest {
+  string refresh_token = 1;
+  string fingerprint = 2; // verify connection fingerprint
+}
+
+message RefreshAgentTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2; // new refresh token (rotation)
+  google.protobuf.Timestamp access_token_expires_at = 3;
+}
+
+// --- List/Query ---
 
 message ListAgentsRequest {
   int32 page_size = 1;
@@ -90,21 +278,16 @@ message DeleteAgentRequest {
   ];
 }
 
-message ConnectAgentRequest {
-  AgentInfo info = 1;
-}
-
-message ConnectAgentResponse {}
-
-message AgentHeartbeatRequest {}
-
-message AgentHeartbeatResponse {}
+// --- Hello ---
 
 message HelloRequest {}
 
 message HelloResponse {
   int64 current_time = 1;
+  string server_version = 2;
 }
+
+// --- Agent Definition ---
 
 message Agent {
   option (google.api.resource) = {
@@ -115,11 +298,16 @@ message Agent {
   string name = 1;
   State state = 2;
   string title = 3;
-  string token = 4;
+  // Token field removed: tokens are no longer returned in API responses.
+  // Use RotateAgentToken to get a new bootstrap token.
+  reserved 4;
+  reserved "token";
   AgentInfo info = 5;
   AgentStatus status = 6;
   google.protobuf.Timestamp created_at = 7;
   map<string, string> labels = 8;
+  google.protobuf.Timestamp last_token_rotated_at = 9;
+  int32 token_version = 10;
 }
 
 message AgentInfo {
@@ -138,9 +326,23 @@ message AgentStatus {
     ONLINE = 1;
     OFFLINE = 2;
     ERROR = 3;
+    KICKED = 4; // evicted by a new connection
   }
   ConnectionState state = 1;
   google.protobuf.Timestamp last_heartbeat_time = 2;
   google.protobuf.Timestamp connected_time = 3;
   string error_message = 4;
+  string active_session_id = 5; // current active session ID
+}
+
+// --- Agent Metrics ---
+
+message AgentMetrics {
+  double cpu_percent = 1;
+  uint64 memory_used_bytes = 2;
+  uint64 memory_total_bytes = 3;
+  uint64 disk_used_bytes = 4;
+  uint64 disk_total_bytes = 5;
+  uint32 uptime_seconds = 6;
+  uint32 goroutine_count = 7;
 }

@@ -29,26 +29,23 @@ import (
 
 const (
 	issuer = "laelia"
-	// Signing key section. For now, this is only used for signing, not for verifying since we only
-	// have 1 version. But it will be used to maintain backward compatibility if we change the signing mechanism.
-	keyID = "v1"
-	// AccessTokenAudienceFmt is the format of the acccess token audience.
-	AccessTokenAudienceFmt = "ll.user.access.%s"
-	// AgentAccessTokenAudienceFmt is the format of the agent access token audience.
+	keyID  = "v1"
+
+	AccessTokenAudienceFmt      = "ll.user.access.%s"
 	AgentAccessTokenAudienceFmt = "ll.agent.access.%s"
-	apiTokenDuration            = 1 * time.Hour
-	// DefaultTokenDuration is the default token expiration duration.
-	DefaultTokenDuration = 7 * 24 * time.Hour
-	// DefaultAgentTokenDuration is the default agent token expiration duration.
+
+	apiTokenDuration          = 1 * time.Hour
+	DefaultTokenDuration      = 7 * 24 * time.Hour
 	DefaultAgentTokenDuration = 365 * 24 * time.Hour
 
-	// AccessTokenCookieName is the cookie name of access token.
 	AccessTokenCookieName = "access-token"
 
-	// GatewayMetadataAccessTokenKey is the gateway metadata key for access token.
-	GatewayMetadataAccessTokenKey = "laelia-access-token"
-	// GatewayMetadataRequestOriginKey is the gateway metadata key for the request origin header.
+	GatewayMetadataAccessTokenKey   = "laelia-access-token"
 	GatewayMetadataRequestOriginKey = "laelia-request-origin"
+
+	TokenTypeBootstrap = "BOOTSTRAP"
+	TokenTypeAccess    = "ACCESS"
+	TokenTypeRefresh   = "REFRESH"
 )
 
 // APIAuthInterceptor is the auth interceptor for gRPC server.
@@ -313,6 +310,9 @@ type claimsMessage struct {
 type agentClaimsMessage struct {
 	Name         string `json:"name"`
 	TokenVersion int    `json:"token_version"`
+	TokenType    string `json:"token_type"`
+	SessionID    string `json:"session_id,omitempty"`
+	TokenFamily  string `json:"token_family,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -328,16 +328,19 @@ func GenerateAccessToken(userName string, userID int, mode common.ReleaseMode, s
 	return generateToken(userName, userID, fmt.Sprintf(AccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
 }
 
-// GenerateAgentToken generates an agent connection token.
-func GenerateAgentToken(agentName string, resourceID string, tokenVersion int, mode common.ReleaseMode, secret string) (string, error) {
-	expirationTime := time.Now().Add(DefaultAgentTokenDuration)
-	return signAgentToken(agentName, resourceID, tokenVersion, fmt.Sprintf(AgentAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
+// GenerateAgentToken generates an agent token with the specified type and duration.
+func GenerateAgentToken(agentName string, resourceID string, tokenVersion int, tokenType string, mode common.ReleaseMode, secret string, duration time.Duration) (string, error) {
+	expirationTime := time.Now().Add(duration)
+	return signAgentToken(agentName, resourceID, tokenVersion, tokenType, "", resourceID, fmt.Sprintf(AgentAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
 }
 
-func signAgentToken(agentName string, resourceID string, tokenVersion int, aud string, expirationTime time.Time, secret []byte) (string, error) {
+func signAgentToken(agentName string, resourceID string, tokenVersion int, tokenType string, sessionID string, tokenFamily string, aud string, expirationTime time.Time, secret []byte) (string, error) {
 	claims := &agentClaimsMessage{
 		Name:         agentName,
 		TokenVersion: tokenVersion,
+		TokenType:    tokenType,
+		SessionID:    sessionID,
+		TokenFamily:  tokenFamily,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Audience:  jwt.ClaimStrings{aud},
 			ExpiresAt: jwt.NewNumericDate(expirationTime),

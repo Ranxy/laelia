@@ -44,24 +44,57 @@ const (
 	// AgentServiceDeleteAgentProcedure is the fully-qualified name of the AgentService's DeleteAgent
 	// RPC.
 	AgentServiceDeleteAgentProcedure = "/laelia.v1.AgentService/DeleteAgent"
+	// AgentServiceRotateAgentTokenProcedure is the fully-qualified name of the AgentService's
+	// RotateAgentToken RPC.
+	AgentServiceRotateAgentTokenProcedure = "/laelia.v1.AgentService/RotateAgentToken"
+	// AgentServiceRevokeAgentTokenProcedure is the fully-qualified name of the AgentService's
+	// RevokeAgentToken RPC.
+	AgentServiceRevokeAgentTokenProcedure = "/laelia.v1.AgentService/RevokeAgentToken"
+	// AgentServiceForceDisconnectAgentProcedure is the fully-qualified name of the AgentService's
+	// ForceDisconnectAgent RPC.
+	AgentServiceForceDisconnectAgentProcedure = "/laelia.v1.AgentService/ForceDisconnectAgent"
+	// AgentServiceListAgentSessionsProcedure is the fully-qualified name of the AgentService's
+	// ListAgentSessions RPC.
+	AgentServiceListAgentSessionsProcedure = "/laelia.v1.AgentService/ListAgentSessions"
 	// AgentServiceConnectAgentProcedure is the fully-qualified name of the AgentService's ConnectAgent
 	// RPC.
 	AgentServiceConnectAgentProcedure = "/laelia.v1.AgentService/ConnectAgent"
 	// AgentServiceAgentHeartbeatProcedure is the fully-qualified name of the AgentService's
 	// AgentHeartbeat RPC.
 	AgentServiceAgentHeartbeatProcedure = "/laelia.v1.AgentService/AgentHeartbeat"
+	// AgentServiceAgentDisconnectProcedure is the fully-qualified name of the AgentService's
+	// AgentDisconnect RPC.
+	AgentServiceAgentDisconnectProcedure = "/laelia.v1.AgentService/AgentDisconnect"
+	// AgentServiceRefreshAgentTokenProcedure is the fully-qualified name of the AgentService's
+	// RefreshAgentToken RPC.
+	AgentServiceRefreshAgentTokenProcedure = "/laelia.v1.AgentService/RefreshAgentToken"
 	// AgentServiceHelloProcedure is the fully-qualified name of the AgentService's Hello RPC.
 	AgentServiceHelloProcedure = "/laelia.v1.AgentService/Hello"
 )
 
 // AgentServiceClient is a client for the laelia.v1.AgentService service.
 type AgentServiceClient interface {
-	CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.Agent], error)
+	CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.CreateAgentResponse], error)
 	ListAgents(context.Context, *connect.Request[v1.ListAgentsRequest]) (*connect.Response[v1.ListAgentsResponse], error)
 	GetAgent(context.Context, *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error)
 	DeleteAgent(context.Context, *connect.Request[v1.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error)
+	// Token rotation: generate a new bootstrap token, old token invalid after grace period
+	RotateAgentToken(context.Context, *connect.Request[v1.RotateAgentTokenRequest]) (*connect.Response[v1.RotateAgentTokenResponse], error)
+	// Token revocation: revoke all tokens for the agent
+	RevokeAgentToken(context.Context, *connect.Request[v1.RevokeAgentTokenRequest]) (*connect.Response[v1.RevokeAgentTokenResponse], error)
+	// Admin force disconnects an agent connection
+	ForceDisconnectAgent(context.Context, *connect.Request[v1.ForceDisconnectAgentRequest]) (*connect.Response[emptypb.Empty], error)
+	// List agent sessions
+	ListAgentSessions(context.Context, *connect.Request[v1.ListAgentSessionsRequest]) (*connect.Response[v1.ListAgentSessionsResponse], error)
+	// Agent initial connection using bootstrap token
 	ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error)
+	// Agent heartbeat
 	AgentHeartbeat(context.Context, *connect.Request[v1.AgentHeartbeatRequest]) (*connect.Response[v1.AgentHeartbeatResponse], error)
+	// Agent graceful disconnect
+	AgentDisconnect(context.Context, *connect.Request[v1.AgentDisconnectRequest]) (*connect.Response[emptypb.Empty], error)
+	// Agent refreshes access token
+	RefreshAgentToken(context.Context, *connect.Request[v1.RefreshAgentTokenRequest]) (*connect.Response[v1.RefreshAgentTokenResponse], error)
+	// Health check (no auth required)
 	Hello(context.Context, *connect.Request[v1.HelloRequest]) (*connect.Response[v1.HelloResponse], error)
 }
 
@@ -76,7 +109,7 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 	baseURL = strings.TrimRight(baseURL, "/")
 	agentServiceMethods := v1.File_v1_agent_proto.Services().ByName("AgentService").Methods()
 	return &agentServiceClient{
-		createAgent: connect.NewClient[v1.CreateAgentRequest, v1.Agent](
+		createAgent: connect.NewClient[v1.CreateAgentRequest, v1.CreateAgentResponse](
 			httpClient,
 			baseURL+AgentServiceCreateAgentProcedure,
 			connect.WithSchema(agentServiceMethods.ByName("CreateAgent")),
@@ -100,6 +133,30 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(agentServiceMethods.ByName("DeleteAgent")),
 			connect.WithClientOptions(opts...),
 		),
+		rotateAgentToken: connect.NewClient[v1.RotateAgentTokenRequest, v1.RotateAgentTokenResponse](
+			httpClient,
+			baseURL+AgentServiceRotateAgentTokenProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("RotateAgentToken")),
+			connect.WithClientOptions(opts...),
+		),
+		revokeAgentToken: connect.NewClient[v1.RevokeAgentTokenRequest, v1.RevokeAgentTokenResponse](
+			httpClient,
+			baseURL+AgentServiceRevokeAgentTokenProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("RevokeAgentToken")),
+			connect.WithClientOptions(opts...),
+		),
+		forceDisconnectAgent: connect.NewClient[v1.ForceDisconnectAgentRequest, emptypb.Empty](
+			httpClient,
+			baseURL+AgentServiceForceDisconnectAgentProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("ForceDisconnectAgent")),
+			connect.WithClientOptions(opts...),
+		),
+		listAgentSessions: connect.NewClient[v1.ListAgentSessionsRequest, v1.ListAgentSessionsResponse](
+			httpClient,
+			baseURL+AgentServiceListAgentSessionsProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("ListAgentSessions")),
+			connect.WithClientOptions(opts...),
+		),
 		connectAgent: connect.NewClient[v1.ConnectAgentRequest, v1.ConnectAgentResponse](
 			httpClient,
 			baseURL+AgentServiceConnectAgentProcedure,
@@ -110,6 +167,18 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+AgentServiceAgentHeartbeatProcedure,
 			connect.WithSchema(agentServiceMethods.ByName("AgentHeartbeat")),
+			connect.WithClientOptions(opts...),
+		),
+		agentDisconnect: connect.NewClient[v1.AgentDisconnectRequest, emptypb.Empty](
+			httpClient,
+			baseURL+AgentServiceAgentDisconnectProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("AgentDisconnect")),
+			connect.WithClientOptions(opts...),
+		),
+		refreshAgentToken: connect.NewClient[v1.RefreshAgentTokenRequest, v1.RefreshAgentTokenResponse](
+			httpClient,
+			baseURL+AgentServiceRefreshAgentTokenProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("RefreshAgentToken")),
 			connect.WithClientOptions(opts...),
 		),
 		hello: connect.NewClient[v1.HelloRequest, v1.HelloResponse](
@@ -123,17 +192,23 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 
 // agentServiceClient implements AgentServiceClient.
 type agentServiceClient struct {
-	createAgent    *connect.Client[v1.CreateAgentRequest, v1.Agent]
-	listAgents     *connect.Client[v1.ListAgentsRequest, v1.ListAgentsResponse]
-	getAgent       *connect.Client[v1.GetAgentRequest, v1.Agent]
-	deleteAgent    *connect.Client[v1.DeleteAgentRequest, emptypb.Empty]
-	connectAgent   *connect.Client[v1.ConnectAgentRequest, v1.ConnectAgentResponse]
-	agentHeartbeat *connect.Client[v1.AgentHeartbeatRequest, v1.AgentHeartbeatResponse]
-	hello          *connect.Client[v1.HelloRequest, v1.HelloResponse]
+	createAgent          *connect.Client[v1.CreateAgentRequest, v1.CreateAgentResponse]
+	listAgents           *connect.Client[v1.ListAgentsRequest, v1.ListAgentsResponse]
+	getAgent             *connect.Client[v1.GetAgentRequest, v1.Agent]
+	deleteAgent          *connect.Client[v1.DeleteAgentRequest, emptypb.Empty]
+	rotateAgentToken     *connect.Client[v1.RotateAgentTokenRequest, v1.RotateAgentTokenResponse]
+	revokeAgentToken     *connect.Client[v1.RevokeAgentTokenRequest, v1.RevokeAgentTokenResponse]
+	forceDisconnectAgent *connect.Client[v1.ForceDisconnectAgentRequest, emptypb.Empty]
+	listAgentSessions    *connect.Client[v1.ListAgentSessionsRequest, v1.ListAgentSessionsResponse]
+	connectAgent         *connect.Client[v1.ConnectAgentRequest, v1.ConnectAgentResponse]
+	agentHeartbeat       *connect.Client[v1.AgentHeartbeatRequest, v1.AgentHeartbeatResponse]
+	agentDisconnect      *connect.Client[v1.AgentDisconnectRequest, emptypb.Empty]
+	refreshAgentToken    *connect.Client[v1.RefreshAgentTokenRequest, v1.RefreshAgentTokenResponse]
+	hello                *connect.Client[v1.HelloRequest, v1.HelloResponse]
 }
 
 // CreateAgent calls laelia.v1.AgentService.CreateAgent.
-func (c *agentServiceClient) CreateAgent(ctx context.Context, req *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.Agent], error) {
+func (c *agentServiceClient) CreateAgent(ctx context.Context, req *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.CreateAgentResponse], error) {
 	return c.createAgent.CallUnary(ctx, req)
 }
 
@@ -152,6 +227,26 @@ func (c *agentServiceClient) DeleteAgent(ctx context.Context, req *connect.Reque
 	return c.deleteAgent.CallUnary(ctx, req)
 }
 
+// RotateAgentToken calls laelia.v1.AgentService.RotateAgentToken.
+func (c *agentServiceClient) RotateAgentToken(ctx context.Context, req *connect.Request[v1.RotateAgentTokenRequest]) (*connect.Response[v1.RotateAgentTokenResponse], error) {
+	return c.rotateAgentToken.CallUnary(ctx, req)
+}
+
+// RevokeAgentToken calls laelia.v1.AgentService.RevokeAgentToken.
+func (c *agentServiceClient) RevokeAgentToken(ctx context.Context, req *connect.Request[v1.RevokeAgentTokenRequest]) (*connect.Response[v1.RevokeAgentTokenResponse], error) {
+	return c.revokeAgentToken.CallUnary(ctx, req)
+}
+
+// ForceDisconnectAgent calls laelia.v1.AgentService.ForceDisconnectAgent.
+func (c *agentServiceClient) ForceDisconnectAgent(ctx context.Context, req *connect.Request[v1.ForceDisconnectAgentRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.forceDisconnectAgent.CallUnary(ctx, req)
+}
+
+// ListAgentSessions calls laelia.v1.AgentService.ListAgentSessions.
+func (c *agentServiceClient) ListAgentSessions(ctx context.Context, req *connect.Request[v1.ListAgentSessionsRequest]) (*connect.Response[v1.ListAgentSessionsResponse], error) {
+	return c.listAgentSessions.CallUnary(ctx, req)
+}
+
 // ConnectAgent calls laelia.v1.AgentService.ConnectAgent.
 func (c *agentServiceClient) ConnectAgent(ctx context.Context, req *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error) {
 	return c.connectAgent.CallUnary(ctx, req)
@@ -162,6 +257,16 @@ func (c *agentServiceClient) AgentHeartbeat(ctx context.Context, req *connect.Re
 	return c.agentHeartbeat.CallUnary(ctx, req)
 }
 
+// AgentDisconnect calls laelia.v1.AgentService.AgentDisconnect.
+func (c *agentServiceClient) AgentDisconnect(ctx context.Context, req *connect.Request[v1.AgentDisconnectRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.agentDisconnect.CallUnary(ctx, req)
+}
+
+// RefreshAgentToken calls laelia.v1.AgentService.RefreshAgentToken.
+func (c *agentServiceClient) RefreshAgentToken(ctx context.Context, req *connect.Request[v1.RefreshAgentTokenRequest]) (*connect.Response[v1.RefreshAgentTokenResponse], error) {
+	return c.refreshAgentToken.CallUnary(ctx, req)
+}
+
 // Hello calls laelia.v1.AgentService.Hello.
 func (c *agentServiceClient) Hello(ctx context.Context, req *connect.Request[v1.HelloRequest]) (*connect.Response[v1.HelloResponse], error) {
 	return c.hello.CallUnary(ctx, req)
@@ -169,12 +274,27 @@ func (c *agentServiceClient) Hello(ctx context.Context, req *connect.Request[v1.
 
 // AgentServiceHandler is an implementation of the laelia.v1.AgentService service.
 type AgentServiceHandler interface {
-	CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.Agent], error)
+	CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.CreateAgentResponse], error)
 	ListAgents(context.Context, *connect.Request[v1.ListAgentsRequest]) (*connect.Response[v1.ListAgentsResponse], error)
 	GetAgent(context.Context, *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error)
 	DeleteAgent(context.Context, *connect.Request[v1.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error)
+	// Token rotation: generate a new bootstrap token, old token invalid after grace period
+	RotateAgentToken(context.Context, *connect.Request[v1.RotateAgentTokenRequest]) (*connect.Response[v1.RotateAgentTokenResponse], error)
+	// Token revocation: revoke all tokens for the agent
+	RevokeAgentToken(context.Context, *connect.Request[v1.RevokeAgentTokenRequest]) (*connect.Response[v1.RevokeAgentTokenResponse], error)
+	// Admin force disconnects an agent connection
+	ForceDisconnectAgent(context.Context, *connect.Request[v1.ForceDisconnectAgentRequest]) (*connect.Response[emptypb.Empty], error)
+	// List agent sessions
+	ListAgentSessions(context.Context, *connect.Request[v1.ListAgentSessionsRequest]) (*connect.Response[v1.ListAgentSessionsResponse], error)
+	// Agent initial connection using bootstrap token
 	ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error)
+	// Agent heartbeat
 	AgentHeartbeat(context.Context, *connect.Request[v1.AgentHeartbeatRequest]) (*connect.Response[v1.AgentHeartbeatResponse], error)
+	// Agent graceful disconnect
+	AgentDisconnect(context.Context, *connect.Request[v1.AgentDisconnectRequest]) (*connect.Response[emptypb.Empty], error)
+	// Agent refreshes access token
+	RefreshAgentToken(context.Context, *connect.Request[v1.RefreshAgentTokenRequest]) (*connect.Response[v1.RefreshAgentTokenResponse], error)
+	// Health check (no auth required)
 	Hello(context.Context, *connect.Request[v1.HelloRequest]) (*connect.Response[v1.HelloResponse], error)
 }
 
@@ -209,6 +329,30 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(agentServiceMethods.ByName("DeleteAgent")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentServiceRotateAgentTokenHandler := connect.NewUnaryHandler(
+		AgentServiceRotateAgentTokenProcedure,
+		svc.RotateAgentToken,
+		connect.WithSchema(agentServiceMethods.ByName("RotateAgentToken")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceRevokeAgentTokenHandler := connect.NewUnaryHandler(
+		AgentServiceRevokeAgentTokenProcedure,
+		svc.RevokeAgentToken,
+		connect.WithSchema(agentServiceMethods.ByName("RevokeAgentToken")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceForceDisconnectAgentHandler := connect.NewUnaryHandler(
+		AgentServiceForceDisconnectAgentProcedure,
+		svc.ForceDisconnectAgent,
+		connect.WithSchema(agentServiceMethods.ByName("ForceDisconnectAgent")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceListAgentSessionsHandler := connect.NewUnaryHandler(
+		AgentServiceListAgentSessionsProcedure,
+		svc.ListAgentSessions,
+		connect.WithSchema(agentServiceMethods.ByName("ListAgentSessions")),
+		connect.WithHandlerOptions(opts...),
+	)
 	agentServiceConnectAgentHandler := connect.NewUnaryHandler(
 		AgentServiceConnectAgentProcedure,
 		svc.ConnectAgent,
@@ -219,6 +363,18 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 		AgentServiceAgentHeartbeatProcedure,
 		svc.AgentHeartbeat,
 		connect.WithSchema(agentServiceMethods.ByName("AgentHeartbeat")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceAgentDisconnectHandler := connect.NewUnaryHandler(
+		AgentServiceAgentDisconnectProcedure,
+		svc.AgentDisconnect,
+		connect.WithSchema(agentServiceMethods.ByName("AgentDisconnect")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceRefreshAgentTokenHandler := connect.NewUnaryHandler(
+		AgentServiceRefreshAgentTokenProcedure,
+		svc.RefreshAgentToken,
+		connect.WithSchema(agentServiceMethods.ByName("RefreshAgentToken")),
 		connect.WithHandlerOptions(opts...),
 	)
 	agentServiceHelloHandler := connect.NewUnaryHandler(
@@ -237,10 +393,22 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 			agentServiceGetAgentHandler.ServeHTTP(w, r)
 		case AgentServiceDeleteAgentProcedure:
 			agentServiceDeleteAgentHandler.ServeHTTP(w, r)
+		case AgentServiceRotateAgentTokenProcedure:
+			agentServiceRotateAgentTokenHandler.ServeHTTP(w, r)
+		case AgentServiceRevokeAgentTokenProcedure:
+			agentServiceRevokeAgentTokenHandler.ServeHTTP(w, r)
+		case AgentServiceForceDisconnectAgentProcedure:
+			agentServiceForceDisconnectAgentHandler.ServeHTTP(w, r)
+		case AgentServiceListAgentSessionsProcedure:
+			agentServiceListAgentSessionsHandler.ServeHTTP(w, r)
 		case AgentServiceConnectAgentProcedure:
 			agentServiceConnectAgentHandler.ServeHTTP(w, r)
 		case AgentServiceAgentHeartbeatProcedure:
 			agentServiceAgentHeartbeatHandler.ServeHTTP(w, r)
+		case AgentServiceAgentDisconnectProcedure:
+			agentServiceAgentDisconnectHandler.ServeHTTP(w, r)
+		case AgentServiceRefreshAgentTokenProcedure:
+			agentServiceRefreshAgentTokenHandler.ServeHTTP(w, r)
 		case AgentServiceHelloProcedure:
 			agentServiceHelloHandler.ServeHTTP(w, r)
 		default:
@@ -252,7 +420,7 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 // UnimplementedAgentServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedAgentServiceHandler struct{}
 
-func (UnimplementedAgentServiceHandler) CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.Agent], error) {
+func (UnimplementedAgentServiceHandler) CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.CreateAgentResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.CreateAgent is not implemented"))
 }
 
@@ -268,12 +436,36 @@ func (UnimplementedAgentServiceHandler) DeleteAgent(context.Context, *connect.Re
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.DeleteAgent is not implemented"))
 }
 
+func (UnimplementedAgentServiceHandler) RotateAgentToken(context.Context, *connect.Request[v1.RotateAgentTokenRequest]) (*connect.Response[v1.RotateAgentTokenResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.RotateAgentToken is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) RevokeAgentToken(context.Context, *connect.Request[v1.RevokeAgentTokenRequest]) (*connect.Response[v1.RevokeAgentTokenResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.RevokeAgentToken is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) ForceDisconnectAgent(context.Context, *connect.Request[v1.ForceDisconnectAgentRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.ForceDisconnectAgent is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) ListAgentSessions(context.Context, *connect.Request[v1.ListAgentSessionsRequest]) (*connect.Response[v1.ListAgentSessionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.ListAgentSessions is not implemented"))
+}
+
 func (UnimplementedAgentServiceHandler) ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.ConnectAgent is not implemented"))
 }
 
 func (UnimplementedAgentServiceHandler) AgentHeartbeat(context.Context, *connect.Request[v1.AgentHeartbeatRequest]) (*connect.Response[v1.AgentHeartbeatResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.AgentHeartbeat is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) AgentDisconnect(context.Context, *connect.Request[v1.AgentDisconnectRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.AgentDisconnect is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) RefreshAgentToken(context.Context, *connect.Request[v1.RefreshAgentTokenRequest]) (*connect.Response[v1.RefreshAgentTokenResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.RefreshAgentToken is not implemented"))
 }
 
 func (UnimplementedAgentServiceHandler) Hello(context.Context, *connect.Request[v1.HelloRequest]) (*connect.Response[v1.HelloResponse], error) {

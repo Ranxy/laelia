@@ -17,14 +17,15 @@ import (
 var agentDeleteTrue = true
 
 type AgentMessage struct {
-	ID           int
-	ResourceID   string
-	Name         string
-	TokenVersion int
-	CreatedAt    time.Time
-	Deleted      bool
-	Info         *models.AgentInfo
-	Status       *models.AgentStatus
+	ID                 int
+	ResourceID         string
+	Name               string
+	TokenVersion       int
+	CreatedAt          time.Time
+	Deleted            bool
+	Info               *models.AgentInfo
+	Status             *models.AgentStatus
+	LastTokenRotatedAt time.Time
 }
 
 type FindAgentMessage struct {
@@ -136,7 +137,8 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 		agent.created_at,
 		agent.deleted,
 		agent.info,
-		agent.status
+		agent.status,
+		agent.last_token_rotated_at
 	FROM agent
 	WHERE ` + strings.Join(where, " AND ") + ` ORDER BY agent.created_at ASC`
 
@@ -157,6 +159,7 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 		var agentMessage AgentMessage
 		var infoBytes []byte
 		var statusBytes []byte
+		var lastTokenRotatedAt sql.NullTime
 		if err := rows.Scan(
 			&agentMessage.ID,
 			&agentMessage.ResourceID,
@@ -166,8 +169,12 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 			&agentMessage.Deleted,
 			&infoBytes,
 			&statusBytes,
+			&lastTokenRotatedAt,
 		); err != nil {
 			return nil, err
+		}
+		if lastTokenRotatedAt.Valid {
+			agentMessage.LastTokenRotatedAt = lastTokenRotatedAt.Time
 		}
 
 		info := &models.AgentInfo{}

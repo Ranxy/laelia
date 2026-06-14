@@ -16,6 +16,7 @@ enum SettingName {
   WORKSPACE_EXTERNAL_APPROVAL = 6;
   PASSWORD_RESTRICTION = 7;
   ENVIRONMENT = 8;
+  AGENT_SECURITY = 9;
 }
 
 message WorkspaceProfileSetting {
@@ -68,13 +69,38 @@ message EnvironmentSetting {
   repeated Environment environments = 1;
 
   message Environment {
-    // The resource id of the environment.
-    // This value should be 4-63 characters, and valid characters
-    // are /[a-z][0-9]-/.
     string id = 1;
-    // The display name of the environment.
     string title = 2;
     map<string, string> tags = 3;
     string color = 4;
   }
+}
+
+// IP validation policy for agent connections.
+enum IPValidationPolicy {
+  IP_VALIDATION_POLICY_UNSPECIFIED = 0;
+  IP_VALIDATION_OFF = 1;
+  IP_VALIDATION_WARN = 2;
+  IP_VALIDATION_STRICT = 3;
+}
+
+message AgentSecuritySetting {
+  // Heartbeat interval in seconds.
+  int32 heartbeat_interval_seconds = 1;
+  // Offline threshold in seconds.
+  int32 offline_threshold_seconds = 2;
+  // Bootstrap token duration.
+  google.protobuf.Duration bootstrap_token_duration = 3;
+  // Access token duration.
+  google.protobuf.Duration access_token_duration = 4;
+  // Refresh token duration.
+  google.protobuf.Duration refresh_token_duration = 5;
+  // Max concurrent sessions per agent (default: 1).
+  int32 max_concurrent_sessions = 6;
+  // IP validation policy.
+  IPValidationPolicy ip_validation_policy = 7;
+  // Heartbeat rate limit per minute per agent.
+  int32 heartbeat_rate_limit_per_minute = 8;
+  // Connect rate limit per minute per IP.
+  int32 connect_rate_limit_per_minute = 9;
 }

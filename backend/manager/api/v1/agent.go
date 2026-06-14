@@ -2,6 +2,10 @@ package v1
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"time"
 
 	"connectrpc.com/connect"
@@ -19,26 +23,36 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
-const agentOfflineThresholdSeconds = 60
+const (
+	agentOfflineThresholdSeconds = 60
+	accessTokenDuration          = 15 * time.Minute
+	refreshTokenDuration         = 24 * time.Hour
+	bootstrapTokenDuration       = 7 * 24 * time.Hour
+	refreshTokenReuseWindow      = 30 * time.Second
+	sessionIDLength              = 32
+	nonceLength                  = 24
+)
 
 type AgentService struct {
 	v1connect.UnimplementedAgentServiceHandler
-	store    *store.Store
-	secret   string
-	profile  *config.Profile
-	stateCfg *state.State
+	store     *store.Store
+	secret    string
+	profile   *config.Profile
+	stateCfg  *state.State
+	nonceKeys map[string][]byte
 }
 
 func NewAgentService(store *store.Store, secret string, profile *config.Profile, stateCfg *state.State) *AgentService {
 	return &AgentService{
-		store:    store,
-		secret:   secret,
-		profile:  profile,
-		stateCfg: stateCfg,
+		store:     store,
+		secret:    secret,
+		profile:   profile,
+		stateCfg:  stateCfg,
+		nonceKeys: make(map[string][]byte),
 	}
 }
 
-func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1pb.CreateAgentRequest]) (*connect.Response[v1pb.Agent], error) {
+func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1pb.CreateAgentRequest]) (*connect.Response[v1pb.CreateAgentResponse], error) {
 	if req.Msg.Agent == nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("agent must be set"))
 	}
@@ -60,13 +74,28 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to create agent, error: %v", err))
 	}
 
-	token, err := auth.GenerateAgentToken(created.Name, created.ResourceID, created.TokenVersion, s.profile.Mode, s.secret)
+	bootstrapToken, err := auth.GenerateAgentToken(created.Name, created.ResourceID, created.TokenVersion, auth.TokenTypeBootstrap, s.profile.Mode, s.secret, bootstrapTokenDuration)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate agent token, error: %v", err))
 	}
 
-	response := convertToAgent(created)
-	response.Token = token
+	tokenHash := hashToken(bootstrapToken)
+	if err := s.store.CreateAgentToken(ctx, &store.AgentTokenMessage{
+		AgentID:     created.ID,
+		TokenHash:   tokenHash,
+		TokenType:   storepb.AgentTokenType_BOOTSTRAP,
+		TokenFamily: created.ResourceID,
+		State:       storepb.AgentTokenState_ACTIVE,
+		ExpiresAt:   time.Now().Add(bootstrapTokenDuration),
+		CreatedBy:   "system",
+	}); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store agent token, error: %v", err))
+	}
+
+	response := &v1pb.CreateAgentResponse{
+		Agent:          convertToAgent(created),
+		BootstrapToken: bootstrapToken,
+	}
 	return connect.NewResponse(response), nil
 }
 
@@ -135,44 +164,245 @@ func (s *AgentService) DeleteAgent(ctx context.Context, req *connect.Request[v1p
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
+func (s *AgentService) RotateAgentToken(ctx context.Context, req *connect.Request[v1pb.RotateAgentTokenRequest]) (*connect.Response[v1pb.RotateAgentTokenResponse], error) {
+	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get agent, error: %v", err))
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+
+	newTokenVersion := agent.TokenVersion + 1
+	if _, err := s.store.UpdateAgent(ctx, agent, &store.UpdateAgentMessage{
+		TokenVersion: &newTokenVersion,
+	}); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent token version, error: %v", err))
+	}
+
+	bootstrapToken, err := auth.GenerateAgentToken(agent.Name, agent.ResourceID, newTokenVersion, auth.TokenTypeBootstrap, s.profile.Mode, s.secret, bootstrapTokenDuration)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate agent token, error: %v", err))
+	}
+
+	tokenHash := hashToken(bootstrapToken)
+	if err := s.store.CreateAgentToken(ctx, &store.AgentTokenMessage{
+		AgentID:     agent.ID,
+		TokenHash:   tokenHash,
+		TokenType:   storepb.AgentTokenType_BOOTSTRAP,
+		TokenFamily: agent.ResourceID,
+		State:       storepb.AgentTokenState_ACTIVE,
+		ExpiresAt:   time.Now().Add(bootstrapTokenDuration),
+		CreatedBy:   "system",
+	}); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store agent token, error: %v", err))
+	}
+
+	return connect.NewResponse(&v1pb.RotateAgentTokenResponse{
+		BootstrapToken: bootstrapToken,
+	}), nil
+}
+
+func (s *AgentService) RevokeAgentToken(ctx context.Context, req *connect.Request[v1pb.RevokeAgentTokenRequest]) (*connect.Response[v1pb.RevokeAgentTokenResponse], error) {
+	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get agent, error: %v", err))
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+
+	newTokenVersion := agent.TokenVersion + 1
+	if _, err := s.store.UpdateAgent(ctx, agent, &store.UpdateAgentMessage{
+		TokenVersion: &newTokenVersion,
+	}); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent token version, error: %v", err))
+	}
+
+	if err := s.store.RevokeAllAgentTokens(ctx, agent.ID); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to revoke agent tokens, error: %v", err))
+	}
+
+	if err := s.store.TerminateAllAgentSessions(ctx, agent.ID, "token_revoked"); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to terminate agent sessions, error: %v", err))
+	}
+
+	return connect.NewResponse(&v1pb.RevokeAgentTokenResponse{}), nil
+}
+
+func (s *AgentService) ForceDisconnectAgent(ctx context.Context, req *connect.Request[v1pb.ForceDisconnectAgentRequest]) (*connect.Response[emptypb.Empty], error) {
+	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get agent, error: %v", err))
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+
+	reason := "admin_forced"
+	if req.Msg.Reason != "" {
+		reason = req.Msg.Reason
+	}
+	if err := s.store.TerminateAllAgentSessions(ctx, agent.ID, reason); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to terminate agent sessions, error: %v", err))
+	}
+
+	patch := &store.UpdateAgentMessage{
+		Status: &storepb.AgentStatus{
+			State: storepb.AgentStatus_OFFLINE,
+		},
+	}
+	if _, err := s.store.UpdateAgent(ctx, agent, patch); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent status, error: %v", err))
+	}
+
+	return connect.NewResponse(&emptypb.Empty{}), nil
+}
+
+func (s *AgentService) ListAgentSessions(ctx context.Context, req *connect.Request[v1pb.ListAgentSessionsRequest]) (*connect.Response[v1pb.ListAgentSessionsResponse], error) {
+	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get agent, error: %v", err))
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+
+	sessions, err := s.store.ListAgentSessions(ctx, agent.ID, req.Msg.IncludeTerminated)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to list agent sessions, error: %v", err))
+	}
+
+	response := &v1pb.ListAgentSessionsResponse{}
+	for _, session := range sessions {
+		response.Sessions = append(response.Sessions, convertToV1Session(session))
+	}
+	return connect.NewResponse(response), nil
+}
+
 func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1pb.ConnectAgentRequest]) (*connect.Response[v1pb.ConnectAgentResponse], error) {
 	agent, ok := GetAgentFromContext(ctx)
 	if !ok || agent == nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent not authenticated"))
 	}
 
-	nowSec := time.Now().Unix()
+	sessionID := generateRandomString(sessionIDLength)
+	nonce, nonceKey := generateNonce(agent.ResourceID, sessionID)
+	s.nonceKeys[agent.ResourceID] = nonceKey
+
+	now := time.Now()
+	nowSec := now.Unix()
+
 	patch := &store.UpdateAgentMessage{
 		Status: &storepb.AgentStatus{
 			State:           storepb.AgentStatus_ONLINE,
 			ConnectedAt:     nowSec,
 			LastHeartbeatAt: nowSec,
+			ActiveSessionId: sessionID,
 		},
 	}
-
 	if req.Msg.Info != nil {
 		patch.Info = convertToStoreAgentInfo(req.Msg.Info)
 	}
 
-	if _, err := s.store.UpdateAgent(ctx, agent, patch); err != nil {
+	updated, err := s.store.UpdateAgent(ctx, agent, patch)
+	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent on connect, error: %v", err))
 	}
 
-	return connect.NewResponse(&v1pb.ConnectAgentResponse{}), nil
+	if err := s.store.TerminateAllAgentSessions(ctx, agent.ID, "replaced"); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to terminate existing sessions, error: %v", err))
+	}
+
+	if err := s.store.CreateAgentSession(ctx, &store.AgentSessionMessage{
+		SessionID:    sessionID,
+		AgentID:      agent.ID,
+		TokenFamily:  agent.ResourceID,
+		State:        "ACTIVE",
+		SourceIP:     "",
+		Fingerprint:  req.Msg.Fingerprint,
+		AgentVersion: "",
+		ConnectedAt:  now,
+	}); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to create agent session, error: %v", err))
+	}
+
+	accessToken, err := auth.GenerateAgentToken(updated.Name, updated.ResourceID, updated.TokenVersion, auth.TokenTypeAccess, s.profile.Mode, s.secret, accessTokenDuration)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate access token, error: %v", err))
+	}
+
+	refreshToken, err := auth.GenerateAgentToken(updated.Name, updated.ResourceID, updated.TokenVersion, auth.TokenTypeRefresh, s.profile.Mode, s.secret, refreshTokenDuration)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate refresh token, error: %v", err))
+	}
+
+	refreshTokenHash := hashToken(refreshToken)
+	if err := s.store.CreateAgentToken(ctx, &store.AgentTokenMessage{
+		AgentID:     agent.ID,
+		TokenHash:   refreshTokenHash,
+		TokenType:   storepb.AgentTokenType_REFRESH,
+		TokenFamily: agent.ResourceID,
+		State:       storepb.AgentTokenState_ACTIVE,
+		Fingerprint: req.Msg.Fingerprint,
+		ExpiresAt:   time.Now().Add(refreshTokenDuration),
+	}); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store refresh token, error: %v", err))
+	}
+
+	return connect.NewResponse(&v1pb.ConnectAgentResponse{
+		AccessToken:          accessToken,
+		RefreshToken:         refreshToken,
+		SessionId:            sessionID,
+		NextNonce:            nonce,
+		AccessTokenExpiresAt: timestamppb.New(time.Now().Add(accessTokenDuration)),
+		InitialStatus:        convertToV1AgentStatus(updated.Status, updated.Deleted),
+	}), nil
 }
 
-func (s *AgentService) AgentHeartbeat(ctx context.Context, _ *connect.Request[v1pb.AgentHeartbeatRequest]) (*connect.Response[v1pb.AgentHeartbeatResponse], error) {
+func (s *AgentService) AgentHeartbeat(ctx context.Context, req *connect.Request[v1pb.AgentHeartbeatRequest]) (*connect.Response[v1pb.AgentHeartbeatResponse], error) {
 	agent, ok := GetAgentFromContext(ctx)
 	if !ok || agent == nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent not authenticated"))
 	}
 
+	if req.Msg.SessionId != "" {
+		session, err := s.store.GetAgentSession(ctx, req.Msg.SessionId)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get agent session, error: %v", err))
+		}
+		if session != nil && session.State == "KICKED" {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("session has been replaced by a new connection"))
+		}
+		if err := s.store.TouchAgentSession(ctx, req.Msg.SessionId); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to touch agent session, error: %v", err))
+		}
+	}
+
 	nowSec := time.Now().Unix()
+	activeSessionID := agent.Status.GetActiveSessionId()
 	patch := &store.UpdateAgentMessage{
 		Status: &storepb.AgentStatus{
 			State:           storepb.AgentStatus_ONLINE,
 			LastHeartbeatAt: nowSec,
 			ConnectedAt:     agent.Status.GetConnectedAt(),
+			ActiveSessionId: activeSessionID,
 		},
 	}
 
@@ -180,12 +410,127 @@ func (s *AgentService) AgentHeartbeat(ctx context.Context, _ *connect.Request[v1
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent heartbeat, error: %v", err))
 	}
 
-	return connect.NewResponse(&v1pb.AgentHeartbeatResponse{}), nil
+	nonce, _ := generateNonce(agent.ResourceID, req.Msg.SessionId)
+
+	resp := &v1pb.AgentHeartbeatResponse{
+		NextNonce:       nonce,
+		NextHeartbeatAt: timestamppb.New(time.Now().Add(30 * time.Second)),
+	}
+
+	return connect.NewResponse(resp), nil
+}
+
+func (s *AgentService) AgentDisconnect(ctx context.Context, req *connect.Request[v1pb.AgentDisconnectRequest]) (*connect.Response[emptypb.Empty], error) {
+	agent, ok := GetAgentFromContext(ctx)
+	if !ok || agent == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent not authenticated"))
+	}
+
+	reason := "agent_shutdown"
+	if req.Msg.Reason != "" {
+		reason = req.Msg.Reason
+	}
+	sessionID := req.Msg.SessionId
+	if sessionID != "" {
+		if err := s.store.TerminateAgentSession(ctx, sessionID, reason); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to terminate agent session, error: %v", err))
+		}
+	}
+
+	patch := &store.UpdateAgentMessage{
+		Status: &storepb.AgentStatus{
+			State:           storepb.AgentStatus_OFFLINE,
+			ActiveSessionId: "",
+		},
+	}
+	if _, err := s.store.UpdateAgent(ctx, agent, patch); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent status, error: %v", err))
+	}
+
+	delete(s.nonceKeys, agent.ResourceID)
+	return connect.NewResponse(&emptypb.Empty{}), nil
+}
+
+func (s *AgentService) RefreshAgentToken(ctx context.Context, req *connect.Request[v1pb.RefreshAgentTokenRequest]) (*connect.Response[v1pb.RefreshAgentTokenResponse], error) {
+	refreshTokenStr := req.Msg.RefreshToken
+	if refreshTokenStr == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("refresh token is required"))
+	}
+
+	tokenHash := hashToken(refreshTokenStr)
+	storedToken, err := s.store.GetAgentTokenByHash(ctx, tokenHash)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to look up refresh token, error: %v", err))
+	}
+	if storedToken == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid refresh token"))
+	}
+
+	switch storedToken.State {
+	case storepb.AgentTokenState_ACTIVE:
+		// valid, continue
+	case storepb.AgentTokenState_CONSUMED:
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("refresh token already used, please use the new token"))
+	case storepb.AgentTokenState_REVOKED:
+		if err := s.store.RevokeTokenFamily(ctx, storedToken.TokenFamily); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to revoke token family, error: %v", err))
+		}
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("refresh token has been revoked, possible security breach detected"))
+	default:
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid refresh token state"))
+	}
+
+	if time.Now().After(storedToken.ExpiresAt) {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("refresh token expired"))
+	}
+
+	agent, err := s.store.GetAgent(ctx, storedToken.AgentID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get agent, error: %v", err))
+	}
+	if agent == nil || agent.Deleted {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent not found or deactivated"))
+	}
+
+	consumedAt := time.Now()
+	if err := s.store.UpdateAgentTokenState(ctx, storedToken.ID, storepb.AgentTokenState_CONSUMED, &consumedAt); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to mark refresh token as consumed, error: %v", err))
+	}
+
+	accessToken, err := auth.GenerateAgentToken(agent.Name, agent.ResourceID, agent.TokenVersion, auth.TokenTypeAccess, s.profile.Mode, s.secret, accessTokenDuration)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate access token, error: %v", err))
+	}
+
+	newRefreshToken, err := auth.GenerateAgentToken(agent.Name, agent.ResourceID, agent.TokenVersion, auth.TokenTypeRefresh, s.profile.Mode, s.secret, refreshTokenDuration)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate refresh token, error: %v", err))
+	}
+
+	newTokenHash := hashToken(newRefreshToken)
+	if err := s.store.CreateAgentToken(ctx, &store.AgentTokenMessage{
+		AgentID:     agent.ID,
+		TokenHash:   newTokenHash,
+		TokenType:   storepb.AgentTokenType_REFRESH,
+		TokenFamily: storedToken.TokenFamily,
+		State:       storepb.AgentTokenState_ACTIVE,
+		Fingerprint: req.Msg.Fingerprint,
+		ExpiresAt:   time.Now().Add(refreshTokenDuration),
+	}); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store new refresh token, error: %v", err))
+	}
+
+	return connect.NewResponse(&v1pb.RefreshAgentTokenResponse{
+		AccessToken:          accessToken,
+		RefreshToken:         newRefreshToken,
+		AccessTokenExpiresAt: timestamppb.New(time.Now().Add(accessTokenDuration)),
+	}), nil
 }
 
 func (*AgentService) Hello(_ context.Context, _ *connect.Request[v1pb.HelloRequest]) (*connect.Response[v1pb.HelloResponse], error) {
 	return connect.NewResponse(&v1pb.HelloResponse{
-		CurrentTime: time.Now().Unix(),
+		CurrentTime:   time.Now().Unix(),
+		ServerVersion: "0.1.0",
 	}), nil
 }
 
@@ -198,14 +543,19 @@ func convertToAgent(agent *store.AgentMessage) *v1pb.Agent {
 
 	status := convertToV1AgentStatus(agent.Status, agent.Deleted)
 
-	return &v1pb.Agent{
-		Name:      name,
-		State:     state,
-		Title:     agent.Name,
-		Info:      convertToV1AgentInfo(agent.Info),
-		Status:    status,
-		CreatedAt: timestamppb.New(agent.CreatedAt),
+	result := &v1pb.Agent{
+		Name:         name,
+		State:        state,
+		Title:        agent.Name,
+		Info:         convertToV1AgentInfo(agent.Info),
+		Status:       status,
+		CreatedAt:    timestamppb.New(agent.CreatedAt),
+		TokenVersion: int32(agent.TokenVersion),
 	}
+	if !agent.LastTokenRotatedAt.IsZero() {
+		result.LastTokenRotatedAt = timestamppb.New(agent.LastTokenRotatedAt)
+	}
+	return result
 }
 
 func convertToV1AgentInfo(info *storepb.AgentInfo) *v1pb.AgentInfo {
@@ -258,12 +608,16 @@ func convertToV1AgentStatus(status *storepb.AgentStatus, deleted bool) *v1pb.Age
 		LastHeartbeatTime: lastHeartbeatTime,
 		ConnectedTime:     connectedTime,
 		ErrorMessage:      status.ErrorMessage,
+		ActiveSessionId:   status.ActiveSessionId,
 	}
 }
 
 func computeConnectionState(status *storepb.AgentStatus, deleted bool) v1pb.AgentStatus_ConnectionState {
 	if status.State == storepb.AgentStatus_ERROR {
 		return v1pb.AgentStatus_ERROR
+	}
+	if status.State == storepb.AgentStatus_KICKED {
+		return v1pb.AgentStatus_KICKED
 	}
 	if deleted {
 		return v1pb.AgentStatus_OFFLINE
@@ -276,4 +630,62 @@ func computeConnectionState(status *storepb.AgentStatus, deleted bool) v1pb.Agen
 		return v1pb.AgentStatus_OFFLINE
 	}
 	return v1pb.AgentStatus_OFFLINE
+}
+
+func convertToV1Session(session *store.AgentSessionMessage) *v1pb.AgentSession {
+	var connectedAt, lastHeartbeatAt, disconnectedAt *timestamppb.Timestamp
+	if !session.ConnectedAt.IsZero() {
+		connectedAt = timestamppb.New(session.ConnectedAt)
+	}
+	if !session.LastHeartbeatAt.IsZero() {
+		lastHeartbeatAt = timestamppb.New(session.LastHeartbeatAt)
+	}
+	if !session.DisconnectedAt.IsZero() {
+		disconnectedAt = timestamppb.New(session.DisconnectedAt)
+	}
+
+	var state v1pb.AgentStatus_ConnectionState
+	switch session.State {
+	case "ACTIVE":
+		state = v1pb.AgentStatus_ONLINE
+	case "KICKED":
+		state = v1pb.AgentStatus_KICKED
+	case "TERMINATED":
+		state = v1pb.AgentStatus_OFFLINE
+	default:
+		state = v1pb.AgentStatus_CONNECTION_STATE_UNSPECIFIED
+	}
+
+	return &v1pb.AgentSession{
+		SessionId:        session.SessionID,
+		AgentName:        common.FormatAgentUID(session.AgentResourceID),
+		SourceIp:         session.SourceIP,
+		AgentVersion:     session.AgentVersion,
+		Fingerprint:      session.Fingerprint,
+		ConnectedAt:      connectedAt,
+		LastHeartbeatAt:  lastHeartbeatAt,
+		DisconnectedAt:   disconnectedAt,
+		DisconnectReason: session.DisconnectReason,
+		State:            state,
+	}
+}
+
+func hashToken(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:])
+}
+
+func generateRandomString(length int) string {
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b)[:length]
+}
+
+func generateNonce(_ string, _ string) (string, []byte) {
+	nonceBytes := make([]byte, nonceLength)
+	_, _ = rand.Read(nonceBytes)
+	nonce := hex.EncodeToString(nonceBytes)
+	return nonce, []byte(nonce)
 }

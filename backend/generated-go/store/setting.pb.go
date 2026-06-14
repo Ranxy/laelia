@@ -34,6 +34,7 @@ const (
 	SettingName_WORKSPACE_EXTERNAL_APPROVAL SettingName = 6
 	SettingName_PASSWORD_RESTRICTION        SettingName = 7
 	SettingName_ENVIRONMENT                 SettingName = 8
+	SettingName_AGENT_SECURITY              SettingName = 9
 )
 
 // Enum value maps for SettingName.
@@ -48,6 +49,7 @@ var (
 		6: "WORKSPACE_EXTERNAL_APPROVAL",
 		7: "PASSWORD_RESTRICTION",
 		8: "ENVIRONMENT",
+		9: "AGENT_SECURITY",
 	}
 	SettingName_value = map[string]int32{
 		"SETTING_NAME_UNSPECIFIED":    0,
@@ -59,6 +61,7 @@ var (
 		"WORKSPACE_EXTERNAL_APPROVAL": 6,
 		"PASSWORD_RESTRICTION":        7,
 		"ENVIRONMENT":                 8,
+		"AGENT_SECURITY":              9,
 	}
 )
 
@@ -87,6 +90,59 @@ func (x SettingName) Number() protoreflect.EnumNumber {
 // Deprecated: Use SettingName.Descriptor instead.
 func (SettingName) EnumDescriptor() ([]byte, []int) {
 	return file_store_setting_proto_rawDescGZIP(), []int{0}
+}
+
+// IP validation policy for agent connections.
+type IPValidationPolicy int32
+
+const (
+	IPValidationPolicy_IP_VALIDATION_POLICY_UNSPECIFIED IPValidationPolicy = 0
+	IPValidationPolicy_IP_VALIDATION_OFF                IPValidationPolicy = 1
+	IPValidationPolicy_IP_VALIDATION_WARN               IPValidationPolicy = 2
+	IPValidationPolicy_IP_VALIDATION_STRICT             IPValidationPolicy = 3
+)
+
+// Enum value maps for IPValidationPolicy.
+var (
+	IPValidationPolicy_name = map[int32]string{
+		0: "IP_VALIDATION_POLICY_UNSPECIFIED",
+		1: "IP_VALIDATION_OFF",
+		2: "IP_VALIDATION_WARN",
+		3: "IP_VALIDATION_STRICT",
+	}
+	IPValidationPolicy_value = map[string]int32{
+		"IP_VALIDATION_POLICY_UNSPECIFIED": 0,
+		"IP_VALIDATION_OFF":                1,
+		"IP_VALIDATION_WARN":               2,
+		"IP_VALIDATION_STRICT":             3,
+	}
+)
+
+func (x IPValidationPolicy) Enum() *IPValidationPolicy {
+	p := new(IPValidationPolicy)
+	*p = x
+	return p
+}
+
+func (x IPValidationPolicy) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (IPValidationPolicy) Descriptor() protoreflect.EnumDescriptor {
+	return file_store_setting_proto_enumTypes[1].Descriptor()
+}
+
+func (IPValidationPolicy) Type() protoreflect.EnumType {
+	return &file_store_setting_proto_enumTypes[1]
+}
+
+func (x IPValidationPolicy) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use IPValidationPolicy.Descriptor instead.
+func (IPValidationPolicy) EnumDescriptor() ([]byte, []int) {
+	return file_store_setting_proto_rawDescGZIP(), []int{1}
 }
 
 type WorkspaceProfileSetting struct {
@@ -349,23 +405,136 @@ func (x *EnvironmentSetting) GetEnvironments() []*EnvironmentSetting_Environment
 	return nil
 }
 
-type EnvironmentSetting_Environment struct {
+type AgentSecuritySetting struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The resource id of the environment.
-	// This value should be 4-63 characters, and valid characters
-	// are /[a-z][0-9]-/.
-	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// The display name of the environment.
-	Title         string            `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
-	Tags          map[string]string `protobuf:"bytes,3,rep,name=tags,proto3" json:"tags,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Color         string            `protobuf:"bytes,4,opt,name=color,proto3" json:"color,omitempty"`
+	// Heartbeat interval in seconds.
+	HeartbeatIntervalSeconds int32 `protobuf:"varint,1,opt,name=heartbeat_interval_seconds,json=heartbeatIntervalSeconds,proto3" json:"heartbeat_interval_seconds,omitempty"`
+	// Offline threshold in seconds.
+	OfflineThresholdSeconds int32 `protobuf:"varint,2,opt,name=offline_threshold_seconds,json=offlineThresholdSeconds,proto3" json:"offline_threshold_seconds,omitempty"`
+	// Bootstrap token duration.
+	BootstrapTokenDuration *durationpb.Duration `protobuf:"bytes,3,opt,name=bootstrap_token_duration,json=bootstrapTokenDuration,proto3" json:"bootstrap_token_duration,omitempty"`
+	// Access token duration.
+	AccessTokenDuration *durationpb.Duration `protobuf:"bytes,4,opt,name=access_token_duration,json=accessTokenDuration,proto3" json:"access_token_duration,omitempty"`
+	// Refresh token duration.
+	RefreshTokenDuration *durationpb.Duration `protobuf:"bytes,5,opt,name=refresh_token_duration,json=refreshTokenDuration,proto3" json:"refresh_token_duration,omitempty"`
+	// Max concurrent sessions per agent (default: 1).
+	MaxConcurrentSessions int32 `protobuf:"varint,6,opt,name=max_concurrent_sessions,json=maxConcurrentSessions,proto3" json:"max_concurrent_sessions,omitempty"`
+	// IP validation policy.
+	IpValidationPolicy IPValidationPolicy `protobuf:"varint,7,opt,name=ip_validation_policy,json=ipValidationPolicy,proto3,enum=laelia.store.IPValidationPolicy" json:"ip_validation_policy,omitempty"`
+	// Heartbeat rate limit per minute per agent.
+	HeartbeatRateLimitPerMinute int32 `protobuf:"varint,8,opt,name=heartbeat_rate_limit_per_minute,json=heartbeatRateLimitPerMinute,proto3" json:"heartbeat_rate_limit_per_minute,omitempty"`
+	// Connect rate limit per minute per IP.
+	ConnectRateLimitPerMinute int32 `protobuf:"varint,9,opt,name=connect_rate_limit_per_minute,json=connectRateLimitPerMinute,proto3" json:"connect_rate_limit_per_minute,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *AgentSecuritySetting) Reset() {
+	*x = AgentSecuritySetting{}
+	mi := &file_store_setting_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentSecuritySetting) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentSecuritySetting) ProtoMessage() {}
+
+func (x *AgentSecuritySetting) ProtoReflect() protoreflect.Message {
+	mi := &file_store_setting_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentSecuritySetting.ProtoReflect.Descriptor instead.
+func (*AgentSecuritySetting) Descriptor() ([]byte, []int) {
+	return file_store_setting_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *AgentSecuritySetting) GetHeartbeatIntervalSeconds() int32 {
+	if x != nil {
+		return x.HeartbeatIntervalSeconds
+	}
+	return 0
+}
+
+func (x *AgentSecuritySetting) GetOfflineThresholdSeconds() int32 {
+	if x != nil {
+		return x.OfflineThresholdSeconds
+	}
+	return 0
+}
+
+func (x *AgentSecuritySetting) GetBootstrapTokenDuration() *durationpb.Duration {
+	if x != nil {
+		return x.BootstrapTokenDuration
+	}
+	return nil
+}
+
+func (x *AgentSecuritySetting) GetAccessTokenDuration() *durationpb.Duration {
+	if x != nil {
+		return x.AccessTokenDuration
+	}
+	return nil
+}
+
+func (x *AgentSecuritySetting) GetRefreshTokenDuration() *durationpb.Duration {
+	if x != nil {
+		return x.RefreshTokenDuration
+	}
+	return nil
+}
+
+func (x *AgentSecuritySetting) GetMaxConcurrentSessions() int32 {
+	if x != nil {
+		return x.MaxConcurrentSessions
+	}
+	return 0
+}
+
+func (x *AgentSecuritySetting) GetIpValidationPolicy() IPValidationPolicy {
+	if x != nil {
+		return x.IpValidationPolicy
+	}
+	return IPValidationPolicy_IP_VALIDATION_POLICY_UNSPECIFIED
+}
+
+func (x *AgentSecuritySetting) GetHeartbeatRateLimitPerMinute() int32 {
+	if x != nil {
+		return x.HeartbeatRateLimitPerMinute
+	}
+	return 0
+}
+
+func (x *AgentSecuritySetting) GetConnectRateLimitPerMinute() int32 {
+	if x != nil {
+		return x.ConnectRateLimitPerMinute
+	}
+	return 0
+}
+
+type EnvironmentSetting_Environment struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Tags          map[string]string      `protobuf:"bytes,3,rep,name=tags,proto3" json:"tags,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Color         string                 `protobuf:"bytes,4,opt,name=color,proto3" json:"color,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EnvironmentSetting_Environment) Reset() {
 	*x = EnvironmentSetting_Environment{}
-	mi := &file_store_setting_proto_msgTypes[3]
+	mi := &file_store_setting_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -377,7 +546,7 @@ func (x *EnvironmentSetting_Environment) String() string {
 func (*EnvironmentSetting_Environment) ProtoMessage() {}
 
 func (x *EnvironmentSetting_Environment) ProtoReflect() protoreflect.Message {
-	mi := &file_store_setting_proto_msgTypes[3]
+	mi := &file_store_setting_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -455,7 +624,17 @@ const file_store_setting_proto_rawDesc = "" +
 	"\x05color\x18\x04 \x01(\tR\x05color\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*\xdc\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x99\x05\n" +
+	"\x14AgentSecuritySetting\x12<\n" +
+	"\x1aheartbeat_interval_seconds\x18\x01 \x01(\x05R\x18heartbeatIntervalSeconds\x12:\n" +
+	"\x19offline_threshold_seconds\x18\x02 \x01(\x05R\x17offlineThresholdSeconds\x12S\n" +
+	"\x18bootstrap_token_duration\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x16bootstrapTokenDuration\x12M\n" +
+	"\x15access_token_duration\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\x13accessTokenDuration\x12O\n" +
+	"\x16refresh_token_duration\x18\x05 \x01(\v2\x19.google.protobuf.DurationR\x14refreshTokenDuration\x126\n" +
+	"\x17max_concurrent_sessions\x18\x06 \x01(\x05R\x15maxConcurrentSessions\x12R\n" +
+	"\x14ip_validation_policy\x18\a \x01(\x0e2 .laelia.store.IPValidationPolicyR\x12ipValidationPolicy\x12D\n" +
+	"\x1fheartbeat_rate_limit_per_minute\x18\b \x01(\x05R\x1bheartbeatRateLimitPerMinute\x12@\n" +
+	"\x1dconnect_rate_limit_per_minute\x18\t \x01(\x05R\x19connectRateLimitPerMinute*\xf0\x01\n" +
 	"\vSettingName\x12\x1c\n" +
 	"\x18SETTING_NAME_UNSPECIFIED\x10\x00\x12\x0f\n" +
 	"\vAUTH_SECRET\x10\x01\x12\x11\n" +
@@ -465,7 +644,13 @@ const file_store_setting_proto_rawDesc = "" +
 	"\x12WORKSPACE_APPROVAL\x10\x05\x12\x1f\n" +
 	"\x1bWORKSPACE_EXTERNAL_APPROVAL\x10\x06\x12\x18\n" +
 	"\x14PASSWORD_RESTRICTION\x10\a\x12\x0f\n" +
-	"\vENVIRONMENT\x10\bB\x14Z\x12generated-go/storeb\x06proto3"
+	"\vENVIRONMENT\x10\b\x12\x12\n" +
+	"\x0eAGENT_SECURITY\x10\t*\x83\x01\n" +
+	"\x12IPValidationPolicy\x12$\n" +
+	" IP_VALIDATION_POLICY_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11IP_VALIDATION_OFF\x10\x01\x12\x16\n" +
+	"\x12IP_VALIDATION_WARN\x10\x02\x12\x18\n" +
+	"\x14IP_VALIDATION_STRICT\x10\x03B\x14Z\x12generated-go/storeb\x06proto3"
 
 var (
 	file_store_setting_proto_rawDescOnce sync.Once
@@ -479,28 +664,34 @@ func file_store_setting_proto_rawDescGZIP() []byte {
 	return file_store_setting_proto_rawDescData
 }
 
-var file_store_setting_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_store_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_store_setting_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_store_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_store_setting_proto_goTypes = []any{
 	(SettingName)(0),                       // 0: laelia.store.SettingName
-	(*WorkspaceProfileSetting)(nil),        // 1: laelia.store.WorkspaceProfileSetting
-	(*PasswordRestrictionSetting)(nil),     // 2: laelia.store.PasswordRestrictionSetting
-	(*EnvironmentSetting)(nil),             // 3: laelia.store.EnvironmentSetting
-	(*EnvironmentSetting_Environment)(nil), // 4: laelia.store.EnvironmentSetting.Environment
-	nil,                                    // 5: laelia.store.EnvironmentSetting.Environment.TagsEntry
-	(*durationpb.Duration)(nil),            // 6: google.protobuf.Duration
+	(IPValidationPolicy)(0),                // 1: laelia.store.IPValidationPolicy
+	(*WorkspaceProfileSetting)(nil),        // 2: laelia.store.WorkspaceProfileSetting
+	(*PasswordRestrictionSetting)(nil),     // 3: laelia.store.PasswordRestrictionSetting
+	(*EnvironmentSetting)(nil),             // 4: laelia.store.EnvironmentSetting
+	(*AgentSecuritySetting)(nil),           // 5: laelia.store.AgentSecuritySetting
+	(*EnvironmentSetting_Environment)(nil), // 6: laelia.store.EnvironmentSetting.Environment
+	nil,                                    // 7: laelia.store.EnvironmentSetting.Environment.TagsEntry
+	(*durationpb.Duration)(nil),            // 8: google.protobuf.Duration
 }
 var file_store_setting_proto_depIdxs = []int32{
-	6, // 0: laelia.store.WorkspaceProfileSetting.token_duration:type_name -> google.protobuf.Duration
-	6, // 1: laelia.store.WorkspaceProfileSetting.maximum_role_expiration:type_name -> google.protobuf.Duration
-	6, // 2: laelia.store.PasswordRestrictionSetting.password_rotation:type_name -> google.protobuf.Duration
-	4, // 3: laelia.store.EnvironmentSetting.environments:type_name -> laelia.store.EnvironmentSetting.Environment
-	5, // 4: laelia.store.EnvironmentSetting.Environment.tags:type_name -> laelia.store.EnvironmentSetting.Environment.TagsEntry
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	8, // 0: laelia.store.WorkspaceProfileSetting.token_duration:type_name -> google.protobuf.Duration
+	8, // 1: laelia.store.WorkspaceProfileSetting.maximum_role_expiration:type_name -> google.protobuf.Duration
+	8, // 2: laelia.store.PasswordRestrictionSetting.password_rotation:type_name -> google.protobuf.Duration
+	6, // 3: laelia.store.EnvironmentSetting.environments:type_name -> laelia.store.EnvironmentSetting.Environment
+	8, // 4: laelia.store.AgentSecuritySetting.bootstrap_token_duration:type_name -> google.protobuf.Duration
+	8, // 5: laelia.store.AgentSecuritySetting.access_token_duration:type_name -> google.protobuf.Duration
+	8, // 6: laelia.store.AgentSecuritySetting.refresh_token_duration:type_name -> google.protobuf.Duration
+	1, // 7: laelia.store.AgentSecuritySetting.ip_validation_policy:type_name -> laelia.store.IPValidationPolicy
+	7, // 8: laelia.store.EnvironmentSetting.Environment.tags:type_name -> laelia.store.EnvironmentSetting.Environment.TagsEntry
+	9, // [9:9] is the sub-list for method output_type
+	9, // [9:9] is the sub-list for method input_type
+	9, // [9:9] is the sub-list for extension type_name
+	9, // [9:9] is the sub-list for extension extendee
+	0, // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_store_setting_proto_init() }
@@ -513,8 +704,8 @@ func file_store_setting_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_store_setting_proto_rawDesc), len(file_store_setting_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   5,
+			NumEnums:      2,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

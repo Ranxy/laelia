@@ -135,3 +135,46 @@ CREATE UNIQUE INDEX idx_agent_unique_resource_id ON agent(resource_id);
 
 ALTER SEQUENCE agent_id_seq RESTART WITH 101;
 
+CREATE TABLE agent_session (
+    id bigserial PRIMARY KEY,
+    session_id text NOT NULL UNIQUE,
+    agent_id int NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
+    token_family text NOT NULL,
+    state text NOT NULL DEFAULT 'ACTIVE',
+    source_ip text NOT NULL DEFAULT '',
+    fingerprint text NOT NULL DEFAULT '',
+    agent_version text NOT NULL DEFAULT '',
+    connected_at timestamptz NOT NULL DEFAULT now(),
+    disconnected_at timestamptz,
+    last_heartbeat_at timestamptz NOT NULL DEFAULT now(),
+    disconnect_reason text,
+    metadata jsonb NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX idx_agent_session_agent ON agent_session(agent_id, state);
+CREATE INDEX idx_agent_session_session ON agent_session(session_id);
+CREATE INDEX idx_agent_session_active ON agent_session(state, last_heartbeat_at);
+
+CREATE TABLE agent_token (
+    id bigserial PRIMARY KEY,
+    agent_id int NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
+    token_hash text NOT NULL,
+    token_type text NOT NULL DEFAULT 'BOOTSTRAP',
+    token_family text NOT NULL,
+    state text NOT NULL DEFAULT 'ACTIVE',
+    fingerprint text NOT NULL DEFAULT '',
+    source_ip text NOT NULL DEFAULT '',
+    issued_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL,
+    consumed_at timestamptz,
+    revoked_at timestamptz,
+    last_used_at timestamptz,
+    created_by text NOT NULL DEFAULT ''
+);
+
+CREATE INDEX idx_agent_token_hash ON agent_token(token_hash);
+CREATE INDEX idx_agent_token_family ON agent_token(token_family, state);
+CREATE INDEX idx_agent_token_agent ON agent_token(agent_id, token_type, state);
+
+ALTER TABLE agent ADD COLUMN last_token_rotated_at timestamptz;
+

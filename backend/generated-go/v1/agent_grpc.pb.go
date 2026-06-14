@@ -20,25 +20,46 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AgentService_CreateAgent_FullMethodName    = "/laelia.v1.AgentService/CreateAgent"
-	AgentService_ListAgents_FullMethodName     = "/laelia.v1.AgentService/ListAgents"
-	AgentService_GetAgent_FullMethodName       = "/laelia.v1.AgentService/GetAgent"
-	AgentService_DeleteAgent_FullMethodName    = "/laelia.v1.AgentService/DeleteAgent"
-	AgentService_ConnectAgent_FullMethodName   = "/laelia.v1.AgentService/ConnectAgent"
-	AgentService_AgentHeartbeat_FullMethodName = "/laelia.v1.AgentService/AgentHeartbeat"
-	AgentService_Hello_FullMethodName          = "/laelia.v1.AgentService/Hello"
+	AgentService_CreateAgent_FullMethodName          = "/laelia.v1.AgentService/CreateAgent"
+	AgentService_ListAgents_FullMethodName           = "/laelia.v1.AgentService/ListAgents"
+	AgentService_GetAgent_FullMethodName             = "/laelia.v1.AgentService/GetAgent"
+	AgentService_DeleteAgent_FullMethodName          = "/laelia.v1.AgentService/DeleteAgent"
+	AgentService_RotateAgentToken_FullMethodName     = "/laelia.v1.AgentService/RotateAgentToken"
+	AgentService_RevokeAgentToken_FullMethodName     = "/laelia.v1.AgentService/RevokeAgentToken"
+	AgentService_ForceDisconnectAgent_FullMethodName = "/laelia.v1.AgentService/ForceDisconnectAgent"
+	AgentService_ListAgentSessions_FullMethodName    = "/laelia.v1.AgentService/ListAgentSessions"
+	AgentService_ConnectAgent_FullMethodName         = "/laelia.v1.AgentService/ConnectAgent"
+	AgentService_AgentHeartbeat_FullMethodName       = "/laelia.v1.AgentService/AgentHeartbeat"
+	AgentService_AgentDisconnect_FullMethodName      = "/laelia.v1.AgentService/AgentDisconnect"
+	AgentService_RefreshAgentToken_FullMethodName    = "/laelia.v1.AgentService/RefreshAgentToken"
+	AgentService_Hello_FullMethodName                = "/laelia.v1.AgentService/Hello"
 )
 
 // AgentServiceClient is the client API for AgentService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentServiceClient interface {
-	CreateAgent(ctx context.Context, in *CreateAgentRequest, opts ...grpc.CallOption) (*Agent, error)
+	CreateAgent(ctx context.Context, in *CreateAgentRequest, opts ...grpc.CallOption) (*CreateAgentResponse, error)
 	ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error)
 	GetAgent(ctx context.Context, in *GetAgentRequest, opts ...grpc.CallOption) (*Agent, error)
 	DeleteAgent(ctx context.Context, in *DeleteAgentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Token rotation: generate a new bootstrap token, old token invalid after grace period
+	RotateAgentToken(ctx context.Context, in *RotateAgentTokenRequest, opts ...grpc.CallOption) (*RotateAgentTokenResponse, error)
+	// Token revocation: revoke all tokens for the agent
+	RevokeAgentToken(ctx context.Context, in *RevokeAgentTokenRequest, opts ...grpc.CallOption) (*RevokeAgentTokenResponse, error)
+	// Admin force disconnects an agent connection
+	ForceDisconnectAgent(ctx context.Context, in *ForceDisconnectAgentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// List agent sessions
+	ListAgentSessions(ctx context.Context, in *ListAgentSessionsRequest, opts ...grpc.CallOption) (*ListAgentSessionsResponse, error)
+	// Agent initial connection using bootstrap token
 	ConnectAgent(ctx context.Context, in *ConnectAgentRequest, opts ...grpc.CallOption) (*ConnectAgentResponse, error)
+	// Agent heartbeat
 	AgentHeartbeat(ctx context.Context, in *AgentHeartbeatRequest, opts ...grpc.CallOption) (*AgentHeartbeatResponse, error)
+	// Agent graceful disconnect
+	AgentDisconnect(ctx context.Context, in *AgentDisconnectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Agent refreshes access token
+	RefreshAgentToken(ctx context.Context, in *RefreshAgentTokenRequest, opts ...grpc.CallOption) (*RefreshAgentTokenResponse, error)
+	// Health check (no auth required)
 	Hello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error)
 }
 
@@ -50,9 +71,9 @@ func NewAgentServiceClient(cc grpc.ClientConnInterface) AgentServiceClient {
 	return &agentServiceClient{cc}
 }
 
-func (c *agentServiceClient) CreateAgent(ctx context.Context, in *CreateAgentRequest, opts ...grpc.CallOption) (*Agent, error) {
+func (c *agentServiceClient) CreateAgent(ctx context.Context, in *CreateAgentRequest, opts ...grpc.CallOption) (*CreateAgentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Agent)
+	out := new(CreateAgentResponse)
 	err := c.cc.Invoke(ctx, AgentService_CreateAgent_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -90,6 +111,46 @@ func (c *agentServiceClient) DeleteAgent(ctx context.Context, in *DeleteAgentReq
 	return out, nil
 }
 
+func (c *agentServiceClient) RotateAgentToken(ctx context.Context, in *RotateAgentTokenRequest, opts ...grpc.CallOption) (*RotateAgentTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RotateAgentTokenResponse)
+	err := c.cc.Invoke(ctx, AgentService_RotateAgentToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentServiceClient) RevokeAgentToken(ctx context.Context, in *RevokeAgentTokenRequest, opts ...grpc.CallOption) (*RevokeAgentTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeAgentTokenResponse)
+	err := c.cc.Invoke(ctx, AgentService_RevokeAgentToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentServiceClient) ForceDisconnectAgent(ctx context.Context, in *ForceDisconnectAgentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AgentService_ForceDisconnectAgent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentServiceClient) ListAgentSessions(ctx context.Context, in *ListAgentSessionsRequest, opts ...grpc.CallOption) (*ListAgentSessionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAgentSessionsResponse)
+	err := c.cc.Invoke(ctx, AgentService_ListAgentSessions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *agentServiceClient) ConnectAgent(ctx context.Context, in *ConnectAgentRequest, opts ...grpc.CallOption) (*ConnectAgentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ConnectAgentResponse)
@@ -110,6 +171,26 @@ func (c *agentServiceClient) AgentHeartbeat(ctx context.Context, in *AgentHeartb
 	return out, nil
 }
 
+func (c *agentServiceClient) AgentDisconnect(ctx context.Context, in *AgentDisconnectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AgentService_AgentDisconnect_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentServiceClient) RefreshAgentToken(ctx context.Context, in *RefreshAgentTokenRequest, opts ...grpc.CallOption) (*RefreshAgentTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RefreshAgentTokenResponse)
+	err := c.cc.Invoke(ctx, AgentService_RefreshAgentToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *agentServiceClient) Hello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(HelloResponse)
@@ -124,12 +205,27 @@ func (c *agentServiceClient) Hello(ctx context.Context, in *HelloRequest, opts .
 // All implementations must embed UnimplementedAgentServiceServer
 // for forward compatibility.
 type AgentServiceServer interface {
-	CreateAgent(context.Context, *CreateAgentRequest) (*Agent, error)
+	CreateAgent(context.Context, *CreateAgentRequest) (*CreateAgentResponse, error)
 	ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error)
 	GetAgent(context.Context, *GetAgentRequest) (*Agent, error)
 	DeleteAgent(context.Context, *DeleteAgentRequest) (*emptypb.Empty, error)
+	// Token rotation: generate a new bootstrap token, old token invalid after grace period
+	RotateAgentToken(context.Context, *RotateAgentTokenRequest) (*RotateAgentTokenResponse, error)
+	// Token revocation: revoke all tokens for the agent
+	RevokeAgentToken(context.Context, *RevokeAgentTokenRequest) (*RevokeAgentTokenResponse, error)
+	// Admin force disconnects an agent connection
+	ForceDisconnectAgent(context.Context, *ForceDisconnectAgentRequest) (*emptypb.Empty, error)
+	// List agent sessions
+	ListAgentSessions(context.Context, *ListAgentSessionsRequest) (*ListAgentSessionsResponse, error)
+	// Agent initial connection using bootstrap token
 	ConnectAgent(context.Context, *ConnectAgentRequest) (*ConnectAgentResponse, error)
+	// Agent heartbeat
 	AgentHeartbeat(context.Context, *AgentHeartbeatRequest) (*AgentHeartbeatResponse, error)
+	// Agent graceful disconnect
+	AgentDisconnect(context.Context, *AgentDisconnectRequest) (*emptypb.Empty, error)
+	// Agent refreshes access token
+	RefreshAgentToken(context.Context, *RefreshAgentTokenRequest) (*RefreshAgentTokenResponse, error)
+	// Health check (no auth required)
 	Hello(context.Context, *HelloRequest) (*HelloResponse, error)
 	mustEmbedUnimplementedAgentServiceServer()
 }
@@ -141,7 +237,7 @@ type AgentServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedAgentServiceServer struct{}
 
-func (UnimplementedAgentServiceServer) CreateAgent(context.Context, *CreateAgentRequest) (*Agent, error) {
+func (UnimplementedAgentServiceServer) CreateAgent(context.Context, *CreateAgentRequest) (*CreateAgentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateAgent not implemented")
 }
 func (UnimplementedAgentServiceServer) ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error) {
@@ -153,11 +249,29 @@ func (UnimplementedAgentServiceServer) GetAgent(context.Context, *GetAgentReques
 func (UnimplementedAgentServiceServer) DeleteAgent(context.Context, *DeleteAgentRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteAgent not implemented")
 }
+func (UnimplementedAgentServiceServer) RotateAgentToken(context.Context, *RotateAgentTokenRequest) (*RotateAgentTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RotateAgentToken not implemented")
+}
+func (UnimplementedAgentServiceServer) RevokeAgentToken(context.Context, *RevokeAgentTokenRequest) (*RevokeAgentTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeAgentToken not implemented")
+}
+func (UnimplementedAgentServiceServer) ForceDisconnectAgent(context.Context, *ForceDisconnectAgentRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method ForceDisconnectAgent not implemented")
+}
+func (UnimplementedAgentServiceServer) ListAgentSessions(context.Context, *ListAgentSessionsRequest) (*ListAgentSessionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAgentSessions not implemented")
+}
 func (UnimplementedAgentServiceServer) ConnectAgent(context.Context, *ConnectAgentRequest) (*ConnectAgentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ConnectAgent not implemented")
 }
 func (UnimplementedAgentServiceServer) AgentHeartbeat(context.Context, *AgentHeartbeatRequest) (*AgentHeartbeatResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AgentHeartbeat not implemented")
+}
+func (UnimplementedAgentServiceServer) AgentDisconnect(context.Context, *AgentDisconnectRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method AgentDisconnect not implemented")
+}
+func (UnimplementedAgentServiceServer) RefreshAgentToken(context.Context, *RefreshAgentTokenRequest) (*RefreshAgentTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RefreshAgentToken not implemented")
 }
 func (UnimplementedAgentServiceServer) Hello(context.Context, *HelloRequest) (*HelloResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Hello not implemented")
@@ -255,6 +369,78 @@ func _AgentService_DeleteAgent_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AgentService_RotateAgentToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RotateAgentTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).RotateAgentToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_RotateAgentToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).RotateAgentToken(ctx, req.(*RotateAgentTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AgentService_RevokeAgentToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeAgentTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).RevokeAgentToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_RevokeAgentToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).RevokeAgentToken(ctx, req.(*RevokeAgentTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AgentService_ForceDisconnectAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ForceDisconnectAgentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).ForceDisconnectAgent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_ForceDisconnectAgent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).ForceDisconnectAgent(ctx, req.(*ForceDisconnectAgentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AgentService_ListAgentSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAgentSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).ListAgentSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_ListAgentSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).ListAgentSessions(ctx, req.(*ListAgentSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AgentService_ConnectAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ConnectAgentRequest)
 	if err := dec(in); err != nil {
@@ -287,6 +473,42 @@ func _AgentService_AgentHeartbeat_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AgentServiceServer).AgentHeartbeat(ctx, req.(*AgentHeartbeatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AgentService_AgentDisconnect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AgentDisconnectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).AgentDisconnect(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_AgentDisconnect_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).AgentDisconnect(ctx, req.(*AgentDisconnectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AgentService_RefreshAgentToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RefreshAgentTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).RefreshAgentToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_RefreshAgentToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).RefreshAgentToken(ctx, req.(*RefreshAgentTokenRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -333,12 +555,36 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AgentService_DeleteAgent_Handler,
 		},
 		{
+			MethodName: "RotateAgentToken",
+			Handler:    _AgentService_RotateAgentToken_Handler,
+		},
+		{
+			MethodName: "RevokeAgentToken",
+			Handler:    _AgentService_RevokeAgentToken_Handler,
+		},
+		{
+			MethodName: "ForceDisconnectAgent",
+			Handler:    _AgentService_ForceDisconnectAgent_Handler,
+		},
+		{
+			MethodName: "ListAgentSessions",
+			Handler:    _AgentService_ListAgentSessions_Handler,
+		},
+		{
 			MethodName: "ConnectAgent",
 			Handler:    _AgentService_ConnectAgent_Handler,
 		},
 		{
 			MethodName: "AgentHeartbeat",
 			Handler:    _AgentService_AgentHeartbeat_Handler,
+		},
+		{
+			MethodName: "AgentDisconnect",
+			Handler:    _AgentService_AgentDisconnect_Handler,
+		},
+		{
+			MethodName: "RefreshAgentToken",
+			Handler:    _AgentService_RefreshAgentToken_Handler,
 		},
 		{
 			MethodName: "Hello",
