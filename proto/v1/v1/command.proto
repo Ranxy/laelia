@@ -1,0 +1,202 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/timestamp.proto";
+import "v1/annotation.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+enum CommandStatus {
+  COMMAND_STATUS_UNSPECIFIED = 0;
+  PENDING = 1;
+  RUNNING = 2;
+  COMPLETED = 3;
+  FAILED = 4;
+  CANCELLED = 5;
+  TIMEOUT = 6;
+}
+
+message Command {
+  option (google.api.resource) = {
+    type: "laelia/Command"
+    pattern: "agents/{agent}/commands/{command}"
+    singular: "command"
+    plural: "commands"
+  };
+
+  string name = 1;
+  string agent = 2;
+  string principal_id = 3;
+  string principal_name = 4;
+  string command = 5;
+  CommandStatus status = 6;
+  int32 exit_code = 7;
+  int64 duration_ms = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp started_at = 10;
+  google.protobuf.Timestamp completed_at = 11;
+  string error_message = 12;
+  map<string, string> env = 13;
+  string working_dir = 14;
+}
+
+message CommandOutput {
+  enum StreamType {
+    STREAM_TYPE_UNSPECIFIED = 0;
+    STDOUT = 1;
+    STDERR = 2;
+    SYSTEM = 3;
+  }
+  string command_id = 1;
+  StreamType type = 2;
+  string content = 3;
+  int32 seq_no = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+service CommandService {
+  rpc SendCommand(SendCommandRequest) returns (Command) {
+    option (google.api.http) = {
+      post: "/v1/{agent=agents/*}/commands"
+      body: "*"
+    };
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc ListCommands(ListCommandsRequest) returns (ListCommandsResponse) {
+    option (google.api.http) = {get: "/v1/{agent=agents/*}/commands"};
+  }
+
+  rpc GetCommand(GetCommandRequest) returns (Command) {
+    option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}"};
+  }
+
+  rpc CancelCommand(CancelCommandRequest) returns (Command) {
+    option (google.api.http) = {
+      post: "/v1/{name=agents/*/commands/*}:cancel"
+      body: "*"
+    };
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc WatchCommand(WatchCommandRequest) returns (stream CommandOutput) {
+    option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}:watch"};
+  }
+}
+
+service AgentCommandService {
+  rpc CommandChannel(stream AgentCommandMessage) returns (stream ManagerCommandMessage);
+}
+
+message AgentCommandMessage {
+  oneof message {
+    AgentReady agent_ready = 1;
+    CommandProgress progress = 2;
+    CommandResult result = 3;
+    Ping ping = 4;
+  }
+}
+
+message ManagerCommandMessage {
+  oneof message {
+    CommandRequest command_request = 1;
+    CancelMessage cancel = 2;
+    Pong pong = 3;
+  }
+}
+
+message AgentReady {
+  string session_id = 1;
+  string last_command_id = 2;
+  int32 last_ack_seq = 3;
+}
+
+message CommandRequest {
+  string command_id = 1;
+  string command = 2;
+  map<string, string> env = 3;
+  string working_dir = 4;
+  int32 timeout_seconds = 5;
+}
+
+message CommandProgress {
+  string command_id = 1;
+  CommandOutput.StreamType type = 2;
+  string content = 3;
+  int32 seq_no = 4;
+}
+
+message CommandResult {
+  string command_id = 1;
+  int32 exit_code = 2;
+  int64 duration_ms = 3;
+  string error_message = 4;
+  int32 last_seq_no = 5;
+}
+
+message CancelMessage {
+  string command_id = 1;
+}
+
+message Ping {
+  int64 seq = 1;
+  int64 sent_at = 2;
+}
+
+message Pong {
+  int64 seq = 1;
+  int64 server_time = 2;
+}
+
+message SendCommandRequest {
+  string agent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Agent"
+  ];
+  string command = 2 [(google.api.field_behavior) = REQUIRED];
+  map<string, string> env = 3;
+  string working_dir = 4;
+  int32 timeout_seconds = 5;
+}
+
+message ListCommandsRequest {
+  string agent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Agent"
+  ];
+  int32 page_size = 2;
+  string page_token = 3;
+  CommandStatus status = 4;
+}
+
+message ListCommandsResponse {
+  repeated Command commands = 1;
+  string next_page_token = 2;
+}
+
+message GetCommandRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Command"
+  ];
+}
+
+message CancelCommandRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Command"
+  ];
+  string reason = 2;
+}
+
+message WatchCommandRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Command"
+  ];
+  int32 after_seq_no = 2;
+}

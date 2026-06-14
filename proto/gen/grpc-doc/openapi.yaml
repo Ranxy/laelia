@@ -132,6 +132,187 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}/commands:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_ListCommands
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+                - name: status
+                  in: query
+                  schema:
+                    enum:
+                        - COMMAND_STATUS_UNSPECIFIED
+                        - PENDING
+                        - RUNNING
+                        - COMPLETED
+                        - FAILED
+                        - CANCELLED
+                        - TIMEOUT
+                    type: string
+                    format: enum
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListCommandsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - CommandService
+            operationId: CommandService_SendCommand
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SendCommandRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Command'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}/commands/{command}:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_GetCommand
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+                - name: command
+                  in: path
+                  description: The command id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Command'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}/commands/{command}:cancel:
+        post:
+            tags:
+                - CommandService
+            operationId: CommandService_CancelCommand
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+                - name: command
+                  in: path
+                  description: The command id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/CancelCommandRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Command'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}/commands/{command}:watch:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_WatchCommand
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+                - name: command
+                  in: path
+                  description: The command id.
+                  required: true
+                  schema:
+                    type: string
+                - name: afterSeqNo
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/CommandOutput'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}/sessions:
         get:
             tags:
@@ -749,6 +930,11 @@ components:
                 accessTokenExpiresAt:
                     type: string
                     format: date-time
+                commandStreamRequired:
+                    type: boolean
+                    description: 'Fallback channel: when bidi command stream is unavailable'
+                pendingCommandHint:
+                    $ref: '#/components/schemas/PendingCommandHint'
         AgentInfo:
             type: object
             properties:
@@ -851,6 +1037,82 @@ components:
                     items:
                         $ref: '#/components/schemas/User'
                     description: The users from the specified request.
+        CancelCommandRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                reason:
+                    type: string
+        Command:
+            type: object
+            properties:
+                name:
+                    type: string
+                agent:
+                    type: string
+                principalId:
+                    type: string
+                principalName:
+                    type: string
+                command:
+                    type: string
+                status:
+                    enum:
+                        - COMMAND_STATUS_UNSPECIFIED
+                        - PENDING
+                        - RUNNING
+                        - COMPLETED
+                        - FAILED
+                        - CANCELLED
+                        - TIMEOUT
+                    type: string
+                    format: enum
+                exitCode:
+                    type: integer
+                    format: int32
+                durationMs:
+                    type: string
+                createdAt:
+                    type: string
+                    format: date-time
+                startedAt:
+                    type: string
+                    format: date-time
+                completedAt:
+                    type: string
+                    format: date-time
+                errorMessage:
+                    type: string
+                env:
+                    type: object
+                    additionalProperties:
+                        type: string
+                workingDir:
+                    type: string
+        CommandOutput:
+            type: object
+            properties:
+                commandId:
+                    type: string
+                type:
+                    enum:
+                        - STREAM_TYPE_UNSPECIFIED
+                        - STDOUT
+                        - STDERR
+                        - SYSTEM
+                    type: string
+                    format: enum
+                content:
+                    type: string
+                seqNo:
+                    type: integer
+                    format: int32
+                timestamp:
+                    type: string
+                    format: date-time
         ConnectAgentRequest:
             type: object
             properties:
@@ -933,6 +1195,15 @@ components:
                         $ref: '#/components/schemas/Agent'
                 nextPageToken:
                     type: string
+        ListCommandsResponse:
+            type: object
+            properties:
+                commands:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Command'
+                nextPageToken:
+                    type: string
         ListUsersResponse:
             type: object
             properties:
@@ -984,6 +1255,22 @@ components:
             properties:
                 code:
                     type: string
+        PendingCommandHint:
+            type: object
+            properties:
+                commandId:
+                    type: string
+                command:
+                    type: string
+                env:
+                    type: object
+                    additionalProperties:
+                        type: string
+                workingDir:
+                    type: string
+                timeoutSeconds:
+                    type: integer
+                    format: int32
         RefreshAgentTokenRequest:
             type: object
             properties:
@@ -1027,6 +1314,25 @@ components:
             properties:
                 bootstrapToken:
                     type: string
+        SendCommandRequest:
+            required:
+                - agent
+                - command
+            type: object
+            properties:
+                agent:
+                    type: string
+                command:
+                    type: string
+                env:
+                    type: object
+                    additionalProperties:
+                        type: string
+                workingDir:
+                    type: string
+                timeoutSeconds:
+                    type: integer
+                    format: int32
         Status:
             type: object
             properties:
@@ -1122,4 +1428,5 @@ components:
 tags:
     - name: AgentService
     - name: AuthService
+    - name: CommandService
     - name: UserService

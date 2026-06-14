@@ -229,6 +229,17 @@ message AgentHeartbeatResponse {
   google.protobuf.Timestamp next_heartbeat_at = 2; // expected next heartbeat time
   string access_token = 3; // new access token (only if expiring soon)
   google.protobuf.Timestamp access_token_expires_at = 4;
+  // Fallback channel: when bidi command stream is unavailable
+  bool command_stream_required = 5;
+  PendingCommandHint pending_command_hint = 6;
+}
+
+message PendingCommandHint {
+  string command_id = 1;
+  string command = 2;
+  map<string, string> env = 3;
+  string working_dir = 4;
+  int32 timeout_seconds = 5;
 }
 
 // --- Agent Disconnect ---

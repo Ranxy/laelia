@@ -42,6 +42,8 @@
     - [ListAgentSessionsResponse](#laelia-v1-ListAgentSessionsResponse)
     - [ListAgentsRequest](#laelia-v1-ListAgentsRequest)
     - [ListAgentsResponse](#laelia-v1-ListAgentsResponse)
+    - [PendingCommandHint](#laelia-v1-PendingCommandHint)
+    - [PendingCommandHint.EnvEntry](#laelia-v1-PendingCommandHint-EnvEntry)
     - [RefreshAgentTokenRequest](#laelia-v1-RefreshAgentTokenRequest)
     - [RefreshAgentTokenResponse](#laelia-v1-RefreshAgentTokenResponse)
     - [RevokeAgentTokenRequest](#laelia-v1-RevokeAgentTokenRequest)
@@ -78,6 +80,34 @@
     - [OAuth2IdentityProviderContext](#laelia-v1-OAuth2IdentityProviderContext)
   
     - [AuthService](#laelia-v1-AuthService)
+  
+- [v1/command.proto](#v1_command-proto)
+    - [AgentCommandMessage](#laelia-v1-AgentCommandMessage)
+    - [AgentReady](#laelia-v1-AgentReady)
+    - [CancelCommandRequest](#laelia-v1-CancelCommandRequest)
+    - [CancelMessage](#laelia-v1-CancelMessage)
+    - [Command](#laelia-v1-Command)
+    - [Command.EnvEntry](#laelia-v1-Command-EnvEntry)
+    - [CommandOutput](#laelia-v1-CommandOutput)
+    - [CommandProgress](#laelia-v1-CommandProgress)
+    - [CommandRequest](#laelia-v1-CommandRequest)
+    - [CommandRequest.EnvEntry](#laelia-v1-CommandRequest-EnvEntry)
+    - [CommandResult](#laelia-v1-CommandResult)
+    - [GetCommandRequest](#laelia-v1-GetCommandRequest)
+    - [ListCommandsRequest](#laelia-v1-ListCommandsRequest)
+    - [ListCommandsResponse](#laelia-v1-ListCommandsResponse)
+    - [ManagerCommandMessage](#laelia-v1-ManagerCommandMessage)
+    - [Ping](#laelia-v1-Ping)
+    - [Pong](#laelia-v1-Pong)
+    - [SendCommandRequest](#laelia-v1-SendCommandRequest)
+    - [SendCommandRequest.EnvEntry](#laelia-v1-SendCommandRequest-EnvEntry)
+    - [WatchCommandRequest](#laelia-v1-WatchCommandRequest)
+  
+    - [CommandOutput.StreamType](#laelia-v1-CommandOutput-StreamType)
+    - [CommandStatus](#laelia-v1-CommandStatus)
+  
+    - [AgentCommandService](#laelia-v1-AgentCommandService)
+    - [CommandService](#laelia-v1-CommandService)
   
 - [Scalar Value Types](#scalar-value-types)
 
@@ -290,6 +320,8 @@ RiskLevel is the risk level.
 | next_heartbeat_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | expected next heartbeat time |
 | access_token | [string](#string) |  | new access token (only if expiring soon) |
 | access_token_expires_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| command_stream_required | [bool](#bool) |  | Fallback channel: when bidi command stream is unavailable |
+| pending_command_hint | [PendingCommandHint](#laelia-v1-PendingCommandHint) |  |  |
 
 
 
@@ -598,6 +630,41 @@ RiskLevel is the risk level.
 | ----- | ---- | ----- | ----------- |
 | agents | [Agent](#laelia-v1-Agent) | repeated |  |
 | next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-PendingCommandHint"></a>
+
+### PendingCommandHint
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_id | [string](#string) |  |  |
+| command | [string](#string) |  |  |
+| env | [PendingCommandHint.EnvEntry](#laelia-v1-PendingCommandHint-EnvEntry) | repeated |  |
+| working_dir | [string](#string) |  |  |
+| timeout_seconds | [int32](#int32) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-PendingCommandHint-EnvEntry"></a>
+
+### PendingCommandHint.EnvEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
 
 
 
@@ -1076,6 +1143,427 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | ----------- | ------------ | ------------- | ------------|
 | Login | [LoginRequest](#laelia-v1-LoginRequest) | [LoginResponse](#laelia-v1-LoginResponse) | Permissions required: None |
 | Logout | [LogoutRequest](#laelia-v1-LogoutRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Permissions required: None |
+
+ 
+
+
+
+<a name="v1_command-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/command.proto
+
+
+
+<a name="laelia-v1-AgentCommandMessage"></a>
+
+### AgentCommandMessage
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_ready | [AgentReady](#laelia-v1-AgentReady) |  |  |
+| progress | [CommandProgress](#laelia-v1-CommandProgress) |  |  |
+| result | [CommandResult](#laelia-v1-CommandResult) |  |  |
+| ping | [Ping](#laelia-v1-Ping) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-AgentReady"></a>
+
+### AgentReady
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| session_id | [string](#string) |  |  |
+| last_command_id | [string](#string) |  |  |
+| last_ack_seq | [int32](#int32) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-CancelCommandRequest"></a>
+
+### CancelCommandRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| reason | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-CancelMessage"></a>
+
+### CancelMessage
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-Command"></a>
+
+### Command
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| agent | [string](#string) |  |  |
+| principal_id | [string](#string) |  |  |
+| principal_name | [string](#string) |  |  |
+| command | [string](#string) |  |  |
+| status | [CommandStatus](#laelia-v1-CommandStatus) |  |  |
+| exit_code | [int32](#int32) |  |  |
+| duration_ms | [int64](#int64) |  |  |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| started_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| completed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| error_message | [string](#string) |  |  |
+| env | [Command.EnvEntry](#laelia-v1-Command-EnvEntry) | repeated |  |
+| working_dir | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-Command-EnvEntry"></a>
+
+### Command.EnvEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-CommandOutput"></a>
+
+### CommandOutput
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_id | [string](#string) |  |  |
+| type | [CommandOutput.StreamType](#laelia-v1-CommandOutput-StreamType) |  |  |
+| content | [string](#string) |  |  |
+| seq_no | [int32](#int32) |  |  |
+| timestamp | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-CommandProgress"></a>
+
+### CommandProgress
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_id | [string](#string) |  |  |
+| type | [CommandOutput.StreamType](#laelia-v1-CommandOutput-StreamType) |  |  |
+| content | [string](#string) |  |  |
+| seq_no | [int32](#int32) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-CommandRequest"></a>
+
+### CommandRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_id | [string](#string) |  |  |
+| command | [string](#string) |  |  |
+| env | [CommandRequest.EnvEntry](#laelia-v1-CommandRequest-EnvEntry) | repeated |  |
+| working_dir | [string](#string) |  |  |
+| timeout_seconds | [int32](#int32) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-CommandRequest-EnvEntry"></a>
+
+### CommandRequest.EnvEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-CommandResult"></a>
+
+### CommandResult
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_id | [string](#string) |  |  |
+| exit_code | [int32](#int32) |  |  |
+| duration_ms | [int64](#int64) |  |  |
+| error_message | [string](#string) |  |  |
+| last_seq_no | [int32](#int32) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetCommandRequest"></a>
+
+### GetCommandRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListCommandsRequest"></a>
+
+### ListCommandsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent | [string](#string) |  |  |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+| status | [CommandStatus](#laelia-v1-CommandStatus) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListCommandsResponse"></a>
+
+### ListCommandsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| commands | [Command](#laelia-v1-Command) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ManagerCommandMessage"></a>
+
+### ManagerCommandMessage
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_request | [CommandRequest](#laelia-v1-CommandRequest) |  |  |
+| cancel | [CancelMessage](#laelia-v1-CancelMessage) |  |  |
+| pong | [Pong](#laelia-v1-Pong) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-Ping"></a>
+
+### Ping
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| seq | [int64](#int64) |  |  |
+| sent_at | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-Pong"></a>
+
+### Pong
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| seq | [int64](#int64) |  |  |
+| server_time | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SendCommandRequest"></a>
+
+### SendCommandRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent | [string](#string) |  |  |
+| command | [string](#string) |  |  |
+| env | [SendCommandRequest.EnvEntry](#laelia-v1-SendCommandRequest-EnvEntry) | repeated |  |
+| working_dir | [string](#string) |  |  |
+| timeout_seconds | [int32](#int32) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SendCommandRequest-EnvEntry"></a>
+
+### SendCommandRequest.EnvEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-WatchCommandRequest"></a>
+
+### WatchCommandRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| after_seq_no | [int32](#int32) |  |  |
+
+
+
+
+
+ 
+
+
+<a name="laelia-v1-CommandOutput-StreamType"></a>
+
+### CommandOutput.StreamType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| STREAM_TYPE_UNSPECIFIED | 0 |  |
+| STDOUT | 1 |  |
+| STDERR | 2 |  |
+| SYSTEM | 3 |  |
+
+
+
+<a name="laelia-v1-CommandStatus"></a>
+
+### CommandStatus
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| COMMAND_STATUS_UNSPECIFIED | 0 |  |
+| PENDING | 1 |  |
+| RUNNING | 2 |  |
+| COMPLETED | 3 |  |
+| FAILED | 4 |  |
+| CANCELLED | 5 |  |
+| TIMEOUT | 6 |  |
+
+
+ 
+
+ 
+
+
+<a name="laelia-v1-AgentCommandService"></a>
+
+### AgentCommandService
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| CommandChannel | [AgentCommandMessage](#laelia-v1-AgentCommandMessage) stream | [ManagerCommandMessage](#laelia-v1-ManagerCommandMessage) stream |  |
+
+
+<a name="laelia-v1-CommandService"></a>
+
+### CommandService
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| SendCommand | [SendCommandRequest](#laelia-v1-SendCommandRequest) | [Command](#laelia-v1-Command) |  |
+| ListCommands | [ListCommandsRequest](#laelia-v1-ListCommandsRequest) | [ListCommandsResponse](#laelia-v1-ListCommandsResponse) |  |
+| GetCommand | [GetCommandRequest](#laelia-v1-GetCommandRequest) | [Command](#laelia-v1-Command) |  |
+| CancelCommand | [CancelCommandRequest](#laelia-v1-CancelCommandRequest) | [Command](#laelia-v1-Command) |  |
+| WatchCommand | [WatchCommandRequest](#laelia-v1-WatchCommandRequest) | [CommandOutput](#laelia-v1-CommandOutput) stream |  |
 
  
 

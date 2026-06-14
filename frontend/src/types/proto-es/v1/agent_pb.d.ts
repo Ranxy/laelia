@@ -399,6 +399,18 @@ export declare type AgentHeartbeatResponse = Message<"laelia.v1.AgentHeartbeatRe
    * @generated from field: google.protobuf.Timestamp access_token_expires_at = 4;
    */
   accessTokenExpiresAt?: Timestamp | undefined;
+
+  /**
+   * Fallback channel: when bidi command stream is unavailable
+   *
+   * @generated from field: bool command_stream_required = 5;
+   */
+  commandStreamRequired: boolean;
+
+  /**
+   * @generated from field: laelia.v1.PendingCommandHint pending_command_hint = 6;
+   */
+  pendingCommandHint?: PendingCommandHint | undefined;
 };
 
 /**
@@ -406,6 +418,42 @@ export declare type AgentHeartbeatResponse = Message<"laelia.v1.AgentHeartbeatRe
  * Use `create(AgentHeartbeatResponseSchema)` to create a new message.
  */
 export declare const AgentHeartbeatResponseSchema: GenMessage<AgentHeartbeatResponse>;
+
+/**
+ * @generated from message laelia.v1.PendingCommandHint
+ */
+export declare type PendingCommandHint = Message<"laelia.v1.PendingCommandHint"> & {
+  /**
+   * @generated from field: string command_id = 1;
+   */
+  commandId: string;
+
+  /**
+   * @generated from field: string command = 2;
+   */
+  command: string;
+
+  /**
+   * @generated from field: map<string, string> env = 3;
+   */
+  env: { [key: string]: string };
+
+  /**
+   * @generated from field: string working_dir = 4;
+   */
+  workingDir: string;
+
+  /**
+   * @generated from field: int32 timeout_seconds = 5;
+   */
+  timeoutSeconds: number;
+};
+
+/**
+ * Describes the message laelia.v1.PendingCommandHint.
+ * Use `create(PendingCommandHintSchema)` to create a new message.
+ */
+export declare const PendingCommandHintSchema: GenMessage<PendingCommandHint>;
 
 /**
  * @generated from message laelia.v1.AgentDisconnectRequest
