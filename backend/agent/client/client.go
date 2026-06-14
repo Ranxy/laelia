@@ -52,29 +52,29 @@ type AgentInfo struct {
 }
 
 type ConnectResponse struct {
-	AccessToken          string `json:"access_token"`
-	RefreshToken         string `json:"refresh_token"`
-	SessionID            string `json:"session_id"`
-	NextNonce            string `json:"next_nonce"`
-	AccessTokenExpiresAt int64  `json:"access_token_expires_at"`
+	AccessToken          string `json:"accessToken"`
+	RefreshToken         string `json:"refreshToken"`
+	SessionID            string `json:"sessionId"`
+	NextNonce            string `json:"nextNonce"`
+	AccessTokenExpiresAt int64  `json:"accessTokenExpiresAt"`
 }
 
 type HeartbeatResponse struct {
-	NextNonce            string `json:"next_nonce"`
-	NextHeartbeatAt      int64  `json:"next_heartbeat_at"`
-	AccessToken          string `json:"access_token,omitempty"`
-	AccessTokenExpiresAt int64  `json:"access_token_expires_at,omitempty"`
+	NextNonce            string `json:"nextNonce"`
+	NextHeartbeatAt      int64  `json:"nextHeartbeatAt"`
+	AccessToken          string `json:"accessToken,omitempty"`
+	AccessTokenExpiresAt int64  `json:"accessTokenExpiresAt,omitempty"`
 }
 
 type RefreshResponse struct {
-	AccessToken          string `json:"access_token"`
-	RefreshToken         string `json:"refresh_token"`
-	AccessTokenExpiresAt int64  `json:"access_token_expires_at"`
+	AccessToken          string `json:"accessToken"`
+	RefreshToken         string `json:"refreshToken"`
+	AccessTokenExpiresAt int64  `json:"accessTokenExpiresAt"`
 }
 
 type HelloResponse struct {
-	CurrentTime   int64  `json:"current_time"`
-	ServerVersion string `json:"server_version"`
+	CurrentTime   int64  `json:"currentTime"`
+	ServerVersion string `json:"serverVersion"`
 }
 
 type Client struct {
