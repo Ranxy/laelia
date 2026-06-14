@@ -178,3 +178,18 @@ CREATE INDEX idx_agent_token_agent ON agent_token(agent_id, token_type, state);
 
 ALTER TABLE agent ADD COLUMN last_token_rotated_at timestamptz;
 
+CREATE TABLE audit_log (
+    id bigserial PRIMARY KEY,
+    method text NOT NULL,
+    actor_type text NOT NULL DEFAULT '',
+    actor_id text NOT NULL DEFAULT '',
+    source_ip text NOT NULL DEFAULT '',
+    status text NOT NULL DEFAULT 'ok',
+    error text NOT NULL DEFAULT '',
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_audit_log_method ON audit_log(method);
+CREATE INDEX idx_audit_log_actor ON audit_log(actor_type, actor_id);
+CREATE INDEX idx_audit_log_created_at ON audit_log(created_at);
+

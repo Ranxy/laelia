@@ -100,7 +100,7 @@ func configureGrpcRouters(
 			rateLimiter,
 			ipValidator,
 			auth.New(stores, secret, stateCfg, profile),
-			apiv1.NewAuditInterceptor(),
+			apiv1.NewAuditInterceptor(stores),
 		),
 		connect.WithRecover(onPanic),
 	)

@@ -9,16 +9,49 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/Ranxy/laelia/backend/common"
+	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
 type AuditInterceptor struct {
+	stores                *store.Store
 	heartbeatSamplingRate int
 }
 
-func NewAuditInterceptor() *AuditInterceptor {
+func NewAuditInterceptor(stores *store.Store) *AuditInterceptor {
 	return &AuditInterceptor{
+		stores:                stores,
 		heartbeatSamplingRate: 100,
 	}
+}
+
+func (a *AuditInterceptor) recordAudit(ctx context.Context, procedure string, err error) {
+	auditLog := &store.AuditLogMessage{
+		Method:    procedure,
+		ActorType: getActorType(ctx),
+		ActorID:   getActorID(ctx),
+		SourceIP:  getSourceIP(ctx),
+		Status:    statusFromError(err),
+		Error:     errorFromError(err),
+		CreatedAt: time.Now(),
+	}
+
+	if a.stores != nil {
+		go func() {
+			if dbErr := a.stores.CreateAuditLog(context.Background(), auditLog); dbErr != nil {
+				slog.Warn("failed to persist audit log", "error", dbErr)
+			}
+		}()
+	}
+
+	slog.Info("audit",
+		"method", auditLog.Method,
+		"actor_type", auditLog.ActorType,
+		"actor_id", auditLog.ActorID,
+		"source_ip", auditLog.SourceIP,
+		"status", auditLog.Status,
+		"error", auditLog.Error,
+		"timestamp", auditLog.CreatedAt.Format(time.RFC3339),
+	)
 }
 
 func (a *AuditInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
@@ -37,15 +70,7 @@ func (a *AuditInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 			}
 		}
 
-		slog.Info("audit",
-			"method", procedure,
-			"actor_type", getActorType(ctx),
-			"actor_id", getActorID(ctx),
-			"source_ip", getSourceIP(ctx),
-			"status", statusFromError(err),
-			"error", errorFromError(err),
-			"timestamp", time.Now().Format(time.RFC3339),
-		)
+		a.recordAudit(ctx, procedure, err)
 
 		return resp, err
 	}
@@ -73,15 +98,7 @@ func (a *AuditInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFun
 			}
 		}
 
-		slog.Info("audit",
-			"method", procedure,
-			"actor_type", getActorType(ctx),
-			"actor_id", getActorID(ctx),
-			"source_ip", getSourceIP(ctx),
-			"status", statusFromError(err),
-			"error", errorFromError(err),
-			"timestamp", time.Now().Format(time.RFC3339),
-		)
+		a.recordAudit(ctx, procedure, err)
 
 		return err
 	}
