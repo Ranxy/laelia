@@ -49,7 +49,7 @@ func New(s *store.Store) *Dispatcher {
 	}
 }
 
-func (d *Dispatcher) RegisterAgent(ctx context.Context, agentID int, agentResourceID string, send SendFunc) *AgentSession {
+func (d *Dispatcher) RegisterAgent(_ context.Context, agentID int, agentResourceID string, send SendFunc) *AgentSession {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -187,7 +187,7 @@ func (d *Dispatcher) CancelCommand(_ context.Context, agentID int, commandID str
 	return nil
 }
 
-func (d *Dispatcher) Subscribe(_ context.Context, commandID string) (<-chan *v1pb.CommandOutput, error) {
+func (d *Dispatcher) Subscribe(_ context.Context, commandID string) (chan *v1pb.CommandOutput, error) {
 	ch := make(chan *v1pb.CommandOutput, watcherBufSize)
 
 	d.mu.Lock()
@@ -206,11 +206,11 @@ func (d *Dispatcher) Unsubscribe(commandID string, ch chan *v1pb.CommandOutput) 
 
 	if watchers, ok := d.watchers[commandID]; ok {
 		delete(watchers, ch)
+		close(ch)
 		if len(watchers) == 0 {
 			delete(d.watchers, commandID)
 		}
 	}
-	close(ch)
 }
 
 func (d *Dispatcher) broadcast(commandID string, output *v1pb.CommandOutput) {
@@ -329,7 +329,7 @@ func (d *Dispatcher) TryDispatchNext(ctx context.Context, agentID int) {
 	}
 }
 
-func (d *Dispatcher) HandlePong(agentID int, _ *v1pb.Pong) {
+func (d *Dispatcher) HandlePing(agentID int, _ *v1pb.Ping) {
 	d.mu.RLock()
 	sess, ok := d.sessions[agentID]
 	d.mu.RUnlock()
