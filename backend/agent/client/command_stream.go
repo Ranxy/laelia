@@ -146,19 +146,23 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 
 func (*commandStream) runCommand(
 	ctx context.Context,
-	executor *executor.BashExecutor,
+	exec *executor.BashExecutor,
 	stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage],
 	commandID string,
 ) {
-	executor.Start()
+	exec.Start()
 
 	for {
 		select {
 		case <-ctx.Done():
-			executor.Cancel()
+			exec.Cancel()
 			return
-		case <-executor.Done():
-			result := <-executor.ResultChannel()
+
+		case <-exec.Done():
+			// Drain any remaining output chunks before reading the result.
+			drainOutput(exec, stream, commandID)
+
+			result := <-exec.ResultChannel()
 			msg := &v1pb.AgentCommandMessage{
 				Message: &v1pb.AgentCommandMessage_Result{
 					Result: &v1pb.CommandResult{
@@ -175,7 +179,8 @@ func (*commandStream) runCommand(
 			}
 			slog.Info("command result sent", "commandID", commandID, "exitCode", result.ExitCode)
 			return
-		case chunk, ok := <-executor.OutputChannel():
+
+		case chunk, ok := <-exec.OutputChannel():
 			if !ok {
 				continue
 			}
@@ -191,9 +196,36 @@ func (*commandStream) runCommand(
 			}
 			if err := stream.Send(msg); err != nil {
 				slog.Error("failed to send command progress", "commandID", commandID, "error", err)
-				executor.Cancel()
+				exec.Cancel()
 				return
 			}
+		}
+	}
+}
+
+func drainOutput(exec *executor.BashExecutor, stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], commandID string) {
+	for {
+		select {
+		case chunk, ok := <-exec.OutputChannel():
+			if !ok {
+				return
+			}
+			msg := &v1pb.AgentCommandMessage{
+				Message: &v1pb.AgentCommandMessage_Progress{
+					Progress: &v1pb.CommandProgress{
+						CommandId: commandID,
+						Type:      chunk.StreamType,
+						Content:   chunk.Content,
+						SeqNo:     chunk.SeqNo,
+					},
+				},
+			}
+			if err := stream.Send(msg); err != nil {
+				slog.Error("failed to send command progress", "commandID", commandID, "error", err)
+				return
+			}
+		default:
+			return
 		}
 	}
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CommandTerminal } from "@/react/components/command-terminal";
 import { Badge } from "@/react/components/ui/badge";
@@ -49,8 +49,8 @@ export function CommandDetailPage() {
   const getCommand = useAppStore((s) => s.getCommand);
   const cancelCommand = useAppStore((s) => s.cancelCommand);
   const watchCommand = useAppStore((s) => s.watchCommand);
-  const unwatchCommand = useAppStore((s) => s.unwatchCommand);
   const activeOutputs = useAppStore((s) => s.activeOutputs);
+  const abortRef = useRef<AbortController | null>(null);
 
   const [cmd, setCmd] = useState<{
     name: string;
@@ -88,13 +88,22 @@ export function CommandDetailPage() {
 
   useEffect(() => {
     if (!cmdName) return;
-    watchCommand(cmdName);
-    return () => {
-      unwatchCommand(cmdName);
-    };
-  }, [cmdName, watchCommand, unwatchCommand]);
 
-  const outputs = activeOutputs.get(cmdName) ?? [];
+    abortRef.current?.abort();
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    watchCommand(cmdName, controller.signal).catch(() => {
+      // stream aborted or failed — expected on unmount
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, [cmdName, watchCommand]);
+
+  const outputs = activeOutputs[cmdName] ?? [];
 
   const handleCancel = async () => {
     if (!cmdName) return;

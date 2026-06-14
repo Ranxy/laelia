@@ -12,8 +12,7 @@ export const createCommandSlice: AppSliceCreator<CommandSlice> = (
 ) => ({
   commands: [],
   commandsLoading: false,
-  activeOutputs: new Map(),
-  watchingCommands: new Set(),
+  activeOutputs: {},
 
   async sendCommand(agent, command, opts) {
     const res = await commandServiceClient.sendCommand(
@@ -60,39 +59,33 @@ export const createCommandSlice: AppSliceCreator<CommandSlice> = (
     return res;
   },
 
-  async watchCommand(name) {
+  async watchCommand(name, signal) {
     const state = get();
-    if (state.watchingCommands.has(name)) return;
-
-    set((s) => {
-      s.watchingCommands.add(name);
-      return {};
-    });
-
-    const existing = state.activeOutputs.get(name);
+    const existing = state.activeOutputs[name];
     const afterSeqNo =
-      existing && existing.length > 0 ? existing[existing.length - 1].seqNo : 0;
+      existing && existing.length > 0
+        ? existing[existing.length - 1].seqNo
+        : -1;
 
-    const stream = commandServiceClient.watchCommand({ name, afterSeqNo });
+    const stream = commandServiceClient.watchCommand(
+      { name, afterSeqNo },
+      { signal }
+    );
 
-    for await (const output of stream) {
-      set((s) => {
-        const prev = s.activeOutputs.get(name) ?? [];
-        s.activeOutputs.set(name, [...prev, output]);
-        return {};
-      });
+    try {
+      for await (const output of stream) {
+        if (signal?.aborted) break;
+        const s = get();
+        const prev = s.activeOutputs[name] ?? [];
+        set({
+          activeOutputs: {
+            ...s.activeOutputs,
+            [name]: [...prev, output],
+          },
+        });
+      }
+    } catch {
+      // stream cancelled (aborted on unmount) or network error — ignore
     }
-
-    set((s) => {
-      s.watchingCommands.delete(name);
-      return {};
-    });
-  },
-
-  unwatchCommand(name) {
-    set((s) => {
-      s.watchingCommands.delete(name);
-      return {};
-    });
   },
 });

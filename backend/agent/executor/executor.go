@@ -161,8 +161,8 @@ func (e *BashExecutor) Run() Result {
 }
 
 func (e *BashExecutor) sendResult(r Result) {
-	close(e.done)
 	e.resultCh <- r
 	close(e.resultCh)
+	close(e.done)
 	close(e.outputCh)
 }

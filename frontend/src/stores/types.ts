@@ -34,8 +34,7 @@ export interface AgentSlice {
 export interface CommandSlice {
   commands: Command[];
   commandsLoading: boolean;
-  activeOutputs: Map<string, CommandOutput[]>;
-  watchingCommands: Set<string>;
+  activeOutputs: Record<string, CommandOutput[]>;
 
   sendCommand: (
     agent: string,
@@ -52,8 +51,7 @@ export interface CommandSlice {
     params?: { pageSize?: number; pageToken?: string; status?: number }
   ) => Promise<{ commands: Command[]; nextPageToken: string } | undefined>;
   getCommand: (name: string) => Promise<Command | undefined>;
-  watchCommand: (name: string) => Promise<void>;
-  unwatchCommand: (name: string) => void;
+  watchCommand: (name: string, signal?: AbortSignal) => Promise<void>;
 }
 
 export type AppStoreState = AuthSlice & AgentSlice & CommandSlice;
