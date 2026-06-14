@@ -195,6 +195,14 @@
                   <a href="#laelia.store.AgentStatus.ConnectionState"><span class="badge">E</span>AgentStatus.ConnectionState</a>
                 </li>
               
+                <li>
+                  <a href="#laelia.store.AgentTokenState"><span class="badge">E</span>AgentTokenState</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.AgentTokenType"><span class="badge">E</span>AgentTokenType</a>
+                </li>
+              
               
               
             </ul>
@@ -361,6 +369,10 @@
             <ul>
               
                 <li>
+                  <a href="#laelia.store.AgentSecuritySetting"><span class="badge">M</span>AgentSecuritySetting</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.store.EnvironmentSetting"><span class="badge">M</span>EnvironmentSetting</a>
                 </li>
               
@@ -380,6 +392,10 @@
                   <a href="#laelia.store.WorkspaceProfileSetting"><span class="badge">M</span>WorkspaceProfileSetting</a>
                 </li>
               
+              
+                <li>
+                  <a href="#laelia.store.IPValidationPolicy"><span class="badge">E</span>IPValidationPolicy</a>
+                </li>
               
                 <li>
                   <a href="#laelia.store.SettingName"><span class="badge">E</span>SettingName</a>
@@ -556,6 +572,13 @@
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>active_session_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -593,6 +616,82 @@
             
               <tr>
                 <td>ERROR</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>KICKED</td>
+                <td>4</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+        <h3 id="laelia.store.AgentTokenState">AgentTokenState</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>STATE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ACTIVE</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>CONSUMED</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>REVOKED</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+        <h3 id="laelia.store.AgentTokenType">AgentTokenType</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>TOKEN_TYPE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>BOOTSTRAP</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ACCESS</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>REFRESH</td>
                 <td>3</td>
                 <td><p></p></td>
               </tr>
@@ -1611,6 +1710,86 @@ for example, the environment resource can have the sql review config tag, like &
       <p></p>
 
       
+        <h3 id="laelia.store.AgentSecuritySetting">AgentSecuritySetting</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>heartbeat_interval_seconds</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>Heartbeat interval in seconds. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>offline_threshold_seconds</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>Offline threshold in seconds. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>bootstrap_token_duration</td>
+                  <td><a href="#google.protobuf.Duration">google.protobuf.Duration</a></td>
+                  <td></td>
+                  <td><p>Bootstrap token duration. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>access_token_duration</td>
+                  <td><a href="#google.protobuf.Duration">google.protobuf.Duration</a></td>
+                  <td></td>
+                  <td><p>Access token duration. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>refresh_token_duration</td>
+                  <td><a href="#google.protobuf.Duration">google.protobuf.Duration</a></td>
+                  <td></td>
+                  <td><p>Refresh token duration. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>max_concurrent_sessions</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>Max concurrent sessions per agent (default: 1). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>ip_validation_policy</td>
+                  <td><a href="#laelia.store.IPValidationPolicy">IPValidationPolicy</a></td>
+                  <td></td>
+                  <td><p>IP validation policy. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>heartbeat_rate_limit_per_minute</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>Heartbeat rate limit per minute per agent. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>connect_rate_limit_per_minute</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>Connect rate limit per minute per IP. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.store.EnvironmentSetting">EnvironmentSetting</h3>
         <p></p>
 
@@ -1649,16 +1828,14 @@ for example, the environment resource can have the sql review config tag, like &
                   <td>id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>The resource id of the environment.
-This value should be 4-63 characters, and valid characters
-are /[a-z][0-9]-/. </p></td>
+                  <td><p> </p></td>
                 </tr>
               
                 <tr>
                   <td>title</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>The display name of the environment. </p></td>
+                  <td><p> </p></td>
                 </tr>
               
                 <tr>
@@ -1861,6 +2038,41 @@ are /[a-z][0-9]-/. </p></td>
       
 
       
+        <h3 id="laelia.store.IPValidationPolicy">IPValidationPolicy</h3>
+        <p>IP validation policy for agent connections.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>IP_VALIDATION_POLICY_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>IP_VALIDATION_OFF</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>IP_VALIDATION_WARN</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>IP_VALIDATION_STRICT</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
         <h3 id="laelia.store.SettingName">SettingName</h3>
         <p></p>
         <table class="enum-table">
@@ -1920,6 +2132,12 @@ are /[a-z][0-9]-/. </p></td>
               <tr>
                 <td>ENVIRONMENT</td>
                 <td>8</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>AGENT_SECURITY</td>
+                <td>9</td>
                 <td><p></p></td>
               </tr>
             

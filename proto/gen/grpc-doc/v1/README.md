@@ -21,20 +21,33 @@
 - [v1/agent.proto](#v1_agent-proto)
     - [Agent](#laelia-v1-Agent)
     - [Agent.LabelsEntry](#laelia-v1-Agent-LabelsEntry)
+    - [AgentDisconnectRequest](#laelia-v1-AgentDisconnectRequest)
     - [AgentHeartbeatRequest](#laelia-v1-AgentHeartbeatRequest)
     - [AgentHeartbeatResponse](#laelia-v1-AgentHeartbeatResponse)
     - [AgentInfo](#laelia-v1-AgentInfo)
     - [AgentInfo.LabelsEntry](#laelia-v1-AgentInfo-LabelsEntry)
+    - [AgentMetrics](#laelia-v1-AgentMetrics)
+    - [AgentSession](#laelia-v1-AgentSession)
     - [AgentStatus](#laelia-v1-AgentStatus)
     - [ConnectAgentRequest](#laelia-v1-ConnectAgentRequest)
     - [ConnectAgentResponse](#laelia-v1-ConnectAgentResponse)
     - [CreateAgentRequest](#laelia-v1-CreateAgentRequest)
+    - [CreateAgentResponse](#laelia-v1-CreateAgentResponse)
     - [DeleteAgentRequest](#laelia-v1-DeleteAgentRequest)
+    - [ForceDisconnectAgentRequest](#laelia-v1-ForceDisconnectAgentRequest)
     - [GetAgentRequest](#laelia-v1-GetAgentRequest)
     - [HelloRequest](#laelia-v1-HelloRequest)
     - [HelloResponse](#laelia-v1-HelloResponse)
+    - [ListAgentSessionsRequest](#laelia-v1-ListAgentSessionsRequest)
+    - [ListAgentSessionsResponse](#laelia-v1-ListAgentSessionsResponse)
     - [ListAgentsRequest](#laelia-v1-ListAgentsRequest)
     - [ListAgentsResponse](#laelia-v1-ListAgentsResponse)
+    - [RefreshAgentTokenRequest](#laelia-v1-RefreshAgentTokenRequest)
+    - [RefreshAgentTokenResponse](#laelia-v1-RefreshAgentTokenResponse)
+    - [RevokeAgentTokenRequest](#laelia-v1-RevokeAgentTokenRequest)
+    - [RevokeAgentTokenResponse](#laelia-v1-RevokeAgentTokenResponse)
+    - [RotateAgentTokenRequest](#laelia-v1-RotateAgentTokenRequest)
+    - [RotateAgentTokenResponse](#laelia-v1-RotateAgentTokenResponse)
   
     - [AgentStatus.ConnectionState](#laelia-v1-AgentStatus-ConnectionState)
   
@@ -204,11 +217,12 @@ RiskLevel is the risk level.
 | name | [string](#string) |  |  |
 | state | [State](#laelia-v1-State) |  |  |
 | title | [string](#string) |  |  |
-| token | [string](#string) |  |  |
 | info | [AgentInfo](#laelia-v1-AgentInfo) |  |  |
 | status | [AgentStatus](#laelia-v1-AgentStatus) |  |  |
 | created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | labels | [Agent.LabelsEntry](#laelia-v1-Agent-LabelsEntry) | repeated |  |
+| last_token_rotated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| token_version | [int32](#int32) |  |  |
 
 
 
@@ -231,10 +245,33 @@ RiskLevel is the risk level.
 
 
 
+<a name="laelia-v1-AgentDisconnectRequest"></a>
+
+### AgentDisconnectRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| session_id | [string](#string) |  |  |
+| reason | [string](#string) |  | &#34;shutdown&#34;, &#34;upgrade&#34; etc. |
+
+
+
+
+
+
 <a name="laelia-v1-AgentHeartbeatRequest"></a>
 
 ### AgentHeartbeatRequest
 
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| session_id | [string](#string) |  |  |
+| previous_nonce | [string](#string) |  | nonce from previous response (replay protection) |
+| metrics | [AgentMetrics](#laelia-v1-AgentMetrics) |  | optional agent metrics |
 
 
 
@@ -245,6 +282,14 @@ RiskLevel is the risk level.
 
 ### AgentHeartbeatResponse
 
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| next_nonce | [string](#string) |  | nonce for next request |
+| next_heartbeat_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | expected next heartbeat time |
+| access_token | [string](#string) |  | new access token (only if expiring soon) |
+| access_token_expires_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 
 
 
@@ -288,6 +333,51 @@ RiskLevel is the risk level.
 
 
 
+<a name="laelia-v1-AgentMetrics"></a>
+
+### AgentMetrics
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| cpu_percent | [double](#double) |  |  |
+| memory_used_bytes | [uint64](#uint64) |  |  |
+| memory_total_bytes | [uint64](#uint64) |  |  |
+| disk_used_bytes | [uint64](#uint64) |  |  |
+| disk_total_bytes | [uint64](#uint64) |  |  |
+| uptime_seconds | [uint32](#uint32) |  |  |
+| goroutine_count | [uint32](#uint32) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-AgentSession"></a>
+
+### AgentSession
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| session_id | [string](#string) |  |  |
+| agent_name | [string](#string) |  |  |
+| source_ip | [string](#string) |  |  |
+| agent_version | [string](#string) |  |  |
+| fingerprint | [string](#string) |  |  |
+| connected_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| last_heartbeat_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| disconnected_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| disconnect_reason | [string](#string) |  |  |
+| state | [AgentStatus.ConnectionState](#laelia-v1-AgentStatus-ConnectionState) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-AgentStatus"></a>
 
 ### AgentStatus
@@ -300,6 +390,7 @@ RiskLevel is the risk level.
 | last_heartbeat_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | connected_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | error_message | [string](#string) |  |  |
+| active_session_id | [string](#string) |  | current active session ID |
 
 
 
@@ -314,7 +405,9 @@ RiskLevel is the risk level.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
+| bootstrap_token | [string](#string) |  | first connection or after refresh failure |
 | info | [AgentInfo](#laelia-v1-AgentInfo) |  |  |
+| fingerprint | [string](#string) |  | client-generated connection fingerprint (hostname:os:arch) |
 
 
 
@@ -325,6 +418,16 @@ RiskLevel is the risk level.
 
 ### ConnectAgentResponse
 
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| access_token | [string](#string) |  | 15-minute validity |
+| refresh_token | [string](#string) |  | 24-hour validity, single-use rotation |
+| session_id | [string](#string) |  | session identifier |
+| next_nonce | [string](#string) |  | server-signed nonce for next heartbeat |
+| access_token_expires_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| initial_status | [AgentStatus](#laelia-v1-AgentStatus) |  |  |
 
 
 
@@ -346,6 +449,22 @@ RiskLevel is the risk level.
 
 
 
+<a name="laelia-v1-CreateAgentResponse"></a>
+
+### CreateAgentResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent | [Agent](#laelia-v1-Agent) |  |  |
+| bootstrap_token | [string](#string) |  | 7-day validity, reusable until rotated/revoked |
+
+
+
+
+
+
 <a name="laelia-v1-DeleteAgentRequest"></a>
 
 ### DeleteAgentRequest
@@ -355,6 +474,22 @@ RiskLevel is the risk level.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ForceDisconnectAgentRequest"></a>
+
+### ForceDisconnectAgentRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| reason | [string](#string) |  |  |
 
 
 
@@ -395,6 +530,41 @@ RiskLevel is the risk level.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | current_time | [int64](#int64) |  |  |
+| server_version | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListAgentSessionsRequest"></a>
+
+### ListAgentSessionsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+| include_terminated | [bool](#bool) |  | default: only active sessions |
+
+
+
+
+
+
+<a name="laelia-v1-ListAgentSessionsResponse"></a>
+
+### ListAgentSessionsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| sessions | [AgentSession](#laelia-v1-AgentSession) | repeated |  |
+| next_page_token | [string](#string) |  |  |
 
 
 
@@ -433,6 +603,96 @@ RiskLevel is the risk level.
 
 
 
+
+<a name="laelia-v1-RefreshAgentTokenRequest"></a>
+
+### RefreshAgentTokenRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| refresh_token | [string](#string) |  |  |
+| fingerprint | [string](#string) |  | verify connection fingerprint |
+
+
+
+
+
+
+<a name="laelia-v1-RefreshAgentTokenResponse"></a>
+
+### RefreshAgentTokenResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| access_token | [string](#string) |  |  |
+| refresh_token | [string](#string) |  | new refresh token (rotation) |
+| access_token_expires_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RevokeAgentTokenRequest"></a>
+
+### RevokeAgentTokenRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| reason | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RevokeAgentTokenResponse"></a>
+
+### RevokeAgentTokenResponse
+
+
+
+
+
+
+
+<a name="laelia-v1-RotateAgentTokenRequest"></a>
+
+### RotateAgentTokenRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| reason | [string](#string) |  | audit purpose |
+
+
+
+
+
+
+<a name="laelia-v1-RotateAgentTokenResponse"></a>
+
+### RotateAgentTokenResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| bootstrap_token | [string](#string) |  | new bootstrap token |
+
+
+
+
+
  
 
 
@@ -447,6 +707,7 @@ RiskLevel is the risk level.
 | ONLINE | 1 |  |
 | OFFLINE | 2 |  |
 | ERROR | 3 |  |
+| KICKED | 4 | evicted by a new connection |
 
 
  
@@ -457,17 +718,23 @@ RiskLevel is the risk level.
 <a name="laelia-v1-AgentService"></a>
 
 ### AgentService
-
+========== Management APIs (IAM auth, admin only) ==========
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| CreateAgent | [CreateAgentRequest](#laelia-v1-CreateAgentRequest) | [Agent](#laelia-v1-Agent) |  |
+| CreateAgent | [CreateAgentRequest](#laelia-v1-CreateAgentRequest) | [CreateAgentResponse](#laelia-v1-CreateAgentResponse) |  |
 | ListAgents | [ListAgentsRequest](#laelia-v1-ListAgentsRequest) | [ListAgentsResponse](#laelia-v1-ListAgentsResponse) |  |
 | GetAgent | [GetAgentRequest](#laelia-v1-GetAgentRequest) | [Agent](#laelia-v1-Agent) |  |
 | DeleteAgent | [DeleteAgentRequest](#laelia-v1-DeleteAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
-| ConnectAgent | [ConnectAgentRequest](#laelia-v1-ConnectAgentRequest) | [ConnectAgentResponse](#laelia-v1-ConnectAgentResponse) |  |
-| AgentHeartbeat | [AgentHeartbeatRequest](#laelia-v1-AgentHeartbeatRequest) | [AgentHeartbeatResponse](#laelia-v1-AgentHeartbeatResponse) |  |
-| Hello | [HelloRequest](#laelia-v1-HelloRequest) | [HelloResponse](#laelia-v1-HelloResponse) |  |
+| RotateAgentToken | [RotateAgentTokenRequest](#laelia-v1-RotateAgentTokenRequest) | [RotateAgentTokenResponse](#laelia-v1-RotateAgentTokenResponse) | Token rotation: generate a new bootstrap token, old token invalid after grace period |
+| RevokeAgentToken | [RevokeAgentTokenRequest](#laelia-v1-RevokeAgentTokenRequest) | [RevokeAgentTokenResponse](#laelia-v1-RevokeAgentTokenResponse) | Token revocation: revoke all tokens for the agent |
+| ForceDisconnectAgent | [ForceDisconnectAgentRequest](#laelia-v1-ForceDisconnectAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Admin force disconnects an agent connection |
+| ListAgentSessions | [ListAgentSessionsRequest](#laelia-v1-ListAgentSessionsRequest) | [ListAgentSessionsResponse](#laelia-v1-ListAgentSessionsResponse) | List agent sessions |
+| ConnectAgent | [ConnectAgentRequest](#laelia-v1-ConnectAgentRequest) | [ConnectAgentResponse](#laelia-v1-ConnectAgentResponse) | Agent initial connection using bootstrap token |
+| AgentHeartbeat | [AgentHeartbeatRequest](#laelia-v1-AgentHeartbeatRequest) | [AgentHeartbeatResponse](#laelia-v1-AgentHeartbeatResponse) | Agent heartbeat |
+| AgentDisconnect | [AgentDisconnectRequest](#laelia-v1-AgentDisconnectRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Agent graceful disconnect |
+| RefreshAgentToken | [RefreshAgentTokenRequest](#laelia-v1-RefreshAgentTokenRequest) | [RefreshAgentTokenResponse](#laelia-v1-RefreshAgentTokenResponse) | Agent refreshes access token |
+| Hello | [HelloRequest](#laelia-v1-HelloRequest) | [HelloResponse](#laelia-v1-HelloResponse) | Health check (no auth required) |
 
  
 

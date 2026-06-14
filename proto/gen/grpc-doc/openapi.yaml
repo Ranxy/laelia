@@ -10,6 +10,7 @@ paths:
         post:
             tags:
                 - AgentService
+            description: Health check (no auth required)
             operationId: AgentService_Hello
             requestBody:
                 content:
@@ -78,7 +79,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/Agent'
+                                $ref: '#/components/schemas/CreateAgentResponse'
                 default:
                     description: Default error response
                     content:
@@ -131,10 +132,143 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}/sessions:
+        get:
+            tags:
+                - AgentService
+            description: List agent sessions
+            operationId: AgentService_ListAgentSessions
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+                - name: includeTerminated
+                  in: query
+                  schema:
+                    type: boolean
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListAgentSessionsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}:forceDisconnect:
+        post:
+            tags:
+                - AgentService
+            description: Admin force disconnects an agent connection
+            operationId: AgentService_ForceDisconnectAgent
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ForceDisconnectAgentRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}:revokeToken:
+        post:
+            tags:
+                - AgentService
+            description: 'Token revocation: revoke all tokens for the agent'
+            operationId: AgentService_RevokeAgentToken
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/RevokeAgentTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/RevokeAgentTokenResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}:rotateToken:
+        post:
+            tags:
+                - AgentService
+            description: 'Token rotation: generate a new bootstrap token, old token invalid after grace period'
+            operationId: AgentService_RotateAgentToken
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/RotateAgentTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/RotateAgentTokenResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents:connect:
         post:
             tags:
                 - AgentService
+            description: Agent initial connection using bootstrap token
             operationId: AgentService_ConnectAgent
             requestBody:
                 content:
@@ -155,10 +289,33 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents:disconnect:
+        post:
+            tags:
+                - AgentService
+            description: Agent graceful disconnect
+            operationId: AgentService_AgentDisconnect
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/AgentDisconnectRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents:heartbeat:
         post:
             tags:
                 - AgentService
+            description: Agent heartbeat
             operationId: AgentService_AgentHeartbeat
             requestBody:
                 content:
@@ -173,6 +330,31 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/AgentHeartbeatResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents:refreshToken:
+        post:
+            tags:
+                - AgentService
+            description: Agent refreshes access token
+            operationId: AgentService_RefreshAgentToken
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/RefreshAgentTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/RefreshAgentTokenResponse'
                 default:
                     description: Default error response
                     content:
@@ -521,8 +703,6 @@ components:
                     format: enum
                 title:
                     type: string
-                token:
-                    type: string
                 info:
                     $ref: '#/components/schemas/AgentInfo'
                 status:
@@ -534,12 +714,41 @@ components:
                     type: object
                     additionalProperties:
                         type: string
+                lastTokenRotatedAt:
+                    type: string
+                    format: date-time
+                tokenVersion:
+                    type: integer
+                    format: int32
+        AgentDisconnectRequest:
+            type: object
+            properties:
+                sessionId:
+                    type: string
+                reason:
+                    type: string
         AgentHeartbeatRequest:
             type: object
-            properties: {}
+            properties:
+                sessionId:
+                    type: string
+                previousNonce:
+                    type: string
+                metrics:
+                    $ref: '#/components/schemas/AgentMetrics'
         AgentHeartbeatResponse:
             type: object
-            properties: {}
+            properties:
+                nextNonce:
+                    type: string
+                nextHeartbeatAt:
+                    type: string
+                    format: date-time
+                accessToken:
+                    type: string
+                accessTokenExpiresAt:
+                    type: string
+                    format: date-time
         AgentInfo:
             type: object
             properties:
@@ -559,6 +768,59 @@ components:
                     type: object
                     additionalProperties:
                         type: string
+        AgentMetrics:
+            type: object
+            properties:
+                cpuPercent:
+                    type: number
+                    format: double
+                memoryUsedBytes:
+                    type: string
+                memoryTotalBytes:
+                    type: string
+                diskUsedBytes:
+                    type: string
+                diskTotalBytes:
+                    type: string
+                uptimeSeconds:
+                    type: integer
+                    format: uint32
+                goroutineCount:
+                    type: integer
+                    format: uint32
+        AgentSession:
+            type: object
+            properties:
+                sessionId:
+                    type: string
+                agentName:
+                    type: string
+                sourceIp:
+                    type: string
+                agentVersion:
+                    type: string
+                fingerprint:
+                    type: string
+                connectedAt:
+                    type: string
+                    format: date-time
+                lastHeartbeatAt:
+                    type: string
+                    format: date-time
+                disconnectedAt:
+                    type: string
+                    format: date-time
+                disconnectReason:
+                    type: string
+                state:
+                    enum:
+                        - CONNECTION_STATE_UNSPECIFIED
+                        - ONLINE
+                        - OFFLINE
+                        - ERROR
+                        - KICKED
+                    type: string
+                    format: enum
         AgentStatus:
             type: object
             properties:
@@ -568,6 +830,7 @@ components:
                         - ONLINE
                         - OFFLINE
                         - ERROR
+                        - KICKED
                     type: string
                     format: enum
                 lastHeartbeatTime:
@@ -577,6 +840,8 @@ components:
                     type: string
                     format: date-time
                 errorMessage:
+                    type: string
+                activeSessionId:
                     type: string
         BatchGetUsersResponse:
             type: object
@@ -589,11 +854,44 @@ components:
         ConnectAgentRequest:
             type: object
             properties:
+                bootstrapToken:
+                    type: string
                 info:
                     $ref: '#/components/schemas/AgentInfo'
+                fingerprint:
+                    type: string
         ConnectAgentResponse:
             type: object
-            properties: {}
+            properties:
+                accessToken:
+                    type: string
+                refreshToken:
+                    type: string
+                sessionId:
+                    type: string
+                nextNonce:
+                    type: string
+                accessTokenExpiresAt:
+                    type: string
+                    format: date-time
+                initialStatus:
+                    $ref: '#/components/schemas/AgentStatus'
+        CreateAgentResponse:
+            type: object
+            properties:
+                agent:
+                    $ref: '#/components/schemas/Agent'
+                bootstrapToken:
+                    type: string
+        ForceDisconnectAgentRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                reason:
+                    type: string
         GoogleProtobufAny:
             type: object
             properties:
@@ -610,11 +908,22 @@ components:
             properties:
                 currentTime:
                     type: string
+                serverVersion:
+                    type: string
         IdentityProviderContext:
             type: object
             properties:
                 oauth2Context:
                     $ref: '#/components/schemas/OAuth2IdentityProviderContext'
+        ListAgentSessionsResponse:
+            type: object
+            properties:
+                sessions:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AgentSession'
+                nextPageToken:
+                    type: string
         ListAgentsResponse:
             type: object
             properties:
@@ -674,6 +983,49 @@ components:
             type: object
             properties:
                 code:
+                    type: string
+        RefreshAgentTokenRequest:
+            type: object
+            properties:
+                refreshToken:
+                    type: string
+                fingerprint:
+                    type: string
+        RefreshAgentTokenResponse:
+            type: object
+            properties:
+                accessToken:
+                    type: string
+                refreshToken:
+                    type: string
+                accessTokenExpiresAt:
+                    type: string
+                    format: date-time
+        RevokeAgentTokenRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                reason:
+                    type: string
+        RevokeAgentTokenResponse:
+            type: object
+            properties: {}
+        RotateAgentTokenRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                reason:
+                    type: string
+        RotateAgentTokenResponse:
+            type: object
+            properties:
+                bootstrapToken:
                     type: string
         Status:
             type: object

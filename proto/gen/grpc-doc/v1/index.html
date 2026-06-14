@@ -245,6 +245,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.AgentDisconnectRequest"><span class="badge">M</span>AgentDisconnectRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.AgentHeartbeatRequest"><span class="badge">M</span>AgentHeartbeatRequest</a>
                 </li>
               
@@ -258,6 +262,14 @@
               
                 <li>
                   <a href="#laelia.v1.AgentInfo.LabelsEntry"><span class="badge">M</span>AgentInfo.LabelsEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AgentMetrics"><span class="badge">M</span>AgentMetrics</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AgentSession"><span class="badge">M</span>AgentSession</a>
                 </li>
               
                 <li>
@@ -277,7 +289,15 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.CreateAgentResponse"><span class="badge">M</span>CreateAgentResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.DeleteAgentRequest"><span class="badge">M</span>DeleteAgentRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ForceDisconnectAgentRequest"><span class="badge">M</span>ForceDisconnectAgentRequest</a>
                 </li>
               
                 <li>
@@ -293,11 +313,43 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ListAgentSessionsRequest"><span class="badge">M</span>ListAgentSessionsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListAgentSessionsResponse"><span class="badge">M</span>ListAgentSessionsResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ListAgentsRequest"><span class="badge">M</span>ListAgentsRequest</a>
                 </li>
               
                 <li>
                   <a href="#laelia.v1.ListAgentsResponse"><span class="badge">M</span>ListAgentsResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RefreshAgentTokenRequest"><span class="badge">M</span>RefreshAgentTokenRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RefreshAgentTokenResponse"><span class="badge">M</span>RefreshAgentTokenResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RevokeAgentTokenRequest"><span class="badge">M</span>RevokeAgentTokenRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RevokeAgentTokenResponse"><span class="badge">M</span>RevokeAgentTokenResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RotateAgentTokenRequest"><span class="badge">M</span>RotateAgentTokenRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RotateAgentTokenResponse"><span class="badge">M</span>RotateAgentTokenResponse</a>
                 </li>
               
               
@@ -681,13 +733,6 @@
                 </tr>
               
                 <tr>
-                  <td>token</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
                   <td>info</td>
                   <td><a href="#laelia.v1.AgentInfo">AgentInfo</a></td>
                   <td></td>
@@ -712,6 +757,20 @@
                   <td>labels</td>
                   <td><a href="#laelia.v1.Agent.LabelsEntry">Agent.LabelsEntry</a></td>
                   <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_token_rotated_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>token_version</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
                   <td><p> </p></td>
                 </tr>
               
@@ -753,10 +812,72 @@
 
         
       
+        <h3 id="laelia.v1.AgentDisconnectRequest">AgentDisconnectRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>session_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reason</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>&#34;shutdown&#34;, &#34;upgrade&#34; etc. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.AgentHeartbeatRequest">AgentHeartbeatRequest</h3>
         <p></p>
 
         
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>session_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>previous_nonce</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>nonce from previous response (replay protection) </p></td>
+                </tr>
+              
+                <tr>
+                  <td>metrics</td>
+                  <td><a href="#laelia.v1.AgentMetrics">AgentMetrics</a></td>
+                  <td></td>
+                  <td><p>optional agent metrics </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
 
         
       
@@ -764,6 +885,44 @@
         <p></p>
 
         
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>next_nonce</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>nonce for next request </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_heartbeat_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p>expected next heartbeat time </p></td>
+                </tr>
+              
+                <tr>
+                  <td>access_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>new access token (only if expiring soon) </p></td>
+                </tr>
+              
+                <tr>
+                  <td>access_token_expires_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
 
         
       
@@ -864,6 +1023,159 @@
 
         
       
+        <h3 id="laelia.v1.AgentMetrics">AgentMetrics</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>cpu_percent</td>
+                  <td><a href="#double">double</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>memory_used_bytes</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>memory_total_bytes</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>disk_used_bytes</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>disk_total_bytes</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>uptime_seconds</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>goroutine_count</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.AgentSession">AgentSession</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>session_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>agent_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>source_ip</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>agent_version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>fingerprint</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>connected_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_heartbeat_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>disconnected_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>disconnect_reason</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>state</td>
+                  <td><a href="#laelia.v1.AgentStatus.ConnectionState">AgentStatus.ConnectionState</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.AgentStatus">AgentStatus</h3>
         <p></p>
 
@@ -902,6 +1214,13 @@
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>active_session_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>current active session ID </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -920,10 +1239,24 @@
             <tbody>
               
                 <tr>
+                  <td>bootstrap_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>first connection or after refresh failure </p></td>
+                </tr>
+              
+                <tr>
                   <td>info</td>
                   <td><a href="#laelia.v1.AgentInfo">AgentInfo</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>fingerprint</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>client-generated connection fingerprint (hostname:os:arch) </p></td>
                 </tr>
               
             </tbody>
@@ -937,6 +1270,58 @@
         <p></p>
 
         
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>access_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>15-minute validity </p></td>
+                </tr>
+              
+                <tr>
+                  <td>refresh_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>24-hour validity, single-use rotation </p></td>
+                </tr>
+              
+                <tr>
+                  <td>session_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>session identifier </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_nonce</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>server-signed nonce for next heartbeat </p></td>
+                </tr>
+              
+                <tr>
+                  <td>access_token_expires_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>initial_status</td>
+                  <td><a href="#laelia.v1.AgentStatus">AgentStatus</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
 
         
       
@@ -964,6 +1349,37 @@
 
         
       
+        <h3 id="laelia.v1.CreateAgentResponse">CreateAgentResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent</td>
+                  <td><a href="#laelia.v1.Agent">Agent</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>bootstrap_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>7-day validity, reusable until rotated/revoked </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.DeleteAgentRequest">DeleteAgentRequest</h3>
         <p></p>
 
@@ -976,6 +1392,37 @@
               
                 <tr>
                   <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ForceDisconnectAgentRequest">ForceDisconnectAgentRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reason</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -1032,6 +1479,89 @@
                 <tr>
                   <td>current_time</td>
                   <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>server_version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListAgentSessionsRequest">ListAgentSessionsRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>include_terminated</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>default: only active sessions </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListAgentSessionsResponse">ListAgentSessionsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>sessions</td>
+                  <td><a href="#laelia.v1.AgentSession">AgentSession</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -1112,6 +1642,168 @@
 
         
       
+        <h3 id="laelia.v1.RefreshAgentTokenRequest">RefreshAgentTokenRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>refresh_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>fingerprint</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>verify connection fingerprint </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RefreshAgentTokenResponse">RefreshAgentTokenResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>access_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>refresh_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>new refresh token (rotation) </p></td>
+                </tr>
+              
+                <tr>
+                  <td>access_token_expires_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RevokeAgentTokenRequest">RevokeAgentTokenRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reason</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RevokeAgentTokenResponse">RevokeAgentTokenResponse</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.RotateAgentTokenRequest">RotateAgentTokenRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reason</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>audit purpose </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RotateAgentTokenResponse">RotateAgentTokenResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>bootstrap_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>new bootstrap token </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
 
       
         <h3 id="laelia.v1.AgentStatus.ConnectionState">AgentStatus.ConnectionState</h3>
@@ -1146,6 +1838,12 @@
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>KICKED</td>
+                <td>4</td>
+                <td><p>evicted by a new connection</p></td>
+              </tr>
+            
           </tbody>
         </table>
       
@@ -1154,7 +1852,7 @@
 
       
         <h3 id="laelia.v1.AgentService">AgentService</h3>
-        <p></p>
+        <p>========== Management APIs (IAM auth, admin only) ==========</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -1164,7 +1862,7 @@
               <tr>
                 <td>CreateAgent</td>
                 <td><a href="#laelia.v1.CreateAgentRequest">CreateAgentRequest</a></td>
-                <td><a href="#laelia.v1.Agent">Agent</a></td>
+                <td><a href="#laelia.v1.CreateAgentResponse">CreateAgentResponse</a></td>
                 <td><p></p></td>
               </tr>
             
@@ -1190,24 +1888,66 @@
               </tr>
             
               <tr>
+                <td>RotateAgentToken</td>
+                <td><a href="#laelia.v1.RotateAgentTokenRequest">RotateAgentTokenRequest</a></td>
+                <td><a href="#laelia.v1.RotateAgentTokenResponse">RotateAgentTokenResponse</a></td>
+                <td><p>Token rotation: generate a new bootstrap token, old token invalid after grace period</p></td>
+              </tr>
+            
+              <tr>
+                <td>RevokeAgentToken</td>
+                <td><a href="#laelia.v1.RevokeAgentTokenRequest">RevokeAgentTokenRequest</a></td>
+                <td><a href="#laelia.v1.RevokeAgentTokenResponse">RevokeAgentTokenResponse</a></td>
+                <td><p>Token revocation: revoke all tokens for the agent</p></td>
+              </tr>
+            
+              <tr>
+                <td>ForceDisconnectAgent</td>
+                <td><a href="#laelia.v1.ForceDisconnectAgentRequest">ForceDisconnectAgentRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p>Admin force disconnects an agent connection</p></td>
+              </tr>
+            
+              <tr>
+                <td>ListAgentSessions</td>
+                <td><a href="#laelia.v1.ListAgentSessionsRequest">ListAgentSessionsRequest</a></td>
+                <td><a href="#laelia.v1.ListAgentSessionsResponse">ListAgentSessionsResponse</a></td>
+                <td><p>List agent sessions</p></td>
+              </tr>
+            
+              <tr>
                 <td>ConnectAgent</td>
                 <td><a href="#laelia.v1.ConnectAgentRequest">ConnectAgentRequest</a></td>
                 <td><a href="#laelia.v1.ConnectAgentResponse">ConnectAgentResponse</a></td>
-                <td><p></p></td>
+                <td><p>Agent initial connection using bootstrap token</p></td>
               </tr>
             
               <tr>
                 <td>AgentHeartbeat</td>
                 <td><a href="#laelia.v1.AgentHeartbeatRequest">AgentHeartbeatRequest</a></td>
                 <td><a href="#laelia.v1.AgentHeartbeatResponse">AgentHeartbeatResponse</a></td>
-                <td><p></p></td>
+                <td><p>Agent heartbeat</p></td>
+              </tr>
+            
+              <tr>
+                <td>AgentDisconnect</td>
+                <td><a href="#laelia.v1.AgentDisconnectRequest">AgentDisconnectRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p>Agent graceful disconnect</p></td>
+              </tr>
+            
+              <tr>
+                <td>RefreshAgentToken</td>
+                <td><a href="#laelia.v1.RefreshAgentTokenRequest">RefreshAgentTokenRequest</a></td>
+                <td><a href="#laelia.v1.RefreshAgentTokenResponse">RefreshAgentTokenResponse</a></td>
+                <td><p>Agent refreshes access token</p></td>
               </tr>
             
               <tr>
                 <td>Hello</td>
                 <td><a href="#laelia.v1.HelloRequest">HelloRequest</a></td>
                 <td><a href="#laelia.v1.HelloResponse">HelloResponse</a></td>
-                <td><p></p></td>
+                <td><p>Health check (no auth required)</p></td>
               </tr>
             
           </tbody>
@@ -1271,6 +2011,46 @@
               
               
               <tr>
+                <td>RotateAgentToken</td>
+                <td>POST</td>
+                <td>/v1/{name=agents/*}:rotateToken</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>RevokeAgentToken</td>
+                <td>POST</td>
+                <td>/v1/{name=agents/*}:revokeToken</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ForceDisconnectAgent</td>
+                <td>POST</td>
+                <td>/v1/{name=agents/*}:forceDisconnect</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListAgentSessions</td>
+                <td>GET</td>
+                <td>/v1/{name=agents/*}/sessions</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
                 <td>ConnectAgent</td>
                 <td>POST</td>
                 <td>/v1/agents:connect</td>
@@ -1284,6 +2064,26 @@
                 <td>AgentHeartbeat</td>
                 <td>POST</td>
                 <td>/v1/agents:heartbeat</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>AgentDisconnect</td>
+                <td>POST</td>
+                <td>/v1/agents:disconnect</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>RefreshAgentToken</td>
+                <td>POST</td>
+                <td>/v1/agents:refreshToken</td>
                 <td>*</td>
               </tr>
               

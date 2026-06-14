@@ -9,6 +9,8 @@
     - [AgentStatus](#laelia-store-AgentStatus)
   
     - [AgentStatus.ConnectionState](#laelia-store-AgentStatus-ConnectionState)
+    - [AgentTokenState](#laelia-store-AgentTokenState)
+    - [AgentTokenType](#laelia-store-AgentTokenType)
   
 - [store/common.proto](#store_common-proto)
     - [PageToken](#laelia-store-PageToken)
@@ -49,12 +51,14 @@
     - [RolePermissions](#laelia-store-RolePermissions)
   
 - [store/setting.proto](#store_setting-proto)
+    - [AgentSecuritySetting](#laelia-store-AgentSecuritySetting)
     - [EnvironmentSetting](#laelia-store-EnvironmentSetting)
     - [EnvironmentSetting.Environment](#laelia-store-EnvironmentSetting-Environment)
     - [EnvironmentSetting.Environment.TagsEntry](#laelia-store-EnvironmentSetting-Environment-TagsEntry)
     - [PasswordRestrictionSetting](#laelia-store-PasswordRestrictionSetting)
     - [WorkspaceProfileSetting](#laelia-store-WorkspaceProfileSetting)
   
+    - [IPValidationPolicy](#laelia-store-IPValidationPolicy)
     - [SettingName](#laelia-store-SettingName)
   
 - [store/user.proto](#store_user-proto)
@@ -122,6 +126,7 @@
 | last_heartbeat_at | [int64](#int64) |  |  |
 | connected_at | [int64](#int64) |  |  |
 | error_message | [string](#string) |  |  |
+| active_session_id | [string](#string) |  |  |
 
 
 
@@ -141,6 +146,35 @@
 | ONLINE | 1 |  |
 | OFFLINE | 2 |  |
 | ERROR | 3 |  |
+| KICKED | 4 |  |
+
+
+
+<a name="laelia-store-AgentTokenState"></a>
+
+### AgentTokenState
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| STATE_UNSPECIFIED | 0 |  |
+| ACTIVE | 1 |  |
+| CONSUMED | 2 |  |
+| REVOKED | 3 |  |
+
+
+
+<a name="laelia-store-AgentTokenType"></a>
+
+### AgentTokenType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TOKEN_TYPE_UNSPECIFIED | 0 |  |
+| BOOTSTRAP | 1 |  |
+| ACCESS | 2 |  |
+| REFRESH | 3 |  |
 
 
  
@@ -641,6 +675,29 @@ EnvironmentTierPolicy is the tier of an environment.
 
 
 
+<a name="laelia-store-AgentSecuritySetting"></a>
+
+### AgentSecuritySetting
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| heartbeat_interval_seconds | [int32](#int32) |  | Heartbeat interval in seconds. |
+| offline_threshold_seconds | [int32](#int32) |  | Offline threshold in seconds. |
+| bootstrap_token_duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Bootstrap token duration. |
+| access_token_duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Access token duration. |
+| refresh_token_duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | Refresh token duration. |
+| max_concurrent_sessions | [int32](#int32) |  | Max concurrent sessions per agent (default: 1). |
+| ip_validation_policy | [IPValidationPolicy](#laelia-store-IPValidationPolicy) |  | IP validation policy. |
+| heartbeat_rate_limit_per_minute | [int32](#int32) |  | Heartbeat rate limit per minute per agent. |
+| connect_rate_limit_per_minute | [int32](#int32) |  | Connect rate limit per minute per IP. |
+
+
+
+
+
+
 <a name="laelia-store-EnvironmentSetting"></a>
 
 ### EnvironmentSetting
@@ -664,8 +721,8 @@ EnvironmentTierPolicy is the tier of an environment.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| id | [string](#string) |  | The resource id of the environment. This value should be 4-63 characters, and valid characters are /[a-z][0-9]-/. |
-| title | [string](#string) |  | The display name of the environment. |
+| id | [string](#string) |  |  |
+| title | [string](#string) |  |  |
 | tags | [EnvironmentSetting.Environment.TagsEntry](#laelia-store-EnvironmentSetting-Environment-TagsEntry) | repeated |  |
 | color | [string](#string) |  |  |
 
@@ -736,6 +793,20 @@ EnvironmentTierPolicy is the tier of an environment.
  
 
 
+<a name="laelia-store-IPValidationPolicy"></a>
+
+### IPValidationPolicy
+IP validation policy for agent connections.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| IP_VALIDATION_POLICY_UNSPECIFIED | 0 |  |
+| IP_VALIDATION_OFF | 1 |  |
+| IP_VALIDATION_WARN | 2 |  |
+| IP_VALIDATION_STRICT | 3 |  |
+
+
+
 <a name="laelia-store-SettingName"></a>
 
 ### SettingName
@@ -752,6 +823,7 @@ EnvironmentTierPolicy is the tier of an environment.
 | WORKSPACE_EXTERNAL_APPROVAL | 6 |  |
 | PASSWORD_RESTRICTION | 7 |  |
 | ENVIRONMENT | 8 |  |
+| AGENT_SECURITY | 9 |  |
 
 
  
