@@ -44,6 +44,10 @@ var (
 		dataDir     string
 		ha          bool
 		saas        bool
+		// TLS flags
+		tlsCertDir string
+		tlsHost    string
+		tlsDomain  string
 		// output logs in json format
 		enableJSONLogging bool
 		// demo mode.
@@ -70,6 +74,9 @@ func Execute() error {
 func init() {
 	rootCmd.PersistentFlags().IntVar(&flags.port, "port", 8181, "port where server runs. Default to 8181")
 	rootCmd.PersistentFlags().BoolVar(&flags.debug, "debug", false, "whether to enable debug level logging")
+	rootCmd.PersistentFlags().StringVar(&flags.tlsCertDir, "tls-cert-dir", "", "TLS certificate directory (enables TLS with self-signed cert if empty)")
+	rootCmd.PersistentFlags().StringVar(&flags.tlsHost, "tls-host", "", "TLS server hostname (comma-separated for multiple hosts)")
+	rootCmd.PersistentFlags().StringVar(&flags.tlsDomain, "tls-domain", "", "TLS public domain (enables ACME/Let's Encrypt auto-cert)")
 }
 
 func start() {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -86,6 +87,7 @@ type Client struct {
 	serverNonce string
 	accessToken string
 	backoff     *ExponentialBackoff
+	insecure    bool
 }
 
 type ExponentialBackoff struct {
@@ -113,14 +115,26 @@ func (eb *ExponentialBackoff) Reset() {
 	eb.attempt = 0
 }
 
-func New(managerURL, token string) *Client {
+func New(managerURL, token string, insecure bool) *Client {
 	managerURL = strings.TrimRight(managerURL, "/")
 	tokenDir := filepath.Join(os.Getenv("HOME"), ".laelia")
+	httpClient := &http.Client{Timeout: defaultConnectTimeout}
+
+	if strings.HasPrefix(managerURL, "https://") {
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion:         tls.VersionTLS13,
+				InsecureSkipVerify: insecure,
+			},
+		}
+	}
+
 	return &Client{
 		managerURL: managerURL,
-		httpClient: &http.Client{Timeout: defaultConnectTimeout},
+		httpClient: httpClient,
 		credential: credential.New(filepath.Join(tokenDir, "agent-token"), token),
 		backoff:    NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
+		insecure:   insecure,
 	}
 }
 

@@ -28,6 +28,10 @@ type TLSConfig struct {
 }
 
 func InitTLS(cfg *TLSConfig) (*tls.Config, error) {
+	if cfg == nil {
+		return nil, nil
+	}
+
 	if cfg.Domain != "" {
 		return initAutoCert(cfg)
 	}
@@ -37,7 +41,7 @@ func InitTLS(cfg *TLSConfig) (*tls.Config, error) {
 		certDir = filepath.Join(cfg.DataDir, "certs")
 	}
 	if certDir == "" {
-		certDir = filepath.Join(".", "certs")
+		return nil, nil
 	}
 
 	cert, err := loadOrGenerateCert(certDir, cfg.Hosts)
@@ -253,6 +257,10 @@ func (v *ManagerVerifier) Verify(_ context.Context, _ string, rawCerts [][]byte)
 	}
 
 	return nil
+}
+
+func (v *ManagerVerifier) VerifyPeerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
+	return v.Verify(context.Background(), "", rawCerts)
 }
 
 func loadKnownHost(path string) (string, error) {

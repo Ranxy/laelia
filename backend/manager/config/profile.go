@@ -17,7 +17,9 @@ type Profile struct {
 	ExternalURL string
 
 	// TLS config
+	TLSDomain  string
 	TLSCertDir string
+	TLSDataDir string
 	TLSHosts   []string
 
 	// LastActiveTS is the service last active timestamp, any API calls will refresh this value.

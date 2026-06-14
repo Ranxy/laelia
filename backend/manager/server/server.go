@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"net"
@@ -12,6 +13,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/Ranxy/laelia/backend/common/log"
+	"github.com/Ranxy/laelia/backend/manager/api/auth"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -109,14 +111,28 @@ func (s *Server) Run(ctx context.Context, port int) error {
 		return err
 	}
 
-	protocols := new(http.Protocols)
-	protocols.SetHTTP1(true)
-	protocols.SetUnencryptedHTTP2(true)
-
 	s.httpServer = &http.Server{
-		Addr:      address,
-		Handler:   s.echoServer,
-		Protocols: protocols,
+		Addr:    address,
+		Handler: s.echoServer,
+	}
+
+	tlsCfg, err := auth.InitTLS(&auth.TLSConfig{
+		Domain:  s.profile.TLSDomain,
+		CertDir: s.profile.TLSCertDir,
+		Hosts:   s.profile.TLSHosts,
+		DataDir: s.profile.TLSDataDir,
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to initialize TLS")
+	}
+	if tlsCfg != nil {
+		s.httpServer.TLSConfig = tlsCfg
+		listener = tls.NewListener(listener, tlsCfg)
+	} else {
+		protocols := new(http.Protocols)
+		protocols.SetHTTP1(true)
+		protocols.SetUnencryptedHTTP2(true)
+		s.httpServer.Protocols = protocols
 	}
 
 	go func() {
