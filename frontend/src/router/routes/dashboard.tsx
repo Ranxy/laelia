@@ -21,6 +21,22 @@ export const dashboardRoutes: RouteObject[] = [
             Component: m.AgentsPage,
           })),
       },
+      {
+        path: "agents/:agentId/commands",
+        handle: { name: "command.list" },
+        lazy: () =>
+          import("@/react/pages/dashboard/command-list").then((m) => ({
+            Component: m.CommandListPage,
+          })),
+      },
+      {
+        path: "agents/:agentId/commands/:commandId",
+        handle: { name: "command.detail" },
+        lazy: () =>
+          import("@/react/pages/dashboard/command-detail").then((m) => ({
+            Component: m.CommandDetailPage,
+          })),
+      },
     ],
   },
 ];
