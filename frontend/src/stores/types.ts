@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
+import type { Command, CommandOutput } from "@/types/proto-es/v1/command_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";
 
 export interface AuthSlice {
@@ -30,6 +31,31 @@ export interface AgentSlice {
   deleteAgent: (name: string) => Promise<void>;
 }
 
-export type AppStoreState = AuthSlice & AgentSlice;
+export interface CommandSlice {
+  commands: Command[];
+  commandsLoading: boolean;
+  activeOutputs: Map<string, CommandOutput[]>;
+  watchingCommands: Set<string>;
+
+  sendCommand: (
+    agent: string,
+    command: string,
+    opts?: {
+      env?: Record<string, string>;
+      workingDir?: string;
+      timeoutSeconds?: number;
+    }
+  ) => Promise<Command>;
+  cancelCommand: (name: string) => Promise<Command>;
+  listCommands: (
+    agent: string,
+    params?: { pageSize?: number; pageToken?: string; status?: number }
+  ) => Promise<{ commands: Command[]; nextPageToken: string } | undefined>;
+  getCommand: (name: string) => Promise<Command | undefined>;
+  watchCommand: (name: string) => Promise<void>;
+  unwatchCommand: (name: string) => void;
+}
+
+export type AppStoreState = AuthSlice & AgentSlice & CommandSlice;
 
 export type AppSliceCreator<Slice> = StateCreator<AppStoreState, [], [], Slice>;
