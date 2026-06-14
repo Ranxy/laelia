@@ -502,7 +502,9 @@ func (s *AgentService) RefreshAgentToken(ctx context.Context, req *connect.Reque
 	switch storedToken.State {
 	case storepb.AgentTokenState_ACTIVE:
 	case storepb.AgentTokenState_CONSUMED:
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("refresh token already used, please use the new token"))
+		if err := s.store.UpdateAgentTokenState(ctx, storedToken.ID, storepb.AgentTokenState_REVOKED, nil); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to revoke consumed token, error: %v", err))
+		}
 	case storepb.AgentTokenState_REVOKED:
 		if err := s.store.RevokeTokenFamily(ctx, storedToken.TokenFamily); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to revoke token family, error: %v", err))
@@ -528,12 +530,13 @@ func (s *AgentService) RefreshAgentToken(ctx context.Context, req *connect.Reque
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent not found or deactivated"))
 	}
 
-	consumedAt := time.Now()
-	if err := s.store.UpdateAgentTokenState(ctx, storedToken.ID, storepb.AgentTokenState_CONSUMED, &consumedAt); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to mark refresh token as consumed, error: %v", err))
+	if storedToken.State == storepb.AgentTokenState_ACTIVE {
+		consumedAt := time.Now()
+		if err := s.store.UpdateAgentTokenState(ctx, storedToken.ID, storepb.AgentTokenState_CONSUMED, &consumedAt); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to mark refresh token as consumed, error: %v", err))
+		}
+		s.scheduleTokenRevoke(storedToken.ID, storedToken.TokenFamily)
 	}
-
-	s.scheduleTokenRevoke(storedToken.ID, storedToken.TokenFamily)
 
 	accessToken, err := auth.GenerateAgentTokenWithSession(agent.Name, agent.ResourceID, agent.TokenVersion, auth.TokenTypeAccess, "", s.profile.Mode, s.secret, accessTokenDuration)
 	if err != nil {
