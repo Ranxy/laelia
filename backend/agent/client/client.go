@@ -53,6 +53,7 @@ type Client struct {
 	serverNonce string
 	accessToken string
 	backoff     *ExponentialBackoff
+	cmdStream   *commandStream
 }
 
 type ExponentialBackoff struct {
@@ -235,6 +236,18 @@ func (c *Client) Run(ctx context.Context) error {
 	info := collectAgentInfo()
 	slog.Info("connecting to manager", "url", c.managerURL)
 
+	c.cmdStream = newCommandStream(c.httpClient, c.managerURL)
+	c.cmdStream.getToken = func() string {
+		c.mu.RLock()
+		defer c.mu.RUnlock()
+		return c.accessToken
+	}
+	c.cmdStream.getSessID = func() string {
+		c.mu.RLock()
+		defer c.mu.RUnlock()
+		return c.sessionID
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -254,6 +267,13 @@ func (c *Client) Run(ctx context.Context) error {
 			continue
 		}
 
+		cmdCtx, cmdCancel := context.WithCancel(ctx)
+		go func() {
+			if err := c.cmdStream.Start(cmdCtx); err != nil {
+				slog.Error("command stream stopped", "error", err)
+			}
+		}()
+
 		ticker := time.NewTicker(defaultHeartbeatInterval)
 
 	heartbeatLoop:
@@ -261,6 +281,7 @@ func (c *Client) Run(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
 				ticker.Stop()
+				cmdCancel()
 				disconnectCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				_ = c.Disconnect(disconnectCtx)
 				cancel()
@@ -272,6 +293,7 @@ func (c *Client) Run(ctx context.Context) error {
 					c.connState = StateDisconnected
 					c.mu.Unlock()
 					ticker.Stop()
+					cmdCancel()
 					break heartbeatLoop
 				}
 				slog.Debug("heartbeat sent")
