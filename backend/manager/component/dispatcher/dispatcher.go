@@ -25,6 +25,7 @@ type AgentSession struct {
 	agentResourceID string
 	currentCmdID    string
 	send            SendFunc
+	sendMu          sync.Mutex
 	lastPingAt      time.Time
 	connectedAt     time.Time
 	mu              sync.Mutex
@@ -45,7 +46,7 @@ func New(s *store.Store) *Dispatcher {
 		sessions:     make(map[int]*AgentSession),
 		watchers:     make(map[string]map[chan *v1pb.CommandOutput]struct{}),
 		pingInterval: 15 * time.Second,
-		pingTimeout:  5 * time.Second,
+		pingTimeout:  45 * time.Second, // allow 3 missed pings
 	}
 }
 
@@ -63,10 +64,15 @@ func (d *Dispatcher) RegisterAgent(_ context.Context, agentID int, agentResource
 	sess := &AgentSession{
 		agentID:         agentID,
 		agentResourceID: agentResourceID,
-		send:            send,
 		connectedAt:     time.Now(),
 		lastPingAt:      time.Now(),
 	}
+	sess.send = func(msg *v1pb.ManagerCommandMessage) error {
+		sess.sendMu.Lock()
+		defer sess.sendMu.Unlock()
+		return send(msg)
+	}
+
 	d.sessions[agentID] = sess
 
 	slog.Info("agent registered for command dispatch", "agentID", agentID)
@@ -341,18 +347,23 @@ func (d *Dispatcher) HandlePing(agentID int, _ *v1pb.Ping) {
 	}
 }
 
+// StartPingMonitor starts a goroutine that periodically checks agent liveness.
+// If an agent has not sent a Ping within pingTimeout, it is unregistered.
+// This goroutine does NOT send any messages on the bidi stream (to avoid
+// concurrent writes with the handler goroutine). Ping/Pong responses are
+// handled exclusively by the AgentCommandService handler.
 func (d *Dispatcher) StartPingMonitor() {
 	go func() {
 		ticker := time.NewTicker(d.pingInterval)
 		defer ticker.Stop()
 
 		for range ticker.C {
-			d.checkAndPingAllSessions()
+			d.checkSessionLiveness()
 		}
 	}()
 }
 
-func (d *Dispatcher) checkAndPingAllSessions() {
+func (d *Dispatcher) checkSessionLiveness() {
 	d.mu.RLock()
 	sessions := make([]*AgentSession, 0, len(d.sessions))
 	for _, sess := range d.sessions {
@@ -364,8 +375,8 @@ func (d *Dispatcher) checkAndPingAllSessions() {
 	for _, sess := range sessions {
 		sess.mu.Lock()
 		idle := now.Sub(sess.lastPingAt)
-		send := sess.send
 		agentID := sess.agentID
+		send := sess.send
 		sess.mu.Unlock()
 
 		if send == nil {
@@ -373,21 +384,10 @@ func (d *Dispatcher) checkAndPingAllSessions() {
 		}
 
 		if idle > d.pingTimeout {
-			slog.Warn("agent ping timeout, unregistering", "agentID", agentID)
-			d.UnregisterAgent(agentID)
-			continue
-		}
-
-		ping := &v1pb.ManagerCommandMessage{
-			Message: &v1pb.ManagerCommandMessage_Pong{
-				Pong: &v1pb.Pong{
-					Seq:        0,
-					ServerTime: now.UnixMilli(),
-				},
-			},
-		}
-		if err := send(ping); err != nil {
-			slog.Error("ping send failed", "agentID", agentID, "error", err)
+			slog.Warn("agent ping timeout, unregistering",
+				"agentID", agentID,
+				"idle", idle,
+				"timeout", d.pingTimeout)
 			d.UnregisterAgent(agentID)
 		}
 	}
