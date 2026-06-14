@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -30,25 +32,25 @@ const (
 	bootstrapTokenDuration       = 7 * 24 * time.Hour
 	refreshTokenReuseWindow      = 30 * time.Second
 	sessionIDLength              = 32
-	nonceLength                  = 24
 )
 
 type AgentService struct {
 	v1connect.UnimplementedAgentServiceHandler
-	store     *store.Store
-	secret    string
-	profile   *config.Profile
-	stateCfg  *state.State
-	nonceKeys map[string][]byte
+	store          *store.Store
+	secret         string
+	profile        *config.Profile
+	stateCfg       *state.State
+	consumedTimers map[int]*time.Timer
+	consumedMu     sync.Mutex
 }
 
 func NewAgentService(store *store.Store, secret string, profile *config.Profile, stateCfg *state.State) *AgentService {
 	return &AgentService{
-		store:     store,
-		secret:    secret,
-		profile:   profile,
-		stateCfg:  stateCfg,
-		nonceKeys: make(map[string][]byte),
+		store:          store,
+		secret:         secret,
+		profile:        profile,
+		stateCfg:       stateCfg,
+		consumedTimers: make(map[int]*time.Timer),
 	}
 }
 
@@ -303,8 +305,7 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 	}
 
 	sessionID := generateRandomString(sessionIDLength)
-	nonce, nonceKey := generateNonce(agent.ResourceID, sessionID)
-	s.nonceKeys[agent.ResourceID] = nonceKey
+	nonce := s.stateCfg.NonceManager.GenerateNonce(agent.ResourceID, sessionID)
 
 	now := time.Now()
 	nowSec := now.Unix()
@@ -330,12 +331,17 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to terminate existing sessions, error: %v", err))
 	}
 
+	sourceIP := ""
+	if ip, ok := common.GetSourceIPFromContext(ctx); ok {
+		sourceIP = ip
+	}
+
 	if err := s.store.CreateAgentSession(ctx, &store.AgentSessionMessage{
 		SessionID:    sessionID,
 		AgentID:      agent.ID,
 		TokenFamily:  agent.ResourceID,
 		State:        "ACTIVE",
-		SourceIP:     "",
+		SourceIP:     sourceIP,
 		Fingerprint:  req.Msg.Fingerprint,
 		AgentVersion: "",
 		ConnectedAt:  now,
@@ -343,12 +349,12 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to create agent session, error: %v", err))
 	}
 
-	accessToken, err := auth.GenerateAgentToken(updated.Name, updated.ResourceID, updated.TokenVersion, auth.TokenTypeAccess, s.profile.Mode, s.secret, accessTokenDuration)
+	accessToken, err := auth.GenerateAgentTokenWithSession(updated.Name, updated.ResourceID, updated.TokenVersion, auth.TokenTypeAccess, sessionID, s.profile.Mode, s.secret, accessTokenDuration)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate access token, error: %v", err))
 	}
 
-	refreshToken, err := auth.GenerateAgentToken(updated.Name, updated.ResourceID, updated.TokenVersion, auth.TokenTypeRefresh, s.profile.Mode, s.secret, refreshTokenDuration)
+	refreshToken, err := auth.GenerateAgentTokenWithSession(updated.Name, updated.ResourceID, updated.TokenVersion, auth.TokenTypeRefresh, "", s.profile.Mode, s.secret, refreshTokenDuration)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate refresh token, error: %v", err))
 	}
@@ -387,13 +393,25 @@ func (s *AgentService) AgentHeartbeat(ctx context.Context, req *connect.Request[
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get agent session, error: %v", err))
 		}
-		if session != nil && session.State == "KICKED" {
+		if session == nil {
+			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("session not found"))
+		}
+		if session.State == "KICKED" {
 			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("session has been replaced by a new connection"))
 		}
+
+		if !s.stateCfg.NonceManager.VerifyNonce(req.Msg.PreviousNonce, agent.ResourceID, req.Msg.SessionId) {
+			if req.Msg.PreviousNonce != "" {
+				return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid nonce"))
+			}
+		}
+
 		if err := s.store.TouchAgentSession(ctx, req.Msg.SessionId); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to touch agent session, error: %v", err))
 		}
 	}
+
+	nonce := s.stateCfg.NonceManager.GenerateNonce(agent.ResourceID, req.Msg.SessionId)
 
 	nowSec := time.Now().Unix()
 	activeSessionID := agent.Status.GetActiveSessionId()
@@ -410,7 +428,13 @@ func (s *AgentService) AgentHeartbeat(ctx context.Context, req *connect.Request[
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent heartbeat, error: %v", err))
 	}
 
-	nonce, _ := generateNonce(agent.ResourceID, req.Msg.SessionId)
+	if s.stateCfg.HeartbeatBuffer != nil {
+		s.stateCfg.HeartbeatBuffer.Record(&state.HeartbeatUpdate{
+			AgentID:         agent.ID,
+			LastHeartbeatAt: nowSec,
+			SessionID:       req.Msg.SessionId,
+		})
+	}
 
 	resp := &v1pb.AgentHeartbeatResponse{
 		NextNonce:       nonce,
@@ -437,6 +461,8 @@ func (s *AgentService) AgentDisconnect(ctx context.Context, req *connect.Request
 		}
 	}
 
+	s.stateCfg.NonceManager.DeleteKey(agent.ResourceID)
+
 	patch := &store.UpdateAgentMessage{
 		Status: &storepb.AgentStatus{
 			State:           storepb.AgentStatus_OFFLINE,
@@ -447,7 +473,6 @@ func (s *AgentService) AgentDisconnect(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent status, error: %v", err))
 	}
 
-	delete(s.nonceKeys, agent.ResourceID)
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
@@ -468,7 +493,6 @@ func (s *AgentService) RefreshAgentToken(ctx context.Context, req *connect.Reque
 
 	switch storedToken.State {
 	case storepb.AgentTokenState_ACTIVE:
-		// valid, continue
 	case storepb.AgentTokenState_CONSUMED:
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("refresh token already used, please use the new token"))
 	case storepb.AgentTokenState_REVOKED:
@@ -484,6 +508,10 @@ func (s *AgentService) RefreshAgentToken(ctx context.Context, req *connect.Reque
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("refresh token expired"))
 	}
 
+	if req.Msg.Fingerprint != "" && storedToken.Fingerprint != "" && req.Msg.Fingerprint != storedToken.Fingerprint {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("fingerprint mismatch, possible token theft detected"))
+	}
+
 	agent, err := s.store.GetAgent(ctx, storedToken.AgentID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get agent, error: %v", err))
@@ -497,12 +525,14 @@ func (s *AgentService) RefreshAgentToken(ctx context.Context, req *connect.Reque
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to mark refresh token as consumed, error: %v", err))
 	}
 
-	accessToken, err := auth.GenerateAgentToken(agent.Name, agent.ResourceID, agent.TokenVersion, auth.TokenTypeAccess, s.profile.Mode, s.secret, accessTokenDuration)
+	s.scheduleTokenRevoke(storedToken.ID, storedToken.TokenFamily)
+
+	accessToken, err := auth.GenerateAgentTokenWithSession(agent.Name, agent.ResourceID, agent.TokenVersion, auth.TokenTypeAccess, "", s.profile.Mode, s.secret, accessTokenDuration)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate access token, error: %v", err))
 	}
 
-	newRefreshToken, err := auth.GenerateAgentToken(agent.Name, agent.ResourceID, agent.TokenVersion, auth.TokenTypeRefresh, s.profile.Mode, s.secret, refreshTokenDuration)
+	newRefreshToken, err := auth.GenerateAgentTokenWithSession(agent.Name, agent.ResourceID, agent.TokenVersion, auth.TokenTypeRefresh, "", s.profile.Mode, s.secret, refreshTokenDuration)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate refresh token, error: %v", err))
 	}
@@ -525,6 +555,20 @@ func (s *AgentService) RefreshAgentToken(ctx context.Context, req *connect.Reque
 		RefreshToken:         newRefreshToken,
 		AccessTokenExpiresAt: timestamppb.New(time.Now().Add(accessTokenDuration)),
 	}), nil
+}
+
+func (s *AgentService) scheduleTokenRevoke(tokenID int, _ string) {
+	timer := time.AfterFunc(refreshTokenReuseWindow, func() {
+		if err := s.store.UpdateAgentTokenState(context.Background(), tokenID, storepb.AgentTokenState_REVOKED, nil); err != nil {
+			slog.Error("failed to revoke consumed token", "token_id", tokenID, "error", err)
+		}
+		s.consumedMu.Lock()
+		delete(s.consumedTimers, tokenID)
+		s.consumedMu.Unlock()
+	})
+	s.consumedMu.Lock()
+	s.consumedTimers[tokenID] = timer
+	s.consumedMu.Unlock()
 }
 
 func (*AgentService) Hello(_ context.Context, _ *connect.Request[v1pb.HelloRequest]) (*connect.Response[v1pb.HelloResponse], error) {
@@ -681,11 +725,4 @@ func generateRandomString(length int) string {
 		return fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(b)[:length]
-}
-
-func generateNonce(_ string, _ string) (string, []byte) {
-	nonceBytes := make([]byte, nonceLength)
-	_, _ = rand.Read(nonceBytes)
-	nonce := hex.EncodeToString(nonceBytes)
-	return nonce, []byte(nonce)
 }

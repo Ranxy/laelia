@@ -106,6 +106,13 @@ func (s *Store) TouchAgentSession(ctx context.Context, sessionID string) error {
 	return err
 }
 
+func (s *Store) TouchAgentSessionForHeartbeat(ctx context.Context, agentID int, lastHeartbeatAt int64) error {
+	_, err := s.GetDB().ExecContext(ctx, `
+		UPDATE agent_session SET last_heartbeat_at = to_timestamp($2) WHERE agent_id = $1 AND state = 'ACTIVE'
+	`, agentID, lastHeartbeatAt)
+	return err
+}
+
 func (s *Store) TerminateAgentSession(ctx context.Context, sessionID string, reason string) error {
 	_, err := s.GetDB().ExecContext(ctx, `
 		UPDATE agent_session SET

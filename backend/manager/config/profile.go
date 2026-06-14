@@ -16,6 +16,10 @@ type Profile struct {
 
 	ExternalURL string
 
+	// TLS config
+	TLSCertDir string
+	TLSHosts   []string
+
 	// LastActiveTS is the service last active timestamp, any API calls will refresh this value.
 	LastActiveTS atomic.Int64
 	// can be set in runtime

@@ -79,6 +79,9 @@ type authResult struct {
 // WrapUnary implements the ConnectRPC interceptor interface for unary RPCs.
 func (in *APIAuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+		sourceIP := extractSourceIP(req.Header(), false)
+		ctx = context.WithValue(ctx, common.SourceIPContextKey, sourceIP)
+
 		accessTokenStr, err := GetTokenFromHeaders(req.Header())
 		if err != nil {
 			return nil, connect.NewError(connect.CodeUnauthenticated, err)
@@ -118,6 +121,9 @@ func (*APIAuthInterceptor) WrapStreamingClient(next connect.StreamingClientFunc)
 // WrapStreamingHandler implements the ConnectRPC interceptor interface for streaming handlers.
 func (in *APIAuthInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		sourceIP := extractSourceIP(conn.RequestHeader(), false)
+		ctx = context.WithValue(ctx, common.SourceIPContextKey, sourceIP)
+
 		accessTokenStr, err := GetTokenFromHeaders(conn.RequestHeader())
 		if err != nil {
 			return connect.NewError(connect.CodeUnauthenticated, err)
@@ -302,6 +308,19 @@ func audienceContains(audience jwt.ClaimStrings, token string) bool {
 	return false
 }
 
+func extractSourceIP(headers http.Header, trustProxy bool) string {
+	if trustProxy {
+		if xff := headers.Get("X-Forwarded-For"); xff != "" {
+			ips := strings.SplitN(xff, ",", 2)
+			return strings.TrimSpace(ips[0])
+		}
+		if xri := headers.Get("X-Real-IP"); xri != "" {
+			return strings.TrimSpace(xri)
+		}
+	}
+	return ""
+}
+
 type claimsMessage struct {
 	Name string `json:"name"`
 	jwt.RegisteredClaims
@@ -332,6 +351,12 @@ func GenerateAccessToken(userName string, userID int, mode common.ReleaseMode, s
 func GenerateAgentToken(agentName string, resourceID string, tokenVersion int, tokenType string, mode common.ReleaseMode, secret string, duration time.Duration) (string, error) {
 	expirationTime := time.Now().Add(duration)
 	return signAgentToken(agentName, resourceID, tokenVersion, tokenType, "", resourceID, fmt.Sprintf(AgentAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
+}
+
+// GenerateAgentTokenWithSession generates an agent token with session ID.
+func GenerateAgentTokenWithSession(agentName string, resourceID string, tokenVersion int, tokenType string, sessionID string, mode common.ReleaseMode, secret string, duration time.Duration) (string, error) {
+	expirationTime := time.Now().Add(duration)
+	return signAgentToken(agentName, resourceID, tokenVersion, tokenType, sessionID, resourceID, fmt.Sprintf(AgentAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
 }
 
 func signAgentToken(agentName string, resourceID string, tokenVersion int, tokenType string, sessionID string, tokenFamily string, aud string, expirationTime time.Time, secret []byte) (string, error) {

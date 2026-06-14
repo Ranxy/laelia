@@ -67,7 +67,7 @@ func NewServer(ctx context.Context, profile *config.Profile) (*Server, error) {
 	s.store = stores
 	s.runnerCtx, s.runnerCancel = context.WithCancel(ctx)
 
-	stateCfg, err := state.New()
+	stateCfg, err := state.NewWithStore(stores)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to initialize state")
 	}
@@ -126,6 +126,11 @@ func (s *Server) Run(ctx context.Context, port int) error {
 			}
 		}
 	}()
+
+	if s.stateCfg.HeartbeatBuffer != nil {
+		go s.stateCfg.HeartbeatBuffer.Start(s.runnerCtx)
+	}
+
 	return nil
 }
 
@@ -144,11 +149,14 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.cancel()
 	}
 
+	// Stop heartbeat buffer
+	if s.stateCfg.HeartbeatBuffer != nil {
+		s.stateCfg.HeartbeatBuffer.Stop()
+	}
+
 	// Shutdown echo
 	if s.httpServer != nil {
-		if err := s.httpServer.Shutdown(ctx); err != nil {
-			// log.Fatal("failed to shutdown server", "error", err)
-		}
+		_ = s.httpServer.Shutdown(ctx)
 	}
 
 	s.runnerWG.Wait()

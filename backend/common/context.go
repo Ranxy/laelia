@@ -12,6 +12,7 @@ const (
 	ServiceDataKey
 	AgentContextKey
 	SessionContextKey
+	SourceIPContextKey
 )
 
 type AuthMethod int
@@ -68,4 +69,9 @@ func (c *AuthContext) GetProjectResources() []string {
 func GetSessionIDFromContext(ctx context.Context) (string, bool) {
 	sessionID, ok := ctx.Value(SessionContextKey).(string)
 	return sessionID, ok
+}
+
+func GetSourceIPFromContext(ctx context.Context) (string, bool) {
+	ip, ok := ctx.Value(SourceIPContextKey).(string)
+	return ip, ok
 }
