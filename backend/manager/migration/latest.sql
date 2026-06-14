@@ -193,3 +193,42 @@ CREATE INDEX idx_audit_log_method ON audit_log(method);
 CREATE INDEX idx_audit_log_actor ON audit_log(actor_type, actor_id);
 CREATE INDEX idx_audit_log_created_at ON audit_log(created_at);
 
+-- Command execution records
+CREATE TABLE command (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_id INTEGER NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
+    principal_id INTEGER NOT NULL REFERENCES principal(id),
+    command TEXT NOT NULL,
+    -- status: 1=PENDING, 2=RUNNING, 3=COMPLETED, 4=FAILED, 5=CANCELLED, 6=TIMEOUT
+    status SMALLINT NOT NULL DEFAULT 1,
+    exit_code INTEGER,
+    duration_ms BIGINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    -- Stored as CommandResult proto
+    result_json JSONB NOT NULL DEFAULT '{}',
+    env JSONB NOT NULL DEFAULT '{}',
+    working_dir TEXT NOT NULL DEFAULT '',
+    timeout_seconds INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT NOT NULL DEFAULT '',
+    last_ack_seq INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_command_agent_status ON command(agent_id, status);
+CREATE INDEX idx_command_created_at ON command(created_at DESC);
+CREATE INDEX idx_command_agent_pending ON command(agent_id, created_at) WHERE status = 1;
+
+-- Real-time output chunks (streaming progress)
+CREATE TABLE command_output (
+    id BIGSERIAL PRIMARY KEY,
+    command_id UUID NOT NULL REFERENCES command(id) ON DELETE CASCADE,
+    seq_no INTEGER NOT NULL,
+    -- stream_type: 1=stdout, 2=stderr, 3=system
+    stream_type SMALLINT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX idx_command_output_seq ON command_output(command_id, seq_no);
+
