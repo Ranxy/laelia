@@ -60,9 +60,10 @@ type ConnectResponse struct {
 }
 
 type HeartbeatResponse struct {
-	NextNonce       string `json:"next_nonce"`
-	NextHeartbeatAt int64  `json:"next_heartbeat_at"`
-	AccessToken     string `json:"access_token,omitempty"`
+	NextNonce            string `json:"next_nonce"`
+	NextHeartbeatAt      int64  `json:"next_heartbeat_at"`
+	AccessToken          string `json:"access_token,omitempty"`
+	AccessTokenExpiresAt int64  `json:"access_token_expires_at,omitempty"`
 }
 
 type RefreshResponse struct {

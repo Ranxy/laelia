@@ -72,8 +72,9 @@ func New(
 }
 
 type authResult struct {
-	user  *store.UserMessage
-	agent *store.AgentMessage
+	user                 *store.UserMessage
+	agent                *store.AgentMessage
+	accessTokenExpiresAt int64
 }
 
 // WrapUnary implements the ConnectRPC interceptor interface for unary RPCs.
@@ -106,6 +107,9 @@ func (in *APIAuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFun
 		}
 		if result.agent != nil {
 			ctx = context.WithValue(ctx, common.AgentContextKey, result.agent)
+		}
+		if result.accessTokenExpiresAt > 0 {
+			ctx = context.WithValue(ctx, common.AccessTokenExpiresAtContextKey, result.accessTokenExpiresAt)
 		}
 		return next(ctx, req)
 	}
@@ -149,6 +153,9 @@ func (in *APIAuthInterceptor) WrapStreamingHandler(next connect.StreamingHandler
 		if result.agent != nil {
 			ctx = context.WithValue(ctx, common.AgentContextKey, result.agent)
 		}
+		if result.accessTokenExpiresAt > 0 {
+			ctx = context.WithValue(ctx, common.AccessTokenExpiresAtContextKey, result.accessTokenExpiresAt)
+		}
 
 		return next(ctx, conn)
 	}
@@ -186,7 +193,7 @@ func (in *APIAuthInterceptor) getUserOrAgentConnect(ctx context.Context, accessT
 			if err != nil {
 				return nil, err
 			}
-			return &authResult{agent: agent}, nil
+			return &authResult{agent: agent, accessTokenExpiresAt: agentClaims.ExpiresAt.Unix()}, nil
 		}
 	}
 
@@ -196,7 +203,7 @@ func (in *APIAuthInterceptor) getUserOrAgentConnect(ctx context.Context, accessT
 			if err != nil {
 				return nil, err
 			}
-			return &authResult{user: user}, nil
+			return &authResult{user: user, accessTokenExpiresAt: userClaims.ExpiresAt.Unix()}, nil
 		}
 	}
 

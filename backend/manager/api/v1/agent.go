@@ -449,6 +449,18 @@ func (s *AgentService) AgentHeartbeat(ctx context.Context, req *connect.Request[
 		NextHeartbeatAt: timestamppb.New(time.Now().Add(30 * time.Second)),
 	}
 
+	if expiresAt, ok := common.GetAccessTokenExpiresAtFromContext(ctx); ok && expiresAt > 0 {
+		if time.Now().Unix() >= expiresAt-int64(accessTokenDuration.Seconds()/3) {
+			newAccessToken, err := auth.GenerateAgentTokenWithSession(agent.Name, agent.ResourceID, agent.TokenVersion, auth.TokenTypeAccess, req.Msg.SessionId, s.profile.Mode, s.secret, accessTokenDuration)
+			if err != nil {
+				slog.Warn("failed to generate new access token during heartbeat", "error", err)
+			} else {
+				resp.AccessToken = newAccessToken
+				resp.AccessTokenExpiresAt = timestamppb.New(time.Now().Add(accessTokenDuration))
+			}
+		}
+	}
+
 	return connect.NewResponse(resp), nil
 }
 

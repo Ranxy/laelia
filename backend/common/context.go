@@ -13,6 +13,7 @@ const (
 	AgentContextKey
 	SessionContextKey
 	SourceIPContextKey
+	AccessTokenExpiresAtContextKey
 )
 
 type AuthMethod int
@@ -74,4 +75,9 @@ func GetSessionIDFromContext(ctx context.Context) (string, bool) {
 func GetSourceIPFromContext(ctx context.Context) (string, bool) {
 	ip, ok := ctx.Value(SourceIPContextKey).(string)
 	return ip, ok
+}
+
+func GetAccessTokenExpiresAtFromContext(ctx context.Context) (int64, bool) {
+	exp, ok := ctx.Value(AccessTokenExpiresAtContextKey).(int64)
+	return exp, ok
 }
