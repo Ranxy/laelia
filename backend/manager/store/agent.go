@@ -37,12 +37,13 @@ type FindAgentMessage struct {
 }
 
 type UpdateAgentMessage struct {
-	ResourceID   *string
-	Name         *string
-	Info         *models.AgentInfo
-	Status       *models.AgentStatus
-	TokenVersion *int
-	Delete       *bool
+	ResourceID         *string
+	Name               *string
+	Info               *models.AgentInfo
+	Status             *models.AgentStatus
+	TokenVersion       *int
+	LastTokenRotatedAt *time.Time
+	Delete             *bool
 }
 
 func (s *Store) GetAgent(ctx context.Context, id int) (*AgentMessage, error) {
@@ -282,6 +283,9 @@ func (s *Store) UpdateAgent(ctx context.Context, current *AgentMessage, patch *U
 	}
 	if v := patch.TokenVersion; v != nil {
 		sets, args = append(sets, fmt.Sprintf("token_version = $%d", len(args)+1)), append(args, *v)
+	}
+	if v := patch.LastTokenRotatedAt; v != nil {
+		sets, args = append(sets, fmt.Sprintf("last_token_rotated_at = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := patch.Delete; v != nil {
 		sets, args = append(sets, fmt.Sprintf("deleted = $%d", len(args)+1)), append(args, *v)

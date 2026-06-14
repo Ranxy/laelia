@@ -181,8 +181,10 @@ func (s *AgentService) RotateAgentToken(ctx context.Context, req *connect.Reques
 	}
 
 	newTokenVersion := agent.TokenVersion + 1
+	nowRotated := time.Now()
 	if _, err := s.store.UpdateAgent(ctx, agent, &store.UpdateAgentMessage{
-		TokenVersion: &newTokenVersion,
+		TokenVersion:       &newTokenVersion,
+		LastTokenRotatedAt: &nowRotated,
 	}); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent token version, error: %v", err))
 	}
@@ -224,8 +226,10 @@ func (s *AgentService) RevokeAgentToken(ctx context.Context, req *connect.Reques
 	}
 
 	newTokenVersion := agent.TokenVersion + 1
+	nowRotated := time.Now()
 	if _, err := s.store.UpdateAgent(ctx, agent, &store.UpdateAgentMessage{
-		TokenVersion: &newTokenVersion,
+		TokenVersion:       &newTokenVersion,
+		LastTokenRotatedAt: &nowRotated,
 	}); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent token version, error: %v", err))
 	}
