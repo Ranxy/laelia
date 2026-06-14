@@ -23,6 +23,7 @@ func configureEchoRouters(
 	profile *config.Profile,
 ) {
 	e.Use(recoverMiddleware)
+	e.Use(securityHeadersMiddleware())
 
 	if profile.Mode == common.ReleaseModeDev {
 		e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
@@ -99,7 +100,6 @@ func recoverMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 				}
 				slog.Error("Middleware PANIC RECOVER", log.WithError(err), log.Stack("panic-stack"))
 
-				// In Echo v5, send error response directly
 				resp, unwrapErr := echo.UnwrapResponse(c.Response())
 				if unwrapErr == nil && !resp.Committed {
 					_ = c.JSON(http.StatusInternalServerError, map[string]string{
@@ -109,5 +109,19 @@ func recoverMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 		}()
 		return next(c)
+	}
+}
+
+func securityHeadersMiddleware() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c *echo.Context) error {
+			h := c.Response().Header()
+			h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			h.Set("X-Content-Type-Options", "nosniff")
+			h.Set("X-Frame-Options", "DENY")
+			h.Set("X-XSS-Protection", "1; mode=block")
+			h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			return next(c)
+		}
 	}
 }

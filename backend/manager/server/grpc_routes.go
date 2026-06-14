@@ -23,6 +23,7 @@ import (
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
 	apiv1 "github.com/Ranxy/laelia/backend/manager/api/v1"
+	"github.com/Ranxy/laelia/backend/manager/component/ratelimit"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -79,6 +80,11 @@ func configureGrpcRouters(
 	authService := apiv1.NewAuthService(stores, secret, profile, stateCfg)
 	agentService := apiv1.NewAgentService(stores, secret, profile, stateCfg)
 
+	rateLimiter, err := ratelimit.New(ratelimit.DefaultConfig())
+	if err != nil {
+		return errors.Wrapf(err, "failed to create rate limiter")
+	}
+
 	onPanic := func(_ context.Context, s connect.Spec, _ http.Header, p any) error {
 		stack := stacktrace.TakeStacktrace(20 /* n */, 5 /* skip */)
 		// keep a multiline stack
@@ -89,9 +95,8 @@ func configureGrpcRouters(
 	handlerOpts := connect.WithHandlerOptions(
 		connect.WithInterceptors(
 			apiv1.NewDebugInterceptor(),
+			rateLimiter,
 			auth.New(stores, secret, stateCfg, profile),
-			// apiv1.NewAuditInterceptor(stores),
-			// apiv1.NewACLInterceptor(stores, secret, iamManager, profile),
 		),
 		connect.WithRecover(onPanic),
 	)
