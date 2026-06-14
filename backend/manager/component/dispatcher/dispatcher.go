@@ -1,0 +1,441 @@
+package dispatcher
+
+import (
+	"context"
+	"log/slog"
+	"sync"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
+
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
+	"github.com/Ranxy/laelia/backend/manager/store"
+)
+
+const (
+	gracePeriod    = 60 * time.Second
+	watcherBufSize = 256
+)
+
+type SendFunc func(*v1pb.ManagerCommandMessage) error
+
+type AgentSession struct {
+	agentID         int
+	agentResourceID string
+	currentCmdID    string
+	send            SendFunc
+	lastPingAt      time.Time
+	connectedAt     time.Time
+	mu              sync.Mutex
+}
+
+type Dispatcher struct {
+	store        *store.Store
+	mu           sync.RWMutex
+	sessions     map[int]*AgentSession
+	watchers     map[string]map[chan *v1pb.CommandOutput]struct{}
+	pingInterval time.Duration
+	pingTimeout  time.Duration
+}
+
+func New(s *store.Store) *Dispatcher {
+	return &Dispatcher{
+		store:        s,
+		sessions:     make(map[int]*AgentSession),
+		watchers:     make(map[string]map[chan *v1pb.CommandOutput]struct{}),
+		pingInterval: 15 * time.Second,
+		pingTimeout:  5 * time.Second,
+	}
+}
+
+func (d *Dispatcher) RegisterAgent(ctx context.Context, agentID int, agentResourceID string, send SendFunc) *AgentSession {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if old, ok := d.sessions[agentID]; ok {
+		slog.Info("replacing existing agent session", "agentID", agentID)
+		old.mu.Lock()
+		old.send = nil // invalidate old session's send function
+		old.mu.Unlock()
+	}
+
+	sess := &AgentSession{
+		agentID:         agentID,
+		agentResourceID: agentResourceID,
+		send:            send,
+		connectedAt:     time.Now(),
+		lastPingAt:      time.Now(),
+	}
+	d.sessions[agentID] = sess
+
+	slog.Info("agent registered for command dispatch", "agentID", agentID)
+	return sess
+}
+
+func (d *Dispatcher) UnregisterAgent(agentID int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	sess, ok := d.sessions[agentID]
+	if !ok {
+		return
+	}
+
+	sess.mu.Lock()
+	cmdID := sess.currentCmdID
+	sess.send = nil
+	sess.mu.Unlock()
+
+	delete(d.sessions, agentID)
+	slog.Info("agent unregistered from command dispatch", "agentID", agentID)
+
+	if cmdID != "" {
+		go d.handleCommandGracePeriod(agentID, cmdID)
+	}
+}
+
+func (d *Dispatcher) IsAgentConnected(agentID int) bool {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	_, ok := d.sessions[agentID]
+	return ok
+}
+
+func (d *Dispatcher) DispatchCommand(ctx context.Context, cmd *store.CommandMessage) error {
+	d.mu.RLock()
+	sess, ok := d.sessions[cmd.AgentID]
+	d.mu.RUnlock()
+
+	if !ok {
+		return errors.New("agent not connected")
+	}
+
+	sess.mu.Lock()
+	if sess.currentCmdID != "" {
+		sess.mu.Unlock()
+		return nil // agent is busy, command stays PENDING in DB
+	}
+	if sess.send == nil {
+		sess.mu.Unlock()
+		return errors.New("agent session invalidated")
+	}
+	send := sess.send
+	sess.mu.Unlock()
+
+	msg := &v1pb.ManagerCommandMessage{
+		Message: &v1pb.ManagerCommandMessage_CommandRequest{
+			CommandRequest: &v1pb.CommandRequest{
+				CommandId:      cmd.ID.String(),
+				Command:        cmd.Command,
+				Env:            parseEnvJSON(cmd.Env),
+				WorkingDir:     cmd.WorkingDir,
+				TimeoutSeconds: cmd.TimeoutSeconds,
+			},
+		},
+	}
+
+	if err := send(msg); err != nil {
+		d.UnregisterAgent(cmd.AgentID)
+		return errors.Wrapf(err, "failed to send command to agent")
+	}
+
+	sess.mu.Lock()
+	sess.currentCmdID = cmd.ID.String()
+	sess.mu.Unlock()
+
+	now := time.Now()
+	if err := d.store.UpdateCommandStatus(ctx, cmd.ID, 2, &now, nil, nil, nil, ""); err != nil {
+		slog.Error("failed to update command status to RUNNING", "commandID", cmd.ID, "error", err)
+	}
+
+	slog.Info("command dispatched to agent", "commandID", cmd.ID, "agentID", cmd.AgentID)
+	return nil
+}
+
+func (d *Dispatcher) CancelCommand(_ context.Context, agentID int, commandID string) error {
+	d.mu.RLock()
+	sess, ok := d.sessions[agentID]
+	d.mu.RUnlock()
+
+	if !ok {
+		return errors.New("agent not connected")
+	}
+
+	sess.mu.Lock()
+	send := sess.send
+	sess.mu.Unlock()
+
+	if send == nil {
+		return errors.New("agent session invalidated")
+	}
+
+	msg := &v1pb.ManagerCommandMessage{
+		Message: &v1pb.ManagerCommandMessage_Cancel{
+			Cancel: &v1pb.CancelMessage{
+				CommandId: commandID,
+			},
+		},
+	}
+
+	if err := send(msg); err != nil {
+		slog.Error("failed to send cancel to agent", "error", err)
+		return errors.Wrapf(err, "failed to send cancel to agent")
+	}
+
+	slog.Info("cancel sent to agent", "commandID", commandID, "agentID", agentID)
+	return nil
+}
+
+func (d *Dispatcher) Subscribe(_ context.Context, commandID string) (<-chan *v1pb.CommandOutput, error) {
+	ch := make(chan *v1pb.CommandOutput, watcherBufSize)
+
+	d.mu.Lock()
+	if d.watchers[commandID] == nil {
+		d.watchers[commandID] = make(map[chan *v1pb.CommandOutput]struct{})
+	}
+	d.watchers[commandID][ch] = struct{}{}
+	d.mu.Unlock()
+
+	return ch, nil
+}
+
+func (d *Dispatcher) Unsubscribe(commandID string, ch chan *v1pb.CommandOutput) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if watchers, ok := d.watchers[commandID]; ok {
+		delete(watchers, ch)
+		if len(watchers) == 0 {
+			delete(d.watchers, commandID)
+		}
+	}
+	close(ch)
+}
+
+func (d *Dispatcher) broadcast(commandID string, output *v1pb.CommandOutput) {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	for ch := range d.watchers[commandID] {
+		select {
+		case ch <- output:
+		default:
+			// watcher too slow, drop
+		}
+	}
+}
+
+func (d *Dispatcher) HandleProgress(ctx context.Context, _ int, progress *v1pb.CommandProgress) error {
+	if err := d.store.AppendCommandOutput(ctx, uuid.MustParse(progress.CommandId), progress.SeqNo, int32(progress.Type), progress.Content); err != nil {
+		return errors.Wrapf(err, "failed to store command output")
+	}
+
+	output := &v1pb.CommandOutput{
+		CommandId: progress.CommandId,
+		Type:      progress.Type,
+		Content:   progress.Content,
+		SeqNo:     progress.SeqNo,
+	}
+
+	d.broadcast(progress.CommandId, output)
+	return nil
+}
+
+func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb.CommandResult) error {
+	cmdID, err := uuid.Parse(result.CommandId)
+	if err != nil {
+		return errors.Wrapf(err, "invalid command ID in result")
+	}
+
+	d.mu.RLock()
+	sess, ok := d.sessions[agentID]
+	d.mu.RUnlock()
+
+	if ok {
+		sess.mu.Lock()
+		if sess.currentCmdID == result.CommandId {
+			sess.currentCmdID = ""
+		}
+		sess.mu.Unlock()
+	}
+
+	status := int32(v1pb.CommandStatus_COMPLETED)
+	errorMsg := result.ErrorMessage
+	if result.ExitCode != 0 {
+		status = int32(v1pb.CommandStatus_FAILED)
+	}
+
+	now := time.Now()
+	completedAt := &now
+	durationMs := result.DurationMs
+	exitCode := result.ExitCode
+
+	if err := d.store.UpdateCommandStatus(ctx, cmdID, status, nil, completedAt, &exitCode, &durationMs, errorMsg); err != nil {
+		return errors.Wrapf(err, "failed to update command result")
+	}
+
+	if err := d.store.UpdateCommandAckSeq(ctx, cmdID, result.LastSeqNo); err != nil {
+		slog.Error("failed to update ack seq", "commandID", cmdID, "error", err)
+	}
+
+	output := &v1pb.CommandOutput{
+		CommandId: result.CommandId,
+		Type:      v1pb.CommandOutput_SYSTEM,
+		Content:   formatResultMessage(result),
+		SeqNo:     result.LastSeqNo + 1,
+	}
+	d.broadcast(result.CommandId, output)
+
+	// close watchers after a short delay so they can consume the final message
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		d.closeWatchers(result.CommandId)
+	}()
+
+	slog.Info("command completed", "commandID", result.CommandId, "exitCode", result.ExitCode, "duration_ms", result.DurationMs)
+
+	// dispatch next pending command if available
+	d.TryDispatchNext(ctx, agentID)
+	return nil
+}
+
+func (d *Dispatcher) TryDispatchNext(ctx context.Context, agentID int) {
+	d.mu.RLock()
+	sess, ok := d.sessions[agentID]
+	d.mu.RUnlock()
+	if !ok {
+		return
+	}
+
+	sess.mu.Lock()
+	busy := sess.currentCmdID != ""
+	sess.mu.Unlock()
+	if busy {
+		return
+	}
+
+	cmd, err := d.store.GetNextPendingCommand(ctx, agentID)
+	if err != nil {
+		slog.Error("failed to get next pending command", "agentID", agentID, "error", err)
+		return
+	}
+	if cmd == nil {
+		return
+	}
+
+	if err := d.DispatchCommand(ctx, cmd); err != nil {
+		slog.Error("failed to dispatch next command", "commandID", cmd.ID, "error", err)
+	}
+}
+
+func (d *Dispatcher) HandlePong(agentID int, _ *v1pb.Pong) {
+	d.mu.RLock()
+	sess, ok := d.sessions[agentID]
+	d.mu.RUnlock()
+
+	if ok {
+		sess.mu.Lock()
+		sess.lastPingAt = time.Now()
+		sess.mu.Unlock()
+	}
+}
+
+func (d *Dispatcher) StartPingMonitor() {
+	go func() {
+		ticker := time.NewTicker(d.pingInterval)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			d.checkAndPingAllSessions()
+		}
+	}()
+}
+
+func (d *Dispatcher) checkAndPingAllSessions() {
+	d.mu.RLock()
+	sessions := make([]*AgentSession, 0, len(d.sessions))
+	for _, sess := range d.sessions {
+		sessions = append(sessions, sess)
+	}
+	d.mu.RUnlock()
+
+	now := time.Now()
+	for _, sess := range sessions {
+		sess.mu.Lock()
+		idle := now.Sub(sess.lastPingAt)
+		send := sess.send
+		agentID := sess.agentID
+		sess.mu.Unlock()
+
+		if send == nil {
+			continue
+		}
+
+		if idle > d.pingTimeout {
+			slog.Warn("agent ping timeout, unregistering", "agentID", agentID)
+			d.UnregisterAgent(agentID)
+			continue
+		}
+
+		ping := &v1pb.ManagerCommandMessage{
+			Message: &v1pb.ManagerCommandMessage_Pong{
+				Pong: &v1pb.Pong{
+					Seq:        0,
+					ServerTime: now.UnixMilli(),
+				},
+			},
+		}
+		if err := send(ping); err != nil {
+			slog.Error("ping send failed", "agentID", agentID, "error", err)
+			d.UnregisterAgent(agentID)
+		}
+	}
+}
+
+func (d *Dispatcher) handleCommandGracePeriod(agentID int, commandID string) {
+	cmdUUID, err := uuid.Parse(commandID)
+	if err != nil {
+		return
+	}
+
+	time.Sleep(gracePeriod)
+
+	d.mu.RLock()
+	_, reconnected := d.sessions[agentID]
+	d.mu.RUnlock()
+
+	if reconnected {
+		return
+	}
+
+	status := int32(v1pb.CommandStatus_FAILED)
+	now := time.Now()
+	if err := d.store.UpdateCommandStatus(context.Background(), cmdUUID, status, nil, &now, nil, nil, "agent disconnected during execution"); err != nil {
+		slog.Error("failed to mark command as failed after grace period", "commandID", commandID, "error", err)
+	}
+
+	d.closeWatchers(commandID)
+	slog.Warn("command marked as FAILED after grace period", "commandID", commandID, "agentID", agentID)
+}
+
+func (d *Dispatcher) closeWatchers(commandID string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	for ch := range d.watchers[commandID] {
+		close(ch)
+	}
+	delete(d.watchers, commandID)
+}
+
+func parseEnvJSON(_ string) map[string]string {
+	return nil
+}
+
+func formatResultMessage(result *v1pb.CommandResult) string {
+	if result.ErrorMessage != "" {
+		return result.ErrorMessage
+	}
+	return ""
+}
