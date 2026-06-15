@@ -39,10 +39,10 @@ func (s *CommandService) SetACPEnabled(enabled bool) {
 func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v1pb.SendCommandRequest]) (*connect.Response[v1pb.Command], error) {
 	executorKind := req.Msg.ExecutorKind
 	if executorKind == v1pb.ExecutorKind_EXECUTOR_KIND_UNSPECIFIED {
-		executorKind = v1pb.ExecutorKind_SHELL
+		executorKind = v1pb.ExecutorKind_ACP
 	}
 	if executorKind == v1pb.ExecutorKind_ACP {
-		if req.Msg.Instruction == "" && req.Msg.Command == "" {
+		if req.Msg.Instruction == "" {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("instruction must not be empty for ACP tasks"))
 		}
 	}
@@ -50,7 +50,7 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 	commandText := req.Msg.Command
 	instruction := req.Msg.Instruction
 
-	if commandText == "" {
+	if executorKind == v1pb.ExecutorKind_SHELL && commandText == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("command must not be empty"))
 	}
 

@@ -369,7 +369,7 @@ func drainOutput(runtime executor.Runtime, stream *connect.BidiStreamForClient[v
 func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime, error) {
 	kind := req.ExecutorKind
 	if kind == v1pb.ExecutorKind_EXECUTOR_KIND_UNSPECIFIED {
-		kind = v1pb.ExecutorKind_SHELL
+		kind = v1pb.ExecutorKind_ACP
 	}
 
 	switch kind {
