@@ -9,10 +9,10 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
@@ -38,7 +38,6 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 		if req.Msg.Instruction == "" && req.Msg.Command == "" {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("instruction must not be empty for ACP tasks"))
 		}
-		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("ACP runtime is not enabled yet; phase 1 only provisions contracts and storage"))
 	}
 
 	commandText := req.Msg.Command
@@ -325,7 +324,7 @@ func convertToV1Command(cmd *store.CommandMessage) *v1pb.Command {
 	}
 	if cmd.ResultJSON != "" && cmd.ResultJSON != "{}" {
 		result := &structpb.Struct{}
-		if err := protojson.Unmarshal([]byte(cmd.ResultJSON), result); err == nil {
+		if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(cmd.ResultJSON), result); err == nil {
 			v1cmd.Result = result
 		}
 	}
@@ -343,7 +342,7 @@ func convertToV1CommandEvent(event *store.CommandEventMessage) *v1pb.CommandEven
 	}
 	if event.PayloadJSON != "" && event.PayloadJSON != "{}" {
 		payload := &structpb.Struct{}
-		if err := protojson.Unmarshal([]byte(event.PayloadJSON), payload); err == nil {
+		if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(event.PayloadJSON), payload); err == nil {
 			v1Event.Payload = payload
 		}
 	}

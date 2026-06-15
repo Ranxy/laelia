@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	"google.golang.org/protobuf/types/known/structpb"
+
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -25,6 +27,8 @@ type Result struct {
 	DurationMs   int64
 	ErrorMessage string
 	LastSeqNo    int32
+	FinalSummary string
+	Result       *structpb.Struct
 }
 
 type BashExecutor struct {
@@ -32,6 +36,7 @@ type BashExecutor struct {
 	cancel    context.CancelFunc
 	cmd       *exec.Cmd
 	outputCh  chan OutputChunk
+	eventCh   chan Event
 	resultCh  chan Result
 	seqNo     atomic.Int32
 	startedAt time.Time
@@ -67,6 +72,7 @@ func New(cmdStr string, env map[string]string, workDir string, timeoutSeconds in
 		cancel:   cancel,
 		cmd:      cmd,
 		outputCh: make(chan OutputChunk, outputBufferSize),
+		eventCh:  make(chan Event, outputBufferSize),
 		resultCh: make(chan Result, 1),
 		done:     make(chan struct{}),
 	}
@@ -151,6 +157,10 @@ func (e *BashExecutor) ResultChannel() <-chan Result {
 	return e.resultCh
 }
 
+func (e *BashExecutor) EventChannel() <-chan Event {
+	return e.eventCh
+}
+
 func (e *BashExecutor) Done() <-chan struct{} {
 	return e.done
 }
@@ -164,5 +174,6 @@ func (e *BashExecutor) sendResult(r Result) {
 	e.resultCh <- r
 	close(e.resultCh)
 	close(e.done)
+	close(e.eventCh)
 	close(e.outputCh)
 }

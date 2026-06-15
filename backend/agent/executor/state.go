@@ -7,11 +7,15 @@ import (
 )
 
 type LocalState struct {
-	CommandID    string        `json:"command_id"`
-	Status       string        `json:"status"`
-	StartedAt    int64         `json:"started_at"`
-	LastSeqSent  int32         `json:"last_seq_sent"`
-	OutputBuffer []OutputChunk `json:"output_buffer"`
+	CommandID        string        `json:"command_id"`
+	ExecutorKind     string        `json:"executor_kind,omitempty"`
+	Profile          string        `json:"profile,omitempty"`
+	Status           string        `json:"status"`
+	StartedAt        int64         `json:"started_at"`
+	LastSeqSent      int32         `json:"last_seq_sent"`
+	LastEventSeqSent int32         `json:"last_event_seq_sent"`
+	SessionID        string        `json:"session_id,omitempty"`
+	OutputBuffer     []OutputChunk `json:"output_buffer"`
 }
 
 func LoadLocalState() (*LocalState, error) {

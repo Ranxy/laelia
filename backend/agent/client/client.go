@@ -21,6 +21,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/Ranxy/laelia/backend/agent/credential"
+	"github.com/Ranxy/laelia/backend/agent/executor"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
@@ -55,6 +56,7 @@ type Client struct {
 	accessToken string
 	backoff     *ExponentialBackoff
 	cmdStream   *commandStream
+	acpConfig   *executor.ACPConfig
 }
 
 type ExponentialBackoff struct {
@@ -82,8 +84,13 @@ func (eb *ExponentialBackoff) Reset() {
 	eb.attempt = 0
 }
 
-func New(managerURL, token string, insecure bool, allowHTTP bool) (*Client, error) {
+func New(managerURL, token string, insecure bool, allowHTTP bool, acpConfigPath string) (*Client, error) {
 	managerURL = strings.TrimRight(managerURL, "/")
+
+	acpConfig, err := executor.LoadACPConfig(acpConfigPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load ACP config")
+	}
 
 	if strings.HasPrefix(managerURL, "http://") {
 		if !allowHTTP {
@@ -128,6 +135,7 @@ func New(managerURL, token string, insecure bool, allowHTTP bool) (*Client, erro
 		client:       client,
 		credential:   credential.New(filepath.Join(tokenDir, "agent-token"), token),
 		backoff:      NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
+		acpConfig:    acpConfig,
 	}, nil
 }
 
@@ -250,10 +258,10 @@ func (c *Client) State() ConnState {
 }
 
 func (c *Client) Run(ctx context.Context) error {
-	info := collectAgentInfo()
+	info := collectAgentInfo(c.acpConfig)
 	slog.Info("connecting to manager", "url", c.managerURL)
 
-	c.cmdStream = newCommandStream(c.streamClient, c.managerURL)
+	c.cmdStream = newCommandStream(c.streamClient, c.managerURL, c.acpConfig)
 	c.cmdStream.getToken = func() string {
 		c.mu.RLock()
 		defer c.mu.RUnlock()
@@ -368,14 +376,15 @@ func computeFingerprint(info *v1pb.AgentInfo) string {
 	return hex.EncodeToString(h[:])[:16]
 }
 
-func collectAgentInfo() *v1pb.AgentInfo {
+func collectAgentInfo(acpConfig *executor.ACPConfig) *v1pb.AgentInfo {
 	hostname, _ := os.Hostname()
 	return &v1pb.AgentInfo{
-		Hostname: hostname,
-		Os:       runtime.GOOS,
-		Arch:     runtime.GOARCH,
-		Version:  "0.2.0",
-		Ip:       getOutboundIP(),
+		Hostname:   hostname,
+		Os:         runtime.GOOS,
+		Arch:       runtime.GOARCH,
+		Version:    "0.2.0",
+		Ip:         getOutboundIP(),
+		Capability: acpConfig.Capability(),
 	}
 }
 

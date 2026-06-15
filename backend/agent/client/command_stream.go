@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -25,13 +27,15 @@ type commandStream struct {
 	backoff    *ExponentialBackoff
 	getToken   func() string
 	getSessID  func() string
+	acpConfig  *executor.ACPConfig
 }
 
-func newCommandStream(httpClient *http.Client, managerURL string) *commandStream {
+func newCommandStream(httpClient *http.Client, managerURL string, acpConfig *executor.ACPConfig) *commandStream {
 	return &commandStream{
 		client:     v1connect.NewAgentCommandServiceClient(httpClient, managerURL),
 		managerURL: managerURL,
 		backoff:    NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
+		acpConfig:  acpConfig,
 	}
 }
 
@@ -72,6 +76,13 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 			},
 		},
 	}
+	if state, err := executor.LoadLocalState(); err != nil {
+		slog.Warn("failed to load local command state", "error", err)
+	} else if state != nil {
+		ready.GetAgentReady().LastCommandId = state.CommandID
+		ready.GetAgentReady().LastAckSeq = state.LastSeqSent
+		ready.GetAgentReady().LastEventSeq = state.LastEventSeqSent
+	}
 	if err := stream.Send(ready); err != nil {
 		return err
 	}
@@ -80,7 +91,7 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 	defer pingTicker.Stop()
 
 	var pingSeq int64
-	var currentExecutor *executor.BashExecutor
+	var currentExecutor executor.Runtime
 
 	errCh := make(chan error, 1)
 	doneCh := make(chan struct{})
@@ -101,8 +112,21 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 				req := m.CommandRequest
 				slog.Info("received command", "commandID", req.CommandId, "command", req.Command)
 
-				currentExecutor = executor.New(req.Command, req.Env, req.WorkingDir, req.TimeoutSeconds)
-				go c.runCommand(ctx, currentExecutor, stream, req.CommandId)
+				runtime, err := c.buildRuntime(req)
+				if err != nil {
+					slog.Error("failed to build runtime", "commandID", req.CommandId, "error", err)
+					if sendErr := sendCommandResult(stream, &v1pb.CommandResult{
+						CommandId:    req.CommandId,
+						ExitCode:     -1,
+						ErrorMessage: err.Error(),
+					}); sendErr != nil {
+						errCh <- sendErr
+					}
+					continue
+				}
+
+				currentExecutor = runtime
+				go c.runCommand(ctx, runtime, stream, req)
 
 			case *v1pb.ManagerCommandMessage_Cancel:
 				if currentExecutor != nil {
@@ -146,86 +170,233 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 
 func (*commandStream) runCommand(
 	ctx context.Context,
-	exec *executor.BashExecutor,
+	runtime executor.Runtime,
 	stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage],
-	commandID string,
+	req *v1pb.CommandRequest,
 ) {
-	exec.Start()
+	commandID := req.CommandId
+	state := &executor.LocalState{
+		CommandID:        commandID,
+		ExecutorKind:     req.ExecutorKind.String(),
+		Profile:          req.Profile,
+		Status:           "running",
+		StartedAt:        time.Now().UnixMilli(),
+		LastSeqSent:      0,
+		LastEventSeqSent: 0,
+	}
+	if err := executor.SaveLocalState(state); err != nil {
+		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
+	}
+
+	runtime.Start()
+	startSeq := nextEventSeq(state)
+	if err := sendCommandEvent(stream, commandID, &executor.Event{
+		SeqNo:     startSeq,
+		Type:      v1pb.CommandEventType_LIFECYCLE,
+		Summary:   "command started",
+		Timestamp: time.Now(),
+		Payload: map[string]any{
+			"executor_kind": req.ExecutorKind.String(),
+			"profile":       req.Profile,
+		},
+	}); err != nil {
+		slog.Error("failed to send command start event", "commandID", commandID, "error", err)
+		runtime.Cancel()
+		return
+	}
+	if err := executor.SaveLocalState(state); err != nil {
+		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			exec.Cancel()
+			runtime.Cancel()
 			return
 
-		case <-exec.Done():
+		case <-runtime.Done():
 			// Drain any remaining output chunks before reading the result.
-			drainOutput(exec, stream, commandID)
+			lastSeqNo, lastEventSeqNo := drainOutput(runtime, stream, commandID, state.LastSeqSent, state.LastEventSeqSent)
+			state.LastSeqSent = lastSeqNo
+			state.LastEventSeqSent = lastEventSeqNo
 
-			result := <-exec.ResultChannel()
-			msg := &v1pb.AgentCommandMessage{
-				Message: &v1pb.AgentCommandMessage_Result{
-					Result: &v1pb.CommandResult{
-						CommandId:    commandID,
-						ExitCode:     result.ExitCode,
-						DurationMs:   result.DurationMs,
-						ErrorMessage: result.ErrorMessage,
-						LastSeqNo:    result.LastSeqNo,
-					},
-				},
-			}
-			if err := stream.Send(msg); err != nil {
+			result := <-runtime.ResultChannel()
+			result.LastSeqNo = state.LastSeqSent
+			if err := sendCommandResult(stream, &v1pb.CommandResult{
+				CommandId:    commandID,
+				ExitCode:     result.ExitCode,
+				DurationMs:   result.DurationMs,
+				ErrorMessage: result.ErrorMessage,
+				LastSeqNo:    result.LastSeqNo,
+				FinalSummary: result.FinalSummary,
+				Result:       result.Result,
+			}); err != nil {
 				slog.Error("failed to send command result", "commandID", commandID, "error", err)
+			} else {
+				slog.Info("command result sent", "commandID", commandID, "exitCode", result.ExitCode)
 			}
-			slog.Info("command result sent", "commandID", commandID, "exitCode", result.ExitCode)
+			_ = executor.ClearLocalState()
 			return
 
-		case chunk, ok := <-exec.OutputChannel():
+		case event, ok := <-runtime.EventChannel():
 			if !ok {
 				continue
 			}
-			msg := &v1pb.AgentCommandMessage{
-				Message: &v1pb.AgentCommandMessage_Progress{
-					Progress: &v1pb.CommandProgress{
-						CommandId: commandID,
-						Type:      chunk.StreamType,
-						Content:   chunk.Content,
-						SeqNo:     chunk.SeqNo,
-					},
+			event.SeqNo = nextEventSeq(state)
+			if err := sendCommandEvent(stream, commandID, &event); err != nil {
+				slog.Error("failed to send command event", "commandID", commandID, "error", err)
+				runtime.Cancel()
+				return
+			}
+			if err := executor.SaveLocalState(state); err != nil {
+				slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
+			}
+
+		case chunk, ok := <-runtime.OutputChannel():
+			if !ok {
+				continue
+			}
+			if err := sendCommandProgress(stream, commandID, chunk); err != nil {
+				slog.Error("failed to send command progress", "commandID", commandID, "error", err)
+				runtime.Cancel()
+				return
+			}
+			state.LastSeqSent = maxSeq(state.LastSeqSent, chunk.SeqNo)
+
+			event := executor.Event{
+				SeqNo:      nextEventSeq(state),
+				Type:       v1pb.CommandEventType_TEXT_DELTA,
+				Summary:    chunk.Content,
+				Text:       chunk.Content,
+				StreamType: chunk.StreamType,
+				Timestamp:  time.Now(),
+				Payload: map[string]any{
+					"stream_type": chunk.StreamType.String(),
+					"content":     chunk.Content,
 				},
 			}
-			if err := stream.Send(msg); err != nil {
-				slog.Error("failed to send command progress", "commandID", commandID, "error", err)
-				exec.Cancel()
+			if err := sendCommandEvent(stream, commandID, &event); err != nil {
+				slog.Error("failed to send synthesized text event", "commandID", commandID, "error", err)
+				runtime.Cancel()
 				return
+			}
+			if err := executor.SaveLocalState(state); err != nil {
+				slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 			}
 		}
 	}
 }
 
-func drainOutput(exec *executor.BashExecutor, stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], commandID string) {
+func drainOutput(runtime executor.Runtime, stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], commandID string, lastSeqNo int32, lastEventSeqNo int32) (int32, int32) {
 	for {
 		select {
-		case chunk, ok := <-exec.OutputChannel():
+		case chunk, ok := <-runtime.OutputChannel():
 			if !ok {
-				return
+				return lastSeqNo, lastEventSeqNo
 			}
-			msg := &v1pb.AgentCommandMessage{
-				Message: &v1pb.AgentCommandMessage_Progress{
-					Progress: &v1pb.CommandProgress{
-						CommandId: commandID,
-						Type:      chunk.StreamType,
-						Content:   chunk.Content,
-						SeqNo:     chunk.SeqNo,
-					},
+			if err := sendCommandProgress(stream, commandID, chunk); err != nil {
+				slog.Error("failed to send command progress", "commandID", commandID, "error", err)
+				return lastSeqNo, lastEventSeqNo
+			}
+			lastSeqNo = maxSeq(lastSeqNo, chunk.SeqNo)
+
+			event := executor.Event{
+				SeqNo:      lastEventSeqNo + 1,
+				Type:       v1pb.CommandEventType_TEXT_DELTA,
+				Summary:    chunk.Content,
+				Text:       chunk.Content,
+				StreamType: chunk.StreamType,
+				Timestamp:  time.Now(),
+				Payload: map[string]any{
+					"stream_type": chunk.StreamType.String(),
+					"content":     chunk.Content,
 				},
 			}
-			if err := stream.Send(msg); err != nil {
-				slog.Error("failed to send command progress", "commandID", commandID, "error", err)
-				return
+			if err := sendCommandEvent(stream, commandID, &event); err != nil {
+				slog.Error("failed to send synthesized text event", "commandID", commandID, "error", err)
+				return lastSeqNo, lastEventSeqNo
 			}
+			lastEventSeqNo = event.SeqNo
 		default:
-			return
+			return lastSeqNo, lastEventSeqNo
 		}
 	}
+}
+
+func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime, error) {
+	kind := req.ExecutorKind
+	if kind == v1pb.ExecutorKind_EXECUTOR_KIND_UNSPECIFIED {
+		kind = v1pb.ExecutorKind_SHELL
+	}
+
+	switch kind {
+	case v1pb.ExecutorKind_SHELL:
+		return executor.New(req.Command, req.Env, req.WorkingDir, req.TimeoutSeconds), nil
+	case v1pb.ExecutorKind_ACP:
+		return executor.NewACP(executor.Request{
+			CommandID:      req.CommandId,
+			Command:        req.Command,
+			Instruction:    req.Instruction,
+			Profile:        req.Profile,
+			WorkingDir:     req.WorkingDir,
+			Env:            req.Env,
+			TimeoutSeconds: req.TimeoutSeconds,
+			ExecutorKind:   kind,
+			AllowDiff:      req.AllowDiff,
+		}, c.acpConfig)
+	default:
+		return nil, connect.NewError(connect.CodeInvalidArgument, io.ErrUnexpectedEOF)
+	}
+}
+
+func sendCommandProgress(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], commandID string, chunk executor.OutputChunk) error {
+	return stream.Send(&v1pb.AgentCommandMessage{
+		Message: &v1pb.AgentCommandMessage_Progress{
+			Progress: &v1pb.CommandProgress{
+				CommandId: commandID,
+				Type:      chunk.StreamType,
+				Content:   chunk.Content,
+				SeqNo:     chunk.SeqNo,
+			},
+		},
+	})
+}
+
+func sendCommandEvent(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], commandID string, event *executor.Event) error {
+	payload, err := structpb.NewStruct(event.Payload)
+	if err != nil {
+		return err
+	}
+	return stream.Send(&v1pb.AgentCommandMessage{
+		Message: &v1pb.AgentCommandMessage_Event{
+			Event: &v1pb.CommandEvent{
+				CommandId: commandID,
+				SeqNo:     event.SeqNo,
+				Type:      event.Type,
+				Summary:   event.Summary,
+				Payload:   payload,
+				Timestamp: timestamppb.New(event.Timestamp),
+			},
+		},
+	})
+}
+
+func sendCommandResult(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], result *v1pb.CommandResult) error {
+	return stream.Send(&v1pb.AgentCommandMessage{
+		Message: &v1pb.AgentCommandMessage_Result{
+			Result: result,
+		},
+	})
+}
+
+func maxSeq(current int32, next int32) int32 {
+	if next > current {
+		return next
+	}
+	return current
+}
+
+func nextEventSeq(state *executor.LocalState) int32 {
+	state.LastEventSeqSent++
+	return state.LastEventSeqSent
 }

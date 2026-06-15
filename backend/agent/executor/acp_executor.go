@@ -1,0 +1,737 @@
+package executor
+
+import (
+	"bufio"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	acp "github.com/coder/acp-go-sdk"
+	pkgerrors "github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/structpb"
+
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
+)
+
+type ACPExecutor struct {
+	ctx              context.Context
+	cancel           context.CancelFunc
+	request          Request
+	config           *ACPConfig
+	profileName      string
+	profile          ACPProfile
+	workingDir       string
+	allowedRoots     []string
+	cmd              *exec.Cmd
+	conn             *acp.ClientSideConnection
+	client           *acpRuntimeClient
+	outputCh         chan OutputChunk
+	eventCh          chan Event
+	resultCh         chan Result
+	done             chan struct{}
+	seqNo            atomic.Int32
+	startedAt        time.Time
+	outputBytes      atomic.Int64
+	eventCount       atomic.Int32
+	toolCallCount    atomic.Int32
+	outputLimited    atomic.Bool
+	eventLimitHit    atomic.Bool
+	lastUsage        atomic.Value
+	warnMu           sync.Mutex
+	sessionID        string
+	initializedAgent string
+}
+
+type acpRuntimeClient struct {
+	executor *ACPExecutor
+}
+
+var _ acp.Client = (*acpRuntimeClient)(nil)
+
+func NewACP(req Request, cfg *ACPConfig) (Runtime, error) {
+	profileName, profile, err := cfg.ResolveProfile(req.Profile)
+	if err != nil {
+		return nil, err
+	}
+
+	workingDir, roots, err := resolveACPWorkingDir(req, profile)
+	if err != nil {
+		return nil, err
+	}
+
+	timeoutSeconds := req.TimeoutSeconds
+	if timeoutSeconds <= 0 || timeoutSeconds > cfg.MaxTimeoutSeconds {
+		timeoutSeconds = cfg.MaxTimeoutSeconds
+	}
+
+	ctx := context.Background()
+	var cancel context.CancelFunc
+	if timeoutSeconds > 0 {
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+
+	cmd := exec.CommandContext(ctx, profile.Executable, profile.Args...)
+	cmd.Dir = workingDir
+	cmd.Env = buildACPEnv(profile, req.Env)
+
+	exec := &ACPExecutor{
+		ctx:          ctx,
+		cancel:       cancel,
+		request:      req,
+		config:       cfg,
+		profileName:  profileName,
+		profile:      profile,
+		workingDir:   workingDir,
+		allowedRoots: roots,
+		cmd:          cmd,
+		outputCh:     make(chan OutputChunk, outputBufferSize),
+		eventCh:      make(chan Event, outputBufferSize),
+		resultCh:     make(chan Result, 1),
+		done:         make(chan struct{}),
+	}
+	exec.client = &acpRuntimeClient{executor: exec}
+	return exec, nil
+}
+
+func (e *ACPExecutor) Start() {
+	go e.run()
+}
+
+func (e *ACPExecutor) Cancel() {
+	e.cancel()
+	if e.conn != nil && e.sessionID != "" {
+		_ = e.conn.Cancel(context.Background(), acp.CancelNotification{SessionId: acp.SessionId(e.sessionID)})
+	}
+	if e.cmd != nil && e.cmd.Process != nil {
+		_ = e.cmd.Process.Kill()
+	}
+}
+
+func (e *ACPExecutor) OutputChannel() <-chan OutputChunk {
+	return e.outputCh
+}
+
+func (e *ACPExecutor) EventChannel() <-chan Event {
+	return e.eventCh
+}
+
+func (e *ACPExecutor) ResultChannel() <-chan Result {
+	return e.resultCh
+}
+
+func (e *ACPExecutor) Done() <-chan struct{} {
+	return e.done
+}
+
+func (e *ACPExecutor) run() {
+	e.startedAt = time.Now()
+	defer close(e.outputCh)
+	defer close(e.eventCh)
+	defer close(e.resultCh)
+	defer close(e.done)
+	defer e.cancel()
+
+	stdin, err := e.cmd.StdinPipe()
+	if err != nil {
+		e.sendACPResult(Result{ExitCode: 1, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: fmt.Sprintf("acp stdin pipe: %v", err)})
+		return
+	}
+	stdout, err := e.cmd.StdoutPipe()
+	if err != nil {
+		e.sendACPResult(Result{ExitCode: 1, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: fmt.Sprintf("acp stdout pipe: %v", err)})
+		return
+	}
+	stderr, err := e.cmd.StderrPipe()
+	if err != nil {
+		e.sendACPResult(Result{ExitCode: 1, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: fmt.Sprintf("acp stderr pipe: %v", err)})
+		return
+	}
+
+	if err := e.cmd.Start(); err != nil {
+		e.sendACPResult(Result{ExitCode: 1, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: fmt.Sprintf("start ACP subprocess: %v", err)})
+		return
+	}
+
+	e.conn = acp.NewClientSideConnection(e.client, stdin, stdout)
+	go e.scanACPStderr(stderr)
+
+	initResp, err := e.conn.Initialize(e.ctx, acp.InitializeRequest{
+		ProtocolVersion: acp.ProtocolVersionNumber,
+		ClientCapabilities: acp.ClientCapabilities{
+			Fs: acp.FileSystemCapabilities{
+				ReadTextFile:  e.profile.ReadTextFiles,
+				WriteTextFile: e.profile.WriteTextFiles,
+			},
+			Terminal: false,
+		},
+		ClientInfo: &acp.Implementation{Name: "laelia-agent", Version: "0.2.0"},
+	})
+	if err != nil {
+		e.finishACPProcess(err)
+		return
+	}
+	if initResp.AgentInfo != nil {
+		e.initializedAgent = initResp.AgentInfo.Name
+	}
+
+	sessionResp, err := e.conn.NewSession(e.ctx, acp.NewSessionRequest{
+		Cwd:                   e.workingDir,
+		AdditionalDirectories: additionalRoots(e.allowedRoots, e.workingDir),
+		McpServers:            []acp.McpServer{},
+	})
+	if err != nil {
+		e.finishACPProcess(err)
+		return
+	}
+	e.sessionID = string(sessionResp.SessionId)
+
+	promptText := e.request.Instruction
+	if promptText == "" {
+		promptText = e.request.Command
+	}
+
+	promptResp, err := e.conn.Prompt(e.ctx, acp.PromptRequest{
+		SessionId: sessionResp.SessionId,
+		Prompt:    []acp.ContentBlock{acp.TextBlock(promptText)},
+	})
+	if err != nil {
+		e.finishACPProcess(err)
+		return
+	}
+
+	_ = e.cmd.Process.Kill()
+	_ = e.cmd.Wait()
+
+	finalSummary := strings.TrimSpace(e.client.finalSummary())
+	if finalSummary == "" {
+		finalSummary = fmt.Sprintf("ACP task finished with stop reason %s", promptResp.StopReason)
+	}
+	resultPayload, payloadErr := structpb.NewStruct(map[string]any{
+		"executor_kind":   e.request.ExecutorKind.String(),
+		"profile":         e.profileName,
+		"session_id":      e.sessionID,
+		"stop_reason":     string(promptResp.StopReason),
+		"agent_name":      e.initializedAgent,
+		"tool_call_count": e.toolCallCount.Load(),
+		"output_limited":  e.outputLimited.Load(),
+		"event_limited":   e.eventLimitHit.Load(),
+	})
+	if payloadErr != nil {
+		resultPayload = nil
+	}
+
+	e.sendEvent(Event{
+		Type:      v1pb.CommandEventType_FINAL_SUMMARY,
+		Summary:   finalSummary,
+		Timestamp: time.Now(),
+		Payload: map[string]any{
+			"stop_reason": string(promptResp.StopReason),
+			"session_id":  e.sessionID,
+		},
+	})
+	e.sendACPResult(Result{
+		ExitCode:     stopReasonExitCode(promptResp.StopReason),
+		DurationMs:   time.Since(e.startedAt).Milliseconds(),
+		FinalSummary: finalSummary,
+		Result:       resultPayload,
+	})
+}
+
+func (e *ACPExecutor) finishACPProcess(err error) {
+	if e.cmd != nil && e.cmd.Process != nil {
+		_ = e.cmd.Process.Kill()
+	}
+	_ = e.cmd.Wait()
+	if errors.Is(e.ctx.Err(), context.DeadlineExceeded) {
+		e.sendACPResult(Result{ExitCode: 124, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: e.ctx.Err().Error()})
+		return
+	}
+	if errors.Is(e.ctx.Err(), context.Canceled) {
+		e.sendACPResult(Result{ExitCode: 130, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: e.ctx.Err().Error()})
+		return
+	}
+	e.sendACPResult(Result{ExitCode: 1, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: simplifyACPError(err)})
+}
+
+func (e *ACPExecutor) scanACPStderr(stderr io.Reader) {
+	scanner := bufio.NewScanner(stderr)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		e.sendOutput(v1pb.CommandOutput_STDERR, line)
+	}
+}
+
+func (e *ACPExecutor) sendACPResult(result Result) {
+	result.LastSeqNo = e.seqNo.Load()
+	e.resultCh <- result
+}
+
+func (e *ACPExecutor) nextSeq() int32 {
+	return e.seqNo.Add(1)
+}
+
+func (e *ACPExecutor) sendOutput(streamType v1pb.CommandOutput_StreamType, content string) {
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return
+	}
+	allowed, ok := e.limitOutput(trimmed)
+	if !ok {
+		return
+	}
+	e.outputCh <- OutputChunk{StreamType: streamType, Content: allowed, SeqNo: e.nextSeq()}
+}
+
+func (e *ACPExecutor) sendEvent(event Event) {
+	if !e.allowEvent() {
+		return
+	}
+	event.SeqNo = e.nextSeq()
+	if event.Timestamp.IsZero() {
+		event.Timestamp = time.Now()
+	}
+	e.eventCh <- event
+}
+
+func (e *ACPExecutor) allowEvent() bool {
+	if e.config.MaxEventCount <= 0 {
+		return true
+	}
+	count := e.eventCount.Add(1)
+	if count <= e.config.MaxEventCount {
+		return true
+	}
+	if e.eventLimitHit.CompareAndSwap(false, true) {
+		e.sendOutput(v1pb.CommandOutput_SYSTEM, "ACP event limit reached; dropping further structured events")
+	}
+	return false
+}
+
+func (e *ACPExecutor) limitOutput(content string) (string, bool) {
+	if e.config.MaxOutputBytes <= 0 {
+		return content, true
+	}
+	used := e.outputBytes.Load()
+	remaining := e.config.MaxOutputBytes - used
+	if remaining <= 0 {
+		if e.outputLimited.CompareAndSwap(false, true) {
+			return "ACP output limit reached; dropping further text output", true
+		}
+		return "", false
+	}
+	if int64(len(content)) <= remaining {
+		e.outputBytes.Add(int64(len(content)))
+		return content, true
+	}
+	truncated := content[:remaining]
+	e.outputBytes.Store(e.config.MaxOutputBytes)
+	e.outputLimited.Store(true)
+	return truncated, true
+}
+
+func (c *acpRuntimeClient) ReadTextFile(_ context.Context, params acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
+	path, err := c.executor.validatePath(params.Path, c.executor.profile.ReadTextFiles)
+	if err != nil {
+		return acp.ReadTextFileResponse{}, err
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return acp.ReadTextFileResponse{}, err
+	}
+	content := string(b)
+	if params.Line != nil || params.Limit != nil {
+		lines := strings.Split(content, "\n")
+		start := 0
+		if params.Line != nil && *params.Line > 0 {
+			start = minInt(maxInt(*params.Line-1, 0), len(lines))
+		}
+		end := len(lines)
+		if params.Limit != nil && *params.Limit > 0 && start+*params.Limit < end {
+			end = start + *params.Limit
+		}
+		content = strings.Join(lines[start:end], "\n")
+	}
+	return acp.ReadTextFileResponse{Content: content}, nil
+}
+
+func (c *acpRuntimeClient) WriteTextFile(_ context.Context, params acp.WriteTextFileRequest) (acp.WriteTextFileResponse, error) {
+	path, err := c.executor.validatePath(params.Path, c.executor.profile.WriteTextFiles)
+	if err != nil {
+		return acp.WriteTextFileResponse{}, err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return acp.WriteTextFileResponse{}, err
+	}
+	if err := os.WriteFile(path, []byte(params.Content), 0o644); err != nil {
+		return acp.WriteTextFileResponse{}, err
+	}
+	return acp.WriteTextFileResponse{}, nil
+}
+
+func (c *acpRuntimeClient) RequestPermission(_ context.Context, params acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
+	selectOption := rejectPermissionOption(params.Options)
+	if allowsToolKind(c.executor.profile.AutoApproveToolKinds, params.ToolCall.Kind) {
+		selectOption = allowPermissionOption(params.Options)
+	}
+	if selectOption == "" {
+		return acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{Outcome: "cancelled"}}}, nil
+	}
+	return acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{Outcome: "selected", OptionId: selectOption}}}, nil
+}
+
+func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNotification) error {
+	u := params.Update
+	switch {
+	case u.AgentMessageChunk != nil:
+		text := contentBlockText(u.AgentMessageChunk.Content)
+		c.executor.client.appendSummary(text)
+		c.executor.sendOutput(v1pb.CommandOutput_STDOUT, text)
+		if c.executor.profile.SupportsRawEvents {
+			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_RAW_ACP, Summary: "agent_message_chunk", Timestamp: time.Now(), Payload: toJSONMap(u.AgentMessageChunk)})
+		}
+	case u.AgentThoughtChunk != nil:
+		text := contentBlockText(u.AgentThoughtChunk.Content)
+		if text != "" {
+			c.executor.sendOutput(v1pb.CommandOutput_SYSTEM, "[thought] "+text)
+		}
+		if c.executor.profile.SupportsRawEvents {
+			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_RAW_ACP, Summary: "agent_thought_chunk", Timestamp: time.Now(), Payload: toJSONMap(u.AgentThoughtChunk)})
+		}
+	case u.ToolCall != nil:
+		c.executor.toolCallCount.Add(1)
+		if c.executor.profile.SupportsToolTraces {
+			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_TOOL_CALL_STARTED, Summary: u.ToolCall.Title, Timestamp: time.Now(), Payload: toolCallPayload(u.ToolCall)})
+		}
+	case u.ToolCallUpdate != nil:
+		for _, content := range u.ToolCallUpdate.Content {
+			if content.Content != nil {
+				text := contentBlockText(content.Content.Content)
+				c.executor.sendOutput(v1pb.CommandOutput_SYSTEM, text)
+			}
+			if content.Diff != nil && c.executor.request.AllowDiff && c.executor.profile.SupportsDiff {
+				c.executor.sendEvent(Event{Type: v1pb.CommandEventType_DIFF_EMITTED, Summary: content.Diff.Path, Timestamp: time.Now(), Payload: toJSONMap(content.Diff)})
+			}
+		}
+		if c.executor.profile.SupportsToolTraces && u.ToolCallUpdate.Status != nil {
+			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_TOOL_CALL_FINISHED, Summary: string(*u.ToolCallUpdate.Status), Timestamp: time.Now(), Payload: toolCallUpdatePayload(u.ToolCallUpdate)})
+		} else if c.executor.profile.SupportsRawEvents {
+			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_RAW_ACP, Summary: "tool_call_update", Timestamp: time.Now(), Payload: toJSONMap(u.ToolCallUpdate)})
+		}
+	case u.Plan != nil:
+		if c.executor.profile.SupportsRawEvents {
+			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_RAW_ACP, Summary: "plan", Timestamp: time.Now(), Payload: toJSONMap(u.Plan)})
+		}
+	case u.UsageUpdate != nil:
+		c.executor.lastUsage.Store(toJSONMap(u.UsageUpdate))
+		if c.executor.profile.SupportsRawEvents {
+			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_RAW_ACP, Summary: "usage", Timestamp: time.Now(), Payload: toJSONMap(u.UsageUpdate)})
+		}
+	default:
+		if c.executor.profile.SupportsRawEvents {
+			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_RAW_ACP, Summary: "session_update", Timestamp: time.Now(), Payload: toJSONMap(u)})
+		}
+	}
+	return nil
+}
+
+func (c *acpRuntimeClient) CreateTerminal(context.Context, acp.CreateTerminalRequest) (acp.CreateTerminalResponse, error) {
+	_ = c
+	return acp.CreateTerminalResponse{}, errors.New("ACP terminal bridge is disabled")
+}
+
+func (c *acpRuntimeClient) KillTerminal(context.Context, acp.KillTerminalRequest) (acp.KillTerminalResponse, error) {
+	_ = c
+	return acp.KillTerminalResponse{}, errors.New("ACP terminal bridge is disabled")
+}
+
+func (c *acpRuntimeClient) TerminalOutput(context.Context, acp.TerminalOutputRequest) (acp.TerminalOutputResponse, error) {
+	_ = c
+	return acp.TerminalOutputResponse{}, errors.New("ACP terminal bridge is disabled")
+}
+
+func (c *acpRuntimeClient) ReleaseTerminal(context.Context, acp.ReleaseTerminalRequest) (acp.ReleaseTerminalResponse, error) {
+	_ = c
+	return acp.ReleaseTerminalResponse{}, errors.New("ACP terminal bridge is disabled")
+}
+
+func (c *acpRuntimeClient) WaitForTerminalExit(context.Context, acp.WaitForTerminalExitRequest) (acp.WaitForTerminalExitResponse, error) {
+	_ = c
+	return acp.WaitForTerminalExitResponse{}, errors.New("ACP terminal bridge is disabled")
+}
+
+func (c *acpRuntimeClient) appendSummary(text string) {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return
+	}
+	c.executor.warnMu.Lock()
+	defer c.executor.warnMu.Unlock()
+	current := c.executor.lastUsageMapLocked()
+	if current == nil {
+		current = map[string]any{}
+	}
+	buffer := ""
+	if raw, ok := current["agent_text"]; ok {
+		if value, ok := raw.(string); ok {
+			buffer = value
+		}
+	}
+	if len(buffer) >= 8192 {
+		return
+	}
+	if buffer != "" {
+		buffer += "\n"
+	}
+	buffer += trimmed
+	current["agent_text"] = buffer
+	c.executor.lastUsage.Store(current)
+}
+
+func (c *acpRuntimeClient) finalSummary() string {
+	c.executor.warnMu.Lock()
+	defer c.executor.warnMu.Unlock()
+	current := c.executor.lastUsageMapLocked()
+	if current == nil {
+		return ""
+	}
+	summary := ""
+	if raw, ok := current["agent_text"]; ok {
+		if value, ok := raw.(string); ok {
+			summary = value
+		}
+	}
+	return summary
+}
+
+func (e *ACPExecutor) lastUsageMapLocked() map[string]any {
+	loaded := e.lastUsage.Load()
+	if loaded == nil {
+		return nil
+	}
+	current, ok := loaded.(map[string]any)
+	if !ok {
+		return nil
+	}
+	clone := make(map[string]any, len(current))
+	for key, value := range current {
+		clone[key] = value
+	}
+	return clone
+}
+
+func (e *ACPExecutor) validatePath(path string, enabled bool) (string, error) {
+	if !enabled {
+		return "", errors.New("filesystem access is disabled for this ACP profile")
+	}
+	cleaned := filepath.Clean(path)
+	if !filepath.IsAbs(cleaned) {
+		return "", pkgerrors.Errorf("path must be absolute: %s", path)
+	}
+	resolved, err := filepath.EvalSymlinks(cleaned)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	if resolved == "" {
+		resolved = cleaned
+	}
+	for _, root := range e.allowedRoots {
+		if resolved == root || strings.HasPrefix(resolved, root+string(os.PathSeparator)) {
+			return resolved, nil
+		}
+	}
+	return "", pkgerrors.Errorf("path %s is outside ACP workspace roots", path)
+}
+
+func resolveACPWorkingDir(req Request, profile ACPProfile) (string, []string, error) {
+	workingDir := req.WorkingDir
+	if workingDir == "" {
+		workingDir = profile.WorkingDir
+	}
+	if workingDir == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", nil, err
+		}
+		workingDir = cwd
+	}
+	absWorkingDir, err := filepath.Abs(workingDir)
+	if err != nil {
+		return "", nil, err
+	}
+	roots := []string{filepath.Clean(absWorkingDir)}
+	for _, dir := range profile.AdditionalDirectories {
+		absDir, err := filepath.Abs(dir)
+		if err != nil {
+			return "", nil, err
+		}
+		roots = append(roots, filepath.Clean(absDir))
+	}
+	return filepath.Clean(absWorkingDir), uniqueStrings(roots), nil
+}
+
+func buildACPEnv(profile ACPProfile, requestEnv map[string]string) []string {
+	values := map[string]string{}
+	for _, item := range os.Environ() {
+		key, value, ok := strings.Cut(item, "=")
+		if ok {
+			values[key] = value
+		}
+	}
+	if len(profile.AllowEnv) > 0 {
+		filtered := map[string]string{}
+		for _, key := range profile.AllowEnv {
+			if value, ok := values[key]; ok {
+				filtered[key] = value
+			}
+		}
+		values = filtered
+	}
+	for key, value := range requestEnv {
+		values[key] = value
+	}
+	for key, value := range profile.Env {
+		values[key] = value
+	}
+	env := make([]string, 0, len(values))
+	for key, value := range values {
+		env = append(env, key+"="+value)
+	}
+	return env
+}
+
+func additionalRoots(roots []string, workingDir string) []string {
+	additional := make([]string, 0, len(roots))
+	for _, root := range roots {
+		if root == workingDir {
+			continue
+		}
+		additional = append(additional, root)
+	}
+	return additional
+}
+
+func simplifyACPError(err error) string {
+	var requestErr *acp.RequestError
+	if errors.As(err, &requestErr) {
+		return fmt.Sprintf("ACP request failed (%d): %s", requestErr.Code, requestErr.Message)
+	}
+	return err.Error()
+}
+
+func stopReasonExitCode(reason acp.StopReason) int32 {
+	switch reason {
+	case acp.StopReasonEndTurn:
+		return 0
+	case acp.StopReasonCancelled:
+		return 130
+	default:
+		return 1
+	}
+}
+
+func contentBlockText(block acp.ContentBlock) string {
+	if block.Text != nil {
+		return block.Text.Text
+	}
+	if block.ResourceLink != nil {
+		return block.ResourceLink.Uri
+	}
+	return ""
+}
+
+func toolCallPayload(toolCall *acp.SessionUpdateToolCall) map[string]any {
+	return toJSONMap(toolCall)
+}
+
+func toolCallUpdatePayload(update *acp.SessionToolCallUpdate) map[string]any {
+	return toJSONMap(update)
+}
+
+func toJSONMap(value any) map[string]any {
+	if value == nil {
+		return map[string]any{}
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		return map[string]any{"marshal_error": err.Error()}
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return map[string]any{"unmarshal_error": err.Error()}
+	}
+	return payload
+}
+
+func allowPermissionOption(options []acp.PermissionOption) acp.PermissionOptionId {
+	for _, option := range options {
+		if option.Kind == acp.PermissionOptionKindAllowOnce || option.Kind == acp.PermissionOptionKindAllowAlways {
+			return option.OptionId
+		}
+	}
+	return ""
+}
+
+func rejectPermissionOption(options []acp.PermissionOption) acp.PermissionOptionId {
+	for _, option := range options {
+		if option.Kind == acp.PermissionOptionKindRejectOnce || option.Kind == acp.PermissionOptionKindRejectAlways {
+			return option.OptionId
+		}
+	}
+	return ""
+}
+
+func allowsToolKind(allowed []string, kind *acp.ToolKind) bool {
+	if kind == nil {
+		return false
+	}
+	for _, candidate := range allowed {
+		if candidate == string(*kind) {
+			return true
+		}
+	}
+	return false
+}
+
+func uniqueStrings(items []string) []string {
+	seen := map[string]struct{}{}
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		result = append(result, item)
+	}
+	return result
+}
+
+func minInt(left int, right int) int {
+	if left < right {
+		return left
+	}
+	return right
+}
+
+func maxInt(left int, right int) int {
+	if left > right {
+		return left
+	}
+	return right
+}
