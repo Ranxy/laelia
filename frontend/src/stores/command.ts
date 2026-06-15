@@ -13,6 +13,7 @@ export const createCommandSlice: AppSliceCreator<CommandSlice> = (
   commands: [],
   commandsLoading: false,
   activeOutputs: {},
+  activeEvents: {},
 
   async sendCommand(agent, command, opts) {
     const res = await commandServiceClient.sendCommand(
@@ -22,6 +23,10 @@ export const createCommandSlice: AppSliceCreator<CommandSlice> = (
         env: opts?.env ?? {},
         workingDir: opts?.workingDir ?? "",
         timeoutSeconds: opts?.timeoutSeconds ?? 0,
+        executorKind: opts?.executorKind ?? 0,
+        instruction: opts?.instruction ?? "",
+        profile: opts?.profile ?? "",
+        allowDiff: opts?.allowDiff ?? false,
       })
     );
     return res;
@@ -81,6 +86,36 @@ export const createCommandSlice: AppSliceCreator<CommandSlice> = (
           activeOutputs: {
             ...s.activeOutputs,
             [name]: [...prev, output],
+          },
+        });
+      }
+    } catch {
+      // stream cancelled (aborted on unmount) or network error — ignore
+    }
+  },
+
+  async watchCommandEvents(name, signal) {
+    const state = get();
+    const existing = state.activeEvents[name];
+    const afterSeqNo =
+      existing && existing.length > 0
+        ? existing[existing.length - 1].seqNo
+        : -1;
+
+    const stream = commandServiceClient.watchCommandEvents(
+      { name, afterSeqNo },
+      { signal }
+    );
+
+    try {
+      for await (const event of stream) {
+        if (signal?.aborted) break;
+        const s = get();
+        const prev = s.activeEvents[name] ?? [];
+        set({
+          activeEvents: {
+            ...s.activeEvents,
+            [name]: [...prev, event],
           },
         });
       }

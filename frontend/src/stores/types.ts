@@ -1,6 +1,10 @@
 import type { StateCreator } from "zustand";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
-import type { Command, CommandOutput } from "@/types/proto-es/v1/command_pb";
+import type {
+  Command,
+  CommandEvent,
+  CommandOutput,
+} from "@/types/proto-es/v1/command_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";
 
 export interface AuthSlice {
@@ -35,6 +39,7 @@ export interface CommandSlice {
   commands: Command[];
   commandsLoading: boolean;
   activeOutputs: Record<string, CommandOutput[]>;
+  activeEvents: Record<string, CommandEvent[]>;
 
   sendCommand: (
     agent: string,
@@ -43,6 +48,10 @@ export interface CommandSlice {
       env?: Record<string, string>;
       workingDir?: string;
       timeoutSeconds?: number;
+      executorKind?: number;
+      instruction?: string;
+      profile?: string;
+      allowDiff?: boolean;
     }
   ) => Promise<Command>;
   cancelCommand: (name: string) => Promise<Command>;
@@ -52,6 +61,7 @@ export interface CommandSlice {
   ) => Promise<{ commands: Command[]; nextPageToken: string } | undefined>;
   getCommand: (name: string) => Promise<Command | undefined>;
   watchCommand: (name: string, signal?: AbortSignal) => Promise<void>;
+  watchCommandEvents: (name: string, signal?: AbortSignal) => Promise<void>;
 }
 
 export type AppStoreState = AuthSlice & AgentSlice & CommandSlice;

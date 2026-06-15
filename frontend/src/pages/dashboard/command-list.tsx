@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Badge } from "@/react/components/ui/badge";
 import { Button } from "@/react/components/ui/button";
+import { Input } from "@/react/components/ui/input";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetTitle,
 } from "@/react/components/ui/sheet";
+import { Switch } from "@/react/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -18,7 +20,11 @@ import {
 } from "@/react/components/ui/table";
 import { Textarea } from "@/react/components/ui/textarea";
 import { useAppStore } from "@/react/stores";
-import { type Command, CommandStatus } from "@/types/proto-es/v1/command_pb";
+import {
+  type Command,
+  CommandStatus,
+  ExecutorKind,
+} from "@/types/proto-es/v1/command_pb";
 
 const statusLabels: Record<number, string> = {
   [CommandStatus.PENDING]: "Pending",
@@ -41,6 +47,12 @@ const statusVariants: Record<
   [CommandStatus.TIMEOUT]: "destructive",
 };
 
+const executorKindLabels: Record<number, string> = {
+  [ExecutorKind.EXECUTOR_KIND_UNSPECIFIED]: "",
+  [ExecutorKind.SHELL]: "Shell",
+  [ExecutorKind.ACP]: "ACP",
+};
+
 function formatDuration(ms: number | bigint | undefined): string {
   if (ms === undefined || ms === 0n) return "-";
   const num = Number(ms);
@@ -59,6 +71,9 @@ export function CommandListPage() {
 
   const [sendOpen, setSendOpen] = useState(false);
   const [cmdText, setCmdText] = useState("");
+  const [instruction, setInstruction] = useState("");
+  const [profile, setProfile] = useState("");
+  const [isACP, setIsACP] = useState(false);
   const [sending, setSending] = useState(false);
 
   const agent = `agents/${agentId}`;
@@ -73,11 +88,22 @@ export function CommandListPage() {
   }, [load]);
 
   const handleSend = async () => {
-    if (!cmdText.trim() || !agent) return;
+    if (!agent) return;
+    if (isACP) {
+      if (!instruction.trim() && !cmdText.trim()) return;
+    } else {
+      if (!cmdText.trim()) return;
+    }
     setSending(true);
     try {
-      await sendCommand(agent, cmdText.trim());
+      await sendCommand(agent, cmdText.trim(), {
+        executorKind: isACP ? ExecutorKind.ACP : ExecutorKind.SHELL,
+        instruction: instruction.trim(),
+        profile,
+      });
       setCmdText("");
+      setInstruction("");
+      setProfile("");
       setSendOpen(false);
       load();
     } finally {
@@ -85,16 +111,23 @@ export function CommandListPage() {
     }
   };
 
+  const canSend = isACP ? instruction.trim() || cmdText.trim() : cmdText.trim();
+
   function handleRowClick(cmd: Command) {
     if (!cmd.name) return;
     navigate(`/agents/${agentId}/commands/${cmd.name.split("/").pop()}`);
+  }
+
+  function displayCommandText(cmd: Command): string {
+    if (cmd.instruction) return cmd.instruction;
+    return cmd.command;
   }
 
   return (
     <div className="p-6 flex flex-col gap-4 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-main">Commands</h1>
-        <Button onClick={() => setSendOpen(true)}>Send Command</Button>
+        <Button onClick={() => setSendOpen(true)}>Send Task</Button>
       </div>
 
       <Sheet
@@ -102,21 +135,63 @@ export function CommandListPage() {
         onOpenChange={(next) => !next && setSendOpen(false)}
       >
         <SheetContent width="standard">
-          <SheetTitle>Send Command</SheetTitle>
-          <SheetDescription>
-            Send a bash command to agent {agentId}
-          </SheetDescription>
+          <SheetTitle>Send Task</SheetTitle>
+          <SheetDescription>Send a task to agent {agentId}</SheetDescription>
           <div className="flex flex-col gap-4 pt-4">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm text-control-light">Command</span>
-              <Textarea
-                className="font-mono text-sm min-h-[120px]"
-                placeholder="e.g. apt-get update -y"
-                value={cmdText}
-                onChange={(e) => setCmdText(e.target.value)}
-              />
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-control">ACP Task</span>
+              <Switch checked={isACP} onCheckedChange={setIsACP} />
             </div>
-            <Button disabled={sending || !cmdText.trim()} onClick={handleSend}>
+
+            {isACP ? (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm text-control-light">
+                    Instruction (natural language)
+                  </span>
+                  <Textarea
+                    className="font-mono text-sm min-h-[120px]"
+                    placeholder="e.g. Read the file config.yaml and report the port numbers in use"
+                    value={instruction}
+                    onChange={(e) => setInstruction(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm text-control-light">
+                    Profile (optional — leave empty for agent default)
+                  </span>
+                  <Input
+                    placeholder="e.g. default-acp"
+                    value={profile}
+                    onChange={(e) => setProfile(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm text-control-light">
+                    Shell command fallback
+                  </span>
+                  <Textarea
+                    className="font-mono text-xs min-h-[60px]"
+                    placeholder="Optional shell command fallback"
+                    value={cmdText}
+                    onChange={(e) => setCmdText(e.target.value)}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm text-control-light">
+                  Shell Command
+                </span>
+                <Textarea
+                  className="font-mono text-sm min-h-[120px]"
+                  placeholder="e.g. apt-get update -y"
+                  value={cmdText}
+                  onChange={(e) => setCmdText(e.target.value)}
+                />
+              </div>
+            )}
+            <Button disabled={sending || !canSend} onClick={handleSend}>
               {sending ? "Sending..." : "Send"}
             </Button>
           </div>
@@ -126,22 +201,23 @@ export function CommandListPage() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-20">Type</TableHead>
             <TableHead className="w-24">Status</TableHead>
-            <TableHead>Command</TableHead>
+            <TableHead>Task</TableHead>
             <TableHead className="w-28">Duration</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading && (
             <TableRow>
-              <TableCell colSpan={3} className="text-center text-control-light">
+              <TableCell colSpan={4} className="text-center text-control-light">
                 Loading...
               </TableCell>
             </TableRow>
           )}
           {!loading && commands.length === 0 && (
             <TableRow>
-              <TableCell colSpan={3} className="text-center text-control-light">
+              <TableCell colSpan={4} className="text-center text-control-light">
                 No commands yet
               </TableCell>
             </TableRow>
@@ -153,12 +229,17 @@ export function CommandListPage() {
               onClick={() => handleRowClick(cmd)}
             >
               <TableCell>
+                <span className="text-xs text-control-light">
+                  {executorKindLabels[cmd.executorKind] ?? "Shell"}
+                </span>
+              </TableCell>
+              <TableCell>
                 <Badge variant={statusVariants[cmd.status] ?? "default"}>
                   {statusLabels[cmd.status] ?? "Unknown"}
                 </Badge>
               </TableCell>
               <TableCell className="font-mono text-xs truncate max-w-md">
-                {cmd.command}
+                {displayCommandText(cmd)}
               </TableCell>
               <TableCell className="text-control-light text-xs">
                 {formatDuration(cmd.durationMs)}

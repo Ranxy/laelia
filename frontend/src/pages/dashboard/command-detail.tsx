@@ -3,8 +3,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { CommandTerminal } from "@/react/components/command-terminal";
 import { Badge } from "@/react/components/ui/badge";
 import { Button } from "@/react/components/ui/button";
+import { cn } from "@/react/lib/utils";
 import { useAppStore } from "@/react/stores";
-import { CommandStatus } from "@/types/proto-es/v1/command_pb";
+import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
+import {
+  CommandEventType,
+  CommandStatus,
+  ExecutorKind,
+} from "@/types/proto-es/v1/command_pb";
 
 const statusLabels: Record<number, string> = {
   [CommandStatus.PENDING]: "Pending",
@@ -27,6 +33,27 @@ const statusVariants: Record<
   [CommandStatus.TIMEOUT]: "destructive",
 };
 
+const eventTypeLabels: Record<number, string> = {
+  [CommandEventType.LIFECYCLE]: "Lifecycle",
+  [CommandEventType.TEXT_DELTA]: "Text",
+  [CommandEventType.TOOL_CALL_STARTED]: "Tool Started",
+  [CommandEventType.TOOL_CALL_FINISHED]: "Tool Finished",
+  [CommandEventType.DIFF_EMITTED]: "Diff",
+  [CommandEventType.WARNING]: "Warning",
+  [CommandEventType.RAW_ACP]: "Raw ACP",
+  [CommandEventType.FINAL_SUMMARY]: "Final Summary",
+};
+
+const eventTypeColors: Record<number, string> = {
+  [CommandEventType.LIFECYCLE]: "text-control-light",
+  [CommandEventType.TOOL_CALL_STARTED]: "text-blue-400",
+  [CommandEventType.TOOL_CALL_FINISHED]: "text-green-400",
+  [CommandEventType.DIFF_EMITTED]: "text-purple-400",
+  [CommandEventType.WARNING]: "text-amber-400",
+  [CommandEventType.RAW_ACP]: "text-zinc-500",
+  [CommandEventType.FINAL_SUMMARY]: "text-emerald-400",
+};
+
 function formatDuration(ms: number | bigint | undefined): string {
   if (ms === undefined || ms === 0n) return "-";
   const num = Number(ms);
@@ -40,6 +67,70 @@ function formatTimestamp(ts: { seconds?: bigint } | undefined): string {
   return new Date(Number(ts.seconds) * 1000).toLocaleString();
 }
 
+function formatEventTimestamp(ev: CommandEvent): string {
+  if (ev.timestamp?.seconds) {
+    return new Date(Number(ev.timestamp.seconds) * 1000).toLocaleTimeString();
+  }
+  return "";
+}
+
+function isVisibleEvent(event: CommandEvent): boolean {
+  return (
+    event.type !== CommandEventType.TEXT_DELTA &&
+    event.type !== CommandEventType.COMMAND_EVENT_TYPE_UNSPECIFIED
+  );
+}
+
+function EventRow({ event }: { event: CommandEvent }) {
+  const [expanded, setExpanded] = useState(false);
+  const isRaw = event.type === CommandEventType.RAW_ACP;
+  const showExpand = isRaw || event.type === CommandEventType.DIFF_EMITTED;
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-1 py-1.5 px-3 rounded border border-control-border",
+        isRaw && "opacity-60"
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <span
+          className={cn(
+            "text-xs font-medium",
+            eventTypeColors[event.type] ?? "text-control"
+          )}
+        >
+          {eventTypeLabels[event.type] ?? `Event ${event.type}`}
+        </span>
+        <span className="text-xs text-control-light">#{event.seqNo}</span>
+        {event.summary && (
+          <span className="text-xs text-control truncate flex-1">
+            {event.summary.slice(0, 120)}
+          </span>
+        )}
+        {showExpand && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs"
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? "Collapse" : "Details"}
+          </Button>
+        )}
+        <span className="text-xs text-control-light ml-auto">
+          {formatEventTimestamp(event)}
+        </span>
+      </div>
+      {expanded && event.payload && (
+        <pre className="text-xs text-control-light font-mono bg-zinc-900 rounded p-2 mt-1 overflow-auto max-h-64 whitespace-pre-wrap">
+          {JSON.stringify(event.payload, null, 2)}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 export function CommandDetailPage() {
   const navigate = useNavigate();
   const { agentId, commandId } = useParams<{
@@ -49,12 +140,18 @@ export function CommandDetailPage() {
   const getCommand = useAppStore((s) => s.getCommand);
   const cancelCommand = useAppStore((s) => s.cancelCommand);
   const watchCommand = useAppStore((s) => s.watchCommand);
+  const watchCommandEvents = useAppStore((s) => s.watchCommandEvents);
   const activeOutputs = useAppStore((s) => s.activeOutputs);
+  const activeEvents = useAppStore((s) => s.activeEvents);
   const abortRef = useRef<AbortController | null>(null);
 
   const [cmd, setCmd] = useState<{
     name: string;
     command: string;
+    instruction: string;
+    profile: string;
+    executorKind: number;
+    finalSummary: string;
     status: number;
     exitCode: number;
     durationMs: bigint;
@@ -73,6 +170,10 @@ export function CommandDetailPage() {
     setCmd({
       name: c.name,
       command: c.command,
+      instruction: c.instruction,
+      profile: c.profile,
+      executorKind: c.executorKind,
+      finalSummary: c.finalSummary,
       status: c.status,
       exitCode: c.exitCode,
       durationMs: c.durationMs,
@@ -94,16 +195,17 @@ export function CommandDetailPage() {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    watchCommand(cmdName, controller.signal).catch(() => {
-      // stream aborted or failed — expected on unmount
-    });
+    watchCommand(cmdName, controller.signal).catch(() => {});
+    watchCommandEvents(cmdName, controller.signal).catch(() => {});
 
     return () => {
       controller.abort();
     };
-  }, [cmdName, watchCommand]);
+  }, [cmdName, watchCommand, watchCommandEvents]);
 
   const outputs = activeOutputs[cmdName] ?? [];
+  const events = activeEvents[cmdName] ?? [];
+  const visibleEvents = events.filter(isVisibleEvent);
 
   const handleCancel = async () => {
     if (!cmdName) return;
@@ -120,6 +222,7 @@ export function CommandDetailPage() {
     cmd &&
     (cmd.status === CommandStatus.PENDING ||
       cmd.status === CommandStatus.RUNNING);
+  const isACP = cmd && cmd.executorKind === ExecutorKind.ACP;
 
   return (
     <div className="p-6 flex flex-col gap-4 w-full">
@@ -138,8 +241,9 @@ export function CommandDetailPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h1 className="text-lg font-mono font-semibold text-main truncate max-w-xl">
-                {cmd.command}
+                {cmd.instruction || cmd.command}
               </h1>
+              {isACP && <Badge variant="secondary">ACP</Badge>}
               <Badge variant={statusVariants[cmd.status] ?? "default"}>
                 {statusLabels[cmd.status] ?? "Unknown"}
               </Badge>
@@ -155,13 +259,17 @@ export function CommandDetailPage() {
             )}
           </div>
 
+          {isACP && cmd.profile && (
+            <div className="text-xs text-control-light">
+              Profile: {cmd.profile}
+            </div>
+          )}
+
           <div className="flex gap-6 text-sm text-control-light">
             <span>Duration: {formatDuration(cmd.durationMs)}</span>
-            {cmd.exitCode !== 0 &&
-              cmd.status === CommandStatus.FAILED &&
-              cmd.exitCode !== undefined && (
-                <span>Exit code: {cmd.exitCode}</span>
-              )}
+            {cmd.exitCode !== undefined && cmd.exitCode !== 0 && (
+              <span>Exit code: {cmd.exitCode}</span>
+            )}
             {cmd.principalName && <span>Sent by: {cmd.principalName}</span>}
             <span>{cmd.created}</span>
           </div>
@@ -171,10 +279,48 @@ export function CommandDetailPage() {
               {cmd.errorMessage}
             </div>
           )}
+
+          {cmd.finalSummary && (
+            <div className="rounded bg-accent/10 border border-control-border p-3">
+              <div className="text-xs font-medium text-control mb-1">
+                Final Summary
+              </div>
+              <div className="text-sm text-main whitespace-pre-wrap">
+                {cmd.finalSummary}
+              </div>
+            </div>
+          )}
         </>
       )}
 
-      <CommandTerminal outputs={outputs} className="min-h-[400px]" />
+      <div className="flex flex-col gap-4 lg:flex-row">
+        <div className="flex-1 flex flex-col gap-2">
+          <h2 className="text-sm font-medium text-control">Output</h2>
+          <CommandTerminal outputs={outputs} className="min-h-[300px]" />
+        </div>
+
+        {isACP && visibleEvents.length > 0 && (
+          <div className="flex-1 flex flex-col gap-2">
+            <h2 className="text-sm font-medium text-control">Events</h2>
+            <div className="rounded border border-control-border p-2 flex flex-col gap-1 max-h-[400px] overflow-auto">
+              {visibleEvents.map((ev) => (
+                <EventRow key={ev.seqNo} event={ev} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isACP &&
+          visibleEvents.length === 0 &&
+          cmd.status === CommandStatus.RUNNING && (
+            <div className="flex-1 flex flex-col gap-2">
+              <h2 className="text-sm font-medium text-control">Events</h2>
+              <div className="rounded border border-control-border p-4 text-xs text-control-light">
+                Waiting for structured events...
+              </div>
+            </div>
+          )}
+      </div>
     </div>
   );
 }
