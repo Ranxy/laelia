@@ -647,15 +647,10 @@ func (c *acpRuntimeClient) appendSummary(text string) {
 	}
 	c.executor.warnMu.Lock()
 	defer c.executor.warnMu.Unlock()
-	buffer := c.executor.summaryText
-	if len(buffer) >= 8192 {
+	if len(c.executor.summaryText) >= 8192 {
 		return
 	}
-	if buffer != "" {
-		buffer += "\n"
-	}
-	buffer += trimmed
-	c.executor.summaryText = buffer
+	c.executor.summaryText += trimmed
 }
 
 func (c *acpRuntimeClient) finalSummary() string {
