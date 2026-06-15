@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 
-	models "github.com/Ranxy/laelia/backend/generated-go/store"
 	lru "github.com/hashicorp/golang-lru/v2"
+
+	models "github.com/Ranxy/laelia/backend/generated-go/store"
 )
 
 type Store struct {
