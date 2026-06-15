@@ -12,6 +12,7 @@ This file provides guidance to Copilot (codex/claude.ai/code) when working with 
    - **Important**: Run golangci-lint repeatedly until there are no issues. The linter has a max-issues limit and may not show all issues in a single run.
 3. **Auto-fix**: Use `golangci-lint run --fix --allow-parallel-runners` to fix issues automatically
 4. **Test**: Run relevant tests before committing
+  - If you change ACP stdio integration or anything that could break real local ACP execution, also run `LAELIA_RUN_OPENCODE_ACP_TESTS=1 go test ./backend/agent/executor -count=1` on a machine with local `opencode acp` available.
 5. **Build**: `go build -ldflags "-w -s" -p=16 -o ./build/laelia ./backend/manager/bin/server/main.go`
 
 ### Frontend Code Changes
@@ -45,6 +46,9 @@ go test -v -count=1 github.com/Ranxy/laelia/backend/manager/path/to/tests -run ^
 
 # Run multiple tests
 go test -v -count=1 github.com/Ranxy/laelia/backend/manager/path/to/tests -run ^(TestFunctionName|TestFunctionNameTwo)$
+
+# Run ACP executor integration tests against local opencode ACP when stdio/runtime integration changes
+LAELIA_RUN_OPENCODE_ACP_TESTS=1 go test ./backend/agent/executor -count=1
 
 # Lint
 golangci-lint run --allow-parallel-runners
