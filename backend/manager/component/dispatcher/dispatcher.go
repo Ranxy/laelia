@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -32,21 +33,23 @@ type AgentSession struct {
 }
 
 type Dispatcher struct {
-	store        *store.Store
-	mu           sync.RWMutex
-	sessions     map[int]*AgentSession
-	watchers     map[string]map[chan *v1pb.CommandOutput]struct{}
-	pingInterval time.Duration
-	pingTimeout  time.Duration
+	store         *store.Store
+	mu            sync.RWMutex
+	sessions      map[int]*AgentSession
+	watchers      map[string]map[chan *v1pb.CommandOutput]struct{}
+	eventWatchers map[string]map[chan *v1pb.CommandEvent]struct{}
+	pingInterval  time.Duration
+	pingTimeout   time.Duration
 }
 
 func New(s *store.Store) *Dispatcher {
 	return &Dispatcher{
-		store:        s,
-		sessions:     make(map[int]*AgentSession),
-		watchers:     make(map[string]map[chan *v1pb.CommandOutput]struct{}),
-		pingInterval: 15 * time.Second,
-		pingTimeout:  45 * time.Second, // allow 3 missed pings
+		store:         s,
+		sessions:      make(map[int]*AgentSession),
+		watchers:      make(map[string]map[chan *v1pb.CommandOutput]struct{}),
+		eventWatchers: make(map[string]map[chan *v1pb.CommandEvent]struct{}),
+		pingInterval:  15 * time.Second,
+		pingTimeout:   45 * time.Second, // allow 3 missed pings
 	}
 }
 
@@ -137,6 +140,10 @@ func (d *Dispatcher) DispatchCommand(ctx context.Context, cmd *store.CommandMess
 				Env:            parseEnvJSON(cmd.Env),
 				WorkingDir:     cmd.WorkingDir,
 				TimeoutSeconds: cmd.TimeoutSeconds,
+				ExecutorKind:   v1pb.ExecutorKind(cmd.ExecutorKind),
+				Instruction:    cmd.Instruction,
+				Profile:        cmd.Profile,
+				AllowDiff:      cmd.AllowDiff,
 			},
 		},
 	}
@@ -219,6 +226,32 @@ func (d *Dispatcher) Unsubscribe(commandID string, ch chan *v1pb.CommandOutput) 
 	}
 }
 
+func (d *Dispatcher) SubscribeEvents(_ context.Context, commandID string) (chan *v1pb.CommandEvent, error) {
+	ch := make(chan *v1pb.CommandEvent, watcherBufSize)
+
+	d.mu.Lock()
+	if d.eventWatchers[commandID] == nil {
+		d.eventWatchers[commandID] = make(map[chan *v1pb.CommandEvent]struct{})
+	}
+	d.eventWatchers[commandID][ch] = struct{}{}
+	d.mu.Unlock()
+
+	return ch, nil
+}
+
+func (d *Dispatcher) UnsubscribeEvents(commandID string, ch chan *v1pb.CommandEvent) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if watchers, ok := d.eventWatchers[commandID]; ok {
+		delete(watchers, ch)
+		close(ch)
+		if len(watchers) == 0 {
+			delete(d.eventWatchers, commandID)
+		}
+	}
+}
+
 func (d *Dispatcher) broadcast(commandID string, output *v1pb.CommandOutput) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
@@ -226,6 +259,19 @@ func (d *Dispatcher) broadcast(commandID string, output *v1pb.CommandOutput) {
 	for ch := range d.watchers[commandID] {
 		select {
 		case ch <- output:
+		default:
+			// watcher too slow, drop
+		}
+	}
+}
+
+func (d *Dispatcher) broadcastEvent(commandID string, event *v1pb.CommandEvent) {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	for ch := range d.eventWatchers[commandID] {
+		select {
+		case ch <- event:
 		default:
 			// watcher too slow, drop
 		}
@@ -245,6 +291,39 @@ func (d *Dispatcher) HandleProgress(ctx context.Context, _ int, progress *v1pb.C
 	}
 
 	d.broadcast(progress.CommandId, output)
+	return nil
+}
+
+func (d *Dispatcher) HandleEvent(ctx context.Context, event *v1pb.CommandEvent) error {
+	cmdID, err := uuid.Parse(event.CommandId)
+	if err != nil {
+		return errors.Wrapf(err, "invalid command ID in event")
+	}
+
+	payloadJSON := "{}"
+	if event.Payload != nil {
+		data, err := protojson.Marshal(event.Payload)
+		if err != nil {
+			return errors.Wrapf(err, "failed to marshal command event payload")
+		}
+		payloadJSON = string(data)
+	}
+
+	if err := d.store.AppendCommandEvent(ctx, &store.CommandEventMessage{
+		CommandID:   cmdID,
+		SeqNo:       event.SeqNo,
+		EventType:   int32(event.Type),
+		Summary:     event.Summary,
+		PayloadJSON: payloadJSON,
+	}); err != nil {
+		return errors.Wrapf(err, "failed to store command event")
+	}
+
+	if err := d.store.UpdateCommandAckSeq(ctx, cmdID, event.SeqNo); err != nil {
+		slog.Error("failed to update command ack seq from event", "commandID", event.CommandId, "error", err)
+	}
+
+	d.broadcastEvent(event.CommandId, event)
 	return nil
 }
 
@@ -285,6 +364,19 @@ func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb
 		slog.Error("failed to update ack seq", "commandID", cmdID, "error", err)
 	}
 
+	resultJSON := ""
+	if result.Result != nil {
+		data, err := protojson.Marshal(result.Result)
+		if err != nil {
+			slog.Error("failed to marshal command result struct", "commandID", result.CommandId, "error", err)
+		} else {
+			resultJSON = string(data)
+		}
+	}
+	if err := d.store.UpdateCommandResultSummary(ctx, cmdID, result.FinalSummary, resultJSON); err != nil {
+		slog.Error("failed to update command result summary", "commandID", cmdID, "error", err)
+	}
+
 	output := &v1pb.CommandOutput{
 		CommandId: result.CommandId,
 		Type:      v1pb.CommandOutput_SYSTEM,
@@ -297,6 +389,7 @@ func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb
 	go func() {
 		time.Sleep(100 * time.Millisecond)
 		d.closeWatchers(result.CommandId)
+		d.closeEventWatchers(result.CommandId)
 	}()
 
 	slog.Info("command completed", "commandID", result.CommandId, "exitCode", result.ExitCode, "duration_ms", result.DurationMs)
@@ -427,6 +520,16 @@ func (d *Dispatcher) closeWatchers(commandID string) {
 		close(ch)
 	}
 	delete(d.watchers, commandID)
+}
+
+func (d *Dispatcher) closeEventWatchers(commandID string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	for ch := range d.eventWatchers[commandID] {
+		close(ch)
+	}
+	delete(d.eventWatchers, commandID)
 }
 
 func parseEnvJSON(_ string) map[string]string {

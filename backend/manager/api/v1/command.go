@@ -9,6 +9,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -28,7 +30,21 @@ func NewCommandService(s *store.Store, d *dispatcher.Dispatcher) *CommandService
 }
 
 func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v1pb.SendCommandRequest]) (*connect.Response[v1pb.Command], error) {
-	if req.Msg.Command == "" {
+	executorKind := req.Msg.ExecutorKind
+	if executorKind == v1pb.ExecutorKind_EXECUTOR_KIND_UNSPECIFIED {
+		executorKind = v1pb.ExecutorKind_SHELL
+	}
+	if executorKind == v1pb.ExecutorKind_ACP {
+		if req.Msg.Instruction == "" && req.Msg.Command == "" {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("instruction must not be empty for ACP tasks"))
+		}
+		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("ACP runtime is not enabled yet; phase 1 only provisions contracts and storage"))
+	}
+
+	commandText := req.Msg.Command
+	instruction := req.Msg.Instruction
+
+	if commandText == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("command must not be empty"))
 	}
 
@@ -57,7 +73,11 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 	cmd := &store.CommandMessage{
 		AgentID:        agent.ID,
 		PrincipalID:    principalID,
-		Command:        req.Msg.Command,
+		Command:        commandText,
+		Instruction:    instruction,
+		Profile:        req.Msg.Profile,
+		ExecutorKind:   int32(executorKind),
+		AllowDiff:      req.Msg.AllowDiff,
 		Status:         1, // PENDING
 		Env:            string(envBytes),
 		WorkingDir:     req.Msg.WorkingDir,
@@ -213,6 +233,48 @@ func (s *CommandService) WatchCommand(ctx context.Context, req *connect.Request[
 	}
 }
 
+func (s *CommandService) WatchCommandEvents(ctx context.Context, req *connect.Request[v1pb.WatchCommandEventsRequest], stream *connect.ServerStream[v1pb.CommandEvent]) error {
+	cmd, err := s.store.GetCommandByName(ctx, req.Msg.Name)
+	if err != nil {
+		return connect.NewError(connect.CodeNotFound, err)
+	}
+
+	historicalEvents, err := s.store.GetCommandEvents(ctx, cmd.ID, req.Msg.AfterSeqNo)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get historical command events"))
+	}
+
+	for _, event := range historicalEvents {
+		if err := stream.Send(convertToV1CommandEvent(event)); err != nil {
+			return err
+		}
+	}
+
+	if cmd.Status != 1 && cmd.Status != 2 {
+		return nil
+	}
+
+	ch, err := s.dispatcher.SubscribeEvents(ctx, cmd.ID.String())
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to subscribe command events"))
+	}
+	defer s.dispatcher.UnsubscribeEvents(cmd.ID.String(), ch)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case event, ok := <-ch:
+			if !ok {
+				return nil
+			}
+			if err := stream.Send(event); err != nil {
+				return err
+			}
+		}
+	}
+}
+
 func parseAgentResourceID(agent string) string {
 	parts := strings.Split(agent, "/")
 	if len(parts) >= 4 && parts[0] == "agents" {
@@ -231,9 +293,14 @@ func convertToV1Command(cmd *store.CommandMessage) *v1pb.Command {
 		PrincipalId:   formatPrincipalID(cmd.PrincipalID),
 		PrincipalName: cmd.PrincipalName,
 		Command:       cmd.Command,
+		Instruction:   cmd.Instruction,
+		Profile:       cmd.Profile,
+		ExecutorKind:  v1pb.ExecutorKind(cmd.ExecutorKind),
+		AllowDiff:     cmd.AllowDiff,
 		Status:        v1pb.CommandStatus(cmd.Status),
 		CreatedAt:     timestamppb.New(cmd.CreatedAt),
 		ErrorMessage:  cmd.ErrorMessage,
+		FinalSummary:  cmd.FinalSummary,
 		WorkingDir:    cmd.WorkingDir,
 	}
 
@@ -256,8 +323,31 @@ func convertToV1Command(cmd *store.CommandMessage) *v1pb.Command {
 			v1cmd.Env = envMap
 		}
 	}
+	if cmd.ResultJSON != "" && cmd.ResultJSON != "{}" {
+		result := &structpb.Struct{}
+		if err := protojson.Unmarshal([]byte(cmd.ResultJSON), result); err == nil {
+			v1cmd.Result = result
+		}
+	}
 
 	return v1cmd
+}
+
+func convertToV1CommandEvent(event *store.CommandEventMessage) *v1pb.CommandEvent {
+	v1Event := &v1pb.CommandEvent{
+		CommandId: event.CommandID.String(),
+		SeqNo:     event.SeqNo,
+		Type:      v1pb.CommandEventType(event.EventType),
+		Summary:   event.Summary,
+		Timestamp: timestamppb.New(event.CreatedAt),
+	}
+	if event.PayloadJSON != "" && event.PayloadJSON != "{}" {
+		payload := &structpb.Struct{}
+		if err := protojson.Unmarshal([]byte(event.PayloadJSON), payload); err == nil {
+			v1Event.Payload = payload
+		}
+	}
+	return v1Event
 }
 
 func formatCommandName(agentResourceID string, commandID uuid.UUID) string {

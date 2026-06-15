@@ -4,6 +4,7 @@
 ## Table of Contents
 
 - [store/agent.proto](#store_agent-proto)
+    - [AgentCapability](#laelia-store-AgentCapability)
     - [AgentInfo](#laelia-store-AgentInfo)
     - [AgentInfo.LabelsEntry](#laelia-store-AgentInfo-LabelsEntry)
     - [AgentStatus](#laelia-store-AgentStatus)
@@ -77,6 +78,29 @@
 
 
 
+<a name="laelia-store-AgentCapability"></a>
+
+### AgentCapability
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| supports_acp | [bool](#bool) |  |  |
+| available_profiles | [string](#string) | repeated |  |
+| max_timeout_seconds | [int32](#int32) |  |  |
+| supports_diff | [bool](#bool) |  |  |
+| supports_raw_events | [bool](#bool) |  |  |
+| supports_tool_traces | [bool](#bool) |  |  |
+| max_event_count | [int32](#int32) |  |  |
+| max_output_bytes | [int64](#int64) |  |  |
+| default_profile | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-store-AgentInfo"></a>
 
 ### AgentInfo
@@ -92,6 +116,7 @@
 | ip | [string](#string) |  |  |
 | version | [string](#string) |  |  |
 | labels | [AgentInfo.LabelsEntry](#laelia-store-AgentInfo-LabelsEntry) | repeated |  |
+| capability | [AgentCapability](#laelia-store-AgentCapability) |  |  |
 
 
 

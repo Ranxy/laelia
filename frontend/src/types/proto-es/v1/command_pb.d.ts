@@ -3,7 +3,7 @@
 /* eslint-disable */
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import type { Message } from "@bufbuild/protobuf";
+import type { JsonObject, Message } from "@bufbuild/protobuf";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 
 /**
@@ -84,6 +84,36 @@ export declare type Command = Message<"laelia.v1.Command"> & {
    * @generated from field: string working_dir = 14;
    */
   workingDir: string;
+
+  /**
+   * @generated from field: laelia.v1.ExecutorKind executor_kind = 15;
+   */
+  executorKind: ExecutorKind;
+
+  /**
+   * @generated from field: string instruction = 16;
+   */
+  instruction: string;
+
+  /**
+   * @generated from field: string profile = 17;
+   */
+  profile: string;
+
+  /**
+   * @generated from field: string final_summary = 18;
+   */
+  finalSummary: string;
+
+  /**
+   * @generated from field: google.protobuf.Struct result = 19;
+   */
+  result?: JsonObject | undefined;
+
+  /**
+   * @generated from field: bool allow_diff = 20;
+   */
+  allowDiff: boolean;
 };
 
 /**
@@ -159,6 +189,47 @@ export enum CommandOutput_StreamType {
 export declare const CommandOutput_StreamTypeSchema: GenEnum<CommandOutput_StreamType>;
 
 /**
+ * @generated from message laelia.v1.CommandEvent
+ */
+export declare type CommandEvent = Message<"laelia.v1.CommandEvent"> & {
+  /**
+   * @generated from field: string command_id = 1;
+   */
+  commandId: string;
+
+  /**
+   * @generated from field: int32 seq_no = 2;
+   */
+  seqNo: number;
+
+  /**
+   * @generated from field: laelia.v1.CommandEventType type = 3;
+   */
+  type: CommandEventType;
+
+  /**
+   * @generated from field: string summary = 4;
+   */
+  summary: string;
+
+  /**
+   * @generated from field: google.protobuf.Struct payload = 5;
+   */
+  payload?: JsonObject | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp timestamp = 6;
+   */
+  timestamp?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.CommandEvent.
+ * Use `create(CommandEventSchema)` to create a new message.
+ */
+export declare const CommandEventSchema: GenMessage<CommandEvent>;
+
+/**
  * @generated from message laelia.v1.AgentCommandMessage
  */
 export declare type AgentCommandMessage = Message<"laelia.v1.AgentCommandMessage"> & {
@@ -189,6 +260,12 @@ export declare type AgentCommandMessage = Message<"laelia.v1.AgentCommandMessage
      */
     value: Ping;
     case: "ping";
+  } | {
+    /**
+     * @generated from field: laelia.v1.CommandEvent event = 5;
+     */
+    value: CommandEvent;
+    case: "event";
   } | { case: undefined; value?: undefined };
 };
 
@@ -250,6 +327,11 @@ export declare type AgentReady = Message<"laelia.v1.AgentReady"> & {
    * @generated from field: int32 last_ack_seq = 3;
    */
   lastAckSeq: number;
+
+  /**
+   * @generated from field: int32 last_event_seq = 4;
+   */
+  lastEventSeq: number;
 };
 
 /**
@@ -286,6 +368,26 @@ export declare type CommandRequest = Message<"laelia.v1.CommandRequest"> & {
    * @generated from field: int32 timeout_seconds = 5;
    */
   timeoutSeconds: number;
+
+  /**
+   * @generated from field: laelia.v1.ExecutorKind executor_kind = 6;
+   */
+  executorKind: ExecutorKind;
+
+  /**
+   * @generated from field: string instruction = 7;
+   */
+  instruction: string;
+
+  /**
+   * @generated from field: string profile = 8;
+   */
+  profile: string;
+
+  /**
+   * @generated from field: bool allow_diff = 9;
+   */
+  allowDiff: boolean;
 };
 
 /**
@@ -353,6 +455,16 @@ export declare type CommandResult = Message<"laelia.v1.CommandResult"> & {
    * @generated from field: int32 last_seq_no = 5;
    */
   lastSeqNo: number;
+
+  /**
+   * @generated from field: string final_summary = 6;
+   */
+  finalSummary: string;
+
+  /**
+   * @generated from field: google.protobuf.Struct result = 7;
+   */
+  result?: JsonObject | undefined;
 };
 
 /**
@@ -447,6 +559,26 @@ export declare type SendCommandRequest = Message<"laelia.v1.SendCommandRequest">
    * @generated from field: int32 timeout_seconds = 5;
    */
   timeoutSeconds: number;
+
+  /**
+   * @generated from field: laelia.v1.ExecutorKind executor_kind = 6;
+   */
+  executorKind: ExecutorKind;
+
+  /**
+   * @generated from field: string instruction = 7;
+   */
+  instruction: string;
+
+  /**
+   * @generated from field: string profile = 8;
+   */
+  profile: string;
+
+  /**
+   * @generated from field: bool allow_diff = 9;
+   */
+  allowDiff: boolean;
 };
 
 /**
@@ -566,6 +698,27 @@ export declare type WatchCommandRequest = Message<"laelia.v1.WatchCommandRequest
 export declare const WatchCommandRequestSchema: GenMessage<WatchCommandRequest>;
 
 /**
+ * @generated from message laelia.v1.WatchCommandEventsRequest
+ */
+export declare type WatchCommandEventsRequest = Message<"laelia.v1.WatchCommandEventsRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: int32 after_seq_no = 2;
+   */
+  afterSeqNo: number;
+};
+
+/**
+ * Describes the message laelia.v1.WatchCommandEventsRequest.
+ * Use `create(WatchCommandEventsRequestSchema)` to create a new message.
+ */
+export declare const WatchCommandEventsRequestSchema: GenMessage<WatchCommandEventsRequest>;
+
+/**
  * @generated from enum laelia.v1.CommandStatus
  */
 export enum CommandStatus {
@@ -611,6 +764,86 @@ export enum CommandStatus {
 export declare const CommandStatusSchema: GenEnum<CommandStatus>;
 
 /**
+ * @generated from enum laelia.v1.ExecutorKind
+ */
+export enum ExecutorKind {
+  /**
+   * @generated from enum value: EXECUTOR_KIND_UNSPECIFIED = 0;
+   */
+  EXECUTOR_KIND_UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: SHELL = 1;
+   */
+  SHELL = 1,
+
+  /**
+   * @generated from enum value: ACP = 2;
+   */
+  ACP = 2,
+}
+
+/**
+ * Describes the enum laelia.v1.ExecutorKind.
+ */
+export declare const ExecutorKindSchema: GenEnum<ExecutorKind>;
+
+/**
+ * @generated from enum laelia.v1.CommandEventType
+ */
+export enum CommandEventType {
+  /**
+   * @generated from enum value: COMMAND_EVENT_TYPE_UNSPECIFIED = 0;
+   */
+  COMMAND_EVENT_TYPE_UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: LIFECYCLE = 1;
+   */
+  LIFECYCLE = 1,
+
+  /**
+   * @generated from enum value: TEXT_DELTA = 2;
+   */
+  TEXT_DELTA = 2,
+
+  /**
+   * @generated from enum value: TOOL_CALL_STARTED = 3;
+   */
+  TOOL_CALL_STARTED = 3,
+
+  /**
+   * @generated from enum value: TOOL_CALL_FINISHED = 4;
+   */
+  TOOL_CALL_FINISHED = 4,
+
+  /**
+   * @generated from enum value: DIFF_EMITTED = 5;
+   */
+  DIFF_EMITTED = 5,
+
+  /**
+   * @generated from enum value: WARNING = 6;
+   */
+  WARNING = 6,
+
+  /**
+   * @generated from enum value: RAW_ACP = 7;
+   */
+  RAW_ACP = 7,
+
+  /**
+   * @generated from enum value: FINAL_SUMMARY = 8;
+   */
+  FINAL_SUMMARY = 8,
+}
+
+/**
+ * Describes the enum laelia.v1.CommandEventType.
+ */
+export declare const CommandEventTypeSchema: GenEnum<CommandEventType>;
+
+/**
  * @generated from service laelia.v1.CommandService
  */
 export declare const CommandService: GenService<{
@@ -653,6 +886,14 @@ export declare const CommandService: GenService<{
     methodKind: "server_streaming";
     input: typeof WatchCommandRequestSchema;
     output: typeof CommandOutputSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.WatchCommandEvents
+   */
+  watchCommandEvents: {
+    methodKind: "server_streaming";
+    input: typeof WatchCommandEventsRequestSchema;
+    output: typeof CommandEventSchema;
   },
 }>;
 

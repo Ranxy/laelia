@@ -19,11 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CommandService_SendCommand_FullMethodName   = "/laelia.v1.CommandService/SendCommand"
-	CommandService_ListCommands_FullMethodName  = "/laelia.v1.CommandService/ListCommands"
-	CommandService_GetCommand_FullMethodName    = "/laelia.v1.CommandService/GetCommand"
-	CommandService_CancelCommand_FullMethodName = "/laelia.v1.CommandService/CancelCommand"
-	CommandService_WatchCommand_FullMethodName  = "/laelia.v1.CommandService/WatchCommand"
+	CommandService_SendCommand_FullMethodName        = "/laelia.v1.CommandService/SendCommand"
+	CommandService_ListCommands_FullMethodName       = "/laelia.v1.CommandService/ListCommands"
+	CommandService_GetCommand_FullMethodName         = "/laelia.v1.CommandService/GetCommand"
+	CommandService_CancelCommand_FullMethodName      = "/laelia.v1.CommandService/CancelCommand"
+	CommandService_WatchCommand_FullMethodName       = "/laelia.v1.CommandService/WatchCommand"
+	CommandService_WatchCommandEvents_FullMethodName = "/laelia.v1.CommandService/WatchCommandEvents"
 )
 
 // CommandServiceClient is the client API for CommandService service.
@@ -35,6 +36,7 @@ type CommandServiceClient interface {
 	GetCommand(ctx context.Context, in *GetCommandRequest, opts ...grpc.CallOption) (*Command, error)
 	CancelCommand(ctx context.Context, in *CancelCommandRequest, opts ...grpc.CallOption) (*Command, error)
 	WatchCommand(ctx context.Context, in *WatchCommandRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CommandOutput], error)
+	WatchCommandEvents(ctx context.Context, in *WatchCommandEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CommandEvent], error)
 }
 
 type commandServiceClient struct {
@@ -104,6 +106,25 @@ func (c *commandServiceClient) WatchCommand(ctx context.Context, in *WatchComman
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type CommandService_WatchCommandClient = grpc.ServerStreamingClient[CommandOutput]
 
+func (c *commandServiceClient) WatchCommandEvents(ctx context.Context, in *WatchCommandEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CommandEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &CommandService_ServiceDesc.Streams[1], CommandService_WatchCommandEvents_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[WatchCommandEventsRequest, CommandEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type CommandService_WatchCommandEventsClient = grpc.ServerStreamingClient[CommandEvent]
+
 // CommandServiceServer is the server API for CommandService service.
 // All implementations must embed UnimplementedCommandServiceServer
 // for forward compatibility.
@@ -113,6 +134,7 @@ type CommandServiceServer interface {
 	GetCommand(context.Context, *GetCommandRequest) (*Command, error)
 	CancelCommand(context.Context, *CancelCommandRequest) (*Command, error)
 	WatchCommand(*WatchCommandRequest, grpc.ServerStreamingServer[CommandOutput]) error
+	WatchCommandEvents(*WatchCommandEventsRequest, grpc.ServerStreamingServer[CommandEvent]) error
 	mustEmbedUnimplementedCommandServiceServer()
 }
 
@@ -137,6 +159,9 @@ func (UnimplementedCommandServiceServer) CancelCommand(context.Context, *CancelC
 }
 func (UnimplementedCommandServiceServer) WatchCommand(*WatchCommandRequest, grpc.ServerStreamingServer[CommandOutput]) error {
 	return status.Error(codes.Unimplemented, "method WatchCommand not implemented")
+}
+func (UnimplementedCommandServiceServer) WatchCommandEvents(*WatchCommandEventsRequest, grpc.ServerStreamingServer[CommandEvent]) error {
+	return status.Error(codes.Unimplemented, "method WatchCommandEvents not implemented")
 }
 func (UnimplementedCommandServiceServer) mustEmbedUnimplementedCommandServiceServer() {}
 func (UnimplementedCommandServiceServer) testEmbeddedByValue()                        {}
@@ -242,6 +267,17 @@ func _CommandService_WatchCommand_Handler(srv interface{}, stream grpc.ServerStr
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type CommandService_WatchCommandServer = grpc.ServerStreamingServer[CommandOutput]
 
+func _CommandService_WatchCommandEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(WatchCommandEventsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(CommandServiceServer).WatchCommandEvents(m, &grpc.GenericServerStream[WatchCommandEventsRequest, CommandEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type CommandService_WatchCommandEventsServer = grpc.ServerStreamingServer[CommandEvent]
+
 // CommandService_ServiceDesc is the grpc.ServiceDesc for CommandService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -270,6 +306,11 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "WatchCommand",
 			Handler:       _CommandService_WatchCommand_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "WatchCommandEvents",
+			Handler:       _CommandService_WatchCommandEvents_Handler,
 			ServerStreams: true,
 		},
 	},

@@ -18,6 +18,10 @@ type CommandMessage struct {
 	PrincipalID     int
 	PrincipalName   string
 	Command         string
+	Instruction     string
+	Profile         string
+	ExecutorKind    int32
+	AllowDiff       bool
 	Status          int32
 	ExitCode        sql.NullInt32
 	DurationMs      sql.NullInt64
@@ -25,6 +29,8 @@ type CommandMessage struct {
 	StartedAt       sql.NullTime
 	CompletedAt     sql.NullTime
 	ErrorMessage    string
+	FinalSummary    string
+	ResultJSON      string
 	Env             string
 	WorkingDir      string
 	TimeoutSeconds  int32
@@ -38,6 +44,16 @@ type CommandOutputMessage struct {
 	StreamType int32
 	Content    string
 	CreatedAt  time.Time
+}
+
+type CommandEventMessage struct {
+	ID          int64
+	CommandID   uuid.UUID
+	SeqNo       int32
+	EventType   int32
+	Summary     string
+	PayloadJSON string
+	CreatedAt   time.Time
 }
 
 type FindCommandMessage struct {
@@ -58,13 +74,17 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 	var createdAt time.Time
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO command (
-			agent_id, principal_id, command, status, env, working_dir, timeout_seconds
-		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+			agent_id, principal_id, command, instruction, profile, executor_kind, allow_diff, status, env, working_dir, timeout_seconds
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, created_at
 	`,
 		cmd.AgentID,
 		cmd.PrincipalID,
 		cmd.Command,
+		cmd.Instruction,
+		cmd.Profile,
+		cmd.ExecutorKind,
+		cmd.AllowDiff,
 		cmd.Status,
 		cmd.Env,
 		cmd.WorkingDir,
@@ -82,6 +102,10 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 		AgentID:        cmd.AgentID,
 		PrincipalID:    cmd.PrincipalID,
 		Command:        cmd.Command,
+		Instruction:    cmd.Instruction,
+		Profile:        cmd.Profile,
+		ExecutorKind:   cmd.ExecutorKind,
+		AllowDiff:      cmd.AllowDiff,
 		Status:         cmd.Status,
 		CreatedAt:      createdAt,
 		Env:            cmd.Env,
@@ -93,9 +117,9 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 
 func (s *Store) GetCommand(ctx context.Context, id uuid.UUID) (*CommandMessage, error) {
 	query := `SELECT
-		c.id, c.agent_id, c.principal_id, c.command, c.status,
+		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
-		c.error_message, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
+		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
 		COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id
@@ -126,9 +150,9 @@ func (s *Store) GetCommandByName(ctx context.Context, name string) (*CommandMess
 	}
 
 	query := `SELECT
-		c.id, c.agent_id, c.principal_id, c.command, c.status,
+		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
-		c.error_message, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
+		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
 		COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id
@@ -151,11 +175,12 @@ func scanCommand(row *sql.Row) (*CommandMessage, error) {
 	var durationMs sql.NullInt64
 	var startedAt sql.NullTime
 	var completedAt sql.NullTime
+	var resultJSON string
 
 	if err := row.Scan(
-		&cmd.ID, &cmd.AgentID, &cmd.PrincipalID, &cmd.Command, &cmd.Status,
+		&cmd.ID, &cmd.AgentID, &cmd.PrincipalID, &cmd.Command, &cmd.Instruction, &cmd.Profile, &cmd.ExecutorKind, &cmd.AllowDiff, &cmd.Status,
 		&exitCode, &durationMs, &cmd.CreatedAt, &startedAt, &completedAt,
-		&cmd.ErrorMessage, &cmd.Env, &cmd.WorkingDir, &cmd.TimeoutSeconds, &cmd.LastAckSeq,
+		&cmd.ErrorMessage, &cmd.FinalSummary, &resultJSON, &cmd.Env, &cmd.WorkingDir, &cmd.TimeoutSeconds, &cmd.LastAckSeq,
 		&cmd.PrincipalName, &cmd.AgentResourceID,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -168,6 +193,7 @@ func scanCommand(row *sql.Row) (*CommandMessage, error) {
 	cmd.DurationMs = durationMs
 	cmd.StartedAt = startedAt
 	cmd.CompletedAt = completedAt
+	cmd.ResultJSON = resultJSON
 	return &cmd, nil
 }
 
@@ -181,9 +207,9 @@ func (s *Store) ListCommands(ctx context.Context, find *FindCommandMessage) ([]*
 	}
 
 	query := `SELECT
-		c.id, c.agent_id, c.principal_id, c.command, c.status,
+		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
-		c.error_message, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
+		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
 		COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id
@@ -210,11 +236,12 @@ func (s *Store) ListCommands(ctx context.Context, find *FindCommandMessage) ([]*
 		var durationMs sql.NullInt64
 		var startedAt sql.NullTime
 		var completedAt sql.NullTime
+		var resultJSON string
 
 		if err := rows.Scan(
-			&cmd.ID, &cmd.AgentID, &cmd.PrincipalID, &cmd.Command, &cmd.Status,
+			&cmd.ID, &cmd.AgentID, &cmd.PrincipalID, &cmd.Command, &cmd.Instruction, &cmd.Profile, &cmd.ExecutorKind, &cmd.AllowDiff, &cmd.Status,
 			&exitCode, &durationMs, &cmd.CreatedAt, &startedAt, &completedAt,
-			&cmd.ErrorMessage, &cmd.Env, &cmd.WorkingDir, &cmd.TimeoutSeconds, &cmd.LastAckSeq,
+			&cmd.ErrorMessage, &cmd.FinalSummary, &resultJSON, &cmd.Env, &cmd.WorkingDir, &cmd.TimeoutSeconds, &cmd.LastAckSeq,
 			&cmd.PrincipalName, &cmd.AgentResourceID,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan command row")
@@ -224,6 +251,7 @@ func (s *Store) ListCommands(ctx context.Context, find *FindCommandMessage) ([]*
 		cmd.DurationMs = durationMs
 		cmd.StartedAt = startedAt
 		cmd.CompletedAt = completedAt
+		cmd.ResultJSON = resultJSON
 		commands = append(commands, &cmd)
 	}
 	if err := rows.Err(); err != nil {
@@ -278,6 +306,30 @@ func (s *Store) UpdateCommandAckSeq(ctx context.Context, id uuid.UUID, seq int32
 	return nil
 }
 
+func (s *Store) UpdateCommandResultSummary(ctx context.Context, id uuid.UUID, finalSummary, resultJSON string) error {
+	sets := make([]string, 0, 2)
+	args := make([]any, 0, 3)
+	if finalSummary != "" {
+		sets = append(sets, fmt.Sprintf("final_summary = $%d", len(args)+1))
+		args = append(args, finalSummary)
+	}
+	if resultJSON != "" {
+		sets = append(sets, fmt.Sprintf("result_json = $%d::jsonb", len(args)+1))
+		args = append(args, resultJSON)
+	}
+	if len(sets) == 0 {
+		return nil
+	}
+	args = append(args, id)
+	_, err := s.GetDB().ExecContext(ctx, fmt.Sprintf(`
+		UPDATE command SET %s WHERE id = $%d
+	`, strings.Join(sets, ", "), len(args)), args...)
+	if err != nil {
+		return errors.Wrapf(err, "failed to update command result summary")
+	}
+	return nil
+}
+
 func (s *Store) AppendCommandOutput(ctx context.Context, cmdID uuid.UUID, seqNo int32, streamType int32, content string) error {
 	_, err := s.GetDB().ExecContext(ctx, `
 		INSERT INTO command_output (command_id, seq_no, stream_type, content)
@@ -286,6 +338,18 @@ func (s *Store) AppendCommandOutput(ctx context.Context, cmdID uuid.UUID, seqNo 
 	`, cmdID, seqNo, streamType, content)
 	if err != nil {
 		return errors.Wrapf(err, "failed to append command output")
+	}
+	return nil
+}
+
+func (s *Store) AppendCommandEvent(ctx context.Context, event *CommandEventMessage) error {
+	_, err := s.GetDB().ExecContext(ctx, `
+		INSERT INTO command_event (command_id, seq_no, event_type, summary, payload_json)
+		VALUES ($1, $2, $3, $4, $5::jsonb)
+		ON CONFLICT (command_id, seq_no) DO NOTHING
+	`, event.CommandID, event.SeqNo, event.EventType, event.Summary, event.PayloadJSON)
+	if err != nil {
+		return errors.Wrapf(err, "failed to append command event")
 	}
 	return nil
 }
@@ -317,11 +381,38 @@ func (s *Store) GetCommandOutput(ctx context.Context, cmdID uuid.UUID, afterSeq 
 	return outputs, nil
 }
 
+func (s *Store) GetCommandEvents(ctx context.Context, cmdID uuid.UUID, afterSeq int32) ([]*CommandEventMessage, error) {
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT id, command_id, seq_no, event_type, summary, payload_json::text, created_at
+		FROM command_event
+		WHERE command_id = $1 AND seq_no > $2
+		ORDER BY seq_no ASC
+	`, cmdID, afterSeq)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get command events")
+	}
+	defer rows.Close()
+
+	var events []*CommandEventMessage
+	for rows.Next() {
+		var event CommandEventMessage
+		if err := rows.Scan(&event.ID, &event.CommandID, &event.SeqNo, &event.EventType, &event.Summary, &event.PayloadJSON, &event.CreatedAt); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan command event row")
+		}
+		events = append(events, &event)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate command event rows")
+	}
+
+	return events, nil
+}
+
 func (s *Store) GetNextPendingCommand(ctx context.Context, agentID int) (*CommandMessage, error) {
 	query := `SELECT
-		c.id, c.agent_id, c.principal_id, c.command, c.status,
+		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
-		c.error_message, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
+		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
 		COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id
@@ -335,9 +426,9 @@ func (s *Store) GetNextPendingCommand(ctx context.Context, agentID int) (*Comman
 
 func (s *Store) GetRunningCommand(ctx context.Context, agentID int) (*CommandMessage, error) {
 	query := `SELECT
-		c.id, c.agent_id, c.principal_id, c.command, c.status,
+		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
-		c.error_message, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
+		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
 		COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id

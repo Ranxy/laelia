@@ -329,6 +329,19 @@ message AgentInfo {
   string ip = 5;
   string version = 6;
   map<string, string> labels = 7;
+  AgentCapability capability = 8;
+}
+
+message AgentCapability {
+  bool supports_acp = 1;
+  repeated string available_profiles = 2;
+  int32 max_timeout_seconds = 3;
+  bool supports_diff = 4;
+  bool supports_raw_events = 5;
+  bool supports_tool_traces = 6;
+  int32 max_event_count = 7;
+  int64 max_output_bytes = 8;
+  string default_profile = 9;
 }
 
 message AgentStatus {

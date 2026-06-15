@@ -199,6 +199,10 @@ CREATE TABLE command (
     agent_id INTEGER NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
     principal_id INTEGER NOT NULL REFERENCES principal(id),
     command TEXT NOT NULL,
+    instruction TEXT NOT NULL DEFAULT '',
+    profile TEXT NOT NULL DEFAULT '',
+    executor_kind SMALLINT NOT NULL DEFAULT 1,
+    allow_diff BOOLEAN NOT NULL DEFAULT FALSE,
     -- status: 1=PENDING, 2=RUNNING, 3=COMPLETED, 4=FAILED, 5=CANCELLED, 6=TIMEOUT
     status SMALLINT NOT NULL DEFAULT 1,
     exit_code INTEGER,
@@ -212,6 +216,7 @@ CREATE TABLE command (
     working_dir TEXT NOT NULL DEFAULT '',
     timeout_seconds INTEGER NOT NULL DEFAULT 0,
     error_message TEXT NOT NULL DEFAULT '',
+    final_summary TEXT NOT NULL DEFAULT '',
     last_ack_seq INTEGER NOT NULL DEFAULT 0
 );
 
@@ -231,4 +236,17 @@ CREATE TABLE command_output (
 );
 
 CREATE UNIQUE INDEX idx_command_output_seq ON command_output(command_id, seq_no);
+
+CREATE TABLE command_event (
+    id BIGSERIAL PRIMARY KEY,
+    command_id UUID NOT NULL REFERENCES command(id) ON DELETE CASCADE,
+    seq_no INTEGER NOT NULL,
+    event_type SMALLINT NOT NULL,
+    summary TEXT NOT NULL DEFAULT '',
+    payload_json JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX idx_command_event_seq ON command_event(command_id, seq_no);
+CREATE INDEX idx_command_event_created_at ON command_event(command_id, created_at);
 

@@ -717,13 +717,14 @@ func convertToV1AgentInfo(info *storepb.AgentInfo) *v1pb.AgentInfo {
 		return nil
 	}
 	return &v1pb.AgentInfo{
-		AgentType: info.AgentType,
-		Hostname:  info.Hostname,
-		Os:        info.Os,
-		Arch:      info.Arch,
-		Ip:        info.Ip,
-		Version:   info.Version,
-		Labels:    info.Labels,
+		AgentType:  info.AgentType,
+		Hostname:   info.Hostname,
+		Os:         info.Os,
+		Arch:       info.Arch,
+		Ip:         info.Ip,
+		Version:    info.Version,
+		Labels:     info.Labels,
+		Capability: convertToV1AgentCapability(info.Capability),
 	}
 }
 
@@ -732,13 +733,48 @@ func convertToStoreAgentInfo(info *v1pb.AgentInfo) *storepb.AgentInfo {
 		return nil
 	}
 	return &storepb.AgentInfo{
-		AgentType: info.AgentType,
-		Hostname:  info.Hostname,
-		Os:        info.Os,
-		Arch:      info.Arch,
-		Ip:        info.Ip,
-		Version:   info.Version,
-		Labels:    info.Labels,
+		AgentType:  info.AgentType,
+		Hostname:   info.Hostname,
+		Os:         info.Os,
+		Arch:       info.Arch,
+		Ip:         info.Ip,
+		Version:    info.Version,
+		Labels:     info.Labels,
+		Capability: convertToStoreAgentCapability(info.Capability),
+	}
+}
+
+func convertToV1AgentCapability(capability *storepb.AgentCapability) *v1pb.AgentCapability {
+	if capability == nil {
+		return nil
+	}
+	return &v1pb.AgentCapability{
+		SupportsAcp:        capability.SupportsAcp,
+		AvailableProfiles:  capability.AvailableProfiles,
+		MaxTimeoutSeconds:  capability.MaxTimeoutSeconds,
+		SupportsDiff:       capability.SupportsDiff,
+		SupportsRawEvents:  capability.SupportsRawEvents,
+		SupportsToolTraces: capability.SupportsToolTraces,
+		MaxEventCount:      capability.MaxEventCount,
+		MaxOutputBytes:     capability.MaxOutputBytes,
+		DefaultProfile:     capability.DefaultProfile,
+	}
+}
+
+func convertToStoreAgentCapability(capability *v1pb.AgentCapability) *storepb.AgentCapability {
+	if capability == nil {
+		return nil
+	}
+	return &storepb.AgentCapability{
+		SupportsAcp:        capability.SupportsAcp,
+		AvailableProfiles:  capability.AvailableProfiles,
+		MaxTimeoutSeconds:  capability.MaxTimeoutSeconds,
+		SupportsDiff:       capability.SupportsDiff,
+		SupportsRawEvents:  capability.SupportsRawEvents,
+		SupportsToolTraces: capability.SupportsToolTraces,
+		MaxEventCount:      capability.MaxEventCount,
+		MaxOutputBytes:     capability.MaxOutputBytes,
+		DefaultProfile:     capability.DefaultProfile,
 	}
 }
 

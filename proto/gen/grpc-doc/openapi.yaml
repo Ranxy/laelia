@@ -313,6 +313,42 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}/commands/{command}:watchEvents:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_WatchCommandEvents
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+                - name: command
+                  in: path
+                  description: The command id.
+                  required: true
+                  schema:
+                    type: string
+                - name: afterSeqNo
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/CommandEvent'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}/sessions:
         get:
             tags:
@@ -901,6 +937,31 @@ components:
                 tokenVersion:
                     type: integer
                     format: int32
+        AgentCapability:
+            type: object
+            properties:
+                supportsAcp:
+                    type: boolean
+                availableProfiles:
+                    type: array
+                    items:
+                        type: string
+                maxTimeoutSeconds:
+                    type: integer
+                    format: int32
+                supportsDiff:
+                    type: boolean
+                supportsRawEvents:
+                    type: boolean
+                supportsToolTraces:
+                    type: boolean
+                maxEventCount:
+                    type: integer
+                    format: int32
+                maxOutputBytes:
+                    type: string
+                defaultProfile:
+                    type: string
         AgentDisconnectRequest:
             type: object
             properties:
@@ -954,6 +1015,8 @@ components:
                     type: object
                     additionalProperties:
                         type: string
+                capability:
+                    $ref: '#/components/schemas/AgentCapability'
         AgentMetrics:
             type: object
             properties:
@@ -1092,6 +1155,51 @@ components:
                         type: string
                 workingDir:
                     type: string
+                executorKind:
+                    enum:
+                        - EXECUTOR_KIND_UNSPECIFIED
+                        - SHELL
+                        - ACP
+                    type: string
+                    format: enum
+                instruction:
+                    type: string
+                profile:
+                    type: string
+                finalSummary:
+                    type: string
+                result:
+                    type: object
+                allowDiff:
+                    type: boolean
+        CommandEvent:
+            type: object
+            properties:
+                commandId:
+                    type: string
+                seqNo:
+                    type: integer
+                    format: int32
+                type:
+                    enum:
+                        - COMMAND_EVENT_TYPE_UNSPECIFIED
+                        - LIFECYCLE
+                        - TEXT_DELTA
+                        - TOOL_CALL_STARTED
+                        - TOOL_CALL_FINISHED
+                        - DIFF_EMITTED
+                        - WARNING
+                        - RAW_ACP
+                        - FINAL_SUMMARY
+                    type: string
+                    format: enum
+                summary:
+                    type: string
+                payload:
+                    type: object
+                timestamp:
+                    type: string
+                    format: date-time
         CommandOutput:
             type: object
             properties:
@@ -1333,6 +1441,19 @@ components:
                 timeoutSeconds:
                     type: integer
                     format: int32
+                executorKind:
+                    enum:
+                        - EXECUTOR_KIND_UNSPECIFIED
+                        - SHELL
+                        - ACP
+                    type: string
+                    format: enum
+                instruction:
+                    type: string
+                profile:
+                    type: string
+                allowDiff:
+                    type: boolean
         Status:
             type: object
             properties:

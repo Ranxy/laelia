@@ -179,6 +179,10 @@
             <ul>
               
                 <li>
+                  <a href="#laelia.store.AgentCapability"><span class="badge">M</span>AgentCapability</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.store.AgentInfo"><span class="badge">M</span>AgentInfo</a>
                 </li>
               
@@ -437,6 +441,86 @@
       <p></p>
 
       
+        <h3 id="laelia.store.AgentCapability">AgentCapability</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>supports_acp</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>available_profiles</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>max_timeout_seconds</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>supports_diff</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>supports_raw_events</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>supports_tool_traces</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>max_event_count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>max_output_bytes</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>default_profile</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.store.AgentInfo">AgentInfo</h3>
         <p></p>
 
@@ -493,6 +577,13 @@
                   <td>labels</td>
                   <td><a href="#laelia.store.AgentInfo.LabelsEntry">AgentInfo.LabelsEntry</a></td>
                   <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>capability</td>
+                  <td><a href="#laelia.store.AgentCapability">AgentCapability</a></td>
+                  <td></td>
                   <td><p> </p></td>
                 </tr>
               

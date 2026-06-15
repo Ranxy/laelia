@@ -5,6 +5,7 @@ package laelia.v1;
 import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "v1/annotation.proto";
 
@@ -18,6 +19,24 @@ enum CommandStatus {
   FAILED = 4;
   CANCELLED = 5;
   TIMEOUT = 6;
+}
+
+enum ExecutorKind {
+  EXECUTOR_KIND_UNSPECIFIED = 0;
+  SHELL = 1;
+  ACP = 2;
+}
+
+enum CommandEventType {
+  COMMAND_EVENT_TYPE_UNSPECIFIED = 0;
+  LIFECYCLE = 1;
+  TEXT_DELTA = 2;
+  TOOL_CALL_STARTED = 3;
+  TOOL_CALL_FINISHED = 4;
+  DIFF_EMITTED = 5;
+  WARNING = 6;
+  RAW_ACP = 7;
+  FINAL_SUMMARY = 8;
 }
 
 message Command {
@@ -42,6 +61,12 @@ message Command {
   string error_message = 12;
   map<string, string> env = 13;
   string working_dir = 14;
+  ExecutorKind executor_kind = 15;
+  string instruction = 16;
+  string profile = 17;
+  string final_summary = 18;
+  google.protobuf.Struct result = 19;
+  bool allow_diff = 20;
 }
 
 message CommandOutput {
@@ -56,6 +81,15 @@ message CommandOutput {
   string content = 3;
   int32 seq_no = 4;
   google.protobuf.Timestamp timestamp = 5;
+}
+
+message CommandEvent {
+  string command_id = 1;
+  int32 seq_no = 2;
+  CommandEventType type = 3;
+  string summary = 4;
+  google.protobuf.Struct payload = 5;
+  google.protobuf.Timestamp timestamp = 6;
 }
 
 service CommandService {
@@ -86,6 +120,10 @@ service CommandService {
   rpc WatchCommand(WatchCommandRequest) returns (stream CommandOutput) {
     option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}:watch"};
   }
+
+  rpc WatchCommandEvents(WatchCommandEventsRequest) returns (stream CommandEvent) {
+    option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}:watchEvents"};
+  }
 }
 
 service AgentCommandService {
@@ -98,6 +136,7 @@ message AgentCommandMessage {
     CommandProgress progress = 2;
     CommandResult result = 3;
     Ping ping = 4;
+    CommandEvent event = 5;
   }
 }
 
@@ -113,6 +152,7 @@ message AgentReady {
   string session_id = 1;
   string last_command_id = 2;
   int32 last_ack_seq = 3;
+  int32 last_event_seq = 4;
 }
 
 message CommandRequest {
@@ -121,6 +161,10 @@ message CommandRequest {
   map<string, string> env = 3;
   string working_dir = 4;
   int32 timeout_seconds = 5;
+  ExecutorKind executor_kind = 6;
+  string instruction = 7;
+  string profile = 8;
+  bool allow_diff = 9;
 }
 
 message CommandProgress {
@@ -136,6 +180,8 @@ message CommandResult {
   int64 duration_ms = 3;
   string error_message = 4;
   int32 last_seq_no = 5;
+  string final_summary = 6;
+  google.protobuf.Struct result = 7;
 }
 
 message CancelMessage {
@@ -161,6 +207,10 @@ message SendCommandRequest {
   map<string, string> env = 3;
   string working_dir = 4;
   int32 timeout_seconds = 5;
+  ExecutorKind executor_kind = 6;
+  string instruction = 7;
+  string profile = 8;
+  bool allow_diff = 9;
 }
 
 message ListCommandsRequest {
@@ -194,6 +244,14 @@ message CancelCommandRequest {
 }
 
 message WatchCommandRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Command"
+  ];
+  int32 after_seq_no = 2;
+}
+
+message WatchCommandEventsRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference).type = "laelia/Command"

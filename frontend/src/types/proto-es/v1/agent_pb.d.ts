@@ -735,6 +735,11 @@ export declare type AgentInfo = Message<"laelia.v1.AgentInfo"> & {
    * @generated from field: map<string, string> labels = 7;
    */
   labels: { [key: string]: string };
+
+  /**
+   * @generated from field: laelia.v1.AgentCapability capability = 8;
+   */
+  capability?: AgentCapability | undefined;
 };
 
 /**
@@ -742,6 +747,62 @@ export declare type AgentInfo = Message<"laelia.v1.AgentInfo"> & {
  * Use `create(AgentInfoSchema)` to create a new message.
  */
 export declare const AgentInfoSchema: GenMessage<AgentInfo>;
+
+/**
+ * @generated from message laelia.v1.AgentCapability
+ */
+export declare type AgentCapability = Message<"laelia.v1.AgentCapability"> & {
+  /**
+   * @generated from field: bool supports_acp = 1;
+   */
+  supportsAcp: boolean;
+
+  /**
+   * @generated from field: repeated string available_profiles = 2;
+   */
+  availableProfiles: string[];
+
+  /**
+   * @generated from field: int32 max_timeout_seconds = 3;
+   */
+  maxTimeoutSeconds: number;
+
+  /**
+   * @generated from field: bool supports_diff = 4;
+   */
+  supportsDiff: boolean;
+
+  /**
+   * @generated from field: bool supports_raw_events = 5;
+   */
+  supportsRawEvents: boolean;
+
+  /**
+   * @generated from field: bool supports_tool_traces = 6;
+   */
+  supportsToolTraces: boolean;
+
+  /**
+   * @generated from field: int32 max_event_count = 7;
+   */
+  maxEventCount: number;
+
+  /**
+   * @generated from field: int64 max_output_bytes = 8;
+   */
+  maxOutputBytes: bigint;
+
+  /**
+   * @generated from field: string default_profile = 9;
+   */
+  defaultProfile: string;
+};
+
+/**
+ * Describes the message laelia.v1.AgentCapability.
+ * Use `create(AgentCapabilitySchema)` to create a new message.
+ */
+export declare const AgentCapabilitySchema: GenMessage<AgentCapability>;
 
 /**
  * @generated from message laelia.v1.AgentStatus

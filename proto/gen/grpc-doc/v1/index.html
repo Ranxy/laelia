@@ -245,6 +245,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.AgentCapability"><span class="badge">M</span>AgentCapability</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.AgentDisconnectRequest"><span class="badge">M</span>AgentDisconnectRequest</a>
                 </li>
               
@@ -502,6 +506,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.CommandEvent"><span class="badge">M</span>CommandEvent</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.CommandOutput"><span class="badge">M</span>CommandOutput</a>
                 </li>
               
@@ -554,9 +562,17 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.WatchCommandEventsRequest"><span class="badge">M</span>WatchCommandEventsRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.WatchCommandRequest"><span class="badge">M</span>WatchCommandRequest</a>
                 </li>
               
+              
+                <li>
+                  <a href="#laelia.v1.CommandEventType"><span class="badge">E</span>CommandEventType</a>
+                </li>
               
                 <li>
                   <a href="#laelia.v1.CommandOutput.StreamType"><span class="badge">E</span>CommandOutput.StreamType</a>
@@ -564,6 +580,10 @@
               
                 <li>
                   <a href="#laelia.v1.CommandStatus"><span class="badge">E</span>CommandStatus</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ExecutorKind"><span class="badge">E</span>ExecutorKind</a>
                 </li>
               
               
@@ -927,6 +947,86 @@
 
         
       
+        <h3 id="laelia.v1.AgentCapability">AgentCapability</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>supports_acp</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>available_profiles</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>max_timeout_seconds</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>supports_diff</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>supports_raw_events</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>supports_tool_traces</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>max_event_count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>max_output_bytes</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>default_profile</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.AgentDisconnectRequest">AgentDisconnectRequest</h3>
         <p></p>
 
@@ -1111,6 +1211,13 @@
                   <td>labels</td>
                   <td><a href="#laelia.v1.AgentInfo.LabelsEntry">AgentInfo.LabelsEntry</a></td>
                   <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>capability</td>
+                  <td><a href="#laelia.v1.AgentCapability">AgentCapability</a></td>
+                  <td></td>
                   <td><p> </p></td>
                 </tr>
               
@@ -3235,6 +3342,13 @@ Format: idps/{idp} </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>event</td>
+                  <td><a href="#laelia.v1.CommandEvent">CommandEvent</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -3268,6 +3382,13 @@ Format: idps/{idp} </p></td>
               
                 <tr>
                   <td>last_ack_seq</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_event_seq</td>
                   <td><a href="#int32">int32</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -3443,6 +3564,48 @@ Format: idps/{idp} </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>executor_kind</td>
+                  <td><a href="#laelia.v1.ExecutorKind">ExecutorKind</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>instruction</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>profile</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>final_summary</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>result</td>
+                  <td><a href="#google.protobuf.Struct">google.protobuf.Struct</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>allow_diff</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -3470,6 +3633,65 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>value</td>
                   <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.CommandEvent">CommandEvent</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>command_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>seq_no</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>type</td>
+                  <td><a href="#laelia.v1.CommandEventType">CommandEventType</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>summary</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>payload</td>
+                  <td><a href="#google.protobuf.Struct">google.protobuf.Struct</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>timestamp</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -3623,6 +3845,34 @@ Format: idps/{idp} </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>executor_kind</td>
+                  <td><a href="#laelia.v1.ExecutorKind">ExecutorKind</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>instruction</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>profile</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>allow_diff</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -3702,6 +3952,20 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>last_seq_no</td>
                   <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>final_summary</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>result</td>
+                  <td><a href="#google.protobuf.Struct">google.protobuf.Struct</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -3958,6 +4222,34 @@ Format: idps/{idp} </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>executor_kind</td>
+                  <td><a href="#laelia.v1.ExecutorKind">ExecutorKind</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>instruction</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>profile</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>allow_diff</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -3985,6 +4277,37 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>value</td>
                   <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.WatchCommandEventsRequest">WatchCommandEventsRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>after_seq_no</td>
+                  <td><a href="#int32">int32</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -4028,6 +4351,71 @@ Format: idps/{idp} </p></td>
         
       
 
+      
+        <h3 id="laelia.v1.CommandEventType">CommandEventType</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>COMMAND_EVENT_TYPE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>LIFECYCLE</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>TEXT_DELTA</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>TOOL_CALL_STARTED</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>TOOL_CALL_FINISHED</td>
+                <td>4</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>DIFF_EMITTED</td>
+                <td>5</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>WARNING</td>
+                <td>6</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>RAW_ACP</td>
+                <td>7</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>FINAL_SUMMARY</td>
+                <td>8</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
       
         <h3 id="laelia.v1.CommandOutput.StreamType">CommandOutput.StreamType</h3>
         <p></p>
@@ -4117,6 +4505,35 @@ Format: idps/{idp} </p></td>
           </tbody>
         </table>
       
+        <h3 id="laelia.v1.ExecutorKind">ExecutorKind</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>EXECUTOR_KIND_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>SHELL</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ACP</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
 
       
 
@@ -4180,6 +4597,13 @@ Format: idps/{idp} </p></td>
                 <td>WatchCommand</td>
                 <td><a href="#laelia.v1.WatchCommandRequest">WatchCommandRequest</a></td>
                 <td><a href="#laelia.v1.CommandOutput">CommandOutput</a> stream</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>WatchCommandEvents</td>
+                <td><a href="#laelia.v1.WatchCommandEventsRequest">WatchCommandEventsRequest</a></td>
+                <td><a href="#laelia.v1.CommandEvent">CommandEvent</a> stream</td>
                 <td><p></p></td>
               </tr>
             
@@ -4247,6 +4671,16 @@ Format: idps/{idp} </p></td>
                 <td>WatchCommand</td>
                 <td>GET</td>
                 <td>/v1/{name=agents/*/commands/*}:watch</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>WatchCommandEvents</td>
+                <td>GET</td>
+                <td>/v1/{name=agents/*/commands/*}:watchEvents</td>
                 <td></td>
               </tr>
               

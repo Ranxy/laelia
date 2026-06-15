@@ -66,6 +66,11 @@ func (s *AgentCommandService) CommandChannel(
 				slog.Error("failed to handle result", "error", err)
 			}
 
+		case *v1pb.AgentCommandMessage_Event:
+			if err := s.dispatcher.HandleEvent(ctx, m.Event); err != nil {
+				slog.Error("failed to handle event", "error", err)
+			}
+
 		case *v1pb.AgentCommandMessage_Ping:
 			s.dispatcher.HandlePing(agent.ID, m.Ping)
 			pong := &v1pb.ManagerCommandMessage{

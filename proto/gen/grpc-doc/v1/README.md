@@ -21,6 +21,7 @@
 - [v1/agent.proto](#v1_agent-proto)
     - [Agent](#laelia-v1-Agent)
     - [Agent.LabelsEntry](#laelia-v1-Agent-LabelsEntry)
+    - [AgentCapability](#laelia-v1-AgentCapability)
     - [AgentDisconnectRequest](#laelia-v1-AgentDisconnectRequest)
     - [AgentHeartbeatRequest](#laelia-v1-AgentHeartbeatRequest)
     - [AgentHeartbeatResponse](#laelia-v1-AgentHeartbeatResponse)
@@ -88,6 +89,7 @@
     - [CancelMessage](#laelia-v1-CancelMessage)
     - [Command](#laelia-v1-Command)
     - [Command.EnvEntry](#laelia-v1-Command-EnvEntry)
+    - [CommandEvent](#laelia-v1-CommandEvent)
     - [CommandOutput](#laelia-v1-CommandOutput)
     - [CommandProgress](#laelia-v1-CommandProgress)
     - [CommandRequest](#laelia-v1-CommandRequest)
@@ -101,10 +103,13 @@
     - [Pong](#laelia-v1-Pong)
     - [SendCommandRequest](#laelia-v1-SendCommandRequest)
     - [SendCommandRequest.EnvEntry](#laelia-v1-SendCommandRequest-EnvEntry)
+    - [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest)
     - [WatchCommandRequest](#laelia-v1-WatchCommandRequest)
   
+    - [CommandEventType](#laelia-v1-CommandEventType)
     - [CommandOutput.StreamType](#laelia-v1-CommandOutput-StreamType)
     - [CommandStatus](#laelia-v1-CommandStatus)
+    - [ExecutorKind](#laelia-v1-ExecutorKind)
   
     - [AgentCommandService](#laelia-v1-AgentCommandService)
     - [CommandService](#laelia-v1-CommandService)
@@ -275,6 +280,29 @@ RiskLevel is the risk level.
 
 
 
+<a name="laelia-v1-AgentCapability"></a>
+
+### AgentCapability
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| supports_acp | [bool](#bool) |  |  |
+| available_profiles | [string](#string) | repeated |  |
+| max_timeout_seconds | [int32](#int32) |  |  |
+| supports_diff | [bool](#bool) |  |  |
+| supports_raw_events | [bool](#bool) |  |  |
+| supports_tool_traces | [bool](#bool) |  |  |
+| max_event_count | [int32](#int32) |  |  |
+| max_output_bytes | [int64](#int64) |  |  |
+| default_profile | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-AgentDisconnectRequest"></a>
 
 ### AgentDisconnectRequest
@@ -343,6 +371,7 @@ RiskLevel is the risk level.
 | ip | [string](#string) |  |  |
 | version | [string](#string) |  |  |
 | labels | [AgentInfo.LabelsEntry](#laelia-v1-AgentInfo-LabelsEntry) | repeated |  |
+| capability | [AgentCapability](#laelia-v1-AgentCapability) |  |  |
 
 
 
@@ -1167,6 +1196,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | progress | [CommandProgress](#laelia-v1-CommandProgress) |  |  |
 | result | [CommandResult](#laelia-v1-CommandResult) |  |  |
 | ping | [Ping](#laelia-v1-Ping) |  |  |
+| event | [CommandEvent](#laelia-v1-CommandEvent) |  |  |
 
 
 
@@ -1184,6 +1214,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | session_id | [string](#string) |  |  |
 | last_command_id | [string](#string) |  |  |
 | last_ack_seq | [int32](#int32) |  |  |
+| last_event_seq | [int32](#int32) |  |  |
 
 
 
@@ -1243,6 +1274,12 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | error_message | [string](#string) |  |  |
 | env | [Command.EnvEntry](#laelia-v1-Command-EnvEntry) | repeated |  |
 | working_dir | [string](#string) |  |  |
+| executor_kind | [ExecutorKind](#laelia-v1-ExecutorKind) |  |  |
+| instruction | [string](#string) |  |  |
+| profile | [string](#string) |  |  |
+| final_summary | [string](#string) |  |  |
+| result | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
+| allow_diff | [bool](#bool) |  |  |
 
 
 
@@ -1259,6 +1296,26 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | ----- | ---- | ----- | ----------- |
 | key | [string](#string) |  |  |
 | value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-CommandEvent"></a>
+
+### CommandEvent
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_id | [string](#string) |  |  |
+| seq_no | [int32](#int32) |  |  |
+| type | [CommandEventType](#laelia-v1-CommandEventType) |  |  |
+| summary | [string](#string) |  |  |
+| payload | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
+| timestamp | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 
 
 
@@ -1315,6 +1372,10 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | env | [CommandRequest.EnvEntry](#laelia-v1-CommandRequest-EnvEntry) | repeated |  |
 | working_dir | [string](#string) |  |  |
 | timeout_seconds | [int32](#int32) |  |  |
+| executor_kind | [ExecutorKind](#laelia-v1-ExecutorKind) |  |  |
+| instruction | [string](#string) |  |  |
+| profile | [string](#string) |  |  |
+| allow_diff | [bool](#bool) |  |  |
 
 
 
@@ -1350,6 +1411,8 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | duration_ms | [int64](#int64) |  |  |
 | error_message | [string](#string) |  |  |
 | last_seq_no | [int32](#int32) |  |  |
+| final_summary | [string](#string) |  |  |
+| result | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
 
 
 
@@ -1467,6 +1530,10 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | env | [SendCommandRequest.EnvEntry](#laelia-v1-SendCommandRequest-EnvEntry) | repeated |  |
 | working_dir | [string](#string) |  |  |
 | timeout_seconds | [int32](#int32) |  |  |
+| executor_kind | [ExecutorKind](#laelia-v1-ExecutorKind) |  |  |
+| instruction | [string](#string) |  |  |
+| profile | [string](#string) |  |  |
+| allow_diff | [bool](#bool) |  |  |
 
 
 
@@ -1489,6 +1556,22 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-WatchCommandEventsRequest"></a>
+
+### WatchCommandEventsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| after_seq_no | [int32](#int32) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-WatchCommandRequest"></a>
 
 ### WatchCommandRequest
@@ -1505,6 +1588,25 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
  
+
+
+<a name="laelia-v1-CommandEventType"></a>
+
+### CommandEventType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| COMMAND_EVENT_TYPE_UNSPECIFIED | 0 |  |
+| LIFECYCLE | 1 |  |
+| TEXT_DELTA | 2 |  |
+| TOOL_CALL_STARTED | 3 |  |
+| TOOL_CALL_FINISHED | 4 |  |
+| DIFF_EMITTED | 5 |  |
+| WARNING | 6 |  |
+| RAW_ACP | 7 |  |
+| FINAL_SUMMARY | 8 |  |
+
 
 
 <a name="laelia-v1-CommandOutput-StreamType"></a>
@@ -1537,6 +1639,19 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | TIMEOUT | 6 |  |
 
 
+
+<a name="laelia-v1-ExecutorKind"></a>
+
+### ExecutorKind
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| EXECUTOR_KIND_UNSPECIFIED | 0 |  |
+| SHELL | 1 |  |
+| ACP | 2 |  |
+
+
  
 
  
@@ -1564,6 +1679,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | GetCommand | [GetCommandRequest](#laelia-v1-GetCommandRequest) | [Command](#laelia-v1-Command) |  |
 | CancelCommand | [CancelCommandRequest](#laelia-v1-CancelCommandRequest) | [Command](#laelia-v1-Command) |  |
 | WatchCommand | [WatchCommandRequest](#laelia-v1-WatchCommandRequest) | [CommandOutput](#laelia-v1-CommandOutput) stream |  |
+| WatchCommandEvents | [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest) | [CommandEvent](#laelia-v1-CommandEvent) stream |  |
 
  
 

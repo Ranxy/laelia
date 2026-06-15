@@ -177,7 +177,7 @@ func (x AgentStatus_ConnectionState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AgentStatus_ConnectionState.Descriptor instead.
 func (AgentStatus_ConnectionState) EnumDescriptor() ([]byte, []int) {
-	return file_store_agent_proto_rawDescGZIP(), []int{1, 0}
+	return file_store_agent_proto_rawDescGZIP(), []int{2, 0}
 }
 
 type AgentInfo struct {
@@ -189,6 +189,7 @@ type AgentInfo struct {
 	Ip            string                 `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"`
 	Version       string                 `protobuf:"bytes,6,opt,name=version,proto3" json:"version,omitempty"`
 	Labels        map[string]string      `protobuf:"bytes,7,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Capability    *AgentCapability       `protobuf:"bytes,8,opt,name=capability,proto3" json:"capability,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -272,6 +273,121 @@ func (x *AgentInfo) GetLabels() map[string]string {
 	return nil
 }
 
+func (x *AgentInfo) GetCapability() *AgentCapability {
+	if x != nil {
+		return x.Capability
+	}
+	return nil
+}
+
+type AgentCapability struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	SupportsAcp        bool                   `protobuf:"varint,1,opt,name=supports_acp,json=supportsAcp,proto3" json:"supports_acp,omitempty"`
+	AvailableProfiles  []string               `protobuf:"bytes,2,rep,name=available_profiles,json=availableProfiles,proto3" json:"available_profiles,omitempty"`
+	MaxTimeoutSeconds  int32                  `protobuf:"varint,3,opt,name=max_timeout_seconds,json=maxTimeoutSeconds,proto3" json:"max_timeout_seconds,omitempty"`
+	SupportsDiff       bool                   `protobuf:"varint,4,opt,name=supports_diff,json=supportsDiff,proto3" json:"supports_diff,omitempty"`
+	SupportsRawEvents  bool                   `protobuf:"varint,5,opt,name=supports_raw_events,json=supportsRawEvents,proto3" json:"supports_raw_events,omitempty"`
+	SupportsToolTraces bool                   `protobuf:"varint,6,opt,name=supports_tool_traces,json=supportsToolTraces,proto3" json:"supports_tool_traces,omitempty"`
+	MaxEventCount      int32                  `protobuf:"varint,7,opt,name=max_event_count,json=maxEventCount,proto3" json:"max_event_count,omitempty"`
+	MaxOutputBytes     int64                  `protobuf:"varint,8,opt,name=max_output_bytes,json=maxOutputBytes,proto3" json:"max_output_bytes,omitempty"`
+	DefaultProfile     string                 `protobuf:"bytes,9,opt,name=default_profile,json=defaultProfile,proto3" json:"default_profile,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *AgentCapability) Reset() {
+	*x = AgentCapability{}
+	mi := &file_store_agent_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentCapability) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentCapability) ProtoMessage() {}
+
+func (x *AgentCapability) ProtoReflect() protoreflect.Message {
+	mi := &file_store_agent_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentCapability.ProtoReflect.Descriptor instead.
+func (*AgentCapability) Descriptor() ([]byte, []int) {
+	return file_store_agent_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *AgentCapability) GetSupportsAcp() bool {
+	if x != nil {
+		return x.SupportsAcp
+	}
+	return false
+}
+
+func (x *AgentCapability) GetAvailableProfiles() []string {
+	if x != nil {
+		return x.AvailableProfiles
+	}
+	return nil
+}
+
+func (x *AgentCapability) GetMaxTimeoutSeconds() int32 {
+	if x != nil {
+		return x.MaxTimeoutSeconds
+	}
+	return 0
+}
+
+func (x *AgentCapability) GetSupportsDiff() bool {
+	if x != nil {
+		return x.SupportsDiff
+	}
+	return false
+}
+
+func (x *AgentCapability) GetSupportsRawEvents() bool {
+	if x != nil {
+		return x.SupportsRawEvents
+	}
+	return false
+}
+
+func (x *AgentCapability) GetSupportsToolTraces() bool {
+	if x != nil {
+		return x.SupportsToolTraces
+	}
+	return false
+}
+
+func (x *AgentCapability) GetMaxEventCount() int32 {
+	if x != nil {
+		return x.MaxEventCount
+	}
+	return 0
+}
+
+func (x *AgentCapability) GetMaxOutputBytes() int64 {
+	if x != nil {
+		return x.MaxOutputBytes
+	}
+	return 0
+}
+
+func (x *AgentCapability) GetDefaultProfile() string {
+	if x != nil {
+		return x.DefaultProfile
+	}
+	return ""
+}
+
 type AgentStatus struct {
 	state           protoimpl.MessageState      `protogen:"open.v1"`
 	State           AgentStatus_ConnectionState `protobuf:"varint,1,opt,name=state,proto3,enum=laelia.store.AgentStatus_ConnectionState" json:"state,omitempty"`
@@ -285,7 +401,7 @@ type AgentStatus struct {
 
 func (x *AgentStatus) Reset() {
 	*x = AgentStatus{}
-	mi := &file_store_agent_proto_msgTypes[1]
+	mi := &file_store_agent_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -297,7 +413,7 @@ func (x *AgentStatus) String() string {
 func (*AgentStatus) ProtoMessage() {}
 
 func (x *AgentStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_store_agent_proto_msgTypes[1]
+	mi := &file_store_agent_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -310,7 +426,7 @@ func (x *AgentStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentStatus.ProtoReflect.Descriptor instead.
 func (*AgentStatus) Descriptor() ([]byte, []int) {
-	return file_store_agent_proto_rawDescGZIP(), []int{1}
+	return file_store_agent_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *AgentStatus) GetState() AgentStatus_ConnectionState {
@@ -352,7 +468,7 @@ var File_store_agent_proto protoreflect.FileDescriptor
 
 const file_store_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x11store/agent.proto\x12\flaelia.store\"\x8c\x02\n" +
+	"\x11store/agent.proto\x12\flaelia.store\"\xcb\x02\n" +
 	"\tAgentInfo\x12\x1d\n" +
 	"\n" +
 	"agent_type\x18\x01 \x01(\tR\tagentType\x12\x1a\n" +
@@ -361,10 +477,23 @@ const file_store_agent_proto_rawDesc = "" +
 	"\x04arch\x18\x04 \x01(\tR\x04arch\x12\x0e\n" +
 	"\x02ip\x18\x05 \x01(\tR\x02ip\x12\x18\n" +
 	"\aversion\x18\x06 \x01(\tR\aversion\x12;\n" +
-	"\x06labels\x18\a \x03(\v2#.laelia.store.AgentInfo.LabelsEntryR\x06labels\x1a9\n" +
+	"\x06labels\x18\a \x03(\v2#.laelia.store.AgentInfo.LabelsEntryR\x06labels\x12=\n" +
+	"\n" +
+	"capability\x18\b \x01(\v2\x1d.laelia.store.AgentCapabilityR\n" +
+	"capability\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd3\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x95\x03\n" +
+	"\x0fAgentCapability\x12!\n" +
+	"\fsupports_acp\x18\x01 \x01(\bR\vsupportsAcp\x12-\n" +
+	"\x12available_profiles\x18\x02 \x03(\tR\x11availableProfiles\x12.\n" +
+	"\x13max_timeout_seconds\x18\x03 \x01(\x05R\x11maxTimeoutSeconds\x12#\n" +
+	"\rsupports_diff\x18\x04 \x01(\bR\fsupportsDiff\x12.\n" +
+	"\x13supports_raw_events\x18\x05 \x01(\bR\x11supportsRawEvents\x120\n" +
+	"\x14supports_tool_traces\x18\x06 \x01(\bR\x12supportsToolTraces\x12&\n" +
+	"\x0fmax_event_count\x18\a \x01(\x05R\rmaxEventCount\x12(\n" +
+	"\x10max_output_bytes\x18\b \x01(\x03R\x0emaxOutputBytes\x12'\n" +
+	"\x0fdefault_profile\x18\t \x01(\tR\x0edefaultProfile\"\xd3\x02\n" +
 	"\vAgentStatus\x12?\n" +
 	"\x05state\x18\x01 \x01(\x0e2).laelia.store.AgentStatus.ConnectionStateR\x05state\x12*\n" +
 	"\x11last_heartbeat_at\x18\x02 \x01(\x03R\x0flastHeartbeatAt\x12!\n" +
@@ -405,23 +534,25 @@ func file_store_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_store_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_store_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_store_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_store_agent_proto_goTypes = []any{
 	(AgentTokenType)(0),              // 0: laelia.store.AgentTokenType
 	(AgentTokenState)(0),             // 1: laelia.store.AgentTokenState
 	(AgentStatus_ConnectionState)(0), // 2: laelia.store.AgentStatus.ConnectionState
 	(*AgentInfo)(nil),                // 3: laelia.store.AgentInfo
-	(*AgentStatus)(nil),              // 4: laelia.store.AgentStatus
-	nil,                              // 5: laelia.store.AgentInfo.LabelsEntry
+	(*AgentCapability)(nil),          // 4: laelia.store.AgentCapability
+	(*AgentStatus)(nil),              // 5: laelia.store.AgentStatus
+	nil,                              // 6: laelia.store.AgentInfo.LabelsEntry
 }
 var file_store_agent_proto_depIdxs = []int32{
-	5, // 0: laelia.store.AgentInfo.labels:type_name -> laelia.store.AgentInfo.LabelsEntry
-	2, // 1: laelia.store.AgentStatus.state:type_name -> laelia.store.AgentStatus.ConnectionState
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	6, // 0: laelia.store.AgentInfo.labels:type_name -> laelia.store.AgentInfo.LabelsEntry
+	4, // 1: laelia.store.AgentInfo.capability:type_name -> laelia.store.AgentCapability
+	2, // 2: laelia.store.AgentStatus.state:type_name -> laelia.store.AgentStatus.ConnectionState
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_store_agent_proto_init() }
@@ -435,7 +566,7 @@ func file_store_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_store_agent_proto_rawDesc), len(file_store_agent_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
