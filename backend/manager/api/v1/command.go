@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"slices"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -23,10 +25,15 @@ type CommandService struct {
 	v1connect.UnimplementedCommandServiceHandler
 	store      *store.Store
 	dispatcher *dispatcher.Dispatcher
+	acpEnabled bool
 }
 
 func NewCommandService(s *store.Store, d *dispatcher.Dispatcher) *CommandService {
-	return &CommandService{store: s, dispatcher: d}
+	return &CommandService{store: s, dispatcher: d, acpEnabled: true}
+}
+
+func (s *CommandService) SetACPEnabled(enabled bool) {
+	s.acpEnabled = enabled
 }
 
 func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v1pb.SendCommandRequest]) (*connect.Response[v1pb.Command], error) {
@@ -64,6 +71,15 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 		principalName = user.Name
 	}
 
+	if err := s.validateACPCapability(ctx, agent, executorKind, req.Msg.Profile, req.Msg.AllowDiff, req.Msg.TimeoutSeconds, user); err != nil {
+		return nil, err
+	}
+
+	resolvedProfile := req.Msg.Profile
+	if resolvedProfile == "" && agent.Info.GetCapability() != nil {
+		resolvedProfile = agent.Info.GetCapability().DefaultProfile
+	}
+
 	envBytes, err := json.Marshal(req.Msg.Env)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to marshal env"))
@@ -74,7 +90,7 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 		PrincipalID:    principalID,
 		Command:        commandText,
 		Instruction:    instruction,
-		Profile:        req.Msg.Profile,
+		Profile:        resolvedProfile,
 		ExecutorKind:   int32(executorKind),
 		AllowDiff:      req.Msg.AllowDiff,
 		Status:         1, // PENDING
@@ -238,6 +254,11 @@ func (s *CommandService) WatchCommandEvents(ctx context.Context, req *connect.Re
 		return connect.NewError(connect.CodeNotFound, err)
 	}
 
+	user, _ := GetUserFromContext(ctx)
+	if err := s.validateRawEventAccess(ctx, user); err != nil {
+		return err
+	}
+
 	historicalEvents, err := s.store.GetCommandEvents(ctx, cmd.ID, req.Msg.AfterSeqNo)
 	if err != nil {
 		return connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get historical command events"))
@@ -359,4 +380,71 @@ func formatAgentName(agentResourceID string) string {
 
 func formatPrincipalID(id int) string {
 	return fmt.Sprintf("%d", id)
+}
+
+func (s *CommandService) validateACPCapability(ctx context.Context, agent *store.AgentMessage, kind v1pb.ExecutorKind, profile string, allowDiff bool, timeoutSeconds int32, user *store.UserMessage) error {
+	if kind != v1pb.ExecutorKind_ACP {
+		return nil
+	}
+
+	capability := agent.Info.GetCapability()
+	if capability == nil || !capability.SupportsAcp {
+		return connect.NewError(connect.CodeInvalidArgument,
+			errors.Errorf("agent %s does not support ACP tasks", agent.ResourceID))
+	}
+
+	if profile != "" && !slices.Contains(capability.AvailableProfiles, profile) {
+		return connect.NewError(connect.CodeInvalidArgument,
+			errors.Errorf("profile %q is not available on agent %s (available: %v)", profile, agent.ResourceID, capability.AvailableProfiles))
+	}
+
+	if timeoutSeconds > 0 && capability.MaxTimeoutSeconds > 0 && timeoutSeconds > capability.MaxTimeoutSeconds {
+		return connect.NewError(connect.CodeInvalidArgument,
+			errors.Errorf("timeout %ds exceeds agent max %ds", timeoutSeconds, capability.MaxTimeoutSeconds))
+	}
+
+	if allowDiff && !capability.SupportsDiff {
+		return connect.NewError(connect.CodeInvalidArgument,
+			errors.Errorf("agent %s does not support diff events", agent.ResourceID))
+	}
+
+	if user == nil {
+		return nil
+	}
+
+	if !s.acpEnabled || allowDiff {
+		isAdmin, checkErr := isUserWorkspaceAdmin(ctx, s.store, user)
+		if checkErr != nil {
+			slog.Warn("failed to check workspace admin for ACP task", "error", checkErr, "user", user.Email)
+			return connect.NewError(connect.CodeInternal, errors.New("failed to verify permissions"))
+		}
+		if !isAdmin {
+			if allowDiff {
+				return connect.NewError(connect.CodePermissionDenied,
+					errors.New("only workspace admins can send ACP tasks with diff support"))
+			}
+			return connect.NewError(connect.CodePermissionDenied,
+				errors.New("ACP tasks are currently restricted to workspace admins"))
+		}
+	}
+
+	return nil
+}
+
+func (s *CommandService) validateRawEventAccess(ctx context.Context, user *store.UserMessage) error {
+	if user == nil {
+		return nil
+	}
+
+	isAdmin, err := isUserWorkspaceAdmin(ctx, s.store, user)
+	if err != nil {
+		slog.Warn("failed to check workspace admin for raw events", "error", err, "user", user.Email)
+		return connect.NewError(connect.CodeInternal, errors.New("failed to verify permissions"))
+	}
+	if !isAdmin {
+		return connect.NewError(connect.CodePermissionDenied,
+			errors.New("only workspace admins can view structured command events"))
+	}
+
+	return nil
 }

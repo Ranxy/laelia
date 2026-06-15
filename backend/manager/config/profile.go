@@ -22,6 +22,10 @@ type Profile struct {
 	TLSDataDir string
 	TLSHosts   []string
 
+	// DisableACP disables ACP task submission for non-admin users.
+	// When true, only workspace admins can send ACP tasks (controlled rollout).
+	DisableACP bool
+
 	// LastActiveTS is the service last active timestamp, any API calls will refresh this value.
 	LastActiveTS atomic.Int64
 	// can be set in runtime

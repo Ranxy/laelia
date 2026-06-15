@@ -55,6 +55,8 @@ var (
 		debug bool
 		// memoryProfileThreshold is the threshold of memory usage in bytes to trigger a memory profile.
 		memoryProfileThreshold uint64
+		// disableACP restricts ACP tasks to workspace admins only (controlled rollout).
+		disableACP bool
 	}
 
 	rootCmd = &cobra.Command{
@@ -77,6 +79,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flags.tlsCertDir, "tls-cert-dir", "", "TLS certificate directory (enables TLS with self-signed cert if empty)")
 	rootCmd.PersistentFlags().StringVar(&flags.tlsHost, "tls-host", "", "TLS server hostname (comma-separated for multiple hosts)")
 	rootCmd.PersistentFlags().StringVar(&flags.tlsDomain, "tls-domain", "", "TLS public domain (enables ACME/Let's Encrypt auto-cert)")
+	rootCmd.PersistentFlags().BoolVar(&flags.disableACP, "disable-acp", true, "restrict ACP tasks to workspace admins only (default: true)")
 }
 
 func start() {
