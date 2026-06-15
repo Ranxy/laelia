@@ -184,6 +184,13 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 			case *v1pb.ManagerCommandMessage_Pong:
 				// pong received, link acknowledged
 
+			case *v1pb.ManagerCommandMessage_PermissionDecision:
+				d := m.PermissionDecision
+				slog.Info("received permission decision", "commandID", d.CommandId, "optionID", d.OptionId)
+				if resolver, ok := currentExecutor.(executor.PermissionResolver); ok {
+					resolver.ResolvePermission(d.OptionId)
+				}
+
 			default:
 				slog.Warn("unknown message type from manager")
 			}
@@ -406,7 +413,7 @@ func sendCommandProgress(stream *connect.BidiStreamForClient[v1pb.AgentCommandMe
 }
 
 func sendCommandEvent(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], commandID string, event *executor.Event) error {
-	payload, err := structpb.NewStruct(event.Payload)
+	payload, err := structpb.NewStruct(normalizePayload(event.Payload))
 	if err != nil {
 		return err
 	}
@@ -422,6 +429,36 @@ func sendCommandEvent(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessa
 			},
 		},
 	})
+}
+
+func normalizePayload(payload map[string]any) map[string]any {
+	if payload == nil {
+		return nil
+	}
+	for k, v := range payload {
+		payload[k] = normalizeValue(v)
+	}
+	return payload
+}
+
+func normalizeValue(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		return normalizePayload(t)
+	case []map[string]any:
+		converted := make([]any, len(t))
+		for i, m := range t {
+			converted[i] = normalizePayload(m)
+		}
+		return converted
+	case []any:
+		for i, item := range t {
+			t[i] = normalizeValue(item)
+		}
+		return t
+	default:
+		return v
+	}
 }
 
 func sendCommandResult(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], result *v1pb.CommandResult) error {

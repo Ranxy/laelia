@@ -9,6 +9,7 @@ import (
 	context "context"
 	errors "errors"
 	v1 "github.com/Ranxy/laelia/backend/generated-go/v1"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	http "net/http"
 	strings "strings"
 )
@@ -53,6 +54,9 @@ const (
 	// CommandServiceWatchCommandEventsProcedure is the fully-qualified name of the CommandService's
 	// WatchCommandEvents RPC.
 	CommandServiceWatchCommandEventsProcedure = "/laelia.v1.CommandService/WatchCommandEvents"
+	// CommandServiceRespondPermissionProcedure is the fully-qualified name of the CommandService's
+	// RespondPermission RPC.
+	CommandServiceRespondPermissionProcedure = "/laelia.v1.CommandService/RespondPermission"
 	// AgentCommandServiceCommandChannelProcedure is the fully-qualified name of the
 	// AgentCommandService's CommandChannel RPC.
 	AgentCommandServiceCommandChannelProcedure = "/laelia.v1.AgentCommandService/CommandChannel"
@@ -66,6 +70,7 @@ type CommandServiceClient interface {
 	CancelCommand(context.Context, *connect.Request[v1.CancelCommandRequest]) (*connect.Response[v1.Command], error)
 	WatchCommand(context.Context, *connect.Request[v1.WatchCommandRequest]) (*connect.ServerStreamForClient[v1.CommandOutput], error)
 	WatchCommandEvents(context.Context, *connect.Request[v1.WatchCommandEventsRequest]) (*connect.ServerStreamForClient[v1.CommandEvent], error)
+	RespondPermission(context.Context, *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error)
 }
 
 // NewCommandServiceClient constructs a client for the laelia.v1.CommandService service. By default,
@@ -115,6 +120,12 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("WatchCommandEvents")),
 			connect.WithClientOptions(opts...),
 		),
+		respondPermission: connect.NewClient[v1.RespondPermissionRequest, emptypb.Empty](
+			httpClient,
+			baseURL+CommandServiceRespondPermissionProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("RespondPermission")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -126,6 +137,7 @@ type commandServiceClient struct {
 	cancelCommand      *connect.Client[v1.CancelCommandRequest, v1.Command]
 	watchCommand       *connect.Client[v1.WatchCommandRequest, v1.CommandOutput]
 	watchCommandEvents *connect.Client[v1.WatchCommandEventsRequest, v1.CommandEvent]
+	respondPermission  *connect.Client[v1.RespondPermissionRequest, emptypb.Empty]
 }
 
 // SendCommand calls laelia.v1.CommandService.SendCommand.
@@ -158,6 +170,11 @@ func (c *commandServiceClient) WatchCommandEvents(ctx context.Context, req *conn
 	return c.watchCommandEvents.CallServerStream(ctx, req)
 }
 
+// RespondPermission calls laelia.v1.CommandService.RespondPermission.
+func (c *commandServiceClient) RespondPermission(ctx context.Context, req *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.respondPermission.CallUnary(ctx, req)
+}
+
 // CommandServiceHandler is an implementation of the laelia.v1.CommandService service.
 type CommandServiceHandler interface {
 	SendCommand(context.Context, *connect.Request[v1.SendCommandRequest]) (*connect.Response[v1.Command], error)
@@ -166,6 +183,7 @@ type CommandServiceHandler interface {
 	CancelCommand(context.Context, *connect.Request[v1.CancelCommandRequest]) (*connect.Response[v1.Command], error)
 	WatchCommand(context.Context, *connect.Request[v1.WatchCommandRequest], *connect.ServerStream[v1.CommandOutput]) error
 	WatchCommandEvents(context.Context, *connect.Request[v1.WatchCommandEventsRequest], *connect.ServerStream[v1.CommandEvent]) error
+	RespondPermission(context.Context, *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error)
 }
 
 // NewCommandServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -211,6 +229,12 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("WatchCommandEvents")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceRespondPermissionHandler := connect.NewUnaryHandler(
+		CommandServiceRespondPermissionProcedure,
+		svc.RespondPermission,
+		connect.WithSchema(commandServiceMethods.ByName("RespondPermission")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/laelia.v1.CommandService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case CommandServiceSendCommandProcedure:
@@ -225,6 +249,8 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceWatchCommandHandler.ServeHTTP(w, r)
 		case CommandServiceWatchCommandEventsProcedure:
 			commandServiceWatchCommandEventsHandler.ServeHTTP(w, r)
+		case CommandServiceRespondPermissionProcedure:
+			commandServiceRespondPermissionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -256,6 +282,10 @@ func (UnimplementedCommandServiceHandler) WatchCommand(context.Context, *connect
 
 func (UnimplementedCommandServiceHandler) WatchCommandEvents(context.Context, *connect.Request[v1.WatchCommandEventsRequest], *connect.ServerStream[v1.CommandEvent]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.WatchCommandEvents is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) RespondPermission(context.Context, *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.RespondPermission is not implemented"))
 }
 
 // AgentCommandServiceClient is a client for the laelia.v1.AgentCommandService service.

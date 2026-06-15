@@ -99,8 +99,10 @@
     - [ListCommandsRequest](#laelia-v1-ListCommandsRequest)
     - [ListCommandsResponse](#laelia-v1-ListCommandsResponse)
     - [ManagerCommandMessage](#laelia-v1-ManagerCommandMessage)
+    - [PermissionDecision](#laelia-v1-PermissionDecision)
     - [Ping](#laelia-v1-Ping)
     - [Pong](#laelia-v1-Pong)
+    - [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest)
     - [SendCommandRequest](#laelia-v1-SendCommandRequest)
     - [SendCommandRequest.EnvEntry](#laelia-v1-SendCommandRequest-EnvEntry)
     - [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest)
@@ -1479,6 +1481,23 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | command_request | [CommandRequest](#laelia-v1-CommandRequest) |  |  |
 | cancel | [CancelMessage](#laelia-v1-CancelMessage) |  |  |
 | pong | [Pong](#laelia-v1-Pong) |  |  |
+| permission_decision | [PermissionDecision](#laelia-v1-PermissionDecision) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-PermissionDecision"></a>
+
+### PermissionDecision
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_id | [string](#string) |  |  |
+| option_id | [string](#string) |  |  |
 
 
 
@@ -1511,6 +1530,22 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | ----- | ---- | ----- | ----------- |
 | seq | [int64](#int64) |  |  |
 | server_time | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RespondPermissionRequest"></a>
+
+### RespondPermissionRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| option_id | [string](#string) |  |  |
 
 
 
@@ -1606,6 +1641,8 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | WARNING | 6 |  |
 | RAW_ACP | 7 |  |
 | FINAL_SUMMARY | 8 |  |
+| PERMISSION_REQUESTED | 9 |  |
+| PERMISSION_TIMED_OUT | 10 |  |
 
 
 
@@ -1680,6 +1717,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | CancelCommand | [CancelCommandRequest](#laelia-v1-CancelCommandRequest) | [Command](#laelia-v1-Command) |  |
 | WatchCommand | [WatchCommandRequest](#laelia-v1-WatchCommandRequest) | [CommandOutput](#laelia-v1-CommandOutput) stream |  |
 | WatchCommandEvents | [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest) | [CommandEvent](#laelia-v1-CommandEvent) stream |  |
+| RespondPermission | [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 
  
 

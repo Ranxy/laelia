@@ -11,6 +11,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -293,6 +294,30 @@ func (s *CommandService) WatchCommandEvents(ctx context.Context, req *connect.Re
 			}
 		}
 	}
+}
+
+func (s *CommandService) RespondPermission(ctx context.Context, req *connect.Request[v1pb.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error) {
+	cmd, err := s.store.GetCommandByName(ctx, req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	if cmd == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("command %s not found", req.Msg.Name))
+	}
+
+	if cmd.Status != 2 {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("command is not running"))
+	}
+
+	if req.Msg.OptionId == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("option_id must not be empty"))
+	}
+
+	if err := s.dispatcher.RespondPermission(ctx, cmd.AgentID, cmd.ID.String(), req.Msg.OptionId); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to respond to permission"))
+	}
+
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
 func parseAgentResourceID(agent string) string {

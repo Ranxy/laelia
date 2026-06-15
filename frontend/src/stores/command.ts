@@ -2,6 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import { commandServiceClient } from "@/connect";
 import {
   CancelCommandRequestSchema,
+  RespondPermissionRequestSchema,
   SendCommandRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import type { AppSliceCreator, CommandSlice } from "./types";
@@ -122,5 +123,11 @@ export const createCommandSlice: AppSliceCreator<CommandSlice> = (
     } catch {
       // stream cancelled (aborted on unmount) or network error — ignore
     }
+  },
+
+  async respondPermission(name, optionId) {
+    await commandServiceClient.respondPermission(
+      create(RespondPermissionRequestSchema, { name, optionId })
+    );
   },
 });

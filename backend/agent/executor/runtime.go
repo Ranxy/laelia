@@ -36,3 +36,7 @@ type Runtime interface {
 	ResultChannel() <-chan Result
 	Done() <-chan struct{}
 }
+
+type PermissionResolver interface {
+	ResolvePermission(optionID string)
+}

@@ -546,11 +546,19 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.PermissionDecision"><span class="badge">M</span>PermissionDecision</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.Ping"><span class="badge">M</span>Ping</a>
                 </li>
               
                 <li>
                   <a href="#laelia.v1.Pong"><span class="badge">M</span>Pong</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RespondPermissionRequest"><span class="badge">M</span>RespondPermissionRequest</a>
                 </li>
               
                 <li>
@@ -4108,6 +4116,44 @@ Format: idps/{idp} </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>permission_decision</td>
+                  <td><a href="#laelia.v1.PermissionDecision">PermissionDecision</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.PermissionDecision">PermissionDecision</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>command_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>option_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -4166,6 +4212,37 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>server_time</td>
                   <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RespondPermissionRequest">RespondPermissionRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>option_id</td>
+                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -4414,6 +4491,18 @@ Format: idps/{idp} </p></td>
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>PERMISSION_REQUESTED</td>
+                <td>9</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PERMISSION_TIMED_OUT</td>
+                <td>10</td>
+                <td><p></p></td>
+              </tr>
+            
           </tbody>
         </table>
       
@@ -4607,6 +4696,13 @@ Format: idps/{idp} </p></td>
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>RespondPermission</td>
+                <td><a href="#laelia.v1.RespondPermissionRequest">RespondPermissionRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p></p></td>
+              </tr>
+            
           </tbody>
         </table>
 
@@ -4682,6 +4778,16 @@ Format: idps/{idp} </p></td>
                 <td>GET</td>
                 <td>/v1/{name=agents/*/commands/*}:watchEvents</td>
                 <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>RespondPermission</td>
+                <td>POST</td>
+                <td>/v1/{name=agents/*/commands/*}:respondPermission</td>
+                <td>*</td>
               </tr>
               
             

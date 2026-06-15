@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CommandTerminal } from "@/react/components/command-terminal";
 import { Badge } from "@/react/components/ui/badge";
@@ -42,6 +42,8 @@ const eventTypeLabels: Record<number, string> = {
   [CommandEventType.WARNING]: "Warning",
   [CommandEventType.RAW_ACP]: "Raw ACP",
   [CommandEventType.FINAL_SUMMARY]: "Final Summary",
+  [CommandEventType.PERMISSION_REQUESTED]: "Permission",
+  [CommandEventType.PERMISSION_TIMED_OUT]: "Timeout",
 };
 
 const eventTypeColors: Record<number, string> = {
@@ -52,6 +54,8 @@ const eventTypeColors: Record<number, string> = {
   [CommandEventType.WARNING]: "text-amber-400",
   [CommandEventType.RAW_ACP]: "text-zinc-500",
   [CommandEventType.FINAL_SUMMARY]: "text-emerald-400",
+  [CommandEventType.PERMISSION_REQUESTED]: "text-amber-400",
+  [CommandEventType.PERMISSION_TIMED_OUT]: "text-red-400",
 };
 
 function formatDuration(ms: number | bigint | undefined): string {
@@ -207,6 +211,35 @@ export function CommandDetailPage() {
   const events = activeEvents[cmdName] ?? [];
   const visibleEvents = events.filter(isVisibleEvent);
 
+  const pendingPermission = useMemo(() => {
+    const requested = events.filter(
+      (ev) => ev.type === CommandEventType.PERMISSION_REQUESTED
+    );
+    if (requested.length === 0) return null;
+
+    const latest = requested[requested.length - 1];
+
+    const decided = events.some(
+      (ev) =>
+        ev.type === CommandEventType.PERMISSION_TIMED_OUT &&
+        ev.seqNo > latest.seqNo
+    );
+    if (decided) return null;
+
+    return latest;
+  }, [events]);
+
+  const respondPermission = useAppStore((s) => s.respondPermission);
+
+  const handleRespondPermission = async (optionId: string) => {
+    if (!cmdName) return;
+    try {
+      await respondPermission(cmdName, optionId);
+    } catch {
+      // ignore network errors
+    }
+  };
+
   const handleCancel = async () => {
     if (!cmdName) return;
     setCancelling(true);
@@ -225,7 +258,7 @@ export function CommandDetailPage() {
   const isACP = cmd && cmd.executorKind === ExecutorKind.ACP;
 
   return (
-    <div className="p-6 flex flex-col gap-4 w-full">
+    <div className="p-6 flex flex-col gap-4 w-full pb-20">
       <div className="flex items-center gap-2">
         <Button
           variant="ghost"
@@ -321,6 +354,46 @@ export function CommandDetailPage() {
             </div>
           )}
       </div>
+
+      {pendingPermission && pendingPermission.payload && (
+        <div className="fixed bottom-0 left-0 right-0 z-[2500] bg-background border-t border-control-border p-3">
+          <div className="max-w-5xl mx-auto flex items-center gap-4">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Badge variant="warning" className="shrink-0">
+                {((pendingPermission.payload as Record<string, unknown>)
+                  ?.kind as string) ?? "tool"}
+              </Badge>
+              <span className="text-sm text-main truncate">
+                {((pendingPermission.payload as Record<string, unknown>)
+                  ?.title as string) ?? "Permission required"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {(
+                (pendingPermission.payload as Record<string, unknown>)
+                  ?.options as Array<{
+                  option_id: string;
+                  name: string;
+                  kind: string;
+                }>
+              )?.map((opt) => (
+                <Button
+                  key={opt.option_id}
+                  variant={
+                    opt.kind === "allow_once" || opt.kind === "allow_always"
+                      ? "default"
+                      : "outline"
+                  }
+                  size="sm"
+                  onClick={() => handleRespondPermission(opt.option_id)}
+                >
+                  {opt.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

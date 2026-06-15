@@ -5,6 +5,7 @@ package laelia.v1;
 import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "v1/annotation.proto";
@@ -37,6 +38,8 @@ enum CommandEventType {
   WARNING = 6;
   RAW_ACP = 7;
   FINAL_SUMMARY = 8;
+  PERMISSION_REQUESTED = 9;
+  PERMISSION_TIMED_OUT = 10;
 }
 
 message Command {
@@ -124,6 +127,14 @@ service CommandService {
   rpc WatchCommandEvents(WatchCommandEventsRequest) returns (stream CommandEvent) {
     option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}:watchEvents"};
   }
+
+  rpc RespondPermission(RespondPermissionRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/{name=agents/*/commands/*}:respondPermission"
+      body: "*"
+    };
+    option (laelia.v1.audit) = true;
+  }
 }
 
 service AgentCommandService {
@@ -145,6 +156,7 @@ message ManagerCommandMessage {
     CommandRequest command_request = 1;
     CancelMessage cancel = 2;
     Pong pong = 3;
+    PermissionDecision permission_decision = 4;
   }
 }
 
@@ -257,4 +269,17 @@ message WatchCommandEventsRequest {
     (google.api.resource_reference).type = "laelia/Command"
   ];
   int32 after_seq_no = 2;
+}
+
+message PermissionDecision {
+  string command_id = 1;
+  string option_id = 2;
+}
+
+message RespondPermissionRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Command"
+  ];
+  string option_id = 2;
 }

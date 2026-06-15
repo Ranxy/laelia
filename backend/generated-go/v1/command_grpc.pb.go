@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -25,6 +26,7 @@ const (
 	CommandService_CancelCommand_FullMethodName      = "/laelia.v1.CommandService/CancelCommand"
 	CommandService_WatchCommand_FullMethodName       = "/laelia.v1.CommandService/WatchCommand"
 	CommandService_WatchCommandEvents_FullMethodName = "/laelia.v1.CommandService/WatchCommandEvents"
+	CommandService_RespondPermission_FullMethodName  = "/laelia.v1.CommandService/RespondPermission"
 )
 
 // CommandServiceClient is the client API for CommandService service.
@@ -37,6 +39,7 @@ type CommandServiceClient interface {
 	CancelCommand(ctx context.Context, in *CancelCommandRequest, opts ...grpc.CallOption) (*Command, error)
 	WatchCommand(ctx context.Context, in *WatchCommandRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CommandOutput], error)
 	WatchCommandEvents(ctx context.Context, in *WatchCommandEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CommandEvent], error)
+	RespondPermission(ctx context.Context, in *RespondPermissionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type commandServiceClient struct {
@@ -125,6 +128,16 @@ func (c *commandServiceClient) WatchCommandEvents(ctx context.Context, in *Watch
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type CommandService_WatchCommandEventsClient = grpc.ServerStreamingClient[CommandEvent]
 
+func (c *commandServiceClient) RespondPermission(ctx context.Context, in *RespondPermissionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, CommandService_RespondPermission_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CommandServiceServer is the server API for CommandService service.
 // All implementations must embed UnimplementedCommandServiceServer
 // for forward compatibility.
@@ -135,6 +148,7 @@ type CommandServiceServer interface {
 	CancelCommand(context.Context, *CancelCommandRequest) (*Command, error)
 	WatchCommand(*WatchCommandRequest, grpc.ServerStreamingServer[CommandOutput]) error
 	WatchCommandEvents(*WatchCommandEventsRequest, grpc.ServerStreamingServer[CommandEvent]) error
+	RespondPermission(context.Context, *RespondPermissionRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedCommandServiceServer()
 }
 
@@ -162,6 +176,9 @@ func (UnimplementedCommandServiceServer) WatchCommand(*WatchCommandRequest, grpc
 }
 func (UnimplementedCommandServiceServer) WatchCommandEvents(*WatchCommandEventsRequest, grpc.ServerStreamingServer[CommandEvent]) error {
 	return status.Error(codes.Unimplemented, "method WatchCommandEvents not implemented")
+}
+func (UnimplementedCommandServiceServer) RespondPermission(context.Context, *RespondPermissionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RespondPermission not implemented")
 }
 func (UnimplementedCommandServiceServer) mustEmbedUnimplementedCommandServiceServer() {}
 func (UnimplementedCommandServiceServer) testEmbeddedByValue()                        {}
@@ -278,6 +295,24 @@ func _CommandService_WatchCommandEvents_Handler(srv interface{}, stream grpc.Ser
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type CommandService_WatchCommandEventsServer = grpc.ServerStreamingServer[CommandEvent]
 
+func _CommandService_RespondPermission_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RespondPermissionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).RespondPermission(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_RespondPermission_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).RespondPermission(ctx, req.(*RespondPermissionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CommandService_ServiceDesc is the grpc.ServiceDesc for CommandService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -300,6 +335,10 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CancelCommand",
 			Handler:    _CommandService_CancelCommand_Handler,
+		},
+		{
+			MethodName: "RespondPermission",
+			Handler:    _CommandService_RespondPermission_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

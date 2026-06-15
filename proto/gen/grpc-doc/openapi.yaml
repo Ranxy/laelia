@@ -277,6 +277,40 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}/commands/{command}:respondPermission:
+        post:
+            tags:
+                - CommandService
+            operationId: CommandService_RespondPermission
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+                - name: command
+                  in: path
+                  description: The command id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/RespondPermissionRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}/commands/{command}:watch:
         get:
             tags:
@@ -1191,6 +1225,8 @@ components:
                         - WARNING
                         - RAW_ACP
                         - FINAL_SUMMARY
+                        - PERMISSION_REQUESTED
+                        - PERMISSION_TIMED_OUT
                     type: string
                     format: enum
                 summary:
@@ -1396,6 +1432,15 @@ components:
                 accessTokenExpiresAt:
                     type: string
                     format: date-time
+        RespondPermissionRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                optionId:
+                    type: string
         RevokeAgentTokenRequest:
             required:
                 - name

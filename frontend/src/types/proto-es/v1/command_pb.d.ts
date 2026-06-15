@@ -4,7 +4,7 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { JsonObject, Message } from "@bufbuild/protobuf";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import type { EmptySchema, Timestamp } from "@bufbuild/protobuf/wkt";
 
 /**
  * Describes the file v1/command.proto.
@@ -300,6 +300,12 @@ export declare type ManagerCommandMessage = Message<"laelia.v1.ManagerCommandMes
      */
     value: Pong;
     case: "pong";
+  } | {
+    /**
+     * @generated from field: laelia.v1.PermissionDecision permission_decision = 4;
+     */
+    value: PermissionDecision;
+    case: "permissionDecision";
   } | { case: undefined; value?: undefined };
 };
 
@@ -719,6 +725,48 @@ export declare type WatchCommandEventsRequest = Message<"laelia.v1.WatchCommandE
 export declare const WatchCommandEventsRequestSchema: GenMessage<WatchCommandEventsRequest>;
 
 /**
+ * @generated from message laelia.v1.PermissionDecision
+ */
+export declare type PermissionDecision = Message<"laelia.v1.PermissionDecision"> & {
+  /**
+   * @generated from field: string command_id = 1;
+   */
+  commandId: string;
+
+  /**
+   * @generated from field: string option_id = 2;
+   */
+  optionId: string;
+};
+
+/**
+ * Describes the message laelia.v1.PermissionDecision.
+ * Use `create(PermissionDecisionSchema)` to create a new message.
+ */
+export declare const PermissionDecisionSchema: GenMessage<PermissionDecision>;
+
+/**
+ * @generated from message laelia.v1.RespondPermissionRequest
+ */
+export declare type RespondPermissionRequest = Message<"laelia.v1.RespondPermissionRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string option_id = 2;
+   */
+  optionId: string;
+};
+
+/**
+ * Describes the message laelia.v1.RespondPermissionRequest.
+ * Use `create(RespondPermissionRequestSchema)` to create a new message.
+ */
+export declare const RespondPermissionRequestSchema: GenMessage<RespondPermissionRequest>;
+
+/**
  * @generated from enum laelia.v1.CommandStatus
  */
 export enum CommandStatus {
@@ -836,6 +884,16 @@ export enum CommandEventType {
    * @generated from enum value: FINAL_SUMMARY = 8;
    */
   FINAL_SUMMARY = 8,
+
+  /**
+   * @generated from enum value: PERMISSION_REQUESTED = 9;
+   */
+  PERMISSION_REQUESTED = 9,
+
+  /**
+   * @generated from enum value: PERMISSION_TIMED_OUT = 10;
+   */
+  PERMISSION_TIMED_OUT = 10,
 }
 
 /**
@@ -894,6 +952,14 @@ export declare const CommandService: GenService<{
     methodKind: "server_streaming";
     input: typeof WatchCommandEventsRequestSchema;
     output: typeof CommandEventSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.RespondPermission
+   */
+  respondPermission: {
+    methodKind: "unary";
+    input: typeof RespondPermissionRequestSchema;
+    output: typeof EmptySchema;
   },
 }>;
 

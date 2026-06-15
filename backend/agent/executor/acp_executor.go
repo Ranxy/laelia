@@ -24,6 +24,7 @@ import (
 
 const flushOutputInterval = 500 * time.Millisecond
 const maxRawEventBatchSize = 256
+const permissionTimeout = 120 * time.Second
 
 type outputBuffer struct {
 	mu        sync.Mutex
@@ -183,6 +184,9 @@ type ACPExecutor struct {
 	initializedAgent string
 	buffer           outputBuffer
 	rawEvents        rawEventBatch
+	permissionCh     chan acp.PermissionOptionId
+	perCommandAllow  map[string]bool
+	perCommandReject map[string]bool
 }
 
 type acpRuntimeClient struct {
@@ -220,19 +224,22 @@ func NewACP(req Request, cfg *ACPConfig) (Runtime, error) {
 	cmd.Env = buildACPEnv(profile, req.Env)
 
 	exec := &ACPExecutor{
-		ctx:          ctx,
-		cancel:       cancel,
-		request:      req,
-		config:       cfg,
-		profileName:  profileName,
-		profile:      profile,
-		workingDir:   workingDir,
-		allowedRoots: roots,
-		cmd:          cmd,
-		outputCh:     make(chan OutputChunk, outputBufferSize),
-		eventCh:      make(chan Event, outputBufferSize),
-		resultCh:     make(chan Result, 1),
-		done:         make(chan struct{}),
+		ctx:              ctx,
+		cancel:           cancel,
+		request:          req,
+		config:           cfg,
+		profileName:      profileName,
+		profile:          profile,
+		workingDir:       workingDir,
+		allowedRoots:     roots,
+		cmd:              cmd,
+		outputCh:         make(chan OutputChunk, outputBufferSize),
+		eventCh:          make(chan Event, outputBufferSize),
+		resultCh:         make(chan Result, 1),
+		done:             make(chan struct{}),
+		permissionCh:     make(chan acp.PermissionOptionId, 1),
+		perCommandAllow:  map[string]bool{},
+		perCommandReject: map[string]bool{},
 	}
 	exec.client = &acpRuntimeClient{executor: exec}
 	return exec, nil
@@ -266,6 +273,13 @@ func (e *ACPExecutor) ResultChannel() <-chan Result {
 
 func (e *ACPExecutor) Done() <-chan struct{} {
 	return e.done
+}
+
+func (e *ACPExecutor) ResolvePermission(optionID string) {
+	select {
+	case e.permissionCh <- acp.PermissionOptionId(optionID):
+	default:
+	}
 }
 
 func (e *ACPExecutor) run() {
@@ -544,14 +558,96 @@ func (c *acpRuntimeClient) WriteTextFile(_ context.Context, params acp.WriteText
 }
 
 func (c *acpRuntimeClient) RequestPermission(_ context.Context, params acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
-	selectOption := rejectPermissionOption(params.Options)
+	kind := ""
+	if params.ToolCall.Kind != nil {
+		kind = string(*params.ToolCall.Kind)
+	}
+
 	if allowsToolKind(c.executor.profile.AutoApproveToolKinds, params.ToolCall.Kind) {
-		selectOption = allowPermissionOption(params.Options)
+		return acp.RequestPermissionResponse{
+			Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{
+				Outcome:  "selected",
+				OptionId: allowPermissionOption(params.Options),
+			}},
+		}, nil
 	}
-	if selectOption == "" {
-		return acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{Outcome: "cancelled"}}}, nil
+
+	if c.executor.perCommandAllow[kind] {
+		return acp.RequestPermissionResponse{
+			Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{
+				Outcome:  "selected",
+				OptionId: allowPermissionOption(params.Options),
+			}},
+		}, nil
 	}
-	return acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{Outcome: "selected", OptionId: selectOption}}}, nil
+
+	if c.executor.perCommandReject[kind] {
+		return acp.RequestPermissionResponse{
+			Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{
+				Outcome:  "selected",
+				OptionId: rejectPermissionOption(params.Options),
+			}},
+		}, nil
+	}
+
+	payload := map[string]any{
+		"tool_call_id": string(params.ToolCall.ToolCallId),
+		"kind":         kind,
+		"title":        "",
+		"options":      marshalPermissionOptions(params.Options),
+		"expires_at":   time.Now().Add(permissionTimeout).Unix(),
+	}
+	if params.ToolCall.Title != nil {
+		payload["title"] = *params.ToolCall.Title
+	}
+
+	c.executor.sendEvent(Event{
+		Type:      v1pb.CommandEventType_PERMISSION_REQUESTED,
+		Summary:   fmt.Sprintf("Permission required for %s: %s", kind, payload["title"]),
+		Timestamp: time.Now(),
+		Payload:   payload,
+	})
+
+	select {
+	case optionID := <-c.executor.permissionCh:
+		if optionID == "" {
+			return acp.RequestPermissionResponse{
+				Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{Outcome: "cancelled"}},
+			}, nil
+		}
+
+		permissionKind := findPermissionOptionKind(params.Options, optionID)
+		switch permissionKind {
+		case acp.PermissionOptionKindAllowAlways:
+			c.executor.perCommandAllow[kind] = true
+		case acp.PermissionOptionKindRejectAlways:
+			c.executor.perCommandReject[kind] = true
+		default:
+		}
+
+		return acp.RequestPermissionResponse{
+			Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{
+				Outcome:  "selected",
+				OptionId: optionID,
+			}},
+		}, nil
+
+	case <-time.After(permissionTimeout):
+		c.executor.sendEvent(Event{
+			Type:      v1pb.CommandEventType_PERMISSION_TIMED_OUT,
+			Summary:   fmt.Sprintf("Permission timed out for %s", kind),
+			Timestamp: time.Now(),
+			Payload:   map[string]any{"tool_call_id": string(params.ToolCall.ToolCallId), "kind": kind},
+		})
+		return acp.RequestPermissionResponse{
+			Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{Outcome: "cancelled"}},
+		}, nil
+
+	case <-c.executor.ctx.Done():
+		return acp.RequestPermissionResponse{
+			Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{Outcome: "cancelled"}},
+		}, nil
+	}
 }
 
 func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNotification) error {
@@ -860,4 +956,25 @@ func maxInt(left int, right int) int {
 		return left
 	}
 	return right
+}
+
+func marshalPermissionOptions(options []acp.PermissionOption) []any {
+	result := make([]any, len(options))
+	for i, opt := range options {
+		result[i] = map[string]any{
+			"option_id": string(opt.OptionId),
+			"name":      opt.Name,
+			"kind":      string(opt.Kind),
+		}
+	}
+	return result
+}
+
+func findPermissionOptionKind(options []acp.PermissionOption, optionID acp.PermissionOptionId) acp.PermissionOptionKind {
+	for _, opt := range options {
+		if opt.OptionId == optionID {
+			return opt.Kind
+		}
+	}
+	return acp.PermissionOptionKindAllowOnce
 }

@@ -62,6 +62,7 @@ export interface CommandSlice {
   getCommand: (name: string) => Promise<Command | undefined>;
   watchCommand: (name: string, signal?: AbortSignal) => Promise<void>;
   watchCommandEvents: (name: string, signal?: AbortSignal) => Promise<void>;
+  respondPermission: (name: string, optionId: string) => Promise<void>;
 }
 
 export type AppStoreState = AuthSlice & AgentSlice & CommandSlice;

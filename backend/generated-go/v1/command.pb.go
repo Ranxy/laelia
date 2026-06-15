@@ -10,6 +10,7 @@ import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
@@ -146,20 +147,24 @@ const (
 	CommandEventType_WARNING                        CommandEventType = 6
 	CommandEventType_RAW_ACP                        CommandEventType = 7
 	CommandEventType_FINAL_SUMMARY                  CommandEventType = 8
+	CommandEventType_PERMISSION_REQUESTED           CommandEventType = 9
+	CommandEventType_PERMISSION_TIMED_OUT           CommandEventType = 10
 )
 
 // Enum value maps for CommandEventType.
 var (
 	CommandEventType_name = map[int32]string{
-		0: "COMMAND_EVENT_TYPE_UNSPECIFIED",
-		1: "LIFECYCLE",
-		2: "TEXT_DELTA",
-		3: "TOOL_CALL_STARTED",
-		4: "TOOL_CALL_FINISHED",
-		5: "DIFF_EMITTED",
-		6: "WARNING",
-		7: "RAW_ACP",
-		8: "FINAL_SUMMARY",
+		0:  "COMMAND_EVENT_TYPE_UNSPECIFIED",
+		1:  "LIFECYCLE",
+		2:  "TEXT_DELTA",
+		3:  "TOOL_CALL_STARTED",
+		4:  "TOOL_CALL_FINISHED",
+		5:  "DIFF_EMITTED",
+		6:  "WARNING",
+		7:  "RAW_ACP",
+		8:  "FINAL_SUMMARY",
+		9:  "PERMISSION_REQUESTED",
+		10: "PERMISSION_TIMED_OUT",
 	}
 	CommandEventType_value = map[string]int32{
 		"COMMAND_EVENT_TYPE_UNSPECIFIED": 0,
@@ -171,6 +176,8 @@ var (
 		"WARNING":                        6,
 		"RAW_ACP":                        7,
 		"FINAL_SUMMARY":                  8,
+		"PERMISSION_REQUESTED":           9,
+		"PERMISSION_TIMED_OUT":           10,
 	}
 )
 
@@ -746,6 +753,7 @@ type ManagerCommandMessage struct {
 	//	*ManagerCommandMessage_CommandRequest
 	//	*ManagerCommandMessage_Cancel
 	//	*ManagerCommandMessage_Pong
+	//	*ManagerCommandMessage_PermissionDecision
 	Message       isManagerCommandMessage_Message `protobuf_oneof:"message"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -815,6 +823,15 @@ func (x *ManagerCommandMessage) GetPong() *Pong {
 	return nil
 }
 
+func (x *ManagerCommandMessage) GetPermissionDecision() *PermissionDecision {
+	if x != nil {
+		if x, ok := x.Message.(*ManagerCommandMessage_PermissionDecision); ok {
+			return x.PermissionDecision
+		}
+	}
+	return nil
+}
+
 type isManagerCommandMessage_Message interface {
 	isManagerCommandMessage_Message()
 }
@@ -831,11 +848,17 @@ type ManagerCommandMessage_Pong struct {
 	Pong *Pong `protobuf:"bytes,3,opt,name=pong,proto3,oneof"`
 }
 
+type ManagerCommandMessage_PermissionDecision struct {
+	PermissionDecision *PermissionDecision `protobuf:"bytes,4,opt,name=permission_decision,json=permissionDecision,proto3,oneof"`
+}
+
 func (*ManagerCommandMessage_CommandRequest) isManagerCommandMessage_Message() {}
 
 func (*ManagerCommandMessage_Cancel) isManagerCommandMessage_Message() {}
 
 func (*ManagerCommandMessage_Pong) isManagerCommandMessage_Message() {}
+
+func (*ManagerCommandMessage_PermissionDecision) isManagerCommandMessage_Message() {}
 
 type AgentReady struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1749,11 +1772,115 @@ func (x *WatchCommandEventsRequest) GetAfterSeqNo() int32 {
 	return 0
 }
 
+type PermissionDecision struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CommandId     string                 `protobuf:"bytes,1,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	OptionId      string                 `protobuf:"bytes,2,opt,name=option_id,json=optionId,proto3" json:"option_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PermissionDecision) Reset() {
+	*x = PermissionDecision{}
+	mi := &file_v1_command_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PermissionDecision) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PermissionDecision) ProtoMessage() {}
+
+func (x *PermissionDecision) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PermissionDecision.ProtoReflect.Descriptor instead.
+func (*PermissionDecision) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *PermissionDecision) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+func (x *PermissionDecision) GetOptionId() string {
+	if x != nil {
+		return x.OptionId
+	}
+	return ""
+}
+
+type RespondPermissionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	OptionId      string                 `protobuf:"bytes,2,opt,name=option_id,json=optionId,proto3" json:"option_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RespondPermissionRequest) Reset() {
+	*x = RespondPermissionRequest{}
+	mi := &file_v1_command_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RespondPermissionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RespondPermissionRequest) ProtoMessage() {}
+
+func (x *RespondPermissionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RespondPermissionRequest.ProtoReflect.Descriptor instead.
+func (*RespondPermissionRequest) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *RespondPermissionRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *RespondPermissionRequest) GetOptionId() string {
+	if x != nil {
+		return x.OptionId
+	}
+	return ""
+}
+
 var File_v1_command_proto protoreflect.FileDescriptor
 
 const file_v1_command_proto_rawDesc = "" +
 	"\n" +
-	"\x10v1/command.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13v1/annotation.proto\"\xa3\a\n" +
+	"\x10v1/command.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13v1/annotation.proto\"\xa3\a\n" +
 	"\aCommand\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05agent\x18\x02 \x01(\tR\x05agent\x12!\n" +
@@ -1816,11 +1943,12 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x06result\x18\x03 \x01(\v2\x18.laelia.v1.CommandResultH\x00R\x06result\x12%\n" +
 	"\x04ping\x18\x04 \x01(\v2\x0f.laelia.v1.PingH\x00R\x04ping\x12/\n" +
 	"\x05event\x18\x05 \x01(\v2\x17.laelia.v1.CommandEventH\x00R\x05eventB\t\n" +
-	"\amessage\"\xc3\x01\n" +
+	"\amessage\"\x95\x02\n" +
 	"\x15ManagerCommandMessage\x12D\n" +
 	"\x0fcommand_request\x18\x01 \x01(\v2\x19.laelia.v1.CommandRequestH\x00R\x0ecommandRequest\x122\n" +
 	"\x06cancel\x18\x02 \x01(\v2\x18.laelia.v1.CancelMessageH\x00R\x06cancel\x12%\n" +
-	"\x04pong\x18\x03 \x01(\v2\x0f.laelia.v1.PongH\x00R\x04pongB\t\n" +
+	"\x04pong\x18\x03 \x01(\v2\x0f.laelia.v1.PongH\x00R\x04pong\x12P\n" +
+	"\x13permission_decision\x18\x04 \x01(\v2\x1d.laelia.v1.PermissionDecisionH\x00R\x12permissionDecisionB\t\n" +
 	"\amessage\"\x9b\x01\n" +
 	"\n" +
 	"AgentReady\x12\x1d\n" +
@@ -1914,7 +2042,15 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tB\x16\xe0A\x02\xfaA\x10\n" +
 	"\x0elaelia/CommandR\x04name\x12 \n" +
 	"\fafter_seq_no\x18\x02 \x01(\x05R\n" +
-	"afterSeqNo*\x80\x01\n" +
+	"afterSeqNo\"P\n" +
+	"\x12PermissionDecision\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x01 \x01(\tR\tcommandId\x12\x1b\n" +
+	"\toption_id\x18\x02 \x01(\tR\boptionId\"c\n" +
+	"\x18RespondPermissionRequest\x12*\n" +
+	"\x04name\x18\x01 \x01(\tB\x16\xe0A\x02\xfaA\x10\n" +
+	"\x0elaelia/CommandR\x04name\x12\x1b\n" +
+	"\toption_id\x18\x02 \x01(\tR\boptionId*\x80\x01\n" +
 	"\rCommandStatus\x12\x1e\n" +
 	"\x1aCOMMAND_STATUS_UNSPECIFIED\x10\x00\x12\v\n" +
 	"\aPENDING\x10\x01\x12\v\n" +
@@ -1927,7 +2063,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\fExecutorKind\x12\x1d\n" +
 	"\x19EXECUTOR_KIND_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05SHELL\x10\x01\x12\a\n" +
-	"\x03ACP\x10\x02*\xc3\x01\n" +
+	"\x03ACP\x10\x02*\xf7\x01\n" +
 	"\x10CommandEventType\x12\"\n" +
 	"\x1eCOMMAND_EVENT_TYPE_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tLIFECYCLE\x10\x01\x12\x0e\n" +
@@ -1938,7 +2074,10 @@ const file_v1_command_proto_rawDesc = "" +
 	"\fDIFF_EMITTED\x10\x05\x12\v\n" +
 	"\aWARNING\x10\x06\x12\v\n" +
 	"\aRAW_ACP\x10\a\x12\x11\n" +
-	"\rFINAL_SUMMARY\x10\b2\xe2\x05\n" +
+	"\rFINAL_SUMMARY\x10\b\x12\x18\n" +
+	"\x14PERMISSION_REQUESTED\x10\t\x12\x18\n" +
+	"\x14PERMISSION_TIMED_OUT\x10\n" +
+	"2\xf6\x06\n" +
 	"\x0eCommandService\x12n\n" +
 	"\vSendCommand\x12\x1d.laelia.v1.SendCommandRequest\x1a\x12.laelia.v1.Command\",\x98\xea0\x01\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/v1/{agent=agents/*}/commands\x12v\n" +
 	"\fListCommands\x12\x1e.laelia.v1.ListCommandsRequest\x1a\x1f.laelia.v1.ListCommandsResponse\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/v1/{agent=agents/*}/commands\x12f\n" +
@@ -1946,7 +2085,8 @@ const file_v1_command_proto_rawDesc = "" +
 	"GetCommand\x12\x1c.laelia.v1.GetCommandRequest\x1a\x12.laelia.v1.Command\"&\x82\xd3\xe4\x93\x02 \x12\x1e/v1/{name=agents/*/commands/*}\x12z\n" +
 	"\rCancelCommand\x12\x1f.laelia.v1.CancelCommandRequest\x1a\x12.laelia.v1.Command\"4\x98\xea0\x01\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=agents/*/commands/*}:cancel\x12x\n" +
 	"\fWatchCommand\x12\x1e.laelia.v1.WatchCommandRequest\x1a\x18.laelia.v1.CommandOutput\",\x82\xd3\xe4\x93\x02&\x12$/v1/{name=agents/*/commands/*}:watch0\x01\x12\x89\x01\n" +
-	"\x12WatchCommandEvents\x12$.laelia.v1.WatchCommandEventsRequest\x1a\x17.laelia.v1.CommandEvent\"2\x82\xd3\xe4\x93\x02,\x12*/v1/{name=agents/*/commands/*}:watchEvents0\x012m\n" +
+	"\x12WatchCommandEvents\x12$.laelia.v1.WatchCommandEventsRequest\x1a\x17.laelia.v1.CommandEvent\"2\x82\xd3\xe4\x93\x02,\x12*/v1/{name=agents/*/commands/*}:watchEvents0\x01\x12\x91\x01\n" +
+	"\x11RespondPermission\x12#.laelia.v1.RespondPermissionRequest\x1a\x16.google.protobuf.Empty\"?\x98\xea0\x01\x82\xd3\xe4\x93\x025:\x01*\"0/v1/{name=agents/*/commands/*}:respondPermission2m\n" +
 	"\x13AgentCommandService\x12V\n" +
 	"\x0eCommandChannel\x12\x1e.laelia.v1.AgentCommandMessage\x1a .laelia.v1.ManagerCommandMessage(\x010\x01B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
@@ -1963,7 +2103,7 @@ func file_v1_command_proto_rawDescGZIP() []byte {
 }
 
 var file_v1_command_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_v1_command_proto_goTypes = []any{
 	(CommandStatus)(0),                // 0: laelia.v1.CommandStatus
 	(ExecutorKind)(0),                 // 1: laelia.v1.ExecutorKind
@@ -1988,25 +2128,28 @@ var file_v1_command_proto_goTypes = []any{
 	(*CancelCommandRequest)(nil),      // 20: laelia.v1.CancelCommandRequest
 	(*WatchCommandRequest)(nil),       // 21: laelia.v1.WatchCommandRequest
 	(*WatchCommandEventsRequest)(nil), // 22: laelia.v1.WatchCommandEventsRequest
-	nil,                               // 23: laelia.v1.Command.EnvEntry
-	nil,                               // 24: laelia.v1.CommandRequest.EnvEntry
-	nil,                               // 25: laelia.v1.SendCommandRequest.EnvEntry
-	(*timestamppb.Timestamp)(nil),     // 26: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),           // 27: google.protobuf.Struct
+	(*PermissionDecision)(nil),        // 23: laelia.v1.PermissionDecision
+	(*RespondPermissionRequest)(nil),  // 24: laelia.v1.RespondPermissionRequest
+	nil,                               // 25: laelia.v1.Command.EnvEntry
+	nil,                               // 26: laelia.v1.CommandRequest.EnvEntry
+	nil,                               // 27: laelia.v1.SendCommandRequest.EnvEntry
+	(*timestamppb.Timestamp)(nil),     // 28: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),           // 29: google.protobuf.Struct
+	(*emptypb.Empty)(nil),             // 30: google.protobuf.Empty
 }
 var file_v1_command_proto_depIdxs = []int32{
 	0,  // 0: laelia.v1.Command.status:type_name -> laelia.v1.CommandStatus
-	26, // 1: laelia.v1.Command.created_at:type_name -> google.protobuf.Timestamp
-	26, // 2: laelia.v1.Command.started_at:type_name -> google.protobuf.Timestamp
-	26, // 3: laelia.v1.Command.completed_at:type_name -> google.protobuf.Timestamp
-	23, // 4: laelia.v1.Command.env:type_name -> laelia.v1.Command.EnvEntry
+	28, // 1: laelia.v1.Command.created_at:type_name -> google.protobuf.Timestamp
+	28, // 2: laelia.v1.Command.started_at:type_name -> google.protobuf.Timestamp
+	28, // 3: laelia.v1.Command.completed_at:type_name -> google.protobuf.Timestamp
+	25, // 4: laelia.v1.Command.env:type_name -> laelia.v1.Command.EnvEntry
 	1,  // 5: laelia.v1.Command.executor_kind:type_name -> laelia.v1.ExecutorKind
-	27, // 6: laelia.v1.Command.result:type_name -> google.protobuf.Struct
+	29, // 6: laelia.v1.Command.result:type_name -> google.protobuf.Struct
 	3,  // 7: laelia.v1.CommandOutput.type:type_name -> laelia.v1.CommandOutput.StreamType
-	26, // 8: laelia.v1.CommandOutput.timestamp:type_name -> google.protobuf.Timestamp
+	28, // 8: laelia.v1.CommandOutput.timestamp:type_name -> google.protobuf.Timestamp
 	2,  // 9: laelia.v1.CommandEvent.type:type_name -> laelia.v1.CommandEventType
-	27, // 10: laelia.v1.CommandEvent.payload:type_name -> google.protobuf.Struct
-	26, // 11: laelia.v1.CommandEvent.timestamp:type_name -> google.protobuf.Timestamp
+	29, // 10: laelia.v1.CommandEvent.payload:type_name -> google.protobuf.Struct
+	28, // 11: laelia.v1.CommandEvent.timestamp:type_name -> google.protobuf.Timestamp
 	9,  // 12: laelia.v1.AgentCommandMessage.agent_ready:type_name -> laelia.v1.AgentReady
 	11, // 13: laelia.v1.AgentCommandMessage.progress:type_name -> laelia.v1.CommandProgress
 	12, // 14: laelia.v1.AgentCommandMessage.result:type_name -> laelia.v1.CommandResult
@@ -2015,33 +2158,36 @@ var file_v1_command_proto_depIdxs = []int32{
 	10, // 17: laelia.v1.ManagerCommandMessage.command_request:type_name -> laelia.v1.CommandRequest
 	13, // 18: laelia.v1.ManagerCommandMessage.cancel:type_name -> laelia.v1.CancelMessage
 	15, // 19: laelia.v1.ManagerCommandMessage.pong:type_name -> laelia.v1.Pong
-	24, // 20: laelia.v1.CommandRequest.env:type_name -> laelia.v1.CommandRequest.EnvEntry
-	1,  // 21: laelia.v1.CommandRequest.executor_kind:type_name -> laelia.v1.ExecutorKind
-	3,  // 22: laelia.v1.CommandProgress.type:type_name -> laelia.v1.CommandOutput.StreamType
-	27, // 23: laelia.v1.CommandResult.result:type_name -> google.protobuf.Struct
-	25, // 24: laelia.v1.SendCommandRequest.env:type_name -> laelia.v1.SendCommandRequest.EnvEntry
-	1,  // 25: laelia.v1.SendCommandRequest.executor_kind:type_name -> laelia.v1.ExecutorKind
-	0,  // 26: laelia.v1.ListCommandsRequest.status:type_name -> laelia.v1.CommandStatus
-	4,  // 27: laelia.v1.ListCommandsResponse.commands:type_name -> laelia.v1.Command
-	16, // 28: laelia.v1.CommandService.SendCommand:input_type -> laelia.v1.SendCommandRequest
-	17, // 29: laelia.v1.CommandService.ListCommands:input_type -> laelia.v1.ListCommandsRequest
-	19, // 30: laelia.v1.CommandService.GetCommand:input_type -> laelia.v1.GetCommandRequest
-	20, // 31: laelia.v1.CommandService.CancelCommand:input_type -> laelia.v1.CancelCommandRequest
-	21, // 32: laelia.v1.CommandService.WatchCommand:input_type -> laelia.v1.WatchCommandRequest
-	22, // 33: laelia.v1.CommandService.WatchCommandEvents:input_type -> laelia.v1.WatchCommandEventsRequest
-	7,  // 34: laelia.v1.AgentCommandService.CommandChannel:input_type -> laelia.v1.AgentCommandMessage
-	4,  // 35: laelia.v1.CommandService.SendCommand:output_type -> laelia.v1.Command
-	18, // 36: laelia.v1.CommandService.ListCommands:output_type -> laelia.v1.ListCommandsResponse
-	4,  // 37: laelia.v1.CommandService.GetCommand:output_type -> laelia.v1.Command
-	4,  // 38: laelia.v1.CommandService.CancelCommand:output_type -> laelia.v1.Command
-	5,  // 39: laelia.v1.CommandService.WatchCommand:output_type -> laelia.v1.CommandOutput
-	6,  // 40: laelia.v1.CommandService.WatchCommandEvents:output_type -> laelia.v1.CommandEvent
-	8,  // 41: laelia.v1.AgentCommandService.CommandChannel:output_type -> laelia.v1.ManagerCommandMessage
-	35, // [35:42] is the sub-list for method output_type
-	28, // [28:35] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	23, // 20: laelia.v1.ManagerCommandMessage.permission_decision:type_name -> laelia.v1.PermissionDecision
+	26, // 21: laelia.v1.CommandRequest.env:type_name -> laelia.v1.CommandRequest.EnvEntry
+	1,  // 22: laelia.v1.CommandRequest.executor_kind:type_name -> laelia.v1.ExecutorKind
+	3,  // 23: laelia.v1.CommandProgress.type:type_name -> laelia.v1.CommandOutput.StreamType
+	29, // 24: laelia.v1.CommandResult.result:type_name -> google.protobuf.Struct
+	27, // 25: laelia.v1.SendCommandRequest.env:type_name -> laelia.v1.SendCommandRequest.EnvEntry
+	1,  // 26: laelia.v1.SendCommandRequest.executor_kind:type_name -> laelia.v1.ExecutorKind
+	0,  // 27: laelia.v1.ListCommandsRequest.status:type_name -> laelia.v1.CommandStatus
+	4,  // 28: laelia.v1.ListCommandsResponse.commands:type_name -> laelia.v1.Command
+	16, // 29: laelia.v1.CommandService.SendCommand:input_type -> laelia.v1.SendCommandRequest
+	17, // 30: laelia.v1.CommandService.ListCommands:input_type -> laelia.v1.ListCommandsRequest
+	19, // 31: laelia.v1.CommandService.GetCommand:input_type -> laelia.v1.GetCommandRequest
+	20, // 32: laelia.v1.CommandService.CancelCommand:input_type -> laelia.v1.CancelCommandRequest
+	21, // 33: laelia.v1.CommandService.WatchCommand:input_type -> laelia.v1.WatchCommandRequest
+	22, // 34: laelia.v1.CommandService.WatchCommandEvents:input_type -> laelia.v1.WatchCommandEventsRequest
+	24, // 35: laelia.v1.CommandService.RespondPermission:input_type -> laelia.v1.RespondPermissionRequest
+	7,  // 36: laelia.v1.AgentCommandService.CommandChannel:input_type -> laelia.v1.AgentCommandMessage
+	4,  // 37: laelia.v1.CommandService.SendCommand:output_type -> laelia.v1.Command
+	18, // 38: laelia.v1.CommandService.ListCommands:output_type -> laelia.v1.ListCommandsResponse
+	4,  // 39: laelia.v1.CommandService.GetCommand:output_type -> laelia.v1.Command
+	4,  // 40: laelia.v1.CommandService.CancelCommand:output_type -> laelia.v1.Command
+	5,  // 41: laelia.v1.CommandService.WatchCommand:output_type -> laelia.v1.CommandOutput
+	6,  // 42: laelia.v1.CommandService.WatchCommandEvents:output_type -> laelia.v1.CommandEvent
+	30, // 43: laelia.v1.CommandService.RespondPermission:output_type -> google.protobuf.Empty
+	8,  // 44: laelia.v1.AgentCommandService.CommandChannel:output_type -> laelia.v1.ManagerCommandMessage
+	37, // [37:45] is the sub-list for method output_type
+	29, // [29:37] is the sub-list for method input_type
+	29, // [29:29] is the sub-list for extension type_name
+	29, // [29:29] is the sub-list for extension extendee
+	0,  // [0:29] is the sub-list for field type_name
 }
 
 func init() { file_v1_command_proto_init() }
@@ -2061,6 +2207,7 @@ func file_v1_command_proto_init() {
 		(*ManagerCommandMessage_CommandRequest)(nil),
 		(*ManagerCommandMessage_Cancel)(nil),
 		(*ManagerCommandMessage_Pong)(nil),
+		(*ManagerCommandMessage_PermissionDecision)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -2068,7 +2215,7 @@ func file_v1_command_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_command_proto_rawDesc), len(file_v1_command_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   22,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
