@@ -439,6 +439,11 @@ func convertToV1CommandEvent(event *store.CommandEventMessage) *v1pb.CommandEven
 			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
 				v1Event.Payload = &v1pb.CommandEvent_PermissionTimedOut{PermissionTimedOut: p}
 			}
+		case v1pb.CommandEventType_PERMISSION_DECIDED:
+			p := &v1pb.PermissionDecidedPayload{}
+			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
+				v1Event.Payload = &v1pb.CommandEvent_PermissionDecided{PermissionDecided: p}
+			}
 		default:
 		}
 	}

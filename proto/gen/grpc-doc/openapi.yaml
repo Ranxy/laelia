@@ -1227,6 +1227,7 @@ components:
                         - FINAL_SUMMARY
                         - PERMISSION_REQUESTED
                         - PERMISSION_TIMED_OUT
+                        - PERMISSION_DECIDED
                     type: string
                     format: enum
                 summary:
@@ -1254,6 +1255,8 @@ components:
                     $ref: '#/components/schemas/PermissionRequestedPayload'
                 permissionTimedOut:
                     $ref: '#/components/schemas/PermissionTimedOutPayload'
+                permissionDecided:
+                    $ref: '#/components/schemas/PermissionDecidedPayload'
         CommandOutput:
             type: object
             properties:
@@ -1456,6 +1459,17 @@ components:
                 timeoutSeconds:
                     type: integer
                     format: int32
+        PermissionDecidedPayload:
+            type: object
+            properties:
+                toolCallId:
+                    type: string
+                kind:
+                    type: string
+                optionId:
+                    type: string
+                optionKind:
+                    type: string
         PermissionOptionPayload:
             type: object
             properties:

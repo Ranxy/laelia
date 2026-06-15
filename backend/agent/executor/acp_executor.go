@@ -624,6 +624,17 @@ func (c *acpRuntimeClient) RequestPermission(_ context.Context, params acp.Reque
 		default:
 		}
 
+		c.executor.sendEvent(Event{
+			Type:    v1pb.CommandEventType_PERMISSION_DECIDED,
+			Summary: fmt.Sprintf("Permission %s for %s: %s", string(permissionKind), kind, title),
+			PermissionDecided: &v1pb.PermissionDecidedPayload{
+				ToolCallId: string(params.ToolCall.ToolCallId),
+				Kind:       kind,
+				OptionId:   string(optionID),
+				OptionKind: string(permissionKind),
+			},
+		})
+
 		return acp.RequestPermissionResponse{
 			Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{
 				Outcome:  "selected",

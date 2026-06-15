@@ -102,6 +102,7 @@
     - [ListCommandsRequest](#laelia-v1-ListCommandsRequest)
     - [ListCommandsResponse](#laelia-v1-ListCommandsResponse)
     - [ManagerCommandMessage](#laelia-v1-ManagerCommandMessage)
+    - [PermissionDecidedPayload](#laelia-v1-PermissionDecidedPayload)
     - [PermissionDecision](#laelia-v1-PermissionDecision)
     - [PermissionOptionPayload](#laelia-v1-PermissionOptionPayload)
     - [PermissionRequestedPayload](#laelia-v1-PermissionRequestedPayload)
@@ -1338,6 +1339,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | final_summary | [FinalSummaryPayload](#laelia-v1-FinalSummaryPayload) |  |  |
 | permission_requested | [PermissionRequestedPayload](#laelia-v1-PermissionRequestedPayload) |  |  |
 | permission_timed_out | [PermissionTimedOutPayload](#laelia-v1-PermissionTimedOutPayload) |  |  |
+| permission_decided | [PermissionDecidedPayload](#laelia-v1-PermissionDecidedPayload) |  |  |
 
 
 
@@ -1551,6 +1553,24 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | cancel | [CancelMessage](#laelia-v1-CancelMessage) |  |  |
 | pong | [Pong](#laelia-v1-Pong) |  |  |
 | permission_decision | [PermissionDecision](#laelia-v1-PermissionDecision) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-PermissionDecidedPayload"></a>
+
+### PermissionDecidedPayload
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| tool_call_id | [string](#string) |  |  |
+| kind | [string](#string) |  |  |
+| option_id | [string](#string) |  |  |
+| option_kind | [string](#string) |  |  |
 
 
 
@@ -1842,6 +1862,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | FINAL_SUMMARY | 8 |  |
 | PERMISSION_REQUESTED | 9 |  |
 | PERMISSION_TIMED_OUT | 10 |  |
+| PERMISSION_DECIDED | 11 |  |
 
 
 

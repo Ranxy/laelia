@@ -280,6 +280,12 @@ export declare type CommandEvent = Message<"laelia.v1.CommandEvent"> & {
      */
     value: PermissionTimedOutPayload;
     case: "permissionTimedOut";
+  } | {
+    /**
+     * @generated from field: laelia.v1.PermissionDecidedPayload permission_decided = 20;
+     */
+    value: PermissionDecidedPayload;
+    case: "permissionDecided";
   } | { case: undefined; value?: undefined };
 };
 
@@ -534,6 +540,37 @@ export declare type PermissionTimedOutPayload = Message<"laelia.v1.PermissionTim
  * Use `create(PermissionTimedOutPayloadSchema)` to create a new message.
  */
 export declare const PermissionTimedOutPayloadSchema: GenMessage<PermissionTimedOutPayload>;
+
+/**
+ * @generated from message laelia.v1.PermissionDecidedPayload
+ */
+export declare type PermissionDecidedPayload = Message<"laelia.v1.PermissionDecidedPayload"> & {
+  /**
+   * @generated from field: string tool_call_id = 1;
+   */
+  toolCallId: string;
+
+  /**
+   * @generated from field: string kind = 2;
+   */
+  kind: string;
+
+  /**
+   * @generated from field: string option_id = 3;
+   */
+  optionId: string;
+
+  /**
+   * @generated from field: string option_kind = 4;
+   */
+  optionKind: string;
+};
+
+/**
+ * Describes the message laelia.v1.PermissionDecidedPayload.
+ * Use `create(PermissionDecidedPayloadSchema)` to create a new message.
+ */
+export declare const PermissionDecidedPayloadSchema: GenMessage<PermissionDecidedPayload>;
 
 /**
  * @generated from message laelia.v1.AgentCommandMessage
@@ -1200,6 +1237,11 @@ export enum CommandEventType {
    * @generated from enum value: PERMISSION_TIMED_OUT = 10;
    */
   PERMISSION_TIMED_OUT = 10,
+
+  /**
+   * @generated from enum value: PERMISSION_DECIDED = 11;
+   */
+  PERMISSION_DECIDED = 11,
 }
 
 /**

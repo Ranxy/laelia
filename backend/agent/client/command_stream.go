@@ -439,6 +439,8 @@ func sendCommandEvent(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessa
 		ce.Payload = &v1pb.CommandEvent_PermissionRequested{PermissionRequested: event.PermissionRequested}
 	case v1pb.CommandEventType_PERMISSION_TIMED_OUT:
 		ce.Payload = &v1pb.CommandEvent_PermissionTimedOut{PermissionTimedOut: event.PermissionTimedOut}
+	case v1pb.CommandEventType_PERMISSION_DECIDED:
+		ce.Payload = &v1pb.CommandEvent_PermissionDecided{PermissionDecided: event.PermissionDecided}
 	default:
 	}
 

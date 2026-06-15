@@ -558,6 +558,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.PermissionDecidedPayload"><span class="badge">M</span>PermissionDecidedPayload</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.PermissionDecision"><span class="badge">M</span>PermissionDecision</a>
                 </li>
               
@@ -3811,6 +3815,13 @@ Format: idps/{idp} </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>permission_decided</td>
+                  <td><a href="#laelia.v1.PermissionDecidedPayload">PermissionDecidedPayload</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -4326,6 +4337,51 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>permission_decision</td>
                   <td><a href="#laelia.v1.PermissionDecision">PermissionDecision</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.PermissionDecidedPayload">PermissionDecidedPayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>tool_call_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>kind</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>option_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>option_kind</td>
+                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -4969,6 +5025,12 @@ Format: idps/{idp} </p></td>
               <tr>
                 <td>PERMISSION_TIMED_OUT</td>
                 <td>10</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PERMISSION_DECIDED</td>
+                <td>11</td>
                 <td><p></p></td>
               </tr>
             

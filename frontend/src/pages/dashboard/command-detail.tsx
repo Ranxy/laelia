@@ -42,8 +42,9 @@ const eventTypeLabels: Record<number, string> = {
   [CommandEventType.WARNING]: "Warning",
   [CommandEventType.RAW_ACP]: "Raw ACP",
   [CommandEventType.FINAL_SUMMARY]: "Final Summary",
-  [CommandEventType.PERMISSION_REQUESTED]: "Permission",
-  [CommandEventType.PERMISSION_TIMED_OUT]: "Timeout",
+  [CommandEventType.PERMISSION_REQUESTED]: "Permission Requested",
+  [CommandEventType.PERMISSION_TIMED_OUT]: "Permission Timed Out",
+  [CommandEventType.PERMISSION_DECIDED]: "Permission Decided",
 };
 
 const eventTypeColors: Record<number, string> = {
@@ -56,6 +57,7 @@ const eventTypeColors: Record<number, string> = {
   [CommandEventType.FINAL_SUMMARY]: "text-emerald-400",
   [CommandEventType.PERMISSION_REQUESTED]: "text-amber-400",
   [CommandEventType.PERMISSION_TIMED_OUT]: "text-red-400",
+  [CommandEventType.PERMISSION_DECIDED]: "text-green-400",
 };
 
 function formatDuration(ms: number | bigint | undefined): string {
@@ -211,7 +213,15 @@ export function CommandDetailPage() {
   const events = activeEvents[cmdName] ?? [];
   const visibleEvents = events.filter(isVisibleEvent);
 
+  const isRunning =
+    cmd &&
+    (cmd.status === CommandStatus.PENDING ||
+      cmd.status === CommandStatus.RUNNING);
+  const isACP = cmd && cmd.executorKind === ExecutorKind.ACP;
+
   const pendingPermission = useMemo(() => {
+    if (!isRunning) return null;
+
     const requested = events.filter(
       (ev) => ev.type === CommandEventType.PERMISSION_REQUESTED
     );
@@ -221,24 +231,31 @@ export function CommandDetailPage() {
 
     const decided = events.some(
       (ev) =>
-        ev.type === CommandEventType.PERMISSION_TIMED_OUT &&
+        (ev.type === CommandEventType.PERMISSION_TIMED_OUT ||
+          ev.type === CommandEventType.PERMISSION_DECIDED) &&
         ev.seqNo > latest.seqNo
     );
     if (decided) return null;
 
     return latest;
-  }, [events]);
+  }, [events, isRunning]);
 
   const respondPermission = useAppStore((s) => s.respondPermission);
+  const [permissionResponded, setPermissionResponded] = useState(false);
 
   const handleRespondPermission = async (optionId: string) => {
     if (!cmdName) return;
+    setPermissionResponded(true);
     try {
       await respondPermission(cmdName, optionId);
     } catch {
-      // ignore network errors
+      setPermissionResponded(false);
     }
   };
+
+  useEffect(() => {
+    setPermissionResponded(false);
+  }, [cmdName]);
 
   const handleCancel = async () => {
     if (!cmdName) return;
@@ -251,114 +268,111 @@ export function CommandDetailPage() {
     }
   };
 
-  const isRunning =
-    cmd &&
-    (cmd.status === CommandStatus.PENDING ||
-      cmd.status === CommandStatus.RUNNING);
-  const isACP = cmd && cmd.executorKind === ExecutorKind.ACP;
-
   return (
-    <div className="p-6 flex flex-col gap-4 w-full pb-20">
-      <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(`/agents/${agentId}/commands`)}
-        >
-          &larr; Back
-        </Button>
-      </div>
-
-      {cmd && (
-        <>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h1 className="text-lg font-mono font-semibold text-main truncate max-w-xl">
-                {cmd.instruction || cmd.command}
-              </h1>
-              {isACP && <Badge variant="secondary">ACP</Badge>}
-              <Badge variant={statusVariants[cmd.status] ?? "default"}>
-                {statusLabels[cmd.status] ?? "Unknown"}
-              </Badge>
-            </div>
-            {isRunning && (
-              <Button
-                variant="outline"
-                onClick={handleCancel}
-                disabled={cancelling}
-              >
-                {cancelling ? "Cancelling..." : "Cancel"}
-              </Button>
-            )}
-          </div>
-
-          {isACP && cmd.profile && (
-            <div className="text-xs text-control-light">
-              Profile: {cmd.profile}
-            </div>
-          )}
-
-          <div className="flex gap-6 text-sm text-control-light">
-            <span>Duration: {formatDuration(cmd.durationMs)}</span>
-            {cmd.exitCode !== undefined && cmd.exitCode !== 0 && (
-              <span>Exit code: {cmd.exitCode}</span>
-            )}
-            {cmd.principalName && <span>Sent by: {cmd.principalName}</span>}
-            <span>{cmd.created}</span>
-          </div>
-
-          {cmd.errorMessage && (
-            <div className="rounded bg-error/10 border border-control-border p-3 text-sm text-error">
-              {cmd.errorMessage}
-            </div>
-          )}
-
-          {cmd.finalSummary && (
-            <div className="rounded bg-accent/10 border border-control-border p-3">
-              <div className="text-xs font-medium text-control mb-1">
-                Final Summary
-              </div>
-              <div className="text-sm text-main whitespace-pre-wrap">
-                {cmd.finalSummary}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="flex-1 flex flex-col gap-2">
-          <h2 className="text-sm font-medium text-control">Output</h2>
-          <CommandTerminal outputs={outputs} className="min-h-[300px]" />
+    <div className="flex flex-col min-h-full">
+      <div className="flex-1 p-6 flex flex-col gap-4 w-full">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(`/agents/${agentId}/commands`)}
+          >
+            &larr; Back
+          </Button>
         </div>
 
-        {isACP && visibleEvents.length > 0 && (
-          <div className="flex-1 flex flex-col gap-2">
-            <h2 className="text-sm font-medium text-control">Events</h2>
-            <div className="rounded border border-control-border p-2 flex flex-col gap-1 max-h-[400px] overflow-auto">
-              {visibleEvents.map((ev) => (
-                <EventRow key={ev.seqNo} event={ev} />
-              ))}
+        {cmd && (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h1 className="text-lg font-mono font-semibold text-main truncate max-w-xl">
+                  {cmd.instruction || cmd.command}
+                </h1>
+                {isACP && <Badge variant="secondary">ACP</Badge>}
+                <Badge variant={statusVariants[cmd.status] ?? "default"}>
+                  {statusLabels[cmd.status] ?? "Unknown"}
+                </Badge>
+              </div>
+              {isRunning && (
+                <Button
+                  variant="outline"
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                >
+                  {cancelling ? "Cancelling..." : "Cancel"}
+                </Button>
+              )}
             </div>
-          </div>
+
+            {isACP && cmd.profile && (
+              <div className="text-xs text-control-light">
+                Profile: {cmd.profile}
+              </div>
+            )}
+
+            <div className="flex gap-6 text-sm text-control-light">
+              <span>Duration: {formatDuration(cmd.durationMs)}</span>
+              {cmd.exitCode !== undefined && cmd.exitCode !== 0 && (
+                <span>Exit code: {cmd.exitCode}</span>
+              )}
+              {cmd.principalName && <span>Sent by: {cmd.principalName}</span>}
+              <span>{cmd.created}</span>
+            </div>
+
+            {cmd.errorMessage && (
+              <div className="rounded bg-error/10 border border-control-border p-3 text-sm text-error">
+                {cmd.errorMessage}
+              </div>
+            )}
+
+            {cmd.finalSummary && (
+              <div className="rounded bg-accent/10 border border-control-border p-3">
+                <div className="text-xs font-medium text-control mb-1">
+                  Final Summary
+                </div>
+                <div className="text-sm text-main whitespace-pre-wrap">
+                  {cmd.finalSummary}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
-        {isACP &&
-          visibleEvents.length === 0 &&
-          cmd.status === CommandStatus.RUNNING && (
+        <div className="flex flex-col gap-4 lg:flex-row">
+          <div className="flex-1 flex flex-col gap-2">
+            <h2 className="text-sm font-medium text-control">Output</h2>
+            <CommandTerminal outputs={outputs} className="min-h-[300px]" />
+          </div>
+
+          {isACP && visibleEvents.length > 0 && (
             <div className="flex-1 flex flex-col gap-2">
               <h2 className="text-sm font-medium text-control">Events</h2>
-              <div className="rounded border border-control-border p-4 text-xs text-control-light">
-                Waiting for structured events...
+              <div className="rounded border border-control-border p-2 flex flex-col gap-1 max-h-[400px] overflow-auto">
+                {visibleEvents.map((ev) => (
+                  <EventRow key={ev.seqNo} event={ev} />
+                ))}
               </div>
             </div>
           )}
+
+          {isACP &&
+            visibleEvents.length === 0 &&
+            cmd.status === CommandStatus.RUNNING && (
+              <div className="flex-1 flex flex-col gap-2">
+                <h2 className="text-sm font-medium text-control">Events</h2>
+                <div className="rounded border border-control-border p-4 text-xs text-control-light">
+                  Waiting for structured events...
+                </div>
+              </div>
+            )}
+        </div>
       </div>
 
       {pendingPermission &&
-        pendingPermission.payload.case === "permissionRequested" && (
-          <div className="fixed bottom-0 left-0 right-0 z-[2500] bg-background border-t border-control-border p-3">
-            <div className="max-w-5xl mx-auto flex items-center gap-4">
+        pendingPermission.payload.case === "permissionRequested" &&
+        !permissionResponded && (
+          <div className="sticky bottom-0 bg-background border-t border-control-border p-3">
+            <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <Badge variant="warning" className="shrink-0">
                   {pendingPermission.payload.value.kind}

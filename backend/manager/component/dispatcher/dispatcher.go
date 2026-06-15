@@ -600,6 +600,8 @@ func marshalEventPayload(event *v1pb.CommandEvent) ([]byte, error) {
 		return protojson.Marshal(event.GetPermissionRequested())
 	case v1pb.CommandEventType_PERMISSION_TIMED_OUT:
 		return protojson.Marshal(event.GetPermissionTimedOut())
+	case v1pb.CommandEventType_PERMISSION_DECIDED:
+		return protojson.Marshal(event.GetPermissionDecided())
 	default:
 		return nil, nil
 	}

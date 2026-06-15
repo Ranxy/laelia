@@ -38,6 +38,7 @@ type Event struct {
 	FinalSummary        *v1pb.FinalSummaryPayload
 	PermissionRequested *v1pb.PermissionRequestedPayload
 	PermissionTimedOut  *v1pb.PermissionTimedOutPayload
+	PermissionDecided   *v1pb.PermissionDecidedPayload
 }
 
 type Runtime interface {

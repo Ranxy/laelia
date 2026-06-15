@@ -40,6 +40,7 @@ enum CommandEventType {
   FINAL_SUMMARY = 8;
   PERMISSION_REQUESTED = 9;
   PERMISSION_TIMED_OUT = 10;
+  PERMISSION_DECIDED = 11;
 }
 
 message Command {
@@ -107,6 +108,7 @@ message CommandEvent {
     FinalSummaryPayload final_summary = 17;
     PermissionRequestedPayload permission_requested = 18;
     PermissionTimedOutPayload permission_timed_out = 19;
+    PermissionDecidedPayload permission_decided = 20;
   }
 }
 
@@ -166,6 +168,13 @@ message PermissionOptionPayload {
 message PermissionTimedOutPayload {
   string tool_call_id = 1;
   string kind = 2;
+}
+
+message PermissionDecidedPayload {
+  string tool_call_id = 1;
+  string kind = 2;
+  string option_id = 3;
+  string option_kind = 4;
 }
 
 service CommandService {
