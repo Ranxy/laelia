@@ -1231,11 +1231,29 @@ components:
                     format: enum
                 summary:
                     type: string
-                payload:
-                    type: object
                 timestamp:
                     type: string
                     format: date-time
+                lifecycle:
+                    $ref: '#/components/schemas/LifecyclePayload'
+                textDelta:
+                    $ref: '#/components/schemas/TextDeltaPayload'
+                toolCallStarted:
+                    $ref: '#/components/schemas/ToolCallStartedPayload'
+                toolCallFinished:
+                    $ref: '#/components/schemas/ToolCallFinishedPayload'
+                diffEmitted:
+                    $ref: '#/components/schemas/DiffEmittedPayload'
+                warning:
+                    $ref: '#/components/schemas/WarningPayload'
+                rawAcp:
+                    $ref: '#/components/schemas/RawAcpPayload'
+                finalSummary:
+                    $ref: '#/components/schemas/FinalSummaryPayload'
+                permissionRequested:
+                    $ref: '#/components/schemas/PermissionRequestedPayload'
+                permissionTimedOut:
+                    $ref: '#/components/schemas/PermissionTimedOutPayload'
         CommandOutput:
             type: object
             properties:
@@ -1289,6 +1307,22 @@ components:
                     $ref: '#/components/schemas/Agent'
                 bootstrapToken:
                     type: string
+        DiffEmittedPayload:
+            type: object
+            properties:
+                path:
+                    type: string
+                oldText:
+                    type: string
+                newText:
+                    type: string
+        FinalSummaryPayload:
+            type: object
+            properties:
+                stopReason:
+                    type: string
+                sessionId:
+                    type: string
         ForceDisconnectAgentRequest:
             required:
                 - name
@@ -1321,6 +1355,13 @@ components:
             properties:
                 oauth2Context:
                     $ref: '#/components/schemas/OAuth2IdentityProviderContext'
+        LifecyclePayload:
+            type: object
+            properties:
+                executorKind:
+                    type: string
+                profile:
+                    type: string
         ListAgentSessionsResponse:
             type: object
             properties:
@@ -1415,6 +1456,42 @@ components:
                 timeoutSeconds:
                     type: integer
                     format: int32
+        PermissionOptionPayload:
+            type: object
+            properties:
+                optionId:
+                    type: string
+                name:
+                    type: string
+                kind:
+                    type: string
+        PermissionRequestedPayload:
+            type: object
+            properties:
+                toolCallId:
+                    type: string
+                kind:
+                    type: string
+                title:
+                    type: string
+                options:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/PermissionOptionPayload'
+                expiresAt:
+                    type: string
+        PermissionTimedOutPayload:
+            type: object
+            properties:
+                toolCallId:
+                    type: string
+                kind:
+                    type: string
+        RawAcpPayload:
+            type: object
+            properties:
+                data:
+                    type: object
         RefreshAgentTokenRequest:
             type: object
             properties:
@@ -1515,6 +1592,27 @@ components:
                         $ref: '#/components/schemas/GoogleProtobufAny'
                     description: A list of messages that carry the error details.  There is a common set of message types for APIs to use.
             description: 'The `Status` type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by [gRPC](https://github.com/grpc). Each `Status` message contains three pieces of data: error code, error message, and error details. You can find out more about this error model and how to work with it in the [API Design Guide](https://cloud.google.com/apis/design/errors).'
+        TextDeltaPayload:
+            type: object
+            properties:
+                streamType:
+                    type: string
+                content:
+                    type: string
+        ToolCallFinishedPayload:
+            type: object
+            properties:
+                status:
+                    type: string
+                rawOutput:
+                    type: object
+        ToolCallStartedPayload:
+            type: object
+            properties:
+                title:
+                    type: string
+                rawInput:
+                    type: object
         UndeleteUserRequest:
             required:
                 - name
@@ -1591,6 +1689,11 @@ components:
                 source:
                     type: string
                     description: source means where the user comes from. For now we support Entra ID SCIM sync, so the source could be Entra ID.
+        WarningPayload:
+            type: object
+            properties:
+                message:
+                    type: string
 tags:
     - name: AgentService
     - name: AuthService

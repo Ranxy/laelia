@@ -95,11 +95,15 @@ func (b *outputBuffer) hasContent() bool {
 type rawEventBatch struct {
 	mu      sync.Mutex
 	summary string
-	chunks  []map[string]any
+	chunks  []*structpb.Struct
 }
 
 func (b *rawEventBatch) append(e *ACPExecutor, summary string, payload map[string]any) {
 	if summary == "" || payload == nil {
+		return
+	}
+	s, err := structpb.NewStruct(payload)
+	if err != nil {
 		return
 	}
 	b.mu.Lock()
@@ -108,7 +112,7 @@ func (b *rawEventBatch) append(e *ACPExecutor, summary string, payload map[strin
 		b.flushLocked(e)
 	}
 	b.summary = summary
-	b.chunks = append(b.chunks, payload)
+	b.chunks = append(b.chunks, s)
 	if len(b.chunks) >= maxRawEventBatchSize {
 		b.flushLocked(e)
 	}
@@ -126,32 +130,29 @@ func (b *rawEventBatch) flushLocked(e *ACPExecutor) {
 		return
 	}
 	if e.profile.SupportsRawEvents {
-		payload := b.buildPayload()
-		if payload != nil {
-			e.sendEvent(Event{
-				Type:      v1pb.CommandEventType_RAW_ACP,
-				Summary:   b.summary,
-				Timestamp: time.Now(),
-				Payload:   payload,
-			})
-		}
+		e.sendEvent(Event{
+			Type:    v1pb.CommandEventType_RAW_ACP,
+			Summary: b.summary,
+			RawAcp:  &v1pb.RawAcpPayload{Data: b.buildData()},
+		})
 	}
 	b.summary = ""
 	b.chunks = b.chunks[:0]
 }
 
-func (b *rawEventBatch) buildPayload() map[string]any {
+func (b *rawEventBatch) buildData() *structpb.Struct {
 	if len(b.chunks) == 1 {
 		return b.chunks[0]
 	}
 	events := make([]any, len(b.chunks))
 	for i, chunk := range b.chunks {
-		events[i] = chunk
+		events[i] = chunk.AsMap()
 	}
-	return map[string]any{
+	s, _ := structpb.NewStruct(map[string]any{
 		"batch_size": len(b.chunks),
 		"events":     events,
-	}
+	})
+	return s
 }
 
 type ACPExecutor struct {
@@ -384,12 +385,11 @@ func (e *ACPExecutor) run() {
 	}
 
 	e.sendEvent(Event{
-		Type:      v1pb.CommandEventType_FINAL_SUMMARY,
-		Summary:   finalSummary,
-		Timestamp: time.Now(),
-		Payload: map[string]any{
-			"stop_reason": string(promptResp.StopReason),
-			"session_id":  e.sessionID,
+		Type:    v1pb.CommandEventType_FINAL_SUMMARY,
+		Summary: finalSummary,
+		FinalSummary: &v1pb.FinalSummaryPayload{
+			StopReason: string(promptResp.StopReason),
+			SessionId:  e.sessionID,
 		},
 	})
 	e.sendACPResult(Result{
@@ -590,22 +590,21 @@ func (c *acpRuntimeClient) RequestPermission(_ context.Context, params acp.Reque
 		}, nil
 	}
 
-	payload := map[string]any{
-		"tool_call_id": string(params.ToolCall.ToolCallId),
-		"kind":         kind,
-		"title":        "",
-		"options":      marshalPermissionOptions(params.Options),
-		"expires_at":   time.Now().Add(permissionTimeout).Unix(),
-	}
+	title := ""
 	if params.ToolCall.Title != nil {
-		payload["title"] = *params.ToolCall.Title
+		title = *params.ToolCall.Title
 	}
 
 	c.executor.sendEvent(Event{
-		Type:      v1pb.CommandEventType_PERMISSION_REQUESTED,
-		Summary:   fmt.Sprintf("Permission required for %s: %s", kind, payload["title"]),
-		Timestamp: time.Now(),
-		Payload:   payload,
+		Type:    v1pb.CommandEventType_PERMISSION_REQUESTED,
+		Summary: fmt.Sprintf("Permission required for %s: %s", kind, title),
+		PermissionRequested: &v1pb.PermissionRequestedPayload{
+			ToolCallId: string(params.ToolCall.ToolCallId),
+			Kind:       kind,
+			Title:      title,
+			Options:    permissionOptionsToProto(params.Options),
+			ExpiresAt:  time.Now().Add(permissionTimeout).Unix(),
+		},
 	})
 
 	select {
@@ -634,10 +633,12 @@ func (c *acpRuntimeClient) RequestPermission(_ context.Context, params acp.Reque
 
 	case <-time.After(permissionTimeout):
 		c.executor.sendEvent(Event{
-			Type:      v1pb.CommandEventType_PERMISSION_TIMED_OUT,
-			Summary:   fmt.Sprintf("Permission timed out for %s", kind),
-			Timestamp: time.Now(),
-			Payload:   map[string]any{"tool_call_id": string(params.ToolCall.ToolCallId), "kind": kind},
+			Type:    v1pb.CommandEventType_PERMISSION_TIMED_OUT,
+			Summary: fmt.Sprintf("Permission timed out for %s", kind),
+			PermissionTimedOut: &v1pb.PermissionTimedOutPayload{
+				ToolCallId: string(params.ToolCall.ToolCallId),
+				Kind:       kind,
+			},
 		})
 		return acp.RequestPermissionResponse{
 			Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{Outcome: "cancelled"}},
@@ -673,7 +674,11 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 		c.executor.rawEvents.flush(c.executor)
 		c.executor.toolCallCount.Add(1)
 		if c.executor.profile.SupportsToolTraces {
-			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_TOOL_CALL_STARTED, Summary: u.ToolCall.Title, Timestamp: time.Now(), Payload: toolCallPayload(u.ToolCall)})
+			c.executor.sendEvent(Event{
+				Type:            v1pb.CommandEventType_TOOL_CALL_STARTED,
+				Summary:         u.ToolCall.Title,
+				ToolCallStarted: &v1pb.ToolCallStartedPayload{Title: u.ToolCall.Title, RawInput: toProtobufStruct(u.ToolCall)},
+			})
 		}
 	case u.ToolCallUpdate != nil:
 		for _, content := range u.ToolCallUpdate.Content {
@@ -685,14 +690,33 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 				}
 			}
 			if content.Diff != nil && c.executor.request.AllowDiff && c.executor.profile.SupportsDiff {
-				c.executor.sendEvent(Event{Type: v1pb.CommandEventType_DIFF_EMITTED, Summary: content.Diff.Path, Timestamp: time.Now(), Payload: toJSONMap(content.Diff)})
+				oldText := ""
+				if content.Diff.OldText != nil {
+					oldText = *content.Diff.OldText
+				}
+				c.executor.sendEvent(Event{
+					Type:    v1pb.CommandEventType_DIFF_EMITTED,
+					Summary: content.Diff.Path,
+					DiffEmitted: &v1pb.DiffEmittedPayload{
+						Path:    content.Diff.Path,
+						OldText: oldText,
+						NewText: content.Diff.NewText,
+					},
+				})
 			}
 		}
 		if u.ToolCallUpdate.Status != nil {
 			c.executor.rawEvents.append(c.executor, "tool_call_update", toJSONMap(u.ToolCallUpdate))
 		}
 		if c.executor.profile.SupportsToolTraces && u.ToolCallUpdate.Status != nil {
-			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_TOOL_CALL_FINISHED, Summary: string(*u.ToolCallUpdate.Status), Timestamp: time.Now(), Payload: toolCallUpdatePayload(u.ToolCallUpdate)})
+			c.executor.sendEvent(Event{
+				Type:    v1pb.CommandEventType_TOOL_CALL_FINISHED,
+				Summary: string(*u.ToolCallUpdate.Status),
+				ToolCallFinished: &v1pb.ToolCallFinishedPayload{
+					Status:    string(*u.ToolCallUpdate.Status),
+					RawOutput: toProtobufStruct(u.ToolCallUpdate),
+				},
+			})
 		}
 	case u.Plan != nil:
 		c.executor.buffer.flush(c.executor)
@@ -875,14 +899,6 @@ func contentBlockText(block acp.ContentBlock) string {
 	return ""
 }
 
-func toolCallPayload(toolCall *acp.SessionUpdateToolCall) map[string]any {
-	return toJSONMap(toolCall)
-}
-
-func toolCallUpdatePayload(update *acp.SessionToolCallUpdate) map[string]any {
-	return toJSONMap(update)
-}
-
 func toJSONMap(value any) map[string]any {
 	if value == nil {
 		return map[string]any{}
@@ -896,6 +912,23 @@ func toJSONMap(value any) map[string]any {
 		return map[string]any{"unmarshal_error": err.Error()}
 	}
 	return payload
+}
+
+func toProtobufStruct(value any) *structpb.Struct {
+	s, _ := structpb.NewStruct(toJSONMap(value))
+	return s
+}
+
+func permissionOptionsToProto(options []acp.PermissionOption) []*v1pb.PermissionOptionPayload {
+	result := make([]*v1pb.PermissionOptionPayload, len(options))
+	for i, opt := range options {
+		result[i] = &v1pb.PermissionOptionPayload{
+			OptionId: string(opt.OptionId),
+			Name:     opt.Name,
+			Kind:     string(opt.Kind),
+		}
+	}
+	return result
 }
 
 func allowPermissionOption(options []acp.PermissionOption) acp.PermissionOptionId {
@@ -928,6 +961,15 @@ func allowsToolKind(allowed []string, kind *acp.ToolKind) bool {
 	return false
 }
 
+func findPermissionOptionKind(options []acp.PermissionOption, optionID acp.PermissionOptionId) acp.PermissionOptionKind {
+	for _, opt := range options {
+		if opt.OptionId == optionID {
+			return opt.Kind
+		}
+	}
+	return acp.PermissionOptionKindAllowOnce
+}
+
 func uniqueStrings(items []string) []string {
 	seen := map[string]struct{}{}
 	result := make([]string, 0, len(items))
@@ -956,25 +998,4 @@ func maxInt(left int, right int) int {
 		return left
 	}
 	return right
-}
-
-func marshalPermissionOptions(options []acp.PermissionOption) []any {
-	result := make([]any, len(options))
-	for i, opt := range options {
-		result[i] = map[string]any{
-			"option_id": string(opt.OptionId),
-			"name":      opt.Name,
-			"kind":      string(opt.Kind),
-		}
-	}
-	return result
-}
-
-func findPermissionOptionKind(options []acp.PermissionOption, optionID acp.PermissionOptionId) acp.PermissionOptionKind {
-	for _, opt := range options {
-		if opt.OptionId == optionID {
-			return opt.Kind
-		}
-	}
-	return acp.PermissionOptionKindAllowOnce
 }

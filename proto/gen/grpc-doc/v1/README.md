@@ -95,16 +95,27 @@
     - [CommandRequest](#laelia-v1-CommandRequest)
     - [CommandRequest.EnvEntry](#laelia-v1-CommandRequest-EnvEntry)
     - [CommandResult](#laelia-v1-CommandResult)
+    - [DiffEmittedPayload](#laelia-v1-DiffEmittedPayload)
+    - [FinalSummaryPayload](#laelia-v1-FinalSummaryPayload)
     - [GetCommandRequest](#laelia-v1-GetCommandRequest)
+    - [LifecyclePayload](#laelia-v1-LifecyclePayload)
     - [ListCommandsRequest](#laelia-v1-ListCommandsRequest)
     - [ListCommandsResponse](#laelia-v1-ListCommandsResponse)
     - [ManagerCommandMessage](#laelia-v1-ManagerCommandMessage)
     - [PermissionDecision](#laelia-v1-PermissionDecision)
+    - [PermissionOptionPayload](#laelia-v1-PermissionOptionPayload)
+    - [PermissionRequestedPayload](#laelia-v1-PermissionRequestedPayload)
+    - [PermissionTimedOutPayload](#laelia-v1-PermissionTimedOutPayload)
     - [Ping](#laelia-v1-Ping)
     - [Pong](#laelia-v1-Pong)
+    - [RawAcpPayload](#laelia-v1-RawAcpPayload)
     - [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest)
     - [SendCommandRequest](#laelia-v1-SendCommandRequest)
     - [SendCommandRequest.EnvEntry](#laelia-v1-SendCommandRequest-EnvEntry)
+    - [TextDeltaPayload](#laelia-v1-TextDeltaPayload)
+    - [ToolCallFinishedPayload](#laelia-v1-ToolCallFinishedPayload)
+    - [ToolCallStartedPayload](#laelia-v1-ToolCallStartedPayload)
+    - [WarningPayload](#laelia-v1-WarningPayload)
     - [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest)
     - [WatchCommandRequest](#laelia-v1-WatchCommandRequest)
   
@@ -1316,8 +1327,17 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | seq_no | [int32](#int32) |  |  |
 | type | [CommandEventType](#laelia-v1-CommandEventType) |  |  |
 | summary | [string](#string) |  |  |
-| payload | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
 | timestamp | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| lifecycle | [LifecyclePayload](#laelia-v1-LifecyclePayload) |  |  |
+| text_delta | [TextDeltaPayload](#laelia-v1-TextDeltaPayload) |  |  |
+| tool_call_started | [ToolCallStartedPayload](#laelia-v1-ToolCallStartedPayload) |  |  |
+| tool_call_finished | [ToolCallFinishedPayload](#laelia-v1-ToolCallFinishedPayload) |  |  |
+| diff_emitted | [DiffEmittedPayload](#laelia-v1-DiffEmittedPayload) |  |  |
+| warning | [WarningPayload](#laelia-v1-WarningPayload) |  |  |
+| raw_acp | [RawAcpPayload](#laelia-v1-RawAcpPayload) |  |  |
+| final_summary | [FinalSummaryPayload](#laelia-v1-FinalSummaryPayload) |  |  |
+| permission_requested | [PermissionRequestedPayload](#laelia-v1-PermissionRequestedPayload) |  |  |
+| permission_timed_out | [PermissionTimedOutPayload](#laelia-v1-PermissionTimedOutPayload) |  |  |
 
 
 
@@ -1421,6 +1441,39 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-DiffEmittedPayload"></a>
+
+### DiffEmittedPayload
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| path | [string](#string) |  |  |
+| old_text | [string](#string) |  |  |
+| new_text | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-FinalSummaryPayload"></a>
+
+### FinalSummaryPayload
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| stop_reason | [string](#string) |  |  |
+| session_id | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-GetCommandRequest"></a>
 
 ### GetCommandRequest
@@ -1430,6 +1483,22 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-LifecyclePayload"></a>
+
+### LifecyclePayload
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| executor_kind | [string](#string) |  |  |
+| profile | [string](#string) |  |  |
 
 
 
@@ -1504,6 +1573,58 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-PermissionOptionPayload"></a>
+
+### PermissionOptionPayload
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| option_id | [string](#string) |  |  |
+| name | [string](#string) |  |  |
+| kind | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-PermissionRequestedPayload"></a>
+
+### PermissionRequestedPayload
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| tool_call_id | [string](#string) |  |  |
+| kind | [string](#string) |  |  |
+| title | [string](#string) |  |  |
+| options | [PermissionOptionPayload](#laelia-v1-PermissionOptionPayload) | repeated |  |
+| expires_at | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-PermissionTimedOutPayload"></a>
+
+### PermissionTimedOutPayload
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| tool_call_id | [string](#string) |  |  |
+| kind | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-Ping"></a>
 
 ### Ping
@@ -1530,6 +1651,21 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | ----- | ---- | ----- | ----------- |
 | seq | [int64](#int64) |  |  |
 | server_time | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RawAcpPayload"></a>
+
+### RawAcpPayload
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| data | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
 
 
 
@@ -1585,6 +1721,69 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | ----- | ---- | ----- | ----------- |
 | key | [string](#string) |  |  |
 | value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-TextDeltaPayload"></a>
+
+### TextDeltaPayload
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| stream_type | [string](#string) |  |  |
+| content | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ToolCallFinishedPayload"></a>
+
+### ToolCallFinishedPayload
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| status | [string](#string) |  |  |
+| raw_output | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ToolCallStartedPayload"></a>
+
+### ToolCallStartedPayload
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| title | [string](#string) |  |  |
+| raw_input | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-WarningPayload"></a>
+
+### WarningPayload
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [string](#string) |  |  |
 
 
 

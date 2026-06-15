@@ -91,8 +91,81 @@ message CommandEvent {
   int32 seq_no = 2;
   CommandEventType type = 3;
   string summary = 4;
-  google.protobuf.Struct payload = 5;
+  // reserved "payload" for backwards-compat; old field 5 is gone.
+  reserved 5;
+  reserved "payload";
   google.protobuf.Timestamp timestamp = 6;
+
+  oneof payload {
+    LifecyclePayload lifecycle = 10;
+    TextDeltaPayload text_delta = 11;
+    ToolCallStartedPayload tool_call_started = 12;
+    ToolCallFinishedPayload tool_call_finished = 13;
+    DiffEmittedPayload diff_emitted = 14;
+    WarningPayload warning = 15;
+    RawAcpPayload raw_acp = 16;
+    FinalSummaryPayload final_summary = 17;
+    PermissionRequestedPayload permission_requested = 18;
+    PermissionTimedOutPayload permission_timed_out = 19;
+  }
+}
+
+message LifecyclePayload {
+  string executor_kind = 1;
+  string profile = 2;
+}
+
+message TextDeltaPayload {
+  string stream_type = 1;
+  string content = 2;
+}
+
+message ToolCallStartedPayload {
+  string title = 1;
+  google.protobuf.Struct raw_input = 2;
+}
+
+message ToolCallFinishedPayload {
+  string status = 1;
+  google.protobuf.Struct raw_output = 2;
+}
+
+message DiffEmittedPayload {
+  string path = 1;
+  string old_text = 2;
+  string new_text = 3;
+}
+
+message WarningPayload {
+  string message = 1;
+}
+
+message RawAcpPayload {
+  google.protobuf.Struct data = 1;
+}
+
+message FinalSummaryPayload {
+  string stop_reason = 1;
+  string session_id = 2;
+}
+
+message PermissionRequestedPayload {
+  string tool_call_id = 1;
+  string kind = 2;
+  string title = 3;
+  repeated PermissionOptionPayload options = 4;
+  int64 expires_at = 5;
+}
+
+message PermissionOptionPayload {
+  string option_id = 1;
+  string name = 2;
+  string kind = 3;
+}
+
+message PermissionTimedOutPayload {
+  string tool_call_id = 1;
+  string kind = 2;
 }
 
 service CommandService {

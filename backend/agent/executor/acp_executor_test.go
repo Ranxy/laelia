@@ -116,12 +116,9 @@ func TestACPSessionUpdateBuffersConsecutiveMessageChunks(t *testing.T) {
 	ev := <-exec.eventCh
 	assert.Equal(t, v1pb.CommandEventType_RAW_ACP, ev.Type)
 	assert.Equal(t, "agent_message_chunk", ev.Summary)
-	payload := ev.Payload
-	assert.NotNil(t, payload)
-	assert.Equal(t, 5, payload["batch_size"])
-	events, ok := payload["events"].([]any)
-	require.True(t, ok, "events should be a slice")
-	assert.Len(t, events, 5)
+	require.NotNil(t, ev.RawAcp)
+	require.NotNil(t, ev.RawAcp.Data)
+	assert.Equal(t, float64(5), ev.RawAcp.Data.AsMap()["batch_size"])
 }
 
 func TestACPSessionUpdateBatchesRawEventsAcrossBoundaries(t *testing.T) {

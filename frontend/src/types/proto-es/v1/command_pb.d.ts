@@ -213,14 +213,74 @@ export declare type CommandEvent = Message<"laelia.v1.CommandEvent"> & {
   summary: string;
 
   /**
-   * @generated from field: google.protobuf.Struct payload = 5;
-   */
-  payload?: JsonObject | undefined;
-
-  /**
    * @generated from field: google.protobuf.Timestamp timestamp = 6;
    */
   timestamp?: Timestamp | undefined;
+
+  /**
+   * @generated from oneof laelia.v1.CommandEvent.payload
+   */
+  payload: {
+    /**
+     * @generated from field: laelia.v1.LifecyclePayload lifecycle = 10;
+     */
+    value: LifecyclePayload;
+    case: "lifecycle";
+  } | {
+    /**
+     * @generated from field: laelia.v1.TextDeltaPayload text_delta = 11;
+     */
+    value: TextDeltaPayload;
+    case: "textDelta";
+  } | {
+    /**
+     * @generated from field: laelia.v1.ToolCallStartedPayload tool_call_started = 12;
+     */
+    value: ToolCallStartedPayload;
+    case: "toolCallStarted";
+  } | {
+    /**
+     * @generated from field: laelia.v1.ToolCallFinishedPayload tool_call_finished = 13;
+     */
+    value: ToolCallFinishedPayload;
+    case: "toolCallFinished";
+  } | {
+    /**
+     * @generated from field: laelia.v1.DiffEmittedPayload diff_emitted = 14;
+     */
+    value: DiffEmittedPayload;
+    case: "diffEmitted";
+  } | {
+    /**
+     * @generated from field: laelia.v1.WarningPayload warning = 15;
+     */
+    value: WarningPayload;
+    case: "warning";
+  } | {
+    /**
+     * @generated from field: laelia.v1.RawAcpPayload raw_acp = 16;
+     */
+    value: RawAcpPayload;
+    case: "rawAcp";
+  } | {
+    /**
+     * @generated from field: laelia.v1.FinalSummaryPayload final_summary = 17;
+     */
+    value: FinalSummaryPayload;
+    case: "finalSummary";
+  } | {
+    /**
+     * @generated from field: laelia.v1.PermissionRequestedPayload permission_requested = 18;
+     */
+    value: PermissionRequestedPayload;
+    case: "permissionRequested";
+  } | {
+    /**
+     * @generated from field: laelia.v1.PermissionTimedOutPayload permission_timed_out = 19;
+     */
+    value: PermissionTimedOutPayload;
+    case: "permissionTimedOut";
+  } | { case: undefined; value?: undefined };
 };
 
 /**
@@ -228,6 +288,252 @@ export declare type CommandEvent = Message<"laelia.v1.CommandEvent"> & {
  * Use `create(CommandEventSchema)` to create a new message.
  */
 export declare const CommandEventSchema: GenMessage<CommandEvent>;
+
+/**
+ * @generated from message laelia.v1.LifecyclePayload
+ */
+export declare type LifecyclePayload = Message<"laelia.v1.LifecyclePayload"> & {
+  /**
+   * @generated from field: string executor_kind = 1;
+   */
+  executorKind: string;
+
+  /**
+   * @generated from field: string profile = 2;
+   */
+  profile: string;
+};
+
+/**
+ * Describes the message laelia.v1.LifecyclePayload.
+ * Use `create(LifecyclePayloadSchema)` to create a new message.
+ */
+export declare const LifecyclePayloadSchema: GenMessage<LifecyclePayload>;
+
+/**
+ * @generated from message laelia.v1.TextDeltaPayload
+ */
+export declare type TextDeltaPayload = Message<"laelia.v1.TextDeltaPayload"> & {
+  /**
+   * @generated from field: string stream_type = 1;
+   */
+  streamType: string;
+
+  /**
+   * @generated from field: string content = 2;
+   */
+  content: string;
+};
+
+/**
+ * Describes the message laelia.v1.TextDeltaPayload.
+ * Use `create(TextDeltaPayloadSchema)` to create a new message.
+ */
+export declare const TextDeltaPayloadSchema: GenMessage<TextDeltaPayload>;
+
+/**
+ * @generated from message laelia.v1.ToolCallStartedPayload
+ */
+export declare type ToolCallStartedPayload = Message<"laelia.v1.ToolCallStartedPayload"> & {
+  /**
+   * @generated from field: string title = 1;
+   */
+  title: string;
+
+  /**
+   * @generated from field: google.protobuf.Struct raw_input = 2;
+   */
+  rawInput?: JsonObject | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.ToolCallStartedPayload.
+ * Use `create(ToolCallStartedPayloadSchema)` to create a new message.
+ */
+export declare const ToolCallStartedPayloadSchema: GenMessage<ToolCallStartedPayload>;
+
+/**
+ * @generated from message laelia.v1.ToolCallFinishedPayload
+ */
+export declare type ToolCallFinishedPayload = Message<"laelia.v1.ToolCallFinishedPayload"> & {
+  /**
+   * @generated from field: string status = 1;
+   */
+  status: string;
+
+  /**
+   * @generated from field: google.protobuf.Struct raw_output = 2;
+   */
+  rawOutput?: JsonObject | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.ToolCallFinishedPayload.
+ * Use `create(ToolCallFinishedPayloadSchema)` to create a new message.
+ */
+export declare const ToolCallFinishedPayloadSchema: GenMessage<ToolCallFinishedPayload>;
+
+/**
+ * @generated from message laelia.v1.DiffEmittedPayload
+ */
+export declare type DiffEmittedPayload = Message<"laelia.v1.DiffEmittedPayload"> & {
+  /**
+   * @generated from field: string path = 1;
+   */
+  path: string;
+
+  /**
+   * @generated from field: string old_text = 2;
+   */
+  oldText: string;
+
+  /**
+   * @generated from field: string new_text = 3;
+   */
+  newText: string;
+};
+
+/**
+ * Describes the message laelia.v1.DiffEmittedPayload.
+ * Use `create(DiffEmittedPayloadSchema)` to create a new message.
+ */
+export declare const DiffEmittedPayloadSchema: GenMessage<DiffEmittedPayload>;
+
+/**
+ * @generated from message laelia.v1.WarningPayload
+ */
+export declare type WarningPayload = Message<"laelia.v1.WarningPayload"> & {
+  /**
+   * @generated from field: string message = 1;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message laelia.v1.WarningPayload.
+ * Use `create(WarningPayloadSchema)` to create a new message.
+ */
+export declare const WarningPayloadSchema: GenMessage<WarningPayload>;
+
+/**
+ * @generated from message laelia.v1.RawAcpPayload
+ */
+export declare type RawAcpPayload = Message<"laelia.v1.RawAcpPayload"> & {
+  /**
+   * @generated from field: google.protobuf.Struct data = 1;
+   */
+  data?: JsonObject | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.RawAcpPayload.
+ * Use `create(RawAcpPayloadSchema)` to create a new message.
+ */
+export declare const RawAcpPayloadSchema: GenMessage<RawAcpPayload>;
+
+/**
+ * @generated from message laelia.v1.FinalSummaryPayload
+ */
+export declare type FinalSummaryPayload = Message<"laelia.v1.FinalSummaryPayload"> & {
+  /**
+   * @generated from field: string stop_reason = 1;
+   */
+  stopReason: string;
+
+  /**
+   * @generated from field: string session_id = 2;
+   */
+  sessionId: string;
+};
+
+/**
+ * Describes the message laelia.v1.FinalSummaryPayload.
+ * Use `create(FinalSummaryPayloadSchema)` to create a new message.
+ */
+export declare const FinalSummaryPayloadSchema: GenMessage<FinalSummaryPayload>;
+
+/**
+ * @generated from message laelia.v1.PermissionRequestedPayload
+ */
+export declare type PermissionRequestedPayload = Message<"laelia.v1.PermissionRequestedPayload"> & {
+  /**
+   * @generated from field: string tool_call_id = 1;
+   */
+  toolCallId: string;
+
+  /**
+   * @generated from field: string kind = 2;
+   */
+  kind: string;
+
+  /**
+   * @generated from field: string title = 3;
+   */
+  title: string;
+
+  /**
+   * @generated from field: repeated laelia.v1.PermissionOptionPayload options = 4;
+   */
+  options: PermissionOptionPayload[];
+
+  /**
+   * @generated from field: int64 expires_at = 5;
+   */
+  expiresAt: bigint;
+};
+
+/**
+ * Describes the message laelia.v1.PermissionRequestedPayload.
+ * Use `create(PermissionRequestedPayloadSchema)` to create a new message.
+ */
+export declare const PermissionRequestedPayloadSchema: GenMessage<PermissionRequestedPayload>;
+
+/**
+ * @generated from message laelia.v1.PermissionOptionPayload
+ */
+export declare type PermissionOptionPayload = Message<"laelia.v1.PermissionOptionPayload"> & {
+  /**
+   * @generated from field: string option_id = 1;
+   */
+  optionId: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string kind = 3;
+   */
+  kind: string;
+};
+
+/**
+ * Describes the message laelia.v1.PermissionOptionPayload.
+ * Use `create(PermissionOptionPayloadSchema)` to create a new message.
+ */
+export declare const PermissionOptionPayloadSchema: GenMessage<PermissionOptionPayload>;
+
+/**
+ * @generated from message laelia.v1.PermissionTimedOutPayload
+ */
+export declare type PermissionTimedOutPayload = Message<"laelia.v1.PermissionTimedOutPayload"> & {
+  /**
+   * @generated from field: string tool_call_id = 1;
+   */
+  toolCallId: string;
+
+  /**
+   * @generated from field: string kind = 2;
+   */
+  kind: string;
+};
+
+/**
+ * Describes the message laelia.v1.PermissionTimedOutPayload.
+ * Use `create(PermissionTimedOutPayloadSchema)` to create a new message.
+ */
+export declare const PermissionTimedOutPayloadSchema: GenMessage<PermissionTimedOutPayload>;
 
 /**
  * @generated from message laelia.v1.AgentCommandMessage

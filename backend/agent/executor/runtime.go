@@ -19,13 +19,25 @@ type Request struct {
 }
 
 type Event struct {
-	SeqNo      int32
-	Type       v1pb.CommandEventType
+	SeqNo int32
+	Type  v1pb.CommandEventType
+
 	Summary    string
-	Payload    map[string]any
 	Text       string
 	StreamType v1pb.CommandOutput_StreamType
-	Timestamp  time.Time
+
+	Timestamp time.Time
+
+	Lifecycle           *v1pb.LifecyclePayload
+	TextDelta           *v1pb.TextDeltaPayload
+	ToolCallStarted     *v1pb.ToolCallStartedPayload
+	ToolCallFinished    *v1pb.ToolCallFinishedPayload
+	DiffEmitted         *v1pb.DiffEmittedPayload
+	Warning             *v1pb.WarningPayload
+	RawAcp              *v1pb.RawAcpPayload
+	FinalSummary        *v1pb.FinalSummaryPayload
+	PermissionRequested *v1pb.PermissionRequestedPayload
+	PermissionTimedOut  *v1pb.PermissionTimedOutPayload
 }
 
 type Runtime interface {

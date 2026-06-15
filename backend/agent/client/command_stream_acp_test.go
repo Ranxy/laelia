@@ -185,8 +185,8 @@ func assertACPCSLifecycle(t *testing.T, msgs []*v1pb.AgentCommandMessage) {
 	require.NotNil(t, firstEvent, "first message should be a LIFECYCLE event")
 	assert.Equal(t, int32(1), firstEvent.SeqNo)
 	assert.Equal(t, "command started", firstEvent.Summary)
-	if firstEvent.Payload != nil {
-		assert.Equal(t, "ACP", firstEvent.Payload.AsMap()["executor_kind"])
+	if lc := firstEvent.GetLifecycle(); lc != nil {
+		assert.Equal(t, "ACP", lc.GetExecutorKind())
 	}
 }
 

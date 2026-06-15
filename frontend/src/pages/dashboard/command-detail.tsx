@@ -126,9 +126,9 @@ function EventRow({ event }: { event: CommandEvent }) {
           {formatEventTimestamp(event)}
         </span>
       </div>
-      {expanded && event.payload && (
+      {expanded && event.payload.value && (
         <pre className="text-xs text-control-light font-mono bg-zinc-900 rounded p-2 mt-1 overflow-auto max-h-64 whitespace-pre-wrap">
-          {JSON.stringify(event.payload, null, 2)}
+          {JSON.stringify(event.payload.value, null, 2)}
         </pre>
       )}
     </div>
@@ -355,45 +355,38 @@ export function CommandDetailPage() {
           )}
       </div>
 
-      {pendingPermission && pendingPermission.payload && (
-        <div className="fixed bottom-0 left-0 right-0 z-[2500] bg-background border-t border-control-border p-3">
-          <div className="max-w-5xl mx-auto flex items-center gap-4">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <Badge variant="warning" className="shrink-0">
-                {((pendingPermission.payload as Record<string, unknown>)
-                  ?.kind as string) ?? "tool"}
-              </Badge>
-              <span className="text-sm text-main truncate">
-                {((pendingPermission.payload as Record<string, unknown>)
-                  ?.title as string) ?? "Permission required"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {(
-                (pendingPermission.payload as Record<string, unknown>)
-                  ?.options as Array<{
-                  option_id: string;
-                  name: string;
-                  kind: string;
-                }>
-              )?.map((opt) => (
-                <Button
-                  key={opt.option_id}
-                  variant={
-                    opt.kind === "allow_once" || opt.kind === "allow_always"
-                      ? "default"
-                      : "outline"
-                  }
-                  size="sm"
-                  onClick={() => handleRespondPermission(opt.option_id)}
-                >
-                  {opt.name}
-                </Button>
-              ))}
+      {pendingPermission &&
+        pendingPermission.payload.case === "permissionRequested" && (
+          <div className="fixed bottom-0 left-0 right-0 z-[2500] bg-background border-t border-control-border p-3">
+            <div className="max-w-5xl mx-auto flex items-center gap-4">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <Badge variant="warning" className="shrink-0">
+                  {pendingPermission.payload.value.kind}
+                </Badge>
+                <span className="text-sm text-main truncate">
+                  {pendingPermission.payload.value.title ||
+                    "Permission required"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {pendingPermission.payload.value.options.map((opt) => (
+                  <Button
+                    key={opt.optionId}
+                    variant={
+                      opt.kind === "allow_once" || opt.kind === "allow_always"
+                        ? "default"
+                        : "outline"
+                    }
+                    size="sm"
+                    onClick={() => handleRespondPermission(opt.optionId)}
+                  >
+                    {opt.name}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }

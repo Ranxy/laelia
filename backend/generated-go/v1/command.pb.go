@@ -533,13 +533,25 @@ func (x *CommandOutput) GetTimestamp() *timestamppb.Timestamp {
 }
 
 type CommandEvent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CommandId     string                 `protobuf:"bytes,1,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
-	SeqNo         int32                  `protobuf:"varint,2,opt,name=seq_no,json=seqNo,proto3" json:"seq_no,omitempty"`
-	Type          CommandEventType       `protobuf:"varint,3,opt,name=type,proto3,enum=laelia.v1.CommandEventType" json:"type,omitempty"`
-	Summary       string                 `protobuf:"bytes,4,opt,name=summary,proto3" json:"summary,omitempty"`
-	Payload       *structpb.Struct       `protobuf:"bytes,5,opt,name=payload,proto3" json:"payload,omitempty"`
-	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	CommandId string                 `protobuf:"bytes,1,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	SeqNo     int32                  `protobuf:"varint,2,opt,name=seq_no,json=seqNo,proto3" json:"seq_no,omitempty"`
+	Type      CommandEventType       `protobuf:"varint,3,opt,name=type,proto3,enum=laelia.v1.CommandEventType" json:"type,omitempty"`
+	Summary   string                 `protobuf:"bytes,4,opt,name=summary,proto3" json:"summary,omitempty"`
+	Timestamp *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*CommandEvent_Lifecycle
+	//	*CommandEvent_TextDelta
+	//	*CommandEvent_ToolCallStarted
+	//	*CommandEvent_ToolCallFinished
+	//	*CommandEvent_DiffEmitted
+	//	*CommandEvent_Warning
+	//	*CommandEvent_RawAcp
+	//	*CommandEvent_FinalSummary
+	//	*CommandEvent_PermissionRequested
+	//	*CommandEvent_PermissionTimedOut
+	Payload       isCommandEvent_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -602,18 +614,768 @@ func (x *CommandEvent) GetSummary() string {
 	return ""
 }
 
-func (x *CommandEvent) GetPayload() *structpb.Struct {
+func (x *CommandEvent) GetTimestamp() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Timestamp
+	}
+	return nil
+}
+
+func (x *CommandEvent) GetPayload() isCommandEvent_Payload {
 	if x != nil {
 		return x.Payload
 	}
 	return nil
 }
 
-func (x *CommandEvent) GetTimestamp() *timestamppb.Timestamp {
+func (x *CommandEvent) GetLifecycle() *LifecyclePayload {
 	if x != nil {
-		return x.Timestamp
+		if x, ok := x.Payload.(*CommandEvent_Lifecycle); ok {
+			return x.Lifecycle
+		}
 	}
 	return nil
+}
+
+func (x *CommandEvent) GetTextDelta() *TextDeltaPayload {
+	if x != nil {
+		if x, ok := x.Payload.(*CommandEvent_TextDelta); ok {
+			return x.TextDelta
+		}
+	}
+	return nil
+}
+
+func (x *CommandEvent) GetToolCallStarted() *ToolCallStartedPayload {
+	if x != nil {
+		if x, ok := x.Payload.(*CommandEvent_ToolCallStarted); ok {
+			return x.ToolCallStarted
+		}
+	}
+	return nil
+}
+
+func (x *CommandEvent) GetToolCallFinished() *ToolCallFinishedPayload {
+	if x != nil {
+		if x, ok := x.Payload.(*CommandEvent_ToolCallFinished); ok {
+			return x.ToolCallFinished
+		}
+	}
+	return nil
+}
+
+func (x *CommandEvent) GetDiffEmitted() *DiffEmittedPayload {
+	if x != nil {
+		if x, ok := x.Payload.(*CommandEvent_DiffEmitted); ok {
+			return x.DiffEmitted
+		}
+	}
+	return nil
+}
+
+func (x *CommandEvent) GetWarning() *WarningPayload {
+	if x != nil {
+		if x, ok := x.Payload.(*CommandEvent_Warning); ok {
+			return x.Warning
+		}
+	}
+	return nil
+}
+
+func (x *CommandEvent) GetRawAcp() *RawAcpPayload {
+	if x != nil {
+		if x, ok := x.Payload.(*CommandEvent_RawAcp); ok {
+			return x.RawAcp
+		}
+	}
+	return nil
+}
+
+func (x *CommandEvent) GetFinalSummary() *FinalSummaryPayload {
+	if x != nil {
+		if x, ok := x.Payload.(*CommandEvent_FinalSummary); ok {
+			return x.FinalSummary
+		}
+	}
+	return nil
+}
+
+func (x *CommandEvent) GetPermissionRequested() *PermissionRequestedPayload {
+	if x != nil {
+		if x, ok := x.Payload.(*CommandEvent_PermissionRequested); ok {
+			return x.PermissionRequested
+		}
+	}
+	return nil
+}
+
+func (x *CommandEvent) GetPermissionTimedOut() *PermissionTimedOutPayload {
+	if x != nil {
+		if x, ok := x.Payload.(*CommandEvent_PermissionTimedOut); ok {
+			return x.PermissionTimedOut
+		}
+	}
+	return nil
+}
+
+type isCommandEvent_Payload interface {
+	isCommandEvent_Payload()
+}
+
+type CommandEvent_Lifecycle struct {
+	Lifecycle *LifecyclePayload `protobuf:"bytes,10,opt,name=lifecycle,proto3,oneof"`
+}
+
+type CommandEvent_TextDelta struct {
+	TextDelta *TextDeltaPayload `protobuf:"bytes,11,opt,name=text_delta,json=textDelta,proto3,oneof"`
+}
+
+type CommandEvent_ToolCallStarted struct {
+	ToolCallStarted *ToolCallStartedPayload `protobuf:"bytes,12,opt,name=tool_call_started,json=toolCallStarted,proto3,oneof"`
+}
+
+type CommandEvent_ToolCallFinished struct {
+	ToolCallFinished *ToolCallFinishedPayload `protobuf:"bytes,13,opt,name=tool_call_finished,json=toolCallFinished,proto3,oneof"`
+}
+
+type CommandEvent_DiffEmitted struct {
+	DiffEmitted *DiffEmittedPayload `protobuf:"bytes,14,opt,name=diff_emitted,json=diffEmitted,proto3,oneof"`
+}
+
+type CommandEvent_Warning struct {
+	Warning *WarningPayload `protobuf:"bytes,15,opt,name=warning,proto3,oneof"`
+}
+
+type CommandEvent_RawAcp struct {
+	RawAcp *RawAcpPayload `protobuf:"bytes,16,opt,name=raw_acp,json=rawAcp,proto3,oneof"`
+}
+
+type CommandEvent_FinalSummary struct {
+	FinalSummary *FinalSummaryPayload `protobuf:"bytes,17,opt,name=final_summary,json=finalSummary,proto3,oneof"`
+}
+
+type CommandEvent_PermissionRequested struct {
+	PermissionRequested *PermissionRequestedPayload `protobuf:"bytes,18,opt,name=permission_requested,json=permissionRequested,proto3,oneof"`
+}
+
+type CommandEvent_PermissionTimedOut struct {
+	PermissionTimedOut *PermissionTimedOutPayload `protobuf:"bytes,19,opt,name=permission_timed_out,json=permissionTimedOut,proto3,oneof"`
+}
+
+func (*CommandEvent_Lifecycle) isCommandEvent_Payload() {}
+
+func (*CommandEvent_TextDelta) isCommandEvent_Payload() {}
+
+func (*CommandEvent_ToolCallStarted) isCommandEvent_Payload() {}
+
+func (*CommandEvent_ToolCallFinished) isCommandEvent_Payload() {}
+
+func (*CommandEvent_DiffEmitted) isCommandEvent_Payload() {}
+
+func (*CommandEvent_Warning) isCommandEvent_Payload() {}
+
+func (*CommandEvent_RawAcp) isCommandEvent_Payload() {}
+
+func (*CommandEvent_FinalSummary) isCommandEvent_Payload() {}
+
+func (*CommandEvent_PermissionRequested) isCommandEvent_Payload() {}
+
+func (*CommandEvent_PermissionTimedOut) isCommandEvent_Payload() {}
+
+type LifecyclePayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ExecutorKind  string                 `protobuf:"bytes,1,opt,name=executor_kind,json=executorKind,proto3" json:"executor_kind,omitempty"`
+	Profile       string                 `protobuf:"bytes,2,opt,name=profile,proto3" json:"profile,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LifecyclePayload) Reset() {
+	*x = LifecyclePayload{}
+	mi := &file_v1_command_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LifecyclePayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LifecyclePayload) ProtoMessage() {}
+
+func (x *LifecyclePayload) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LifecyclePayload.ProtoReflect.Descriptor instead.
+func (*LifecyclePayload) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *LifecyclePayload) GetExecutorKind() string {
+	if x != nil {
+		return x.ExecutorKind
+	}
+	return ""
+}
+
+func (x *LifecyclePayload) GetProfile() string {
+	if x != nil {
+		return x.Profile
+	}
+	return ""
+}
+
+type TextDeltaPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StreamType    string                 `protobuf:"bytes,1,opt,name=stream_type,json=streamType,proto3" json:"stream_type,omitempty"`
+	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TextDeltaPayload) Reset() {
+	*x = TextDeltaPayload{}
+	mi := &file_v1_command_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TextDeltaPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TextDeltaPayload) ProtoMessage() {}
+
+func (x *TextDeltaPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TextDeltaPayload.ProtoReflect.Descriptor instead.
+func (*TextDeltaPayload) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *TextDeltaPayload) GetStreamType() string {
+	if x != nil {
+		return x.StreamType
+	}
+	return ""
+}
+
+func (x *TextDeltaPayload) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+type ToolCallStartedPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Title         string                 `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
+	RawInput      *structpb.Struct       `protobuf:"bytes,2,opt,name=raw_input,json=rawInput,proto3" json:"raw_input,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolCallStartedPayload) Reset() {
+	*x = ToolCallStartedPayload{}
+	mi := &file_v1_command_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolCallStartedPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolCallStartedPayload) ProtoMessage() {}
+
+func (x *ToolCallStartedPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolCallStartedPayload.ProtoReflect.Descriptor instead.
+func (*ToolCallStartedPayload) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ToolCallStartedPayload) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *ToolCallStartedPayload) GetRawInput() *structpb.Struct {
+	if x != nil {
+		return x.RawInput
+	}
+	return nil
+}
+
+type ToolCallFinishedPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	RawOutput     *structpb.Struct       `protobuf:"bytes,2,opt,name=raw_output,json=rawOutput,proto3" json:"raw_output,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolCallFinishedPayload) Reset() {
+	*x = ToolCallFinishedPayload{}
+	mi := &file_v1_command_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolCallFinishedPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolCallFinishedPayload) ProtoMessage() {}
+
+func (x *ToolCallFinishedPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolCallFinishedPayload.ProtoReflect.Descriptor instead.
+func (*ToolCallFinishedPayload) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ToolCallFinishedPayload) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ToolCallFinishedPayload) GetRawOutput() *structpb.Struct {
+	if x != nil {
+		return x.RawOutput
+	}
+	return nil
+}
+
+type DiffEmittedPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	OldText       string                 `protobuf:"bytes,2,opt,name=old_text,json=oldText,proto3" json:"old_text,omitempty"`
+	NewText       string                 `protobuf:"bytes,3,opt,name=new_text,json=newText,proto3" json:"new_text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiffEmittedPayload) Reset() {
+	*x = DiffEmittedPayload{}
+	mi := &file_v1_command_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiffEmittedPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiffEmittedPayload) ProtoMessage() {}
+
+func (x *DiffEmittedPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiffEmittedPayload.ProtoReflect.Descriptor instead.
+func (*DiffEmittedPayload) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *DiffEmittedPayload) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *DiffEmittedPayload) GetOldText() string {
+	if x != nil {
+		return x.OldText
+	}
+	return ""
+}
+
+func (x *DiffEmittedPayload) GetNewText() string {
+	if x != nil {
+		return x.NewText
+	}
+	return ""
+}
+
+type WarningPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WarningPayload) Reset() {
+	*x = WarningPayload{}
+	mi := &file_v1_command_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WarningPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WarningPayload) ProtoMessage() {}
+
+func (x *WarningPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WarningPayload.ProtoReflect.Descriptor instead.
+func (*WarningPayload) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *WarningPayload) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type RawAcpPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *structpb.Struct       `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RawAcpPayload) Reset() {
+	*x = RawAcpPayload{}
+	mi := &file_v1_command_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RawAcpPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RawAcpPayload) ProtoMessage() {}
+
+func (x *RawAcpPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RawAcpPayload.ProtoReflect.Descriptor instead.
+func (*RawAcpPayload) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RawAcpPayload) GetData() *structpb.Struct {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type FinalSummaryPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StopReason    string                 `protobuf:"bytes,1,opt,name=stop_reason,json=stopReason,proto3" json:"stop_reason,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FinalSummaryPayload) Reset() {
+	*x = FinalSummaryPayload{}
+	mi := &file_v1_command_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FinalSummaryPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FinalSummaryPayload) ProtoMessage() {}
+
+func (x *FinalSummaryPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FinalSummaryPayload.ProtoReflect.Descriptor instead.
+func (*FinalSummaryPayload) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *FinalSummaryPayload) GetStopReason() string {
+	if x != nil {
+		return x.StopReason
+	}
+	return ""
+}
+
+func (x *FinalSummaryPayload) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+type PermissionRequestedPayload struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	ToolCallId    string                     `protobuf:"bytes,1,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
+	Kind          string                     `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	Title         string                     `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Options       []*PermissionOptionPayload `protobuf:"bytes,4,rep,name=options,proto3" json:"options,omitempty"`
+	ExpiresAt     int64                      `protobuf:"varint,5,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PermissionRequestedPayload) Reset() {
+	*x = PermissionRequestedPayload{}
+	mi := &file_v1_command_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PermissionRequestedPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PermissionRequestedPayload) ProtoMessage() {}
+
+func (x *PermissionRequestedPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PermissionRequestedPayload.ProtoReflect.Descriptor instead.
+func (*PermissionRequestedPayload) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *PermissionRequestedPayload) GetToolCallId() string {
+	if x != nil {
+		return x.ToolCallId
+	}
+	return ""
+}
+
+func (x *PermissionRequestedPayload) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *PermissionRequestedPayload) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *PermissionRequestedPayload) GetOptions() []*PermissionOptionPayload {
+	if x != nil {
+		return x.Options
+	}
+	return nil
+}
+
+func (x *PermissionRequestedPayload) GetExpiresAt() int64 {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return 0
+}
+
+type PermissionOptionPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OptionId      string                 `protobuf:"bytes,1,opt,name=option_id,json=optionId,proto3" json:"option_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Kind          string                 `protobuf:"bytes,3,opt,name=kind,proto3" json:"kind,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PermissionOptionPayload) Reset() {
+	*x = PermissionOptionPayload{}
+	mi := &file_v1_command_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PermissionOptionPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PermissionOptionPayload) ProtoMessage() {}
+
+func (x *PermissionOptionPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PermissionOptionPayload.ProtoReflect.Descriptor instead.
+func (*PermissionOptionPayload) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *PermissionOptionPayload) GetOptionId() string {
+	if x != nil {
+		return x.OptionId
+	}
+	return ""
+}
+
+func (x *PermissionOptionPayload) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PermissionOptionPayload) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+type PermissionTimedOutPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ToolCallId    string                 `protobuf:"bytes,1,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
+	Kind          string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PermissionTimedOutPayload) Reset() {
+	*x = PermissionTimedOutPayload{}
+	mi := &file_v1_command_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PermissionTimedOutPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PermissionTimedOutPayload) ProtoMessage() {}
+
+func (x *PermissionTimedOutPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PermissionTimedOutPayload.ProtoReflect.Descriptor instead.
+func (*PermissionTimedOutPayload) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PermissionTimedOutPayload) GetToolCallId() string {
+	if x != nil {
+		return x.ToolCallId
+	}
+	return ""
+}
+
+func (x *PermissionTimedOutPayload) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
 }
 
 type AgentCommandMessage struct {
@@ -632,7 +1394,7 @@ type AgentCommandMessage struct {
 
 func (x *AgentCommandMessage) Reset() {
 	*x = AgentCommandMessage{}
-	mi := &file_v1_command_proto_msgTypes[3]
+	mi := &file_v1_command_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -644,7 +1406,7 @@ func (x *AgentCommandMessage) String() string {
 func (*AgentCommandMessage) ProtoMessage() {}
 
 func (x *AgentCommandMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[3]
+	mi := &file_v1_command_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -657,7 +1419,7 @@ func (x *AgentCommandMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentCommandMessage.ProtoReflect.Descriptor instead.
 func (*AgentCommandMessage) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{3}
+	return file_v1_command_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AgentCommandMessage) GetMessage() isAgentCommandMessage_Message {
@@ -761,7 +1523,7 @@ type ManagerCommandMessage struct {
 
 func (x *ManagerCommandMessage) Reset() {
 	*x = ManagerCommandMessage{}
-	mi := &file_v1_command_proto_msgTypes[4]
+	mi := &file_v1_command_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -773,7 +1535,7 @@ func (x *ManagerCommandMessage) String() string {
 func (*ManagerCommandMessage) ProtoMessage() {}
 
 func (x *ManagerCommandMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[4]
+	mi := &file_v1_command_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -786,7 +1548,7 @@ func (x *ManagerCommandMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ManagerCommandMessage.ProtoReflect.Descriptor instead.
 func (*ManagerCommandMessage) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{4}
+	return file_v1_command_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ManagerCommandMessage) GetMessage() isManagerCommandMessage_Message {
@@ -872,7 +1634,7 @@ type AgentReady struct {
 
 func (x *AgentReady) Reset() {
 	*x = AgentReady{}
-	mi := &file_v1_command_proto_msgTypes[5]
+	mi := &file_v1_command_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -884,7 +1646,7 @@ func (x *AgentReady) String() string {
 func (*AgentReady) ProtoMessage() {}
 
 func (x *AgentReady) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[5]
+	mi := &file_v1_command_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -897,7 +1659,7 @@ func (x *AgentReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentReady.ProtoReflect.Descriptor instead.
 func (*AgentReady) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{5}
+	return file_v1_command_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *AgentReady) GetSessionId() string {
@@ -945,7 +1707,7 @@ type CommandRequest struct {
 
 func (x *CommandRequest) Reset() {
 	*x = CommandRequest{}
-	mi := &file_v1_command_proto_msgTypes[6]
+	mi := &file_v1_command_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -957,7 +1719,7 @@ func (x *CommandRequest) String() string {
 func (*CommandRequest) ProtoMessage() {}
 
 func (x *CommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[6]
+	mi := &file_v1_command_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -970,7 +1732,7 @@ func (x *CommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandRequest.ProtoReflect.Descriptor instead.
 func (*CommandRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{6}
+	return file_v1_command_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CommandRequest) GetCommandId() string {
@@ -1048,7 +1810,7 @@ type CommandProgress struct {
 
 func (x *CommandProgress) Reset() {
 	*x = CommandProgress{}
-	mi := &file_v1_command_proto_msgTypes[7]
+	mi := &file_v1_command_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1060,7 +1822,7 @@ func (x *CommandProgress) String() string {
 func (*CommandProgress) ProtoMessage() {}
 
 func (x *CommandProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[7]
+	mi := &file_v1_command_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1073,7 +1835,7 @@ func (x *CommandProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandProgress.ProtoReflect.Descriptor instead.
 func (*CommandProgress) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{7}
+	return file_v1_command_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *CommandProgress) GetCommandId() string {
@@ -1119,7 +1881,7 @@ type CommandResult struct {
 
 func (x *CommandResult) Reset() {
 	*x = CommandResult{}
-	mi := &file_v1_command_proto_msgTypes[8]
+	mi := &file_v1_command_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1131,7 +1893,7 @@ func (x *CommandResult) String() string {
 func (*CommandResult) ProtoMessage() {}
 
 func (x *CommandResult) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[8]
+	mi := &file_v1_command_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1144,7 +1906,7 @@ func (x *CommandResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandResult.ProtoReflect.Descriptor instead.
 func (*CommandResult) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{8}
+	return file_v1_command_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CommandResult) GetCommandId() string {
@@ -1205,7 +1967,7 @@ type CancelMessage struct {
 
 func (x *CancelMessage) Reset() {
 	*x = CancelMessage{}
-	mi := &file_v1_command_proto_msgTypes[9]
+	mi := &file_v1_command_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1217,7 +1979,7 @@ func (x *CancelMessage) String() string {
 func (*CancelMessage) ProtoMessage() {}
 
 func (x *CancelMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[9]
+	mi := &file_v1_command_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1230,7 +1992,7 @@ func (x *CancelMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelMessage.ProtoReflect.Descriptor instead.
 func (*CancelMessage) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{9}
+	return file_v1_command_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *CancelMessage) GetCommandId() string {
@@ -1250,7 +2012,7 @@ type Ping struct {
 
 func (x *Ping) Reset() {
 	*x = Ping{}
-	mi := &file_v1_command_proto_msgTypes[10]
+	mi := &file_v1_command_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1262,7 +2024,7 @@ func (x *Ping) String() string {
 func (*Ping) ProtoMessage() {}
 
 func (x *Ping) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[10]
+	mi := &file_v1_command_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1275,7 +2037,7 @@ func (x *Ping) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ping.ProtoReflect.Descriptor instead.
 func (*Ping) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{10}
+	return file_v1_command_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *Ping) GetSeq() int64 {
@@ -1302,7 +2064,7 @@ type Pong struct {
 
 func (x *Pong) Reset() {
 	*x = Pong{}
-	mi := &file_v1_command_proto_msgTypes[11]
+	mi := &file_v1_command_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1314,7 +2076,7 @@ func (x *Pong) String() string {
 func (*Pong) ProtoMessage() {}
 
 func (x *Pong) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[11]
+	mi := &file_v1_command_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1327,7 +2089,7 @@ func (x *Pong) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Pong.ProtoReflect.Descriptor instead.
 func (*Pong) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{11}
+	return file_v1_command_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Pong) GetSeq() int64 {
@@ -1361,7 +2123,7 @@ type SendCommandRequest struct {
 
 func (x *SendCommandRequest) Reset() {
 	*x = SendCommandRequest{}
-	mi := &file_v1_command_proto_msgTypes[12]
+	mi := &file_v1_command_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1373,7 +2135,7 @@ func (x *SendCommandRequest) String() string {
 func (*SendCommandRequest) ProtoMessage() {}
 
 func (x *SendCommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[12]
+	mi := &file_v1_command_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1386,7 +2148,7 @@ func (x *SendCommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendCommandRequest.ProtoReflect.Descriptor instead.
 func (*SendCommandRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{12}
+	return file_v1_command_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SendCommandRequest) GetAgent() string {
@@ -1464,7 +2226,7 @@ type ListCommandsRequest struct {
 
 func (x *ListCommandsRequest) Reset() {
 	*x = ListCommandsRequest{}
-	mi := &file_v1_command_proto_msgTypes[13]
+	mi := &file_v1_command_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1476,7 +2238,7 @@ func (x *ListCommandsRequest) String() string {
 func (*ListCommandsRequest) ProtoMessage() {}
 
 func (x *ListCommandsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[13]
+	mi := &file_v1_command_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1489,7 +2251,7 @@ func (x *ListCommandsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCommandsRequest.ProtoReflect.Descriptor instead.
 func (*ListCommandsRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{13}
+	return file_v1_command_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ListCommandsRequest) GetAgent() string {
@@ -1530,7 +2292,7 @@ type ListCommandsResponse struct {
 
 func (x *ListCommandsResponse) Reset() {
 	*x = ListCommandsResponse{}
-	mi := &file_v1_command_proto_msgTypes[14]
+	mi := &file_v1_command_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1542,7 +2304,7 @@ func (x *ListCommandsResponse) String() string {
 func (*ListCommandsResponse) ProtoMessage() {}
 
 func (x *ListCommandsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[14]
+	mi := &file_v1_command_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1555,7 +2317,7 @@ func (x *ListCommandsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCommandsResponse.ProtoReflect.Descriptor instead.
 func (*ListCommandsResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{14}
+	return file_v1_command_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ListCommandsResponse) GetCommands() []*Command {
@@ -1581,7 +2343,7 @@ type GetCommandRequest struct {
 
 func (x *GetCommandRequest) Reset() {
 	*x = GetCommandRequest{}
-	mi := &file_v1_command_proto_msgTypes[15]
+	mi := &file_v1_command_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1593,7 +2355,7 @@ func (x *GetCommandRequest) String() string {
 func (*GetCommandRequest) ProtoMessage() {}
 
 func (x *GetCommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[15]
+	mi := &file_v1_command_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1606,7 +2368,7 @@ func (x *GetCommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCommandRequest.ProtoReflect.Descriptor instead.
 func (*GetCommandRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{15}
+	return file_v1_command_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *GetCommandRequest) GetName() string {
@@ -1626,7 +2388,7 @@ type CancelCommandRequest struct {
 
 func (x *CancelCommandRequest) Reset() {
 	*x = CancelCommandRequest{}
-	mi := &file_v1_command_proto_msgTypes[16]
+	mi := &file_v1_command_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1638,7 +2400,7 @@ func (x *CancelCommandRequest) String() string {
 func (*CancelCommandRequest) ProtoMessage() {}
 
 func (x *CancelCommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[16]
+	mi := &file_v1_command_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1651,7 +2413,7 @@ func (x *CancelCommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelCommandRequest.ProtoReflect.Descriptor instead.
 func (*CancelCommandRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{16}
+	return file_v1_command_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *CancelCommandRequest) GetName() string {
@@ -1678,7 +2440,7 @@ type WatchCommandRequest struct {
 
 func (x *WatchCommandRequest) Reset() {
 	*x = WatchCommandRequest{}
-	mi := &file_v1_command_proto_msgTypes[17]
+	mi := &file_v1_command_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1690,7 +2452,7 @@ func (x *WatchCommandRequest) String() string {
 func (*WatchCommandRequest) ProtoMessage() {}
 
 func (x *WatchCommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[17]
+	mi := &file_v1_command_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1703,7 +2465,7 @@ func (x *WatchCommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchCommandRequest.ProtoReflect.Descriptor instead.
 func (*WatchCommandRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{17}
+	return file_v1_command_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *WatchCommandRequest) GetName() string {
@@ -1730,7 +2492,7 @@ type WatchCommandEventsRequest struct {
 
 func (x *WatchCommandEventsRequest) Reset() {
 	*x = WatchCommandEventsRequest{}
-	mi := &file_v1_command_proto_msgTypes[18]
+	mi := &file_v1_command_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1742,7 +2504,7 @@ func (x *WatchCommandEventsRequest) String() string {
 func (*WatchCommandEventsRequest) ProtoMessage() {}
 
 func (x *WatchCommandEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[18]
+	mi := &file_v1_command_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1755,7 +2517,7 @@ func (x *WatchCommandEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchCommandEventsRequest.ProtoReflect.Descriptor instead.
 func (*WatchCommandEventsRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{18}
+	return file_v1_command_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *WatchCommandEventsRequest) GetName() string {
@@ -1782,7 +2544,7 @@ type PermissionDecision struct {
 
 func (x *PermissionDecision) Reset() {
 	*x = PermissionDecision{}
-	mi := &file_v1_command_proto_msgTypes[19]
+	mi := &file_v1_command_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1794,7 +2556,7 @@ func (x *PermissionDecision) String() string {
 func (*PermissionDecision) ProtoMessage() {}
 
 func (x *PermissionDecision) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[19]
+	mi := &file_v1_command_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1807,7 +2569,7 @@ func (x *PermissionDecision) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionDecision.ProtoReflect.Descriptor instead.
 func (*PermissionDecision) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{19}
+	return file_v1_command_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *PermissionDecision) GetCommandId() string {
@@ -1834,7 +2596,7 @@ type RespondPermissionRequest struct {
 
 func (x *RespondPermissionRequest) Reset() {
 	*x = RespondPermissionRequest{}
-	mi := &file_v1_command_proto_msgTypes[20]
+	mi := &file_v1_command_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1846,7 +2608,7 @@ func (x *RespondPermissionRequest) String() string {
 func (*RespondPermissionRequest) ProtoMessage() {}
 
 func (x *RespondPermissionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[20]
+	mi := &file_v1_command_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1859,7 +2621,7 @@ func (x *RespondPermissionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RespondPermissionRequest.ProtoReflect.Descriptor instead.
 func (*RespondPermissionRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{20}
+	return file_v1_command_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *RespondPermissionRequest) GetName() string {
@@ -1927,15 +2689,70 @@ const file_v1_command_proto_rawDesc = "" +
 	"\n" +
 	"\x06STDERR\x10\x02\x12\n" +
 	"\n" +
-	"\x06SYSTEM\x10\x03\"\xfc\x01\n" +
+	"\x06SYSTEM\x10\x03\"\xb0\a\n" +
 	"\fCommandEvent\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12\x15\n" +
 	"\x06seq_no\x18\x02 \x01(\x05R\x05seqNo\x12/\n" +
 	"\x04type\x18\x03 \x01(\x0e2\x1b.laelia.v1.CommandEventTypeR\x04type\x12\x18\n" +
-	"\asummary\x18\x04 \x01(\tR\asummary\x121\n" +
-	"\apayload\x18\x05 \x01(\v2\x17.google.protobuf.StructR\apayload\x128\n" +
-	"\ttimestamp\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\xa0\x02\n" +
+	"\asummary\x18\x04 \x01(\tR\asummary\x128\n" +
+	"\ttimestamp\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12;\n" +
+	"\tlifecycle\x18\n" +
+	" \x01(\v2\x1b.laelia.v1.LifecyclePayloadH\x00R\tlifecycle\x12<\n" +
+	"\n" +
+	"text_delta\x18\v \x01(\v2\x1b.laelia.v1.TextDeltaPayloadH\x00R\ttextDelta\x12O\n" +
+	"\x11tool_call_started\x18\f \x01(\v2!.laelia.v1.ToolCallStartedPayloadH\x00R\x0ftoolCallStarted\x12R\n" +
+	"\x12tool_call_finished\x18\r \x01(\v2\".laelia.v1.ToolCallFinishedPayloadH\x00R\x10toolCallFinished\x12B\n" +
+	"\fdiff_emitted\x18\x0e \x01(\v2\x1d.laelia.v1.DiffEmittedPayloadH\x00R\vdiffEmitted\x125\n" +
+	"\awarning\x18\x0f \x01(\v2\x19.laelia.v1.WarningPayloadH\x00R\awarning\x123\n" +
+	"\araw_acp\x18\x10 \x01(\v2\x18.laelia.v1.RawAcpPayloadH\x00R\x06rawAcp\x12E\n" +
+	"\rfinal_summary\x18\x11 \x01(\v2\x1e.laelia.v1.FinalSummaryPayloadH\x00R\ffinalSummary\x12Z\n" +
+	"\x14permission_requested\x18\x12 \x01(\v2%.laelia.v1.PermissionRequestedPayloadH\x00R\x13permissionRequested\x12X\n" +
+	"\x14permission_timed_out\x18\x13 \x01(\v2$.laelia.v1.PermissionTimedOutPayloadH\x00R\x12permissionTimedOutB\t\n" +
+	"\apayloadJ\x04\b\x05\x10\x06R\apayload\"Q\n" +
+	"\x10LifecyclePayload\x12#\n" +
+	"\rexecutor_kind\x18\x01 \x01(\tR\fexecutorKind\x12\x18\n" +
+	"\aprofile\x18\x02 \x01(\tR\aprofile\"M\n" +
+	"\x10TextDeltaPayload\x12\x1f\n" +
+	"\vstream_type\x18\x01 \x01(\tR\n" +
+	"streamType\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\"d\n" +
+	"\x16ToolCallStartedPayload\x12\x14\n" +
+	"\x05title\x18\x01 \x01(\tR\x05title\x124\n" +
+	"\traw_input\x18\x02 \x01(\v2\x17.google.protobuf.StructR\brawInput\"i\n" +
+	"\x17ToolCallFinishedPayload\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x126\n" +
+	"\n" +
+	"raw_output\x18\x02 \x01(\v2\x17.google.protobuf.StructR\trawOutput\"^\n" +
+	"\x12DiffEmittedPayload\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x19\n" +
+	"\bold_text\x18\x02 \x01(\tR\aoldText\x12\x19\n" +
+	"\bnew_text\x18\x03 \x01(\tR\anewText\"*\n" +
+	"\x0eWarningPayload\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"<\n" +
+	"\rRawAcpPayload\x12+\n" +
+	"\x04data\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x04data\"U\n" +
+	"\x13FinalSummaryPayload\x12\x1f\n" +
+	"\vstop_reason\x18\x01 \x01(\tR\n" +
+	"stopReason\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\"\xc5\x01\n" +
+	"\x1aPermissionRequestedPayload\x12 \n" +
+	"\ftool_call_id\x18\x01 \x01(\tR\n" +
+	"toolCallId\x12\x12\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12<\n" +
+	"\aoptions\x18\x04 \x03(\v2\".laelia.v1.PermissionOptionPayloadR\aoptions\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\x05 \x01(\x03R\texpiresAt\"^\n" +
+	"\x17PermissionOptionPayload\x12\x1b\n" +
+	"\toption_id\x18\x01 \x01(\tR\boptionId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
+	"\x04kind\x18\x03 \x01(\tR\x04kind\"Q\n" +
+	"\x19PermissionTimedOutPayload\x12 \n" +
+	"\ftool_call_id\x18\x01 \x01(\tR\n" +
+	"toolCallId\x12\x12\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind\"\xa0\x02\n" +
 	"\x13AgentCommandMessage\x128\n" +
 	"\vagent_ready\x18\x01 \x01(\v2\x15.laelia.v1.AgentReadyH\x00R\n" +
 	"agentReady\x128\n" +
@@ -2103,91 +2920,115 @@ func file_v1_command_proto_rawDescGZIP() []byte {
 }
 
 var file_v1_command_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_v1_command_proto_goTypes = []any{
-	(CommandStatus)(0),                // 0: laelia.v1.CommandStatus
-	(ExecutorKind)(0),                 // 1: laelia.v1.ExecutorKind
-	(CommandEventType)(0),             // 2: laelia.v1.CommandEventType
-	(CommandOutput_StreamType)(0),     // 3: laelia.v1.CommandOutput.StreamType
-	(*Command)(nil),                   // 4: laelia.v1.Command
-	(*CommandOutput)(nil),             // 5: laelia.v1.CommandOutput
-	(*CommandEvent)(nil),              // 6: laelia.v1.CommandEvent
-	(*AgentCommandMessage)(nil),       // 7: laelia.v1.AgentCommandMessage
-	(*ManagerCommandMessage)(nil),     // 8: laelia.v1.ManagerCommandMessage
-	(*AgentReady)(nil),                // 9: laelia.v1.AgentReady
-	(*CommandRequest)(nil),            // 10: laelia.v1.CommandRequest
-	(*CommandProgress)(nil),           // 11: laelia.v1.CommandProgress
-	(*CommandResult)(nil),             // 12: laelia.v1.CommandResult
-	(*CancelMessage)(nil),             // 13: laelia.v1.CancelMessage
-	(*Ping)(nil),                      // 14: laelia.v1.Ping
-	(*Pong)(nil),                      // 15: laelia.v1.Pong
-	(*SendCommandRequest)(nil),        // 16: laelia.v1.SendCommandRequest
-	(*ListCommandsRequest)(nil),       // 17: laelia.v1.ListCommandsRequest
-	(*ListCommandsResponse)(nil),      // 18: laelia.v1.ListCommandsResponse
-	(*GetCommandRequest)(nil),         // 19: laelia.v1.GetCommandRequest
-	(*CancelCommandRequest)(nil),      // 20: laelia.v1.CancelCommandRequest
-	(*WatchCommandRequest)(nil),       // 21: laelia.v1.WatchCommandRequest
-	(*WatchCommandEventsRequest)(nil), // 22: laelia.v1.WatchCommandEventsRequest
-	(*PermissionDecision)(nil),        // 23: laelia.v1.PermissionDecision
-	(*RespondPermissionRequest)(nil),  // 24: laelia.v1.RespondPermissionRequest
-	nil,                               // 25: laelia.v1.Command.EnvEntry
-	nil,                               // 26: laelia.v1.CommandRequest.EnvEntry
-	nil,                               // 27: laelia.v1.SendCommandRequest.EnvEntry
-	(*timestamppb.Timestamp)(nil),     // 28: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),           // 29: google.protobuf.Struct
-	(*emptypb.Empty)(nil),             // 30: google.protobuf.Empty
+	(CommandStatus)(0),                 // 0: laelia.v1.CommandStatus
+	(ExecutorKind)(0),                  // 1: laelia.v1.ExecutorKind
+	(CommandEventType)(0),              // 2: laelia.v1.CommandEventType
+	(CommandOutput_StreamType)(0),      // 3: laelia.v1.CommandOutput.StreamType
+	(*Command)(nil),                    // 4: laelia.v1.Command
+	(*CommandOutput)(nil),              // 5: laelia.v1.CommandOutput
+	(*CommandEvent)(nil),               // 6: laelia.v1.CommandEvent
+	(*LifecyclePayload)(nil),           // 7: laelia.v1.LifecyclePayload
+	(*TextDeltaPayload)(nil),           // 8: laelia.v1.TextDeltaPayload
+	(*ToolCallStartedPayload)(nil),     // 9: laelia.v1.ToolCallStartedPayload
+	(*ToolCallFinishedPayload)(nil),    // 10: laelia.v1.ToolCallFinishedPayload
+	(*DiffEmittedPayload)(nil),         // 11: laelia.v1.DiffEmittedPayload
+	(*WarningPayload)(nil),             // 12: laelia.v1.WarningPayload
+	(*RawAcpPayload)(nil),              // 13: laelia.v1.RawAcpPayload
+	(*FinalSummaryPayload)(nil),        // 14: laelia.v1.FinalSummaryPayload
+	(*PermissionRequestedPayload)(nil), // 15: laelia.v1.PermissionRequestedPayload
+	(*PermissionOptionPayload)(nil),    // 16: laelia.v1.PermissionOptionPayload
+	(*PermissionTimedOutPayload)(nil),  // 17: laelia.v1.PermissionTimedOutPayload
+	(*AgentCommandMessage)(nil),        // 18: laelia.v1.AgentCommandMessage
+	(*ManagerCommandMessage)(nil),      // 19: laelia.v1.ManagerCommandMessage
+	(*AgentReady)(nil),                 // 20: laelia.v1.AgentReady
+	(*CommandRequest)(nil),             // 21: laelia.v1.CommandRequest
+	(*CommandProgress)(nil),            // 22: laelia.v1.CommandProgress
+	(*CommandResult)(nil),              // 23: laelia.v1.CommandResult
+	(*CancelMessage)(nil),              // 24: laelia.v1.CancelMessage
+	(*Ping)(nil),                       // 25: laelia.v1.Ping
+	(*Pong)(nil),                       // 26: laelia.v1.Pong
+	(*SendCommandRequest)(nil),         // 27: laelia.v1.SendCommandRequest
+	(*ListCommandsRequest)(nil),        // 28: laelia.v1.ListCommandsRequest
+	(*ListCommandsResponse)(nil),       // 29: laelia.v1.ListCommandsResponse
+	(*GetCommandRequest)(nil),          // 30: laelia.v1.GetCommandRequest
+	(*CancelCommandRequest)(nil),       // 31: laelia.v1.CancelCommandRequest
+	(*WatchCommandRequest)(nil),        // 32: laelia.v1.WatchCommandRequest
+	(*WatchCommandEventsRequest)(nil),  // 33: laelia.v1.WatchCommandEventsRequest
+	(*PermissionDecision)(nil),         // 34: laelia.v1.PermissionDecision
+	(*RespondPermissionRequest)(nil),   // 35: laelia.v1.RespondPermissionRequest
+	nil,                                // 36: laelia.v1.Command.EnvEntry
+	nil,                                // 37: laelia.v1.CommandRequest.EnvEntry
+	nil,                                // 38: laelia.v1.SendCommandRequest.EnvEntry
+	(*timestamppb.Timestamp)(nil),      // 39: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),            // 40: google.protobuf.Struct
+	(*emptypb.Empty)(nil),              // 41: google.protobuf.Empty
 }
 var file_v1_command_proto_depIdxs = []int32{
 	0,  // 0: laelia.v1.Command.status:type_name -> laelia.v1.CommandStatus
-	28, // 1: laelia.v1.Command.created_at:type_name -> google.protobuf.Timestamp
-	28, // 2: laelia.v1.Command.started_at:type_name -> google.protobuf.Timestamp
-	28, // 3: laelia.v1.Command.completed_at:type_name -> google.protobuf.Timestamp
-	25, // 4: laelia.v1.Command.env:type_name -> laelia.v1.Command.EnvEntry
+	39, // 1: laelia.v1.Command.created_at:type_name -> google.protobuf.Timestamp
+	39, // 2: laelia.v1.Command.started_at:type_name -> google.protobuf.Timestamp
+	39, // 3: laelia.v1.Command.completed_at:type_name -> google.protobuf.Timestamp
+	36, // 4: laelia.v1.Command.env:type_name -> laelia.v1.Command.EnvEntry
 	1,  // 5: laelia.v1.Command.executor_kind:type_name -> laelia.v1.ExecutorKind
-	29, // 6: laelia.v1.Command.result:type_name -> google.protobuf.Struct
+	40, // 6: laelia.v1.Command.result:type_name -> google.protobuf.Struct
 	3,  // 7: laelia.v1.CommandOutput.type:type_name -> laelia.v1.CommandOutput.StreamType
-	28, // 8: laelia.v1.CommandOutput.timestamp:type_name -> google.protobuf.Timestamp
+	39, // 8: laelia.v1.CommandOutput.timestamp:type_name -> google.protobuf.Timestamp
 	2,  // 9: laelia.v1.CommandEvent.type:type_name -> laelia.v1.CommandEventType
-	29, // 10: laelia.v1.CommandEvent.payload:type_name -> google.protobuf.Struct
-	28, // 11: laelia.v1.CommandEvent.timestamp:type_name -> google.protobuf.Timestamp
-	9,  // 12: laelia.v1.AgentCommandMessage.agent_ready:type_name -> laelia.v1.AgentReady
-	11, // 13: laelia.v1.AgentCommandMessage.progress:type_name -> laelia.v1.CommandProgress
-	12, // 14: laelia.v1.AgentCommandMessage.result:type_name -> laelia.v1.CommandResult
-	14, // 15: laelia.v1.AgentCommandMessage.ping:type_name -> laelia.v1.Ping
-	6,  // 16: laelia.v1.AgentCommandMessage.event:type_name -> laelia.v1.CommandEvent
-	10, // 17: laelia.v1.ManagerCommandMessage.command_request:type_name -> laelia.v1.CommandRequest
-	13, // 18: laelia.v1.ManagerCommandMessage.cancel:type_name -> laelia.v1.CancelMessage
-	15, // 19: laelia.v1.ManagerCommandMessage.pong:type_name -> laelia.v1.Pong
-	23, // 20: laelia.v1.ManagerCommandMessage.permission_decision:type_name -> laelia.v1.PermissionDecision
-	26, // 21: laelia.v1.CommandRequest.env:type_name -> laelia.v1.CommandRequest.EnvEntry
-	1,  // 22: laelia.v1.CommandRequest.executor_kind:type_name -> laelia.v1.ExecutorKind
-	3,  // 23: laelia.v1.CommandProgress.type:type_name -> laelia.v1.CommandOutput.StreamType
-	29, // 24: laelia.v1.CommandResult.result:type_name -> google.protobuf.Struct
-	27, // 25: laelia.v1.SendCommandRequest.env:type_name -> laelia.v1.SendCommandRequest.EnvEntry
-	1,  // 26: laelia.v1.SendCommandRequest.executor_kind:type_name -> laelia.v1.ExecutorKind
-	0,  // 27: laelia.v1.ListCommandsRequest.status:type_name -> laelia.v1.CommandStatus
-	4,  // 28: laelia.v1.ListCommandsResponse.commands:type_name -> laelia.v1.Command
-	16, // 29: laelia.v1.CommandService.SendCommand:input_type -> laelia.v1.SendCommandRequest
-	17, // 30: laelia.v1.CommandService.ListCommands:input_type -> laelia.v1.ListCommandsRequest
-	19, // 31: laelia.v1.CommandService.GetCommand:input_type -> laelia.v1.GetCommandRequest
-	20, // 32: laelia.v1.CommandService.CancelCommand:input_type -> laelia.v1.CancelCommandRequest
-	21, // 33: laelia.v1.CommandService.WatchCommand:input_type -> laelia.v1.WatchCommandRequest
-	22, // 34: laelia.v1.CommandService.WatchCommandEvents:input_type -> laelia.v1.WatchCommandEventsRequest
-	24, // 35: laelia.v1.CommandService.RespondPermission:input_type -> laelia.v1.RespondPermissionRequest
-	7,  // 36: laelia.v1.AgentCommandService.CommandChannel:input_type -> laelia.v1.AgentCommandMessage
-	4,  // 37: laelia.v1.CommandService.SendCommand:output_type -> laelia.v1.Command
-	18, // 38: laelia.v1.CommandService.ListCommands:output_type -> laelia.v1.ListCommandsResponse
-	4,  // 39: laelia.v1.CommandService.GetCommand:output_type -> laelia.v1.Command
-	4,  // 40: laelia.v1.CommandService.CancelCommand:output_type -> laelia.v1.Command
-	5,  // 41: laelia.v1.CommandService.WatchCommand:output_type -> laelia.v1.CommandOutput
-	6,  // 42: laelia.v1.CommandService.WatchCommandEvents:output_type -> laelia.v1.CommandEvent
-	30, // 43: laelia.v1.CommandService.RespondPermission:output_type -> google.protobuf.Empty
-	8,  // 44: laelia.v1.AgentCommandService.CommandChannel:output_type -> laelia.v1.ManagerCommandMessage
-	37, // [37:45] is the sub-list for method output_type
-	29, // [29:37] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	39, // 10: laelia.v1.CommandEvent.timestamp:type_name -> google.protobuf.Timestamp
+	7,  // 11: laelia.v1.CommandEvent.lifecycle:type_name -> laelia.v1.LifecyclePayload
+	8,  // 12: laelia.v1.CommandEvent.text_delta:type_name -> laelia.v1.TextDeltaPayload
+	9,  // 13: laelia.v1.CommandEvent.tool_call_started:type_name -> laelia.v1.ToolCallStartedPayload
+	10, // 14: laelia.v1.CommandEvent.tool_call_finished:type_name -> laelia.v1.ToolCallFinishedPayload
+	11, // 15: laelia.v1.CommandEvent.diff_emitted:type_name -> laelia.v1.DiffEmittedPayload
+	12, // 16: laelia.v1.CommandEvent.warning:type_name -> laelia.v1.WarningPayload
+	13, // 17: laelia.v1.CommandEvent.raw_acp:type_name -> laelia.v1.RawAcpPayload
+	14, // 18: laelia.v1.CommandEvent.final_summary:type_name -> laelia.v1.FinalSummaryPayload
+	15, // 19: laelia.v1.CommandEvent.permission_requested:type_name -> laelia.v1.PermissionRequestedPayload
+	17, // 20: laelia.v1.CommandEvent.permission_timed_out:type_name -> laelia.v1.PermissionTimedOutPayload
+	40, // 21: laelia.v1.ToolCallStartedPayload.raw_input:type_name -> google.protobuf.Struct
+	40, // 22: laelia.v1.ToolCallFinishedPayload.raw_output:type_name -> google.protobuf.Struct
+	40, // 23: laelia.v1.RawAcpPayload.data:type_name -> google.protobuf.Struct
+	16, // 24: laelia.v1.PermissionRequestedPayload.options:type_name -> laelia.v1.PermissionOptionPayload
+	20, // 25: laelia.v1.AgentCommandMessage.agent_ready:type_name -> laelia.v1.AgentReady
+	22, // 26: laelia.v1.AgentCommandMessage.progress:type_name -> laelia.v1.CommandProgress
+	23, // 27: laelia.v1.AgentCommandMessage.result:type_name -> laelia.v1.CommandResult
+	25, // 28: laelia.v1.AgentCommandMessage.ping:type_name -> laelia.v1.Ping
+	6,  // 29: laelia.v1.AgentCommandMessage.event:type_name -> laelia.v1.CommandEvent
+	21, // 30: laelia.v1.ManagerCommandMessage.command_request:type_name -> laelia.v1.CommandRequest
+	24, // 31: laelia.v1.ManagerCommandMessage.cancel:type_name -> laelia.v1.CancelMessage
+	26, // 32: laelia.v1.ManagerCommandMessage.pong:type_name -> laelia.v1.Pong
+	34, // 33: laelia.v1.ManagerCommandMessage.permission_decision:type_name -> laelia.v1.PermissionDecision
+	37, // 34: laelia.v1.CommandRequest.env:type_name -> laelia.v1.CommandRequest.EnvEntry
+	1,  // 35: laelia.v1.CommandRequest.executor_kind:type_name -> laelia.v1.ExecutorKind
+	3,  // 36: laelia.v1.CommandProgress.type:type_name -> laelia.v1.CommandOutput.StreamType
+	40, // 37: laelia.v1.CommandResult.result:type_name -> google.protobuf.Struct
+	38, // 38: laelia.v1.SendCommandRequest.env:type_name -> laelia.v1.SendCommandRequest.EnvEntry
+	1,  // 39: laelia.v1.SendCommandRequest.executor_kind:type_name -> laelia.v1.ExecutorKind
+	0,  // 40: laelia.v1.ListCommandsRequest.status:type_name -> laelia.v1.CommandStatus
+	4,  // 41: laelia.v1.ListCommandsResponse.commands:type_name -> laelia.v1.Command
+	27, // 42: laelia.v1.CommandService.SendCommand:input_type -> laelia.v1.SendCommandRequest
+	28, // 43: laelia.v1.CommandService.ListCommands:input_type -> laelia.v1.ListCommandsRequest
+	30, // 44: laelia.v1.CommandService.GetCommand:input_type -> laelia.v1.GetCommandRequest
+	31, // 45: laelia.v1.CommandService.CancelCommand:input_type -> laelia.v1.CancelCommandRequest
+	32, // 46: laelia.v1.CommandService.WatchCommand:input_type -> laelia.v1.WatchCommandRequest
+	33, // 47: laelia.v1.CommandService.WatchCommandEvents:input_type -> laelia.v1.WatchCommandEventsRequest
+	35, // 48: laelia.v1.CommandService.RespondPermission:input_type -> laelia.v1.RespondPermissionRequest
+	18, // 49: laelia.v1.AgentCommandService.CommandChannel:input_type -> laelia.v1.AgentCommandMessage
+	4,  // 50: laelia.v1.CommandService.SendCommand:output_type -> laelia.v1.Command
+	29, // 51: laelia.v1.CommandService.ListCommands:output_type -> laelia.v1.ListCommandsResponse
+	4,  // 52: laelia.v1.CommandService.GetCommand:output_type -> laelia.v1.Command
+	4,  // 53: laelia.v1.CommandService.CancelCommand:output_type -> laelia.v1.Command
+	5,  // 54: laelia.v1.CommandService.WatchCommand:output_type -> laelia.v1.CommandOutput
+	6,  // 55: laelia.v1.CommandService.WatchCommandEvents:output_type -> laelia.v1.CommandEvent
+	41, // 56: laelia.v1.CommandService.RespondPermission:output_type -> google.protobuf.Empty
+	19, // 57: laelia.v1.AgentCommandService.CommandChannel:output_type -> laelia.v1.ManagerCommandMessage
+	50, // [50:58] is the sub-list for method output_type
+	42, // [42:50] is the sub-list for method input_type
+	42, // [42:42] is the sub-list for extension type_name
+	42, // [42:42] is the sub-list for extension extendee
+	0,  // [0:42] is the sub-list for field type_name
 }
 
 func init() { file_v1_command_proto_init() }
@@ -2196,14 +3037,26 @@ func file_v1_command_proto_init() {
 		return
 	}
 	file_v1_annotation_proto_init()
-	file_v1_command_proto_msgTypes[3].OneofWrappers = []any{
+	file_v1_command_proto_msgTypes[2].OneofWrappers = []any{
+		(*CommandEvent_Lifecycle)(nil),
+		(*CommandEvent_TextDelta)(nil),
+		(*CommandEvent_ToolCallStarted)(nil),
+		(*CommandEvent_ToolCallFinished)(nil),
+		(*CommandEvent_DiffEmitted)(nil),
+		(*CommandEvent_Warning)(nil),
+		(*CommandEvent_RawAcp)(nil),
+		(*CommandEvent_FinalSummary)(nil),
+		(*CommandEvent_PermissionRequested)(nil),
+		(*CommandEvent_PermissionTimedOut)(nil),
+	}
+	file_v1_command_proto_msgTypes[14].OneofWrappers = []any{
 		(*AgentCommandMessage_AgentReady)(nil),
 		(*AgentCommandMessage_Progress)(nil),
 		(*AgentCommandMessage_Result)(nil),
 		(*AgentCommandMessage_Ping)(nil),
 		(*AgentCommandMessage_Event)(nil),
 	}
-	file_v1_command_proto_msgTypes[4].OneofWrappers = []any{
+	file_v1_command_proto_msgTypes[15].OneofWrappers = []any{
 		(*ManagerCommandMessage_CommandRequest)(nil),
 		(*ManagerCommandMessage_Cancel)(nil),
 		(*ManagerCommandMessage_Pong)(nil),
@@ -2215,7 +3068,7 @@ func file_v1_command_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_command_proto_rawDesc), len(file_v1_command_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   24,
+			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

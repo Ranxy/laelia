@@ -530,7 +530,19 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.DiffEmittedPayload"><span class="badge">M</span>DiffEmittedPayload</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.FinalSummaryPayload"><span class="badge">M</span>FinalSummaryPayload</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.GetCommandRequest"><span class="badge">M</span>GetCommandRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.LifecyclePayload"><span class="badge">M</span>LifecyclePayload</a>
                 </li>
               
                 <li>
@@ -550,11 +562,27 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.PermissionOptionPayload"><span class="badge">M</span>PermissionOptionPayload</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.PermissionRequestedPayload"><span class="badge">M</span>PermissionRequestedPayload</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.PermissionTimedOutPayload"><span class="badge">M</span>PermissionTimedOutPayload</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.Ping"><span class="badge">M</span>Ping</a>
                 </li>
               
                 <li>
                   <a href="#laelia.v1.Pong"><span class="badge">M</span>Pong</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RawAcpPayload"><span class="badge">M</span>RawAcpPayload</a>
                 </li>
               
                 <li>
@@ -567,6 +595,22 @@
               
                 <li>
                   <a href="#laelia.v1.SendCommandRequest.EnvEntry"><span class="badge">M</span>SendCommandRequest.EnvEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.TextDeltaPayload"><span class="badge">M</span>TextDeltaPayload</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ToolCallFinishedPayload"><span class="badge">M</span>ToolCallFinishedPayload</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ToolCallStartedPayload"><span class="badge">M</span>ToolCallStartedPayload</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.WarningPayload"><span class="badge">M</span>WarningPayload</a>
                 </li>
               
                 <li>
@@ -3691,15 +3735,78 @@ Format: idps/{idp} </p></td>
                 </tr>
               
                 <tr>
-                  <td>payload</td>
-                  <td><a href="#google.protobuf.Struct">google.protobuf.Struct</a></td>
+                  <td>timestamp</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
               
                 <tr>
-                  <td>timestamp</td>
-                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td>lifecycle</td>
+                  <td><a href="#laelia.v1.LifecyclePayload">LifecyclePayload</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>text_delta</td>
+                  <td><a href="#laelia.v1.TextDeltaPayload">TextDeltaPayload</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>tool_call_started</td>
+                  <td><a href="#laelia.v1.ToolCallStartedPayload">ToolCallStartedPayload</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>tool_call_finished</td>
+                  <td><a href="#laelia.v1.ToolCallFinishedPayload">ToolCallFinishedPayload</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>diff_emitted</td>
+                  <td><a href="#laelia.v1.DiffEmittedPayload">DiffEmittedPayload</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>warning</td>
+                  <td><a href="#laelia.v1.WarningPayload">WarningPayload</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>raw_acp</td>
+                  <td><a href="#laelia.v1.RawAcpPayload">RawAcpPayload</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>final_summary</td>
+                  <td><a href="#laelia.v1.FinalSummaryPayload">FinalSummaryPayload</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>permission_requested</td>
+                  <td><a href="#laelia.v1.PermissionRequestedPayload">PermissionRequestedPayload</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>permission_timed_out</td>
+                  <td><a href="#laelia.v1.PermissionTimedOutPayload">PermissionTimedOutPayload</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -3985,6 +4092,75 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.DiffEmittedPayload">DiffEmittedPayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>path</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>old_text</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>new_text</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.FinalSummaryPayload">FinalSummaryPayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>stop_reason</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>session_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.GetCommandRequest">GetCommandRequest</h3>
         <p></p>
 
@@ -3997,6 +4173,37 @@ Format: idps/{idp} </p></td>
               
                 <tr>
                   <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.LifecyclePayload">LifecyclePayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>executor_kind</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>profile</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -4161,6 +4368,127 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.PermissionOptionPayload">PermissionOptionPayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>option_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>kind</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.PermissionRequestedPayload">PermissionRequestedPayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>tool_call_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>kind</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>options</td>
+                  <td><a href="#laelia.v1.PermissionOptionPayload">PermissionOptionPayload</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>expires_at</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.PermissionTimedOutPayload">PermissionTimedOutPayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>tool_call_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>kind</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.Ping">Ping</h3>
         <p></p>
 
@@ -4212,6 +4540,30 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>server_time</td>
                   <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RawAcpPayload">RawAcpPayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#google.protobuf.Struct">google.protobuf.Struct</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -4353,6 +4705,123 @@ Format: idps/{idp} </p></td>
               
                 <tr>
                   <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.TextDeltaPayload">TextDeltaPayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>stream_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>content</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ToolCallFinishedPayload">ToolCallFinishedPayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>status</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>raw_output</td>
+                  <td><a href="#google.protobuf.Struct">google.protobuf.Struct</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ToolCallStartedPayload">ToolCallStartedPayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>raw_input</td>
+                  <td><a href="#google.protobuf.Struct">google.protobuf.Struct</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.WarningPayload">WarningPayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>

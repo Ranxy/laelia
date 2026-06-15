@@ -387,9 +387,59 @@ func convertToV1CommandEvent(event *store.CommandEventMessage) *v1pb.CommandEven
 		Timestamp: timestamppb.New(event.CreatedAt),
 	}
 	if event.PayloadJSON != "" && event.PayloadJSON != "{}" {
-		payload := &structpb.Struct{}
-		if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(event.PayloadJSON), payload); err == nil {
-			v1Event.Payload = payload
+		data := []byte(event.PayloadJSON)
+		switch v1pb.CommandEventType(event.EventType) {
+		case v1pb.CommandEventType_LIFECYCLE:
+			p := &v1pb.LifecyclePayload{}
+			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
+				v1Event.Payload = &v1pb.CommandEvent_Lifecycle{Lifecycle: p}
+			}
+		case v1pb.CommandEventType_TEXT_DELTA:
+			p := &v1pb.TextDeltaPayload{}
+			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
+				v1Event.Payload = &v1pb.CommandEvent_TextDelta{TextDelta: p}
+			}
+		case v1pb.CommandEventType_TOOL_CALL_STARTED:
+			p := &v1pb.ToolCallStartedPayload{}
+			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
+				v1Event.Payload = &v1pb.CommandEvent_ToolCallStarted{ToolCallStarted: p}
+			}
+		case v1pb.CommandEventType_TOOL_CALL_FINISHED:
+			p := &v1pb.ToolCallFinishedPayload{}
+			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
+				v1Event.Payload = &v1pb.CommandEvent_ToolCallFinished{ToolCallFinished: p}
+			}
+		case v1pb.CommandEventType_DIFF_EMITTED:
+			p := &v1pb.DiffEmittedPayload{}
+			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
+				v1Event.Payload = &v1pb.CommandEvent_DiffEmitted{DiffEmitted: p}
+			}
+		case v1pb.CommandEventType_WARNING:
+			p := &v1pb.WarningPayload{}
+			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
+				v1Event.Payload = &v1pb.CommandEvent_Warning{Warning: p}
+			}
+		case v1pb.CommandEventType_RAW_ACP:
+			p := &v1pb.RawAcpPayload{}
+			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
+				v1Event.Payload = &v1pb.CommandEvent_RawAcp{RawAcp: p}
+			}
+		case v1pb.CommandEventType_FINAL_SUMMARY:
+			p := &v1pb.FinalSummaryPayload{}
+			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
+				v1Event.Payload = &v1pb.CommandEvent_FinalSummary{FinalSummary: p}
+			}
+		case v1pb.CommandEventType_PERMISSION_REQUESTED:
+			p := &v1pb.PermissionRequestedPayload{}
+			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
+				v1Event.Payload = &v1pb.CommandEvent_PermissionRequested{PermissionRequested: p}
+			}
+		case v1pb.CommandEventType_PERMISSION_TIMED_OUT:
+			p := &v1pb.PermissionTimedOutPayload{}
+			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
+				v1Event.Payload = &v1pb.CommandEvent_PermissionTimedOut{PermissionTimedOut: p}
+			}
+		default:
 		}
 	}
 	return v1Event

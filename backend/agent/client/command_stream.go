@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
@@ -58,10 +57,9 @@ func (m *mergedText) flush(stream *connect.BidiStreamForClient[v1pb.AgentCommand
 		Summary:    text,
 		Text:       text,
 		StreamType: m.streamType,
-		Timestamp:  time.Now(),
-		Payload: map[string]any{
-			"stream_type": m.streamType.String(),
-			"content":     text,
+		TextDelta: &v1pb.TextDeltaPayload{
+			StreamType: m.streamType.String(),
+			Content:    text,
 		},
 	}
 	return sendCommandEvent(stream, commandID, &event)
@@ -260,13 +258,12 @@ func (*commandStream) runCommand(
 	runtime.Start()
 	startSeq := nextEventSeq(state)
 	if err := sendCommandEvent(stream, commandID, &executor.Event{
-		SeqNo:     startSeq,
-		Type:      v1pb.CommandEventType_LIFECYCLE,
-		Summary:   "command started",
-		Timestamp: time.Now(),
-		Payload: map[string]any{
-			"executor_kind": req.ExecutorKind.String(),
-			"profile":       req.Profile,
+		SeqNo:   startSeq,
+		Type:    v1pb.CommandEventType_LIFECYCLE,
+		Summary: "command started",
+		Lifecycle: &v1pb.LifecyclePayload{
+			ExecutorKind: req.ExecutorKind.String(),
+			Profile:      req.Profile,
 		},
 	}); err != nil {
 		slog.Error("failed to send command start event", "commandID", commandID, "error", err)
@@ -413,52 +410,41 @@ func sendCommandProgress(stream *connect.BidiStreamForClient[v1pb.AgentCommandMe
 }
 
 func sendCommandEvent(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], commandID string, event *executor.Event) error {
-	payload, err := structpb.NewStruct(normalizePayload(event.Payload))
-	if err != nil {
-		return err
+	ce := &v1pb.CommandEvent{
+		CommandId: commandID,
+		SeqNo:     event.SeqNo,
+		Type:      event.Type,
+		Summary:   event.Summary,
+		Timestamp: timestamppb.New(time.Now()),
 	}
-	return stream.Send(&v1pb.AgentCommandMessage{
-		Message: &v1pb.AgentCommandMessage_Event{
-			Event: &v1pb.CommandEvent{
-				CommandId: commandID,
-				SeqNo:     event.SeqNo,
-				Type:      event.Type,
-				Summary:   event.Summary,
-				Payload:   payload,
-				Timestamp: timestamppb.New(event.Timestamp),
-			},
-		},
-	})
-}
 
-func normalizePayload(payload map[string]any) map[string]any {
-	if payload == nil {
-		return nil
-	}
-	for k, v := range payload {
-		payload[k] = normalizeValue(v)
-	}
-	return payload
-}
-
-func normalizeValue(v any) any {
-	switch t := v.(type) {
-	case map[string]any:
-		return normalizePayload(t)
-	case []map[string]any:
-		converted := make([]any, len(t))
-		for i, m := range t {
-			converted[i] = normalizePayload(m)
-		}
-		return converted
-	case []any:
-		for i, item := range t {
-			t[i] = normalizeValue(item)
-		}
-		return t
+	switch event.Type {
+	case v1pb.CommandEventType_LIFECYCLE:
+		ce.Payload = &v1pb.CommandEvent_Lifecycle{Lifecycle: event.Lifecycle}
+	case v1pb.CommandEventType_TEXT_DELTA:
+		ce.Payload = &v1pb.CommandEvent_TextDelta{TextDelta: event.TextDelta}
+	case v1pb.CommandEventType_TOOL_CALL_STARTED:
+		ce.Payload = &v1pb.CommandEvent_ToolCallStarted{ToolCallStarted: event.ToolCallStarted}
+	case v1pb.CommandEventType_TOOL_CALL_FINISHED:
+		ce.Payload = &v1pb.CommandEvent_ToolCallFinished{ToolCallFinished: event.ToolCallFinished}
+	case v1pb.CommandEventType_DIFF_EMITTED:
+		ce.Payload = &v1pb.CommandEvent_DiffEmitted{DiffEmitted: event.DiffEmitted}
+	case v1pb.CommandEventType_WARNING:
+		ce.Payload = &v1pb.CommandEvent_Warning{Warning: event.Warning}
+	case v1pb.CommandEventType_RAW_ACP:
+		ce.Payload = &v1pb.CommandEvent_RawAcp{RawAcp: event.RawAcp}
+	case v1pb.CommandEventType_FINAL_SUMMARY:
+		ce.Payload = &v1pb.CommandEvent_FinalSummary{FinalSummary: event.FinalSummary}
+	case v1pb.CommandEventType_PERMISSION_REQUESTED:
+		ce.Payload = &v1pb.CommandEvent_PermissionRequested{PermissionRequested: event.PermissionRequested}
+	case v1pb.CommandEventType_PERMISSION_TIMED_OUT:
+		ce.Payload = &v1pb.CommandEvent_PermissionTimedOut{PermissionTimedOut: event.PermissionTimedOut}
 	default:
-		return v
 	}
+
+	return stream.Send(&v1pb.AgentCommandMessage{
+		Message: &v1pb.AgentCommandMessage_Event{Event: ce},
+	})
 }
 
 func sendCommandResult(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], result *v1pb.CommandResult) error {

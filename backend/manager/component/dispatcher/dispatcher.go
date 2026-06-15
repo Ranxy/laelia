@@ -336,11 +336,11 @@ func (d *Dispatcher) HandleEvent(ctx context.Context, event *v1pb.CommandEvent) 
 	}
 
 	payloadJSON := "{}"
-	if event.Payload != nil {
-		data, err := protojson.Marshal(event.Payload)
-		if err != nil {
-			return errors.Wrapf(err, "failed to marshal command event payload")
-		}
+	data, err := marshalEventPayload(event)
+	if err != nil {
+		return errors.Wrapf(err, "failed to marshal command event payload")
+	}
+	if data != nil {
 		payloadJSON = string(data)
 	}
 
@@ -576,4 +576,31 @@ func formatResultMessage(result *v1pb.CommandResult) string {
 		return result.ErrorMessage
 	}
 	return ""
+}
+
+func marshalEventPayload(event *v1pb.CommandEvent) ([]byte, error) {
+	switch event.Type {
+	case v1pb.CommandEventType_LIFECYCLE:
+		return protojson.Marshal(event.GetLifecycle())
+	case v1pb.CommandEventType_TEXT_DELTA:
+		return protojson.Marshal(event.GetTextDelta())
+	case v1pb.CommandEventType_TOOL_CALL_STARTED:
+		return protojson.Marshal(event.GetToolCallStarted())
+	case v1pb.CommandEventType_TOOL_CALL_FINISHED:
+		return protojson.Marshal(event.GetToolCallFinished())
+	case v1pb.CommandEventType_DIFF_EMITTED:
+		return protojson.Marshal(event.GetDiffEmitted())
+	case v1pb.CommandEventType_WARNING:
+		return protojson.Marshal(event.GetWarning())
+	case v1pb.CommandEventType_RAW_ACP:
+		return protojson.Marshal(event.GetRawAcp())
+	case v1pb.CommandEventType_FINAL_SUMMARY:
+		return protojson.Marshal(event.GetFinalSummary())
+	case v1pb.CommandEventType_PERMISSION_REQUESTED:
+		return protojson.Marshal(event.GetPermissionRequested())
+	case v1pb.CommandEventType_PERMISSION_TIMED_OUT:
+		return protojson.Marshal(event.GetPermissionTimedOut())
+	default:
+		return nil, nil
+	}
 }

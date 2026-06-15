@@ -36,12 +36,9 @@ func TestCommandStreamRunCommandSendsProgressEventAndResult(t *testing.T) {
 			SeqNo:      7,
 		}
 		runtime.eventCh <- executor.Event{
-			Type:      v1pb.CommandEventType_WARNING,
-			Summary:   "tool warning",
-			Timestamp: time.Unix(1710000000, 0),
-			Payload: map[string]any{
-				"code": "warn-1",
-			},
+			Type:    v1pb.CommandEventType_WARNING,
+			Summary: "tool warning",
+			Warning: &v1pb.WarningPayload{Message: "warn-1"},
 		}
 		close(runtime.outputCh)
 		close(runtime.eventCh)
@@ -90,8 +87,8 @@ func TestCommandStreamRunCommandSendsProgressEventAndResult(t *testing.T) {
 	assert.Equal(t, int32(1), lifecycle.SeqNo)
 	assert.Equal(t, v1pb.CommandEventType_LIFECYCLE, lifecycle.Type)
 	assert.Equal(t, "command started", lifecycle.Summary)
-	assert.Equal(t, "ACP", lifecycle.Payload.AsMap()["executor_kind"])
-	assert.Equal(t, "opencode", lifecycle.Payload.AsMap()["profile"])
+	assert.Equal(t, "ACP", lifecycle.GetLifecycle().GetExecutorKind())
+	assert.Equal(t, "opencode", lifecycle.GetLifecycle().GetProfile())
 
 	progress := msgs[1].GetProgress()
 	require.NotNil(t, progress)
@@ -104,14 +101,14 @@ func TestCommandStreamRunCommandSendsProgressEventAndResult(t *testing.T) {
 	require.NotNil(t, warning)
 	assert.Equal(t, v1pb.CommandEventType_WARNING, warning.Type)
 	assert.Equal(t, "tool warning", warning.Summary)
-	assert.Equal(t, "warn-1", warning.Payload.AsMap()["code"])
+	assert.Equal(t, "warn-1", warning.GetWarning().GetMessage())
 
 	textDelta := msgs[3].GetEvent()
 	require.NotNil(t, textDelta)
 	assert.Equal(t, v1pb.CommandEventType_TEXT_DELTA, textDelta.Type)
 	assert.Equal(t, "hello from runtime", textDelta.Summary)
-	assert.Equal(t, "STDOUT", textDelta.Payload.AsMap()["stream_type"])
-	assert.Equal(t, "hello from runtime", textDelta.Payload.AsMap()["content"])
+	assert.Equal(t, "STDOUT", textDelta.GetTextDelta().GetStreamType())
+	assert.Equal(t, "hello from runtime", textDelta.GetTextDelta().GetContent())
 
 	result := msgs[4].GetResult()
 	require.NotNil(t, result)
@@ -164,8 +161,8 @@ func TestDrainOutputSendsProgressAndSynthesizedEvent(t *testing.T) {
 	require.NotNil(t, textDelta)
 	assert.Equal(t, v1pb.CommandEventType_TEXT_DELTA, textDelta.Type)
 	assert.Equal(t, "remaining output", textDelta.Summary)
-	assert.Equal(t, "STDERR", textDelta.Payload.AsMap()["stream_type"])
-	assert.Equal(t, "remaining output", textDelta.Payload.AsMap()["content"])
+	assert.Equal(t, "STDERR", textDelta.GetTextDelta().GetStreamType())
+	assert.Equal(t, "remaining output", textDelta.GetTextDelta().GetContent())
 	assert.True(t, recorder.closed.Load())
 }
 
