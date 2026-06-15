@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -19,7 +20,52 @@ import (
 const (
 	cmdPingInterval = 15 * time.Second
 	cmdPingTimeout  = 5 * time.Second
+
+	mergedTextDeltaFlushBytes = 4096
 )
+
+type mergedText struct {
+	builder    strings.Builder
+	streamType v1pb.CommandOutput_StreamType
+	started    bool
+}
+
+func (m *mergedText) append(streamType v1pb.CommandOutput_StreamType, text string) bool {
+	if !m.started {
+		m.started = true
+		m.streamType = streamType
+	}
+	if streamType != m.streamType {
+		return true
+	}
+	_, _ = m.builder.WriteString(text)
+	return m.builder.Len() >= mergedTextDeltaFlushBytes
+}
+
+func (m *mergedText) flush(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], commandID string, state *executor.LocalState) error {
+	if !m.started {
+		return nil
+	}
+	text := m.builder.String()
+	m.builder.Reset()
+	m.started = false
+	if text == "" {
+		return nil
+	}
+	event := executor.Event{
+		SeqNo:      nextEventSeq(state),
+		Type:       v1pb.CommandEventType_TEXT_DELTA,
+		Summary:    text,
+		Text:       text,
+		StreamType: m.streamType,
+		Timestamp:  time.Now(),
+		Payload: map[string]any{
+			"stream_type": m.streamType.String(),
+			"content":     text,
+		},
+	}
+	return sendCommandEvent(stream, commandID, &event)
+}
 
 type commandStream struct {
 	client     v1connect.AgentCommandServiceClient
@@ -119,6 +165,7 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 						CommandId:    req.CommandId,
 						ExitCode:     -1,
 						ErrorMessage: err.Error(),
+						LastSeqNo:    -1,
 					}); sendErr != nil {
 						errCh <- sendErr
 					}
@@ -188,6 +235,21 @@ func (*commandStream) runCommand(
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 	}
 
+	resultSent := false
+	defer func() {
+		if resultSent {
+			return
+		}
+		runtime.Cancel()
+		_ = executor.ClearLocalState()
+		_ = sendCommandResult(stream, &v1pb.CommandResult{
+			CommandId:    commandID,
+			ExitCode:     -1,
+			ErrorMessage: "agent stream send failure",
+			LastSeqNo:    state.LastSeqSent,
+		})
+	}()
+
 	runtime.Start()
 	startSeq := nextEventSeq(state)
 	if err := sendCommandEvent(stream, commandID, &executor.Event{
@@ -201,27 +263,32 @@ func (*commandStream) runCommand(
 		},
 	}); err != nil {
 		slog.Error("failed to send command start event", "commandID", commandID, "error", err)
-		runtime.Cancel()
 		return
 	}
 	if err := executor.SaveLocalState(state); err != nil {
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 	}
 
+	var merged mergedText
+
 	for {
 		select {
 		case <-ctx.Done():
-			runtime.Cancel()
 			return
 
 		case <-runtime.Done():
+			_ = merged.flush(stream, commandID, state)
+
 			// Drain any remaining output chunks before reading the result.
-			lastSeqNo, lastEventSeqNo := drainOutput(runtime, stream, commandID, state.LastSeqSent, state.LastEventSeqSent)
+			lastSeqNo, lastEventSeqNo := drainOutput(runtime, stream, commandID, state.LastSeqSent, state.LastEventSeqSent, &merged)
 			state.LastSeqSent = lastSeqNo
 			state.LastEventSeqSent = lastEventSeqNo
 
+			_ = merged.flush(stream, commandID, state)
+
 			result := <-runtime.ResultChannel()
 			result.LastSeqNo = state.LastSeqSent
+			resultSent = true
 			if err := sendCommandResult(stream, &v1pb.CommandResult{
 				CommandId:    commandID,
 				ExitCode:     result.ExitCode,
@@ -245,7 +312,6 @@ func (*commandStream) runCommand(
 			event.SeqNo = nextEventSeq(state)
 			if err := sendCommandEvent(stream, commandID, &event); err != nil {
 				slog.Error("failed to send command event", "commandID", commandID, "error", err)
-				runtime.Cancel()
 				return
 			}
 			if err := executor.SaveLocalState(state); err != nil {
@@ -258,27 +324,16 @@ func (*commandStream) runCommand(
 			}
 			if err := sendCommandProgress(stream, commandID, chunk); err != nil {
 				slog.Error("failed to send command progress", "commandID", commandID, "error", err)
-				runtime.Cancel()
 				return
 			}
 			state.LastSeqSent = maxSeq(state.LastSeqSent, chunk.SeqNo)
 
-			event := executor.Event{
-				SeqNo:      nextEventSeq(state),
-				Type:       v1pb.CommandEventType_TEXT_DELTA,
-				Summary:    chunk.Content,
-				Text:       chunk.Content,
-				StreamType: chunk.StreamType,
-				Timestamp:  time.Now(),
-				Payload: map[string]any{
-					"stream_type": chunk.StreamType.String(),
-					"content":     chunk.Content,
-				},
-			}
-			if err := sendCommandEvent(stream, commandID, &event); err != nil {
-				slog.Error("failed to send synthesized text event", "commandID", commandID, "error", err)
-				runtime.Cancel()
-				return
+			if merged.append(chunk.StreamType, chunk.Content) {
+				if err := merged.flush(stream, commandID, state); err != nil {
+					slog.Error("failed to send merged text delta", "commandID", commandID, "error", err)
+					return
+				}
+				_ = merged.append(chunk.StreamType, chunk.Content)
 			}
 			if err := executor.SaveLocalState(state); err != nil {
 				slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
@@ -287,11 +342,12 @@ func (*commandStream) runCommand(
 	}
 }
 
-func drainOutput(runtime executor.Runtime, stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], commandID string, lastSeqNo int32, lastEventSeqNo int32) (int32, int32) {
+func drainOutput(runtime executor.Runtime, stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], commandID string, lastSeqNo int32, lastEventSeqNo int32, merged *mergedText) (int32, int32) {
 	for {
 		select {
 		case chunk, ok := <-runtime.OutputChannel():
 			if !ok {
+				_ = merged.flush(stream, commandID, &executor.LocalState{LastEventSeqSent: lastEventSeqNo})
 				return lastSeqNo, lastEventSeqNo
 			}
 			if err := sendCommandProgress(stream, commandID, chunk); err != nil {
@@ -300,23 +356,10 @@ func drainOutput(runtime executor.Runtime, stream *connect.BidiStreamForClient[v
 			}
 			lastSeqNo = maxSeq(lastSeqNo, chunk.SeqNo)
 
-			event := executor.Event{
-				SeqNo:      lastEventSeqNo + 1,
-				Type:       v1pb.CommandEventType_TEXT_DELTA,
-				Summary:    chunk.Content,
-				Text:       chunk.Content,
-				StreamType: chunk.StreamType,
-				Timestamp:  time.Now(),
-				Payload: map[string]any{
-					"stream_type": chunk.StreamType.String(),
-					"content":     chunk.Content,
-				},
+			if merged.append(chunk.StreamType, chunk.Content) {
+				_ = merged.flush(stream, commandID, &executor.LocalState{})
+				_ = merged.append(chunk.StreamType, chunk.Content)
 			}
-			if err := sendCommandEvent(stream, commandID, &event); err != nil {
-				slog.Error("failed to send synthesized text event", "commandID", commandID, "error", err)
-				return lastSeqNo, lastEventSeqNo
-			}
-			lastEventSeqNo = event.SeqNo
 		default:
 			return lastSeqNo, lastEventSeqNo
 		}

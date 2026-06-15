@@ -15,6 +15,7 @@ const (
 	defaultACPMaxTimeoutSeconds = 1800
 	defaultACPMaxEventCount     = 10000
 	defaultACPMaxOutputBytes    = 1 << 20
+	defaultOutputFlushBytes     = 4096
 )
 
 type ACPConfig struct {
@@ -22,6 +23,7 @@ type ACPConfig struct {
 	MaxTimeoutSeconds int32                 `yaml:"max_timeout_seconds"`
 	MaxEventCount     int32                 `yaml:"max_event_count"`
 	MaxOutputBytes    int64                 `yaml:"max_output_bytes"`
+	OutputFlushBytes  int32                 `yaml:"output_flush_bytes"`
 	Profiles          map[string]ACPProfile `yaml:"profiles"`
 }
 
@@ -74,6 +76,9 @@ func LoadACPConfig(path string) (*ACPConfig, error) {
 	}
 	if cfg.MaxOutputBytes <= 0 {
 		cfg.MaxOutputBytes = defaultACPMaxOutputBytes
+	}
+	if cfg.OutputFlushBytes <= 0 {
+		cfg.OutputFlushBytes = defaultOutputFlushBytes
 	}
 	if cfg.DefaultProfile == "" {
 		profiles := cfg.AvailableProfiles()

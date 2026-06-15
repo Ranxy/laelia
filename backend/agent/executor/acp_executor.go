@@ -22,6 +22,137 @@ import (
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
+const flushOutputInterval = 500 * time.Millisecond
+const maxRawEventBatchSize = 256
+
+type outputBuffer struct {
+	mu        sync.Mutex
+	stdout    strings.Builder
+	system    strings.Builder
+	order     []v1pb.CommandOutput_StreamType
+	lastFlush time.Time
+}
+
+func (b *outputBuffer) append(streamType v1pb.CommandOutput_StreamType, text string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	switch streamType {
+	case v1pb.CommandOutput_STDOUT:
+		if b.stdout.Len() == 0 {
+			b.order = append(b.order, streamType)
+		}
+		_, _ = b.stdout.WriteString(text)
+	case v1pb.CommandOutput_SYSTEM:
+		if b.system.Len() == 0 {
+			b.order = append(b.order, streamType)
+		}
+		_, _ = b.system.WriteString(text)
+	default:
+	}
+}
+
+func (b *outputBuffer) totalLen() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.stdout.Len() + b.system.Len()
+}
+
+func (b *outputBuffer) flush(e *ACPExecutor) {
+	b.mu.Lock()
+	stdout := b.stdout.String()
+	b.stdout.Reset()
+	system := b.system.String()
+	b.system.Reset()
+	order := b.order
+	b.order = b.order[:0]
+	b.lastFlush = time.Now()
+	b.mu.Unlock()
+
+	for _, st := range order {
+		switch st {
+		case v1pb.CommandOutput_STDOUT:
+			if stdout != "" {
+				e.sendOutput(v1pb.CommandOutput_STDOUT, stdout)
+				stdout = ""
+			}
+		case v1pb.CommandOutput_SYSTEM:
+			if system != "" {
+				e.sendOutput(v1pb.CommandOutput_SYSTEM, system)
+				system = ""
+			}
+		default:
+		}
+	}
+}
+
+func (b *outputBuffer) hasContent() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.stdout.Len() > 0 || b.system.Len() > 0
+}
+
+type rawEventBatch struct {
+	mu      sync.Mutex
+	summary string
+	chunks  []map[string]any
+}
+
+func (b *rawEventBatch) append(e *ACPExecutor, summary string, payload map[string]any) {
+	if summary == "" || payload == nil {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.summary != "" && b.summary != summary {
+		b.flushLocked(e)
+	}
+	b.summary = summary
+	b.chunks = append(b.chunks, payload)
+	if len(b.chunks) >= maxRawEventBatchSize {
+		b.flushLocked(e)
+	}
+}
+
+func (b *rawEventBatch) flush(e *ACPExecutor) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.flushLocked(e)
+}
+
+func (b *rawEventBatch) flushLocked(e *ACPExecutor) {
+	if len(b.chunks) == 0 {
+		b.summary = ""
+		return
+	}
+	if e.profile.SupportsRawEvents {
+		payload := b.buildPayload()
+		if payload != nil {
+			e.sendEvent(Event{
+				Type:      v1pb.CommandEventType_RAW_ACP,
+				Summary:   b.summary,
+				Timestamp: time.Now(),
+				Payload:   payload,
+			})
+		}
+	}
+	b.summary = ""
+	b.chunks = b.chunks[:0]
+}
+
+func (b *rawEventBatch) buildPayload() map[string]any {
+	if len(b.chunks) == 1 {
+		return b.chunks[0]
+	}
+	events := make([]any, len(b.chunks))
+	for i, chunk := range b.chunks {
+		events[i] = chunk
+	}
+	return map[string]any{
+		"batch_size": len(b.chunks),
+		"events":     events,
+	}
+}
+
 type ACPExecutor struct {
 	ctx              context.Context
 	cancel           context.CancelFunc
@@ -50,6 +181,8 @@ type ACPExecutor struct {
 	warnMu           sync.Mutex
 	sessionID        string
 	initializedAgent string
+	buffer           outputBuffer
+	rawEvents        rawEventBatch
 }
 
 type acpRuntimeClient struct {
@@ -166,6 +299,7 @@ func (e *ACPExecutor) run() {
 
 	e.conn = acp.NewClientSideConnection(e.client, stdin, stdout)
 	go e.scanACPStderr(stderr)
+	go e.startFlushTimer()
 
 	initResp, err := e.conn.Initialize(e.ctx, acp.InitializeRequest{
 		ProtocolVersion: acp.ProtocolVersionNumber,
@@ -214,6 +348,9 @@ func (e *ACPExecutor) run() {
 	_ = e.cmd.Process.Kill()
 	_ = e.cmd.Wait()
 
+	e.buffer.flush(e)
+	e.rawEvents.flush(e)
+
 	finalSummary := strings.TrimSpace(e.client.finalSummary())
 	if finalSummary == "" {
 		finalSummary = fmt.Sprintf("ACP task finished with stop reason %s", promptResp.StopReason)
@@ -254,6 +391,8 @@ func (e *ACPExecutor) finishACPProcess(err error) {
 		_ = e.cmd.Process.Kill()
 	}
 	_ = e.cmd.Wait()
+	e.buffer.flush(e)
+	e.rawEvents.flush(e)
 	if errors.Is(e.ctx.Err(), context.DeadlineExceeded) {
 		e.sendACPResult(Result{ExitCode: 124, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: e.ctx.Err().Error()})
 		return
@@ -295,6 +434,27 @@ func (e *ACPExecutor) sendOutput(streamType v1pb.CommandOutput_StreamType, conte
 		return
 	}
 	e.outputCh <- OutputChunk{StreamType: streamType, Content: allowed, SeqNo: e.nextSeq()}
+}
+
+func (e *ACPExecutor) startFlushTimer() {
+	ticker := time.NewTicker(flushOutputInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if e.buffer.hasContent() {
+				e.buffer.flush(e)
+			}
+		case <-e.ctx.Done():
+			return
+		}
+	}
+}
+
+func (e *ACPExecutor) flushIfNeeded() {
+	if e.buffer.totalLen() >= int(e.config.OutputFlushBytes) {
+		e.buffer.flush(e)
+	}
 }
 
 func (e *ACPExecutor) sendEvent(event Event) {
@@ -400,19 +560,21 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 	case u.AgentMessageChunk != nil:
 		text := contentBlockText(u.AgentMessageChunk.Content)
 		c.executor.client.appendSummary(text)
-		c.executor.sendOutput(v1pb.CommandOutput_STDOUT, text)
-		if c.executor.profile.SupportsRawEvents {
-			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_RAW_ACP, Summary: "agent_message_chunk", Timestamp: time.Now(), Payload: toJSONMap(u.AgentMessageChunk)})
+		if text != "" {
+			c.executor.buffer.append(v1pb.CommandOutput_STDOUT, text)
+			c.executor.flushIfNeeded()
 		}
+		c.executor.rawEvents.append(c.executor, "agent_message_chunk", toJSONMap(u.AgentMessageChunk))
 	case u.AgentThoughtChunk != nil:
 		text := contentBlockText(u.AgentThoughtChunk.Content)
 		if text != "" {
-			c.executor.sendOutput(v1pb.CommandOutput_SYSTEM, "[thought] "+text)
+			c.executor.buffer.append(v1pb.CommandOutput_SYSTEM, text)
+			c.executor.flushIfNeeded()
 		}
-		if c.executor.profile.SupportsRawEvents {
-			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_RAW_ACP, Summary: "agent_thought_chunk", Timestamp: time.Now(), Payload: toJSONMap(u.AgentThoughtChunk)})
-		}
+		c.executor.rawEvents.append(c.executor, "agent_thought_chunk", toJSONMap(u.AgentThoughtChunk))
 	case u.ToolCall != nil:
+		c.executor.buffer.flush(c.executor)
+		c.executor.rawEvents.flush(c.executor)
 		c.executor.toolCallCount.Add(1)
 		if c.executor.profile.SupportsToolTraces {
 			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_TOOL_CALL_STARTED, Summary: u.ToolCall.Title, Timestamp: time.Now(), Payload: toolCallPayload(u.ToolCall)})
@@ -421,30 +583,34 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 		for _, content := range u.ToolCallUpdate.Content {
 			if content.Content != nil {
 				text := contentBlockText(content.Content.Content)
-				c.executor.sendOutput(v1pb.CommandOutput_SYSTEM, text)
+				if text != "" {
+					c.executor.buffer.append(v1pb.CommandOutput_SYSTEM, text)
+					c.executor.flushIfNeeded()
+				}
 			}
 			if content.Diff != nil && c.executor.request.AllowDiff && c.executor.profile.SupportsDiff {
 				c.executor.sendEvent(Event{Type: v1pb.CommandEventType_DIFF_EMITTED, Summary: content.Diff.Path, Timestamp: time.Now(), Payload: toJSONMap(content.Diff)})
 			}
 		}
+		if u.ToolCallUpdate.Status != nil {
+			c.executor.rawEvents.append(c.executor, "tool_call_update", toJSONMap(u.ToolCallUpdate))
+		}
 		if c.executor.profile.SupportsToolTraces && u.ToolCallUpdate.Status != nil {
 			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_TOOL_CALL_FINISHED, Summary: string(*u.ToolCallUpdate.Status), Timestamp: time.Now(), Payload: toolCallUpdatePayload(u.ToolCallUpdate)})
-		} else if c.executor.profile.SupportsRawEvents {
-			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_RAW_ACP, Summary: "tool_call_update", Timestamp: time.Now(), Payload: toJSONMap(u.ToolCallUpdate)})
 		}
 	case u.Plan != nil:
-		if c.executor.profile.SupportsRawEvents {
-			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_RAW_ACP, Summary: "plan", Timestamp: time.Now(), Payload: toJSONMap(u.Plan)})
-		}
+		c.executor.buffer.flush(c.executor)
+		c.executor.rawEvents.flush(c.executor)
+		c.executor.rawEvents.append(c.executor, "plan", toJSONMap(u.Plan))
+		c.executor.rawEvents.flush(c.executor)
 	case u.UsageUpdate != nil:
+		c.executor.buffer.flush(c.executor)
+		c.executor.rawEvents.flush(c.executor)
 		c.executor.lastUsage.Store(toJSONMap(u.UsageUpdate))
-		if c.executor.profile.SupportsRawEvents {
-			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_RAW_ACP, Summary: "usage", Timestamp: time.Now(), Payload: toJSONMap(u.UsageUpdate)})
-		}
+		c.executor.rawEvents.append(c.executor, "usage", toJSONMap(u.UsageUpdate))
+		c.executor.rawEvents.flush(c.executor)
 	default:
-		if c.executor.profile.SupportsRawEvents {
-			c.executor.sendEvent(Event{Type: v1pb.CommandEventType_RAW_ACP, Summary: "session_update", Timestamp: time.Now(), Payload: toJSONMap(u)})
-		}
+		c.executor.rawEvents.append(c.executor, "session_update", toJSONMap(u))
 	}
 	return nil
 }

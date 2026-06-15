@@ -100,20 +100,18 @@ func TestCommandStreamRunCommandSendsProgressEventAndResult(t *testing.T) {
 	assert.Equal(t, "hello from runtime", progress.Content)
 	assert.Equal(t, int32(7), progress.SeqNo)
 
-	textDelta := msgs[2].GetEvent()
+	warning := msgs[2].GetEvent()
+	require.NotNil(t, warning)
+	assert.Equal(t, v1pb.CommandEventType_WARNING, warning.Type)
+	assert.Equal(t, "tool warning", warning.Summary)
+	assert.Equal(t, "warn-1", warning.Payload.AsMap()["code"])
+
+	textDelta := msgs[3].GetEvent()
 	require.NotNil(t, textDelta)
-	assert.Equal(t, int32(2), textDelta.SeqNo)
 	assert.Equal(t, v1pb.CommandEventType_TEXT_DELTA, textDelta.Type)
 	assert.Equal(t, "hello from runtime", textDelta.Summary)
 	assert.Equal(t, "STDOUT", textDelta.Payload.AsMap()["stream_type"])
 	assert.Equal(t, "hello from runtime", textDelta.Payload.AsMap()["content"])
-
-	warning := msgs[3].GetEvent()
-	require.NotNil(t, warning)
-	assert.Equal(t, int32(3), warning.SeqNo)
-	assert.Equal(t, v1pb.CommandEventType_WARNING, warning.Type)
-	assert.Equal(t, "tool warning", warning.Summary)
-	assert.Equal(t, "warn-1", warning.Payload.AsMap()["code"])
 
 	result := msgs[4].GetResult()
 	require.NotNil(t, result)
@@ -146,9 +144,9 @@ func TestDrainOutputSendsProgressAndSynthesizedEvent(t *testing.T) {
 	}
 	close(runtime.outputCh)
 
-	lastSeqNo, lastEventSeqNo := drainOutput(runtime, stream, "cmd-2", 4, 6)
+	lastSeqNo, lastEventSeqNo := drainOutput(runtime, stream, "cmd-2", 4, 6, &mergedText{})
 	assert.Equal(t, int32(9), lastSeqNo)
-	assert.Equal(t, int32(7), lastEventSeqNo)
+	assert.Equal(t, int32(6), lastEventSeqNo)
 
 	require.NoError(t, stream.CloseRequest())
 
@@ -164,7 +162,6 @@ func TestDrainOutputSendsProgressAndSynthesizedEvent(t *testing.T) {
 
 	textDelta := msgs[1].GetEvent()
 	require.NotNil(t, textDelta)
-	assert.Equal(t, int32(7), textDelta.SeqNo)
 	assert.Equal(t, v1pb.CommandEventType_TEXT_DELTA, textDelta.Type)
 	assert.Equal(t, "remaining output", textDelta.Summary)
 	assert.Equal(t, "STDERR", textDelta.Payload.AsMap()["stream_type"])

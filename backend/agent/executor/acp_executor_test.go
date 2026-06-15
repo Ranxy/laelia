@@ -85,6 +85,145 @@ func TestACPSessionUpdateEmitsDiffEvent(t *testing.T) {
 	assert.Contains(t, eventTypes, v1pb.CommandEventType_TOOL_CALL_FINISHED)
 }
 
+func TestACPSessionUpdateBuffersConsecutiveMessageChunks(t *testing.T) {
+	exec := newTestBufferedExecutor()
+	exec.profile.SupportsRawEvents = true
+	client := &acpRuntimeClient{executor: exec}
+
+	for i := 0; i < 5; i++ {
+		err := client.SessionUpdate(context.Background(), acp.SessionNotification{
+			Update: acp.SessionUpdate{
+				AgentMessageChunk: &acp.SessionUpdateAgentMessageChunk{
+					Content: acp.TextBlock("chunk " + fmt.Sprintf("%d", i)),
+				},
+			},
+		})
+		require.NoError(t, err)
+	}
+
+	assert.Empty(t, exec.outputCh, "consecutive message chunks should be buffered in output")
+
+	exec.buffer.flush(exec)
+	assert.NotEmpty(t, exec.outputCh)
+	output := <-exec.outputCh
+	assert.Equal(t, v1pb.CommandOutput_STDOUT, output.StreamType)
+	assert.Contains(t, output.Content, "chunk 0")
+	assert.Contains(t, output.Content, "chunk 4")
+	assert.Empty(t, exec.outputCh, "only one output after flush")
+
+	exec.rawEvents.flush(exec)
+	assert.NotEmpty(t, exec.eventCh)
+	ev := <-exec.eventCh
+	assert.Equal(t, v1pb.CommandEventType_RAW_ACP, ev.Type)
+	assert.Equal(t, "agent_message_chunk", ev.Summary)
+	payload := ev.Payload
+	assert.NotNil(t, payload)
+	assert.Equal(t, 5, payload["batch_size"])
+	events, ok := payload["events"].([]any)
+	require.True(t, ok, "events should be a slice")
+	assert.Len(t, events, 5)
+}
+
+func TestACPSessionUpdateBatchesRawEventsAcrossBoundaries(t *testing.T) {
+	exec := newTestBufferedExecutor()
+	exec.profile.SupportsRawEvents = true
+	client := &acpRuntimeClient{executor: exec}
+
+	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
+		Update: acp.SessionUpdate{
+			AgentMessageChunk: &acp.SessionUpdateAgentMessageChunk{
+				Content: acp.TextBlock("hello"),
+			},
+		},
+	}))
+
+	kind := acp.ToolKindRead
+	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
+		Update: acp.SessionUpdate{
+			ToolCall: &acp.SessionUpdateToolCall{
+				Title: "Read",
+				Kind:  kind,
+			},
+		},
+	}))
+
+	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
+		Update: acp.SessionUpdate{
+			AgentMessageChunk: &acp.SessionUpdateAgentMessageChunk{
+				Content: acp.TextBlock("world"),
+			},
+		},
+	}))
+
+	exec.buffer.flush(exec)
+	exec.rawEvents.flush(exec)
+
+	var rawEvents []Event
+	for len(exec.eventCh) > 0 {
+		ev := <-exec.eventCh
+		if ev.Type == v1pb.CommandEventType_RAW_ACP {
+			rawEvents = append(rawEvents, ev)
+		}
+	}
+
+	assert.Len(t, rawEvents, 2, "should have 2 batched raw events (message batch + tool_call boundary flushes, then new message batch)")
+}
+
+func TestACPSessionUpdateFlushesOnToolCallBoundary(t *testing.T) {
+	exec := newTestBufferedExecutor()
+	client := &acpRuntimeClient{executor: exec}
+
+	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
+		Update: acp.SessionUpdate{
+			AgentMessageChunk: &acp.SessionUpdateAgentMessageChunk{
+				Content: acp.TextBlock("hello"),
+			},
+		},
+	}))
+
+	assert.Empty(t, exec.outputCh, "should be buffered before tool call")
+
+	kind := acp.ToolKindRead
+	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
+		Update: acp.SessionUpdate{
+			ToolCall: &acp.SessionUpdateToolCall{
+				Title: "Read",
+				Kind:  kind,
+			},
+		},
+	}))
+
+	assert.NotEmpty(t, exec.outputCh)
+	output := <-exec.outputCh
+	assert.Equal(t, v1pb.CommandOutput_STDOUT, output.StreamType)
+	assert.Equal(t, "hello", output.Content)
+}
+
+func TestACPSessionUpdateFlushesOnSizeThreshold(t *testing.T) {
+	exec := newTestBufferedExecutor()
+	exec.config.OutputFlushBytes = 20
+	client := &acpRuntimeClient{executor: exec}
+
+	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
+		Update: acp.SessionUpdate{
+			AgentMessageChunk: &acp.SessionUpdateAgentMessageChunk{
+				Content: acp.TextBlock("short"),
+			},
+		},
+	}))
+	assert.Empty(t, exec.outputCh)
+
+	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
+		Update: acp.SessionUpdate{
+			AgentMessageChunk: &acp.SessionUpdateAgentMessageChunk{
+				Content: acp.TextBlock(" this is more text to exceed byte threshold"),
+			},
+		},
+	}))
+
+	assert.NotEmpty(t, exec.outputCh)
+}
+
 func TestACPExecutorWithOpencodeReadFile(t *testing.T) {
 	bin := requireOpencodeACP(t)
 	workspace := t.TempDir()
@@ -290,4 +429,14 @@ func joinOutput(chunks []OutputChunk) string {
 
 func compactText(input string) string {
 	return strings.Join(strings.Fields(input), "")
+}
+
+func newTestBufferedExecutor() *ACPExecutor {
+	e := &ACPExecutor{
+		config:   &ACPConfig{OutputFlushBytes: defaultOutputFlushBytes, MaxEventCount: 10},
+		outputCh: make(chan OutputChunk, 16),
+		eventCh:  make(chan Event, 16),
+	}
+	e.client = &acpRuntimeClient{executor: e}
+	return e
 }
