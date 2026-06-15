@@ -46,6 +46,7 @@ type ACPExecutor struct {
 	outputLimited    atomic.Bool
 	eventLimitHit    atomic.Bool
 	lastUsage        atomic.Value
+	summaryText      string
 	warnMu           sync.Mutex
 	sessionID        string
 	initializedAgent string
@@ -480,16 +481,7 @@ func (c *acpRuntimeClient) appendSummary(text string) {
 	}
 	c.executor.warnMu.Lock()
 	defer c.executor.warnMu.Unlock()
-	current := c.executor.lastUsageMapLocked()
-	if current == nil {
-		current = map[string]any{}
-	}
-	buffer := ""
-	if raw, ok := current["agent_text"]; ok {
-		if value, ok := raw.(string); ok {
-			buffer = value
-		}
-	}
+	buffer := c.executor.summaryText
 	if len(buffer) >= 8192 {
 		return
 	}
@@ -497,40 +489,13 @@ func (c *acpRuntimeClient) appendSummary(text string) {
 		buffer += "\n"
 	}
 	buffer += trimmed
-	current["agent_text"] = buffer
-	c.executor.lastUsage.Store(current)
+	c.executor.summaryText = buffer
 }
 
 func (c *acpRuntimeClient) finalSummary() string {
 	c.executor.warnMu.Lock()
 	defer c.executor.warnMu.Unlock()
-	current := c.executor.lastUsageMapLocked()
-	if current == nil {
-		return ""
-	}
-	summary := ""
-	if raw, ok := current["agent_text"]; ok {
-		if value, ok := raw.(string); ok {
-			summary = value
-		}
-	}
-	return summary
-}
-
-func (e *ACPExecutor) lastUsageMapLocked() map[string]any {
-	loaded := e.lastUsage.Load()
-	if loaded == nil {
-		return nil
-	}
-	current, ok := loaded.(map[string]any)
-	if !ok {
-		return nil
-	}
-	clone := make(map[string]any, len(current))
-	for key, value := range current {
-		clone[key] = value
-	}
-	return clone
+	return c.executor.summaryText
 }
 
 func (e *ACPExecutor) validatePath(path string, enabled bool) (string, error) {
