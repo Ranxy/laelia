@@ -240,6 +240,11 @@ func (*commandStream) runCommand(
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 	}
 
+	var mergedTextBuf mergedText
+	defer func() {
+		_ = mergedTextBuf.flush(stream, commandID, state)
+	}()
+
 	resultSent := false
 	defer func() {
 		if resultSent {
