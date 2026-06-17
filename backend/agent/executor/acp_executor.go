@@ -1021,9 +1021,11 @@ func (e *ACPExecutor) buildMCPServers() []acp.McpServer {
 
 	return []acp.McpServer{{
 		Http: &acp.McpServerHttpInline{
-			Type: "http",
-			Name: "laelia-chat",
-			Url:  url,
+			Type:    "http",
+			Name:    "laelia-chat",
+			Url:     url,
+			Headers: []acp.HttpHeader{},
+			Meta:    map[string]any{},
 		},
 	}}
 }

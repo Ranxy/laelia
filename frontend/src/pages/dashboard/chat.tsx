@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
 import { Badge } from "@/react/components/ui/badge";
 import { Button } from "@/react/components/ui/button";
 import { Input } from "@/react/components/ui/input";
 import { useAppStore } from "@/react/stores";
 import type { ChatMessage } from "@/react/stores/types";
 import { CommandStatus } from "@/types/proto-es/v1/command_pb";
-import { useShallow } from "zustand/react/shallow";
 
 const statusLabels: Record<number, string> = {
   [CommandStatus.PENDING]: "Pending",
