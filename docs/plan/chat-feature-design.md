@@ -4,18 +4,20 @@
 
 Add a real-time chat interface allowing users to converse directly with agents. Modeled after instant messaging UX (e.g. Feishu/Lark). The agent processes messages via its ACP-backed LLM and returns only the final answer in the chat UI. All intermediate reasoning, tool calls, and events are persisted for audit/debug in the existing command detail views.
 
-This design reuses the existing **command** model, extending it with a `source_type` discriminator (`MANUAL` vs `CHAT`), and injects custom MCP tools into each ACP session so the LLM can actively search chat history and recall full execution context.
+This design introduces a dedicated **`chat_message`** table, decoupling chat messages from the `command` table. Each assistant message links back to its originating `command` for traceability. Custom MCP tools are injected into each ACP session so the LLM can actively search chat history and recall full execution context.
 
 ### Key Design Decisions
 
 | Decision | Rationale |
 |---|---|
-| Reuse `command` table as chat message store | Commands already capture instruction, final_summary, outputs, events, and are keyed by agent+principal — a natural fit |
-| `source_type` enum on `command` | Cleanly separates manual CLI commands from chat messages; all unified in command history views |
-| Inject N recent messages as prompt context | Provides LLM with conversation continuity without modifying the ACP protocol |
-| Embed MCP Server in Laelia Agent (localhost HTTP) | The ACP protocol natively supports `mcpServers` in `session/new`. Embedding avoids a separate binary; localhost-only needs no auth |
-| Two MCP tools: `search_chat_history` + `get_command_context` | Gives the LLM agency to dig into history and recall prior "thinking" on demand |
-| Group chat reserved but not implemented | `conversation` + `conversation_member` tables created as schema-only; `command.conversation_id` nullable FK |
+| Dedicated `chat_message` table, not reused `command` | The `command` table carries 22+ fields (exit code, env, working dir, etc.) irrelevant to chat. A dedicated table provides clean separation: `chat_message` for conversation UI, `command` for execution artifacts. |
+| `conversation` table with `agent_id` | One conversation per (agent, principal) pair for direct chat. Grows into group chat via `conversation_member` in the future. |
+| `chat_message.command_id` nullable FK | Only ASSISTANT messages reference their originating command. USER messages have no command. This provides traceability without forcing every message through the command lifecycle. |
+| Assistant message created in `Dispatcher.HandleResult` | The single point where command completion is processed. Uses `command.source_type` and `command.conversation_id` to decide whether to create a chat_message. |
+| Lightweight context injection (3–5 recent rounds) + MCP tool hint | Gives the LLM enough context for continuity without overwhelming it. Older history is available on-demand via `search_chat_history` MCP tool. |
+| `SearchChatHistory` queries `chat_message` via `conversation` JOIN | Clean role-based results; no more heuristic detection of user vs assistant from instruction/final_summary. |
+| Embed MCP Server in Laelia Agent (localhost HTTP) | The ACP protocol natively supports `mcpServers` in `session/new`. Embedding avoids a separate binary; localhost-only needs no auth. |
+| Two MCP tools: `search_chat_history` + `get_command_context` | Gives the LLM agency to dig into history and recall prior "thinking" on demand. |
 
 ---
 
@@ -23,32 +25,42 @@ This design reuses the existing **command** model, extending it with a `source_t
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ Frontend (Vue.js / React)                                         │
-│  /agents/:id/chat                                                 │
-│  ┌─────────────┐   POST /v1/agents/*/commands (source=CHAT)       │
+│ Frontend (React)                                                   │
+│  /agents/:id/chat                                                  │
+│  ┌─────────────┐   POST /v1/agents/*/conversations                │
 │  │ Chat UI     │────────────────────────────────────────────────► │
-│  │ (messages,  │                                                  │
-│  │  input box, │  WatchCommand (streaming final reply)            │
-│  │  queue      │◄─────────────────────────────────────────────────│
-│  │  indicator) │                                                  │
-│  └─────────────┘                                                  │
+│  │ (messages,  │   GET  /v1/conversations/*/messages              │
+│  │  input box, │◄─────────────────────────────────────────────────│
+│  │  queue      │                                                  │
+│  │  indicator) │   POST /v1/agents/*/commands (source=CHAT)       │
+│  └─────────────┘────────────────────────────────────────────────► │
+│                  │  WatchCommand (streaming progress)              │
+│                  ◄─────────────────────────────────────────────────│
 └──────────────────────────────────────────────────────────────────┘
                                      │
                                      ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │ Laelia Manager                                                    │
-│  ┌──────────────┐   ┌─────────────────────────┐                   │
-│  │ SendCommand  │   │ SearchChatHistory       │  (new RPCs)       │
-│  │  - injects   │   │ GetCommandContext        │                   │
-│  │    recent N  │   └───────────┬─────────────┘                   │
-│  │    history   │               │                                  │
-│  └──────┬───────┘               │ gRPC                             │
-│         │                       │                                  │
-│  ┌──────▼───────────────────────▼──┐                               │
-│  │ Store (PostgreSQL)              │                               │
-│  │  command, command_output,       │                               │
-│  │  command_event, conversation    │                               │
-│  └─────────────────────────────────┘                               │
+│  ┌───────────────────┐  ┌────────────────────────────────────┐    │
+│  │ SendCommand       │  │ GetOrCreateConversation            │    │
+│  │  - creates conv   │  │ ListConversationMessages           │    │
+│  │  - creates user   │  │ SearchChatHistory                  │    │
+│  │    chat_message   │  │ GetCommandContext                  │    │
+│  │  - light context  │  └──────────────┬─────────────────────┘    │
+│  │    injection      │                 │                            │
+│  └────────┬──────────┘                 │ gRPC                       │
+│           │                            │                            │
+│  ┌────────▼────────────────────────────▼──┐                         │
+│  │ Dispatcher                             │                         │
+│  │  HandleResult: creates assistant       │                         │
+│  │  chat_message on CHAT completion       │                         │
+│  └────────────────────┬───────────────────┘                         │
+│                       │                                            │
+│  ┌────────────────────▼───────────────────┐                         │
+│  │ Store (PostgreSQL)                     │                         │
+│  │  chat_message, conversation,           │                         │
+│  │  command, command_output, command_event│                         │
+│  └────────────────────────────────────────┘                         │
 └──────────────────────────────────────────────────────────────────┘
          │ Bidirectional gRPC Stream (CommandChannel)
          ▼
@@ -82,61 +94,116 @@ This design reuses the existing **command** model, extending it with a `source_t
 ### Data Flow for a Chat Message
 
 ```
-1. User types message in chat UI → POST /v1/agents/{id}/commands (source=CHAT)
-2. Manager receives request:
-   a. Queries recent 20 chat messages for (agent, principal)
-   b. Formats conversation history, appends to instruction
-   c. Creates command row (status=PENDING, source_type=CHAT)
-   d. Dispatches to agent via gRPC stream
-3. Agent receives command:
+1. Frontend loads chat page → POST /v1/agents/{id}/conversations
+   → Creates or finds direct conversation for (agent, principal)
+   → GET /v1/conversations/{conv_id}/messages → renders chat history
+
+2. User types message → POST /v1/agents/{id}/commands (source=CHAT)
+   a. Manager gets/creates conversation via GetOrCreateDirectConversation
+   b. Creates user chat_message (role=USER, conversation_id)
+   c. Loads last 3–5 rounds from chat_message for light context injection
+   d. Creates command row (status=PENDING, source_type=CHAT, conversation_id)
+   e. Dispatches to agent via gRPC stream
+
+3. Agent processes:
    a. buildRuntime sees source_type=CHAT
    b. ACPExecutor sets McpServers with HTTP URL pointing to local MCP server
    c. Starts ACP binary (opencode), creates session with mcpServers config
-   d. Sends Prompt with the enriched instruction (history + user message)
+   d. Sends Prompt with the instruction (light context + user message)
+
 4. opencode processes:
-   a. LLM reads instruction including conversation history
+   a. LLM reads instruction including light conversation context
    b. LLM optionally calls MCP tools to search deeper history or recall context
    c. LLM executes tools, streams progress/events back to manager
-5. Manager persists outputs + events, broadcasts final result
-6. Chat UI receives final_summary via streaming, renders as agent reply
+
+5. Agent sends Result → Dispatcher.HandleResult:
+   a. Loads command to check source_type and conversation_id
+   b. If source_type=CHAT and conversation_id is set and final_summary is present:
+      Creates assistant chat_message (role=ASSISTANT, content=final_summary, command_id)
+   c. Updates command status, broadcasts final result
+
+6. Frontend polls command status, on completion reloads messages from
+   GET /v1/conversations/{conv_id}/messages → renders full updated history
 ```
 
 ---
 
-## 3. Data Model Changes
+## 3. Data Model
 
-### 3.1 command table
-
-```sql
-ALTER TABLE command ADD COLUMN source_type SMALLINT NOT NULL DEFAULT 0;
--- 0=MANUAL, 1=CHAT
-
-ALTER TABLE command ADD COLUMN conversation_id UUID REFERENCES conversation(id);
--- nullable; NULL for direct (1:1) chat, set for group conversations in future
-
-CREATE INDEX idx_command_chat_history
-  ON command(agent_id, principal_id, source_type, created_at DESC)
-  WHERE source_type = 1;
-```
-
-### 3.2 conversation tables (v1: schema only, not used)
+### 3.1 conversation table
 
 ```sql
 CREATE TABLE conversation (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_id INTEGER NOT NULL REFERENCES agent(id),
     title TEXT NOT NULL DEFAULT '',
-    type SMALLINT NOT NULL DEFAULT 1,  -- 1=DIRECT, 2=GROUP
+    type SMALLINT NOT NULL DEFAULT 1,       -- 1=DIRECT, 2=GROUP (future)
     created_by INTEGER NOT NULL REFERENCES principal(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE UNIQUE INDEX idx_conversation_agent_principal
+  ON conversation(agent_id, created_by, type);
+```
+
+One conversation per (agent, principal) pair for direct (`type=1`) chats. The unique index enables `INSERT ... ON CONFLICT DO NOTHING` in `GetOrCreateDirectConversation`.
+
+### 3.2 conversation_member table (future)
+
+```sql
 CREATE TABLE conversation_member (
     conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
-    member_type SMALLINT NOT NULL,  -- 1=USER, 2=AGENT
-    member_id TEXT NOT NULL,         -- principal_id or agent_resource_id
+    member_type SMALLINT NOT NULL,          -- 1=USER, 2=AGENT
+    member_id TEXT NOT NULL,                -- principal_id or agent_resource_id
     PRIMARY KEY (conversation_id, member_type, member_id)
 );
 ```
+
+Schema-only; reserved for group chat. Not used in current direct-chat implementation.
+
+### 3.3 chat_message table
+
+```sql
+CREATE TABLE chat_message (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+    principal_id INTEGER NOT NULL REFERENCES principal(id),
+    role SMALLINT NOT NULL DEFAULT 1,       -- 1=USER, 2=ASSISTANT
+    content TEXT NOT NULL,
+    command_id UUID REFERENCES command(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_chat_message_conversation
+  ON chat_message(conversation_id, created_at);
+
+CREATE INDEX idx_chat_message_command
+  ON chat_message(command_id) WHERE command_id IS NOT NULL;
+```
+
+| Column | Description |
+|---|---|
+| `role` | 1=USER (human message), 2=ASSISTANT (agent reply). Removes heuristic detection. |
+| `content` | Full message text. Equivalent to `instruction` for user, `final_summary` for assistant. |
+| `command_id` | Links assistant messages to their originating command. NULL for user messages. Enables "View details" → command detail drill-down. |
+
+### 3.4 command table
+
+```sql
+-- Relevant columns for chat
+ALTER TABLE command ADD COLUMN source_type SMALLINT NOT NULL DEFAULT 0;
+-- 0=UNSPECIFIED, 1=MANUAL, 2=CHAT
+
+ALTER TABLE command ADD COLUMN conversation_id UUID;
+-- Set by SendCommand when source=CHAT; used by Dispatcher.HandleResult
+-- to know which conversation to write the assistant message into.
+
+CREATE INDEX idx_command_chat_history
+  ON command(agent_id, principal_id, source_type, created_at DESC)
+  WHERE source_type = 2;  -- CHAT
+```
+
+The `command` table retains its full execution detail (outputs, events, exit codes, etc.) but chat history is no longer queried from it. `SearchChatHistory` now joins `chat_message` ↔ `conversation` for role-aware, deduplicated results.
 
 ---
 
@@ -144,7 +211,7 @@ CREATE TABLE conversation_member (
 
 All changes in `proto/v1/v1/command.proto`.
 
-### 4.1 New Enum: CommandSource
+### 4.1 Enums
 
 ```protobuf
 enum CommandSource {
@@ -154,518 +221,367 @@ enum CommandSource {
 }
 ```
 
-### 4.2 Modified Messages
+### 4.2 Chat-specific Messages
 
 ```protobuf
-message Command {
-  // ... existing fields 1-20 ...
-  CommandSource source = 21;
-  string conversation_id = 22;  // reserved for group chat
+message ChatMessage {
+  string name = 1;                    // message ID (UUID)
+  string conversation = 2;            // "conversations/{id}" (resource name)
+  string principal_name = 3;
+  int32 role = 4;                     // 1=USER, 2=ASSISTANT
+  string content = 5;
+  string command_id = 6;              // only set for ASSISTANT messages
+  google.protobuf.Timestamp created_at = 7;
 }
 
-message SendCommandRequest {
-  // ... existing fields 1-8 ...
-  CommandSource source = 9;
-}
-```
-
-### 4.3 New RPCs
-
-```protobuf
-// Search chat history for a given agent+principal pair.
-// Returns matching command records (instruction + final_summary).
-rpc SearchChatHistory(SearchChatHistoryRequest) returns (SearchChatHistoryResponse) {
-    option (google.api.http) = {get: "/v1/{agent=agents/*}/chat-history"};
+message ListConversationMessagesRequest {
+  string conversation = 1 [(google.api.field_behavior) = REQUIRED];
+  int32 page_size = 2;
+  string page_token = 3;
 }
 
-// Get the full execution context for a specific command.
-// Returns command metadata + all outputs + all events.
-rpc GetCommandContext(GetCommandContextRequest) returns (GetCommandContextResponse) {
-    option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}/context"};
+message ListConversationMessagesResponse {
+  repeated ChatMessage messages = 1;
+  string next_page_token = 2;
 }
-```
 
-```protobuf
-message SearchChatHistoryRequest {
+message GetOrCreateConversationRequest {
   string agent = 1 [(google.api.field_behavior) = REQUIRED];
-  string query = 2;                       // keyword search (matches command + final_summary)
-  google.protobuf.Timestamp since = 3;    // optional: earliest message time
-  google.protobuf.Timestamp until = 4;    // optional: latest message time
-  string principal_id = 5;               // filter by user
-  int32 limit = 6;                        // max results (default 10, max 50)
 }
 
-message SearchChatHistoryResponse {
-  repeated ChatHistoryEntry entries = 1;
+message GetOrCreateConversationResponse {
+  string name = 1;                    // "conversations/{id}"
 }
+```
 
+### 4.3 ChatHistoryEntry (revised)
+
+```protobuf
 message ChatHistoryEntry {
-  string command_id = 1;
-  string instruction = 2;       // user message
-  string final_summary = 3;     // agent reply
-  google.protobuf.Timestamp created_at = 4;
+  string message_id = 1;              // chat_message.id
+  string command_id = 2;              // set for assistant entries
+  string role = 3;                    // "1" (USER) or "2" (ASSISTANT)
+  string content = 4;                 // message text
+  google.protobuf.Timestamp created_at = 5;
 }
+```
 
-message GetCommandContextRequest {
-  string name = 1 [(google.api.field_behavior) = REQUIRED];
-}
+Previously used `instruction`/`final_summary` with heuristic role detection. Now uses direct `role`/`content` from `chat_message`.
 
-message GetCommandContextResponse {
-  Command command = 1;
-  repeated CommandOutput outputs = 2;
-  repeated CommandEvent events = 3;
+### 4.4 RPCs
+
+```protobuf
+service CommandService {
+  // ... existing: SendCommand, ListCommands, GetCommand, CancelCommand,
+  //     WatchCommand, WatchCommandEvents, RespondPermission ...
+
+  rpc SearchChatHistory(SearchChatHistoryRequest)
+      returns (SearchChatHistoryResponse) {
+    option (google.api.http) = {get: "/v1/{agent=agents/*}/chat-history"};
+  }
+
+  rpc GetCommandContext(GetCommandContextRequest)
+      returns (GetCommandContextResponse) {
+    option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}/context"};
+  }
+
+  rpc GetOrCreateConversation(GetOrCreateConversationRequest)
+      returns (GetOrCreateConversationResponse) {
+    option (google.api.http) = {post: "/v1/{agent=agents/*}/conversations"};
+  }
+
+  rpc ListConversationMessages(ListConversationMessagesRequest)
+      returns (ListConversationMessagesResponse) {
+    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/messages"};
+  }
 }
 ```
 
 ---
 
-## 5. Manager Backend Changes
+## 5. Manager Backend
 
-### 5.1 Store: `store/command.go`
+### 5.1 Store Layer
 
-New methods:
+**`store/conversation.go`** (new):
 
 ```go
-// GetRecentChatHistory returns the most recent N chat messages for a given
-// agent+principal pair, ordered by created_at DESC (most recent first).
-// Returns (instruction, final_summary, created_at) for each row.
-func (s *Store) GetRecentChatHistory(ctx context.Context, agentID, principalID int, limit int) ([]*ChatHistoryEntry, error)
+type ConversationMessage struct {
+    ID        uuid.UUID
+    AgentID   int
+    Title     string
+    Type      int32
+    CreatedBy int
+    CreatedAt time.Time
+}
 
-// SearchChatHistory searches chat messages by keyword across instruction
-// and final_summary fields, optionally filtered by time range.
-func (s *Store) SearchChatHistory(ctx context.Context, agentID, principalID int, query string, since, until *time.Time, limit int) ([]*ChatHistoryEntry, error)
+func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, principalID int) (*ConversationMessage, error)
+// INSERT ... ON CONFLICT DO NOTHING for (agent_id, created_by, type=1).
+// Falls back to SELECT if conflict (concurrent creation).
 
-// GetCommandContext returns the full details of a command including its
-// outputs and events — the complete "thinking" context behind a reply.
-func (s *Store) GetCommandContext(ctx context.Context, commandID uuid.UUID) (*CommandContext, error)
+func (s *Store) GetConversation(ctx context.Context, id uuid.UUID) (*ConversationMessage, error)
 ```
 
-**SQL for search:**
+**`store/chat_message.go`** (new):
+
+```go
+type ChatMessage struct {
+    ID             uuid.UUID
+    ConversationID uuid.UUID
+    PrincipalID    int
+    PrincipalName  string
+    Role           int32     // 1=USER, 2=ASSISTANT
+    Content        string
+    CommandID      uuid.NullUUID
+    CreatedAt      time.Time
+}
+
+func (s *Store) CreateChatMessage(ctx context.Context, msg *ChatMessage) (*ChatMessage, error)
+
+func (s *Store) ListConversationMessages(ctx context.Context, conversationID uuid.UUID, limit, offset int) ([]*ChatMessage, error)
+// Returns messages in chronological order (ASC created_at) for chat UI rendering.
+
+func (s *Store) GetRecentChatMessages(ctx context.Context, conversationID uuid.UUID, limit int) ([]*ChatMessage, error)
+// Returns most recent N messages (DESC created_at) for light context building.
+```
+
+**`store/command.go`** (modified):
+
+- `CommandMessage` gains `ConversationID *uuid.UUID` field.
+- `CreateCommand` writes `conversation_id`.
+- All SELECT queries scan `c.conversation_id`.
+- `ChatHistoryEntry` struct updated to hold `MessageID`, `CommandID`, `Role`, `Content`.
+- Removed `GetRecentChatHistory` (replaced by chat_message queries).
+- `SearchChatHistory` rewritten with SQL:
+
 ```sql
-SELECT c.id, c.instruction, c.final_summary, c.created_at
-FROM command c
-WHERE c.agent_id = $1
-  AND c.principal_id = $2
-  AND c.source_type = 1  -- CHAT only
-  AND ($3 = '' OR c.instruction ILIKE '%' || $3 || '%'
-               OR c.final_summary ILIKE '%' || $3 || '%')
-  AND ($4::timestamptz IS NULL OR c.created_at >= $4)
-  AND ($5::timestamptz IS NULL OR c.created_at <= $5)
-ORDER BY c.created_at DESC
+SELECT cm.id, cm.command_id, cm.role, cm.content, cm.created_at
+FROM chat_message cm
+JOIN conversation c ON c.id = cm.conversation_id
+WHERE c.agent_id = $1 AND cm.principal_id = $2
+  AND ($3 = '' OR cm.content ILIKE '%' || $3 || '%')
+  AND ($4::timestamptz IS NULL OR cm.created_at >= $4)
+  AND ($5::timestamptz IS NULL OR cm.created_at <= $5)
+ORDER BY cm.created_at DESC
 LIMIT $6
 ```
 
-### 5.2 API: `api/v1/command.go`
+### 5.2 API Layer: `api/v1/command.go`
 
-**Modify `SendCommand`**: when `source == CHAT`, inject recent history into instruction before creating the command:
+**`SendCommand` (modified — CHAT path)**:
 
 ```go
-if req.Msg.Source == v1pb.CommandSource_CHAT {
-    history, err := s.store.GetRecentChatHistory(ctx, agent.ID, principalID, 20)
-    if err != nil {
-        slog.Warn("failed to load chat history", "error", err)
-    }
-    contextBlock := buildChatPromptContext(history)
-    if contextBlock != "" {
-        instruction = contextBlock + "\n---\n" + instruction
+if req.Msg.Source == v1pb.CommandSource_CHAT && instruction != "" {
+    // 1. Get or create conversation
+    conv, _ := s.store.GetOrCreateDirectConversation(ctx, agent.ID, principalID)
+    conversationID = &conv.ID
+
+    // 2. Create user chat_message
+    s.store.CreateChatMessage(ctx, &store.ChatMessage{
+        ConversationID: conv.ID,
+        PrincipalID:    principalID,
+        Role:           1, // USER
+        Content:        instruction,
+    })
+
+    // 3. Light context injection (last 3–5 rounds from chat_message)
+    if recent, _ := s.store.GetRecentChatMessages(ctx, conv.ID, 6); len(recent) > 0 {
+        instruction = buildLightChatContext(recent) + "\n---\n" + instruction
     }
 }
 ```
 
-Where `buildChatPromptContext` formats entries like:
+`buildLightChatContext` outputs:
 
 ```
-## Recent conversation history with this user:
-- User: {instruction}
-- Assistant: {final_summary}
-- User: {instruction}
-- Assistant: {final_summary}
-## Current message:
-{instruction}
-```
-
-**Implement `SearchChatHistory`**:
-- Validates agent exists
-- Optional ACL check (only return messages for authenticated principal)
-- Delegates to `store.SearchChatHistory`
-
-**Implement `GetCommandContext`**:
-- Loads command, outputs, events from store
-- Returns as unified response
-
-### 5.3 Command Message: `store/command.go`
-
-Implement `CommandMessage` to include `SourceType int32` and `ConversationID` fields.
-
-### 5.4 CommandResult: Pass Source Info to Agent
-
-The `CommandRequest` message in the agent stream must carry the `source_type` so the agent knows whether to inject MCP servers. Add `source` field:
-
-```protobuf
-message CommandRequest {
-  // ... existing fields 1-9 ...
-  CommandSource source = 10;
-}
-```
-
+## Recent conversation (use search_chat_history for older messages)
+- User: What's the status of server X?
+- Assistant: Server X is running, CPU at 45%.
+- User: Check the logs.
 ---
+```
 
-## 6. Agent MCP Server
+Replaces the old `buildChatContext` which injected 20 rounds from `command` table with 2000-char truncation.
 
-### 6.1 SDK: `github.com/modelcontextprotocol/go-sdk` v1.6.1
-
-The official MCP Go SDK provides:
-- `mcp.NewServer` — create an MCP server instance
-- `mcp.AddTool[In, Out]` — register typed tools with JSON Schema from struct tags
-- `mcp.NewStreamableHTTPHandler` — create a `net/http.Handler` for streamable HTTP transport
-- Tool handlers receive `context.Context`, `*CallToolRequest`, and typed input
-
-### 6.2 Implementation: `backend/agent/mcp/server.go`
+**`GetOrCreateConversation`** (new):
 
 ```go
-package mcp
-
-import (
-    "context"
-    "fmt"
-    "net"
-    "net/http"
-    "log/slog"
-
-    "github.com/modelcontextprotocol/go-sdk/mcp"
-    v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
-    "github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
-)
-
-type Server struct {
-    server  *mcp.Server
-    handler http.Handler
-    port    int
-
-    managerClient v1connect.CommandServiceClient
-    agentResourceID string
+func (s *CommandService) GetOrCreateConversation(ctx context.Context, req *connect.Request[...]) (*connect.Response[...], error) {
+    agent := // lookup agent
+    user, _ := GetUserFromContext(ctx)
+    conv, _ := s.store.GetOrCreateDirectConversation(ctx, agent.ID, user.ID)
+    return connect.NewResponse(&v1pb.GetOrCreateConversationResponse{
+        Name: fmt.Sprintf("conversations/%s", conv.ID.String()),
+    }), nil
 }
+```
 
-func New(managerAddr string, agentResourceID string) (*Server, error) {
-    client := v1connect.NewCommandServiceClient(
-        // gRPC connection to manager, authenticated with agent token
-    )
+**`ListConversationMessages`** (new):
 
-    srv := mcp.NewServer(
-        &mcp.Implementation{Name: "laelia-chat", Version: "1.0.0"},
-        &mcp.ServerOptions{},
-    )
+```go
+func (s *CommandService) ListConversationMessages(ctx context.Context, req *connect.Request[...]) (*connect.Response[...], error) {
+    convID := parseConversationID(req.Msg.Conversation) // "conversations/{id}" → uuid
+    msgs, _ := s.store.ListConversationMessages(ctx, convID, limit, offset)
+    // convert to proto ChatMessage, return with pagination
+}
+```
 
-    ms := &Server{
-        server:         srv,
-        managerClient:  client,
-        agentResourceID: agentResourceID,
+**`SearchChatHistory`** (modified):
+
+Now uses new `ChatHistoryEntry` fields (`MessageId`, `CommandId`, `Role`, `Content`) instead of old `Instruction`/`FinalSummary`.
+
+### 5.3 Dispatcher: `component/dispatcher/dispatcher.go`
+
+**`HandleResult`** (modified):
+
+```go
+func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb.CommandResult) error {
+    cmdID := uuid.Parse(result.CommandId)
+
+    // NEW: load command to check if chat message creation is needed
+    cmd, _ := d.store.GetCommand(ctx, cmdID)
+
+    // ... existing status update, ack seq, result summary ...
+
+    // NEW: create assistant chat_message for CHAT commands
+    if cmd != nil && cmd.SourceType == 2 && cmd.ConversationID != nil && result.FinalSummary != "" {
+        d.store.CreateChatMessage(ctx, &store.ChatMessage{
+            ConversationID: *cmd.ConversationID,
+            PrincipalID:    cmd.PrincipalID,
+            Role:           2, // ASSISTANT
+            Content:        result.FinalSummary,
+            CommandID:      uuid.NullUUID{UUID: cmdID, Valid: true},
+        })
     }
-
-    // Register tools
-    mcp.AddTool(srv,
-        &mcp.Tool{
-            Name:        "search_chat_history",
-            Description: "Search past chat messages by keyword and optional time range. Returns matching user messages and agent replies.",
-        },
-        ms.handleSearchChatHistory,
-    )
-    mcp.AddTool(srv,
-        &mcp.Tool{
-            Name:        "get_command_context",
-            Description: "Get the full execution context (thinking process, tool calls, outputs) behind a specific agent reply, by its command/message ID.",
-        },
-        ms.handleGetCommandContext,
-    )
-
-    // Create HTTP handler with stateless sessions on random port
-    handler := mcp.NewStreamableHTTPHandler(
-        func(r *http.Request) *mcp.Server { return srv },
-        &mcp.StreamableHTTPOptions{
-            Stateless:  true,  // stateless: LLaMA context is per ACP session
-        },
-    )
-
-    // Wrap with middleware to capture query params (agent, principal)
-    ms.handler = ms.contextMiddleware(handler)
-
-    return ms, nil
+    // ...
 }
+```
 
-// contextMiddleware parses agent/principal from URL query and stores in
-// request context for tool handlers to access.
-func (s *Server) contextMiddleware(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        ctx := r.Context()
-        if aid := r.URL.Query().Get("agent"); aid != "" {
-            ctx = context.WithValue(ctx, ctxKeyAgentID, aid)
-        }
-        if pid := r.URL.Query().Get("principal"); pid != "" {
-            ctx = context.WithValue(ctx, ctxKeyPrincipalID, pid)
-        }
-        next.ServeHTTP(w, r.WithContext(ctx))
+Uses `command.source_type` (set during `SendCommand`) and `command.conversation_id` to decide. One extra `GetCommand` call per result — negligible overhead.
+
+### 5.4 MCP Server: `agent/mcp/server.go`
+
+**`handleSearchChatHistory`** (modified):
+
+```go
+for _, e := range resp.Msg.Entries {
+    results = append(results, chatHistoryResult{
+        MessageID: e.MessageId,
+        Role:      e.Role,        // directly from server — no heuristics
+        Content:   e.Content,
+        Timestamp: e.CreatedAt.AsTime().Format(...),
     })
 }
-
-// Start binds to 127.0.0.1:0 (random port) and begins serving.
-func (s *Server) Start() error {
-    listener, err := net.Listen("tcp", "127.0.0.1:0")
-    if err != nil {
-        return err
-    }
-    s.port = listener.Addr().(*net.TCPAddr).Port
-    slog.Info("MCP server started", "port", s.port)
-
-    go func() {
-        if err := http.Serve(listener, s.handler); err != nil {
-            slog.Error("MCP server stopped", "error", err)
-        }
-    }()
-    return nil
-}
-
-func (s *Server) Port() int { return s.port }
-
-func (s *Server) Stop() {
-    // Graceful shutdown (implement with server.Shutdown)
-}
 ```
 
-### 6.3 Tool Input/Output Types
-
+Removed the old heuristic:
 ```go
-type SearchChatHistoryInput struct {
-    Query     string `json:"query" jsonschema_description:"keywords to search for"`
-    Since     string `json:"since,omitempty" jsonschema_description:"ISO8601 timestamp; include messages after this time"`
-    Limit     int    `json:"limit,omitempty" jsonschema_description:"max results, between 1–50 (default 10)"`
-}
-
-type SearchChatHistoryOutput struct {
-    Results []ChatHistoryResult `json:"results" jsonschema_description:"matching chat messages"`
-}
-
-type ChatHistoryResult struct {
-    MessageID    string `json:"message_id" jsonschema_description:"unique ID of this message"`
-    Role         string `json:"role" jsonschema_description:"'user' or 'assistant'"`
-    Content      string `json:"content" jsonschema_description:"message text"`
-    Timestamp    string `json:"timestamp" jsonschema_description:"ISO8601 timestamp"`
-}
-
-type GetCommandContextInput struct {
-    CommandID string `json:"command_id" jsonschema_description:"the command/message ID to fetch full context for"`
-}
-
-type GetCommandContextOutput struct {
-    Instruction  string       `json:"instruction" jsonschema_description:"the original user message"`
-    FinalSummary string       `json:"final_summary" jsonschema_description:"the agent's reply"`
-    Events       []EventEntry `json:"events" jsonschema_description:"structured events during execution (tool calls, thinking, etc.)"`
-}
-
-type EventEntry struct {
-    SeqNo    int32  `json:"seq_no" jsonschema_description:"sequence number"`
-    Type     string `json:"type" jsonschema_description:"event type"`
-    Summary  string `json:"summary" jsonschema_description:"event summary"`
-    Payload  string `json:"payload" jsonschema_description:"JSON payload"`
+// OLD:
+role := "user"
+if e.FinalSummary != "" && e.Instruction == "" {
+    role = "assistant"
 }
 ```
-
-### 6.4 Context Passing Strategy
-
-The MCP server is shared across all chat sessions for a given agent. Per-session context (principal_id) is passed via URL query parameters on the `mcpServers[].url` field in the ACP session config:
-
-```
-http://127.0.0.1:{port}/mcp?agent=agents/abc123&principal=101
-```
-
-A middleware extracts these values into `context.Context` before the MCP handler processes the request. The MCP SDK's `Stateless: true` mode ensures each opencode connection creates a clean MCP session.
-
-Tool handlers access context values from `ctx`:
-
-```go
-func (s *Server) handleSearchChatHistory(ctx context.Context, req *mcp.CallToolRequest, input SearchChatHistoryInput) (*mcp.CallToolResult, SearchChatHistoryOutput, error) {
-    principalID := ctx.Value(ctxKeyPrincipalID).(string)
-    // Call manager RPC with principalID filter
-}
-```
-
-**Fallback**: If context values are not available (e.g., protocol version mismatch), the tool returns an error instructing the LLM to pass context parameters directly.
 
 ---
 
-## 7. Agent Executor Integration
+## 6. Agent Executor Integration
 
-### 7.1 Modified Files
-
-**`backend/agent/client/command_stream.go`**
-
-- `commandStream` struct gets a `mcpPort int` field
-- `runCommand` passes MCP context to `buildRuntime`
-- On agent startup, MCP server is started and port recorded
-
-**`backend/agent/executor/acp_executor.go`**
-
-- `ACPExecutor` struct gets new fields: `sourceType int32`, `mcpPort int`, `agentResourceID string`, `principalID string`
-- `NewACP` accepts additional parameters for MCP configuration
-- In `run()`, when `sourceType == CHAT`:
-
-```go
-var mcpServers []acp.McpServer
-if e.sourceType == 2 { // CHAT
-    mcpServers = []acp.McpServer{{
-        Http: &acp.McpServerHttpInline{
-            Type: "http",
-            Name: "laelia-chat",
-            Url:  fmt.Sprintf("http://127.0.0.1:%d/mcp?agent=%s&principal=%s",
-                    e.mcpPort, e.agentResourceID, e.principalID),
-        },
-    }}
-}
-
-sessionResp, err := e.conn.NewSession(e.ctx, acp.NewSessionRequest{
-    Cwd:        e.workingDir,
-    AdditionalDirectories: additionalRoots(e.allowedRoots, e.workingDir),
-    McpServers: mcpServers,
-})
-```
-
-**`backend/agent/executor/runtime.go`**
-
-- `Request` struct extended with `SourceType int32`, `AgentResourceID string`, `PrincipalID string`
+Identical to the original design. The agent's `ACPExecutor` injects the MCP server URL when `source_type == CHAT`. The `CommandRequest` message on the agent stream carries `source` and `principal_id` so the agent knows when to enable MCP tools.
 
 ---
 
-## 8. Frontend Changes
+## 7. Frontend
 
-### 8.1 New Files
+### 7.1 Store Architecture
 
-```
-src/pages/dashboard/chat.tsx          # Chat page component
-src/components/chat-message-list.tsx   # Message list (user + agent bubbles)
-src/components/chat-input.tsx          # Message input with send button
-```
+Chat state is split from `commandSlice` into a dedicated `chatSlice`:
 
-### 8.2 Router Changes
+**`stores/chat.ts`** (new):
 
-`src/router/routes/dashboard.tsx`:
-```tsx
-{
-  path: "agents/:agentId/chat",
-  handle: { name: "chat" },
-  Component: lazy(() => import("@/pages/dashboard/chat")),
+```typescript
+interface ChatSlice {
+  conversations: Record<string, string>;  // agentName → "conversations/{id}"
+  chatMessages: ChatMessageUI[];
+  chatLoading: boolean;
+
+  getOrCreateConversation(agent: string): Promise<string>;
+  loadMessages(conversation: string): Promise<void>;
+  sendChatMessage(agent: string, instruction: string): Promise<void>;
 }
 ```
 
-### 8.3 Store Changes
+`sendChatMessage` flow:
+1. Optimistically inserts user message into local state (with `crypto.randomUUID()`)
+2. Calls `SendCommand(source=CHAT)` via commandServiceClient
+3. Frontend polls command status, on completion reloads via `loadMessages`
+4. Server-validated assistant messages replace any stale local state
 
-`src/stores/command.ts`:
-- `sendCommand` extended to accept `source?: CommandSource`
-- New state: `chatHistory: Map<string, ChatEntry[]>` keyed by agent
+**`stores/command.ts`** (cleaned):
 
-### 8.4 Chat Page Behavior
+Removed `chatMessages`, `chatLoading`, `sendChatMessage`, `loadChatHistory`. Now contains only command-centric state and methods.
+
+**`stores/index.ts`**:
+
+```typescript
+export const useAppStore = create<AppStoreState>()((...args) => ({
+  ...createAuthSlice(...args),
+  ...createAgentSlice(...args),
+  ...createCommandSlice(...args),
+  ...createChatSlice(...args),
+}));
+```
+
+### 7.2 Chat Page: `pages/dashboard/chat.tsx`
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│ Agent Name / Chat                      [Command List] │
+│ Agent Name / Chat                      [Tasks]        │
 ├──────────────────────────────────────────────────────┤
 │                                                       │
 │  ┌──────────────────────────────────────────────┐    │
-│  │ 12:30  User: What's the status of server X? │    │
+│  │ 12:30  You: What's the status of server X?  │    │
 │  └──────────────────────────────────────────────┘    │
 │  ┌──────────────────────────────────────────────┐    │
 │  │ 12:31  Agent: Server X is running, CPU 45%, │    │
 │  │         memory 60%. 3 active connections.   │    │
-│  └──────────────────────────────────────────────┘    │
-│                                                       │
-│  ┌──────────────────────────────────────────────┐    │
-│  │ 12:32  User: Can you check the logs?        │    │
-│  └──────────────────────────────────────────────┘    │
-│  ┌──────────────────────────────────────────────┐    │
-│  │ 12:34  Agent: I found 2 errors in the last  │    │
-│  │         hour: ... [View Details →]           │    │
+│  │         [View details →]                     │    │
 │  └──────────────────────────────────────────────┘    │
 │                                                       │
 ├──────────────────────────────────────────────────────┤
 │  ┌────────────────────────────────────┐  [Send]      │
 │  │ Type a message...                  │  (disabled   │
 │  └────────────────────────────────────┘   when busy) │
-│  Agent is processing... (message queued)              │
 └──────────────────────────────────────────────────────┘
 ```
 
 Key UX behaviors:
-- **Send button disable**: Locked while a command is in-flight (state != COMPLETED/FAILED/CANCELLED)
-- **Queue indicator**: When agent is busy and user sends, show "Your message is queued"
-- **Auto-scroll**: New messages scroll into view
-- **History loading**: Scroll up to load older messages (cursor-based pagination from ListCommands)
-- **View Details**: Each agent message links to `/agents/:agentId/commands/:cmdId` for full execution context
-- **Real-time**: Subscribe to `WatchCommand` stream for live final_summary
+- **Initialization**: Loads conversation (get-or-create), then loads messages from `ListConversationMessages`.
+- **Send**: Creates a command, polls every 1s until completion, then reloads messages.
+- **View Details**: Each assistant message links to `/agents/:agentId/commands/:cmdId` using `command_id` from `chat_message`.
+- **Queue indicator**: Input disabled + "Agent is thinking..." when a command is in-flight.
+- **Auto-scroll**: New messages scroll into view.
+
+### 7.3 Route
+
+`/agents/:agentId/chat` → `ChatPage` component (lazy loaded).
 
 ---
 
-## 9. Implementation Plan
+## 8. Files Inventory
 
-### Phase 1 — Data Model & Proto (1-2 days)
-
-| Step | Description |
-|---|---|
-| 1.1 | Add `source_type` column to `command` table (migration SQL) |
-| 1.2 | Create `conversation` + `conversation_member` tables (migration SQL) |
-| 1.3 | Add `CommandSource` enum to `command.proto` |
-| 1.4 | Add `source` field to `Command`, `SendCommandRequest`, `CommandRequest` |
-| 1.5 | Define `SearchChatHistoryRequest/Response`, `GetCommandContextRequest/Response` |
-| 1.6 | Run `buf generate` in `proto/` |
-
-### Phase 2 — Manager Backend (2-3 days)
-
-| Step | Description |
-|---|---|
-| 2.1 | `store/command.go`: Add `GetRecentChatHistory`, `SearchChatHistory`, `GetCommandContext` |
-| 2.2 | `store/command.go`: Update `CreateCommand` to accept `source_type` |
-| 2.3 | `api/v1/command.go`: Implement `SearchChatHistory` RPC |
-| 2.4 | `api/v1/command.go`: Implement `GetCommandContext` RPC |
-| 2.5 | `api/v1/command.go`: Modify `SendCommand` to inject chat history for CHAT source |
-| 2.6 | `component/dispatcher/`: Pass `source` through `CommandRequest` to agent |
-
-### Phase 3 — Agent MCP Server + Executor (2-3 days)
-
-| Step | Description |
-|---|---|
-| 3.1 | Add `github.com/modelcontextprotocol/go-sdk` to `go.mod` (`go get`) |
-| 3.2 | Create `backend/agent/mcp/server.go` — MCP Server with two tools |
-| 3.3 | Wire MCP Server start/stop in agent entrypoint (`cmd/run.go`) |
-| 3.4 | `executor/runtime.go`: Extend `Request` with SourceType, AgentResourceID, PrincipalID |
-| 3.5 | `executor/acp_executor.go`: Construct `McpServers` when source_type == CHAT |
-| 3.6 | `client/command_stream.go`: Pass MCP port + source info to executor |
-
-### Phase 4 — Frontend (2-3 days)
-
-| Step | Description |
-|---|---|
-| 4.1 | Create chat page component (`pages/dashboard/chat.tsx`) |
-| 4.2 | Create message list and input components |
-| 4.3 | Add route `/agents/:agentId/chat` |
-| 4.4 | Extend store with chat-specific methods (send chat, load history) |
-| 4.5 | Implement send button lock + queue indicator |
-| 4.6 | Wire up real-time streaming via `WatchCommand` |
-
-### Phase 5 — Testing & Polish (1-2 days)
-
-| Step | Description |
-|---|---|
-| 5.1 | Unit tests for new store methods |
-| 5.2 | Integration test: send chat message → agent processes → MCP tool can query |
-| 5.3 | Frontend manual test: chat UI, history scrolling, queue behavior |
-| 5.4 | Go lint + format + test suite pass |
-
----
-
-## 10. Open Questions & Risks
-
-| # | Question | Status |
+| File | Status | Purpose |
 |---|---|---|
-| 1 | **Context flow through MCP SDK**: Does `ctx` in tool handlers carry the HTTP request context (with our middleware values)? If not, fall back to a `sync.Map` keyed by session ID, populated during `getServer` callback. | **To verify during Phase 3** |
-| 2 | **MCP stateless mode**: `StreamableHTTPOptions.Stateless: true` means no session state is retained between requests. This simplifies our implementation but may limit future features (e.g., multi-turn within one ACP session). Acceptable for v1. | Accepted |
-| 3 | **ACP session reuse**: Each chat message creates a new ACP session. The LLM's internal state is reset each time. Long-term, session reuse (ACP `session/load`) would improve efficiency. | v2 consideration |
-| 4 | **Large command_event payloads**: `get_command_context` returning all events for a long-running command could produce large payloads. Consider truncation or summarizing. | Mitigation: serializing only TEXT_DELTA and TOOL_CALL events, skipping RAW_ACP batches |
-| 5 | **Port exhaustion**: Random ports, agent lifecycle binding. One port per agent process — negligible risk for hundreds of agents. | Non-issue for typical deployments |
-| 6 | **open `mcpCapabilities.http`**: The ACP binary (opencode) must support `mcpCapabilities.http` transport. Per the ACP spec, new agents SHOULD support HTTP transport. The current `@zed-industries/claude-code-acp` supports it. | Required — verify with current opencode version |
+| `backend/manager/migration/latest.sql` | modified | `chat_message` table, `conversation.agent_id`, unique index, fixed chat-history index |
+| `proto/v1/v1/command.proto` | modified | `ChatMessage`, `GetOrCreateConversation`, `ListConversationMessages`, revised `ChatHistoryEntry` |
+| `backend/manager/store/conversation.go` | **new** | `ConversationMessage` + `GetOrCreateDirectConversation` |
+| `backend/manager/store/chat_message.go` | **new** | `ChatMessage` + `CreateChatMessage`/`ListConversationMessages`/`GetRecentChatMessages` |
+| `backend/manager/store/command.go` | modified | Added `ConversationID`; removed `GetRecentChatHistory`; rewrote `SearchChatHistory` |
+| `backend/manager/api/v1/command.go` | modified | `SendCommand` chat flow; new `GetOrCreateConversation`/`ListConversationMessages` handlers; `buildLightChatContext` |
+| `backend/manager/component/dispatcher/dispatcher.go` | modified | `HandleResult` creates assistant `chat_message` |
+| `backend/agent/mcp/server.go` | modified | Direct `role`/`content` access, no heuristic detection |
+| `frontend/src/stores/types.ts` | modified | Added `ChatSlice`, `ChatMessageUI`; removed chat from `CommandSlice` |
+| `frontend/src/stores/chat.ts` | **new** | Independent `chatSlice` |
+| `frontend/src/stores/command.ts` | modified | Removed chat state/methods |
+| `frontend/src/stores/index.ts` | modified | Registered `chatSlice` |
+| `frontend/src/pages/dashboard/chat.tsx` | modified | Uses new store APIs; loads from `ListConversationMessages` |
