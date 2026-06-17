@@ -269,7 +269,7 @@ func (c *Client) Run(ctx context.Context) error {
 		c.mu.RLock()
 		defer c.mu.RUnlock()
 		return c.accessToken
-	})
+	}, c.httpClient)
 	if err != nil {
 		return errors.Wrap(err, "failed to create MCP server")
 	}

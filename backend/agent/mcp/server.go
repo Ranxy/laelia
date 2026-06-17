@@ -29,10 +29,11 @@ type Server struct {
 	managerURL  string
 	agentName   string
 	getToken    func() string
+	httpClient  *http.Client
 	clientCache v1connect.CommandServiceClient
 }
 
-func New(managerURL, agentName string, getToken func() string) (*Server, error) {
+func New(managerURL, agentName string, getToken func() string, httpClient *http.Client) (*Server, error) {
 	srv := mcp.NewServer(
 		&mcp.Implementation{Name: "laelia-chat", Version: "1.0.0"},
 		&mcp.ServerOptions{},
@@ -43,6 +44,7 @@ func New(managerURL, agentName string, getToken func() string) (*Server, error) 
 		managerURL: managerURL,
 		agentName:  agentName,
 		getToken:   getToken,
+		httpClient: httpClient,
 	}
 
 	mcp.AddTool(srv,
@@ -66,7 +68,7 @@ func New(managerURL, agentName string, getToken func() string) (*Server, error) 
 func (s *Server) client() v1connect.CommandServiceClient {
 	if s.clientCache == nil {
 		s.clientCache = v1connect.NewCommandServiceClient(
-			newHTTPClient(),
+			s.httpClient,
 			s.managerURL,
 			connect.WithInterceptors(s.authInterceptor()),
 		)
@@ -260,8 +262,4 @@ func (s *Server) handleGetCommandContext(ctx context.Context, _ *mcp.CallToolReq
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: text}},
 	}, output, nil
-}
-
-func newHTTPClient() *http.Client {
-	return &http.Client{}
 }
