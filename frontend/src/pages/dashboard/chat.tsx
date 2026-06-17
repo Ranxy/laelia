@@ -6,6 +6,7 @@ import { Input } from "@/react/components/ui/input";
 import { useAppStore } from "@/react/stores";
 import type { ChatMessage } from "@/react/stores/types";
 import { CommandStatus } from "@/types/proto-es/v1/command_pb";
+import { useShallow } from "zustand/react/shallow";
 
 const statusLabels: Record<number, string> = {
   [CommandStatus.PENDING]: "Pending",
@@ -39,7 +40,9 @@ export function ChatPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const agent = `agents/${agentId}`;
 
-  const chatMessages = useAppStore((s) => s.chatMessages[agent] ?? []);
+  const chatMessages = useAppStore(
+    useShallow((s) => s.chatMessages[agent] ?? [])
+  );
   const chatLoading = useAppStore((s) => s.chatLoading);
 
   const [input, setInput] = useState("");
