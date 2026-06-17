@@ -1,4 +1,5 @@
 import { create } from "@bufbuild/protobuf";
+import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { commandServiceClient } from "@/connect";
 import {
   CommandSource,
@@ -41,9 +42,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
         id: msg.name,
         role: msg.role === 1 ? "user" : "assistant",
         content: msg.content,
-        timestamp: msg.createdAt
-          ? new Date(msg.createdAt.toString())
-          : new Date(),
+        timestamp: msg.createdAt ? timestampDate(msg.createdAt) : new Date(),
         commandName: msg.commandId
           ? `agents/__/commands/${msg.commandId}`
           : undefined,
