@@ -27,6 +27,8 @@ const (
 	CommandService_WatchCommand_FullMethodName       = "/laelia.v1.CommandService/WatchCommand"
 	CommandService_WatchCommandEvents_FullMethodName = "/laelia.v1.CommandService/WatchCommandEvents"
 	CommandService_RespondPermission_FullMethodName  = "/laelia.v1.CommandService/RespondPermission"
+	CommandService_SearchChatHistory_FullMethodName  = "/laelia.v1.CommandService/SearchChatHistory"
+	CommandService_GetCommandContext_FullMethodName  = "/laelia.v1.CommandService/GetCommandContext"
 )
 
 // CommandServiceClient is the client API for CommandService service.
@@ -40,6 +42,8 @@ type CommandServiceClient interface {
 	WatchCommand(ctx context.Context, in *WatchCommandRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CommandOutput], error)
 	WatchCommandEvents(ctx context.Context, in *WatchCommandEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CommandEvent], error)
 	RespondPermission(ctx context.Context, in *RespondPermissionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SearchChatHistory(ctx context.Context, in *SearchChatHistoryRequest, opts ...grpc.CallOption) (*SearchChatHistoryResponse, error)
+	GetCommandContext(ctx context.Context, in *GetCommandContextRequest, opts ...grpc.CallOption) (*GetCommandContextResponse, error)
 }
 
 type commandServiceClient struct {
@@ -138,6 +142,26 @@ func (c *commandServiceClient) RespondPermission(ctx context.Context, in *Respon
 	return out, nil
 }
 
+func (c *commandServiceClient) SearchChatHistory(ctx context.Context, in *SearchChatHistoryRequest, opts ...grpc.CallOption) (*SearchChatHistoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchChatHistoryResponse)
+	err := c.cc.Invoke(ctx, CommandService_SearchChatHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) GetCommandContext(ctx context.Context, in *GetCommandContextRequest, opts ...grpc.CallOption) (*GetCommandContextResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCommandContextResponse)
+	err := c.cc.Invoke(ctx, CommandService_GetCommandContext_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CommandServiceServer is the server API for CommandService service.
 // All implementations must embed UnimplementedCommandServiceServer
 // for forward compatibility.
@@ -149,6 +173,8 @@ type CommandServiceServer interface {
 	WatchCommand(*WatchCommandRequest, grpc.ServerStreamingServer[CommandOutput]) error
 	WatchCommandEvents(*WatchCommandEventsRequest, grpc.ServerStreamingServer[CommandEvent]) error
 	RespondPermission(context.Context, *RespondPermissionRequest) (*emptypb.Empty, error)
+	SearchChatHistory(context.Context, *SearchChatHistoryRequest) (*SearchChatHistoryResponse, error)
+	GetCommandContext(context.Context, *GetCommandContextRequest) (*GetCommandContextResponse, error)
 	mustEmbedUnimplementedCommandServiceServer()
 }
 
@@ -179,6 +205,12 @@ func (UnimplementedCommandServiceServer) WatchCommandEvents(*WatchCommandEventsR
 }
 func (UnimplementedCommandServiceServer) RespondPermission(context.Context, *RespondPermissionRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method RespondPermission not implemented")
+}
+func (UnimplementedCommandServiceServer) SearchChatHistory(context.Context, *SearchChatHistoryRequest) (*SearchChatHistoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchChatHistory not implemented")
+}
+func (UnimplementedCommandServiceServer) GetCommandContext(context.Context, *GetCommandContextRequest) (*GetCommandContextResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCommandContext not implemented")
 }
 func (UnimplementedCommandServiceServer) mustEmbedUnimplementedCommandServiceServer() {}
 func (UnimplementedCommandServiceServer) testEmbeddedByValue()                        {}
@@ -313,6 +345,42 @@ func _CommandService_RespondPermission_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommandService_SearchChatHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchChatHistoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).SearchChatHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_SearchChatHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).SearchChatHistory(ctx, req.(*SearchChatHistoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_GetCommandContext_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCommandContextRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).GetCommandContext(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_GetCommandContext_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).GetCommandContext(ctx, req.(*GetCommandContextRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CommandService_ServiceDesc is the grpc.ServiceDesc for CommandService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -339,6 +407,14 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RespondPermission",
 			Handler:    _CommandService_RespondPermission_Handler,
+		},
+		{
+			MethodName: "SearchChatHistory",
+			Handler:    _CommandService_SearchChatHistory_Handler,
+		},
+		{
+			MethodName: "GetCommandContext",
+			Handler:    _CommandService_GetCommandContext_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

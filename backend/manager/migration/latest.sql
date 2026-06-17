@@ -250,3 +250,22 @@ CREATE TABLE command_event (
 CREATE UNIQUE INDEX idx_command_event_seq ON command_event(command_id, seq_no);
 CREATE INDEX idx_command_event_created_at ON command_event(command_id, created_at);
 
+ALTER TABLE command ADD COLUMN source_type SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE command ADD COLUMN conversation_id UUID;
+CREATE INDEX idx_command_chat_history ON command(agent_id, principal_id, source_type, created_at DESC) WHERE source_type = 1;
+
+CREATE TABLE conversation (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL DEFAULT '',
+    type SMALLINT NOT NULL DEFAULT 1,
+    created_by INTEGER NOT NULL REFERENCES principal(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE conversation_member (
+    conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+    member_type SMALLINT NOT NULL,
+    member_id TEXT NOT NULL,
+    PRIMARY KEY (conversation_id, member_type, member_id)
+);
+

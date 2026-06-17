@@ -114,6 +114,16 @@ export declare type Command = Message<"laelia.v1.Command"> & {
    * @generated from field: bool allow_diff = 20;
    */
   allowDiff: boolean;
+
+  /**
+   * @generated from field: laelia.v1.CommandSource source = 21;
+   */
+  source: CommandSource;
+
+  /**
+   * @generated from field: string conversation_id = 22;
+   */
+  conversationId: string;
 };
 
 /**
@@ -573,6 +583,136 @@ export declare type PermissionDecidedPayload = Message<"laelia.v1.PermissionDeci
 export declare const PermissionDecidedPayloadSchema: GenMessage<PermissionDecidedPayload>;
 
 /**
+ * @generated from message laelia.v1.SearchChatHistoryRequest
+ */
+export declare type SearchChatHistoryRequest = Message<"laelia.v1.SearchChatHistoryRequest"> & {
+  /**
+   * @generated from field: string agent = 1;
+   */
+  agent: string;
+
+  /**
+   * @generated from field: string query = 2;
+   */
+  query: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp since = 3;
+   */
+  since?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp until = 4;
+   */
+  until?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string principal_id = 5;
+   */
+  principalId: string;
+
+  /**
+   * @generated from field: int32 limit = 6;
+   */
+  limit: number;
+};
+
+/**
+ * Describes the message laelia.v1.SearchChatHistoryRequest.
+ * Use `create(SearchChatHistoryRequestSchema)` to create a new message.
+ */
+export declare const SearchChatHistoryRequestSchema: GenMessage<SearchChatHistoryRequest>;
+
+/**
+ * @generated from message laelia.v1.SearchChatHistoryResponse
+ */
+export declare type SearchChatHistoryResponse = Message<"laelia.v1.SearchChatHistoryResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.ChatHistoryEntry entries = 1;
+   */
+  entries: ChatHistoryEntry[];
+};
+
+/**
+ * Describes the message laelia.v1.SearchChatHistoryResponse.
+ * Use `create(SearchChatHistoryResponseSchema)` to create a new message.
+ */
+export declare const SearchChatHistoryResponseSchema: GenMessage<SearchChatHistoryResponse>;
+
+/**
+ * @generated from message laelia.v1.ChatHistoryEntry
+ */
+export declare type ChatHistoryEntry = Message<"laelia.v1.ChatHistoryEntry"> & {
+  /**
+   * @generated from field: string command_id = 1;
+   */
+  commandId: string;
+
+  /**
+   * @generated from field: string instruction = 2;
+   */
+  instruction: string;
+
+  /**
+   * @generated from field: string final_summary = 3;
+   */
+  finalSummary: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 4;
+   */
+  createdAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.ChatHistoryEntry.
+ * Use `create(ChatHistoryEntrySchema)` to create a new message.
+ */
+export declare const ChatHistoryEntrySchema: GenMessage<ChatHistoryEntry>;
+
+/**
+ * @generated from message laelia.v1.GetCommandContextRequest
+ */
+export declare type GetCommandContextRequest = Message<"laelia.v1.GetCommandContextRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetCommandContextRequest.
+ * Use `create(GetCommandContextRequestSchema)` to create a new message.
+ */
+export declare const GetCommandContextRequestSchema: GenMessage<GetCommandContextRequest>;
+
+/**
+ * @generated from message laelia.v1.GetCommandContextResponse
+ */
+export declare type GetCommandContextResponse = Message<"laelia.v1.GetCommandContextResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Command command = 1;
+   */
+  command?: Command | undefined;
+
+  /**
+   * @generated from field: repeated laelia.v1.CommandOutput outputs = 2;
+   */
+  outputs: CommandOutput[];
+
+  /**
+   * @generated from field: repeated laelia.v1.CommandEvent events = 3;
+   */
+  events: CommandEvent[];
+};
+
+/**
+ * Describes the message laelia.v1.GetCommandContextResponse.
+ * Use `create(GetCommandContextResponseSchema)` to create a new message.
+ */
+export declare const GetCommandContextResponseSchema: GenMessage<GetCommandContextResponse>;
+
+/**
  * @generated from message laelia.v1.AgentCommandMessage
  */
 export declare type AgentCommandMessage = Message<"laelia.v1.AgentCommandMessage"> & {
@@ -737,6 +877,11 @@ export declare type CommandRequest = Message<"laelia.v1.CommandRequest"> & {
    * @generated from field: bool allow_diff = 9;
    */
   allowDiff: boolean;
+
+  /**
+   * @generated from field: laelia.v1.CommandSource source = 10;
+   */
+  source: CommandSource;
 };
 
 /**
@@ -928,6 +1073,11 @@ export declare type SendCommandRequest = Message<"laelia.v1.SendCommandRequest">
    * @generated from field: bool allow_diff = 9;
    */
   allowDiff: boolean;
+
+  /**
+   * @generated from field: laelia.v1.CommandSource source = 10;
+   */
+  source: CommandSource;
 };
 
 /**
@@ -1180,6 +1330,31 @@ export enum ExecutorKind {
 export declare const ExecutorKindSchema: GenEnum<ExecutorKind>;
 
 /**
+ * @generated from enum laelia.v1.CommandSource
+ */
+export enum CommandSource {
+  /**
+   * @generated from enum value: COMMAND_SOURCE_UNSPECIFIED = 0;
+   */
+  COMMAND_SOURCE_UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: MANUAL = 1;
+   */
+  MANUAL = 1,
+
+  /**
+   * @generated from enum value: CHAT = 2;
+   */
+  CHAT = 2,
+}
+
+/**
+ * Describes the enum laelia.v1.CommandSource.
+ */
+export declare const CommandSourceSchema: GenEnum<CommandSource>;
+
+/**
  * @generated from enum laelia.v1.CommandEventType
  */
 export enum CommandEventType {
@@ -1308,6 +1483,22 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof RespondPermissionRequestSchema;
     output: typeof EmptySchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.SearchChatHistory
+   */
+  searchChatHistory: {
+    methodKind: "unary";
+    input: typeof SearchChatHistoryRequestSchema;
+    output: typeof SearchChatHistoryResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.GetCommandContext
+   */
+  getCommandContext: {
+    methodKind: "unary";
+    input: typeof GetCommandContextRequestSchema;
+    output: typeof GetCommandContextResponseSchema;
   },
 }>;
 

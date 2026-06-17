@@ -28,6 +28,12 @@ enum ExecutorKind {
   ACP = 2;
 }
 
+enum CommandSource {
+  COMMAND_SOURCE_UNSPECIFIED = 0;
+  MANUAL = 1;
+  CHAT = 2;
+}
+
 enum CommandEventType {
   COMMAND_EVENT_TYPE_UNSPECIFIED = 0;
   LIFECYCLE = 1;
@@ -71,6 +77,8 @@ message Command {
   string final_summary = 18;
   google.protobuf.Struct result = 19;
   bool allow_diff = 20;
+  CommandSource source = 21;
+  string conversation_id = 22;
 }
 
 message CommandOutput {
@@ -177,6 +185,42 @@ message PermissionDecidedPayload {
   string option_kind = 4;
 }
 
+message SearchChatHistoryRequest {
+  string agent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Agent"
+  ];
+  string query = 2;
+  google.protobuf.Timestamp since = 3;
+  google.protobuf.Timestamp until = 4;
+  string principal_id = 5;
+  int32 limit = 6;
+}
+
+message SearchChatHistoryResponse {
+  repeated ChatHistoryEntry entries = 1;
+}
+
+message ChatHistoryEntry {
+  string command_id = 1;
+  string instruction = 2;
+  string final_summary = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message GetCommandContextRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Command"}
+  ];
+}
+
+message GetCommandContextResponse {
+  Command command = 1;
+  repeated CommandOutput outputs = 2;
+  repeated CommandEvent events = 3;
+}
+
 service CommandService {
   rpc SendCommand(SendCommandRequest) returns (Command) {
     option (google.api.http) = {
@@ -216,6 +260,14 @@ service CommandService {
       body: "*"
     };
     option (laelia.v1.audit) = true;
+  }
+
+  rpc SearchChatHistory(SearchChatHistoryRequest) returns (SearchChatHistoryResponse) {
+    option (google.api.http) = {get: "/v1/{agent=agents/*}/chat-history"};
+  }
+
+  rpc GetCommandContext(GetCommandContextRequest) returns (GetCommandContextResponse) {
+    option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}/context"};
   }
 }
 
@@ -259,6 +311,7 @@ message CommandRequest {
   string instruction = 7;
   string profile = 8;
   bool allow_diff = 9;
+  CommandSource source = 10;
 }
 
 message CommandProgress {
@@ -305,6 +358,7 @@ message SendCommandRequest {
   string instruction = 7;
   string profile = 8;
   bool allow_diff = 9;
+  CommandSource source = 10;
 }
 
 message ListCommandsRequest {

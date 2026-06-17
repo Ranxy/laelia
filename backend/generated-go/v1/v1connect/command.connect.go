@@ -57,6 +57,12 @@ const (
 	// CommandServiceRespondPermissionProcedure is the fully-qualified name of the CommandService's
 	// RespondPermission RPC.
 	CommandServiceRespondPermissionProcedure = "/laelia.v1.CommandService/RespondPermission"
+	// CommandServiceSearchChatHistoryProcedure is the fully-qualified name of the CommandService's
+	// SearchChatHistory RPC.
+	CommandServiceSearchChatHistoryProcedure = "/laelia.v1.CommandService/SearchChatHistory"
+	// CommandServiceGetCommandContextProcedure is the fully-qualified name of the CommandService's
+	// GetCommandContext RPC.
+	CommandServiceGetCommandContextProcedure = "/laelia.v1.CommandService/GetCommandContext"
 	// AgentCommandServiceCommandChannelProcedure is the fully-qualified name of the
 	// AgentCommandService's CommandChannel RPC.
 	AgentCommandServiceCommandChannelProcedure = "/laelia.v1.AgentCommandService/CommandChannel"
@@ -71,6 +77,8 @@ type CommandServiceClient interface {
 	WatchCommand(context.Context, *connect.Request[v1.WatchCommandRequest]) (*connect.ServerStreamForClient[v1.CommandOutput], error)
 	WatchCommandEvents(context.Context, *connect.Request[v1.WatchCommandEventsRequest]) (*connect.ServerStreamForClient[v1.CommandEvent], error)
 	RespondPermission(context.Context, *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error)
+	SearchChatHistory(context.Context, *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error)
+	GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error)
 }
 
 // NewCommandServiceClient constructs a client for the laelia.v1.CommandService service. By default,
@@ -126,6 +134,18 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("RespondPermission")),
 			connect.WithClientOptions(opts...),
 		),
+		searchChatHistory: connect.NewClient[v1.SearchChatHistoryRequest, v1.SearchChatHistoryResponse](
+			httpClient,
+			baseURL+CommandServiceSearchChatHistoryProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("SearchChatHistory")),
+			connect.WithClientOptions(opts...),
+		),
+		getCommandContext: connect.NewClient[v1.GetCommandContextRequest, v1.GetCommandContextResponse](
+			httpClient,
+			baseURL+CommandServiceGetCommandContextProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("GetCommandContext")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -138,6 +158,8 @@ type commandServiceClient struct {
 	watchCommand       *connect.Client[v1.WatchCommandRequest, v1.CommandOutput]
 	watchCommandEvents *connect.Client[v1.WatchCommandEventsRequest, v1.CommandEvent]
 	respondPermission  *connect.Client[v1.RespondPermissionRequest, emptypb.Empty]
+	searchChatHistory  *connect.Client[v1.SearchChatHistoryRequest, v1.SearchChatHistoryResponse]
+	getCommandContext  *connect.Client[v1.GetCommandContextRequest, v1.GetCommandContextResponse]
 }
 
 // SendCommand calls laelia.v1.CommandService.SendCommand.
@@ -175,6 +197,16 @@ func (c *commandServiceClient) RespondPermission(ctx context.Context, req *conne
 	return c.respondPermission.CallUnary(ctx, req)
 }
 
+// SearchChatHistory calls laelia.v1.CommandService.SearchChatHistory.
+func (c *commandServiceClient) SearchChatHistory(ctx context.Context, req *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error) {
+	return c.searchChatHistory.CallUnary(ctx, req)
+}
+
+// GetCommandContext calls laelia.v1.CommandService.GetCommandContext.
+func (c *commandServiceClient) GetCommandContext(ctx context.Context, req *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error) {
+	return c.getCommandContext.CallUnary(ctx, req)
+}
+
 // CommandServiceHandler is an implementation of the laelia.v1.CommandService service.
 type CommandServiceHandler interface {
 	SendCommand(context.Context, *connect.Request[v1.SendCommandRequest]) (*connect.Response[v1.Command], error)
@@ -184,6 +216,8 @@ type CommandServiceHandler interface {
 	WatchCommand(context.Context, *connect.Request[v1.WatchCommandRequest], *connect.ServerStream[v1.CommandOutput]) error
 	WatchCommandEvents(context.Context, *connect.Request[v1.WatchCommandEventsRequest], *connect.ServerStream[v1.CommandEvent]) error
 	RespondPermission(context.Context, *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error)
+	SearchChatHistory(context.Context, *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error)
+	GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error)
 }
 
 // NewCommandServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -235,6 +269,18 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("RespondPermission")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceSearchChatHistoryHandler := connect.NewUnaryHandler(
+		CommandServiceSearchChatHistoryProcedure,
+		svc.SearchChatHistory,
+		connect.WithSchema(commandServiceMethods.ByName("SearchChatHistory")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceGetCommandContextHandler := connect.NewUnaryHandler(
+		CommandServiceGetCommandContextProcedure,
+		svc.GetCommandContext,
+		connect.WithSchema(commandServiceMethods.ByName("GetCommandContext")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/laelia.v1.CommandService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case CommandServiceSendCommandProcedure:
@@ -251,6 +297,10 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceWatchCommandEventsHandler.ServeHTTP(w, r)
 		case CommandServiceRespondPermissionProcedure:
 			commandServiceRespondPermissionHandler.ServeHTTP(w, r)
+		case CommandServiceSearchChatHistoryProcedure:
+			commandServiceSearchChatHistoryHandler.ServeHTTP(w, r)
+		case CommandServiceGetCommandContextProcedure:
+			commandServiceGetCommandContextHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -286,6 +336,14 @@ func (UnimplementedCommandServiceHandler) WatchCommandEvents(context.Context, *c
 
 func (UnimplementedCommandServiceHandler) RespondPermission(context.Context, *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.RespondPermission is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) SearchChatHistory(context.Context, *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.SearchChatHistory is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.GetCommandContext is not implemented"))
 }
 
 // AgentCommandServiceClient is a client for the laelia.v1.AgentCommandService service.
