@@ -67,7 +67,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       chatMessages: [...state.chatMessages, userMsg],
     }));
 
-    await commandServiceClient.sendCommand(
+    const res = await commandServiceClient.sendCommand(
       create(SendCommandRequestSchema, {
         agent,
         command: instruction,
@@ -76,5 +76,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
         source: CommandSource.CHAT,
       })
     );
+
+    return res;
   },
 });

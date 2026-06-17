@@ -5,7 +5,7 @@ import { Button } from "@/react/components/ui/button";
 import { Input } from "@/react/components/ui/input";
 import { useAppStore } from "@/react/stores";
 import type { ChatMessageUI } from "@/react/stores/types";
-import { CommandSource, CommandStatus } from "@/types/proto-es/v1/command_pb";
+import { CommandStatus } from "@/types/proto-es/v1/command_pb";
 
 const statusLabels: Record<number, string> = {
   [CommandStatus.PENDING]: "Pending",
@@ -44,7 +44,6 @@ export function ChatPage() {
   const getOrCreateConversation = useAppStore((s) => s.getOrCreateConversation);
   const loadMessages = useAppStore((s) => s.loadMessages);
   const sendChatMessage = useAppStore((s) => s.sendChatMessage);
-  const sendCommand = useAppStore((s) => s.sendCommand);
   const getCommand = useAppStore((s) => s.getCommand);
 
   const [input, setInput] = useState("");
@@ -89,15 +88,9 @@ export function ChatPage() {
     setWaitingCommand(true);
 
     try {
-      const res = await sendCommand(agent, text, {
-        executorKind: 2,
-        instruction: text,
-        source: CommandSource.CHAT,
-      });
+      const res = await sendChatMessage(agent, text);
 
       if (res.name) {
-        sendChatMessage(agent, text);
-
         const checkCommand = async () => {
           try {
             const cmd = await getCommand(res.name);

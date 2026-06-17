@@ -82,7 +82,7 @@ export interface ChatSlice {
 
   getOrCreateConversation: (agent: string) => Promise<string>;
   loadMessages: (conversation: string) => Promise<void>;
-  sendChatMessage: (agent: string, instruction: string) => Promise<void>;
+  sendChatMessage: (agent: string, instruction: string) => Promise<Command>;
 }
 
 export type AppStoreState = AuthSlice & AgentSlice & CommandSlice & ChatSlice;
