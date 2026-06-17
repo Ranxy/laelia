@@ -36,6 +36,7 @@ type CommandMessage struct {
 	TimeoutSeconds  int32
 	LastAckSeq      int32
 	SourceType      int32
+	ConversationID  *uuid.UUID
 }
 
 type CommandOutputMessage struct {
@@ -75,8 +76,8 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 	var createdAt time.Time
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO command (
-			agent_id, principal_id, command, instruction, profile, executor_kind, allow_diff, status, env, working_dir, timeout_seconds, source_type
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+			agent_id, principal_id, command, instruction, profile, executor_kind, allow_diff, status, env, working_dir, timeout_seconds, source_type, conversation_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING id, created_at
 	`,
 		cmd.AgentID,
@@ -91,6 +92,7 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 		cmd.WorkingDir,
 		cmd.TimeoutSeconds,
 		cmd.SourceType,
+		cmd.ConversationID,
 	).Scan(&commandID, &createdAt); err != nil {
 		return nil, errors.Wrapf(err, "failed to create command")
 	}
@@ -114,6 +116,7 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 		WorkingDir:     cmd.WorkingDir,
 		TimeoutSeconds: cmd.TimeoutSeconds,
 		SourceType:     cmd.SourceType,
+		ConversationID: cmd.ConversationID,
 	}
 	return created, nil
 }
@@ -123,7 +126,7 @@ func (s *Store) GetCommand(ctx context.Context, id uuid.UUID) (*CommandMessage, 
 		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
 		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq, c.source_type,
-		COALESCE(p.name, ''), a.resource_id
+		c.conversation_id, COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id
 	JOIN principal p ON p.id = c.principal_id
@@ -156,7 +159,7 @@ func (s *Store) GetCommandByName(ctx context.Context, name string) (*CommandMess
 		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
 		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq, c.source_type,
-		COALESCE(p.name, ''), a.resource_id
+		c.conversation_id, COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id
 	JOIN principal p ON p.id = c.principal_id
@@ -179,12 +182,13 @@ func scanCommand(row *sql.Row) (*CommandMessage, error) {
 	var startedAt sql.NullTime
 	var completedAt sql.NullTime
 	var resultJSON string
+	var conversationID sql.NullString
 
 	if err := row.Scan(
 		&cmd.ID, &cmd.AgentID, &cmd.PrincipalID, &cmd.Command, &cmd.Instruction, &cmd.Profile, &cmd.ExecutorKind, &cmd.AllowDiff, &cmd.Status,
 		&exitCode, &durationMs, &cmd.CreatedAt, &startedAt, &completedAt,
 		&cmd.ErrorMessage, &cmd.FinalSummary, &resultJSON, &cmd.Env, &cmd.WorkingDir, &cmd.TimeoutSeconds, &cmd.LastAckSeq, &cmd.SourceType,
-		&cmd.PrincipalName, &cmd.AgentResourceID,
+		&conversationID, &cmd.PrincipalName, &cmd.AgentResourceID,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -197,6 +201,12 @@ func scanCommand(row *sql.Row) (*CommandMessage, error) {
 	cmd.StartedAt = startedAt
 	cmd.CompletedAt = completedAt
 	cmd.ResultJSON = resultJSON
+	if conversationID.Valid {
+		id, err := uuid.Parse(conversationID.String)
+		if err == nil {
+			cmd.ConversationID = &id
+		}
+	}
 	return &cmd, nil
 }
 
@@ -213,7 +223,7 @@ func (s *Store) ListCommands(ctx context.Context, find *FindCommandMessage) ([]*
 		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
 		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq, c.source_type,
-		COALESCE(p.name, ''), a.resource_id
+		c.conversation_id, COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id
 	JOIN principal p ON p.id = c.principal_id
@@ -240,12 +250,13 @@ func (s *Store) ListCommands(ctx context.Context, find *FindCommandMessage) ([]*
 		var startedAt sql.NullTime
 		var completedAt sql.NullTime
 		var resultJSON string
+		var conversationID sql.NullString
 
 		if err := rows.Scan(
 			&cmd.ID, &cmd.AgentID, &cmd.PrincipalID, &cmd.Command, &cmd.Instruction, &cmd.Profile, &cmd.ExecutorKind, &cmd.AllowDiff, &cmd.Status,
 			&exitCode, &durationMs, &cmd.CreatedAt, &startedAt, &completedAt,
 			&cmd.ErrorMessage, &cmd.FinalSummary, &resultJSON, &cmd.Env, &cmd.WorkingDir, &cmd.TimeoutSeconds, &cmd.LastAckSeq, &cmd.SourceType,
-			&cmd.PrincipalName, &cmd.AgentResourceID,
+			&conversationID, &cmd.PrincipalName, &cmd.AgentResourceID,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan command row")
 		}
@@ -255,6 +266,12 @@ func (s *Store) ListCommands(ctx context.Context, find *FindCommandMessage) ([]*
 		cmd.StartedAt = startedAt
 		cmd.CompletedAt = completedAt
 		cmd.ResultJSON = resultJSON
+		if conversationID.Valid {
+			id, parseErr := uuid.Parse(conversationID.String)
+			if parseErr == nil {
+				cmd.ConversationID = &id
+			}
+		}
 		commands = append(commands, &cmd)
 	}
 	if err := rows.Err(); err != nil {
@@ -416,7 +433,7 @@ func (s *Store) GetNextPendingCommand(ctx context.Context, agentID int) (*Comman
 		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
 		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq, c.source_type,
-		COALESCE(p.name, ''), a.resource_id
+		c.conversation_id, COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id
 	JOIN principal p ON p.id = c.principal_id
@@ -432,7 +449,7 @@ func (s *Store) GetRunningCommand(ctx context.Context, agentID int) (*CommandMes
 		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
 		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq, c.source_type,
-		COALESCE(p.name, ''), a.resource_id
+		c.conversation_id, COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id
 	JOIN principal p ON p.id = c.principal_id
@@ -444,57 +461,28 @@ func (s *Store) GetRunningCommand(ctx context.Context, agentID int) (*CommandMes
 }
 
 type ChatHistoryEntry struct {
-	CommandID    string
-	Instruction  string
-	FinalSummary string
-	CreatedAt    time.Time
-}
-
-func (s *Store) GetRecentChatHistory(ctx context.Context, agentID, principalID int, limit int) ([]*ChatHistoryEntry, error) {
-	rows, err := s.GetDB().QueryContext(ctx, `
-		SELECT c.id, c.instruction, c.final_summary, c.created_at
-		FROM command c
-		WHERE c.agent_id = $1 AND c.principal_id = $2 AND c.source_type = 2
-		ORDER BY c.created_at DESC
-		LIMIT $3
-	`, agentID, principalID, limit)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to query recent chat history")
-	}
-	defer rows.Close()
-
-	var entries []*ChatHistoryEntry
-	for rows.Next() {
-		var e ChatHistoryEntry
-		var cmdID uuid.UUID
-		if err := rows.Scan(&cmdID, &e.Instruction, &e.FinalSummary, &e.CreatedAt); err != nil {
-			return nil, errors.Wrapf(err, "failed to scan chat history row")
-		}
-		e.CommandID = cmdID.String()
-		entries = append(entries, &e)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errors.Wrapf(err, "failed to iterate chat history rows")
-	}
-
-	return entries, nil
+	MessageID string
+	CommandID string
+	Role      string
+	Content   string
+	CreatedAt time.Time
 }
 
 func (s *Store) SearchChatHistory(ctx context.Context, agentID, principalID int, query string, since, until *time.Time, limit int) ([]*ChatHistoryEntry, error) {
 	args := []any{agentID, principalID}
-	where := `c.agent_id = $1 AND c.principal_id = $2 AND c.source_type = 2`
+	where := `c.agent_id = $1 AND cm.principal_id = $2`
 
 	if query != "" {
 		args = append(args, "%"+query+"%")
-		where += fmt.Sprintf(` AND (c.instruction ILIKE $%d OR c.final_summary ILIKE $%d)`, len(args), len(args))
+		where += fmt.Sprintf(` AND cm.content ILIKE $%d`, len(args))
 	}
 	if since != nil {
 		args = append(args, since)
-		where += fmt.Sprintf(` AND c.created_at >= $%d`, len(args))
+		where += fmt.Sprintf(` AND cm.created_at >= $%d`, len(args))
 	}
 	if until != nil {
 		args = append(args, until)
-		where += fmt.Sprintf(` AND c.created_at <= $%d`, len(args))
+		where += fmt.Sprintf(` AND cm.created_at <= $%d`, len(args))
 	}
 	if limit <= 0 || limit > 50 {
 		limit = 10
@@ -502,10 +490,11 @@ func (s *Store) SearchChatHistory(ctx context.Context, agentID, principalID int,
 	args = append(args, limit)
 
 	rows, err := s.GetDB().QueryContext(ctx, fmt.Sprintf(`
-		SELECT c.id, c.instruction, c.final_summary, c.created_at
-		FROM command c
+		SELECT cm.id, cm.command_id, cm.role, cm.content, cm.created_at
+		FROM chat_message cm
+		JOIN conversation c ON c.id = cm.conversation_id
 		WHERE %s
-		ORDER BY c.created_at DESC
+		ORDER BY cm.created_at DESC
 		LIMIT $%d
 	`, where, len(args)), args...)
 	if err != nil {
@@ -516,11 +505,15 @@ func (s *Store) SearchChatHistory(ctx context.Context, agentID, principalID int,
 	var entries []*ChatHistoryEntry
 	for rows.Next() {
 		var e ChatHistoryEntry
-		var cmdID uuid.UUID
-		if err := rows.Scan(&cmdID, &e.Instruction, &e.FinalSummary, &e.CreatedAt); err != nil {
+		var msgID uuid.UUID
+		var cmdID uuid.NullUUID
+		if err := rows.Scan(&msgID, &cmdID, &e.Role, &e.Content, &e.CreatedAt); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan chat history row")
 		}
-		e.CommandID = cmdID.String()
+		e.MessageID = msgID.String()
+		if cmdID.Valid {
+			e.CommandID = cmdID.UUID.String()
+		}
 		entries = append(entries, &e)
 	}
 	if err := rows.Err(); err != nil {

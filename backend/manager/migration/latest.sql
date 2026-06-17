@@ -263,7 +263,7 @@ CREATE TABLE conversation (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_conversation_agent_principal ON conversation(agent_id, created_by, type);
+CREATE UNIQUE INDEX idx_conversation_agent_principal ON conversation(agent_id, created_by, type);
 
 CREATE TABLE conversation_member (
     conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
