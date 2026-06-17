@@ -41,21 +41,21 @@ export function ChatPage() {
 
   const chatMessages = useAppStore((s) => s.chatMessages[agent] ?? []);
   const chatLoading = useAppStore((s) => s.chatLoading);
-  const sendCommand = useAppStore((s) => s.sendCommand);
-  const getCommand = useAppStore((s) => s.getCommand);
-  const loadChatHistory = useAppStore((s) => s.loadChatHistory);
 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [waitingCommand, setWaitingCommand] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const loadedRef = useRef(false);
 
   const load = useCallback(() => {
-    loadChatHistory(agent, 100);
-  }, [agent, loadChatHistory]);
+    useAppStore.getState().loadChatHistory(agent, 100);
+  }, [agent]);
 
   useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     load();
   }, [load]);
 
@@ -73,16 +73,16 @@ export function ChatPage() {
     setWaitingCommand(true);
 
     try {
-      const res = await sendCommand(agent, text, {
+      const res = await useAppStore.getState().sendCommand(agent, text, {
         executorKind: 2,
         instruction: text,
-        source: 2, // CHAT
+        source: 2,
       });
 
       if (res.name) {
         const checkCommand = async () => {
           try {
-            const cmd = await getCommand(res.name);
+            const cmd = await useAppStore.getState().getCommand(res.name);
             if (!cmd) return;
 
             if (
