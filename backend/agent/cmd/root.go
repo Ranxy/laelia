@@ -10,6 +10,7 @@ var flags struct {
 	insecure   bool
 	allowHTTP  bool
 	acpConfig  string
+	agentName  string
 }
 
 var rootCmd = &cobra.Command{
@@ -27,5 +28,6 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&flags.insecure, "insecure", false, "skip TLS certificate verification")
 	rootCmd.PersistentFlags().BoolVar(&flags.allowHTTP, "allow-http", false, "allow plain HTTP connections (insecure, dev only)")
 	rootCmd.PersistentFlags().StringVar(&flags.acpConfig, "acp-config", "", "path to ACP profile config file (defaults to ~/.laelia/acp.yaml if present)")
+	rootCmd.PersistentFlags().StringVar(&flags.agentName, "agent-name", "", "agent resource name used for API routing")
 	_ = rootCmd.MarkPersistentFlagRequired("token")
 }

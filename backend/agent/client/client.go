@@ -22,6 +22,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/agent/credential"
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	mcpsrv "github.com/Ranxy/laelia/backend/agent/mcp"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
@@ -57,6 +58,8 @@ type Client struct {
 	backoff     *ExponentialBackoff
 	cmdStream   *commandStream
 	acpConfig   *executor.ACPConfig
+	mcpServer   *mcpsrv.Server
+	agentName   string
 }
 
 type ExponentialBackoff struct {
@@ -84,7 +87,7 @@ func (eb *ExponentialBackoff) Reset() {
 	eb.attempt = 0
 }
 
-func New(managerURL, token string, insecure bool, allowHTTP bool, acpConfigPath string) (*Client, error) {
+func New(managerURL, token string, insecure bool, allowHTTP bool, acpConfigPath, agentName string) (*Client, error) {
 	managerURL = strings.TrimRight(managerURL, "/")
 
 	acpConfig, err := executor.LoadACPConfig(acpConfigPath)
@@ -136,6 +139,7 @@ func New(managerURL, token string, insecure bool, allowHTTP bool, acpConfigPath 
 		credential:   credential.New(filepath.Join(tokenDir, "agent-token"), token),
 		backoff:      NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
 		acpConfig:    acpConfig,
+		agentName:    agentName,
 	}, nil
 }
 
@@ -261,7 +265,21 @@ func (c *Client) Run(ctx context.Context) error {
 	info := collectAgentInfo(c.acpConfig)
 	slog.Info("connecting to manager", "url", c.managerURL)
 
-	c.cmdStream = newCommandStream(c.streamClient, c.managerURL, c.acpConfig)
+	mcpSrv, err := mcpsrv.New(c.managerURL, c.agentName, func() string {
+		c.mu.RLock()
+		defer c.mu.RUnlock()
+		return c.accessToken
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to create MCP server")
+	}
+	if err := mcpSrv.Start(); err != nil {
+		return errors.Wrap(err, "failed to start MCP server")
+	}
+	c.mcpServer = mcpSrv
+	defer mcpSrv.Stop()
+
+	c.cmdStream = newCommandStream(c.streamClient, c.managerURL, c.acpConfig, mcpSrv.Port(), c.agentName)
 	c.cmdStream.getToken = func() string {
 		c.mu.RLock()
 		defer c.mu.RUnlock()

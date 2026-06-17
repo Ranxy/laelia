@@ -66,20 +66,24 @@ func (m *mergedText) flush(stream *connect.BidiStreamForClient[v1pb.AgentCommand
 }
 
 type commandStream struct {
-	client     v1connect.AgentCommandServiceClient
-	managerURL string
-	backoff    *ExponentialBackoff
-	getToken   func() string
-	getSessID  func() string
-	acpConfig  *executor.ACPConfig
+	client          v1connect.AgentCommandServiceClient
+	managerURL      string
+	backoff         *ExponentialBackoff
+	getToken        func() string
+	getSessID       func() string
+	acpConfig       *executor.ACPConfig
+	mcpPort         int
+	agentResourceID string
 }
 
-func newCommandStream(httpClient *http.Client, managerURL string, acpConfig *executor.ACPConfig) *commandStream {
+func newCommandStream(httpClient *http.Client, managerURL string, acpConfig *executor.ACPConfig, mcpPort int, agentResourceID string) *commandStream {
 	return &commandStream{
-		client:     v1connect.NewAgentCommandServiceClient(httpClient, managerURL),
-		managerURL: managerURL,
-		backoff:    NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
-		acpConfig:  acpConfig,
+		client:          v1connect.NewAgentCommandServiceClient(httpClient, managerURL),
+		managerURL:      managerURL,
+		backoff:         NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
+		acpConfig:       acpConfig,
+		mcpPort:         mcpPort,
+		agentResourceID: agentResourceID,
 	}
 }
 
@@ -386,15 +390,19 @@ func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime
 		return executor.New(req.Command, req.Env, req.WorkingDir, req.TimeoutSeconds), nil
 	case v1pb.ExecutorKind_ACP:
 		return executor.NewACP(executor.Request{
-			CommandID:      req.CommandId,
-			Command:        req.Command,
-			Instruction:    req.Instruction,
-			Profile:        req.Profile,
-			WorkingDir:     req.WorkingDir,
-			Env:            req.Env,
-			TimeoutSeconds: req.TimeoutSeconds,
-			ExecutorKind:   kind,
-			AllowDiff:      req.AllowDiff,
+			CommandID:       req.CommandId,
+			Command:         req.Command,
+			Instruction:     req.Instruction,
+			Profile:         req.Profile,
+			WorkingDir:      req.WorkingDir,
+			Env:             req.Env,
+			TimeoutSeconds:  req.TimeoutSeconds,
+			ExecutorKind:    kind,
+			AllowDiff:       req.AllowDiff,
+			SourceType:      int32(req.Source),
+			AgentResourceID: c.agentResourceID,
+			PrincipalID:     req.PrincipalId,
+			MCPPort:         c.mcpPort,
 		}, c.acpConfig)
 	default:
 		return nil, connect.NewError(connect.CodeInvalidArgument, io.ErrUnexpectedEOF)

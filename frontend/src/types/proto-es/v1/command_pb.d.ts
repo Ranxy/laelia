@@ -882,6 +882,11 @@ export declare type CommandRequest = Message<"laelia.v1.CommandRequest"> & {
    * @generated from field: laelia.v1.CommandSource source = 10;
    */
   source: CommandSource;
+
+  /**
+   * @generated from field: string principal_id = 11;
+   */
+  principalId: string;
 };
 
 /**

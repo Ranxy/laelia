@@ -87,6 +87,7 @@
     - [AgentReady](#laelia-v1-AgentReady)
     - [CancelCommandRequest](#laelia-v1-CancelCommandRequest)
     - [CancelMessage](#laelia-v1-CancelMessage)
+    - [ChatHistoryEntry](#laelia-v1-ChatHistoryEntry)
     - [Command](#laelia-v1-Command)
     - [Command.EnvEntry](#laelia-v1-Command-EnvEntry)
     - [CommandEvent](#laelia-v1-CommandEvent)
@@ -97,6 +98,8 @@
     - [CommandResult](#laelia-v1-CommandResult)
     - [DiffEmittedPayload](#laelia-v1-DiffEmittedPayload)
     - [FinalSummaryPayload](#laelia-v1-FinalSummaryPayload)
+    - [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest)
+    - [GetCommandContextResponse](#laelia-v1-GetCommandContextResponse)
     - [GetCommandRequest](#laelia-v1-GetCommandRequest)
     - [LifecyclePayload](#laelia-v1-LifecyclePayload)
     - [ListCommandsRequest](#laelia-v1-ListCommandsRequest)
@@ -111,6 +114,8 @@
     - [Pong](#laelia-v1-Pong)
     - [RawAcpPayload](#laelia-v1-RawAcpPayload)
     - [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest)
+    - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
+    - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
     - [SendCommandRequest](#laelia-v1-SendCommandRequest)
     - [SendCommandRequest.EnvEntry](#laelia-v1-SendCommandRequest-EnvEntry)
     - [TextDeltaPayload](#laelia-v1-TextDeltaPayload)
@@ -122,6 +127,7 @@
   
     - [CommandEventType](#laelia-v1-CommandEventType)
     - [CommandOutput.StreamType](#laelia-v1-CommandOutput-StreamType)
+    - [CommandSource](#laelia-v1-CommandSource)
     - [CommandStatus](#laelia-v1-CommandStatus)
     - [ExecutorKind](#laelia-v1-ExecutorKind)
   
@@ -1266,6 +1272,24 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-ChatHistoryEntry"></a>
+
+### ChatHistoryEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_id | [string](#string) |  |  |
+| instruction | [string](#string) |  |  |
+| final_summary | [string](#string) |  |  |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-Command"></a>
 
 ### Command
@@ -1294,6 +1318,8 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | final_summary | [string](#string) |  |  |
 | result | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
 | allow_diff | [bool](#bool) |  |  |
+| source | [CommandSource](#laelia-v1-CommandSource) |  |  |
+| conversation_id | [string](#string) |  |  |
 
 
 
@@ -1400,6 +1426,8 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | instruction | [string](#string) |  |  |
 | profile | [string](#string) |  |  |
 | allow_diff | [bool](#bool) |  |  |
+| source | [CommandSource](#laelia-v1-CommandSource) |  |  |
+| principal_id | [string](#string) |  |  |
 
 
 
@@ -1470,6 +1498,38 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | ----- | ---- | ----- | ----------- |
 | stop_reason | [string](#string) |  |  |
 | session_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetCommandContextRequest"></a>
+
+### GetCommandContextRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetCommandContextResponse"></a>
+
+### GetCommandContextResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command | [Command](#laelia-v1-Command) |  |  |
+| outputs | [CommandOutput](#laelia-v1-CommandOutput) | repeated |  |
+| events | [CommandEvent](#laelia-v1-CommandEvent) | repeated |  |
 
 
 
@@ -1708,6 +1768,41 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-SearchChatHistoryRequest"></a>
+
+### SearchChatHistoryRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent | [string](#string) |  |  |
+| query | [string](#string) |  |  |
+| since | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| until | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| principal_id | [string](#string) |  |  |
+| limit | [int32](#int32) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SearchChatHistoryResponse"></a>
+
+### SearchChatHistoryResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| entries | [ChatHistoryEntry](#laelia-v1-ChatHistoryEntry) | repeated |  |
+
+
+
+
+
+
 <a name="laelia-v1-SendCommandRequest"></a>
 
 ### SendCommandRequest
@@ -1725,6 +1820,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | instruction | [string](#string) |  |  |
 | profile | [string](#string) |  |  |
 | allow_diff | [bool](#bool) |  |  |
+| source | [CommandSource](#laelia-v1-CommandSource) |  |  |
 
 
 
@@ -1880,6 +1976,19 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-CommandSource"></a>
+
+### CommandSource
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| COMMAND_SOURCE_UNSPECIFIED | 0 |  |
+| MANUAL | 1 |  |
+| CHAT | 2 |  |
+
+
+
 <a name="laelia-v1-CommandStatus"></a>
 
 ### CommandStatus
@@ -1938,6 +2047,8 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | WatchCommand | [WatchCommandRequest](#laelia-v1-WatchCommandRequest) | [CommandOutput](#laelia-v1-CommandOutput) stream |  |
 | WatchCommandEvents | [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest) | [CommandEvent](#laelia-v1-CommandEvent) stream |  |
 | RespondPermission | [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+| SearchChatHistory | [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest) | [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse) |  |
+| GetCommandContext | [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest) | [GetCommandContextResponse](#laelia-v1-GetCommandContextResponse) |  |
 
  
 

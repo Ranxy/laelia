@@ -338,7 +338,7 @@ func (e *ACPExecutor) run() {
 	sessionResp, err := e.conn.NewSession(e.ctx, acp.NewSessionRequest{
 		Cwd:                   e.workingDir,
 		AdditionalDirectories: additionalRoots(e.allowedRoots, e.workingDir),
-		McpServers:            []acp.McpServer{},
+		McpServers:            e.buildMCPServers(),
 	})
 	if err != nil {
 		e.finishACPProcess(err)
@@ -1009,4 +1009,21 @@ func maxInt(left int, right int) int {
 		return left
 	}
 	return right
+}
+
+func (e *ACPExecutor) buildMCPServers() []acp.McpServer {
+	if e.request.SourceType != int32(v1pb.CommandSource_CHAT) || e.request.MCPPort <= 0 {
+		return []acp.McpServer{}
+	}
+
+	url := fmt.Sprintf("http://127.0.0.1:%d/mcp?agent=%s&principal=%s",
+		e.request.MCPPort, e.request.AgentResourceID, e.request.PrincipalID)
+
+	return []acp.McpServer{{
+		Http: &acp.McpServerHttpInline{
+			Type: "http",
+			Name: "laelia-chat",
+			Url:  url,
+		},
+	}}
 }

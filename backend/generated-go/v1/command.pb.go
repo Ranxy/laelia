@@ -2154,6 +2154,7 @@ type CommandRequest struct {
 	Profile        string                 `protobuf:"bytes,8,opt,name=profile,proto3" json:"profile,omitempty"`
 	AllowDiff      bool                   `protobuf:"varint,9,opt,name=allow_diff,json=allowDiff,proto3" json:"allow_diff,omitempty"`
 	Source         CommandSource          `protobuf:"varint,10,opt,name=source,proto3,enum=laelia.v1.CommandSource" json:"source,omitempty"`
+	PrincipalId    string                 `protobuf:"bytes,11,opt,name=principal_id,json=principalId,proto3" json:"principal_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -2256,6 +2257,13 @@ func (x *CommandRequest) GetSource() CommandSource {
 		return x.Source
 	}
 	return CommandSource_COMMAND_SOURCE_UNSPECIFIED
+}
+
+func (x *CommandRequest) GetPrincipalId() string {
+	if x != nil {
+		return x.PrincipalId
+	}
+	return ""
 }
 
 type CommandProgress struct {
@@ -3276,7 +3284,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x0flast_command_id\x18\x02 \x01(\tR\rlastCommandId\x12 \n" +
 	"\flast_ack_seq\x18\x03 \x01(\x05R\n" +
 	"lastAckSeq\x12$\n" +
-	"\x0elast_event_seq\x18\x04 \x01(\x05R\flastEventSeq\"\xcc\x03\n" +
+	"\x0elast_event_seq\x18\x04 \x01(\x05R\flastEventSeq\"\xef\x03\n" +
 	"\x0eCommandRequest\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12\x18\n" +
@@ -3291,7 +3299,8 @@ const file_v1_command_proto_rawDesc = "" +
 	"\n" +
 	"allow_diff\x18\t \x01(\bR\tallowDiff\x120\n" +
 	"\x06source\x18\n" +
-	" \x01(\x0e2\x18.laelia.v1.CommandSourceR\x06source\x1a6\n" +
+	" \x01(\x0e2\x18.laelia.v1.CommandSourceR\x06source\x12!\n" +
+	"\fprincipal_id\x18\v \x01(\tR\vprincipalId\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9a\x01\n" +

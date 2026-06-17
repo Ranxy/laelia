@@ -498,6 +498,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ChatHistoryEntry"><span class="badge">M</span>ChatHistoryEntry</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.Command"><span class="badge">M</span>Command</a>
                 </li>
               
@@ -535,6 +539,14 @@
               
                 <li>
                   <a href="#laelia.v1.FinalSummaryPayload"><span class="badge">M</span>FinalSummaryPayload</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetCommandContextRequest"><span class="badge">M</span>GetCommandContextRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetCommandContextResponse"><span class="badge">M</span>GetCommandContextResponse</a>
                 </li>
               
                 <li>
@@ -594,6 +606,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.SearchChatHistoryRequest"><span class="badge">M</span>SearchChatHistoryRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SearchChatHistoryResponse"><span class="badge">M</span>SearchChatHistoryResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.SendCommandRequest"><span class="badge">M</span>SendCommandRequest</a>
                 </li>
               
@@ -632,6 +652,10 @@
               
                 <li>
                   <a href="#laelia.v1.CommandOutput.StreamType"><span class="badge">E</span>CommandOutput.StreamType</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.CommandSource"><span class="badge">E</span>CommandSource</a>
                 </li>
               
                 <li>
@@ -3512,6 +3536,51 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.ChatHistoryEntry">ChatHistoryEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>command_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>instruction</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>final_summary</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.Command">Command</h3>
         <p></p>
 
@@ -3658,6 +3727,20 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>allow_diff</td>
                   <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>source</td>
+                  <td><a href="#laelia.v1.CommandSource">CommandSource</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>conversation_id</td>
+                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -3999,6 +4082,20 @@ Format: idps/{idp} </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>source</td>
+                  <td><a href="#laelia.v1.CommandSource">CommandSource</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>principal_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -4162,6 +4259,68 @@ Format: idps/{idp} </p></td>
                   <td>session_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetCommandContextRequest">GetCommandContextRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetCommandContextResponse">GetCommandContextResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>command</td>
+                  <td><a href="#laelia.v1.Command">Command</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>outputs</td>
+                  <td><a href="#laelia.v1.CommandOutput">CommandOutput</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>events</td>
+                  <td><a href="#laelia.v1.CommandEvent">CommandEvent</a></td>
+                  <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
               
@@ -4662,6 +4821,89 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.SearchChatHistoryRequest">SearchChatHistoryRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>query</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>since</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>until</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>principal_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>limit</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SearchChatHistoryResponse">SearchChatHistoryResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>entries</td>
+                  <td><a href="#laelia.v1.ChatHistoryEntry">ChatHistoryEntry</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.SendCommandRequest">SendCommandRequest</h3>
         <p></p>
 
@@ -4731,6 +4973,13 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>allow_diff</td>
                   <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>source</td>
+                  <td><a href="#laelia.v1.CommandSource">CommandSource</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -5072,6 +5321,35 @@ Format: idps/{idp} </p></td>
           </tbody>
         </table>
       
+        <h3 id="laelia.v1.CommandSource">CommandSource</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>COMMAND_SOURCE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>MANUAL</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>CHAT</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
         <h3 id="laelia.v1.CommandStatus">CommandStatus</h3>
         <p></p>
         <table class="enum-table">
@@ -5234,6 +5512,20 @@ Format: idps/{idp} </p></td>
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>SearchChatHistory</td>
+                <td><a href="#laelia.v1.SearchChatHistoryRequest">SearchChatHistoryRequest</a></td>
+                <td><a href="#laelia.v1.SearchChatHistoryResponse">SearchChatHistoryResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>GetCommandContext</td>
+                <td><a href="#laelia.v1.GetCommandContextRequest">GetCommandContextRequest</a></td>
+                <td><a href="#laelia.v1.GetCommandContextResponse">GetCommandContextResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
           </tbody>
         </table>
 
@@ -5319,6 +5611,26 @@ Format: idps/{idp} </p></td>
                 <td>POST</td>
                 <td>/v1/{name=agents/*/commands/*}:respondPermission</td>
                 <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>SearchChatHistory</td>
+                <td>GET</td>
+                <td>/v1/{agent=agents/*}/chat-history</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetCommandContext</td>
+                <td>GET</td>
+                <td>/v1/{name=agents/*/commands/*}/context</td>
+                <td></td>
               </tr>
               
             

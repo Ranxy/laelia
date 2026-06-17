@@ -7,15 +7,19 @@ import (
 )
 
 type Request struct {
-	CommandID      string
-	Command        string
-	Instruction    string
-	Profile        string
-	WorkingDir     string
-	Env            map[string]string
-	TimeoutSeconds int32
-	ExecutorKind   v1pb.ExecutorKind
-	AllowDiff      bool
+	CommandID       string
+	Command         string
+	Instruction     string
+	Profile         string
+	WorkingDir      string
+	Env             map[string]string
+	TimeoutSeconds  int32
+	ExecutorKind    v1pb.ExecutorKind
+	AllowDiff       bool
+	SourceType      int32
+	AgentResourceID string
+	PrincipalID     string
+	MCPPort         int
 }
 
 type Event struct {

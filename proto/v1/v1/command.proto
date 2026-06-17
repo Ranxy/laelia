@@ -312,6 +312,7 @@ message CommandRequest {
   string profile = 8;
   bool allow_diff = 9;
   CommandSource source = 10;
+  string principal_id = 11;
 }
 
 message CommandProgress {

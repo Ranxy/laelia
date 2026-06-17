@@ -2,6 +2,7 @@ package dispatcher
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -145,6 +146,7 @@ func (d *Dispatcher) DispatchCommand(ctx context.Context, cmd *store.CommandMess
 				Profile:        cmd.Profile,
 				AllowDiff:      cmd.AllowDiff,
 				Source:         v1pb.CommandSource(cmd.SourceType),
+				PrincipalId:    fmt.Sprintf("%d", cmd.PrincipalID),
 			},
 		},
 	}

@@ -132,6 +132,54 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}/chat-history:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_SearchChatHistory
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+                - name: query
+                  in: query
+                  schema:
+                    type: string
+                - name: since
+                  in: query
+                  schema:
+                    type: string
+                    format: date-time
+                - name: until
+                  in: query
+                  schema:
+                    type: string
+                    format: date-time
+                - name: principalId
+                  in: query
+                  schema:
+                    type: string
+                - name: limit
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/SearchChatHistoryResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}/commands:
         get:
             tags:
@@ -234,6 +282,37 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Command'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}/commands/{command}/context:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_GetCommandContext
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+                - name: command
+                  in: path
+                  description: The command id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetCommandContextResponse'
                 default:
                     description: Default error response
                     content:
@@ -1143,6 +1222,18 @@ components:
                     type: string
                 reason:
                     type: string
+        ChatHistoryEntry:
+            type: object
+            properties:
+                commandId:
+                    type: string
+                instruction:
+                    type: string
+                finalSummary:
+                    type: string
+                createdAt:
+                    type: string
+                    format: date-time
         Command:
             type: object
             properties:
@@ -1206,6 +1297,15 @@ components:
                     type: object
                 allowDiff:
                     type: boolean
+                source:
+                    enum:
+                        - COMMAND_SOURCE_UNSPECIFIED
+                        - MANUAL
+                        - CHAT
+                    type: string
+                    format: enum
+                conversationId:
+                    type: string
         CommandEvent:
             type: object
             properties:
@@ -1335,6 +1435,19 @@ components:
                     type: string
                 reason:
                     type: string
+        GetCommandContextResponse:
+            type: object
+            properties:
+                command:
+                    $ref: '#/components/schemas/Command'
+                outputs:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/CommandOutput'
+                events:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/CommandEvent'
         GoogleProtobufAny:
             type: object
             properties:
@@ -1558,6 +1671,13 @@ components:
             properties:
                 bootstrapToken:
                     type: string
+        SearchChatHistoryResponse:
+            type: object
+            properties:
+                entries:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ChatHistoryEntry'
         SendCommandRequest:
             required:
                 - agent
@@ -1590,6 +1710,13 @@ components:
                     type: string
                 allowDiff:
                     type: boolean
+                source:
+                    enum:
+                        - COMMAND_SOURCE_UNSPECIFIED
+                        - MANUAL
+                        - CHAT
+                    type: string
+                    format: enum
         Status:
             type: object
             properties:
