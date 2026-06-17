@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Badge } from "@/react/components/ui/badge";
 import { Button } from "@/react/components/ui/button";
@@ -47,17 +47,13 @@ export function ChatPage() {
   const [waitingCommand, setWaitingCommand] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const loadedRef = useRef(false);
-
-  const load = useCallback(() => {
-    useAppStore.getState().loadChatHistory(agent, 100);
-  }, [agent]);
+  const lastAgentRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (loadedRef.current) return;
-    loadedRef.current = true;
-    load();
-  }, [load]);
+    if (lastAgentRef.current === agent) return;
+    lastAgentRef.current = agent;
+    useAppStore.getState().loadChatHistory(agent, 100);
+  }, [agent]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -94,7 +90,7 @@ export function ChatPage() {
                 pollRef.current = null;
               }
               setWaitingCommand(false);
-              load();
+              useAppStore.getState().loadChatHistory(agent, 100);
             }
           } catch {
             // retry on next interval

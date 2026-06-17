@@ -183,8 +183,8 @@ func scanCommand(row *sql.Row) (*CommandMessage, error) {
 	if err := row.Scan(
 		&cmd.ID, &cmd.AgentID, &cmd.PrincipalID, &cmd.Command, &cmd.Instruction, &cmd.Profile, &cmd.ExecutorKind, &cmd.AllowDiff, &cmd.Status,
 		&exitCode, &durationMs, &cmd.CreatedAt, &startedAt, &completedAt,
-		&cmd.ErrorMessage, &cmd.FinalSummary, &resultJSON, &cmd.Env, &cmd.WorkingDir, &cmd.TimeoutSeconds, &cmd.LastAckSeq,
-		&cmd.PrincipalName, &cmd.AgentResourceID, &cmd.SourceType,
+		&cmd.ErrorMessage, &cmd.FinalSummary, &resultJSON, &cmd.Env, &cmd.WorkingDir, &cmd.TimeoutSeconds, &cmd.LastAckSeq, &cmd.SourceType,
+		&cmd.PrincipalName, &cmd.AgentResourceID,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -244,8 +244,8 @@ func (s *Store) ListCommands(ctx context.Context, find *FindCommandMessage) ([]*
 		if err := rows.Scan(
 			&cmd.ID, &cmd.AgentID, &cmd.PrincipalID, &cmd.Command, &cmd.Instruction, &cmd.Profile, &cmd.ExecutorKind, &cmd.AllowDiff, &cmd.Status,
 			&exitCode, &durationMs, &cmd.CreatedAt, &startedAt, &completedAt,
-			&cmd.ErrorMessage, &cmd.FinalSummary, &resultJSON, &cmd.Env, &cmd.WorkingDir, &cmd.TimeoutSeconds, &cmd.LastAckSeq,
-			&cmd.PrincipalName, &cmd.AgentResourceID, &cmd.SourceType,
+			&cmd.ErrorMessage, &cmd.FinalSummary, &resultJSON, &cmd.Env, &cmd.WorkingDir, &cmd.TimeoutSeconds, &cmd.LastAckSeq, &cmd.SourceType,
+			&cmd.PrincipalName, &cmd.AgentResourceID,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan command row")
 		}
