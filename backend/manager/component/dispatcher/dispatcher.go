@@ -371,6 +371,11 @@ func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb
 		return errors.Wrapf(err, "invalid command ID in result")
 	}
 
+	cmd, cmdLoadErr := d.store.GetCommand(ctx, cmdID)
+	if cmdLoadErr != nil {
+		slog.Warn("failed to load command for result handling", "commandID", cmdID, "error", cmdLoadErr)
+	}
+
 	d.mu.RLock()
 	sess, ok := d.sessions[agentID]
 	d.mu.RUnlock()
@@ -413,6 +418,18 @@ func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb
 	}
 	if err := d.store.UpdateCommandResultSummary(ctx, cmdID, result.FinalSummary, resultJSON); err != nil {
 		slog.Error("failed to update command result summary", "commandID", cmdID, "error", err)
+	}
+
+	if cmd != nil && cmd.SourceType == 2 && cmd.ConversationID != nil && result.FinalSummary != "" {
+		if _, msgErr := d.store.CreateChatMessage(ctx, &store.ChatMessage{
+			ConversationID: *cmd.ConversationID,
+			PrincipalID:    cmd.PrincipalID,
+			Role:           2, // ASSISTANT
+			Content:        result.FinalSummary,
+			CommandID:      uuid.NullUUID{UUID: cmdID, Valid: true},
+		}); msgErr != nil {
+			slog.Error("failed to create assistant chat message", "commandID", cmdID, "error", msgErr)
+		}
 	}
 
 	output := &v1pb.CommandOutput{

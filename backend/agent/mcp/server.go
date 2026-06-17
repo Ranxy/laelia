@@ -176,16 +176,10 @@ func (s *Server) handleSearchChatHistory(ctx context.Context, _ *mcp.CallToolReq
 
 	var results []chatHistoryResult
 	for _, e := range resp.Msg.Entries {
-		role := "user"
-		content := e.Instruction
-		if e.FinalSummary != "" && e.Instruction == "" {
-			role = "assistant"
-			content = e.FinalSummary
-		}
 		results = append(results, chatHistoryResult{
-			MessageID: e.CommandId,
-			Role:      role,
-			Content:   content,
+			MessageID: e.MessageId,
+			Role:      e.Role,
+			Content:   e.Content,
 			Timestamp: e.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
 		})
 	}

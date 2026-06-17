@@ -77,13 +77,26 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 		return nil, err
 	}
 
+	var conversationID *uuid.UUID
 	if req.Msg.Source == v1pb.CommandSource_CHAT && instruction != "" {
-		history, histErr := s.store.GetRecentChatHistory(ctx, agent.ID, principalID, 20)
-		if histErr != nil {
-			slog.Warn("failed to load chat history", "error", histErr)
-		}
-		if len(history) > 0 {
-			instruction = buildChatContext(history) + "\n---\n" + instruction
+		conv, convErr := s.store.GetOrCreateDirectConversation(ctx, agent.ID, principalID)
+		if convErr != nil {
+			slog.Warn("failed to get or create conversation", "error", convErr)
+		} else {
+			conversationID = &conv.ID
+			if _, msgErr := s.store.CreateChatMessage(ctx, &store.ChatMessage{
+				ConversationID: conv.ID,
+				PrincipalID:    principalID,
+				Role:           1, // USER
+				Content:        instruction,
+			}); msgErr != nil {
+				slog.Warn("failed to create user chat message", "error", msgErr)
+			}
+			if recent, recentErr := s.store.GetRecentChatMessages(ctx, conv.ID, 6); recentErr == nil && len(recent) > 0 {
+				if ctx := buildLightChatContext(recent); ctx != "" {
+					instruction = ctx + "\n---\n" + instruction
+				}
+			}
 		}
 	}
 
@@ -110,6 +123,7 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 		WorkingDir:     req.Msg.WorkingDir,
 		TimeoutSeconds: req.Msg.TimeoutSeconds,
 		SourceType:     int32(req.Msg.Source),
+		ConversationID: conversationID,
 	}
 
 	created, err := s.store.CreateCommand(ctx, cmd)
@@ -332,6 +346,14 @@ func (s *CommandService) RespondPermission(ctx context.Context, req *connect.Req
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
+func parseConversationID(conversation string) (uuid.UUID, error) {
+	parts := strings.Split(conversation, "/")
+	if len(parts) == 2 && parts[0] == "conversations" {
+		return uuid.Parse(parts[1])
+	}
+	return uuid.Parse(conversation)
+}
+
 func parseAgentResourceID(agent string) string {
 	parts := strings.Split(agent, "/")
 	if len(parts) >= 4 && parts[0] == "agents" {
@@ -360,6 +382,10 @@ func convertToV1Command(cmd *store.CommandMessage) *v1pb.Command {
 		FinalSummary:  cmd.FinalSummary,
 		WorkingDir:    cmd.WorkingDir,
 		Source:        v1pb.CommandSource(cmd.SourceType),
+	}
+
+	if cmd.ConversationID != nil {
+		v1cmd.ConversationId = cmd.ConversationID.String()
 	}
 
 	if cmd.ExitCode.Valid {
@@ -579,10 +605,11 @@ func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Req
 	var v1Entries []*v1pb.ChatHistoryEntry
 	for _, e := range entries {
 		v1Entries = append(v1Entries, &v1pb.ChatHistoryEntry{
-			CommandId:    e.CommandID,
-			Instruction:  e.Instruction,
-			FinalSummary: e.FinalSummary,
-			CreatedAt:    timestamppb.New(e.CreatedAt),
+			MessageId: e.MessageID,
+			CommandId: e.CommandID,
+			Role:      e.Role,
+			Content:   e.Content,
+			CreatedAt: timestamppb.New(e.CreatedAt),
 		})
 	}
 
@@ -628,22 +655,93 @@ func (s *CommandService) GetCommandContext(ctx context.Context, req *connect.Req
 	}), nil
 }
 
-func buildChatContext(entries []*store.ChatHistoryEntry) string {
-	var b strings.Builder
-	_, _ = b.WriteString("Conversation history:\n")
-	for i := len(entries) - 1; i >= 0; i-- {
-		e := entries[i]
-		_, _ = fmt.Fprintf(&b, "- User: %s\n", truncateText(e.Instruction, 2000))
-		if e.FinalSummary != "" {
-			_, _ = fmt.Fprintf(&b, "- Assistant: %s\n", truncateText(e.FinalSummary, 2000))
-		}
+func (s *CommandService) GetOrCreateConversation(ctx context.Context, req *connect.Request[v1pb.GetOrCreateConversationRequest]) (*connect.Response[v1pb.GetOrCreateConversationResponse], error) {
+	agentResourceID := parseAgentResourceID(req.Msg.Agent)
+	agent, err := s.store.GetAgentByResourceID(ctx, agentResourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get agent"))
 	}
-	return b.String()
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", agentResourceID))
+	}
+
+	user, _ := GetUserFromContext(ctx)
+	principalID := 1
+	if user != nil {
+		principalID = user.ID
+	}
+
+	conv, err := s.store.GetOrCreateDirectConversation(ctx, agent.ID, principalID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get or create conversation"))
+	}
+
+	return connect.NewResponse(&v1pb.GetOrCreateConversationResponse{
+		Name: fmt.Sprintf("conversations/%s", conv.ID.String()),
+	}), nil
 }
 
-func truncateText(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
+func (s *CommandService) ListConversationMessages(ctx context.Context, req *connect.Request[v1pb.ListConversationMessagesRequest]) (*connect.Response[v1pb.ListConversationMessagesResponse], error) {
+	convID, err := parseConversationID(req.Msg.Conversation)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation id"))
 	}
-	return s[:maxLen] + "..."
+
+	offset, err := parseLimitAndOffset(&pageSize{
+		token:   req.Msg.PageToken,
+		limit:   int(req.Msg.PageSize),
+		maximum: 100,
+	})
+	if err != nil {
+		return nil, err
+	}
+	limitPlusOne := offset.limit + 1
+
+	msgs, err := s.store.ListConversationMessages(ctx, convID, limitPlusOne, offset.offset)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list conversation messages"))
+	}
+
+	nextPageToken := ""
+	if len(msgs) == limitPlusOne {
+		msgs = msgs[:offset.limit]
+		nextPageToken, _ = offset.getNextPageToken()
+	}
+
+	var v1msgs []*v1pb.ChatMessage
+	for _, msg := range msgs {
+		v1m := &v1pb.ChatMessage{
+			Name:          msg.ID.String(),
+			Conversation:  msg.ConversationID.String(),
+			PrincipalName: msg.PrincipalName,
+			Role:          msg.Role,
+			Content:       msg.Content,
+			CreatedAt:     timestamppb.New(msg.CreatedAt),
+		}
+		if msg.CommandID.Valid {
+			v1m.CommandId = msg.CommandID.UUID.String()
+		}
+		v1msgs = append(v1msgs, v1m)
+	}
+
+	return connect.NewResponse(&v1pb.ListConversationMessagesResponse{
+		Messages:      v1msgs,
+		NextPageToken: nextPageToken,
+	}), nil
+}
+
+func buildLightChatContext(msgs []*store.ChatMessage) string {
+	var b strings.Builder
+	b.WriteString("## Recent conversation (use search_chat_history for older messages)\n")
+	count := 0
+	for i := len(msgs) - 1; i >= 0 && count < 6; i-- {
+		msg := msgs[i]
+		if msg.Role == 1 {
+			fmt.Fprintf(&b, "- User: %s\n", msg.Content)
+		} else {
+			fmt.Fprintf(&b, "- Assistant: %s\n", msg.Content)
+		}
+		count++
+	}
+	return b.String()
 }
