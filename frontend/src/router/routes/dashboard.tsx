@@ -2,6 +2,7 @@ import type { RouteObject } from "react-router-dom";
 import { DashboardLayout } from "@/react/app/layouts/dashboard-layout";
 import {
   AGENT_ROUTE_LIST,
+  CHAT_ROUTE,
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
   WORKSPACE_ROUTE_LANDING,
@@ -41,6 +42,14 @@ export const dashboardRoutes: RouteObject[] = [
         lazy: () =>
           import("@/react/pages/dashboard/command-detail").then((m) => ({
             Component: m.CommandDetailPage,
+          })),
+      },
+      {
+        path: "agents/:agentId/chat",
+        handle: { name: CHAT_ROUTE },
+        lazy: () =>
+          import("@/react/pages/dashboard/chat").then((m) => ({
+            Component: m.ChatPage,
           })),
       },
     ],

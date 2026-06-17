@@ -14,6 +14,7 @@ import { getLayerRoot, LAYER_SURFACE_CLASS } from "@/react/components/ui/layer";
 import { cn } from "@/react/lib/utils";
 import {
   AGENT_ROUTE_LIST,
+  CHAT_ROUTE,
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
   WORKSPACE_ROUTE_LANDING,
@@ -47,7 +48,8 @@ function getItemClass(item: SidebarItem, currentRouteName: string): string {
   if (
     item.name === AGENT_ROUTE_LIST &&
     (currentRouteName === COMMAND_ROUTE_LIST ||
-      currentRouteName === COMMAND_ROUTE_DETAIL)
+      currentRouteName === COMMAND_ROUTE_DETAIL ||
+      currentRouteName === CHAT_ROUTE)
   ) {
     return cn("router-link-active", "bg-link-hover");
   }

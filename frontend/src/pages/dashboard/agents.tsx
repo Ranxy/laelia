@@ -290,6 +290,20 @@ export function AgentsPage() {
                             /^agents\//,
                             ""
                           );
+                          navigate(`/agents/${resourceId}/chat`);
+                        }}
+                      >
+                        Chat
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const resourceId = agent.name.replace(
+                            /^agents\//,
+                            ""
+                          );
                           navigate(`/agents/${resourceId}/commands`);
                         }}
                       >

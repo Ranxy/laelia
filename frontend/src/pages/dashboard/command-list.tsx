@@ -116,7 +116,16 @@ export function CommandListPage() {
     <div className="p-6 flex flex-col gap-4 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-main">Tasks</h1>
-        <Button onClick={() => setSendOpen(true)}>New Task</Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/agents/${agentId}/chat`)}
+          >
+            Chat
+          </Button>
+          <Button onClick={() => setSendOpen(true)}>New Task</Button>
+        </div>
       </div>
 
       <Sheet
