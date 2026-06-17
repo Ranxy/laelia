@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useShallow } from "zustand/react/shallow";
 import { Badge } from "@/react/components/ui/badge";
 import { Button } from "@/react/components/ui/button";
 import { Input } from "@/react/components/ui/input";
 import { useAppStore } from "@/react/stores";
-import type { ChatMessage } from "@/react/stores/types";
-import { CommandStatus } from "@/types/proto-es/v1/command_pb";
+import type { ChatMessageUI } from "@/react/stores/types";
+import { CommandSource, CommandStatus } from "@/types/proto-es/v1/command_pb";
 
 const statusLabels: Record<number, string> = {
   [CommandStatus.PENDING]: "Pending",
@@ -40,10 +39,13 @@ export function ChatPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const agent = `agents/${agentId}`;
 
-  const chatMessages = useAppStore(
-    useShallow((s) => s.chatMessages[agent] ?? [])
-  );
+  const chatMessages = useAppStore((s) => s.chatMessages);
   const chatLoading = useAppStore((s) => s.chatLoading);
+  const getOrCreateConversation = useAppStore((s) => s.getOrCreateConversation);
+  const loadMessages = useAppStore((s) => s.loadMessages);
+  const sendChatMessage = useAppStore((s) => s.sendChatMessage);
+  const sendCommand = useAppStore((s) => s.sendCommand);
+  const getCommand = useAppStore((s) => s.getCommand);
 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -55,14 +57,29 @@ export function ChatPage() {
   useEffect(() => {
     if (lastAgentRef.current === agent) return;
     lastAgentRef.current = agent;
-    useAppStore.getState().loadChatHistory(agent, 100);
-  }, [agent]);
+
+    const init = async () => {
+      try {
+        const convName = await getOrCreateConversation(agent);
+        await loadMessages(convName);
+      } catch {
+        // conversation init failed
+      }
+    };
+    init();
+  }, [agent, getOrCreateConversation, loadMessages]);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [chatMessages]);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
 
   const handleSend = async () => {
     const text = input.trim();
@@ -72,16 +89,18 @@ export function ChatPage() {
     setWaitingCommand(true);
 
     try {
-      const res = await useAppStore.getState().sendCommand(agent, text, {
+      const res = await sendCommand(agent, text, {
         executorKind: 2,
         instruction: text,
-        source: 2,
+        source: CommandSource.CHAT,
       });
 
       if (res.name) {
+        sendChatMessage(agent, text);
+
         const checkCommand = async () => {
           try {
-            const cmd = await useAppStore.getState().getCommand(res.name);
+            const cmd = await getCommand(res.name);
             if (!cmd) return;
 
             if (
@@ -93,7 +112,10 @@ export function ChatPage() {
                 pollRef.current = null;
               }
               setWaitingCommand(false);
-              useAppStore.getState().loadChatHistory(agent, 100);
+              const convName = useAppStore.getState().conversations[agent];
+              if (convName) {
+                await loadMessages(convName);
+              }
             }
           } catch {
             // retry on next interval
@@ -108,12 +130,6 @@ export function ChatPage() {
       setSending(false);
     }
   };
-
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, []);
 
   const lastMsg = chatMessages[chatMessages.length - 1];
   const isWaiting = waitingCommand && lastMsg?.role === "user";
@@ -143,7 +159,7 @@ export function ChatPage() {
             Start a conversation with the agent
           </div>
         )}
-        {chatMessages.map((msg: ChatMessage) => (
+        {chatMessages.map((msg) => (
           <ChatBubble
             key={msg.id}
             msg={msg}
@@ -194,7 +210,7 @@ function ChatBubble({
   msg,
   onViewDetails,
 }: {
-  msg: ChatMessage;
+  msg: ChatMessageUI;
   onViewDetails: () => void;
 }) {
   const isUser = msg.role === "user";

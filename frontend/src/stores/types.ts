@@ -7,7 +7,7 @@ import type {
 } from "@/types/proto-es/v1/command_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";
 
-export interface ChatMessage {
+export interface ChatMessageUI {
   id: string;
   role: "user" | "assistant";
   content: string;
@@ -49,8 +49,6 @@ export interface CommandSlice {
   commandsLoading: boolean;
   activeOutputs: Record<string, CommandOutput[]>;
   activeEvents: Record<string, CommandEvent[]>;
-  chatMessages: Record<string, ChatMessage[]>;
-  chatLoading: boolean;
 
   sendCommand: (
     agent: string,
@@ -75,10 +73,18 @@ export interface CommandSlice {
   watchCommand: (name: string, signal?: AbortSignal) => Promise<void>;
   watchCommandEvents: (name: string, signal?: AbortSignal) => Promise<void>;
   respondPermission: (name: string, optionId: string) => Promise<void>;
-  sendChatMessage: (agent: string, instruction: string) => Promise<Command>;
-  loadChatHistory: (agent: string, limit?: number) => Promise<void>;
 }
 
-export type AppStoreState = AuthSlice & AgentSlice & CommandSlice;
+export interface ChatSlice {
+  conversations: Record<string, string>;
+  chatMessages: ChatMessageUI[];
+  chatLoading: boolean;
+
+  getOrCreateConversation: (agent: string) => Promise<string>;
+  loadMessages: (conversation: string) => Promise<void>;
+  sendChatMessage: (agent: string, instruction: string) => Promise<void>;
+}
+
+export type AppStoreState = AuthSlice & AgentSlice & CommandSlice & ChatSlice;
 
 export type AppSliceCreator<Slice> = StateCreator<AppStoreState, [], [], Slice>;
