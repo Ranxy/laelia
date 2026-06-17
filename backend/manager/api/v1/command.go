@@ -732,14 +732,14 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 
 func buildLightChatContext(msgs []*store.ChatMessage) string {
 	var b strings.Builder
-	b.WriteString("## Recent conversation (use search_chat_history for older messages)\n")
+	_, _ = b.WriteString("## Recent conversation (use search_chat_history for older messages)\n")
 	count := 0
 	for i := len(msgs) - 1; i >= 0 && count < 6; i-- {
 		msg := msgs[i]
 		if msg.Role == 1 {
-			fmt.Fprintf(&b, "- User: %s\n", msg.Content)
+			_, _ = fmt.Fprintf(&b, "- User: %s\n", msg.Content)
 		} else {
-			fmt.Fprintf(&b, "- Assistant: %s\n", msg.Content)
+			_, _ = fmt.Fprintf(&b, "- Assistant: %s\n", msg.Content)
 		}
 		count++
 	}
