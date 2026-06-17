@@ -63,6 +63,12 @@ const (
 	// CommandServiceGetCommandContextProcedure is the fully-qualified name of the CommandService's
 	// GetCommandContext RPC.
 	CommandServiceGetCommandContextProcedure = "/laelia.v1.CommandService/GetCommandContext"
+	// CommandServiceGetOrCreateConversationProcedure is the fully-qualified name of the
+	// CommandService's GetOrCreateConversation RPC.
+	CommandServiceGetOrCreateConversationProcedure = "/laelia.v1.CommandService/GetOrCreateConversation"
+	// CommandServiceListConversationMessagesProcedure is the fully-qualified name of the
+	// CommandService's ListConversationMessages RPC.
+	CommandServiceListConversationMessagesProcedure = "/laelia.v1.CommandService/ListConversationMessages"
 	// AgentCommandServiceCommandChannelProcedure is the fully-qualified name of the
 	// AgentCommandService's CommandChannel RPC.
 	AgentCommandServiceCommandChannelProcedure = "/laelia.v1.AgentCommandService/CommandChannel"
@@ -79,6 +85,8 @@ type CommandServiceClient interface {
 	RespondPermission(context.Context, *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error)
 	SearchChatHistory(context.Context, *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error)
 	GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error)
+	GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error)
+	ListConversationMessages(context.Context, *connect.Request[v1.ListConversationMessagesRequest]) (*connect.Response[v1.ListConversationMessagesResponse], error)
 }
 
 // NewCommandServiceClient constructs a client for the laelia.v1.CommandService service. By default,
@@ -146,20 +154,34 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("GetCommandContext")),
 			connect.WithClientOptions(opts...),
 		),
+		getOrCreateConversation: connect.NewClient[v1.GetOrCreateConversationRequest, v1.GetOrCreateConversationResponse](
+			httpClient,
+			baseURL+CommandServiceGetOrCreateConversationProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("GetOrCreateConversation")),
+			connect.WithClientOptions(opts...),
+		),
+		listConversationMessages: connect.NewClient[v1.ListConversationMessagesRequest, v1.ListConversationMessagesResponse](
+			httpClient,
+			baseURL+CommandServiceListConversationMessagesProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ListConversationMessages")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // commandServiceClient implements CommandServiceClient.
 type commandServiceClient struct {
-	sendCommand        *connect.Client[v1.SendCommandRequest, v1.Command]
-	listCommands       *connect.Client[v1.ListCommandsRequest, v1.ListCommandsResponse]
-	getCommand         *connect.Client[v1.GetCommandRequest, v1.Command]
-	cancelCommand      *connect.Client[v1.CancelCommandRequest, v1.Command]
-	watchCommand       *connect.Client[v1.WatchCommandRequest, v1.CommandOutput]
-	watchCommandEvents *connect.Client[v1.WatchCommandEventsRequest, v1.CommandEvent]
-	respondPermission  *connect.Client[v1.RespondPermissionRequest, emptypb.Empty]
-	searchChatHistory  *connect.Client[v1.SearchChatHistoryRequest, v1.SearchChatHistoryResponse]
-	getCommandContext  *connect.Client[v1.GetCommandContextRequest, v1.GetCommandContextResponse]
+	sendCommand              *connect.Client[v1.SendCommandRequest, v1.Command]
+	listCommands             *connect.Client[v1.ListCommandsRequest, v1.ListCommandsResponse]
+	getCommand               *connect.Client[v1.GetCommandRequest, v1.Command]
+	cancelCommand            *connect.Client[v1.CancelCommandRequest, v1.Command]
+	watchCommand             *connect.Client[v1.WatchCommandRequest, v1.CommandOutput]
+	watchCommandEvents       *connect.Client[v1.WatchCommandEventsRequest, v1.CommandEvent]
+	respondPermission        *connect.Client[v1.RespondPermissionRequest, emptypb.Empty]
+	searchChatHistory        *connect.Client[v1.SearchChatHistoryRequest, v1.SearchChatHistoryResponse]
+	getCommandContext        *connect.Client[v1.GetCommandContextRequest, v1.GetCommandContextResponse]
+	getOrCreateConversation  *connect.Client[v1.GetOrCreateConversationRequest, v1.GetOrCreateConversationResponse]
+	listConversationMessages *connect.Client[v1.ListConversationMessagesRequest, v1.ListConversationMessagesResponse]
 }
 
 // SendCommand calls laelia.v1.CommandService.SendCommand.
@@ -207,6 +229,16 @@ func (c *commandServiceClient) GetCommandContext(ctx context.Context, req *conne
 	return c.getCommandContext.CallUnary(ctx, req)
 }
 
+// GetOrCreateConversation calls laelia.v1.CommandService.GetOrCreateConversation.
+func (c *commandServiceClient) GetOrCreateConversation(ctx context.Context, req *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error) {
+	return c.getOrCreateConversation.CallUnary(ctx, req)
+}
+
+// ListConversationMessages calls laelia.v1.CommandService.ListConversationMessages.
+func (c *commandServiceClient) ListConversationMessages(ctx context.Context, req *connect.Request[v1.ListConversationMessagesRequest]) (*connect.Response[v1.ListConversationMessagesResponse], error) {
+	return c.listConversationMessages.CallUnary(ctx, req)
+}
+
 // CommandServiceHandler is an implementation of the laelia.v1.CommandService service.
 type CommandServiceHandler interface {
 	SendCommand(context.Context, *connect.Request[v1.SendCommandRequest]) (*connect.Response[v1.Command], error)
@@ -218,6 +250,8 @@ type CommandServiceHandler interface {
 	RespondPermission(context.Context, *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error)
 	SearchChatHistory(context.Context, *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error)
 	GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error)
+	GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error)
+	ListConversationMessages(context.Context, *connect.Request[v1.ListConversationMessagesRequest]) (*connect.Response[v1.ListConversationMessagesResponse], error)
 }
 
 // NewCommandServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -281,6 +315,18 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("GetCommandContext")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceGetOrCreateConversationHandler := connect.NewUnaryHandler(
+		CommandServiceGetOrCreateConversationProcedure,
+		svc.GetOrCreateConversation,
+		connect.WithSchema(commandServiceMethods.ByName("GetOrCreateConversation")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceListConversationMessagesHandler := connect.NewUnaryHandler(
+		CommandServiceListConversationMessagesProcedure,
+		svc.ListConversationMessages,
+		connect.WithSchema(commandServiceMethods.ByName("ListConversationMessages")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/laelia.v1.CommandService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case CommandServiceSendCommandProcedure:
@@ -301,6 +347,10 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceSearchChatHistoryHandler.ServeHTTP(w, r)
 		case CommandServiceGetCommandContextProcedure:
 			commandServiceGetCommandContextHandler.ServeHTTP(w, r)
+		case CommandServiceGetOrCreateConversationProcedure:
+			commandServiceGetOrCreateConversationHandler.ServeHTTP(w, r)
+		case CommandServiceListConversationMessagesProcedure:
+			commandServiceListConversationMessagesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -344,6 +394,14 @@ func (UnimplementedCommandServiceHandler) SearchChatHistory(context.Context, *co
 
 func (UnimplementedCommandServiceHandler) GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.GetCommandContext is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.GetOrCreateConversation is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ListConversationMessages(context.Context, *connect.Request[v1.ListConversationMessagesRequest]) (*connect.Response[v1.ListConversationMessagesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListConversationMessages is not implemented"))
 }
 
 // AgentCommandServiceClient is a client for the laelia.v1.AgentCommandService service.

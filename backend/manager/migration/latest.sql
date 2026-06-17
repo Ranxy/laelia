@@ -252,15 +252,18 @@ CREATE INDEX idx_command_event_created_at ON command_event(command_id, created_a
 
 ALTER TABLE command ADD COLUMN source_type SMALLINT NOT NULL DEFAULT 0;
 ALTER TABLE command ADD COLUMN conversation_id UUID;
-CREATE INDEX idx_command_chat_history ON command(agent_id, principal_id, source_type, created_at DESC) WHERE source_type = 1;
+CREATE INDEX idx_command_chat_history ON command(agent_id, principal_id, source_type, created_at DESC) WHERE source_type = 2;
 
 CREATE TABLE conversation (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_id INTEGER NOT NULL REFERENCES agent(id),
     title TEXT NOT NULL DEFAULT '',
     type SMALLINT NOT NULL DEFAULT 1,
     created_by INTEGER NOT NULL REFERENCES principal(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX idx_conversation_agent_principal ON conversation(agent_id, created_by, type);
 
 CREATE TABLE conversation_member (
     conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
@@ -268,4 +271,17 @@ CREATE TABLE conversation_member (
     member_id TEXT NOT NULL,
     PRIMARY KEY (conversation_id, member_type, member_id)
 );
+
+CREATE TABLE chat_message (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+    principal_id INTEGER NOT NULL REFERENCES principal(id),
+    role SMALLINT NOT NULL DEFAULT 1,
+    content TEXT NOT NULL,
+    command_id UUID REFERENCES command(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_chat_message_conversation ON chat_message(conversation_id, created_at);
+CREATE INDEX idx_chat_message_command ON chat_message(command_id) WHERE command_id IS NOT NULL;
 

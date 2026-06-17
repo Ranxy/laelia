@@ -88,6 +88,7 @@
     - [CancelCommandRequest](#laelia-v1-CancelCommandRequest)
     - [CancelMessage](#laelia-v1-CancelMessage)
     - [ChatHistoryEntry](#laelia-v1-ChatHistoryEntry)
+    - [ChatMessage](#laelia-v1-ChatMessage)
     - [Command](#laelia-v1-Command)
     - [Command.EnvEntry](#laelia-v1-Command-EnvEntry)
     - [CommandEvent](#laelia-v1-CommandEvent)
@@ -101,9 +102,13 @@
     - [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest)
     - [GetCommandContextResponse](#laelia-v1-GetCommandContextResponse)
     - [GetCommandRequest](#laelia-v1-GetCommandRequest)
+    - [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest)
+    - [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse)
     - [LifecyclePayload](#laelia-v1-LifecyclePayload)
     - [ListCommandsRequest](#laelia-v1-ListCommandsRequest)
     - [ListCommandsResponse](#laelia-v1-ListCommandsResponse)
+    - [ListConversationMessagesRequest](#laelia-v1-ListConversationMessagesRequest)
+    - [ListConversationMessagesResponse](#laelia-v1-ListConversationMessagesResponse)
     - [ManagerCommandMessage](#laelia-v1-ManagerCommandMessage)
     - [PermissionDecidedPayload](#laelia-v1-PermissionDecidedPayload)
     - [PermissionDecision](#laelia-v1-PermissionDecision)
@@ -1280,9 +1285,31 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
+| message_id | [string](#string) |  |  |
 | command_id | [string](#string) |  |  |
-| instruction | [string](#string) |  |  |
-| final_summary | [string](#string) |  |  |
+| role | [string](#string) |  |  |
+| content | [string](#string) |  |  |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ChatMessage"></a>
+
+### ChatMessage
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| conversation | [string](#string) |  |  |
+| principal_name | [string](#string) |  |  |
+| role | [int32](#int32) |  |  |
+| content | [string](#string) |  |  |
+| command_id | [string](#string) |  |  |
 | created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 
 
@@ -1551,6 +1578,36 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-GetOrCreateConversationRequest"></a>
+
+### GetOrCreateConversationRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetOrCreateConversationResponse"></a>
+
+### GetOrCreateConversationResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-LifecyclePayload"></a>
 
 ### LifecyclePayload
@@ -1594,6 +1651,39 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | commands | [Command](#laelia-v1-Command) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListConversationMessagesRequest"></a>
+
+### ListConversationMessagesRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListConversationMessagesResponse"></a>
+
+### ListConversationMessagesResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| messages | [ChatMessage](#laelia-v1-ChatMessage) | repeated |  |
 | next_page_token | [string](#string) |  |  |
 
 
@@ -2049,6 +2139,8 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | RespondPermission | [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 | SearchChatHistory | [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest) | [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse) |  |
 | GetCommandContext | [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest) | [GetCommandContextResponse](#laelia-v1-GetCommandContextResponse) |  |
+| GetOrCreateConversation | [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest) | [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse) |  |
+| ListConversationMessages | [ListConversationMessagesRequest](#laelia-v1-ListConversationMessagesRequest) | [ListConversationMessagesResponse](#laelia-v1-ListConversationMessagesResponse) |  |
 
  
 

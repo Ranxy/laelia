@@ -1,0 +1,150 @@
+# Example ACP config for laelia-agent.
+#
+# Usage:
+# 1. Adjust the executable / args / paths to match your environment.
+# 2. Save the real file to ~/.laelia/acp.yaml, or start the agent with:
+#    laelia-agent run --acp-config /absolute/path/to/acp_example.yaml
+#
+# Notes:
+# - All directories in working_dir and additional_directories should be absolute paths.
+# - allow_env is a whitelist of host environment variables that may be inherited.
+# - env entries here override both inherited env and manager-supplied env.
+# - auto_approve_tool_kinds only affects ACP permission prompts.
+# - Terminal bridging is currently disabled in laelia, so do not rely on execute-style
+#   terminal tools unless the ACP agent can work without terminal/create.
+
+default_profile: claude_code_readonly
+
+# Global limits enforced by laelia around the ACP session.
+max_timeout_seconds: 1800
+max_event_count: 10000
+max_output_bytes: 1048576
+
+profiles:
+  # A safer default profile for investigation / analysis tasks.
+  # Suitable when you want the ACP agent to read the repo and return findings,
+  # but not modify files.
+  claude_code_readonly:
+    executable: npx
+    args:
+      - -y
+      - "@zed-industries/claude-code-acp@latest"
+
+    # This is the fallback workspace root when manager-side requests do not set working_dir.
+    working_dir: /home/ran/gocode/laelia
+
+    # Extra readable roots the ACP client is allowed to touch.
+    additional_directories:
+      - /home/ran/gocode/laelia/docs
+      - /home/ran/gocode/laelia/proto
+
+    # Only variables listed here are inherited from the host shell environment.
+    # Keep this list narrow in production.
+    allow_env:
+      - PATH
+      - HOME
+      - LANG
+      - TERM
+      - HTTP_PROXY
+      - HTTPS_PROXY
+      - NO_PROXY
+      - ANTHROPIC_API_KEY
+      - OPENAI_API_KEY
+      - GOOGLE_API_KEY
+
+    # Profile-local overrides. These take precedence over inherited env and request env.
+    env:
+      ACP_LOG: info
+
+    # Filesystem capabilities exposed by laelia to the ACP agent.
+    read_text_files: true
+    write_text_files: false
+
+    # Auto-approve only low-risk tool kinds here.
+    # Supported values today include:
+    # read, edit, delete, move, search, execute, think, fetch, switch_mode, other
+    auto_approve_tool_kinds:
+      - read
+      - search
+      - think
+      - fetch
+
+    # These flags describe what the profile is expected to emit so manager / UI can present it.
+    supports_diff: false
+    supports_raw_events: true
+    supports_tool_traces: true
+
+  # A writable profile for controlled code change tasks.
+  # Use this only when the ACP agent is trusted to edit files inside the configured roots.
+  claude_code_editor:
+    executable: npx
+    args:
+      - -y
+      - "@zed-industries/claude-code-acp@latest"
+
+    working_dir: /home/ran/gocode/laelia
+    additional_directories:
+      - /home/ran/gocode/laelia/frontend
+      - /home/ran/gocode/laelia/backend
+
+    allow_env:
+      - PATH
+      - HOME
+      - LANG
+      - HTTP_PROXY
+      - HTTPS_PROXY
+      - NO_PROXY
+      - ANTHROPIC_API_KEY
+
+    env:
+      ACP_LOG: debug
+
+    read_text_files: true
+    write_text_files: true
+
+    # Only include edit-like auto approval if you are comfortable with unattended edits.
+    auto_approve_tool_kinds:
+      - read
+      - search
+      - think
+      - fetch
+      - edit
+      - move
+
+    supports_diff: true
+    supports_raw_events: true
+    supports_tool_traces: true
+
+  # A generic local ACP binary example.
+  # Replace executable / args with your own ACP-compatible agent implementation.
+  custom_local_agent:
+    executable: /usr/local/bin/my-acp-agent
+    args:
+      - --mode
+      - acp
+      - --model
+      - gpt-5.4
+
+    working_dir: /srv/workspaces/project-a
+    additional_directories:
+      - /srv/workspaces/shared-lib
+
+    allow_env:
+      - PATH
+      - HOME
+      - OPENAI_API_KEY
+
+    env:
+      MY_AGENT_LOG_LEVEL: warn
+      MY_AGENT_CACHE_DIR: /tmp/my-acp-agent
+
+    read_text_files: true
+    write_text_files: true
+    auto_approve_tool_kinds:
+      - read
+      - search
+      - think
+
+    supports_diff: true
+    supports_raw_events: false
+    supports_tool_traces: true

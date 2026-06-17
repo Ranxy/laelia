@@ -502,6 +502,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ChatMessage"><span class="badge">M</span>ChatMessage</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.Command"><span class="badge">M</span>Command</a>
                 </li>
               
@@ -554,6 +558,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.GetOrCreateConversationRequest"><span class="badge">M</span>GetOrCreateConversationRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetOrCreateConversationResponse"><span class="badge">M</span>GetOrCreateConversationResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.LifecyclePayload"><span class="badge">M</span>LifecyclePayload</a>
                 </li>
               
@@ -563,6 +575,14 @@
               
                 <li>
                   <a href="#laelia.v1.ListCommandsResponse"><span class="badge">M</span>ListCommandsResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListConversationMessagesRequest"><span class="badge">M</span>ListConversationMessagesRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListConversationMessagesResponse"><span class="badge">M</span>ListConversationMessagesResponse</a>
                 </li>
               
                 <li>
@@ -3547,6 +3567,13 @@ Format: idps/{idp} </p></td>
             <tbody>
               
                 <tr>
+                  <td>message_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
                   <td>command_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
@@ -3554,14 +3581,80 @@ Format: idps/{idp} </p></td>
                 </tr>
               
                 <tr>
-                  <td>instruction</td>
+                  <td>role</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
               
                 <tr>
-                  <td>final_summary</td>
+                  <td>content</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ChatMessage">ChatMessage</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>principal_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>role</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>content</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>command_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -4355,6 +4448,54 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.GetOrCreateConversationRequest">GetOrCreateConversationRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetOrCreateConversationResponse">GetOrCreateConversationResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.LifecyclePayload">LifecyclePayload</h3>
         <p></p>
 
@@ -4444,6 +4585,75 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>commands</td>
                   <td><a href="#laelia.v1.Command">Command</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListConversationMessagesRequest">ListConversationMessagesRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListConversationMessagesResponse">ListConversationMessagesResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>messages</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
                   <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
@@ -5526,6 +5736,20 @@ Format: idps/{idp} </p></td>
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>GetOrCreateConversation</td>
+                <td><a href="#laelia.v1.GetOrCreateConversationRequest">GetOrCreateConversationRequest</a></td>
+                <td><a href="#laelia.v1.GetOrCreateConversationResponse">GetOrCreateConversationResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ListConversationMessages</td>
+                <td><a href="#laelia.v1.ListConversationMessagesRequest">ListConversationMessagesRequest</a></td>
+                <td><a href="#laelia.v1.ListConversationMessagesResponse">ListConversationMessagesResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
           </tbody>
         </table>
 
@@ -5630,6 +5854,26 @@ Format: idps/{idp} </p></td>
                 <td>GetCommandContext</td>
                 <td>GET</td>
                 <td>/v1/{name=agents/*/commands/*}/context</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetOrCreateConversation</td>
+                <td>POST</td>
+                <td>/v1/{agent=agents/*}/conversations</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListConversationMessages</td>
+                <td>GET</td>
+                <td>/v1/{conversation=conversations/*}/messages</td>
                 <td></td>
               </tr>
               

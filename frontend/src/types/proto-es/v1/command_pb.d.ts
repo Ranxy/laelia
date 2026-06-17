@@ -644,22 +644,27 @@ export declare const SearchChatHistoryResponseSchema: GenMessage<SearchChatHisto
  */
 export declare type ChatHistoryEntry = Message<"laelia.v1.ChatHistoryEntry"> & {
   /**
-   * @generated from field: string command_id = 1;
+   * @generated from field: string message_id = 1;
+   */
+  messageId: string;
+
+  /**
+   * @generated from field: string command_id = 2;
    */
   commandId: string;
 
   /**
-   * @generated from field: string instruction = 2;
+   * @generated from field: string role = 3;
    */
-  instruction: string;
+  role: string;
 
   /**
-   * @generated from field: string final_summary = 3;
+   * @generated from field: string content = 4;
    */
-  finalSummary: string;
+  content: string;
 
   /**
-   * @generated from field: google.protobuf.Timestamp created_at = 4;
+   * @generated from field: google.protobuf.Timestamp created_at = 5;
    */
   createdAt?: Timestamp | undefined;
 };
@@ -669,6 +674,131 @@ export declare type ChatHistoryEntry = Message<"laelia.v1.ChatHistoryEntry"> & {
  * Use `create(ChatHistoryEntrySchema)` to create a new message.
  */
 export declare const ChatHistoryEntrySchema: GenMessage<ChatHistoryEntry>;
+
+/**
+ * @generated from message laelia.v1.ChatMessage
+ */
+export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string conversation = 2;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: string principal_name = 3;
+   */
+  principalName: string;
+
+  /**
+   * @generated from field: int32 role = 4;
+   */
+  role: number;
+
+  /**
+   * @generated from field: string content = 5;
+   */
+  content: string;
+
+  /**
+   * @generated from field: string command_id = 6;
+   */
+  commandId: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 7;
+   */
+  createdAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.ChatMessage.
+ * Use `create(ChatMessageSchema)` to create a new message.
+ */
+export declare const ChatMessageSchema: GenMessage<ChatMessage>;
+
+/**
+ * @generated from message laelia.v1.ListConversationMessagesRequest
+ */
+export declare type ListConversationMessagesRequest = Message<"laelia.v1.ListConversationMessagesRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: int32 page_size = 2;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 3;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListConversationMessagesRequest.
+ * Use `create(ListConversationMessagesRequestSchema)` to create a new message.
+ */
+export declare const ListConversationMessagesRequestSchema: GenMessage<ListConversationMessagesRequest>;
+
+/**
+ * @generated from message laelia.v1.ListConversationMessagesResponse
+ */
+export declare type ListConversationMessagesResponse = Message<"laelia.v1.ListConversationMessagesResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.ChatMessage messages = 1;
+   */
+  messages: ChatMessage[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListConversationMessagesResponse.
+ * Use `create(ListConversationMessagesResponseSchema)` to create a new message.
+ */
+export declare const ListConversationMessagesResponseSchema: GenMessage<ListConversationMessagesResponse>;
+
+/**
+ * @generated from message laelia.v1.GetOrCreateConversationRequest
+ */
+export declare type GetOrCreateConversationRequest = Message<"laelia.v1.GetOrCreateConversationRequest"> & {
+  /**
+   * @generated from field: string agent = 1;
+   */
+  agent: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetOrCreateConversationRequest.
+ * Use `create(GetOrCreateConversationRequestSchema)` to create a new message.
+ */
+export declare const GetOrCreateConversationRequestSchema: GenMessage<GetOrCreateConversationRequest>;
+
+/**
+ * @generated from message laelia.v1.GetOrCreateConversationResponse
+ */
+export declare type GetOrCreateConversationResponse = Message<"laelia.v1.GetOrCreateConversationResponse"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetOrCreateConversationResponse.
+ * Use `create(GetOrCreateConversationResponseSchema)` to create a new message.
+ */
+export declare const GetOrCreateConversationResponseSchema: GenMessage<GetOrCreateConversationResponse>;
 
 /**
  * @generated from message laelia.v1.GetCommandContextRequest
@@ -1504,6 +1634,22 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof GetCommandContextRequestSchema;
     output: typeof GetCommandContextResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.GetOrCreateConversation
+   */
+  getOrCreateConversation: {
+    methodKind: "unary";
+    input: typeof GetOrCreateConversationRequestSchema;
+    output: typeof GetOrCreateConversationResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.ListConversationMessages
+   */
+  listConversationMessages: {
+    methodKind: "unary";
+    input: typeof ListConversationMessagesRequestSchema;
+    output: typeof ListConversationMessagesResponseSchema;
   },
 }>;
 

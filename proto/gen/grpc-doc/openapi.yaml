@@ -462,6 +462,31 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}/conversations:
+        post:
+            tags:
+                - CommandService
+            operationId: CommandService_GetOrCreateConversation
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetOrCreateConversationResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}/sessions:
         get:
             tags:
@@ -732,6 +757,40 @@ paths:
                 "200":
                     description: OK
                     content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/messages:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_ListConversationMessages
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListConversationMessagesResponse'
                 default:
                     description: Default error response
                     content:
@@ -1225,11 +1284,32 @@ components:
         ChatHistoryEntry:
             type: object
             properties:
+                messageId:
+                    type: string
                 commandId:
                     type: string
-                instruction:
+                role:
                     type: string
-                finalSummary:
+                content:
+                    type: string
+                createdAt:
+                    type: string
+                    format: date-time
+        ChatMessage:
+            type: object
+            properties:
+                name:
+                    type: string
+                conversation:
+                    type: string
+                principalName:
+                    type: string
+                role:
+                    type: integer
+                    format: int32
+                content:
+                    type: string
+                commandId:
                     type: string
                 createdAt:
                     type: string
@@ -1448,6 +1528,11 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/CommandEvent'
+        GetOrCreateConversationResponse:
+            type: object
+            properties:
+                name:
+                    type: string
         GoogleProtobufAny:
             type: object
             properties:
@@ -1503,6 +1588,15 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/Command'
+                nextPageToken:
+                    type: string
+        ListConversationMessagesResponse:
+            type: object
+            properties:
+                messages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ChatMessage'
                 nextPageToken:
                     type: string
         ListUsersResponse:

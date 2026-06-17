@@ -20,15 +20,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CommandService_SendCommand_FullMethodName        = "/laelia.v1.CommandService/SendCommand"
-	CommandService_ListCommands_FullMethodName       = "/laelia.v1.CommandService/ListCommands"
-	CommandService_GetCommand_FullMethodName         = "/laelia.v1.CommandService/GetCommand"
-	CommandService_CancelCommand_FullMethodName      = "/laelia.v1.CommandService/CancelCommand"
-	CommandService_WatchCommand_FullMethodName       = "/laelia.v1.CommandService/WatchCommand"
-	CommandService_WatchCommandEvents_FullMethodName = "/laelia.v1.CommandService/WatchCommandEvents"
-	CommandService_RespondPermission_FullMethodName  = "/laelia.v1.CommandService/RespondPermission"
-	CommandService_SearchChatHistory_FullMethodName  = "/laelia.v1.CommandService/SearchChatHistory"
-	CommandService_GetCommandContext_FullMethodName  = "/laelia.v1.CommandService/GetCommandContext"
+	CommandService_SendCommand_FullMethodName              = "/laelia.v1.CommandService/SendCommand"
+	CommandService_ListCommands_FullMethodName             = "/laelia.v1.CommandService/ListCommands"
+	CommandService_GetCommand_FullMethodName               = "/laelia.v1.CommandService/GetCommand"
+	CommandService_CancelCommand_FullMethodName            = "/laelia.v1.CommandService/CancelCommand"
+	CommandService_WatchCommand_FullMethodName             = "/laelia.v1.CommandService/WatchCommand"
+	CommandService_WatchCommandEvents_FullMethodName       = "/laelia.v1.CommandService/WatchCommandEvents"
+	CommandService_RespondPermission_FullMethodName        = "/laelia.v1.CommandService/RespondPermission"
+	CommandService_SearchChatHistory_FullMethodName        = "/laelia.v1.CommandService/SearchChatHistory"
+	CommandService_GetCommandContext_FullMethodName        = "/laelia.v1.CommandService/GetCommandContext"
+	CommandService_GetOrCreateConversation_FullMethodName  = "/laelia.v1.CommandService/GetOrCreateConversation"
+	CommandService_ListConversationMessages_FullMethodName = "/laelia.v1.CommandService/ListConversationMessages"
 )
 
 // CommandServiceClient is the client API for CommandService service.
@@ -44,6 +46,8 @@ type CommandServiceClient interface {
 	RespondPermission(ctx context.Context, in *RespondPermissionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SearchChatHistory(ctx context.Context, in *SearchChatHistoryRequest, opts ...grpc.CallOption) (*SearchChatHistoryResponse, error)
 	GetCommandContext(ctx context.Context, in *GetCommandContextRequest, opts ...grpc.CallOption) (*GetCommandContextResponse, error)
+	GetOrCreateConversation(ctx context.Context, in *GetOrCreateConversationRequest, opts ...grpc.CallOption) (*GetOrCreateConversationResponse, error)
+	ListConversationMessages(ctx context.Context, in *ListConversationMessagesRequest, opts ...grpc.CallOption) (*ListConversationMessagesResponse, error)
 }
 
 type commandServiceClient struct {
@@ -162,6 +166,26 @@ func (c *commandServiceClient) GetCommandContext(ctx context.Context, in *GetCom
 	return out, nil
 }
 
+func (c *commandServiceClient) GetOrCreateConversation(ctx context.Context, in *GetOrCreateConversationRequest, opts ...grpc.CallOption) (*GetOrCreateConversationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOrCreateConversationResponse)
+	err := c.cc.Invoke(ctx, CommandService_GetOrCreateConversation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) ListConversationMessages(ctx context.Context, in *ListConversationMessagesRequest, opts ...grpc.CallOption) (*ListConversationMessagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListConversationMessagesResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListConversationMessages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CommandServiceServer is the server API for CommandService service.
 // All implementations must embed UnimplementedCommandServiceServer
 // for forward compatibility.
@@ -175,6 +199,8 @@ type CommandServiceServer interface {
 	RespondPermission(context.Context, *RespondPermissionRequest) (*emptypb.Empty, error)
 	SearchChatHistory(context.Context, *SearchChatHistoryRequest) (*SearchChatHistoryResponse, error)
 	GetCommandContext(context.Context, *GetCommandContextRequest) (*GetCommandContextResponse, error)
+	GetOrCreateConversation(context.Context, *GetOrCreateConversationRequest) (*GetOrCreateConversationResponse, error)
+	ListConversationMessages(context.Context, *ListConversationMessagesRequest) (*ListConversationMessagesResponse, error)
 	mustEmbedUnimplementedCommandServiceServer()
 }
 
@@ -211,6 +237,12 @@ func (UnimplementedCommandServiceServer) SearchChatHistory(context.Context, *Sea
 }
 func (UnimplementedCommandServiceServer) GetCommandContext(context.Context, *GetCommandContextRequest) (*GetCommandContextResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetCommandContext not implemented")
+}
+func (UnimplementedCommandServiceServer) GetOrCreateConversation(context.Context, *GetOrCreateConversationRequest) (*GetOrCreateConversationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOrCreateConversation not implemented")
+}
+func (UnimplementedCommandServiceServer) ListConversationMessages(context.Context, *ListConversationMessagesRequest) (*ListConversationMessagesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListConversationMessages not implemented")
 }
 func (UnimplementedCommandServiceServer) mustEmbedUnimplementedCommandServiceServer() {}
 func (UnimplementedCommandServiceServer) testEmbeddedByValue()                        {}
@@ -381,6 +413,42 @@ func _CommandService_GetCommandContext_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommandService_GetOrCreateConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrCreateConversationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).GetOrCreateConversation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_GetOrCreateConversation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).GetOrCreateConversation(ctx, req.(*GetOrCreateConversationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_ListConversationMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListConversationMessagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListConversationMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListConversationMessages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListConversationMessages(ctx, req.(*ListConversationMessagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CommandService_ServiceDesc is the grpc.ServiceDesc for CommandService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -415,6 +483,14 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetCommandContext",
 			Handler:    _CommandService_GetCommandContext_Handler,
+		},
+		{
+			MethodName: "GetOrCreateConversation",
+			Handler:    _CommandService_GetOrCreateConversation_Handler,
+		},
+		{
+			MethodName: "ListConversationMessages",
+			Handler:    _CommandService_ListConversationMessages_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

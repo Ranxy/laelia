@@ -202,10 +202,40 @@ message SearchChatHistoryResponse {
 }
 
 message ChatHistoryEntry {
-  string command_id = 1;
-  string instruction = 2;
-  string final_summary = 3;
-  google.protobuf.Timestamp created_at = 4;
+  string message_id = 1;
+  string command_id = 2;
+  string role = 3;
+  string content = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message ChatMessage {
+  string name = 1;
+  string conversation = 2;
+  string principal_name = 3;
+  int32 role = 4;
+  string content = 5;
+  string command_id = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message ListConversationMessagesRequest {
+  string conversation = 1 [(google.api.field_behavior) = REQUIRED];
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListConversationMessagesResponse {
+  repeated ChatMessage messages = 1;
+  string next_page_token = 2;
+}
+
+message GetOrCreateConversationRequest {
+  string agent = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetOrCreateConversationResponse {
+  string name = 1;
 }
 
 message GetCommandContextRequest {
@@ -268,6 +298,14 @@ service CommandService {
 
   rpc GetCommandContext(GetCommandContextRequest) returns (GetCommandContextResponse) {
     option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}/context"};
+  }
+
+  rpc GetOrCreateConversation(GetOrCreateConversationRequest) returns (GetOrCreateConversationResponse) {
+    option (google.api.http) = {post: "/v1/{agent=agents/*}/conversations"};
+  }
+
+  rpc ListConversationMessages(ListConversationMessagesRequest) returns (ListConversationMessagesResponse) {
+    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/messages"};
   }
 }
 

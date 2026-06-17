@@ -1,0 +1,105 @@
+# ACP config for laelia-agent using opencode.
+#
+# Save to ~/.laelia/acp.yaml, or start the agent with:
+#   laelia-agent run --acp-config /absolute/path/to/acp.yaml
+#
+# The agent reads this on startup and reports available profiles to the manager.
+# The manager can then select a profile by name when sending ACP tasks.
+
+default_profile: opencode_readonly
+
+max_timeout_seconds: 1800
+max_event_count: 20000
+max_output_bytes: 1048576
+output_flush_bytes: 4096
+
+profiles:
+  opencode_readonly:
+    executable: /home/ran/.opencode/bin/opencode
+    args:
+      - acp
+      - --pure
+
+    working_dir: /home/ran/gocode/laelia
+    additional_directories:
+      - /home/ran/gocode/laelia/docs
+      - /home/ran/gocode/laelia/proto
+
+    allow_env:
+      - PATH
+      - HOME
+      - LANG
+      - TERM
+      - XDG_CONFIG_HOME
+      - XDG_DATA_HOME
+      - XDG_CACHE_HOME
+      - ANTHROPIC_API_KEY
+      - ANTHROPIC_BASE_URL
+      - OPENAI_API_KEY
+      - GOOGLE_API_KEY
+      - OPENROUTER_API_KEY
+      - HTTP_PROXY
+      - HTTPS_PROXY
+      - NO_PROXY
+
+    env:
+      ACP_LOG: info
+
+    read_text_files: true
+    write_text_files: false
+
+    auto_approve_tool_kinds:
+      - read
+      - search
+      - think
+      - fetch
+
+    supports_diff: false
+    supports_raw_events: true
+    supports_tool_traces: true
+
+  opencode_editor:
+    executable: /home/ran/.opencode/bin/opencode
+    args:
+      - acp
+      - --pure
+
+    working_dir: /home/ran/gocode/laelia
+    additional_directories:
+      - /home/ran/gocode/laelia/frontend
+      - /home/ran/gocode/laelia/backend
+
+    allow_env:
+      - PATH
+      - HOME
+      - LANG
+      - TERM
+      - XDG_CONFIG_HOME
+      - XDG_DATA_HOME
+      - XDG_CACHE_HOME
+      - ANTHROPIC_API_KEY
+      - ANTHROPIC_BASE_URL
+      - OPENAI_API_KEY
+      - GOOGLE_API_KEY
+      - OPENROUTER_API_KEY
+      - HTTP_PROXY
+      - HTTPS_PROXY
+      - NO_PROXY
+
+    env:
+      ACP_LOG: debug
+
+    read_text_files: true
+    write_text_files: true
+
+    auto_approve_tool_kinds:
+      - read
+      - search
+      - think
+      - fetch
+      - edit
+      - move
+
+    supports_diff: true
+    supports_raw_events: true
+    supports_tool_traces: true
