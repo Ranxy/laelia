@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -76,6 +77,16 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 		return nil, err
 	}
 
+	if req.Msg.Source == v1pb.CommandSource_CHAT && instruction != "" {
+		history, histErr := s.store.GetRecentChatHistory(ctx, agent.ID, principalID, 20)
+		if histErr != nil {
+			slog.Warn("failed to load chat history", "error", histErr)
+		}
+		if len(history) > 0 {
+			instruction = buildChatContext(history) + "\n---\n" + instruction
+		}
+	}
+
 	resolvedProfile := req.Msg.Profile
 	if resolvedProfile == "" && agent.Info.GetCapability() != nil {
 		resolvedProfile = agent.Info.GetCapability().DefaultProfile
@@ -98,6 +109,7 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 		Env:            string(envBytes),
 		WorkingDir:     req.Msg.WorkingDir,
 		TimeoutSeconds: req.Msg.TimeoutSeconds,
+		SourceType:     int32(req.Msg.Source),
 	}
 
 	created, err := s.store.CreateCommand(ctx, cmd)
@@ -347,6 +359,7 @@ func convertToV1Command(cmd *store.CommandMessage) *v1pb.Command {
 		ErrorMessage:  cmd.ErrorMessage,
 		FinalSummary:  cmd.FinalSummary,
 		WorkingDir:    cmd.WorkingDir,
+		Source:        v1pb.CommandSource(cmd.SourceType),
 	}
 
 	if cmd.ExitCode.Valid {
@@ -527,4 +540,110 @@ func (s *CommandService) validateRawEventAccess(ctx context.Context, user *store
 	}
 
 	return nil
+}
+
+func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Request[v1pb.SearchChatHistoryRequest]) (*connect.Response[v1pb.SearchChatHistoryResponse], error) {
+	agentResourceID := parseAgentResourceID(req.Msg.Agent)
+	agent, err := s.store.GetAgentByResourceID(ctx, agentResourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get agent"))
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", agentResourceID))
+	}
+
+	principalID := 0
+	if req.Msg.PrincipalId != "" {
+		var pid int
+		if _, err := fmt.Sscanf(req.Msg.PrincipalId, "%d", &pid); err == nil {
+			principalID = pid
+		}
+	}
+
+	var since, until *time.Time
+	if req.Msg.Since != nil {
+		s := req.Msg.Since.AsTime()
+		since = &s
+	}
+	if req.Msg.Until != nil {
+		u := req.Msg.Until.AsTime()
+		until = &u
+	}
+
+	limit := int(req.Msg.Limit)
+	entries, err := s.store.SearchChatHistory(ctx, agent.ID, principalID, req.Msg.Query, since, until, limit)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to search chat history"))
+	}
+
+	var v1Entries []*v1pb.ChatHistoryEntry
+	for _, e := range entries {
+		v1Entries = append(v1Entries, &v1pb.ChatHistoryEntry{
+			CommandId:    e.CommandID,
+			Instruction:  e.Instruction,
+			FinalSummary: e.FinalSummary,
+			CreatedAt:    timestamppb.New(e.CreatedAt),
+		})
+	}
+
+	return connect.NewResponse(&v1pb.SearchChatHistoryResponse{Entries: v1Entries}), nil
+}
+
+func (s *CommandService) GetCommandContext(ctx context.Context, req *connect.Request[v1pb.GetCommandContextRequest]) (*connect.Response[v1pb.GetCommandContextResponse], error) {
+	cmd, err := s.store.GetCommandByName(ctx, req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+
+	outputs, err := s.store.GetCommandOutput(ctx, cmd.ID, 0)
+	if err != nil {
+		slog.Warn("failed to get command outputs for context", "commandID", cmd.ID, "error", err)
+	}
+
+	events, err := s.store.GetCommandEvents(ctx, cmd.ID, 0)
+	if err != nil {
+		slog.Warn("failed to get command events for context", "commandID", cmd.ID, "error", err)
+	}
+
+	var v1Outputs []*v1pb.CommandOutput
+	for _, o := range outputs {
+		v1Outputs = append(v1Outputs, &v1pb.CommandOutput{
+			CommandId: o.CommandID.String(),
+			Type:      v1pb.CommandOutput_StreamType(o.StreamType),
+			Content:   o.Content,
+			SeqNo:     o.SeqNo,
+			Timestamp: timestamppb.New(o.CreatedAt),
+		})
+	}
+
+	var v1Events []*v1pb.CommandEvent
+	for _, e := range events {
+		v1Events = append(v1Events, convertToV1CommandEvent(e))
+	}
+
+	return connect.NewResponse(&v1pb.GetCommandContextResponse{
+		Command: convertToV1Command(cmd),
+		Outputs: v1Outputs,
+		Events:  v1Events,
+	}), nil
+}
+
+func buildChatContext(entries []*store.ChatHistoryEntry) string {
+	var b strings.Builder
+	_, _ = b.WriteString("Conversation history:\n")
+	for i := len(entries) - 1; i >= 0; i-- {
+		e := entries[i]
+		_, _ = fmt.Fprintf(&b, "- User: %s\n", truncateText(e.Instruction, 2000))
+		if e.FinalSummary != "" {
+			_, _ = fmt.Fprintf(&b, "- Assistant: %s\n", truncateText(e.FinalSummary, 2000))
+		}
+	}
+	return b.String()
+}
+
+func truncateText(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }

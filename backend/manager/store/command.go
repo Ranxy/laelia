@@ -35,6 +35,7 @@ type CommandMessage struct {
 	WorkingDir      string
 	TimeoutSeconds  int32
 	LastAckSeq      int32
+	SourceType      int32
 }
 
 type CommandOutputMessage struct {
@@ -74,8 +75,8 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 	var createdAt time.Time
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO command (
-			agent_id, principal_id, command, instruction, profile, executor_kind, allow_diff, status, env, working_dir, timeout_seconds
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			agent_id, principal_id, command, instruction, profile, executor_kind, allow_diff, status, env, working_dir, timeout_seconds, source_type
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id, created_at
 	`,
 		cmd.AgentID,
@@ -89,6 +90,7 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 		cmd.Env,
 		cmd.WorkingDir,
 		cmd.TimeoutSeconds,
+		cmd.SourceType,
 	).Scan(&commandID, &createdAt); err != nil {
 		return nil, errors.Wrapf(err, "failed to create command")
 	}
@@ -111,6 +113,7 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 		Env:            cmd.Env,
 		WorkingDir:     cmd.WorkingDir,
 		TimeoutSeconds: cmd.TimeoutSeconds,
+		SourceType:     cmd.SourceType,
 	}
 	return created, nil
 }
@@ -119,7 +122,7 @@ func (s *Store) GetCommand(ctx context.Context, id uuid.UUID) (*CommandMessage, 
 	query := `SELECT
 		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
-		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
+		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq, c.source_type,
 		COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id
@@ -152,7 +155,7 @@ func (s *Store) GetCommandByName(ctx context.Context, name string) (*CommandMess
 	query := `SELECT
 		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
-		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
+		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq, c.source_type,
 		COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id
@@ -181,7 +184,7 @@ func scanCommand(row *sql.Row) (*CommandMessage, error) {
 		&cmd.ID, &cmd.AgentID, &cmd.PrincipalID, &cmd.Command, &cmd.Instruction, &cmd.Profile, &cmd.ExecutorKind, &cmd.AllowDiff, &cmd.Status,
 		&exitCode, &durationMs, &cmd.CreatedAt, &startedAt, &completedAt,
 		&cmd.ErrorMessage, &cmd.FinalSummary, &resultJSON, &cmd.Env, &cmd.WorkingDir, &cmd.TimeoutSeconds, &cmd.LastAckSeq,
-		&cmd.PrincipalName, &cmd.AgentResourceID,
+		&cmd.PrincipalName, &cmd.AgentResourceID, &cmd.SourceType,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -209,7 +212,7 @@ func (s *Store) ListCommands(ctx context.Context, find *FindCommandMessage) ([]*
 	query := `SELECT
 		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
-		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
+		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq, c.source_type,
 		COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id
@@ -242,7 +245,7 @@ func (s *Store) ListCommands(ctx context.Context, find *FindCommandMessage) ([]*
 			&cmd.ID, &cmd.AgentID, &cmd.PrincipalID, &cmd.Command, &cmd.Instruction, &cmd.Profile, &cmd.ExecutorKind, &cmd.AllowDiff, &cmd.Status,
 			&exitCode, &durationMs, &cmd.CreatedAt, &startedAt, &completedAt,
 			&cmd.ErrorMessage, &cmd.FinalSummary, &resultJSON, &cmd.Env, &cmd.WorkingDir, &cmd.TimeoutSeconds, &cmd.LastAckSeq,
-			&cmd.PrincipalName, &cmd.AgentResourceID,
+			&cmd.PrincipalName, &cmd.AgentResourceID, &cmd.SourceType,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan command row")
 		}
@@ -412,7 +415,7 @@ func (s *Store) GetNextPendingCommand(ctx context.Context, agentID int) (*Comman
 	query := `SELECT
 		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
-		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
+		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq, c.source_type,
 		COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id
@@ -428,7 +431,7 @@ func (s *Store) GetRunningCommand(ctx context.Context, agentID int) (*CommandMes
 	query := `SELECT
 		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
 		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
-		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq,
+		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq, c.source_type,
 		COALESCE(p.name, ''), a.resource_id
 	FROM command c
 	JOIN agent a ON a.id = c.agent_id
@@ -438,4 +441,91 @@ func (s *Store) GetRunningCommand(ctx context.Context, agentID int) (*CommandMes
 	LIMIT 1`
 
 	return scanCommand(s.GetDB().QueryRowContext(ctx, query, agentID))
+}
+
+type ChatHistoryEntry struct {
+	CommandID    string
+	Instruction  string
+	FinalSummary string
+	CreatedAt    time.Time
+}
+
+func (s *Store) GetRecentChatHistory(ctx context.Context, agentID, principalID int, limit int) ([]*ChatHistoryEntry, error) {
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT c.id, c.instruction, c.final_summary, c.created_at
+		FROM command c
+		WHERE c.agent_id = $1 AND c.principal_id = $2 AND c.source_type = 2
+		ORDER BY c.created_at DESC
+		LIMIT $3
+	`, agentID, principalID, limit)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query recent chat history")
+	}
+	defer rows.Close()
+
+	var entries []*ChatHistoryEntry
+	for rows.Next() {
+		var e ChatHistoryEntry
+		var cmdID uuid.UUID
+		if err := rows.Scan(&cmdID, &e.Instruction, &e.FinalSummary, &e.CreatedAt); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan chat history row")
+		}
+		e.CommandID = cmdID.String()
+		entries = append(entries, &e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate chat history rows")
+	}
+
+	return entries, nil
+}
+
+func (s *Store) SearchChatHistory(ctx context.Context, agentID, principalID int, query string, since, until *time.Time, limit int) ([]*ChatHistoryEntry, error) {
+	args := []any{agentID, principalID}
+	where := `c.agent_id = $1 AND c.principal_id = $2 AND c.source_type = 2`
+
+	if query != "" {
+		args = append(args, "%"+query+"%")
+		where += fmt.Sprintf(` AND (c.instruction ILIKE $%d OR c.final_summary ILIKE $%d)`, len(args), len(args))
+	}
+	if since != nil {
+		args = append(args, since)
+		where += fmt.Sprintf(` AND c.created_at >= $%d`, len(args))
+	}
+	if until != nil {
+		args = append(args, until)
+		where += fmt.Sprintf(` AND c.created_at <= $%d`, len(args))
+	}
+	if limit <= 0 || limit > 50 {
+		limit = 10
+	}
+	args = append(args, limit)
+
+	rows, err := s.GetDB().QueryContext(ctx, fmt.Sprintf(`
+		SELECT c.id, c.instruction, c.final_summary, c.created_at
+		FROM command c
+		WHERE %s
+		ORDER BY c.created_at DESC
+		LIMIT $%d
+	`, where, len(args)), args...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to search chat history")
+	}
+	defer rows.Close()
+
+	var entries []*ChatHistoryEntry
+	for rows.Next() {
+		var e ChatHistoryEntry
+		var cmdID uuid.UUID
+		if err := rows.Scan(&cmdID, &e.Instruction, &e.FinalSummary, &e.CreatedAt); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan chat history row")
+		}
+		e.CommandID = cmdID.String()
+		entries = append(entries, &e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate chat history rows")
+	}
+
+	return entries, nil
 }

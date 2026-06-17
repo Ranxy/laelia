@@ -144,6 +144,7 @@ func (d *Dispatcher) DispatchCommand(ctx context.Context, cmd *store.CommandMess
 				Instruction:    cmd.Instruction,
 				Profile:        cmd.Profile,
 				AllowDiff:      cmd.AllowDiff,
+				Source:         v1pb.CommandSource(cmd.SourceType),
 			},
 		},
 	}
