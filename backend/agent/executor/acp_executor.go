@@ -772,8 +772,7 @@ func (c *acpRuntimeClient) WaitForTerminalExit(context.Context, acp.WaitForTermi
 }
 
 func (c *acpRuntimeClient) appendSummary(text string) {
-	trimmed := strings.TrimSpace(text)
-	if trimmed == "" {
+	if text == "" {
 		return
 	}
 	c.executor.warnMu.Lock()
@@ -781,13 +780,13 @@ func (c *acpRuntimeClient) appendSummary(text string) {
 	if len(c.executor.summaryText) >= 8192 {
 		return
 	}
-	c.executor.summaryText += trimmed
+	c.executor.summaryText += text
 }
 
 func (c *acpRuntimeClient) finalSummary() string {
 	c.executor.warnMu.Lock()
 	defer c.executor.warnMu.Unlock()
-	return c.executor.summaryText
+	return strings.TrimSpace(c.executor.summaryText)
 }
 
 func (e *ACPExecutor) validatePath(path string, enabled bool) (string, error) {

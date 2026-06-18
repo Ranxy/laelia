@@ -221,44 +221,58 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
     if (signal?.aborted) return;
 
     // Reload from backend to get the actual final assistant text.
-    // The assistant's response text is stored server-side and may not
-    // arrive via TEXT_DELTA events during streaming.
-    try {
-      const res = await commandServiceClient.listConversationMessages(
-        create(ListConversationMessagesRequestSchema, {
-          conversation,
-          pageSize: 200,
-          pageToken: "",
-        })
-      );
+    // The assistant's response text is stored server-side via FinalSummary
+    // which may not arrive via TEXT_DELTA events during streaming.
+    // Retry a few times because the backend may not have persisted the
+    // assistant message yet when the event stream closes.
+    const cmdId = commandName.split("/").pop();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await commandServiceClient.listConversationMessages(
+          create(ListConversationMessagesRequestSchema, {
+            conversation,
+            pageSize: 200,
+            pageToken: "",
+          })
+        );
 
-      const s2 = get();
-      const cmdId = commandName.split("/").pop();
-      const uiMsgs: ChatMessageUI[] = (res.messages ?? []).map((msg) => ({
-        id: msg.name,
-        role: (msg.role === 1 ? "user" : "assistant") as "user" | "assistant",
-        content: msg.content,
-        timestamp: msg.createdAt ? timestampDate(msg.createdAt) : new Date(),
-        commandId: msg.commandId || undefined,
-      }));
+        const s2 = get();
+        const uiMsgs: ChatMessageUI[] = (res.messages ?? []).map((msg) => ({
+          id: msg.name,
+          role: (msg.role === 1 ? "user" : "assistant") as "user" | "assistant",
+          content: msg.content,
+          timestamp: msg.createdAt ? timestampDate(msg.createdAt) : new Date(),
+          commandId: msg.commandId || undefined,
+        }));
 
-      // Merge streaming events back into the reloaded assistant message
-      const merged = uiMsgs.map((m) => {
-        if (m.commandId === cmdId) {
-          return {
-            ...m,
-            commandName,
-            events: finalEvents,
-            status: finalStatus,
-            content: m.content || streamedContent,
-          };
+        // Check if the assistant message for this command exists yet
+        const assistantMsg = uiMsgs.find((m) => m.commandId === cmdId);
+        if (assistantMsg && assistantMsg.content) {
+          // Merge streaming events back into the reloaded assistant message
+          const merged = uiMsgs.map((m) => {
+            if (m.commandId === cmdId) {
+              return {
+                ...m,
+                commandName,
+                events: finalEvents,
+                status: finalStatus,
+                content: m.content || streamedContent,
+              };
+            }
+            return m;
+          });
+          set({ chatMessages: { ...s2.chatMessages, [conversation]: merged } });
+          return;
         }
-        return m;
-      });
 
-      set({ chatMessages: { ...s2.chatMessages, [conversation]: merged } });
-    } catch {
-      // If reload fails, keep streamed content + events
+        // Backend hasn't persisted the assistant message yet, wait and retry
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      } catch {
+        // If reload fails, keep streamed content + events
+        return;
+      }
     }
   },
 
