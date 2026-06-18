@@ -1,3 +1,4 @@
+import MarkdownRender from "markstream-react";
 import { useEffect, useRef } from "react";
 import { cn } from "@/react/lib/utils";
 import type { CommandOutput } from "@/types/proto-es/v1/command_pb";
@@ -28,7 +29,7 @@ export function CommandTerminal({ outputs, className }: CommandTerminalProps) {
     return (
       <div
         className={cn(
-          "rounded bg-zinc-950 p-4 font-mono text-xs text-zinc-500",
+          "rounded bg-dark-bg p-4 font-mono text-xs text-matrix-green/50",
           className
         )}
       >
@@ -42,7 +43,7 @@ export function CommandTerminal({ outputs, className }: CommandTerminalProps) {
       ref={scrollRef}
       onScroll={handleScroll}
       className={cn(
-        "rounded bg-zinc-950 p-4 font-mono text-xs overflow-auto max-h-96",
+        "rounded bg-dark-bg p-4 font-mono text-xs overflow-auto max-h-96",
         className
       )}
     >
@@ -50,14 +51,33 @@ export function CommandTerminal({ outputs, className }: CommandTerminalProps) {
         <div
           key={`${o.commandId}-${o.seqNo}`}
           className={cn("whitespace-pre-wrap break-all", {
-            "text-green-400": o.type === CommandOutput_StreamType.STDOUT,
-            "text-red-400": o.type === CommandOutput_StreamType.STDERR,
-            "text-yellow-400": o.type === CommandOutput_StreamType.SYSTEM,
+            "text-matrix-green": o.type === CommandOutput_StreamType.STDOUT,
+            "text-error": o.type === CommandOutput_StreamType.STDERR,
+            "text-warning": o.type === CommandOutput_StreamType.SYSTEM,
           })}
         >
           {o.content}
         </div>
       ))}
+    </div>
+  );
+}
+
+interface FinalSummaryProps {
+  content: string;
+  className?: string;
+}
+
+export function FinalSummary({ content, className }: FinalSummaryProps) {
+  return (
+    <div className={cn("markstream-chat", className)}>
+      <MarkdownRender
+        customId="command-summary"
+        content={content}
+        final
+        smoothStreaming={false}
+        fade
+      />
     </div>
   );
 }

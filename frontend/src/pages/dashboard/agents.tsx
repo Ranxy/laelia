@@ -56,8 +56,8 @@ export function AgentsPage() {
     try {
       const createAgent = useAppStore.getState().createAgent;
       const agent = await createAgent(name.trim());
-      if (agent.token) {
-        setToken(agent.token);
+      if (agent.bootstrapToken) {
+        setToken(agent.bootstrapToken);
         setTokenOpen(true);
       }
       setName("");

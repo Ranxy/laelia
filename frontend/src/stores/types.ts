@@ -1,5 +1,5 @@
 import type { StateCreator } from "zustand";
-import type { Agent } from "@/types/proto-es/v1/agent_pb";
+import type { Agent, CreateAgentResponse } from "@/types/proto-es/v1/agent_pb";
 import type {
   Command,
   CommandEvent,
@@ -48,7 +48,7 @@ export interface AgentSlice {
   createAgent: (
     title: string,
     labels?: Record<string, string>
-  ) => Promise<Agent>;
+  ) => Promise<CreateAgentResponse>;
   deleteAgent: (name: string) => Promise<void>;
 }
 
