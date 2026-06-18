@@ -13,7 +13,10 @@ export interface ChatMessageUI {
   content: string;
   timestamp: Date;
   commandName?: string;
+  commandId?: string;
   status?: number;
+  streaming?: boolean;
+  events?: CommandEvent[];
 }
 
 export interface AuthSlice {
@@ -82,12 +85,21 @@ export interface CommandSlice {
 
 export interface ChatSlice {
   conversations: Record<string, string>;
-  chatMessages: ChatMessageUI[];
-  chatLoading: boolean;
+  chatMessages: Record<string, ChatMessageUI[]>;
+  chatLoading: Record<string, boolean>;
+  streamingContent: Record<string, string>;
+  streamingEvents: Record<string, CommandEvent[]>;
+  streamingStatus: Record<string, number>;
 
   getOrCreateConversation: (agent: string) => Promise<string>;
   loadMessages: (conversation: string) => Promise<void>;
   sendChatMessage: (agent: string, instruction: string) => Promise<Command>;
+  streamChatCommand: (
+    commandName: string,
+    conversation: string,
+    signal: AbortSignal
+  ) => Promise<void>;
+  resetStreaming: (commandName: string) => void;
 }
 
 export type AppStoreState = AuthSlice & AgentSlice & CommandSlice & ChatSlice;
