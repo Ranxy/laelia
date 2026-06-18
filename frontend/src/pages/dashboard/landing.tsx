@@ -15,7 +15,7 @@ export function LandingPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center gap-6 px-4 py-16">
+    <div className="flex h-full overflow-y-auto flex-col items-center justify-center gap-6 px-4 py-16">
       <h1 className="text-3xl font-bold text-main">
         {t("landing.welcome")}
         {currentUser ? `, ${currentUser.title || currentUser.email}` : ""}

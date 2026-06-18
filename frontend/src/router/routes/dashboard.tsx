@@ -1,4 +1,6 @@
 import type { RouteObject } from "react-router-dom";
+import { Navigate } from "react-router-dom";
+import { AgentWorkspaceLayout } from "@/react/app/layouts/agent-workspace-layout";
 import { DashboardLayout } from "@/react/app/layouts/dashboard-layout";
 import {
   AGENT_ROUTE_LIST,
@@ -29,28 +31,35 @@ export const dashboardRoutes: RouteObject[] = [
           })),
       },
       {
-        path: "agents/:agentId/commands",
-        handle: { name: COMMAND_ROUTE_LIST },
-        lazy: () =>
-          import("@/react/pages/dashboard/command-list").then((m) => ({
-            Component: m.CommandListPage,
-          })),
-      },
-      {
-        path: "agents/:agentId/commands/:commandId",
-        handle: { name: COMMAND_ROUTE_DETAIL },
-        lazy: () =>
-          import("@/react/pages/dashboard/command-detail").then((m) => ({
-            Component: m.CommandDetailPage,
-          })),
-      },
-      {
-        path: "agents/:agentId/chat",
-        handle: { name: CHAT_ROUTE },
-        lazy: () =>
-          import("@/react/pages/dashboard/chat").then((m) => ({
-            Component: m.ChatPage,
-          })),
+        path: "agents/:agentId",
+        element: <AgentWorkspaceLayout />,
+        children: [
+          { index: true, element: <Navigate to="chat" replace /> },
+          {
+            path: "chat",
+            handle: { name: CHAT_ROUTE },
+            lazy: () =>
+              import("@/react/pages/dashboard/chat").then((m) => ({
+                Component: m.ChatPage,
+              })),
+          },
+          {
+            path: "commands",
+            handle: { name: COMMAND_ROUTE_LIST },
+            lazy: () =>
+              import("@/react/pages/dashboard/command-list").then((m) => ({
+                Component: m.CommandListPage,
+              })),
+          },
+          {
+            path: "commands/:commandId",
+            handle: { name: COMMAND_ROUTE_DETAIL },
+            lazy: () =>
+              import("@/react/pages/dashboard/command-detail").then((m) => ({
+                Component: m.CommandDetailPage,
+              })),
+          },
+        ],
       },
     ],
   },

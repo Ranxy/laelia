@@ -2,7 +2,7 @@ import { Timestamp } from "@bufbuild/protobuf/wkt";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { Badge } from "@/react/components/ui/badge";
+import { ConnectionBadge } from "@/react/components/connection-badge";
 import { Button } from "@/react/components/ui/button";
 import {
   Dialog,
@@ -27,7 +27,6 @@ import {
 } from "@/react/components/ui/table";
 import { useAppStore } from "@/react/stores";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
-import { AgentStatus_ConnectionState } from "@/types/proto-es/v1/agent_pb";
 
 export function AgentsPage() {
   const { t } = useTranslation();
@@ -85,7 +84,7 @@ export function AgentsPage() {
   }
 
   return (
-    <div className="p-6 flex flex-col gap-4 w-full">
+    <div className="h-full overflow-y-auto p-6 flex flex-col gap-4 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-main">{t("agent.title")}</h1>
         <Button onClick={() => setCreateOpen(true)}>{t("agent.create")}</Button>
@@ -337,18 +336,6 @@ export function AgentsPage() {
       )}
     </div>
   );
-}
-
-function ConnectionBadge({ state }: { state?: AgentStatus_ConnectionState }) {
-  const { t } = useTranslation();
-  switch (state) {
-    case AgentStatus_ConnectionState.ONLINE:
-      return <Badge variant="success">{t("agent.status-online")}</Badge>;
-    case AgentStatus_ConnectionState.ERROR:
-      return <Badge variant="destructive">{t("agent.status-error")}</Badge>;
-    default:
-      return <Badge variant="secondary">{t("agent.status-offline")}</Badge>;
-  }
 }
 
 function formatTimestamp(ts: Timestamp): string {

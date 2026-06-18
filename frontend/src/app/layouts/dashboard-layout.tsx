@@ -55,7 +55,7 @@ export function DashboardLayout() {
           <div className="flex-1" />
           <UserMenu />
         </header>
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-hidden">
           <Outlet />
         </main>
       </div>
