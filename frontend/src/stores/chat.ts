@@ -1,8 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
-import type { StoreApi } from "zustand";
 import { commandServiceClient } from "@/connect";
-import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
 import {
   CommandEventType,
   CommandSource,
@@ -11,50 +9,7 @@ import {
   ListConversationMessagesRequestSchema,
   SendCommandRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
-import type {
-  AppSliceCreator,
-  AppStoreState,
-  ChatMessageUI,
-  ChatSlice,
-} from "./types";
-
-function finalizeStreaming(
-  set: StoreApi<AppStoreState>["setState"],
-  get: StoreApi<AppStoreState>["getState"],
-  commandName: string,
-  conversation: string,
-  overrideContent?: string,
-  overrideEvents?: CommandEvent[]
-) {
-  const s = get();
-  const finalContent = overrideContent ?? s.streamingContent[commandName] ?? "";
-  const finalEvents = overrideEvents ?? s.streamingEvents[commandName] ?? [];
-  const finalStatus = s.streamingStatus[commandName] ?? CommandStatus.COMPLETED;
-
-  const messages = s.chatMessages[conversation] ?? [];
-  const updated = messages.map((m) =>
-    m.commandName === commandName
-      ? {
-          ...m,
-          content: finalContent,
-          streaming: false,
-          status: finalStatus,
-          events: finalEvents,
-        }
-      : m
-  );
-
-  const { [commandName]: _c, ...restContent } = s.streamingContent;
-  const { [commandName]: _e, ...restEvents } = s.streamingEvents;
-  const { [commandName]: _s, ...restStatus } = s.streamingStatus;
-
-  set({
-    chatMessages: { ...s.chatMessages, [conversation]: updated },
-    streamingContent: restContent,
-    streamingEvents: restEvents,
-    streamingStatus: restStatus,
-  });
-}
+import type { AppSliceCreator, ChatMessageUI, ChatSlice } from "./types";
 
 export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
   conversations: {},
@@ -182,23 +137,6 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       { signal }
     );
 
-    let didFinalize = false;
-    const finalize = (
-      overrideContent?: string,
-      overrideEvents?: CommandEvent[]
-    ) => {
-      if (didFinalize) return;
-      didFinalize = true;
-      finalizeStreaming(
-        set,
-        get,
-        commandName,
-        conversation,
-        overrideContent,
-        overrideEvents
-      );
-    };
-
     try {
       for await (const event of stream) {
         if (signal?.aborted) break;
@@ -224,18 +162,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
             },
           });
         } else if (event.type === CommandEventType.FINAL_SUMMARY) {
-          let finalContent = s.streamingContent[commandName] ?? "";
-          if (event.payload.case === "finalSummary") {
-            const summary = event.payload.value;
-            if (finalContent === "" && summary.stopReason) {
-              finalContent = summary.stopReason;
-            }
-          }
           set({
-            streamingContent: {
-              ...s.streamingContent,
-              [commandName]: finalContent,
-            },
             streamingEvents: {
               ...s.streamingEvents,
               [commandName]: nextEvents,
@@ -245,7 +172,6 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
               [commandName]: CommandStatus.COMPLETED,
             },
           });
-          finalize(finalContent, nextEvents);
         } else {
           set({
             streamingEvents: {
@@ -255,23 +181,115 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
           });
         }
       }
-
-      finalize();
     } catch {
-      finalize();
+      // Stream cancelled or network error
+    }
+
+    // Collect final streaming state before cleaning up
+    const s = get();
+    const finalEvents = s.streamingEvents[commandName] ?? [];
+    const finalStatus =
+      s.streamingStatus[commandName] ?? CommandStatus.COMPLETED;
+    const streamedContent = s.streamingContent[commandName] ?? "";
+
+    // Clean up streaming state
+    const { [commandName]: _c, ...restContent } = s.streamingContent;
+    const { [commandName]: _e, ...restEvents } = s.streamingEvents;
+    const { [commandName]: _s, ...restStatus } = s.streamingStatus;
+
+    // Mark the assistant message as not streaming, preserving events
+    const messages = s.chatMessages[conversation] ?? [];
+    const updated = messages.map((m) =>
+      m.commandName === commandName
+        ? {
+            ...m,
+            streaming: false,
+            content: streamedContent,
+            events: finalEvents,
+            status: finalStatus,
+          }
+        : m
+    );
+    set({
+      chatMessages: { ...s.chatMessages, [conversation]: updated },
+      streamingContent: restContent,
+      streamingEvents: restEvents,
+      streamingStatus: restStatus,
+    });
+
+    // If aborted (user clicked Stop), skip backend reload
+    if (signal?.aborted) return;
+
+    // Reload from backend to get the actual final assistant text.
+    // The assistant's response text is stored server-side and may not
+    // arrive via TEXT_DELTA events during streaming.
+    try {
+      const res = await commandServiceClient.listConversationMessages(
+        create(ListConversationMessagesRequestSchema, {
+          conversation,
+          pageSize: 200,
+          pageToken: "",
+        })
+      );
+
+      const s2 = get();
+      const cmdId = commandName.split("/").pop();
+      const uiMsgs: ChatMessageUI[] = (res.messages ?? []).map((msg) => ({
+        id: msg.name,
+        role: (msg.role === 1 ? "user" : "assistant") as "user" | "assistant",
+        content: msg.content,
+        timestamp: msg.createdAt ? timestampDate(msg.createdAt) : new Date(),
+        commandId: msg.commandId || undefined,
+      }));
+
+      // Merge streaming events back into the reloaded assistant message
+      const merged = uiMsgs.map((m) => {
+        if (m.commandId === cmdId) {
+          return {
+            ...m,
+            commandName,
+            events: finalEvents,
+            status: finalStatus,
+            content: m.content || streamedContent,
+          };
+        }
+        return m;
+      });
+
+      set({ chatMessages: { ...s2.chatMessages, [conversation]: merged } });
+    } catch {
+      // If reload fails, keep streamed content + events
     }
   },
 
   resetStreaming(commandName) {
-    set((state) => {
-      const { [commandName]: _c, ...content } = state.streamingContent;
-      const { [commandName]: _e, ...events } = state.streamingEvents;
-      const { [commandName]: _s, ...status } = state.streamingStatus;
-      return {
-        streamingContent: content,
-        streamingEvents: events,
-        streamingStatus: status,
-      };
+    const s = get();
+    const finalEvents = s.streamingEvents[commandName] ?? [];
+    const finalContent = s.streamingContent[commandName] ?? "";
+
+    const { [commandName]: _c, ...restContent } = s.streamingContent;
+    const { [commandName]: _e, ...restEvents } = s.streamingEvents;
+    const { [commandName]: _s, ...restStatus } = s.streamingStatus;
+
+    const chatMessages = { ...s.chatMessages };
+    for (const [conv, msgs] of Object.entries(chatMessages)) {
+      chatMessages[conv] = msgs.map((m) =>
+        m.commandName === commandName
+          ? {
+              ...m,
+              streaming: false,
+              content: finalContent,
+              events: finalEvents,
+            }
+          : m
+      );
+    }
+
+    set({
+      chatMessages,
+      streamingContent: restContent,
+      streamingEvents: restEvents,
+      streamingStatus: restStatus,
     });
   },
 });

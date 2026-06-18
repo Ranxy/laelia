@@ -1,4 +1,4 @@
-import { ArrowDown, Loader2, Square } from "lucide-react";
+import { ArrowDown, ChevronRight, Loader2, Square } from "lucide-react";
 import MarkdownRender, {
   MarkdownCodeBlockNode,
   setCustomComponents,
@@ -66,7 +66,6 @@ export function ChatPage() {
   const loadMessages = useAppStore((s) => s.loadMessages);
   const sendChatMessage = useAppStore((s) => s.sendChatMessage);
   const streamChatCommand = useAppStore((s) => s.streamChatCommand);
-  const resetStreaming = useAppStore((s) => s.resetStreaming);
 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -161,9 +160,6 @@ export function ChatPage() {
 
   const handleStop = () => {
     abortRef.current?.abort();
-    if (streamingCommandName) {
-      resetStreaming(streamingCommandName);
-    }
     setSending(false);
   };
 
@@ -315,6 +311,36 @@ function MessageBubble({
     [events]
   );
 
+  const hasEvents =
+    !isUser &&
+    (toolCallPairs.length > 0 ||
+      diffEvents.length > 0 ||
+      warningEvents.length > 0);
+
+  // Auto-collapse events when streaming finishes and final content is available
+  const [eventsCollapsed, setEventsCollapsed] = useState(false);
+  const prevStreamingRef = useRef(isStreaming);
+  useEffect(() => {
+    if (prevStreamingRef.current && !isStreaming && displayContent) {
+      setEventsCollapsed(true);
+    }
+    prevStreamingRef.current = isStreaming;
+  }, [isStreaming, displayContent]);
+
+  const eventSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (toolCallPairs.length > 0) {
+      parts.push(`${toolCallPairs.length} ${t("chat.tool-call")}`);
+    }
+    if (diffEvents.length > 0) {
+      parts.push(`${diffEvents.length} ${t("chat.diff")}`);
+    }
+    if (warningEvents.length > 0) {
+      parts.push(`${warningEvents.length} ${t("chat.warning")}`);
+    }
+    return parts.join(" · ");
+  }, [toolCallPairs.length, diffEvents.length, warningEvents.length, t]);
+
   return (
     <div
       className={cn(
@@ -337,6 +363,54 @@ function MessageBubble({
         )}
       </div>
 
+      {/* Events (tool calls, diffs, warnings) — shown above content */}
+      {hasEvents && !eventsCollapsed && (
+        <div className="flex flex-col gap-1.5 w-full max-w-[85%]">
+          {toolCallPairs.map((pair, i) => (
+            <ChatToolCall
+              key={`tool-${i}-${pair.started.seqNo}`}
+              startedEvent={pair.started}
+              finishedEvent={pair.finished}
+            />
+          ))}
+          {diffEvents.map((e) => (
+            <ChatDiff key={`diff-${e.seqNo}`} event={e} />
+          ))}
+          {warningEvents.map((e) => (
+            <ChatWarning key={`warn-${e.seqNo}`} event={e} />
+          ))}
+          {permissionEvent && !isPermissionDecided && msg.commandName && (
+            <ChatPermissionRequest
+              event={permissionEvent}
+              commandName={msg.commandName}
+            />
+          )}
+          {/* Collapse toggle when finalized */}
+          {!isStreaming && (
+            <button
+              type="button"
+              onClick={() => setEventsCollapsed(true)}
+              className="text-xs text-control-light hover:text-accent px-1 cursor-pointer transition-colors self-start"
+            >
+              {t("command.collapse")} ↑
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Collapsed events summary — click to expand */}
+      {hasEvents && eventsCollapsed && (
+        <button
+          type="button"
+          onClick={() => setEventsCollapsed(false)}
+          className="flex items-center gap-1.5 text-xs text-control-light hover:text-accent px-1 cursor-pointer transition-colors max-w-[85%]"
+        >
+          <ChevronRight className="size-3" />
+          <span>{eventSummary}</span>
+        </button>
+      )}
+
+      {/* Content bubble */}
       <div
         className={cn(
           "max-w-[85%] rounded-lg px-4 py-3 text-sm",
@@ -364,36 +438,8 @@ function MessageBubble({
             <Loader2 className="size-3 animate-spin" />
             {t("chat.thinking")}
           </div>
-        ) : (
-          <div className="text-control-light text-xs italic">
-            {displayContent || ""}
-          </div>
-        )}
+        ) : null}
       </div>
-
-      {!isUser && (
-        <div className="flex flex-col gap-1.5 w-full max-w-[85%]">
-          {toolCallPairs.map((pair, i) => (
-            <ChatToolCall
-              key={`tool-${i}-${pair.started.seqNo}`}
-              startedEvent={pair.started}
-              finishedEvent={pair.finished}
-            />
-          ))}
-          {diffEvents.map((e) => (
-            <ChatDiff key={`diff-${e.seqNo}`} event={e} />
-          ))}
-          {warningEvents.map((e) => (
-            <ChatWarning key={`warn-${e.seqNo}`} event={e} />
-          ))}
-          {permissionEvent && !isPermissionDecided && msg.commandName && (
-            <ChatPermissionRequest
-              event={permissionEvent}
-              commandName={msg.commandName}
-            />
-          )}
-        </div>
-      )}
 
       {!isUser && msg.commandId && !isStreaming && (
         <button
