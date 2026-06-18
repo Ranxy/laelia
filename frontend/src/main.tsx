@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import "@/react/lib/i18n";
 import { AppRoot } from "@/react/app/root";
 import "@/react/assets/css/tailwind.css";
+import "markstream-react/index.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

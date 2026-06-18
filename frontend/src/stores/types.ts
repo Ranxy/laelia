@@ -32,11 +32,16 @@ export interface AuthSlice {
 export interface AgentSlice {
   agents: Agent[];
   agentsLoading: boolean;
+  agentCache: Record<string, Agent>;
 
   fetchAgents: (params?: {
     pageSize?: number;
     pageToken?: string;
   }) => Promise<{ nextPageToken: string } | undefined>;
+  getAgent: (
+    name: string,
+    opts?: { force?: boolean }
+  ) => Promise<Agent | undefined>;
   createAgent: (
     title: string,
     labels?: Record<string, string>
