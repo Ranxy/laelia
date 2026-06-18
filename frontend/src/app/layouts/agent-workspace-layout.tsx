@@ -40,7 +40,7 @@ export function AgentWorkspaceLayout() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b border-control-border px-4 py-2.5">
+      <div className="flex items-center gap-3 border-b border-control-border px-4 py-2.5 shrink-0">
         <Button variant="ghost" size="sm" onClick={() => navigate("/agents")}>
           <ArrowLeft className="size-4" />
           {t("workspace.back-to-agents")}
@@ -51,9 +51,9 @@ export function AgentWorkspaceLayout() {
         </div>
       </div>
 
-      <Tabs value={activeTab} className="flex h-full flex-col">
-        <div className="px-4">
-          <TabsList>
+      <Tabs value={activeTab} className="flex h-full flex-col overflow-hidden">
+        <div className="px-4 border-b border-control-border shrink-0">
+          <TabsList className="border-b-0">
             <TabsTrigger
               value="chat"
               onClick={() => navigate(`/agents/${agentId}/chat`)}

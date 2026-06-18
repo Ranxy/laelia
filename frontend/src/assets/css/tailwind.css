@@ -421,3 +421,97 @@
 body[data-bb-screenshot-active] [data-screenshot-hide] {
   display: none !important;
 }
+
+/* ---------------------------------------------------------------------------
+   Chat markdown styling — scope markstream-react output inside chat bubbles
+   --------------------------------------------------------------------------- */
+.markstream-chat {
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+.markstream-chat p {
+  margin: 0.5em 0;
+}
+.markstream-chat p:first-child {
+  margin-top: 0;
+}
+.markstream-chat p:last-child {
+  margin-bottom: 0;
+}
+.markstream-chat h1,
+.markstream-chat h2,
+.markstream-chat h3,
+.markstream-chat h4 {
+  font-weight: 600;
+  margin: 1em 0 0.5em;
+  line-height: 1.4;
+}
+.markstream-chat h1 {
+  font-size: 1.4em;
+}
+.markstream-chat h2 {
+  font-size: 1.25em;
+}
+.markstream-chat h3 {
+  font-size: 1.1em;
+}
+.markstream-chat h4 {
+  font-size: 1em;
+}
+.markstream-chat ul,
+.markstream-chat ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+.markstream-chat li {
+  margin: 0.25em 0;
+}
+.markstream-chat code {
+  font-size: 0.85em;
+  background: rgb(var(--color-control-bg-hover));
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+}
+.markstream-chat pre {
+  margin: 0.75em 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.markstream-chat pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.85em;
+}
+.markstream-chat blockquote {
+  border-left: 3px solid rgb(var(--color-control-border));
+  margin: 0.5em 0;
+  padding: 0.25em 0 0.25em 1em;
+  color: rgb(var(--color-control-light));
+}
+.markstream-chat table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75em 0;
+  font-size: 0.85em;
+}
+.markstream-chat th,
+.markstream-chat td {
+  border: 1px solid rgb(var(--color-control-border));
+  padding: 0.4em 0.65em;
+  text-align: left;
+}
+.markstream-chat th {
+  background: rgb(var(--color-control-bg));
+  font-weight: 600;
+}
+.markstream-chat a {
+  color: rgb(var(--color-info));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.markstream-chat hr {
+  border: none;
+  border-top: 1px solid rgb(var(--color-control-border));
+  margin: 1em 0;
+}

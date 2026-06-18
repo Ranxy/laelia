@@ -1,4 +1,11 @@
-import { ArrowDown, ChevronRight, Loader2, Square } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronRight,
+  Loader2,
+  Send,
+  Square,
+} from "lucide-react";
 import MarkdownRender, {
   MarkdownCodeBlockNode,
   setCustomComponents,
@@ -11,8 +18,6 @@ import { ChatPermissionRequest } from "@/react/components/chat-events/permission
 import { ChatToolCall } from "@/react/components/chat-events/tool-call";
 import { ChatWarning } from "@/react/components/chat-events/warning";
 import { CommandStatusBadge } from "@/react/components/command-status-badge";
-import { Button } from "@/react/components/ui/button";
-import { Textarea } from "@/react/components/ui/textarea";
 import { agentResourceName } from "@/react/lib/command-status";
 import { cn } from "@/react/lib/utils";
 import { useAppStore } from "@/react/stores";
@@ -107,18 +112,23 @@ export function ChatPage() {
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: "smooth",
+      });
     }
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, streamingContent, scrollToBottom]);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, streamingContent]);
 
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    const nearBottom = scrollHeight - scrollTop - clientHeight < 80;
+    const nearBottom = scrollHeight - scrollTop - clientHeight < 100;
     setShowScrollDown(!nearBottom);
   }, []);
 
@@ -126,7 +136,7 @@ export function ChatPage() {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, []);
 
   useEffect(() => {
@@ -166,72 +176,87 @@ export function ChatPage() {
   const isStreaming = sending || !!streamingCommandName;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col overflow-hidden">
+      {/* Messages scroll area */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto"
       >
-        <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6">
+        <div className="mx-auto flex max-w-3xl flex-col gap-6 px-6 pt-8 pb-4">
           {loading && (
-            <div className="flex items-center justify-center gap-2 py-8 text-control-light text-sm">
+            <div className="flex items-center justify-center gap-2 py-12 text-control-light text-sm">
               <Loader2 className="size-4 animate-spin" />
               {t("common.loading")}
             </div>
           )}
           {!loading && messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+            <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
+              <div className="flex size-14 items-center justify-center rounded-full bg-control-bg text-control-light">
+                <Send className="size-6" />
+              </div>
               <p className="text-control-light text-sm">{t("chat.empty")}</p>
             </div>
           )}
-          {messages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              msg={msg}
-              streamingContent={
-                msg.streaming && msg.commandName
-                  ? (streamingContent[msg.commandName] ?? "")
-                  : ""
-              }
-              streamingEvents={
-                msg.streaming && msg.commandName
-                  ? (streamingEvents[msg.commandName] ?? [])
-                  : (msg.events ?? [])
-              }
-              onViewDetails={() => {
-                if (msg.commandId) {
-                  navigate(`/agents/${agentId}/commands/${msg.commandId}`);
+          {messages.map((msg, idx) => {
+            const prevMsg = idx > 0 ? messages[idx - 1] : null;
+            const showAvatar = !prevMsg || prevMsg.role !== msg.role;
+            return (
+              <MessageRow
+                key={msg.id}
+                msg={msg}
+                showAvatar={showAvatar}
+                streamingContent={
+                  msg.streaming && msg.commandName
+                    ? (streamingContent[msg.commandName] ?? "")
+                    : ""
                 }
-              }}
-            />
-          ))}
+                streamingEvents={
+                  msg.streaming && msg.commandName
+                    ? (streamingEvents[msg.commandName] ?? [])
+                    : (msg.events ?? [])
+                }
+                onViewDetails={() => {
+                  if (msg.commandId) {
+                    navigate(`/agents/${agentId}/commands/${msg.commandId}`);
+                  }
+                }}
+              />
+            );
+          })}
         </div>
       </div>
 
+      {/* Scroll to bottom button */}
       {showScrollDown && (
-        <div className="relative">
-          <button
-            type="button"
-            onClick={scrollToBottom}
-            className={cn(
-              "absolute bottom-4 left-1/2 -translate-x-1/2",
-              "rounded-full size-9 flex items-center justify-center",
-              "bg-control-bg border border-control-border shadow-md",
-              "text-control hover:text-main hover:bg-link-hover transition-colors"
-            )}
-            aria-label={t("chat.scroll-to-bottom")}
-          >
-            <ArrowDown className="size-4" />
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          className={cn(
+            "absolute bottom-28 left-1/2 -translate-x-1/2 z-10",
+            "flex size-9 items-center justify-center",
+            "rounded-full border border-control-border bg-background shadow-lg",
+            "text-control hover:text-main hover:bg-control-bg transition-all"
+          )}
+          aria-label={t("chat.scroll-to-bottom")}
+        >
+          <ArrowDown className="size-4" />
+        </button>
       )}
 
-      <div className="shrink-0 border-t border-control-border bg-background">
-        <div className="mx-auto max-w-3xl px-4 py-3">
-          <div className="flex items-end gap-2">
-            <Textarea
+      {/* Input area */}
+      <div className="shrink-0 bg-background">
+        <div className="mx-auto max-w-3xl px-6 pb-5 pt-2">
+          <div className="rounded-2xl border border-control-border bg-control-bg/40 focus-within:border-accent focus-within:bg-background transition-colors">
+            <textarea
               ref={textareaRef}
-              className="flex-1 resize-none min-h-[44px] max-h-[160px]"
+              className={cn(
+                "block w-full resize-none bg-transparent px-4 py-3 text-sm text-main",
+                "placeholder:text-control-placeholder",
+                "focus:outline-none",
+                "max-h-[200px] min-h-[24px]"
+              )}
+              rows={1}
               placeholder={
                 isStreaming
                   ? t("chat.placeholder-processing")
@@ -247,23 +272,39 @@ export function ChatPage() {
               }}
               disabled={isStreaming}
             />
-            {isStreaming ? (
-              <Button
-                variant="outline"
-                onClick={handleStop}
-                className="h-9 w-9 p-0"
-              >
-                <Square className="size-4" />
-              </Button>
-            ) : (
-              <Button
-                onClick={handleSend}
-                disabled={!input.trim()}
-                size="default"
-              >
-                {t("common.send")}
-              </Button>
-            )}
+            <div className="flex items-center justify-between px-3 pb-2">
+              <span className="text-xs text-control-placeholder">
+                Enter {t("common.send")} · Shift+Enter
+              </span>
+              {isStreaming ? (
+                <button
+                  type="button"
+                  onClick={handleStop}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium",
+                    "bg-error/10 text-error hover:bg-error/20 transition-colors"
+                  )}
+                >
+                  <Square className="size-3" />
+                  {t("chat.stop")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={!input.trim()}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                    input.trim()
+                      ? "bg-accent text-accent-foreground hover:bg-accent-hover"
+                      : "bg-control-bg text-control-placeholder cursor-not-allowed"
+                  )}
+                >
+                  <Send className="size-3" />
+                  {t("common.send")}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -271,13 +312,30 @@ export function ChatPage() {
   );
 }
 
-function MessageBubble({
+function Avatar({ isUser }: { isUser: boolean }) {
+  return (
+    <div
+      className={cn(
+        "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+        isUser
+          ? "bg-accent text-accent-foreground"
+          : "bg-control-bg text-control"
+      )}
+    >
+      {isUser ? "U" : "A"}
+    </div>
+  );
+}
+
+function MessageRow({
   msg,
+  showAvatar,
   streamingContent,
   streamingEvents,
   onViewDetails,
 }: {
   msg: ChatMessageUI;
+  showAvatar: boolean;
   streamingContent: string;
   streamingEvents: CommandEvent[];
   onViewDetails: () => void;
@@ -317,7 +375,6 @@ function MessageBubble({
       diffEvents.length > 0 ||
       warningEvents.length > 0);
 
-  // Auto-collapse events when streaming finishes and final content is available
   const [eventsCollapsed, setEventsCollapsed] = useState(false);
   const prevStreamingRef = useRef(isStreaming);
   useEffect(() => {
@@ -342,114 +399,137 @@ function MessageBubble({
   }, [toolCallPairs.length, diffEvents.length, warningEvents.length, t]);
 
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-1",
-        isUser ? "items-end" : "items-start"
-      )}
-    >
-      <div className="flex items-center gap-2 px-1">
-        <span className="text-xs text-control-light">
-          {isUser ? t("chat.you") : t("chat.agent")}
-        </span>
-        <span className="text-xs text-control-light/60">
-          {formatTime(msg.timestamp)}
-        </span>
-        {!isUser && msg.status !== undefined && !isStreaming && (
-          <CommandStatusBadge
-            status={msg.status}
-            className="text-[10px] px-1.5 py-0"
-          />
+    <div className={cn("flex gap-3", isUser ? "flex-row-reverse" : "flex-row")}>
+      {/* Avatar */}
+      <div className="flex shrink-0 flex-col items-center pt-0.5">
+        {showAvatar ? (
+          <Avatar isUser={isUser} />
+        ) : (
+          <div className="size-8 shrink-0" />
         )}
       </div>
 
-      {/* Events (tool calls, diffs, warnings) — shown above content */}
-      {hasEvents && !eventsCollapsed && (
-        <div className="flex flex-col gap-1.5 w-full max-w-[85%]">
-          {toolCallPairs.map((pair, i) => (
-            <ChatToolCall
-              key={`tool-${i}-${pair.started.seqNo}`}
-              startedEvent={pair.started}
-              finishedEvent={pair.finished}
-            />
-          ))}
-          {diffEvents.map((e) => (
-            <ChatDiff key={`diff-${e.seqNo}`} event={e} />
-          ))}
-          {warningEvents.map((e) => (
-            <ChatWarning key={`warn-${e.seqNo}`} event={e} />
-          ))}
-          {permissionEvent && !isPermissionDecided && msg.commandName && (
-            <ChatPermissionRequest
-              event={permissionEvent}
-              commandName={msg.commandName}
-            />
-          )}
-          {/* Collapse toggle when finalized */}
-          {!isStreaming && (
-            <button
-              type="button"
-              onClick={() => setEventsCollapsed(true)}
-              className="text-xs text-control-light hover:text-accent px-1 cursor-pointer transition-colors self-start"
-            >
-              {t("command.collapse")} ↑
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Collapsed events summary — click to expand */}
-      {hasEvents && eventsCollapsed && (
-        <button
-          type="button"
-          onClick={() => setEventsCollapsed(false)}
-          className="flex items-center gap-1.5 text-xs text-control-light hover:text-accent px-1 cursor-pointer transition-colors max-w-[85%]"
-        >
-          <ChevronRight className="size-3" />
-          <span>{eventSummary}</span>
-        </button>
-      )}
-
-      {/* Content bubble */}
+      {/* Message body */}
       <div
         className={cn(
-          "max-w-[85%] rounded-lg px-4 py-3 text-sm",
-          isUser
-            ? "bg-accent text-accent-foreground"
-            : "bg-control-bg text-main"
+          "flex min-w-0 flex-1 flex-col gap-1.5",
+          isUser ? "items-end" : "items-start"
         )}
       >
-        {isUser ? (
-          <div className="whitespace-pre-wrap">{displayContent || ""}</div>
-        ) : displayContent ? (
-          <div className="markstream-chat">
-            <MarkdownRender
-              customId="chat"
-              content={displayContent}
-              final={!isStreaming}
-              smoothStreaming={isStreaming ? "auto" : false}
-              fade={!isStreaming}
-              typewriter={isStreaming}
-              maxLiveNodes={isStreaming ? 0 : undefined}
-            />
+        {/* Header */}
+        {showAvatar && (
+          <div className="flex items-center gap-2 px-0.5">
+            <span className="text-xs font-medium text-control">
+              {isUser ? t("chat.you") : t("chat.agent")}
+            </span>
+            <span className="text-xs text-control-placeholder">
+              {formatTime(msg.timestamp)}
+            </span>
+            {!isUser && msg.status !== undefined && !isStreaming && (
+              <CommandStatusBadge
+                status={msg.status}
+                className="text-[10px] px-1.5 py-0"
+              />
+            )}
           </div>
-        ) : isStreaming ? (
-          <div className="flex items-center gap-2 text-control-light text-xs">
-            <Loader2 className="size-3 animate-spin" />
-            {t("chat.thinking")}
-          </div>
-        ) : null}
-      </div>
+        )}
 
-      {!isUser && msg.commandId && !isStreaming && (
-        <button
-          type="button"
-          className="text-xs text-control-light hover:text-accent px-1 cursor-pointer transition-colors"
-          onClick={onViewDetails}
+        {/* Events (tool calls, diffs, warnings) */}
+        {hasEvents && !eventsCollapsed && (
+          <div className="flex w-full flex-col gap-1.5">
+            {toolCallPairs.map((pair, i) => (
+              <ChatToolCall
+                key={`tool-${i}-${pair.started.seqNo}`}
+                startedEvent={pair.started}
+                finishedEvent={pair.finished}
+              />
+            ))}
+            {diffEvents.map((e) => (
+              <ChatDiff key={`diff-${e.seqNo}`} event={e} />
+            ))}
+            {warningEvents.map((e) => (
+              <ChatWarning key={`warn-${e.seqNo}`} event={e} />
+            ))}
+            {permissionEvent && !isPermissionDecided && msg.commandName && (
+              <ChatPermissionRequest
+                event={permissionEvent}
+                commandName={msg.commandName}
+              />
+            )}
+            {!isStreaming && (
+              <button
+                type="button"
+                onClick={() => setEventsCollapsed(true)}
+                className="flex items-center gap-1 text-xs text-control-placeholder hover:text-accent cursor-pointer transition-colors self-start"
+              >
+                <ArrowUp className="size-3" />
+                {t("command.collapse")}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Collapsed events summary */}
+        {hasEvents && eventsCollapsed && (
+          <button
+            type="button"
+            onClick={() => setEventsCollapsed(false)}
+            className="flex items-center gap-1.5 text-xs text-control-placeholder hover:text-accent cursor-pointer transition-colors"
+          >
+            <ChevronRight className="size-3" />
+            <span>{eventSummary}</span>
+          </button>
+        )}
+
+        {/* Content bubble */}
+        <div
+          className={cn(
+            "rounded-2xl text-sm leading-relaxed",
+            isUser
+              ? "bg-accent text-accent-foreground rounded-tr-sm px-4 py-2.5 max-w-[80%]"
+              : displayContent || isStreaming
+                ? "bg-control-bg/60 text-main rounded-tl-sm px-4 py-3 max-w-[80%]"
+                : "hidden"
+          )}
         >
-          {t("chat.view-details")} &rarr;
-        </button>
-      )}
+          {isUser ? (
+            <div className="whitespace-pre-wrap break-words">
+              {displayContent || ""}
+            </div>
+          ) : displayContent ? (
+            <div className="markstream-chat break-words">
+              <MarkdownRender
+                customId="chat"
+                content={displayContent}
+                final={!isStreaming}
+                smoothStreaming={isStreaming ? "auto" : false}
+                fade={!isStreaming}
+                typewriter={isStreaming}
+                maxLiveNodes={isStreaming ? 0 : undefined}
+              />
+            </div>
+          ) : isStreaming ? (
+            <div className="flex items-center gap-2 text-control-light text-xs py-1">
+              <span className="flex gap-1">
+                <span className="size-1.5 rounded-full bg-control-light/60 animate-bounce [animation-delay:0ms]" />
+                <span className="size-1.5 rounded-full bg-control-light/60 animate-bounce [animation-delay:150ms]" />
+                <span className="size-1.5 rounded-full bg-control-light/60 animate-bounce [animation-delay:300ms]" />
+              </span>
+            </div>
+          ) : null}
+        </div>
+
+        {/* View details link */}
+        {!isUser && msg.commandId && !isStreaming && (
+          <button
+            type="button"
+            className="text-xs text-control-placeholder hover:text-accent px-0.5 cursor-pointer transition-colors"
+            onClick={onViewDetails}
+          >
+            {t("chat.view-details")} &rarr;
+          </button>
+        )}
+      </div>
     </div>
   );
 }
