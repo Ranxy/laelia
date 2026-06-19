@@ -263,12 +263,6 @@ export function CommandDetailPage() {
               )}
             </div>
 
-            {isACP && cmd.profile && (
-              <div className="text-xs text-control-light">
-                {t("command.profile")}: {cmd.profile}
-              </div>
-            )}
-
             <div className="flex gap-6 text-sm text-control-light flex-wrap">
               <span>
                 {t("command.duration")}: {formatDuration(cmd.durationMs)}

@@ -6,13 +6,6 @@ import { CommandStatusBadge } from "@/react/components/command-status-badge";
 import { Button } from "@/react/components/ui/button";
 import { Input } from "@/react/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/react/components/ui/select";
-import {
   Sheet,
   SheetBody,
   SheetContent,
@@ -37,7 +30,6 @@ import {
   formatTimestamp,
 } from "@/react/lib/command-status";
 import { useAppStore } from "@/react/stores";
-import type { Agent } from "@/types/proto-es/v1/agent_pb";
 import type { Command } from "@/types/proto-es/v1/command_pb";
 import { CommandStatus, ExecutorKind } from "@/types/proto-es/v1/command_pb";
 
@@ -65,15 +57,12 @@ export function CommandListPage() {
   const loading = useAppStore((s) => s.commandsLoading);
   const listCommands = useAppStore((s) => s.listCommands);
   const sendCommand = useAppStore((s) => s.sendCommand);
-  const getAgent = useAppStore((s) => s.getAgent);
 
   const [sendOpen, setSendOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
-  const [profile, setProfile] = useState("");
   const [sending, setSending] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
-  const [agentDetail, setAgentDetail] = useState<Agent | undefined>(undefined);
 
   const load = useCallback(() => {
     if (!agent) return;
@@ -83,21 +72,6 @@ export function CommandListPage() {
   useEffect(() => {
     load();
   }, [load]);
-
-  useEffect(() => {
-    if (!agentId) return;
-    getAgent(agent).then(setAgentDetail);
-  }, [agentId, agent, getAgent]);
-
-  const availableProfiles = useMemo(() => {
-    const caps = agentDetail?.info?.capability;
-    return caps?.availableProfiles ?? [];
-  }, [agentDetail]);
-
-  const defaultProfile = useMemo(() => {
-    const caps = agentDetail?.info?.capability;
-    return caps?.defaultProfile ?? "";
-  }, [agentDetail]);
 
   const filteredCommands = useMemo(() => {
     const statuses = statusFilterToStatuses[statusFilter];
@@ -119,10 +93,8 @@ export function CommandListPage() {
       await sendCommand(agent, instruction.trim(), {
         executorKind: ExecutorKind.ACP,
         instruction: instruction.trim(),
-        profile,
       });
       setInstruction("");
-      setProfile("");
       setSendOpen(false);
       load();
     } finally {
@@ -268,12 +240,8 @@ export function CommandListPage() {
         agentId={agentId ?? ""}
         instruction={instruction}
         setInstruction={setInstruction}
-        profile={profile}
-        setProfile={setProfile}
         sending={sending}
         onSend={handleSend}
-        availableProfiles={availableProfiles}
-        defaultProfile={defaultProfile}
       />
     </div>
   );
@@ -285,12 +253,8 @@ interface NewTaskSheetProps {
   agentId: string;
   instruction: string;
   setInstruction: (v: string) => void;
-  profile: string;
-  setProfile: (v: string) => void;
   sending: boolean;
   onSend: () => void;
-  availableProfiles: string[];
-  defaultProfile: string;
 }
 
 function NewTaskSheet({
@@ -299,12 +263,8 @@ function NewTaskSheet({
   agentId,
   instruction,
   setInstruction,
-  profile,
-  setProfile,
   sending,
   onSend,
-  availableProfiles,
-  defaultProfile,
 }: NewTaskSheetProps) {
   const { t } = useTranslation();
 
@@ -328,36 +288,6 @@ function NewTaskSheet({
               value={instruction}
               onChange={(e) => setInstruction(e.target.value)}
             />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-sm text-control-light">
-              {t("tasks.profile-label")}
-            </span>
-            {availableProfiles.length > 0 ? (
-              <Select
-                value={profile || defaultProfile}
-                onValueChange={(v) =>
-                  setProfile(v && v !== defaultProfile ? String(v) : "")
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableProfiles.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Input
-                placeholder={t("tasks.profile-placeholder")}
-                value={profile}
-                onChange={(e) => setProfile(e.target.value)}
-              />
-            )}
           </div>
         </SheetBody>
         <SheetFooter>

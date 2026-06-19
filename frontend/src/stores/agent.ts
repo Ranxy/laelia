@@ -5,6 +5,7 @@ import {
   AgentSchema,
   CreateAgentRequestSchema,
   DeleteAgentRequestSchema,
+  UpdateAgentACPConfigRequestSchema,
 } from "@/types/proto-es/v1/agent_pb";
 import type { AgentSlice, AppSliceCreator } from "./types";
 
@@ -71,5 +72,11 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
         Object.entries(state.agentCache).filter(([k]) => k !== name)
       ),
     }));
+  },
+
+  async updateAgentACPConfig(name: string, acpConfigYaml: string) {
+    await agentServiceClient.updateAgentACPConfig(
+      create(UpdateAgentACPConfigRequestSchema, { name, acpConfigYaml })
+    );
   },
 });

@@ -50,6 +50,7 @@ export interface AgentSlice {
     labels?: Record<string, string>
   ) => Promise<CreateAgentResponse>;
   deleteAgent: (name: string) => Promise<void>;
+  updateAgentACPConfig: (name: string, acpConfigYaml: string) => Promise<void>;
 }
 
 export interface CommandSlice {
@@ -67,7 +68,6 @@ export interface CommandSlice {
       timeoutSeconds?: number;
       executorKind?: number;
       instruction?: string;
-      profile?: string;
       allowDiff?: boolean;
       source?: number;
     }

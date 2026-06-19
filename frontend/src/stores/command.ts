@@ -26,7 +26,6 @@ export const createCommandSlice: AppSliceCreator<CommandSlice> = (
         timeoutSeconds: opts?.timeoutSeconds ?? 0,
         executorKind: opts?.executorKind ?? 0,
         instruction: opts?.instruction ?? "",
-        profile: opts?.profile ?? "",
         allowDiff: opts?.allowDiff ?? false,
         source: opts?.source ?? 0,
       })

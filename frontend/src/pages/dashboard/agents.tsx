@@ -13,8 +13,11 @@ import {
 import { Input } from "@/react/components/ui/input";
 import {
   Sheet,
+  SheetBody,
   SheetContent,
   SheetDescription,
+  SheetFooter,
+  SheetHeader,
   SheetTitle,
 } from "@/react/components/ui/sheet";
 import {
@@ -25,6 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/react/components/ui/table";
+import { Textarea } from "@/react/components/ui/textarea";
 import { useAppStore } from "@/react/stores";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
 
@@ -41,6 +45,9 @@ export function AgentsPage() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [acpConfigOpen, setAcpConfigOpen] = useState(false);
+  const [acpConfigYaml, setAcpConfigYaml] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(() => {
     fetchAgents({ pageSize: 100 });
@@ -81,6 +88,25 @@ export function AgentsPage() {
   function handleRowClick(agent: Agent) {
     setSelectedAgent(agent);
     setDetailOpen(true);
+  }
+
+  function handleEditACPConfig(agent: Agent) {
+    setSelectedAgent(agent);
+    setAcpConfigYaml(agent.info?.acpConfigYaml ?? "");
+    setAcpConfigOpen(true);
+  }
+
+  async function handleSaveACPConfig() {
+    if (!selectedAgent?.name) return;
+    setSaving(true);
+    try {
+      const updateAgentACPConfig = useAppStore.getState().updateAgentACPConfig;
+      await updateAgentACPConfig(selectedAgent.name, acpConfigYaml);
+      setAcpConfigOpen(false);
+      load();
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -231,10 +257,55 @@ export function AgentsPage() {
                   </>
                 )}
               </div>
+              <div className="pt-3 border-t border-control-border">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleEditACPConfig(selectedAgent)}
+                >
+                  ACP Config
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      <Sheet
+        open={acpConfigOpen}
+        onOpenChange={(next) => !next && setAcpConfigOpen(false)}
+      >
+        <SheetContent width="standard">
+          <SheetHeader>
+            <SheetTitle>ACP Config — {selectedAgent?.title ?? ""}</SheetTitle>
+            <SheetDescription>
+              Edit the ACP YAML configuration for this agent
+            </SheetDescription>
+          </SheetHeader>
+          <SheetBody>
+            <Textarea
+              className="font-mono text-sm min-h-[360px]"
+              value={acpConfigYaml}
+              onChange={(e) => setAcpConfigYaml(e.target.value)}
+            />
+          </SheetBody>
+          <SheetFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAcpConfigOpen(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={saving || !acpConfigYaml.trim()}
+              onClick={handleSaveACPConfig}
+            >
+              {saving ? "Saving..." : "Save"}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {loading ? (
         <p className="text-control-light">{t("common.loading")}</p>
