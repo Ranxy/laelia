@@ -364,6 +364,10 @@
                   <a href="#laelia.v1.RotateAgentTokenResponse"><span class="badge">M</span>RotateAgentTokenResponse</a>
                 </li>
               
+                <li>
+                  <a href="#laelia.v1.UpdateAgentACPConfigRequest"><span class="badge">M</span>UpdateAgentACPConfigRequest</a>
+                </li>
+              
               
                 <li>
                   <a href="#laelia.v1.AgentStatus.ConnectionState"><span class="badge">E</span>AgentStatus.ConnectionState</a>
@@ -1065,13 +1069,6 @@
                 </tr>
               
                 <tr>
-                  <td>available_profiles</td>
-                  <td><a href="#string">string</a></td>
-                  <td>repeated</td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
                   <td>max_timeout_seconds</td>
                   <td><a href="#int32">int32</a></td>
                   <td></td>
@@ -1109,13 +1106,6 @@
                 <tr>
                   <td>max_output_bytes</td>
                   <td><a href="#int64">int64</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>default_profile</td>
-                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -1317,6 +1307,13 @@
                 <tr>
                   <td>capability</td>
                   <td><a href="#laelia.v1.AgentCapability">AgentCapability</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>acp_config_yaml</td>
+                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -1652,6 +1649,13 @@
                   <td><a href="#laelia.v1.AgentStatus">AgentStatus</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>acp_config_yaml</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>server-provided ACP YAML config (empty when agent uses local file) </p></td>
                 </tr>
               
             </tbody>
@@ -2223,6 +2227,37 @@
 
         
       
+        <h3 id="laelia.v1.UpdateAgentACPConfigRequest">UpdateAgentACPConfigRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>acp_config_yaml</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
 
       
         <h3 id="laelia.v1.AgentStatus.ConnectionState">AgentStatus.ConnectionState</h3>
@@ -2332,6 +2367,13 @@
                 <td><a href="#laelia.v1.ListAgentSessionsRequest">ListAgentSessionsRequest</a></td>
                 <td><a href="#laelia.v1.ListAgentSessionsResponse">ListAgentSessionsResponse</a></td>
                 <td><p>List agent sessions</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateAgentACPConfig</td>
+                <td><a href="#laelia.v1.UpdateAgentACPConfigRequest">UpdateAgentACPConfigRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p>Update agent ACP config YAML (admin only)</p></td>
               </tr>
             
               <tr>
@@ -2464,6 +2506,16 @@
                 <td>GET</td>
                 <td>/v1/{name=agents/*}/sessions</td>
                 <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateAgentACPConfig</td>
+                <td>PATCH</td>
+                <td>/v1/{name=agents/*}:updateAcpConfig</td>
+                <td>*</td>
               </tr>
               
             

@@ -51,6 +51,7 @@
     - [RevokeAgentTokenResponse](#laelia-v1-RevokeAgentTokenResponse)
     - [RotateAgentTokenRequest](#laelia-v1-RotateAgentTokenRequest)
     - [RotateAgentTokenResponse](#laelia-v1-RotateAgentTokenResponse)
+    - [UpdateAgentACPConfigRequest](#laelia-v1-UpdateAgentACPConfigRequest)
   
     - [AgentStatus.ConnectionState](#laelia-v1-AgentStatus-ConnectionState)
   
@@ -314,14 +315,12 @@ RiskLevel is the risk level.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | supports_acp | [bool](#bool) |  |  |
-| available_profiles | [string](#string) | repeated |  |
 | max_timeout_seconds | [int32](#int32) |  |  |
 | supports_diff | [bool](#bool) |  |  |
 | supports_raw_events | [bool](#bool) |  |  |
 | supports_tool_traces | [bool](#bool) |  |  |
 | max_event_count | [int32](#int32) |  |  |
 | max_output_bytes | [int64](#int64) |  |  |
-| default_profile | [string](#string) |  |  |
 
 
 
@@ -397,6 +396,7 @@ RiskLevel is the risk level.
 | version | [string](#string) |  |  |
 | labels | [AgentInfo.LabelsEntry](#laelia-v1-AgentInfo-LabelsEntry) | repeated |  |
 | capability | [AgentCapability](#laelia-v1-AgentCapability) |  |  |
+| acp_config_yaml | [string](#string) |  |  |
 
 
 
@@ -514,6 +514,7 @@ RiskLevel is the risk level.
 | next_nonce | [string](#string) |  | server-signed nonce for next heartbeat |
 | access_token_expires_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | initial_status | [AgentStatus](#laelia-v1-AgentStatus) |  |  |
+| acp_config_yaml | [string](#string) |  | server-provided ACP YAML config (empty when agent uses local file) |
 
 
 
@@ -814,6 +815,22 @@ RiskLevel is the risk level.
 
 
 
+
+<a name="laelia-v1-UpdateAgentACPConfigRequest"></a>
+
+### UpdateAgentACPConfigRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| acp_config_yaml | [string](#string) |  |  |
+
+
+
+
+
  
 
 
@@ -851,6 +868,7 @@ RiskLevel is the risk level.
 | RevokeAgentToken | [RevokeAgentTokenRequest](#laelia-v1-RevokeAgentTokenRequest) | [RevokeAgentTokenResponse](#laelia-v1-RevokeAgentTokenResponse) | Token revocation: revoke all tokens for the agent |
 | ForceDisconnectAgent | [ForceDisconnectAgentRequest](#laelia-v1-ForceDisconnectAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Admin force disconnects an agent connection |
 | ListAgentSessions | [ListAgentSessionsRequest](#laelia-v1-ListAgentSessionsRequest) | [ListAgentSessionsResponse](#laelia-v1-ListAgentSessionsResponse) | List agent sessions |
+| UpdateAgentACPConfig | [UpdateAgentACPConfigRequest](#laelia-v1-UpdateAgentACPConfigRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Update agent ACP config YAML (admin only) |
 | ConnectAgent | [ConnectAgentRequest](#laelia-v1-ConnectAgentRequest) | [ConnectAgentResponse](#laelia-v1-ConnectAgentResponse) | Agent initial connection using bootstrap token |
 | AgentHeartbeat | [AgentHeartbeatRequest](#laelia-v1-AgentHeartbeatRequest) | [AgentHeartbeatResponse](#laelia-v1-AgentHeartbeatResponse) | Agent heartbeat |
 | AgentDisconnect | [AgentDisconnectRequest](#laelia-v1-AgentDisconnectRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Agent graceful disconnect |

@@ -28,6 +28,7 @@ const (
 	AgentService_RevokeAgentToken_FullMethodName     = "/laelia.v1.AgentService/RevokeAgentToken"
 	AgentService_ForceDisconnectAgent_FullMethodName = "/laelia.v1.AgentService/ForceDisconnectAgent"
 	AgentService_ListAgentSessions_FullMethodName    = "/laelia.v1.AgentService/ListAgentSessions"
+	AgentService_UpdateAgentACPConfig_FullMethodName = "/laelia.v1.AgentService/UpdateAgentACPConfig"
 	AgentService_ConnectAgent_FullMethodName         = "/laelia.v1.AgentService/ConnectAgent"
 	AgentService_AgentHeartbeat_FullMethodName       = "/laelia.v1.AgentService/AgentHeartbeat"
 	AgentService_AgentDisconnect_FullMethodName      = "/laelia.v1.AgentService/AgentDisconnect"
@@ -51,6 +52,8 @@ type AgentServiceClient interface {
 	ForceDisconnectAgent(ctx context.Context, in *ForceDisconnectAgentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// List agent sessions
 	ListAgentSessions(ctx context.Context, in *ListAgentSessionsRequest, opts ...grpc.CallOption) (*ListAgentSessionsResponse, error)
+	// Update agent ACP config YAML (admin only)
+	UpdateAgentACPConfig(ctx context.Context, in *UpdateAgentACPConfigRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Agent initial connection using bootstrap token
 	ConnectAgent(ctx context.Context, in *ConnectAgentRequest, opts ...grpc.CallOption) (*ConnectAgentResponse, error)
 	// Agent heartbeat
@@ -151,6 +154,16 @@ func (c *agentServiceClient) ListAgentSessions(ctx context.Context, in *ListAgen
 	return out, nil
 }
 
+func (c *agentServiceClient) UpdateAgentACPConfig(ctx context.Context, in *UpdateAgentACPConfigRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AgentService_UpdateAgentACPConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *agentServiceClient) ConnectAgent(ctx context.Context, in *ConnectAgentRequest, opts ...grpc.CallOption) (*ConnectAgentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ConnectAgentResponse)
@@ -217,6 +230,8 @@ type AgentServiceServer interface {
 	ForceDisconnectAgent(context.Context, *ForceDisconnectAgentRequest) (*emptypb.Empty, error)
 	// List agent sessions
 	ListAgentSessions(context.Context, *ListAgentSessionsRequest) (*ListAgentSessionsResponse, error)
+	// Update agent ACP config YAML (admin only)
+	UpdateAgentACPConfig(context.Context, *UpdateAgentACPConfigRequest) (*emptypb.Empty, error)
 	// Agent initial connection using bootstrap token
 	ConnectAgent(context.Context, *ConnectAgentRequest) (*ConnectAgentResponse, error)
 	// Agent heartbeat
@@ -260,6 +275,9 @@ func (UnimplementedAgentServiceServer) ForceDisconnectAgent(context.Context, *Fo
 }
 func (UnimplementedAgentServiceServer) ListAgentSessions(context.Context, *ListAgentSessionsRequest) (*ListAgentSessionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListAgentSessions not implemented")
+}
+func (UnimplementedAgentServiceServer) UpdateAgentACPConfig(context.Context, *UpdateAgentACPConfigRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateAgentACPConfig not implemented")
 }
 func (UnimplementedAgentServiceServer) ConnectAgent(context.Context, *ConnectAgentRequest) (*ConnectAgentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ConnectAgent not implemented")
@@ -441,6 +459,24 @@ func _AgentService_ListAgentSessions_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AgentService_UpdateAgentACPConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAgentACPConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).UpdateAgentACPConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_UpdateAgentACPConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).UpdateAgentACPConfig(ctx, req.(*UpdateAgentACPConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AgentService_ConnectAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ConnectAgentRequest)
 	if err := dec(in); err != nil {
@@ -569,6 +605,10 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListAgentSessions",
 			Handler:    _AgentService_ListAgentSessions_Handler,
+		},
+		{
+			MethodName: "UpdateAgentACPConfig",
+			Handler:    _AgentService_UpdateAgentACPConfig_Handler,
 		},
 		{
 			MethodName: "ConnectAgent",

@@ -332,6 +332,13 @@ export declare type ConnectAgentResponse = Message<"laelia.v1.ConnectAgentRespon
    * @generated from field: laelia.v1.AgentStatus initial_status = 6;
    */
   initialStatus?: AgentStatus | undefined;
+
+  /**
+   * server-provided ACP YAML config (empty when agent uses local file)
+   *
+   * @generated from field: string acp_config_yaml = 7;
+   */
+  acpConfigYaml: string;
 };
 
 /**
@@ -609,6 +616,27 @@ export declare type DeleteAgentRequest = Message<"laelia.v1.DeleteAgentRequest">
 export declare const DeleteAgentRequestSchema: GenMessage<DeleteAgentRequest>;
 
 /**
+ * @generated from message laelia.v1.UpdateAgentACPConfigRequest
+ */
+export declare type UpdateAgentACPConfigRequest = Message<"laelia.v1.UpdateAgentACPConfigRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string acp_config_yaml = 2;
+   */
+  acpConfigYaml: string;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateAgentACPConfigRequest.
+ * Use `create(UpdateAgentACPConfigRequestSchema)` to create a new message.
+ */
+export declare const UpdateAgentACPConfigRequestSchema: GenMessage<UpdateAgentACPConfigRequest>;
+
+/**
  * @generated from message laelia.v1.HelloRequest
  */
 export declare type HelloRequest = Message<"laelia.v1.HelloRequest"> & {
@@ -740,6 +768,11 @@ export declare type AgentInfo = Message<"laelia.v1.AgentInfo"> & {
    * @generated from field: laelia.v1.AgentCapability capability = 8;
    */
   capability?: AgentCapability | undefined;
+
+  /**
+   * @generated from field: string acp_config_yaml = 10;
+   */
+  acpConfigYaml: string;
 };
 
 /**
@@ -756,11 +789,6 @@ export declare type AgentCapability = Message<"laelia.v1.AgentCapability"> & {
    * @generated from field: bool supports_acp = 1;
    */
   supportsAcp: boolean;
-
-  /**
-   * @generated from field: repeated string available_profiles = 2;
-   */
-  availableProfiles: string[];
 
   /**
    * @generated from field: int32 max_timeout_seconds = 3;
@@ -791,11 +819,6 @@ export declare type AgentCapability = Message<"laelia.v1.AgentCapability"> & {
    * @generated from field: int64 max_output_bytes = 8;
    */
   maxOutputBytes: bigint;
-
-  /**
-   * @generated from field: string default_profile = 9;
-   */
-  defaultProfile: string;
 };
 
 /**
@@ -1002,6 +1025,16 @@ export declare const AgentService: GenService<{
     methodKind: "unary";
     input: typeof ListAgentSessionsRequestSchema;
     output: typeof ListAgentSessionsResponseSchema;
+  },
+  /**
+   * Update agent ACP config YAML (admin only)
+   *
+   * @generated from rpc laelia.v1.AgentService.UpdateAgentACPConfig
+   */
+  updateAgentACPConfig: {
+    methodKind: "unary";
+    input: typeof UpdateAgentACPConfigRequestSchema;
+    output: typeof EmptySchema;
   },
   /**
    * Agent initial connection using bootstrap token

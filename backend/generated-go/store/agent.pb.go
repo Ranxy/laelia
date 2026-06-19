@@ -190,6 +190,7 @@ type AgentInfo struct {
 	Version       string                 `protobuf:"bytes,6,opt,name=version,proto3" json:"version,omitempty"`
 	Labels        map[string]string      `protobuf:"bytes,7,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Capability    *AgentCapability       `protobuf:"bytes,8,opt,name=capability,proto3" json:"capability,omitempty"`
+	AcpConfigYaml string                 `protobuf:"bytes,10,opt,name=acp_config_yaml,json=acpConfigYaml,proto3" json:"acp_config_yaml,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -280,17 +281,22 @@ func (x *AgentInfo) GetCapability() *AgentCapability {
 	return nil
 }
 
+func (x *AgentInfo) GetAcpConfigYaml() string {
+	if x != nil {
+		return x.AcpConfigYaml
+	}
+	return ""
+}
+
 type AgentCapability struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	SupportsAcp        bool                   `protobuf:"varint,1,opt,name=supports_acp,json=supportsAcp,proto3" json:"supports_acp,omitempty"`
-	AvailableProfiles  []string               `protobuf:"bytes,2,rep,name=available_profiles,json=availableProfiles,proto3" json:"available_profiles,omitempty"`
 	MaxTimeoutSeconds  int32                  `protobuf:"varint,3,opt,name=max_timeout_seconds,json=maxTimeoutSeconds,proto3" json:"max_timeout_seconds,omitempty"`
 	SupportsDiff       bool                   `protobuf:"varint,4,opt,name=supports_diff,json=supportsDiff,proto3" json:"supports_diff,omitempty"`
 	SupportsRawEvents  bool                   `protobuf:"varint,5,opt,name=supports_raw_events,json=supportsRawEvents,proto3" json:"supports_raw_events,omitempty"`
 	SupportsToolTraces bool                   `protobuf:"varint,6,opt,name=supports_tool_traces,json=supportsToolTraces,proto3" json:"supports_tool_traces,omitempty"`
 	MaxEventCount      int32                  `protobuf:"varint,7,opt,name=max_event_count,json=maxEventCount,proto3" json:"max_event_count,omitempty"`
 	MaxOutputBytes     int64                  `protobuf:"varint,8,opt,name=max_output_bytes,json=maxOutputBytes,proto3" json:"max_output_bytes,omitempty"`
-	DefaultProfile     string                 `protobuf:"bytes,9,opt,name=default_profile,json=defaultProfile,proto3" json:"default_profile,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -330,13 +336,6 @@ func (x *AgentCapability) GetSupportsAcp() bool {
 		return x.SupportsAcp
 	}
 	return false
-}
-
-func (x *AgentCapability) GetAvailableProfiles() []string {
-	if x != nil {
-		return x.AvailableProfiles
-	}
-	return nil
 }
 
 func (x *AgentCapability) GetMaxTimeoutSeconds() int32 {
@@ -379,13 +378,6 @@ func (x *AgentCapability) GetMaxOutputBytes() int64 {
 		return x.MaxOutputBytes
 	}
 	return 0
-}
-
-func (x *AgentCapability) GetDefaultProfile() string {
-	if x != nil {
-		return x.DefaultProfile
-	}
-	return ""
 }
 
 type AgentStatus struct {
@@ -468,7 +460,7 @@ var File_store_agent_proto protoreflect.FileDescriptor
 
 const file_store_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x11store/agent.proto\x12\flaelia.store\"\xcb\x02\n" +
+	"\x11store/agent.proto\x12\flaelia.store\"\xf3\x02\n" +
 	"\tAgentInfo\x12\x1d\n" +
 	"\n" +
 	"agent_type\x18\x01 \x01(\tR\tagentType\x12\x1a\n" +
@@ -480,20 +472,20 @@ const file_store_agent_proto_rawDesc = "" +
 	"\x06labels\x18\a \x03(\v2#.laelia.store.AgentInfo.LabelsEntryR\x06labels\x12=\n" +
 	"\n" +
 	"capability\x18\b \x01(\v2\x1d.laelia.store.AgentCapabilityR\n" +
-	"capability\x1a9\n" +
+	"capability\x12&\n" +
+	"\x0facp_config_yaml\x18\n" +
+	" \x01(\tR\racpConfigYaml\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x95\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xbd\x02\n" +
 	"\x0fAgentCapability\x12!\n" +
-	"\fsupports_acp\x18\x01 \x01(\bR\vsupportsAcp\x12-\n" +
-	"\x12available_profiles\x18\x02 \x03(\tR\x11availableProfiles\x12.\n" +
+	"\fsupports_acp\x18\x01 \x01(\bR\vsupportsAcp\x12.\n" +
 	"\x13max_timeout_seconds\x18\x03 \x01(\x05R\x11maxTimeoutSeconds\x12#\n" +
 	"\rsupports_diff\x18\x04 \x01(\bR\fsupportsDiff\x12.\n" +
 	"\x13supports_raw_events\x18\x05 \x01(\bR\x11supportsRawEvents\x120\n" +
 	"\x14supports_tool_traces\x18\x06 \x01(\bR\x12supportsToolTraces\x12&\n" +
 	"\x0fmax_event_count\x18\a \x01(\x05R\rmaxEventCount\x12(\n" +
-	"\x10max_output_bytes\x18\b \x01(\x03R\x0emaxOutputBytes\x12'\n" +
-	"\x0fdefault_profile\x18\t \x01(\tR\x0edefaultProfile\"\xd3\x02\n" +
+	"\x10max_output_bytes\x18\b \x01(\x03R\x0emaxOutputBytes\"\xd3\x02\n" +
 	"\vAgentStatus\x12?\n" +
 	"\x05state\x18\x01 \x01(\x0e2).laelia.store.AgentStatus.ConnectionStateR\x05state\x12*\n" +
 	"\x11last_heartbeat_at\x18\x02 \x01(\x03R\x0flastHeartbeatAt\x12!\n" +

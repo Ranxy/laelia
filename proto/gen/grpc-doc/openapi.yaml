@@ -619,6 +619,35 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}:updateAcpConfig:
+        patch:
+            tags:
+                - AgentService
+            description: Update agent ACP config YAML (admin only)
+            operationId: AgentService_UpdateAgentACPConfig
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UpdateAgentACPConfigRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents:connect:
         post:
             tags:
@@ -1114,10 +1143,6 @@ components:
             properties:
                 supportsAcp:
                     type: boolean
-                availableProfiles:
-                    type: array
-                    items:
-                        type: string
                 maxTimeoutSeconds:
                     type: integer
                     format: int32
@@ -1131,8 +1156,6 @@ components:
                     type: integer
                     format: int32
                 maxOutputBytes:
-                    type: string
-                defaultProfile:
                     type: string
         AgentDisconnectRequest:
             type: object
@@ -1189,6 +1212,8 @@ components:
                         type: string
                 capability:
                     $ref: '#/components/schemas/AgentCapability'
+                acpConfigYaml:
+                    type: string
         AgentMetrics:
             type: object
             properties:
@@ -1483,6 +1508,8 @@ components:
                     format: date-time
                 initialStatus:
                     $ref: '#/components/schemas/AgentStatus'
+                acpConfigYaml:
+                    type: string
         CreateAgentResponse:
             type: object
             properties:
@@ -1858,6 +1885,16 @@ components:
                     description: |-
                         The name of the deleted user.
                          Format: users/{user}
+        UpdateAgentACPConfigRequest:
+            required:
+                - name
+                - acpConfigYaml
+            type: object
+            properties:
+                name:
+                    type: string
+                acpConfigYaml:
+                    type: string
         User:
             type: object
             properties:

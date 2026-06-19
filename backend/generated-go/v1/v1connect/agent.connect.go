@@ -56,6 +56,9 @@ const (
 	// AgentServiceListAgentSessionsProcedure is the fully-qualified name of the AgentService's
 	// ListAgentSessions RPC.
 	AgentServiceListAgentSessionsProcedure = "/laelia.v1.AgentService/ListAgentSessions"
+	// AgentServiceUpdateAgentACPConfigProcedure is the fully-qualified name of the AgentService's
+	// UpdateAgentACPConfig RPC.
+	AgentServiceUpdateAgentACPConfigProcedure = "/laelia.v1.AgentService/UpdateAgentACPConfig"
 	// AgentServiceConnectAgentProcedure is the fully-qualified name of the AgentService's ConnectAgent
 	// RPC.
 	AgentServiceConnectAgentProcedure = "/laelia.v1.AgentService/ConnectAgent"
@@ -86,6 +89,8 @@ type AgentServiceClient interface {
 	ForceDisconnectAgent(context.Context, *connect.Request[v1.ForceDisconnectAgentRequest]) (*connect.Response[emptypb.Empty], error)
 	// List agent sessions
 	ListAgentSessions(context.Context, *connect.Request[v1.ListAgentSessionsRequest]) (*connect.Response[v1.ListAgentSessionsResponse], error)
+	// Update agent ACP config YAML (admin only)
+	UpdateAgentACPConfig(context.Context, *connect.Request[v1.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error)
 	// Agent initial connection using bootstrap token
 	ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error)
 	// Agent heartbeat
@@ -157,6 +162,12 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(agentServiceMethods.ByName("ListAgentSessions")),
 			connect.WithClientOptions(opts...),
 		),
+		updateAgentACPConfig: connect.NewClient[v1.UpdateAgentACPConfigRequest, emptypb.Empty](
+			httpClient,
+			baseURL+AgentServiceUpdateAgentACPConfigProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("UpdateAgentACPConfig")),
+			connect.WithClientOptions(opts...),
+		),
 		connectAgent: connect.NewClient[v1.ConnectAgentRequest, v1.ConnectAgentResponse](
 			httpClient,
 			baseURL+AgentServiceConnectAgentProcedure,
@@ -200,6 +211,7 @@ type agentServiceClient struct {
 	revokeAgentToken     *connect.Client[v1.RevokeAgentTokenRequest, v1.RevokeAgentTokenResponse]
 	forceDisconnectAgent *connect.Client[v1.ForceDisconnectAgentRequest, emptypb.Empty]
 	listAgentSessions    *connect.Client[v1.ListAgentSessionsRequest, v1.ListAgentSessionsResponse]
+	updateAgentACPConfig *connect.Client[v1.UpdateAgentACPConfigRequest, emptypb.Empty]
 	connectAgent         *connect.Client[v1.ConnectAgentRequest, v1.ConnectAgentResponse]
 	agentHeartbeat       *connect.Client[v1.AgentHeartbeatRequest, v1.AgentHeartbeatResponse]
 	agentDisconnect      *connect.Client[v1.AgentDisconnectRequest, emptypb.Empty]
@@ -247,6 +259,11 @@ func (c *agentServiceClient) ListAgentSessions(ctx context.Context, req *connect
 	return c.listAgentSessions.CallUnary(ctx, req)
 }
 
+// UpdateAgentACPConfig calls laelia.v1.AgentService.UpdateAgentACPConfig.
+func (c *agentServiceClient) UpdateAgentACPConfig(ctx context.Context, req *connect.Request[v1.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.updateAgentACPConfig.CallUnary(ctx, req)
+}
+
 // ConnectAgent calls laelia.v1.AgentService.ConnectAgent.
 func (c *agentServiceClient) ConnectAgent(ctx context.Context, req *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error) {
 	return c.connectAgent.CallUnary(ctx, req)
@@ -286,6 +303,8 @@ type AgentServiceHandler interface {
 	ForceDisconnectAgent(context.Context, *connect.Request[v1.ForceDisconnectAgentRequest]) (*connect.Response[emptypb.Empty], error)
 	// List agent sessions
 	ListAgentSessions(context.Context, *connect.Request[v1.ListAgentSessionsRequest]) (*connect.Response[v1.ListAgentSessionsResponse], error)
+	// Update agent ACP config YAML (admin only)
+	UpdateAgentACPConfig(context.Context, *connect.Request[v1.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error)
 	// Agent initial connection using bootstrap token
 	ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error)
 	// Agent heartbeat
@@ -353,6 +372,12 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(agentServiceMethods.ByName("ListAgentSessions")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentServiceUpdateAgentACPConfigHandler := connect.NewUnaryHandler(
+		AgentServiceUpdateAgentACPConfigProcedure,
+		svc.UpdateAgentACPConfig,
+		connect.WithSchema(agentServiceMethods.ByName("UpdateAgentACPConfig")),
+		connect.WithHandlerOptions(opts...),
+	)
 	agentServiceConnectAgentHandler := connect.NewUnaryHandler(
 		AgentServiceConnectAgentProcedure,
 		svc.ConnectAgent,
@@ -401,6 +426,8 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 			agentServiceForceDisconnectAgentHandler.ServeHTTP(w, r)
 		case AgentServiceListAgentSessionsProcedure:
 			agentServiceListAgentSessionsHandler.ServeHTTP(w, r)
+		case AgentServiceUpdateAgentACPConfigProcedure:
+			agentServiceUpdateAgentACPConfigHandler.ServeHTTP(w, r)
 		case AgentServiceConnectAgentProcedure:
 			agentServiceConnectAgentHandler.ServeHTTP(w, r)
 		case AgentServiceAgentHeartbeatProcedure:
@@ -450,6 +477,10 @@ func (UnimplementedAgentServiceHandler) ForceDisconnectAgent(context.Context, *c
 
 func (UnimplementedAgentServiceHandler) ListAgentSessions(context.Context, *connect.Request[v1.ListAgentSessionsRequest]) (*connect.Response[v1.ListAgentSessionsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.ListAgentSessions is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) UpdateAgentACPConfig(context.Context, *connect.Request[v1.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.UpdateAgentACPConfig is not implemented"))
 }
 
 func (UnimplementedAgentServiceHandler) ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error) {
