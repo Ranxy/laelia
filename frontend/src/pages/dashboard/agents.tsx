@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ConnectionBadge } from "@/react/components/connection-badge";
+import { Alert } from "@/react/components/ui/alert";
 import { Button } from "@/react/components/ui/button";
 import {
   Dialog,
@@ -48,6 +49,7 @@ export function AgentsPage() {
   const [acpConfigOpen, setAcpConfigOpen] = useState(false);
   const [acpConfigYaml, setAcpConfigYaml] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const load = useCallback(() => {
     fetchAgents({ pageSize: 100 });
@@ -93,12 +95,14 @@ export function AgentsPage() {
   function handleEditACPConfig(agent: Agent) {
     setSelectedAgent(agent);
     setAcpConfigYaml(agent.info?.acpConfigYaml ?? "");
+    setSaveError("");
     setAcpConfigOpen(true);
   }
 
   async function handleSaveACPConfig() {
     if (!selectedAgent?.name) return;
     setSaving(true);
+    setSaveError("");
     try {
       const updateAgentACPConfig = useAppStore.getState().updateAgentACPConfig;
       await updateAgentACPConfig(selectedAgent.name, acpConfigYaml);
@@ -109,6 +113,10 @@ export function AgentsPage() {
       if (updated) {
         setSelectedAgent(updated);
       }
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to save ACP config";
+      setSaveError(msg);
     } finally {
       setSaving(false);
     }
@@ -288,10 +296,16 @@ export function AgentsPage() {
             </SheetDescription>
           </SheetHeader>
           <SheetBody>
+            {saveError && (
+              <Alert variant="error" description={saveError} className="mb-4" />
+            )}
             <Textarea
               className="font-mono text-sm min-h-[360px]"
               value={acpConfigYaml}
-              onChange={(e) => setAcpConfigYaml(e.target.value)}
+              onChange={(e) => {
+                setAcpConfigYaml(e.target.value);
+                setSaveError("");
+              }}
             />
           </SheetBody>
           <SheetFooter>
