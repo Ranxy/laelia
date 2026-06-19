@@ -129,7 +129,7 @@ func (b *rawEventBatch) flushLocked(e *ACPExecutor) {
 		b.summary = ""
 		return
 	}
-	if e.profile.SupportsRawEvents {
+	if e.config.SupportsRawEvents {
 		e.sendEvent(Event{
 			Type:    v1pb.CommandEventType_RAW_ACP,
 			Summary: b.summary,
@@ -160,8 +160,6 @@ type ACPExecutor struct {
 	cancel           context.CancelFunc
 	request          Request
 	config           *ACPConfig
-	profileName      string
-	profile          ACPProfile
 	workingDir       string
 	allowedRoots     []string
 	cmd              *exec.Cmd
@@ -197,12 +195,11 @@ type acpRuntimeClient struct {
 var _ acp.Client = (*acpRuntimeClient)(nil)
 
 func NewACP(req Request, cfg *ACPConfig) (Runtime, error) {
-	profileName, profile, err := cfg.ResolveProfile(req.Profile)
-	if err != nil {
-		return nil, err
+	if cfg == nil || cfg.Executable == "" {
+		return nil, errors.New("ACP is not configured on this agent")
 	}
 
-	workingDir, roots, err := resolveACPWorkingDir(req, profile)
+	workingDir, roots, err := resolveACPWorkingDir(req, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -220,17 +217,15 @@ func NewACP(req Request, cfg *ACPConfig) (Runtime, error) {
 		ctx, cancel = context.WithCancel(ctx)
 	}
 
-	cmd := exec.CommandContext(ctx, profile.Executable, profile.Args...)
+	cmd := exec.CommandContext(ctx, cfg.Executable, cfg.Args...)
 	cmd.Dir = workingDir
-	cmd.Env = buildACPEnv(profile, req.Env)
+	cmd.Env = buildACPEnv(cfg, req.Env)
 
 	exec := &ACPExecutor{
 		ctx:              ctx,
 		cancel:           cancel,
 		request:          req,
 		config:           cfg,
-		profileName:      profileName,
-		profile:          profile,
 		workingDir:       workingDir,
 		allowedRoots:     roots,
 		cmd:              cmd,
@@ -320,8 +315,8 @@ func (e *ACPExecutor) run() {
 		ProtocolVersion: acp.ProtocolVersionNumber,
 		ClientCapabilities: acp.ClientCapabilities{
 			Fs: acp.FileSystemCapabilities{
-				ReadTextFile:  e.profile.ReadTextFiles,
-				WriteTextFile: e.profile.WriteTextFiles,
+				ReadTextFile:  e.config.ReadTextFiles,
+				WriteTextFile: e.config.WriteTextFiles,
 			},
 			Terminal: false,
 		},
@@ -372,7 +367,7 @@ func (e *ACPExecutor) run() {
 	}
 	resultPayload, payloadErr := structpb.NewStruct(map[string]any{
 		"executor_kind":   e.request.ExecutorKind.String(),
-		"profile":         e.profileName,
+		"executable":      e.config.Executable,
 		"session_id":      e.sessionID,
 		"stop_reason":     string(promptResp.StopReason),
 		"agent_name":      e.initializedAgent,
@@ -519,7 +514,7 @@ func (e *ACPExecutor) limitOutput(content string) (string, bool) {
 }
 
 func (c *acpRuntimeClient) ReadTextFile(_ context.Context, params acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
-	path, err := c.executor.validatePath(params.Path, c.executor.profile.ReadTextFiles)
+	path, err := c.executor.validatePath(params.Path, c.executor.config.ReadTextFiles)
 	if err != nil {
 		return acp.ReadTextFileResponse{}, err
 	}
@@ -544,7 +539,7 @@ func (c *acpRuntimeClient) ReadTextFile(_ context.Context, params acp.ReadTextFi
 }
 
 func (c *acpRuntimeClient) WriteTextFile(_ context.Context, params acp.WriteTextFileRequest) (acp.WriteTextFileResponse, error) {
-	path, err := c.executor.validatePath(params.Path, c.executor.profile.WriteTextFiles)
+	path, err := c.executor.validatePath(params.Path, c.executor.config.WriteTextFiles)
 	if err != nil {
 		return acp.WriteTextFileResponse{}, err
 	}
@@ -563,7 +558,7 @@ func (c *acpRuntimeClient) RequestPermission(_ context.Context, params acp.Reque
 		kind = string(*params.ToolCall.Kind)
 	}
 
-	if allowsToolKind(c.executor.profile.AutoApproveToolKinds, params.ToolCall.Kind) {
+	if allowsToolKind(c.executor.config.AutoApproveToolKinds, params.ToolCall.Kind) {
 		return acp.RequestPermissionResponse{
 			Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{
 				Outcome:  "selected",
@@ -684,7 +679,7 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 		c.executor.buffer.flush(c.executor)
 		c.executor.rawEvents.flush(c.executor)
 		c.executor.toolCallCount.Add(1)
-		if c.executor.profile.SupportsToolTraces {
+		if c.executor.config.SupportsToolTraces {
 			c.executor.sendEvent(Event{
 				Type:            v1pb.CommandEventType_TOOL_CALL_STARTED,
 				Summary:         u.ToolCall.Title,
@@ -700,7 +695,7 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 					c.executor.flushIfNeeded()
 				}
 			}
-			if content.Diff != nil && c.executor.request.AllowDiff && c.executor.profile.SupportsDiff {
+			if content.Diff != nil && c.executor.request.AllowDiff && c.executor.config.SupportsDiff {
 				oldText := ""
 				if content.Diff.OldText != nil {
 					oldText = *content.Diff.OldText
@@ -719,7 +714,7 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 		if u.ToolCallUpdate.Status != nil {
 			c.executor.rawEvents.append(c.executor, "tool_call_update", toJSONMap(u.ToolCallUpdate))
 		}
-		if c.executor.profile.SupportsToolTraces && u.ToolCallUpdate.Status != nil {
+		if c.executor.config.SupportsToolTraces && u.ToolCallUpdate.Status != nil {
 			c.executor.sendEvent(Event{
 				Type:    v1pb.CommandEventType_TOOL_CALL_FINISHED,
 				Summary: string(*u.ToolCallUpdate.Status),
@@ -812,10 +807,10 @@ func (e *ACPExecutor) validatePath(path string, enabled bool) (string, error) {
 	return "", pkgerrors.Errorf("path %s is outside ACP workspace roots", path)
 }
 
-func resolveACPWorkingDir(req Request, profile ACPProfile) (string, []string, error) {
+func resolveACPWorkingDir(req Request, cfg *ACPConfig) (string, []string, error) {
 	workingDir := req.WorkingDir
 	if workingDir == "" {
-		workingDir = profile.WorkingDir
+		workingDir = cfg.WorkingDir
 	}
 	if workingDir == "" {
 		cwd, err := os.Getwd()
@@ -829,7 +824,7 @@ func resolveACPWorkingDir(req Request, profile ACPProfile) (string, []string, er
 		return "", nil, err
 	}
 	roots := []string{filepath.Clean(absWorkingDir)}
-	for _, dir := range profile.AdditionalDirectories {
+	for _, dir := range cfg.AdditionalDirectories {
 		absDir, err := filepath.Abs(dir)
 		if err != nil {
 			return "", nil, err
@@ -839,7 +834,7 @@ func resolveACPWorkingDir(req Request, profile ACPProfile) (string, []string, er
 	return filepath.Clean(absWorkingDir), uniqueStrings(roots), nil
 }
 
-func buildACPEnv(profile ACPProfile, requestEnv map[string]string) []string {
+func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string) []string {
 	values := map[string]string{}
 	for _, item := range os.Environ() {
 		key, value, ok := strings.Cut(item, "=")
@@ -847,9 +842,9 @@ func buildACPEnv(profile ACPProfile, requestEnv map[string]string) []string {
 			values[key] = value
 		}
 	}
-	if len(profile.AllowEnv) > 0 {
+	if len(cfg.AllowEnv) > 0 {
 		filtered := map[string]string{}
-		for _, key := range profile.AllowEnv {
+		for _, key := range cfg.AllowEnv {
 			if value, ok := values[key]; ok {
 				filtered[key] = value
 			}
@@ -859,7 +854,7 @@ func buildACPEnv(profile ACPProfile, requestEnv map[string]string) []string {
 	for key, value := range requestEnv {
 		values[key] = value
 	}
-	for key, value := range profile.Env {
+	for key, value := range cfg.Env {
 		values[key] = value
 	}
 	env := make([]string, 0, len(values))

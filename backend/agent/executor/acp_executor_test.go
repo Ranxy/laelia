@@ -39,7 +39,7 @@ func TestACPValidatePath(t *testing.T) {
 
 func TestACPRequestPermissionSelectsAllowOption(t *testing.T) {
 	kind := acp.ToolKindRead
-	client := &acpRuntimeClient{executor: &ACPExecutor{profile: ACPProfile{AutoApproveToolKinds: []string{"read"}}}}
+	client := &acpRuntimeClient{executor: &ACPExecutor{config: &ACPConfig{AutoApproveToolKinds: []string{"read"}}}}
 
 	resp, err := client.RequestPermission(context.Background(), acp.RequestPermissionRequest{
 		Options: []acp.PermissionOption{
@@ -57,8 +57,7 @@ func TestACPSessionUpdateEmitsDiffEvent(t *testing.T) {
 	status := acp.ToolCallStatusCompleted
 	exec := &ACPExecutor{
 		request:  Request{AllowDiff: true},
-		profile:  ACPProfile{SupportsDiff: true, SupportsToolTraces: true},
-		config:   &ACPConfig{MaxEventCount: 10},
+		config:   &ACPConfig{SupportsDiff: true, SupportsToolTraces: true, MaxEventCount: 10},
 		outputCh: make(chan OutputChunk, 4),
 		eventCh:  make(chan Event, 4),
 	}
@@ -87,7 +86,7 @@ func TestACPSessionUpdateEmitsDiffEvent(t *testing.T) {
 
 func TestACPSessionUpdateBuffersConsecutiveMessageChunks(t *testing.T) {
 	exec := newTestBufferedExecutor()
-	exec.profile.SupportsRawEvents = true
+	exec.config.SupportsRawEvents = true
 	client := &acpRuntimeClient{executor: exec}
 
 	for i := 0; i < 5; i++ {
@@ -123,7 +122,7 @@ func TestACPSessionUpdateBuffersConsecutiveMessageChunks(t *testing.T) {
 
 func TestACPSessionUpdateBatchesRawEventsAcrossBoundaries(t *testing.T) {
 	exec := newTestBufferedExecutor()
-	exec.profile.SupportsRawEvents = true
+	exec.config.SupportsRawEvents = true
 	client := &acpRuntimeClient{executor: exec}
 
 	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
@@ -244,7 +243,7 @@ func TestACPExecutorWithOpencodeReadFile(t *testing.T) {
 	assert.True(t, hasEventType(obs.events, v1pb.CommandEventType_FINAL_SUMMARY))
 	assert.True(t, hasEventType(obs.events, v1pb.CommandEventType_TOOL_CALL_STARTED) || hasEventType(obs.events, v1pb.CommandEventType_TOOL_CALL_FINISHED))
 	if obs.result.Result != nil {
-		assert.Equal(t, "opencode", obs.result.Result.AsMap()["profile"])
+		assert.Equal(t, bin, obs.result.Result.AsMap()["executable"])
 	}
 }
 
@@ -365,37 +364,32 @@ func newOpencodeTestConfig(bin string, workspace string, writable bool) *ACPConf
 	}
 
 	return &ACPConfig{
-		DefaultProfile:    "opencode",
-		MaxTimeoutSeconds: 120,
-		MaxEventCount:     2000,
-		MaxOutputBytes:    256 * 1024,
-		Profiles: map[string]ACPProfile{
-			"opencode": {
-				Executable:            bin,
-				Args:                  args,
-				WorkingDir:            workspace,
-				AdditionalDirectories: []string{workspace},
-				AllowEnv: []string{
-					"PATH",
-					"HOME",
-					"LANG",
-					"TERM",
-					"XDG_CONFIG_HOME",
-					"XDG_DATA_HOME",
-					"XDG_CACHE_HOME",
-					"ANTHROPIC_API_KEY",
-					"OPENAI_API_KEY",
-					"GOOGLE_API_KEY",
-					"OPENROUTER_API_KEY",
-				},
-				ReadTextFiles:        true,
-				WriteTextFiles:       writable,
-				AutoApproveToolKinds: toolKinds,
-				SupportsDiff:         writable,
-				SupportsRawEvents:    true,
-				SupportsToolTraces:   true,
-			},
+		MaxTimeoutSeconds:     120,
+		MaxEventCount:         2000,
+		MaxOutputBytes:        256 * 1024,
+		Executable:            bin,
+		Args:                  args,
+		WorkingDir:            workspace,
+		AdditionalDirectories: []string{workspace},
+		AllowEnv: []string{
+			"PATH",
+			"HOME",
+			"LANG",
+			"TERM",
+			"XDG_CONFIG_HOME",
+			"XDG_DATA_HOME",
+			"XDG_CACHE_HOME",
+			"ANTHROPIC_API_KEY",
+			"OPENAI_API_KEY",
+			"GOOGLE_API_KEY",
+			"OPENROUTER_API_KEY",
 		},
+		ReadTextFiles:        true,
+		WriteTextFiles:       writable,
+		AutoApproveToolKinds: toolKinds,
+		SupportsDiff:         writable,
+		SupportsRawEvents:    true,
+		SupportsToolTraces:   true,
 	}
 }
 

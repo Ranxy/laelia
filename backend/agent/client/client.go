@@ -90,7 +90,7 @@ func (eb *ExponentialBackoff) Reset() {
 func New(managerURL, token string, insecure bool, allowHTTP bool, acpConfigPath, agentName string) (*Client, error) {
 	managerURL = strings.TrimRight(managerURL, "/")
 
-	acpConfig, err := executor.LoadACPConfig(acpConfigPath)
+	acpConfig, err := executor.LoadACPConfigFromFile(acpConfigPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load ACP config")
 	}

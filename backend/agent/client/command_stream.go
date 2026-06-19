@@ -234,7 +234,6 @@ func (*commandStream) runCommand(
 	state := &executor.LocalState{
 		CommandID:        commandID,
 		ExecutorKind:     req.ExecutorKind.String(),
-		Profile:          req.Profile,
 		Status:           "running",
 		StartedAt:        time.Now().UnixMilli(),
 		LastSeqSent:      0,
