@@ -87,13 +87,19 @@ func (eb *ExponentialBackoff) Reset() {
 	eb.attempt = 0
 }
 
-func New(managerURL, token string, insecure bool, allowHTTP bool, acpConfigPath, agentName string) (*Client, error) {
+func New(managerURL, token string, insecure bool, allowHTTP bool, acpConfigPath, agentName string, acpConfigServer bool) (*Client, error) {
 	managerURL = strings.TrimRight(managerURL, "/")
 
-	acpConfig, err := executor.LoadACPConfigFromFile(acpConfigPath)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to load ACP config")
+	var acpConfig *executor.ACPConfig
+	var err error
+
+	if !acpConfigServer {
+		acpConfig, err = executor.LoadACPConfigFromFile(acpConfigPath)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, errors.Wrap(err, "failed to load ACP config")
+		}
 	}
+	// acpConfigServer=true: acpConfig stays nil, will be populated from server connect response
 
 	if strings.HasPrefix(managerURL, "http://") {
 		if !allowHTTP {
@@ -169,6 +175,7 @@ func (c *Client) Connect(ctx context.Context, info *v1pb.AgentInfo) error {
 				c.serverNonce = connectResp.NextNonce
 				c.mu.Unlock()
 				c.backoff.Reset()
+				c.handleServerACPConfig(connectResp)
 				slog.Info("connected to manager via refresh token")
 				return nil
 			}
@@ -192,8 +199,24 @@ func (c *Client) Connect(ctx context.Context, info *v1pb.AgentInfo) error {
 	c.serverNonce = resp.NextNonce
 	c.mu.Unlock()
 	c.backoff.Reset()
+	c.handleServerACPConfig(resp)
 	slog.Info("connected to manager via bootstrap token")
 	return nil
+}
+
+func (c *Client) handleServerACPConfig(connectResp *v1pb.ConnectAgentResponse) {
+	if connectResp.AcpConfigYaml == "" {
+		return
+	}
+	cfg, err := executor.LoadACPConfigFromYAML(connectResp.AcpConfigYaml)
+	if err != nil {
+		slog.Warn("failed to load server-provided ACP config", "error", err)
+		return
+	}
+	c.mu.Lock()
+	c.acpConfig = cfg
+	c.mu.Unlock()
+	slog.Info("loaded ACP config from server (overrides local)")
 }
 
 func (c *Client) Heartbeat(ctx context.Context) error {
