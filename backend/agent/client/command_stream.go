@@ -71,17 +71,16 @@ type commandStream struct {
 	backoff         *ExponentialBackoff
 	getToken        func() string
 	getSessID       func() string
-	acpConfig       *executor.ACPConfig
+	getAcpConfig    func() *executor.ACPConfig
 	mcpPort         int
 	agentResourceID string
 }
 
-func newCommandStream(httpClient *http.Client, managerURL string, acpConfig *executor.ACPConfig, mcpPort int, agentResourceID string) *commandStream {
+func newCommandStream(httpClient *http.Client, managerURL string, mcpPort int, agentResourceID string) *commandStream {
 	return &commandStream{
 		client:          v1connect.NewAgentCommandServiceClient(httpClient, managerURL),
 		managerURL:      managerURL,
 		backoff:         NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
-		acpConfig:       acpConfig,
 		mcpPort:         mcpPort,
 		agentResourceID: agentResourceID,
 	}
@@ -402,7 +401,7 @@ func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime
 			AgentResourceID: c.agentResourceID,
 			PrincipalID:     req.PrincipalId,
 			MCPPort:         c.mcpPort,
-		}, c.acpConfig)
+		}, c.getAcpConfig())
 	default:
 		return nil, connect.NewError(connect.CodeInvalidArgument, io.ErrUnexpectedEOF)
 	}

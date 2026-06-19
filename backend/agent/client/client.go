@@ -302,7 +302,7 @@ func (c *Client) Run(ctx context.Context) error {
 	c.mcpServer = mcpSrv
 	defer mcpSrv.Stop()
 
-	c.cmdStream = newCommandStream(c.streamClient, c.managerURL, c.acpConfig, mcpSrv.Port(), c.agentName)
+	c.cmdStream = newCommandStream(c.streamClient, c.managerURL, mcpSrv.Port(), c.agentName)
 	c.cmdStream.getToken = func() string {
 		c.mu.RLock()
 		defer c.mu.RUnlock()
@@ -312,6 +312,11 @@ func (c *Client) Run(ctx context.Context) error {
 		c.mu.RLock()
 		defer c.mu.RUnlock()
 		return c.sessionID
+	}
+	c.cmdStream.getAcpConfig = func() *executor.ACPConfig {
+		c.mu.RLock()
+		defer c.mu.RUnlock()
+		return c.acpConfig
 	}
 
 	for {

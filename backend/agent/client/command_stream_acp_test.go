@@ -28,7 +28,7 @@ func TestACPCommandStreamReadFile(t *testing.T) {
 	defer cleanup()
 
 	acpConfig := newOpencodeCSConfig(bin, workspace, false)
-	cs := &commandStream{acpConfig: acpConfig}
+	cs := &commandStream{getAcpConfig: func() *executor.ACPConfig { return acpConfig }}
 
 	req := &v1pb.CommandRequest{
 		CommandId:      "acp-cs-read",
@@ -84,7 +84,7 @@ func TestACPCommandStreamWriteFile(t *testing.T) {
 	defer cleanup()
 
 	acpConfig := newOpencodeCSConfig(bin, workspace, true)
-	cs := &commandStream{acpConfig: acpConfig}
+	cs := &commandStream{getAcpConfig: func() *executor.ACPConfig { return acpConfig }}
 
 	req := &v1pb.CommandRequest{
 		CommandId:      "acp-cs-write",
@@ -138,7 +138,7 @@ func TestACPCommandStreamCancel(t *testing.T) {
 	defer cleanup()
 
 	acpConfig := newOpencodeCSConfig(bin, workspace, false)
-	cs := &commandStream{acpConfig: acpConfig}
+	cs := &commandStream{getAcpConfig: func() *executor.ACPConfig { return acpConfig }}
 
 	req := &v1pb.CommandRequest{
 		CommandId:      "acp-cs-cancel",
