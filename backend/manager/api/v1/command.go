@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"slices"
 	"strings"
 	"time"
 
@@ -100,11 +99,6 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 		}
 	}
 
-	resolvedProfile := req.Msg.Profile
-	if resolvedProfile == "" && agent.Info.GetCapability() != nil {
-		resolvedProfile = agent.Info.GetCapability().DefaultProfile
-	}
-
 	envBytes, err := json.Marshal(req.Msg.Env)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to marshal env"))
@@ -115,7 +109,6 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 		PrincipalID:    principalID,
 		Command:        commandText,
 		Instruction:    instruction,
-		Profile:        resolvedProfile,
 		ExecutorKind:   int32(executorKind),
 		AllowDiff:      req.Msg.AllowDiff,
 		Status:         1, // PENDING
@@ -501,7 +494,7 @@ func formatPrincipalID(id int) string {
 	return fmt.Sprintf("%d", id)
 }
 
-func (s *CommandService) validateACPCapability(ctx context.Context, agent *store.AgentMessage, kind v1pb.ExecutorKind, profile string, allowDiff bool, timeoutSeconds int32, user *store.UserMessage) error {
+func (s *CommandService) validateACPCapability(ctx context.Context, agent *store.AgentMessage, kind v1pb.ExecutorKind, _ string, allowDiff bool, timeoutSeconds int32, user *store.UserMessage) error {
 	if kind != v1pb.ExecutorKind_ACP {
 		return nil
 	}
@@ -510,11 +503,6 @@ func (s *CommandService) validateACPCapability(ctx context.Context, agent *store
 	if capability == nil || !capability.SupportsAcp {
 		return connect.NewError(connect.CodeInvalidArgument,
 			errors.Errorf("agent %s does not support ACP tasks", agent.ResourceID))
-	}
-
-	if profile != "" && !slices.Contains(capability.AvailableProfiles, profile) {
-		return connect.NewError(connect.CodeInvalidArgument,
-			errors.Errorf("profile %q is not available on agent %s (available: %v)", profile, agent.ResourceID, capability.AvailableProfiles))
 	}
 
 	if timeoutSeconds > 0 && capability.MaxTimeoutSeconds > 0 && timeoutSeconds > capability.MaxTimeoutSeconds {

@@ -16,6 +16,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/Ranxy/laelia/backend/agent/executor"
 	"github.com/Ranxy/laelia/backend/common"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -325,6 +326,14 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 	now := time.Now()
 	nowSec := now.Unix()
 
+	acpConfigYaml := ""
+	if agent.Info != nil && agent.Info.AcpConfigYaml != "" {
+		agentCap := req.Msg.Info.GetCapability()
+		if agentCap == nil || !agentCap.SupportsAcp {
+			acpConfigYaml = agent.Info.AcpConfigYaml
+		}
+	}
+
 	patch := &store.UpdateAgentMessage{
 		Status: &storepb.AgentStatus{
 			State:           storepb.AgentStatus_ONLINE,
@@ -335,6 +344,16 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 	}
 	if req.Msg.Info != nil {
 		patch.Info = convertToStoreAgentInfo(req.Msg.Info)
+	}
+
+	if acpConfigYaml != "" {
+		cfg, err := executor.LoadACPConfigFromYAML(acpConfigYaml)
+		if err != nil {
+			slog.Warn("failed to parse stored ACP config, skipping capability override", "agent", agent.ResourceID, "error", err)
+		} else {
+			patch.Info.Capability = convertToStoreAgentCapability(cfg.Capability())
+			patch.Info.AcpConfigYaml = acpConfigYaml
+		}
 	}
 
 	updated, err := s.store.UpdateAgent(ctx, agent, patch)
@@ -402,6 +421,7 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 		NextNonce:            nonce,
 		AccessTokenExpiresAt: timestamppb.New(time.Now().Add(accessTokenDuration)),
 		InitialStatus:        convertToV1AgentStatus(updated.Status, updated.Deleted),
+		AcpConfigYaml:        acpConfigYaml,
 	}), nil
 }
 
@@ -717,14 +737,15 @@ func convertToV1AgentInfo(info *storepb.AgentInfo) *v1pb.AgentInfo {
 		return nil
 	}
 	return &v1pb.AgentInfo{
-		AgentType:  info.AgentType,
-		Hostname:   info.Hostname,
-		Os:         info.Os,
-		Arch:       info.Arch,
-		Ip:         info.Ip,
-		Version:    info.Version,
-		Labels:     info.Labels,
-		Capability: convertToV1AgentCapability(info.Capability),
+		AgentType:     info.AgentType,
+		Hostname:      info.Hostname,
+		Os:            info.Os,
+		Arch:          info.Arch,
+		Ip:            info.Ip,
+		Version:       info.Version,
+		Labels:        info.Labels,
+		Capability:    convertToV1AgentCapability(info.Capability),
+		AcpConfigYaml: info.AcpConfigYaml,
 	}
 }
 
@@ -733,14 +754,15 @@ func convertToStoreAgentInfo(info *v1pb.AgentInfo) *storepb.AgentInfo {
 		return nil
 	}
 	return &storepb.AgentInfo{
-		AgentType:  info.AgentType,
-		Hostname:   info.Hostname,
-		Os:         info.Os,
-		Arch:       info.Arch,
-		Ip:         info.Ip,
-		Version:    info.Version,
-		Labels:     info.Labels,
-		Capability: convertToStoreAgentCapability(info.Capability),
+		AgentType:     info.AgentType,
+		Hostname:      info.Hostname,
+		Os:            info.Os,
+		Arch:          info.Arch,
+		Ip:            info.Ip,
+		Version:       info.Version,
+		Labels:        info.Labels,
+		Capability:    convertToStoreAgentCapability(info.Capability),
+		AcpConfigYaml: info.AcpConfigYaml,
 	}
 }
 
@@ -750,14 +772,12 @@ func convertToV1AgentCapability(capability *storepb.AgentCapability) *v1pb.Agent
 	}
 	return &v1pb.AgentCapability{
 		SupportsAcp:        capability.SupportsAcp,
-		AvailableProfiles:  capability.AvailableProfiles,
 		MaxTimeoutSeconds:  capability.MaxTimeoutSeconds,
 		SupportsDiff:       capability.SupportsDiff,
 		SupportsRawEvents:  capability.SupportsRawEvents,
 		SupportsToolTraces: capability.SupportsToolTraces,
 		MaxEventCount:      capability.MaxEventCount,
 		MaxOutputBytes:     capability.MaxOutputBytes,
-		DefaultProfile:     capability.DefaultProfile,
 	}
 }
 
@@ -767,14 +787,12 @@ func convertToStoreAgentCapability(capability *v1pb.AgentCapability) *storepb.Ag
 	}
 	return &storepb.AgentCapability{
 		SupportsAcp:        capability.SupportsAcp,
-		AvailableProfiles:  capability.AvailableProfiles,
 		MaxTimeoutSeconds:  capability.MaxTimeoutSeconds,
 		SupportsDiff:       capability.SupportsDiff,
 		SupportsRawEvents:  capability.SupportsRawEvents,
 		SupportsToolTraces: capability.SupportsToolTraces,
 		MaxEventCount:      capability.MaxEventCount,
 		MaxOutputBytes:     capability.MaxOutputBytes,
-		DefaultProfile:     capability.DefaultProfile,
 	}
 }
 
@@ -871,4 +889,34 @@ func generateRandomString(length int) string {
 		return fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(b)[:length]
+}
+
+func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Request[v1pb.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error) {
+	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+
+	if _, err := executor.LoadACPConfigFromYAML(req.Msg.AcpConfigYaml); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument,
+			errors.Errorf("invalid ACP config YAML: %v", err))
+	}
+
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+
+	patch := &store.UpdateAgentMessage{
+		Info: &storepb.AgentInfo{
+			AcpConfigYaml: req.Msg.AcpConfigYaml,
+		},
+	}
+	if _, err := s.store.UpdateAgent(ctx, agent, patch); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
