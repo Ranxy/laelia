@@ -104,6 +104,11 @@ export function AgentsPage() {
       await updateAgentACPConfig(selectedAgent.name, acpConfigYaml);
       setAcpConfigOpen(false);
       load();
+      const getAgent = useAppStore.getState().getAgent;
+      const updated = await getAgent(selectedAgent.name, { force: true });
+      if (updated) {
+        setSelectedAgent(updated);
+      }
     } finally {
       setSaving(false);
     }
