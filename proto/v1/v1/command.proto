@@ -6,6 +6,7 @@ import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "v1/annotation.proto";
@@ -195,6 +196,7 @@ message SearchChatHistoryRequest {
   google.protobuf.Timestamp until = 4;
   string principal_id = 5;
   int32 limit = 6;
+  string conversation = 7;
 }
 
 message SearchChatHistoryResponse {
@@ -217,6 +219,34 @@ message ChatMessage {
   string content = 5;
   string command_id = 6;
   google.protobuf.Timestamp created_at = 7;
+  string sender_name = 8;
+  int32 sender_type = 9;
+}
+
+message Conversation {
+  option (google.api.resource) = {
+    type: "laelia/Conversation"
+    pattern: "conversations/{conversation}"
+    singular: "conversation"
+    plural: "conversations"
+  };
+
+  string name = 1;
+  string title = 2;
+  int32 type = 3;
+  int32 member_count = 4;
+  string owner_id = 5;
+  string owner_name = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message ChannelMember {
+  int32 member_type = 1;
+  string member_id = 2;
+  string display_name = 3;
+  int32 member_role = 4;
+  google.protobuf.Timestamp joined_at = 5;
 }
 
 message ListConversationMessagesRequest {
@@ -236,6 +266,76 @@ message GetOrCreateConversationRequest {
 
 message GetOrCreateConversationResponse {
   string name = 1;
+}
+
+message CreateChannelRequest {
+  string title = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ListChannelsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListChannelsResponse {
+  repeated Conversation channels = 1;
+  string next_page_token = 2;
+}
+
+message GetChannelRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+}
+
+message UpdateChannelRequest {
+  Conversation conversation = 1;
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteChannelRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+}
+
+message AddChannelMemberRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+  int32 member_type = 2;
+  string member_id = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message RemoveChannelMemberRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+  string member_id = 2 [(google.api.field_behavior) = REQUIRED];
+  int32 member_type = 3;
+}
+
+message ListChannelMembersRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+}
+
+message ListChannelMembersResponse {
+  repeated ChannelMember members = 1;
+}
+
+message SendMessageRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+  string content = 2 [(google.api.field_behavior) = REQUIRED];
 }
 
 message GetCommandContextRequest {
@@ -306,6 +406,60 @@ service CommandService {
 
   rpc ListConversationMessages(ListConversationMessagesRequest) returns (ListConversationMessagesResponse) {
     option (google.api.http) = {get: "/v1/{conversation=conversations/*}/messages"};
+  }
+
+  rpc CreateChannel(CreateChannelRequest) returns (Conversation) {
+    option (google.api.http) = {
+      post: "/v1/channels"
+      body: "*"
+    };
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc ListChannels(ListChannelsRequest) returns (ListChannelsResponse) {
+    option (google.api.http) = {get: "/v1/channels"};
+  }
+
+  rpc GetChannel(GetChannelRequest) returns (Conversation) {
+    option (google.api.http) = {get: "/v1/{name=conversations/*}"};
+  }
+
+  rpc UpdateChannel(UpdateChannelRequest) returns (Conversation) {
+    option (google.api.http) = {
+      patch: "/v1/{conversation.name=conversations/*}"
+      body: "conversation"
+    };
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc DeleteChannel(DeleteChannelRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/{name=conversations/*}"};
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc AddChannelMember(AddChannelMemberRequest) returns (ChannelMember) {
+    option (google.api.http) = {
+      post: "/v1/{conversation=conversations/*}/members"
+      body: "*"
+    };
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc RemoveChannelMember(RemoveChannelMemberRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/{conversation=conversations/*}/members/{member_id}"};
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc ListChannelMembers(ListChannelMembersRequest) returns (ListChannelMembersResponse) {
+    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/members"};
+  }
+
+  rpc SendMessage(SendMessageRequest) returns (ChatMessage) {
+    option (google.api.http) = {
+      post: "/v1/{conversation=conversations/*}/messages:send"
+      body: "*"
+    };
+    option (laelia.v1.audit) = true;
   }
 }
 
@@ -398,6 +552,7 @@ message SendCommandRequest {
   string profile = 8;
   bool allow_diff = 9;
   CommandSource source = 10;
+  string conversation_id = 11;
 }
 
 message ListCommandsRequest {

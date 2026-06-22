@@ -285,3 +285,41 @@ CREATE TABLE chat_message (
 CREATE INDEX idx_chat_message_conversation ON chat_message(conversation_id, created_at);
 CREATE INDEX idx_chat_message_command ON chat_message(command_id) WHERE command_id IS NOT NULL;
 
+-- === Channel/Unified Conversation Model Migration ===
+
+-- 1. Make conversation.agent_id nullable (channels don't belong to a single agent)
+ALTER TABLE conversation ALTER COLUMN agent_id DROP NOT NULL;
+
+-- 2. Add owner_id and updated_at to conversation
+ALTER TABLE conversation ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES principal(id);
+ALTER TABLE conversation ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
+-- Migrate existing rows: owner_id = created_by
+UPDATE conversation SET owner_id = created_by WHERE owner_id IS NULL;
+ALTER TABLE conversation ALTER COLUMN owner_id SET NOT NULL;
+
+-- 3. Drop old unique constraint (channel membership is tracked through conversation_member)
+DROP INDEX IF EXISTS idx_conversation_agent_principal;
+
+-- 4. Populate conversation_member for existing direct conversations
+INSERT INTO conversation_member (conversation_id, member_type, member_id)
+SELECT id, 1, created_by::TEXT FROM conversation WHERE type = 1
+ON CONFLICT (conversation_id, member_type, member_id) DO NOTHING;
+
+INSERT INTO conversation_member (conversation_id, member_type, member_id)
+SELECT c.id, 2, a.resource_id
+FROM conversation c
+JOIN agent a ON a.id = c.agent_id
+WHERE c.type = 1 AND c.agent_id IS NOT NULL
+ON CONFLICT (conversation_id, member_type, member_id) DO NOTHING;
+
+-- 5. Add sender_agent_id to chat_message (distinguishes agent-sent messages)
+ALTER TABLE chat_message ADD COLUMN IF NOT EXISTS sender_agent_id INTEGER REFERENCES agent(id);
+
+-- 6. Add joined_at and member_role to conversation_member
+ALTER TABLE conversation_member ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE conversation_member ADD COLUMN IF NOT EXISTS member_role SMALLINT NOT NULL DEFAULT 2;
+
+CREATE INDEX IF NOT EXISTS idx_chat_message_sender_agent ON chat_message(sender_agent_id) WHERE sender_agent_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_conversation_member_lookup ON conversation_member(member_type, member_id);
+

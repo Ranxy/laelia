@@ -4,7 +4,7 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { JsonObject, Message } from "@bufbuild/protobuf";
-import type { EmptySchema, Timestamp } from "@bufbuild/protobuf/wkt";
+import type { EmptySchema, FieldMask, Timestamp } from "@bufbuild/protobuf/wkt";
 
 /**
  * Describes the file v1/command.proto.
@@ -615,6 +615,11 @@ export declare type SearchChatHistoryRequest = Message<"laelia.v1.SearchChatHist
    * @generated from field: int32 limit = 6;
    */
   limit: number;
+
+  /**
+   * @generated from field: string conversation = 7;
+   */
+  conversation: string;
 };
 
 /**
@@ -713,6 +718,16 @@ export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
    * @generated from field: google.protobuf.Timestamp created_at = 7;
    */
   createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string sender_name = 8;
+   */
+  senderName: string;
+
+  /**
+   * @generated from field: int32 sender_type = 9;
+   */
+  senderType: number;
 };
 
 /**
@@ -720,6 +735,93 @@ export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
  * Use `create(ChatMessageSchema)` to create a new message.
  */
 export declare const ChatMessageSchema: GenMessage<ChatMessage>;
+
+/**
+ * @generated from message laelia.v1.Conversation
+ */
+export declare type Conversation = Message<"laelia.v1.Conversation"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: int32 type = 3;
+   */
+  type: number;
+
+  /**
+   * @generated from field: int32 member_count = 4;
+   */
+  memberCount: number;
+
+  /**
+   * @generated from field: string owner_id = 5;
+   */
+  ownerId: string;
+
+  /**
+   * @generated from field: string owner_name = 6;
+   */
+  ownerName: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 7;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 8;
+   */
+  updatedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.Conversation.
+ * Use `create(ConversationSchema)` to create a new message.
+ */
+export declare const ConversationSchema: GenMessage<Conversation>;
+
+/**
+ * @generated from message laelia.v1.ChannelMember
+ */
+export declare type ChannelMember = Message<"laelia.v1.ChannelMember"> & {
+  /**
+   * @generated from field: int32 member_type = 1;
+   */
+  memberType: number;
+
+  /**
+   * @generated from field: string member_id = 2;
+   */
+  memberId: string;
+
+  /**
+   * @generated from field: string display_name = 3;
+   */
+  displayName: string;
+
+  /**
+   * @generated from field: int32 member_role = 4;
+   */
+  memberRole: number;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp joined_at = 5;
+   */
+  joinedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.ChannelMember.
+ * Use `create(ChannelMemberSchema)` to create a new message.
+ */
+export declare const ChannelMemberSchema: GenMessage<ChannelMember>;
 
 /**
  * @generated from message laelia.v1.ListConversationMessagesRequest
@@ -799,6 +901,222 @@ export declare type GetOrCreateConversationResponse = Message<"laelia.v1.GetOrCr
  * Use `create(GetOrCreateConversationResponseSchema)` to create a new message.
  */
 export declare const GetOrCreateConversationResponseSchema: GenMessage<GetOrCreateConversationResponse>;
+
+/**
+ * @generated from message laelia.v1.CreateChannelRequest
+ */
+export declare type CreateChannelRequest = Message<"laelia.v1.CreateChannelRequest"> & {
+  /**
+   * @generated from field: string title = 1;
+   */
+  title: string;
+};
+
+/**
+ * Describes the message laelia.v1.CreateChannelRequest.
+ * Use `create(CreateChannelRequestSchema)` to create a new message.
+ */
+export declare const CreateChannelRequestSchema: GenMessage<CreateChannelRequest>;
+
+/**
+ * @generated from message laelia.v1.ListChannelsRequest
+ */
+export declare type ListChannelsRequest = Message<"laelia.v1.ListChannelsRequest"> & {
+  /**
+   * @generated from field: int32 page_size = 1;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 2;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListChannelsRequest.
+ * Use `create(ListChannelsRequestSchema)` to create a new message.
+ */
+export declare const ListChannelsRequestSchema: GenMessage<ListChannelsRequest>;
+
+/**
+ * @generated from message laelia.v1.ListChannelsResponse
+ */
+export declare type ListChannelsResponse = Message<"laelia.v1.ListChannelsResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.Conversation channels = 1;
+   */
+  channels: Conversation[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListChannelsResponse.
+ * Use `create(ListChannelsResponseSchema)` to create a new message.
+ */
+export declare const ListChannelsResponseSchema: GenMessage<ListChannelsResponse>;
+
+/**
+ * @generated from message laelia.v1.GetChannelRequest
+ */
+export declare type GetChannelRequest = Message<"laelia.v1.GetChannelRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetChannelRequest.
+ * Use `create(GetChannelRequestSchema)` to create a new message.
+ */
+export declare const GetChannelRequestSchema: GenMessage<GetChannelRequest>;
+
+/**
+ * @generated from message laelia.v1.UpdateChannelRequest
+ */
+export declare type UpdateChannelRequest = Message<"laelia.v1.UpdateChannelRequest"> & {
+  /**
+   * @generated from field: laelia.v1.Conversation conversation = 1;
+   */
+  conversation?: Conversation | undefined;
+
+  /**
+   * @generated from field: google.protobuf.FieldMask update_mask = 2;
+   */
+  updateMask?: FieldMask | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateChannelRequest.
+ * Use `create(UpdateChannelRequestSchema)` to create a new message.
+ */
+export declare const UpdateChannelRequestSchema: GenMessage<UpdateChannelRequest>;
+
+/**
+ * @generated from message laelia.v1.DeleteChannelRequest
+ */
+export declare type DeleteChannelRequest = Message<"laelia.v1.DeleteChannelRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.DeleteChannelRequest.
+ * Use `create(DeleteChannelRequestSchema)` to create a new message.
+ */
+export declare const DeleteChannelRequestSchema: GenMessage<DeleteChannelRequest>;
+
+/**
+ * @generated from message laelia.v1.AddChannelMemberRequest
+ */
+export declare type AddChannelMemberRequest = Message<"laelia.v1.AddChannelMemberRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: int32 member_type = 2;
+   */
+  memberType: number;
+
+  /**
+   * @generated from field: string member_id = 3;
+   */
+  memberId: string;
+};
+
+/**
+ * Describes the message laelia.v1.AddChannelMemberRequest.
+ * Use `create(AddChannelMemberRequestSchema)` to create a new message.
+ */
+export declare const AddChannelMemberRequestSchema: GenMessage<AddChannelMemberRequest>;
+
+/**
+ * @generated from message laelia.v1.RemoveChannelMemberRequest
+ */
+export declare type RemoveChannelMemberRequest = Message<"laelia.v1.RemoveChannelMemberRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: string member_id = 2;
+   */
+  memberId: string;
+
+  /**
+   * @generated from field: int32 member_type = 3;
+   */
+  memberType: number;
+};
+
+/**
+ * Describes the message laelia.v1.RemoveChannelMemberRequest.
+ * Use `create(RemoveChannelMemberRequestSchema)` to create a new message.
+ */
+export declare const RemoveChannelMemberRequestSchema: GenMessage<RemoveChannelMemberRequest>;
+
+/**
+ * @generated from message laelia.v1.ListChannelMembersRequest
+ */
+export declare type ListChannelMembersRequest = Message<"laelia.v1.ListChannelMembersRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListChannelMembersRequest.
+ * Use `create(ListChannelMembersRequestSchema)` to create a new message.
+ */
+export declare const ListChannelMembersRequestSchema: GenMessage<ListChannelMembersRequest>;
+
+/**
+ * @generated from message laelia.v1.ListChannelMembersResponse
+ */
+export declare type ListChannelMembersResponse = Message<"laelia.v1.ListChannelMembersResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.ChannelMember members = 1;
+   */
+  members: ChannelMember[];
+};
+
+/**
+ * Describes the message laelia.v1.ListChannelMembersResponse.
+ * Use `create(ListChannelMembersResponseSchema)` to create a new message.
+ */
+export declare const ListChannelMembersResponseSchema: GenMessage<ListChannelMembersResponse>;
+
+/**
+ * @generated from message laelia.v1.SendMessageRequest
+ */
+export declare type SendMessageRequest = Message<"laelia.v1.SendMessageRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: string content = 2;
+   */
+  content: string;
+};
+
+/**
+ * Describes the message laelia.v1.SendMessageRequest.
+ * Use `create(SendMessageRequestSchema)` to create a new message.
+ */
+export declare const SendMessageRequestSchema: GenMessage<SendMessageRequest>;
 
 /**
  * @generated from message laelia.v1.GetCommandContextRequest
@@ -1213,6 +1531,11 @@ export declare type SendCommandRequest = Message<"laelia.v1.SendCommandRequest">
    * @generated from field: laelia.v1.CommandSource source = 10;
    */
   source: CommandSource;
+
+  /**
+   * @generated from field: string conversation_id = 11;
+   */
+  conversationId: string;
 };
 
 /**
@@ -1650,6 +1973,78 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof ListConversationMessagesRequestSchema;
     output: typeof ListConversationMessagesResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.CreateChannel
+   */
+  createChannel: {
+    methodKind: "unary";
+    input: typeof CreateChannelRequestSchema;
+    output: typeof ConversationSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.ListChannels
+   */
+  listChannels: {
+    methodKind: "unary";
+    input: typeof ListChannelsRequestSchema;
+    output: typeof ListChannelsResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.GetChannel
+   */
+  getChannel: {
+    methodKind: "unary";
+    input: typeof GetChannelRequestSchema;
+    output: typeof ConversationSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.UpdateChannel
+   */
+  updateChannel: {
+    methodKind: "unary";
+    input: typeof UpdateChannelRequestSchema;
+    output: typeof ConversationSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.DeleteChannel
+   */
+  deleteChannel: {
+    methodKind: "unary";
+    input: typeof DeleteChannelRequestSchema;
+    output: typeof EmptySchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.AddChannelMember
+   */
+  addChannelMember: {
+    methodKind: "unary";
+    input: typeof AddChannelMemberRequestSchema;
+    output: typeof ChannelMemberSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.RemoveChannelMember
+   */
+  removeChannelMember: {
+    methodKind: "unary";
+    input: typeof RemoveChannelMemberRequestSchema;
+    output: typeof EmptySchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.ListChannelMembers
+   */
+  listChannelMembers: {
+    methodKind: "unary";
+    input: typeof ListChannelMembersRequestSchema;
+    output: typeof ListChannelMembersResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.SendMessage
+   */
+  sendMessage: {
+    methodKind: "unary";
+    input: typeof SendMessageRequestSchema;
+    output: typeof ChatMessageSchema;
   },
 }>;
 

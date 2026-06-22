@@ -167,6 +167,10 @@ paths:
                   schema:
                     type: integer
                     format: int32
+                - name: conversation
+                  in: query
+                  schema:
+                    type: string
             responses:
                 "200":
                     description: OK
@@ -792,6 +796,231 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/channels:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_ListChannels
+            parameters:
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListChannelsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - CommandService
+            operationId: CommandService_CreateChannel
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/CreateChannelRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Conversation'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_GetChannel
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Conversation'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        delete:
+            tags:
+                - CommandService
+            operationId: CommandService_DeleteChannel
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - CommandService
+            operationId: CommandService_UpdateChannel
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+                - name: updateMask
+                  in: query
+                  schema:
+                    type: string
+                    format: field-mask
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/Conversation'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Conversation'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/members:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_ListChannelMembers
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListChannelMembersResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - CommandService
+            operationId: CommandService_AddChannelMember
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/AddChannelMemberRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ChannelMember'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/members/{member}:
+        delete:
+            tags:
+                - CommandService
+            operationId: CommandService_RemoveChannelMember
+            parameters:
+                - name: memberId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+                - name: member
+                  in: path
+                  description: The member id.
+                  required: true
+                  schema:
+                    type: string
+                - name: memberType
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/conversations/{conversation}/messages:
         get:
             tags:
@@ -820,6 +1049,37 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/ListConversationMessagesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/messages:send:
+        post:
+            tags:
+                - CommandService
+            operationId: CommandService_SendMessage
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SendMessageRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ChatMessage'
                 default:
                     description: Default error response
                     content:
@@ -1107,6 +1367,19 @@ paths:
                                 $ref: '#/components/schemas/Status'
 components:
     schemas:
+        AddChannelMemberRequest:
+            required:
+                - conversation
+                - memberId
+            type: object
+            properties:
+                conversation:
+                    type: string
+                memberType:
+                    type: integer
+                    format: int32
+                memberId:
+                    type: string
         Agent:
             type: object
             properties:
@@ -1306,6 +1579,22 @@ components:
                     type: string
                 reason:
                     type: string
+        ChannelMember:
+            type: object
+            properties:
+                memberType:
+                    type: integer
+                    format: int32
+                memberId:
+                    type: string
+                displayName:
+                    type: string
+                memberRole:
+                    type: integer
+                    format: int32
+                joinedAt:
+                    type: string
+                    format: date-time
         ChatHistoryEntry:
             type: object
             properties:
@@ -1339,6 +1628,11 @@ components:
                 createdAt:
                     type: string
                     format: date-time
+                senderName:
+                    type: string
+                senderType:
+                    type: integer
+                    format: int32
         Command:
             type: object
             properties:
@@ -1510,12 +1804,42 @@ components:
                     $ref: '#/components/schemas/AgentStatus'
                 acpConfigYaml:
                     type: string
+        Conversation:
+            type: object
+            properties:
+                name:
+                    type: string
+                title:
+                    type: string
+                type:
+                    type: integer
+                    format: int32
+                memberCount:
+                    type: integer
+                    format: int32
+                ownerId:
+                    type: string
+                ownerName:
+                    type: string
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
         CreateAgentResponse:
             type: object
             properties:
                 agent:
                     $ref: '#/components/schemas/Agent'
                 bootstrapToken:
+                    type: string
+        CreateChannelRequest:
+            required:
+                - title
+            type: object
+            properties:
+                title:
                     type: string
         DiffEmittedPayload:
             type: object
@@ -1606,6 +1930,22 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/Agent'
+                nextPageToken:
+                    type: string
+        ListChannelMembersResponse:
+            type: object
+            properties:
+                members:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ChannelMember'
+        ListChannelsResponse:
+            type: object
+            properties:
+                channels:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Conversation'
                 nextPageToken:
                     type: string
         ListCommandsResponse:
@@ -1838,6 +2178,18 @@ components:
                         - CHAT
                     type: string
                     format: enum
+                conversationId:
+                    type: string
+        SendMessageRequest:
+            required:
+                - conversation
+                - content
+            type: object
+            properties:
+                conversation:
+                    type: string
+                content:
+                    type: string
         Status:
             type: object
             properties:

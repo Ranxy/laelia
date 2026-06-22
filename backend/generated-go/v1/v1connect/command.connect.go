@@ -69,6 +69,33 @@ const (
 	// CommandServiceListConversationMessagesProcedure is the fully-qualified name of the
 	// CommandService's ListConversationMessages RPC.
 	CommandServiceListConversationMessagesProcedure = "/laelia.v1.CommandService/ListConversationMessages"
+	// CommandServiceCreateChannelProcedure is the fully-qualified name of the CommandService's
+	// CreateChannel RPC.
+	CommandServiceCreateChannelProcedure = "/laelia.v1.CommandService/CreateChannel"
+	// CommandServiceListChannelsProcedure is the fully-qualified name of the CommandService's
+	// ListChannels RPC.
+	CommandServiceListChannelsProcedure = "/laelia.v1.CommandService/ListChannels"
+	// CommandServiceGetChannelProcedure is the fully-qualified name of the CommandService's GetChannel
+	// RPC.
+	CommandServiceGetChannelProcedure = "/laelia.v1.CommandService/GetChannel"
+	// CommandServiceUpdateChannelProcedure is the fully-qualified name of the CommandService's
+	// UpdateChannel RPC.
+	CommandServiceUpdateChannelProcedure = "/laelia.v1.CommandService/UpdateChannel"
+	// CommandServiceDeleteChannelProcedure is the fully-qualified name of the CommandService's
+	// DeleteChannel RPC.
+	CommandServiceDeleteChannelProcedure = "/laelia.v1.CommandService/DeleteChannel"
+	// CommandServiceAddChannelMemberProcedure is the fully-qualified name of the CommandService's
+	// AddChannelMember RPC.
+	CommandServiceAddChannelMemberProcedure = "/laelia.v1.CommandService/AddChannelMember"
+	// CommandServiceRemoveChannelMemberProcedure is the fully-qualified name of the CommandService's
+	// RemoveChannelMember RPC.
+	CommandServiceRemoveChannelMemberProcedure = "/laelia.v1.CommandService/RemoveChannelMember"
+	// CommandServiceListChannelMembersProcedure is the fully-qualified name of the CommandService's
+	// ListChannelMembers RPC.
+	CommandServiceListChannelMembersProcedure = "/laelia.v1.CommandService/ListChannelMembers"
+	// CommandServiceSendMessageProcedure is the fully-qualified name of the CommandService's
+	// SendMessage RPC.
+	CommandServiceSendMessageProcedure = "/laelia.v1.CommandService/SendMessage"
 	// AgentCommandServiceCommandChannelProcedure is the fully-qualified name of the
 	// AgentCommandService's CommandChannel RPC.
 	AgentCommandServiceCommandChannelProcedure = "/laelia.v1.AgentCommandService/CommandChannel"
@@ -87,6 +114,15 @@ type CommandServiceClient interface {
 	GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error)
 	GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error)
 	ListConversationMessages(context.Context, *connect.Request[v1.ListConversationMessagesRequest]) (*connect.Response[v1.ListConversationMessagesResponse], error)
+	CreateChannel(context.Context, *connect.Request[v1.CreateChannelRequest]) (*connect.Response[v1.Conversation], error)
+	ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error)
+	GetChannel(context.Context, *connect.Request[v1.GetChannelRequest]) (*connect.Response[v1.Conversation], error)
+	UpdateChannel(context.Context, *connect.Request[v1.UpdateChannelRequest]) (*connect.Response[v1.Conversation], error)
+	DeleteChannel(context.Context, *connect.Request[v1.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error)
+	AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.ChannelMember], error)
+	RemoveChannelMember(context.Context, *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error)
+	ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error)
+	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.ChatMessage], error)
 }
 
 // NewCommandServiceClient constructs a client for the laelia.v1.CommandService service. By default,
@@ -166,6 +202,60 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("ListConversationMessages")),
 			connect.WithClientOptions(opts...),
 		),
+		createChannel: connect.NewClient[v1.CreateChannelRequest, v1.Conversation](
+			httpClient,
+			baseURL+CommandServiceCreateChannelProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("CreateChannel")),
+			connect.WithClientOptions(opts...),
+		),
+		listChannels: connect.NewClient[v1.ListChannelsRequest, v1.ListChannelsResponse](
+			httpClient,
+			baseURL+CommandServiceListChannelsProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ListChannels")),
+			connect.WithClientOptions(opts...),
+		),
+		getChannel: connect.NewClient[v1.GetChannelRequest, v1.Conversation](
+			httpClient,
+			baseURL+CommandServiceGetChannelProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("GetChannel")),
+			connect.WithClientOptions(opts...),
+		),
+		updateChannel: connect.NewClient[v1.UpdateChannelRequest, v1.Conversation](
+			httpClient,
+			baseURL+CommandServiceUpdateChannelProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("UpdateChannel")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteChannel: connect.NewClient[v1.DeleteChannelRequest, emptypb.Empty](
+			httpClient,
+			baseURL+CommandServiceDeleteChannelProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("DeleteChannel")),
+			connect.WithClientOptions(opts...),
+		),
+		addChannelMember: connect.NewClient[v1.AddChannelMemberRequest, v1.ChannelMember](
+			httpClient,
+			baseURL+CommandServiceAddChannelMemberProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("AddChannelMember")),
+			connect.WithClientOptions(opts...),
+		),
+		removeChannelMember: connect.NewClient[v1.RemoveChannelMemberRequest, emptypb.Empty](
+			httpClient,
+			baseURL+CommandServiceRemoveChannelMemberProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("RemoveChannelMember")),
+			connect.WithClientOptions(opts...),
+		),
+		listChannelMembers: connect.NewClient[v1.ListChannelMembersRequest, v1.ListChannelMembersResponse](
+			httpClient,
+			baseURL+CommandServiceListChannelMembersProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ListChannelMembers")),
+			connect.WithClientOptions(opts...),
+		),
+		sendMessage: connect.NewClient[v1.SendMessageRequest, v1.ChatMessage](
+			httpClient,
+			baseURL+CommandServiceSendMessageProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("SendMessage")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -182,6 +272,15 @@ type commandServiceClient struct {
 	getCommandContext        *connect.Client[v1.GetCommandContextRequest, v1.GetCommandContextResponse]
 	getOrCreateConversation  *connect.Client[v1.GetOrCreateConversationRequest, v1.GetOrCreateConversationResponse]
 	listConversationMessages *connect.Client[v1.ListConversationMessagesRequest, v1.ListConversationMessagesResponse]
+	createChannel            *connect.Client[v1.CreateChannelRequest, v1.Conversation]
+	listChannels             *connect.Client[v1.ListChannelsRequest, v1.ListChannelsResponse]
+	getChannel               *connect.Client[v1.GetChannelRequest, v1.Conversation]
+	updateChannel            *connect.Client[v1.UpdateChannelRequest, v1.Conversation]
+	deleteChannel            *connect.Client[v1.DeleteChannelRequest, emptypb.Empty]
+	addChannelMember         *connect.Client[v1.AddChannelMemberRequest, v1.ChannelMember]
+	removeChannelMember      *connect.Client[v1.RemoveChannelMemberRequest, emptypb.Empty]
+	listChannelMembers       *connect.Client[v1.ListChannelMembersRequest, v1.ListChannelMembersResponse]
+	sendMessage              *connect.Client[v1.SendMessageRequest, v1.ChatMessage]
 }
 
 // SendCommand calls laelia.v1.CommandService.SendCommand.
@@ -239,6 +338,51 @@ func (c *commandServiceClient) ListConversationMessages(ctx context.Context, req
 	return c.listConversationMessages.CallUnary(ctx, req)
 }
 
+// CreateChannel calls laelia.v1.CommandService.CreateChannel.
+func (c *commandServiceClient) CreateChannel(ctx context.Context, req *connect.Request[v1.CreateChannelRequest]) (*connect.Response[v1.Conversation], error) {
+	return c.createChannel.CallUnary(ctx, req)
+}
+
+// ListChannels calls laelia.v1.CommandService.ListChannels.
+func (c *commandServiceClient) ListChannels(ctx context.Context, req *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error) {
+	return c.listChannels.CallUnary(ctx, req)
+}
+
+// GetChannel calls laelia.v1.CommandService.GetChannel.
+func (c *commandServiceClient) GetChannel(ctx context.Context, req *connect.Request[v1.GetChannelRequest]) (*connect.Response[v1.Conversation], error) {
+	return c.getChannel.CallUnary(ctx, req)
+}
+
+// UpdateChannel calls laelia.v1.CommandService.UpdateChannel.
+func (c *commandServiceClient) UpdateChannel(ctx context.Context, req *connect.Request[v1.UpdateChannelRequest]) (*connect.Response[v1.Conversation], error) {
+	return c.updateChannel.CallUnary(ctx, req)
+}
+
+// DeleteChannel calls laelia.v1.CommandService.DeleteChannel.
+func (c *commandServiceClient) DeleteChannel(ctx context.Context, req *connect.Request[v1.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.deleteChannel.CallUnary(ctx, req)
+}
+
+// AddChannelMember calls laelia.v1.CommandService.AddChannelMember.
+func (c *commandServiceClient) AddChannelMember(ctx context.Context, req *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.ChannelMember], error) {
+	return c.addChannelMember.CallUnary(ctx, req)
+}
+
+// RemoveChannelMember calls laelia.v1.CommandService.RemoveChannelMember.
+func (c *commandServiceClient) RemoveChannelMember(ctx context.Context, req *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.removeChannelMember.CallUnary(ctx, req)
+}
+
+// ListChannelMembers calls laelia.v1.CommandService.ListChannelMembers.
+func (c *commandServiceClient) ListChannelMembers(ctx context.Context, req *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error) {
+	return c.listChannelMembers.CallUnary(ctx, req)
+}
+
+// SendMessage calls laelia.v1.CommandService.SendMessage.
+func (c *commandServiceClient) SendMessage(ctx context.Context, req *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.ChatMessage], error) {
+	return c.sendMessage.CallUnary(ctx, req)
+}
+
 // CommandServiceHandler is an implementation of the laelia.v1.CommandService service.
 type CommandServiceHandler interface {
 	SendCommand(context.Context, *connect.Request[v1.SendCommandRequest]) (*connect.Response[v1.Command], error)
@@ -252,6 +396,15 @@ type CommandServiceHandler interface {
 	GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error)
 	GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error)
 	ListConversationMessages(context.Context, *connect.Request[v1.ListConversationMessagesRequest]) (*connect.Response[v1.ListConversationMessagesResponse], error)
+	CreateChannel(context.Context, *connect.Request[v1.CreateChannelRequest]) (*connect.Response[v1.Conversation], error)
+	ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error)
+	GetChannel(context.Context, *connect.Request[v1.GetChannelRequest]) (*connect.Response[v1.Conversation], error)
+	UpdateChannel(context.Context, *connect.Request[v1.UpdateChannelRequest]) (*connect.Response[v1.Conversation], error)
+	DeleteChannel(context.Context, *connect.Request[v1.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error)
+	AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.ChannelMember], error)
+	RemoveChannelMember(context.Context, *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error)
+	ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error)
+	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.ChatMessage], error)
 }
 
 // NewCommandServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -327,6 +480,60 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("ListConversationMessages")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceCreateChannelHandler := connect.NewUnaryHandler(
+		CommandServiceCreateChannelProcedure,
+		svc.CreateChannel,
+		connect.WithSchema(commandServiceMethods.ByName("CreateChannel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceListChannelsHandler := connect.NewUnaryHandler(
+		CommandServiceListChannelsProcedure,
+		svc.ListChannels,
+		connect.WithSchema(commandServiceMethods.ByName("ListChannels")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceGetChannelHandler := connect.NewUnaryHandler(
+		CommandServiceGetChannelProcedure,
+		svc.GetChannel,
+		connect.WithSchema(commandServiceMethods.ByName("GetChannel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceUpdateChannelHandler := connect.NewUnaryHandler(
+		CommandServiceUpdateChannelProcedure,
+		svc.UpdateChannel,
+		connect.WithSchema(commandServiceMethods.ByName("UpdateChannel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceDeleteChannelHandler := connect.NewUnaryHandler(
+		CommandServiceDeleteChannelProcedure,
+		svc.DeleteChannel,
+		connect.WithSchema(commandServiceMethods.ByName("DeleteChannel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceAddChannelMemberHandler := connect.NewUnaryHandler(
+		CommandServiceAddChannelMemberProcedure,
+		svc.AddChannelMember,
+		connect.WithSchema(commandServiceMethods.ByName("AddChannelMember")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceRemoveChannelMemberHandler := connect.NewUnaryHandler(
+		CommandServiceRemoveChannelMemberProcedure,
+		svc.RemoveChannelMember,
+		connect.WithSchema(commandServiceMethods.ByName("RemoveChannelMember")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceListChannelMembersHandler := connect.NewUnaryHandler(
+		CommandServiceListChannelMembersProcedure,
+		svc.ListChannelMembers,
+		connect.WithSchema(commandServiceMethods.ByName("ListChannelMembers")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceSendMessageHandler := connect.NewUnaryHandler(
+		CommandServiceSendMessageProcedure,
+		svc.SendMessage,
+		connect.WithSchema(commandServiceMethods.ByName("SendMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/laelia.v1.CommandService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case CommandServiceSendCommandProcedure:
@@ -351,6 +558,24 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceGetOrCreateConversationHandler.ServeHTTP(w, r)
 		case CommandServiceListConversationMessagesProcedure:
 			commandServiceListConversationMessagesHandler.ServeHTTP(w, r)
+		case CommandServiceCreateChannelProcedure:
+			commandServiceCreateChannelHandler.ServeHTTP(w, r)
+		case CommandServiceListChannelsProcedure:
+			commandServiceListChannelsHandler.ServeHTTP(w, r)
+		case CommandServiceGetChannelProcedure:
+			commandServiceGetChannelHandler.ServeHTTP(w, r)
+		case CommandServiceUpdateChannelProcedure:
+			commandServiceUpdateChannelHandler.ServeHTTP(w, r)
+		case CommandServiceDeleteChannelProcedure:
+			commandServiceDeleteChannelHandler.ServeHTTP(w, r)
+		case CommandServiceAddChannelMemberProcedure:
+			commandServiceAddChannelMemberHandler.ServeHTTP(w, r)
+		case CommandServiceRemoveChannelMemberProcedure:
+			commandServiceRemoveChannelMemberHandler.ServeHTTP(w, r)
+		case CommandServiceListChannelMembersProcedure:
+			commandServiceListChannelMembersHandler.ServeHTTP(w, r)
+		case CommandServiceSendMessageProcedure:
+			commandServiceSendMessageHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -402,6 +627,42 @@ func (UnimplementedCommandServiceHandler) GetOrCreateConversation(context.Contex
 
 func (UnimplementedCommandServiceHandler) ListConversationMessages(context.Context, *connect.Request[v1.ListConversationMessagesRequest]) (*connect.Response[v1.ListConversationMessagesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListConversationMessages is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) CreateChannel(context.Context, *connect.Request[v1.CreateChannelRequest]) (*connect.Response[v1.Conversation], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.CreateChannel is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListChannels is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) GetChannel(context.Context, *connect.Request[v1.GetChannelRequest]) (*connect.Response[v1.Conversation], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.GetChannel is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) UpdateChannel(context.Context, *connect.Request[v1.UpdateChannelRequest]) (*connect.Response[v1.Conversation], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.UpdateChannel is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) DeleteChannel(context.Context, *connect.Request[v1.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.DeleteChannel is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.ChannelMember], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.AddChannelMember is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) RemoveChannelMember(context.Context, *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.RemoveChannelMember is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListChannelMembers is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.ChatMessage], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.SendMessage is not implemented"))
 }
 
 // AgentCommandServiceClient is a client for the laelia.v1.AgentCommandService service.

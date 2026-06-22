@@ -486,6 +486,10 @@
             <ul>
               
                 <li>
+                  <a href="#laelia.v1.AddChannelMemberRequest"><span class="badge">M</span>AddChannelMemberRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.AgentCommandMessage"><span class="badge">M</span>AgentCommandMessage</a>
                 </li>
               
@@ -499,6 +503,10 @@
               
                 <li>
                   <a href="#laelia.v1.CancelMessage"><span class="badge">M</span>CancelMessage</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ChannelMember"><span class="badge">M</span>ChannelMember</a>
                 </li>
               
                 <li>
@@ -542,11 +550,27 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.Conversation"><span class="badge">M</span>Conversation</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.CreateChannelRequest"><span class="badge">M</span>CreateChannelRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DeleteChannelRequest"><span class="badge">M</span>DeleteChannelRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.DiffEmittedPayload"><span class="badge">M</span>DiffEmittedPayload</a>
                 </li>
               
                 <li>
                   <a href="#laelia.v1.FinalSummaryPayload"><span class="badge">M</span>FinalSummaryPayload</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetChannelRequest"><span class="badge">M</span>GetChannelRequest</a>
                 </li>
               
                 <li>
@@ -571,6 +595,22 @@
               
                 <li>
                   <a href="#laelia.v1.LifecyclePayload"><span class="badge">M</span>LifecyclePayload</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListChannelMembersRequest"><span class="badge">M</span>ListChannelMembersRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListChannelMembersResponse"><span class="badge">M</span>ListChannelMembersResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListChannelsRequest"><span class="badge">M</span>ListChannelsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListChannelsResponse"><span class="badge">M</span>ListChannelsResponse</a>
                 </li>
               
                 <li>
@@ -626,6 +666,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.RemoveChannelMemberRequest"><span class="badge">M</span>RemoveChannelMemberRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.RespondPermissionRequest"><span class="badge">M</span>RespondPermissionRequest</a>
                 </li>
               
@@ -646,6 +690,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.SendMessageRequest"><span class="badge">M</span>SendMessageRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.TextDeltaPayload"><span class="badge">M</span>TextDeltaPayload</a>
                 </li>
               
@@ -655,6 +703,10 @@
               
                 <li>
                   <a href="#laelia.v1.ToolCallStartedPayload"><span class="badge">M</span>ToolCallStartedPayload</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateChannelRequest"><span class="badge">M</span>UpdateChannelRequest</a>
                 </li>
               
                 <li>
@@ -3456,6 +3508,44 @@ Format: idps/{idp} </p></td>
       <p></p>
 
       
+        <h3 id="laelia.v1.AddChannelMemberRequest">AddChannelMemberRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member_type</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.AgentCommandMessage">AgentCommandMessage</h3>
         <p></p>
 
@@ -3608,6 +3698,58 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.ChannelMember">ChannelMember</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>member_type</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>display_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member_role</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>joined_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ChatHistoryEntry">ChatHistoryEntry</h3>
         <p></p>
 
@@ -3715,6 +3857,20 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>created_at</td>
                   <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sender_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sender_type</td>
+                  <td><a href="#int32">int32</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -4345,6 +4501,127 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.Conversation">Conversation</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>type</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member_count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>owner_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>owner_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>updated_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.CreateChannelRequest">CreateChannelRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DeleteChannelRequest">DeleteChannelRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.DiffEmittedPayload">DiffEmittedPayload</h3>
         <p></p>
 
@@ -4402,6 +4679,30 @@ Format: idps/{idp} </p></td>
               
                 <tr>
                   <td>session_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetChannelRequest">GetChannelRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -4567,6 +4868,116 @@ Format: idps/{idp} </p></td>
               
                 <tr>
                   <td>profile</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListChannelMembersRequest">ListChannelMembersRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListChannelMembersResponse">ListChannelMembersResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>members</td>
+                  <td><a href="#laelia.v1.ChannelMember">ChannelMember</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListChannelsRequest">ListChannelsRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListChannelsResponse">ListChannelsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>channels</td>
+                  <td><a href="#laelia.v1.Conversation">Conversation</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -5052,6 +5463,44 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.RemoveChannelMemberRequest">RemoveChannelMemberRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member_type</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.RespondPermissionRequest">RespondPermissionRequest</h3>
         <p></p>
 
@@ -5131,6 +5580,13 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>limit</td>
                   <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -5246,6 +5702,13 @@ Format: idps/{idp} </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>conversation_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -5272,6 +5735,37 @@ Format: idps/{idp} </p></td>
               
                 <tr>
                   <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SendMessageRequest">SendMessageRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>content</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -5366,6 +5860,37 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>raw_input</td>
                   <td><a href="#google.protobuf.Struct">google.protobuf.Struct</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateChannelRequest">UpdateChannelRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#laelia.v1.Conversation">Conversation</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>update_mask</td>
+                  <td><a href="#google.protobuf.FieldMask">google.protobuf.FieldMask</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -5802,6 +6327,69 @@ Format: idps/{idp} </p></td>
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>CreateChannel</td>
+                <td><a href="#laelia.v1.CreateChannelRequest">CreateChannelRequest</a></td>
+                <td><a href="#laelia.v1.Conversation">Conversation</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ListChannels</td>
+                <td><a href="#laelia.v1.ListChannelsRequest">ListChannelsRequest</a></td>
+                <td><a href="#laelia.v1.ListChannelsResponse">ListChannelsResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>GetChannel</td>
+                <td><a href="#laelia.v1.GetChannelRequest">GetChannelRequest</a></td>
+                <td><a href="#laelia.v1.Conversation">Conversation</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateChannel</td>
+                <td><a href="#laelia.v1.UpdateChannelRequest">UpdateChannelRequest</a></td>
+                <td><a href="#laelia.v1.Conversation">Conversation</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>DeleteChannel</td>
+                <td><a href="#laelia.v1.DeleteChannelRequest">DeleteChannelRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>AddChannelMember</td>
+                <td><a href="#laelia.v1.AddChannelMemberRequest">AddChannelMemberRequest</a></td>
+                <td><a href="#laelia.v1.ChannelMember">ChannelMember</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>RemoveChannelMember</td>
+                <td><a href="#laelia.v1.RemoveChannelMemberRequest">RemoveChannelMemberRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ListChannelMembers</td>
+                <td><a href="#laelia.v1.ListChannelMembersRequest">ListChannelMembersRequest</a></td>
+                <td><a href="#laelia.v1.ListChannelMembersResponse">ListChannelMembersResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>SendMessage</td>
+                <td><a href="#laelia.v1.SendMessageRequest">SendMessageRequest</a></td>
+                <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                <td><p></p></td>
+              </tr>
+            
           </tbody>
         </table>
 
@@ -5927,6 +6515,96 @@ Format: idps/{idp} </p></td>
                 <td>GET</td>
                 <td>/v1/{conversation=conversations/*}/messages</td>
                 <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>CreateChannel</td>
+                <td>POST</td>
+                <td>/v1/channels</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListChannels</td>
+                <td>GET</td>
+                <td>/v1/channels</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetChannel</td>
+                <td>GET</td>
+                <td>/v1/{name=conversations/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateChannel</td>
+                <td>PATCH</td>
+                <td>/v1/{conversation.name=conversations/*}</td>
+                <td>conversation</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>DeleteChannel</td>
+                <td>DELETE</td>
+                <td>/v1/{name=conversations/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>AddChannelMember</td>
+                <td>POST</td>
+                <td>/v1/{conversation=conversations/*}/members</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>RemoveChannelMember</td>
+                <td>DELETE</td>
+                <td>/v1/{conversation=conversations/*}/members/{member_id}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListChannelMembers</td>
+                <td>GET</td>
+                <td>/v1/{conversation=conversations/*}/members</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>SendMessage</td>
+                <td>POST</td>
+                <td>/v1/{conversation=conversations/*}/messages:send</td>
+                <td>*</td>
               </tr>
               
             

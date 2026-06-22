@@ -84,10 +84,12 @@
     - [AuthService](#laelia-v1-AuthService)
   
 - [v1/command.proto](#v1_command-proto)
+    - [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest)
     - [AgentCommandMessage](#laelia-v1-AgentCommandMessage)
     - [AgentReady](#laelia-v1-AgentReady)
     - [CancelCommandRequest](#laelia-v1-CancelCommandRequest)
     - [CancelMessage](#laelia-v1-CancelMessage)
+    - [ChannelMember](#laelia-v1-ChannelMember)
     - [ChatHistoryEntry](#laelia-v1-ChatHistoryEntry)
     - [ChatMessage](#laelia-v1-ChatMessage)
     - [Command](#laelia-v1-Command)
@@ -98,14 +100,22 @@
     - [CommandRequest](#laelia-v1-CommandRequest)
     - [CommandRequest.EnvEntry](#laelia-v1-CommandRequest-EnvEntry)
     - [CommandResult](#laelia-v1-CommandResult)
+    - [Conversation](#laelia-v1-Conversation)
+    - [CreateChannelRequest](#laelia-v1-CreateChannelRequest)
+    - [DeleteChannelRequest](#laelia-v1-DeleteChannelRequest)
     - [DiffEmittedPayload](#laelia-v1-DiffEmittedPayload)
     - [FinalSummaryPayload](#laelia-v1-FinalSummaryPayload)
+    - [GetChannelRequest](#laelia-v1-GetChannelRequest)
     - [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest)
     - [GetCommandContextResponse](#laelia-v1-GetCommandContextResponse)
     - [GetCommandRequest](#laelia-v1-GetCommandRequest)
     - [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest)
     - [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse)
     - [LifecyclePayload](#laelia-v1-LifecyclePayload)
+    - [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest)
+    - [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse)
+    - [ListChannelsRequest](#laelia-v1-ListChannelsRequest)
+    - [ListChannelsResponse](#laelia-v1-ListChannelsResponse)
     - [ListCommandsRequest](#laelia-v1-ListCommandsRequest)
     - [ListCommandsResponse](#laelia-v1-ListCommandsResponse)
     - [ListConversationMessagesRequest](#laelia-v1-ListConversationMessagesRequest)
@@ -119,14 +129,17 @@
     - [Ping](#laelia-v1-Ping)
     - [Pong](#laelia-v1-Pong)
     - [RawAcpPayload](#laelia-v1-RawAcpPayload)
+    - [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest)
     - [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest)
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
     - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
     - [SendCommandRequest](#laelia-v1-SendCommandRequest)
     - [SendCommandRequest.EnvEntry](#laelia-v1-SendCommandRequest-EnvEntry)
+    - [SendMessageRequest](#laelia-v1-SendMessageRequest)
     - [TextDeltaPayload](#laelia-v1-TextDeltaPayload)
     - [ToolCallFinishedPayload](#laelia-v1-ToolCallFinishedPayload)
     - [ToolCallStartedPayload](#laelia-v1-ToolCallStartedPayload)
+    - [UpdateChannelRequest](#laelia-v1-UpdateChannelRequest)
     - [WarningPayload](#laelia-v1-WarningPayload)
     - [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest)
     - [WatchCommandRequest](#laelia-v1-WatchCommandRequest)
@@ -1227,6 +1240,23 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-AddChannelMemberRequest"></a>
+
+### AddChannelMemberRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| member_type | [int32](#int32) |  |  |
+| member_id | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-AgentCommandMessage"></a>
 
 ### AgentCommandMessage
@@ -1295,6 +1325,25 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-ChannelMember"></a>
+
+### ChannelMember
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| member_type | [int32](#int32) |  |  |
+| member_id | [string](#string) |  |  |
+| display_name | [string](#string) |  |  |
+| member_role | [int32](#int32) |  |  |
+| joined_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-ChatHistoryEntry"></a>
 
 ### ChatHistoryEntry
@@ -1329,6 +1378,8 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | content | [string](#string) |  |  |
 | command_id | [string](#string) |  |  |
 | created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| sender_name | [string](#string) |  |  |
+| sender_type | [int32](#int32) |  |  |
 
 
 
@@ -1516,6 +1567,58 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-Conversation"></a>
+
+### Conversation
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| title | [string](#string) |  |  |
+| type | [int32](#int32) |  |  |
+| member_count | [int32](#int32) |  |  |
+| owner_id | [string](#string) |  |  |
+| owner_name | [string](#string) |  |  |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| updated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-CreateChannelRequest"></a>
+
+### CreateChannelRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| title | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-DeleteChannelRequest"></a>
+
+### DeleteChannelRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-DiffEmittedPayload"></a>
 
 ### DiffEmittedPayload
@@ -1543,6 +1646,21 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | ----- | ---- | ----- | ----------- |
 | stop_reason | [string](#string) |  |  |
 | session_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetChannelRequest"></a>
+
+### GetChannelRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
 
 
 
@@ -1636,6 +1754,68 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | ----- | ---- | ----- | ----------- |
 | executor_kind | [string](#string) |  |  |
 | profile | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListChannelMembersRequest"></a>
+
+### ListChannelMembersRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListChannelMembersResponse"></a>
+
+### ListChannelMembersResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| members | [ChannelMember](#laelia-v1-ChannelMember) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListChannelsRequest"></a>
+
+### ListChannelsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListChannelsResponse"></a>
+
+### ListChannelsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| channels | [Conversation](#laelia-v1-Conversation) | repeated |  |
+| next_page_token | [string](#string) |  |  |
 
 
 
@@ -1860,6 +2040,23 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-RemoveChannelMemberRequest"></a>
+
+### RemoveChannelMemberRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| member_id | [string](#string) |  |  |
+| member_type | [int32](#int32) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-RespondPermissionRequest"></a>
 
 ### RespondPermissionRequest
@@ -1890,6 +2087,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | until | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | principal_id | [string](#string) |  |  |
 | limit | [int32](#int32) |  |  |
+| conversation | [string](#string) |  |  |
 
 
 
@@ -1929,6 +2127,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | profile | [string](#string) |  |  |
 | allow_diff | [bool](#bool) |  |  |
 | source | [CommandSource](#laelia-v1-CommandSource) |  |  |
+| conversation_id | [string](#string) |  |  |
 
 
 
@@ -1945,6 +2144,22 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | ----- | ---- | ----- | ----------- |
 | key | [string](#string) |  |  |
 | value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SendMessageRequest"></a>
+
+### SendMessageRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| content | [string](#string) |  |  |
 
 
 
@@ -1993,6 +2208,22 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | ----- | ---- | ----- | ----------- |
 | title | [string](#string) |  |  |
 | raw_input | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateChannelRequest"></a>
+
+### UpdateChannelRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [Conversation](#laelia-v1-Conversation) |  |  |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  |  |
 
 
 
@@ -2159,6 +2390,15 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | GetCommandContext | [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest) | [GetCommandContextResponse](#laelia-v1-GetCommandContextResponse) |  |
 | GetOrCreateConversation | [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest) | [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse) |  |
 | ListConversationMessages | [ListConversationMessagesRequest](#laelia-v1-ListConversationMessagesRequest) | [ListConversationMessagesResponse](#laelia-v1-ListConversationMessagesResponse) |  |
+| CreateChannel | [CreateChannelRequest](#laelia-v1-CreateChannelRequest) | [Conversation](#laelia-v1-Conversation) |  |
+| ListChannels | [ListChannelsRequest](#laelia-v1-ListChannelsRequest) | [ListChannelsResponse](#laelia-v1-ListChannelsResponse) |  |
+| GetChannel | [GetChannelRequest](#laelia-v1-GetChannelRequest) | [Conversation](#laelia-v1-Conversation) |  |
+| UpdateChannel | [UpdateChannelRequest](#laelia-v1-UpdateChannelRequest) | [Conversation](#laelia-v1-Conversation) |  |
+| DeleteChannel | [DeleteChannelRequest](#laelia-v1-DeleteChannelRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+| AddChannelMember | [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest) | [ChannelMember](#laelia-v1-ChannelMember) |  |
+| RemoveChannelMember | [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+| ListChannelMembers | [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest) | [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse) |  |
+| SendMessage | [SendMessageRequest](#laelia-v1-SendMessageRequest) | [ChatMessage](#laelia-v1-ChatMessage) |  |
 
  
 

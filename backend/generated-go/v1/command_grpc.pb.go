@@ -31,6 +31,15 @@ const (
 	CommandService_GetCommandContext_FullMethodName        = "/laelia.v1.CommandService/GetCommandContext"
 	CommandService_GetOrCreateConversation_FullMethodName  = "/laelia.v1.CommandService/GetOrCreateConversation"
 	CommandService_ListConversationMessages_FullMethodName = "/laelia.v1.CommandService/ListConversationMessages"
+	CommandService_CreateChannel_FullMethodName            = "/laelia.v1.CommandService/CreateChannel"
+	CommandService_ListChannels_FullMethodName             = "/laelia.v1.CommandService/ListChannels"
+	CommandService_GetChannel_FullMethodName               = "/laelia.v1.CommandService/GetChannel"
+	CommandService_UpdateChannel_FullMethodName            = "/laelia.v1.CommandService/UpdateChannel"
+	CommandService_DeleteChannel_FullMethodName            = "/laelia.v1.CommandService/DeleteChannel"
+	CommandService_AddChannelMember_FullMethodName         = "/laelia.v1.CommandService/AddChannelMember"
+	CommandService_RemoveChannelMember_FullMethodName      = "/laelia.v1.CommandService/RemoveChannelMember"
+	CommandService_ListChannelMembers_FullMethodName       = "/laelia.v1.CommandService/ListChannelMembers"
+	CommandService_SendMessage_FullMethodName              = "/laelia.v1.CommandService/SendMessage"
 )
 
 // CommandServiceClient is the client API for CommandService service.
@@ -48,6 +57,15 @@ type CommandServiceClient interface {
 	GetCommandContext(ctx context.Context, in *GetCommandContextRequest, opts ...grpc.CallOption) (*GetCommandContextResponse, error)
 	GetOrCreateConversation(ctx context.Context, in *GetOrCreateConversationRequest, opts ...grpc.CallOption) (*GetOrCreateConversationResponse, error)
 	ListConversationMessages(ctx context.Context, in *ListConversationMessagesRequest, opts ...grpc.CallOption) (*ListConversationMessagesResponse, error)
+	CreateChannel(ctx context.Context, in *CreateChannelRequest, opts ...grpc.CallOption) (*Conversation, error)
+	ListChannels(ctx context.Context, in *ListChannelsRequest, opts ...grpc.CallOption) (*ListChannelsResponse, error)
+	GetChannel(ctx context.Context, in *GetChannelRequest, opts ...grpc.CallOption) (*Conversation, error)
+	UpdateChannel(ctx context.Context, in *UpdateChannelRequest, opts ...grpc.CallOption) (*Conversation, error)
+	DeleteChannel(ctx context.Context, in *DeleteChannelRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	AddChannelMember(ctx context.Context, in *AddChannelMemberRequest, opts ...grpc.CallOption) (*ChannelMember, error)
+	RemoveChannelMember(ctx context.Context, in *RemoveChannelMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ListChannelMembers(ctx context.Context, in *ListChannelMembersRequest, opts ...grpc.CallOption) (*ListChannelMembersResponse, error)
+	SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*ChatMessage, error)
 }
 
 type commandServiceClient struct {
@@ -186,6 +204,96 @@ func (c *commandServiceClient) ListConversationMessages(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *commandServiceClient) CreateChannel(ctx context.Context, in *CreateChannelRequest, opts ...grpc.CallOption) (*Conversation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Conversation)
+	err := c.cc.Invoke(ctx, CommandService_CreateChannel_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) ListChannels(ctx context.Context, in *ListChannelsRequest, opts ...grpc.CallOption) (*ListChannelsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListChannelsResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListChannels_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) GetChannel(ctx context.Context, in *GetChannelRequest, opts ...grpc.CallOption) (*Conversation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Conversation)
+	err := c.cc.Invoke(ctx, CommandService_GetChannel_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) UpdateChannel(ctx context.Context, in *UpdateChannelRequest, opts ...grpc.CallOption) (*Conversation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Conversation)
+	err := c.cc.Invoke(ctx, CommandService_UpdateChannel_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) DeleteChannel(ctx context.Context, in *DeleteChannelRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, CommandService_DeleteChannel_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) AddChannelMember(ctx context.Context, in *AddChannelMemberRequest, opts ...grpc.CallOption) (*ChannelMember, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChannelMember)
+	err := c.cc.Invoke(ctx, CommandService_AddChannelMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) RemoveChannelMember(ctx context.Context, in *RemoveChannelMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, CommandService_RemoveChannelMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) ListChannelMembers(ctx context.Context, in *ListChannelMembersRequest, opts ...grpc.CallOption) (*ListChannelMembersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListChannelMembersResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListChannelMembers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*ChatMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChatMessage)
+	err := c.cc.Invoke(ctx, CommandService_SendMessage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CommandServiceServer is the server API for CommandService service.
 // All implementations must embed UnimplementedCommandServiceServer
 // for forward compatibility.
@@ -201,6 +309,15 @@ type CommandServiceServer interface {
 	GetCommandContext(context.Context, *GetCommandContextRequest) (*GetCommandContextResponse, error)
 	GetOrCreateConversation(context.Context, *GetOrCreateConversationRequest) (*GetOrCreateConversationResponse, error)
 	ListConversationMessages(context.Context, *ListConversationMessagesRequest) (*ListConversationMessagesResponse, error)
+	CreateChannel(context.Context, *CreateChannelRequest) (*Conversation, error)
+	ListChannels(context.Context, *ListChannelsRequest) (*ListChannelsResponse, error)
+	GetChannel(context.Context, *GetChannelRequest) (*Conversation, error)
+	UpdateChannel(context.Context, *UpdateChannelRequest) (*Conversation, error)
+	DeleteChannel(context.Context, *DeleteChannelRequest) (*emptypb.Empty, error)
+	AddChannelMember(context.Context, *AddChannelMemberRequest) (*ChannelMember, error)
+	RemoveChannelMember(context.Context, *RemoveChannelMemberRequest) (*emptypb.Empty, error)
+	ListChannelMembers(context.Context, *ListChannelMembersRequest) (*ListChannelMembersResponse, error)
+	SendMessage(context.Context, *SendMessageRequest) (*ChatMessage, error)
 	mustEmbedUnimplementedCommandServiceServer()
 }
 
@@ -243,6 +360,33 @@ func (UnimplementedCommandServiceServer) GetOrCreateConversation(context.Context
 }
 func (UnimplementedCommandServiceServer) ListConversationMessages(context.Context, *ListConversationMessagesRequest) (*ListConversationMessagesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListConversationMessages not implemented")
+}
+func (UnimplementedCommandServiceServer) CreateChannel(context.Context, *CreateChannelRequest) (*Conversation, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateChannel not implemented")
+}
+func (UnimplementedCommandServiceServer) ListChannels(context.Context, *ListChannelsRequest) (*ListChannelsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListChannels not implemented")
+}
+func (UnimplementedCommandServiceServer) GetChannel(context.Context, *GetChannelRequest) (*Conversation, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetChannel not implemented")
+}
+func (UnimplementedCommandServiceServer) UpdateChannel(context.Context, *UpdateChannelRequest) (*Conversation, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateChannel not implemented")
+}
+func (UnimplementedCommandServiceServer) DeleteChannel(context.Context, *DeleteChannelRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteChannel not implemented")
+}
+func (UnimplementedCommandServiceServer) AddChannelMember(context.Context, *AddChannelMemberRequest) (*ChannelMember, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddChannelMember not implemented")
+}
+func (UnimplementedCommandServiceServer) RemoveChannelMember(context.Context, *RemoveChannelMemberRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveChannelMember not implemented")
+}
+func (UnimplementedCommandServiceServer) ListChannelMembers(context.Context, *ListChannelMembersRequest) (*ListChannelMembersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListChannelMembers not implemented")
+}
+func (UnimplementedCommandServiceServer) SendMessage(context.Context, *SendMessageRequest) (*ChatMessage, error) {
+	return nil, status.Error(codes.Unimplemented, "method SendMessage not implemented")
 }
 func (UnimplementedCommandServiceServer) mustEmbedUnimplementedCommandServiceServer() {}
 func (UnimplementedCommandServiceServer) testEmbeddedByValue()                        {}
@@ -449,6 +593,168 @@ func _CommandService_ListConversationMessages_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommandService_CreateChannel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateChannelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).CreateChannel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_CreateChannel_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).CreateChannel(ctx, req.(*CreateChannelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_ListChannels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListChannelsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListChannels(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListChannels_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListChannels(ctx, req.(*ListChannelsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_GetChannel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetChannelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).GetChannel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_GetChannel_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).GetChannel(ctx, req.(*GetChannelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_UpdateChannel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateChannelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).UpdateChannel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_UpdateChannel_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).UpdateChannel(ctx, req.(*UpdateChannelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_DeleteChannel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteChannelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).DeleteChannel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_DeleteChannel_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).DeleteChannel(ctx, req.(*DeleteChannelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_AddChannelMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddChannelMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).AddChannelMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_AddChannelMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).AddChannelMember(ctx, req.(*AddChannelMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_RemoveChannelMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveChannelMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).RemoveChannelMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_RemoveChannelMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).RemoveChannelMember(ctx, req.(*RemoveChannelMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_ListChannelMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListChannelMembersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListChannelMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListChannelMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListChannelMembers(ctx, req.(*ListChannelMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_SendMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).SendMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_SendMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).SendMessage(ctx, req.(*SendMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CommandService_ServiceDesc is the grpc.ServiceDesc for CommandService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -491,6 +797,42 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListConversationMessages",
 			Handler:    _CommandService_ListConversationMessages_Handler,
+		},
+		{
+			MethodName: "CreateChannel",
+			Handler:    _CommandService_CreateChannel_Handler,
+		},
+		{
+			MethodName: "ListChannels",
+			Handler:    _CommandService_ListChannels_Handler,
+		},
+		{
+			MethodName: "GetChannel",
+			Handler:    _CommandService_GetChannel_Handler,
+		},
+		{
+			MethodName: "UpdateChannel",
+			Handler:    _CommandService_UpdateChannel_Handler,
+		},
+		{
+			MethodName: "DeleteChannel",
+			Handler:    _CommandService_DeleteChannel_Handler,
+		},
+		{
+			MethodName: "AddChannelMember",
+			Handler:    _CommandService_AddChannelMember_Handler,
+		},
+		{
+			MethodName: "RemoveChannelMember",
+			Handler:    _CommandService_RemoveChannelMember_Handler,
+		},
+		{
+			MethodName: "ListChannelMembers",
+			Handler:    _CommandService_ListChannelMembers_Handler,
+		},
+		{
+			MethodName: "SendMessage",
+			Handler:    _CommandService_SendMessage_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
