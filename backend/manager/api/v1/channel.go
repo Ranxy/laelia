@@ -310,7 +310,11 @@ func resolveMemberDisplayName(ctx context.Context, s *store.Store, memberType in
 		return resolveUserName(ctx, s, uid)
 	}
 	if memberType == store.MemberTypeAgent {
-		return memberID
+		agent, err := s.GetAgentByResourceID(ctx, memberID)
+		if err != nil || agent == nil {
+			return memberID
+		}
+		return agent.Name
 	}
 	return memberID
 }

@@ -722,7 +722,7 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 		senderName := msg.PrincipalName
 		senderType := int32(1)
 		if msg.SenderAgentID.Valid {
-			senderName = msg.AgentResourceID
+			senderName = msg.AgentName
 			senderType = 2
 		}
 		v1m := &v1pb.ChatMessage{

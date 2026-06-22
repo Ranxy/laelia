@@ -62,6 +62,9 @@ export function ChatPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const agent = agentResourceName(agentId);
 
+  const agentCache = useAppStore((s) => s.agentCache);
+  const agentTitle = agentCache[agent]?.title ?? agentId ?? "";
+
   const conversations = useAppStore((s) => s.conversations);
   const chatMessages = useAppStore((s) => s.chatMessages);
   const chatLoading = useAppStore((s) => s.chatLoading);
@@ -206,6 +209,7 @@ export function ChatPage() {
                 key={msg.id}
                 msg={msg}
                 showAvatar={showAvatar}
+                agentTitle={agentTitle}
                 streamingContent={
                   msg.streaming && msg.commandName
                     ? (streamingContent[msg.commandName] ?? "")
@@ -312,17 +316,17 @@ export function ChatPage() {
   );
 }
 
-function Avatar({ isUser }: { isUser: boolean }) {
+function Avatar({ label }: { label: string }) {
   return (
     <div
       className={cn(
         "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-        isUser
+        label === "U"
           ? "bg-accent text-accent-foreground"
           : "bg-control-bg text-control"
       )}
     >
-      {isUser ? "U" : "A"}
+      {label.charAt(0).toUpperCase()}
     </div>
   );
 }
@@ -330,12 +334,14 @@ function Avatar({ isUser }: { isUser: boolean }) {
 function MessageRow({
   msg,
   showAvatar,
+  agentTitle,
   streamingContent,
   streamingEvents,
   onViewDetails,
 }: {
   msg: ChatMessageUI;
   showAvatar: boolean;
+  agentTitle: string;
   streamingContent: string;
   streamingEvents: CommandEvent[];
   onViewDetails: () => void;
@@ -403,7 +409,7 @@ function MessageRow({
       {/* Avatar */}
       <div className="flex shrink-0 flex-col items-center pt-0.5">
         {showAvatar ? (
-          <Avatar isUser={isUser} />
+          <Avatar label={isUser ? "U" : agentTitle || "A"} />
         ) : (
           <div className="size-8 shrink-0" />
         )}
@@ -420,7 +426,9 @@ function MessageRow({
         {showAvatar && (
           <div className="flex items-center gap-2 px-0.5">
             <span className="text-xs font-medium text-control">
-              {isUser ? t("chat.you") : t("chat.agent")}
+              {isUser
+                ? t("chat.you")
+                : agentTitle || msg.senderName || t("chat.agent")}
             </span>
             <span className="text-xs text-control-placeholder">
               {formatTime(msg.timestamp)}

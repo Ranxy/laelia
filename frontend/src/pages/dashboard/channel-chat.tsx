@@ -372,7 +372,7 @@ export function ChannelChatPage() {
                     className="flex items-center gap-3 px-1 py-3"
                   >
                     <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-control-bg text-control text-xs font-medium">
-                      {m.memberType === 2 ? "A" : "U"}
+                      {(m.displayName || m.memberId).charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm text-main truncate">
@@ -520,17 +520,17 @@ export function ChannelChatPage() {
   );
 }
 
-function Avatar({ isUser }: { isUser: boolean }) {
+function Avatar({ label }: { label: string }) {
   return (
     <div
       className={cn(
         "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-        isUser
+        label === "U"
           ? "bg-accent text-accent-foreground"
           : "bg-control-bg text-control"
       )}
     >
-      {isUser ? "U" : "A"}
+      {label.charAt(0).toUpperCase()}
     </div>
   );
 }
@@ -551,7 +551,7 @@ function ChannelMessageRow({
     <div className={cn("flex gap-3", isUser ? "flex-row-reverse" : "flex-row")}>
       <div className="flex shrink-0 flex-col items-center pt-0.5">
         {showAvatar ? (
-          <Avatar isUser={isUser} />
+          <Avatar label={isUser ? "U" : senderName || "A"} />
         ) : (
           <div className="size-8 shrink-0" />
         )}

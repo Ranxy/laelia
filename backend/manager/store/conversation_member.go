@@ -116,6 +116,7 @@ func (s *Store) findDirectConversation(ctx context.Context, userPrincipalID int,
 			FROM conversation_member cma
 			WHERE cma.member_type = $3 AND cma.member_id = $4
 		)
+		AND c.type = 1
 		LIMIT 1
 	`, MemberTypeUser, fmt.Sprintf("%d", userPrincipalID), MemberTypeAgent, agentResourceID).Scan(
 		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt,

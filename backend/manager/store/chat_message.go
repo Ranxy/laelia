@@ -16,6 +16,7 @@ type ChatMessage struct {
 	PrincipalName   string
 	SenderAgentID   sql.NullInt32
 	AgentResourceID string
+	AgentName       string
 	Role            int32
 	Content         string
 	CommandID       uuid.NullUUID
@@ -50,7 +51,7 @@ func (s *Store) CreateChatMessage(ctx context.Context, msg *ChatMessage) (*ChatM
 
 func (s *Store) ListConversationMessages(ctx context.Context, conversationID uuid.UUID, limit, offset int) ([]*ChatMessage, error) {
 	rows, err := s.GetDB().QueryContext(ctx, `
-		SELECT cm.id, cm.conversation_id, cm.principal_id, COALESCE(p.name, ''), cm.sender_agent_id, COALESCE(a.resource_id, ''), cm.role, cm.content, cm.command_id, cm.created_at
+		SELECT cm.id, cm.conversation_id, cm.principal_id, COALESCE(p.name, ''), cm.sender_agent_id, COALESCE(a.resource_id, ''), COALESCE(a.name, ''), cm.role, cm.content, cm.command_id, cm.created_at
 		FROM chat_message cm
 		JOIN principal p ON p.id = cm.principal_id
 		LEFT JOIN agent a ON a.id = cm.sender_agent_id
@@ -67,7 +68,7 @@ func (s *Store) ListConversationMessages(ctx context.Context, conversationID uui
 	for rows.Next() {
 		var msg ChatMessage
 		if err := rows.Scan(&msg.ID, &msg.ConversationID, &msg.PrincipalID, &msg.PrincipalName,
-			&msg.SenderAgentID, &msg.AgentResourceID,
+			&msg.SenderAgentID, &msg.AgentResourceID, &msg.AgentName,
 			&msg.Role, &msg.Content, &msg.CommandID, &msg.CreatedAt); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan chat message")
 		}
@@ -82,7 +83,7 @@ func (s *Store) ListConversationMessages(ctx context.Context, conversationID uui
 
 func (s *Store) GetRecentChatMessages(ctx context.Context, conversationID uuid.UUID, limit int) ([]*ChatMessage, error) {
 	rows, err := s.GetDB().QueryContext(ctx, `
-		SELECT cm.id, cm.conversation_id, cm.principal_id, COALESCE(p.name, ''), cm.sender_agent_id, COALESCE(a.resource_id, ''), cm.role, cm.content, cm.command_id, cm.created_at
+		SELECT cm.id, cm.conversation_id, cm.principal_id, COALESCE(p.name, ''), cm.sender_agent_id, COALESCE(a.resource_id, ''), COALESCE(a.name, ''), cm.role, cm.content, cm.command_id, cm.created_at
 		FROM chat_message cm
 		JOIN principal p ON p.id = cm.principal_id
 		LEFT JOIN agent a ON a.id = cm.sender_agent_id
@@ -99,7 +100,7 @@ func (s *Store) GetRecentChatMessages(ctx context.Context, conversationID uuid.U
 	for rows.Next() {
 		var msg ChatMessage
 		if err := rows.Scan(&msg.ID, &msg.ConversationID, &msg.PrincipalID, &msg.PrincipalName,
-			&msg.SenderAgentID, &msg.AgentResourceID,
+			&msg.SenderAgentID, &msg.AgentResourceID, &msg.AgentName,
 			&msg.Role, &msg.Content, &msg.CommandID, &msg.CreatedAt); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan chat message")
 		}
