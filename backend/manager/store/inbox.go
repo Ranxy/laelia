@@ -137,21 +137,21 @@ func (s *Store) DeleteInboxItemByCommandID(ctx context.Context, commandID uuid.U
 }
 
 type InboxItemWithCommand struct {
-	InboxItemID  uuid.UUID
-	CommandID    uuid.UUID
-	Priority     int32
-	CreatedAt    time.Time
+	InboxItemID uuid.UUID
+	CommandID   uuid.UUID
+	Priority    int32
+	CreatedAt   time.Time
 
-	Command     string
-	Instruction string
+	Command      string
+	Instruction  string
 	ExecutorKind int32
-	Profile     string
-	AllowDiff   bool
-	SourceType  int32
-	Env         string
-	WorkingDir  string
-	TimeoutSecs int32
-	PrincipalID int
+	Profile      string
+	AllowDiff    bool
+	SourceType   int32
+	Env          string
+	WorkingDir   string
+	TimeoutSecs  int32
+	PrincipalID  int
 }
 
 func (s *Store) GetInboxItemWithCommand(ctx context.Context, itemID uuid.UUID) (*InboxItemWithCommand, error) {

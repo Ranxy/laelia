@@ -1197,6 +1197,24 @@ export declare type AgentCommandMessage = Message<"laelia.v1.AgentCommandMessage
      */
     value: CommandEvent;
     case: "event";
+  } | {
+    /**
+     * @generated from field: laelia.v1.PullInbox pull_inbox = 6;
+     */
+    value: PullInbox;
+    case: "pullInbox";
+  } | {
+    /**
+     * @generated from field: laelia.v1.SelectInboxItem select_inbox_item = 7;
+     */
+    value: SelectInboxItem;
+    case: "selectInboxItem";
+  } | {
+    /**
+     * @generated from field: laelia.v1.DeferInboxItem defer_inbox_item = 8;
+     */
+    value: DeferInboxItem;
+    case: "deferInboxItem";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1237,6 +1255,18 @@ export declare type ManagerCommandMessage = Message<"laelia.v1.ManagerCommandMes
      */
     value: PermissionDecision;
     case: "permissionDecision";
+  } | {
+    /**
+     * @generated from field: laelia.v1.InboxSnapshot inbox_snapshot = 5;
+     */
+    value: InboxSnapshot;
+    case: "inboxSnapshot";
+  } | {
+    /**
+     * @generated from field: laelia.v1.InboxItemSelected inbox_item_selected = 6;
+     */
+    value: InboxItemSelected;
+    case: "inboxItemSelected";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1695,6 +1725,145 @@ export declare type PermissionDecision = Message<"laelia.v1.PermissionDecision">
  * Use `create(PermissionDecisionSchema)` to create a new message.
  */
 export declare const PermissionDecisionSchema: GenMessage<PermissionDecision>;
+
+/**
+ * @generated from message laelia.v1.InboxItem
+ */
+export declare type InboxItem = Message<"laelia.v1.InboxItem"> & {
+  /**
+   * @generated from field: string inbox_item_id = 1;
+   */
+  inboxItemId: string;
+
+  /**
+   * @generated from field: string command_id = 2;
+   */
+  commandId: string;
+
+  /**
+   * @generated from field: int32 priority = 3;
+   */
+  priority: number;
+
+  /**
+   * @generated from field: string context_summary = 4;
+   */
+  contextSummary: string;
+
+  /**
+   * @generated from field: laelia.v1.ExecutorKind executor_kind = 5;
+   */
+  executorKind: ExecutorKind;
+
+  /**
+   * @generated from field: string instruction = 6;
+   */
+  instruction: string;
+
+  /**
+   * @generated from field: laelia.v1.CommandSource source = 7;
+   */
+  source: CommandSource;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 8;
+   */
+  createdAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.InboxItem.
+ * Use `create(InboxItemSchema)` to create a new message.
+ */
+export declare const InboxItemSchema: GenMessage<InboxItem>;
+
+/**
+ * Empty pull request; agent requests current inbox snapshot
+ *
+ * @generated from message laelia.v1.PullInbox
+ */
+export declare type PullInbox = Message<"laelia.v1.PullInbox"> & {
+};
+
+/**
+ * Describes the message laelia.v1.PullInbox.
+ * Use `create(PullInboxSchema)` to create a new message.
+ */
+export declare const PullInboxSchema: GenMessage<PullInbox>;
+
+/**
+ * @generated from message laelia.v1.InboxSnapshot
+ */
+export declare type InboxSnapshot = Message<"laelia.v1.InboxSnapshot"> & {
+  /**
+   * @generated from field: repeated laelia.v1.InboxItem items = 1;
+   */
+  items: InboxItem[];
+};
+
+/**
+ * Describes the message laelia.v1.InboxSnapshot.
+ * Use `create(InboxSnapshotSchema)` to create a new message.
+ */
+export declare const InboxSnapshotSchema: GenMessage<InboxSnapshot>;
+
+/**
+ * @generated from message laelia.v1.SelectInboxItem
+ */
+export declare type SelectInboxItem = Message<"laelia.v1.SelectInboxItem"> & {
+  /**
+   * @generated from field: string inbox_item_id = 1;
+   */
+  inboxItemId: string;
+};
+
+/**
+ * Describes the message laelia.v1.SelectInboxItem.
+ * Use `create(SelectInboxItemSchema)` to create a new message.
+ */
+export declare const SelectInboxItemSchema: GenMessage<SelectInboxItem>;
+
+/**
+ * @generated from message laelia.v1.InboxItemSelected
+ */
+export declare type InboxItemSelected = Message<"laelia.v1.InboxItemSelected"> & {
+  /**
+   * @generated from field: string inbox_item_id = 1;
+   */
+  inboxItemId: string;
+
+  /**
+   * @generated from field: string command_id = 2;
+   */
+  commandId: string;
+};
+
+/**
+ * Describes the message laelia.v1.InboxItemSelected.
+ * Use `create(InboxItemSelectedSchema)` to create a new message.
+ */
+export declare const InboxItemSelectedSchema: GenMessage<InboxItemSelected>;
+
+/**
+ * @generated from message laelia.v1.DeferInboxItem
+ */
+export declare type DeferInboxItem = Message<"laelia.v1.DeferInboxItem"> & {
+  /**
+   * @generated from field: string inbox_item_id = 1;
+   */
+  inboxItemId: string;
+
+  /**
+   * @generated from field: string reason = 2;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message laelia.v1.DeferInboxItem.
+ * Use `create(DeferInboxItemSchema)` to create a new message.
+ */
+export declare const DeferInboxItemSchema: GenMessage<DeferInboxItem>;
 
 /**
  * @generated from message laelia.v1.RespondPermissionRequest

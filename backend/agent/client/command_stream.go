@@ -189,7 +189,7 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 					c.runCommand(ctx, runtime, stream, req)
 					c.isExecuting.Store(false)
 					slog.Info("command completed, pulling inbox", "commandID", req.CommandId)
-					c.sendPullInbox(stream)
+					sendPullInbox(stream)
 				}()
 
 			case *v1pb.ManagerCommandMessage_Cancel:
@@ -270,7 +270,7 @@ func (c *commandStream) handleInboxSnapshot(stream *connect.BidiStreamForClient[
 	}
 }
 
-func (c *commandStream) sendPullInbox(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage]) {
+func sendPullInbox(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage]) {
 	if err := stream.Send(&v1pb.AgentCommandMessage{
 		Message: &v1pb.AgentCommandMessage_PullInbox{
 			PullInbox: &v1pb.PullInbox{},

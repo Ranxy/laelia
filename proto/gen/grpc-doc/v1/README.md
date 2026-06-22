@@ -102,6 +102,7 @@
     - [CommandResult](#laelia-v1-CommandResult)
     - [Conversation](#laelia-v1-Conversation)
     - [CreateChannelRequest](#laelia-v1-CreateChannelRequest)
+    - [DeferInboxItem](#laelia-v1-DeferInboxItem)
     - [DeleteChannelRequest](#laelia-v1-DeleteChannelRequest)
     - [DiffEmittedPayload](#laelia-v1-DiffEmittedPayload)
     - [FinalSummaryPayload](#laelia-v1-FinalSummaryPayload)
@@ -111,6 +112,9 @@
     - [GetCommandRequest](#laelia-v1-GetCommandRequest)
     - [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest)
     - [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse)
+    - [InboxItem](#laelia-v1-InboxItem)
+    - [InboxItemSelected](#laelia-v1-InboxItemSelected)
+    - [InboxSnapshot](#laelia-v1-InboxSnapshot)
     - [LifecyclePayload](#laelia-v1-LifecyclePayload)
     - [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest)
     - [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse)
@@ -128,11 +132,13 @@
     - [PermissionTimedOutPayload](#laelia-v1-PermissionTimedOutPayload)
     - [Ping](#laelia-v1-Ping)
     - [Pong](#laelia-v1-Pong)
+    - [PullInbox](#laelia-v1-PullInbox)
     - [RawAcpPayload](#laelia-v1-RawAcpPayload)
     - [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest)
     - [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest)
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
     - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
+    - [SelectInboxItem](#laelia-v1-SelectInboxItem)
     - [SendCommandRequest](#laelia-v1-SendCommandRequest)
     - [SendCommandRequest.EnvEntry](#laelia-v1-SendCommandRequest-EnvEntry)
     - [SendMessageRequest](#laelia-v1-SendMessageRequest)
@@ -1270,6 +1276,9 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | result | [CommandResult](#laelia-v1-CommandResult) |  |  |
 | ping | [Ping](#laelia-v1-Ping) |  |  |
 | event | [CommandEvent](#laelia-v1-CommandEvent) |  |  |
+| pull_inbox | [PullInbox](#laelia-v1-PullInbox) |  |  |
+| select_inbox_item | [SelectInboxItem](#laelia-v1-SelectInboxItem) |  |  |
+| defer_inbox_item | [DeferInboxItem](#laelia-v1-DeferInboxItem) |  |  |
 
 
 
@@ -1604,6 +1613,22 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-DeferInboxItem"></a>
+
+### DeferInboxItem
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| inbox_item_id | [string](#string) |  |  |
+| reason | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-DeleteChannelRequest"></a>
 
 ### DeleteChannelRequest
@@ -1738,6 +1763,59 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-InboxItem"></a>
+
+### InboxItem
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| inbox_item_id | [string](#string) |  |  |
+| command_id | [string](#string) |  |  |
+| priority | [int32](#int32) |  |  |
+| context_summary | [string](#string) |  |  |
+| executor_kind | [ExecutorKind](#laelia-v1-ExecutorKind) |  |  |
+| instruction | [string](#string) |  |  |
+| source | [CommandSource](#laelia-v1-CommandSource) |  |  |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-InboxItemSelected"></a>
+
+### InboxItemSelected
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| inbox_item_id | [string](#string) |  |  |
+| command_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-InboxSnapshot"></a>
+
+### InboxSnapshot
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| items | [InboxItem](#laelia-v1-InboxItem) | repeated |  |
 
 
 
@@ -1901,6 +1979,8 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | cancel | [CancelMessage](#laelia-v1-CancelMessage) |  |  |
 | pong | [Pong](#laelia-v1-Pong) |  |  |
 | permission_decision | [PermissionDecision](#laelia-v1-PermissionDecision) |  |  |
+| inbox_snapshot | [InboxSnapshot](#laelia-v1-InboxSnapshot) |  |  |
+| inbox_item_selected | [InboxItemSelected](#laelia-v1-InboxItemSelected) |  |  |
 
 
 
@@ -2025,6 +2105,16 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-PullInbox"></a>
+
+### PullInbox
+Empty pull request; agent requests current inbox snapshot
+
+
+
+
+
+
 <a name="laelia-v1-RawAcpPayload"></a>
 
 ### RawAcpPayload
@@ -2103,6 +2193,21 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | entries | [ChatHistoryEntry](#laelia-v1-ChatHistoryEntry) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-SelectInboxItem"></a>
+
+### SelectInboxItem
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| inbox_item_id | [string](#string) |  |  |
 
 
 

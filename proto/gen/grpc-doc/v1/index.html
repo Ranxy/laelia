@@ -558,6 +558,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.DeferInboxItem"><span class="badge">M</span>DeferInboxItem</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.DeleteChannelRequest"><span class="badge">M</span>DeleteChannelRequest</a>
                 </li>
               
@@ -591,6 +595,18 @@
               
                 <li>
                   <a href="#laelia.v1.GetOrCreateConversationResponse"><span class="badge">M</span>GetOrCreateConversationResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.InboxItem"><span class="badge">M</span>InboxItem</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.InboxItemSelected"><span class="badge">M</span>InboxItemSelected</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.InboxSnapshot"><span class="badge">M</span>InboxSnapshot</a>
                 </li>
               
                 <li>
@@ -662,6 +678,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.PullInbox"><span class="badge">M</span>PullInbox</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.RawAcpPayload"><span class="badge">M</span>RawAcpPayload</a>
                 </li>
               
@@ -679,6 +699,10 @@
               
                 <li>
                   <a href="#laelia.v1.SearchChatHistoryResponse"><span class="badge">M</span>SearchChatHistoryResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SelectInboxItem"><span class="badge">M</span>SelectInboxItem</a>
                 </li>
               
                 <li>
@@ -3591,6 +3615,27 @@ Format: idps/{idp} </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>pull_inbox</td>
+                  <td><a href="#laelia.v1.PullInbox">PullInbox</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>select_inbox_item</td>
+                  <td><a href="#laelia.v1.SelectInboxItem">SelectInboxItem</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>defer_inbox_item</td>
+                  <td><a href="#laelia.v1.DeferInboxItem">DeferInboxItem</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -4598,6 +4643,37 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.DeferInboxItem">DeferInboxItem</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>inbox_item_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reason</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.DeleteChannelRequest">DeleteChannelRequest</h3>
         <p></p>
 
@@ -4839,6 +4915,134 @@ Format: idps/{idp} </p></td>
                   <td>name</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.InboxItem">InboxItem</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>inbox_item_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>command_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>priority</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>context_summary</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>executor_kind</td>
+                  <td><a href="#laelia.v1.ExecutorKind">ExecutorKind</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>instruction</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>source</td>
+                  <td><a href="#laelia.v1.CommandSource">CommandSource</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.InboxItemSelected">InboxItemSelected</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>inbox_item_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>command_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.InboxSnapshot">InboxSnapshot</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>items</td>
+                  <td><a href="#laelia.v1.InboxItem">InboxItem</a></td>
+                  <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
               
@@ -5173,6 +5377,20 @@ Format: idps/{idp} </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>inbox_snapshot</td>
+                  <td><a href="#laelia.v1.InboxSnapshot">InboxSnapshot</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>inbox_item_selected</td>
+                  <td><a href="#laelia.v1.InboxItemSelected">InboxItemSelected</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -5439,6 +5657,13 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.PullInbox">PullInbox</h3>
+        <p>Empty pull request; agent requests current inbox snapshot</p>
+
+        
+
+        
+      
         <h3 id="laelia.v1.RawAcpPayload">RawAcpPayload</h3>
         <p></p>
 
@@ -5612,6 +5837,30 @@ Format: idps/{idp} </p></td>
                   <td>entries</td>
                   <td><a href="#laelia.v1.ChatHistoryEntry">ChatHistoryEntry</a></td>
                   <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SelectInboxItem">SelectInboxItem</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>inbox_item_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
                   <td><p> </p></td>
                 </tr>
               
