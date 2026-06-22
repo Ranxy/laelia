@@ -323,3 +323,31 @@ ALTER TABLE conversation_member ADD COLUMN IF NOT EXISTS member_role SMALLINT NO
 CREATE INDEX IF NOT EXISTS idx_chat_message_sender_agent ON chat_message(sender_agent_id) WHERE sender_agent_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_conversation_member_lookup ON conversation_member(member_type, member_id);
 
+-- agent_inbox stores the task inbox for each agent (pull model)
+-- state: 1=PENDING, 2=SELECTED, 3=DEFERRED
+CREATE TABLE agent_inbox (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_id INTEGER NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
+    command_id UUID NOT NULL REFERENCES command(id) ON DELETE CASCADE,
+    priority INTEGER NOT NULL DEFAULT 0,
+    context_summary TEXT NOT NULL DEFAULT '',
+    state SMALLINT NOT NULL DEFAULT 1,
+    deferred_until TIMESTAMPTZ,
+    defer_count INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    selected_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_agent_inbox_agent_state ON agent_inbox(agent_id, state);
+CREATE INDEX idx_agent_inbox_command ON agent_inbox(command_id);
+
+-- agent_working_state tracks what each agent is currently doing
+-- state: 1=IDLE, 2=DECIDING, 3=WORKING
+CREATE TABLE agent_working_state (
+    agent_id INTEGER PRIMARY KEY REFERENCES agent(id) ON DELETE CASCADE,
+    session_id TEXT NOT NULL DEFAULT '',
+    inbox_item_id UUID REFERENCES agent_inbox(id) ON DELETE SET NULL,
+    state SMALLINT NOT NULL DEFAULT 1,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
