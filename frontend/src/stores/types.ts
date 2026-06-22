@@ -5,6 +5,7 @@ import type {
   RotateAgentTokenResponse,
 } from "@/types/proto-es/v1/agent_pb";
 import type {
+  ChannelMember,
   ChatMessage,
   Command,
   CommandEvent,
@@ -125,6 +126,19 @@ export interface ChatSlice {
     conversationId: string,
     content: string
   ) => Promise<ChatMessage>;
+  listChannelMembers: (conversationId: string) => Promise<ChannelMember[]>;
+  addChannelMember: (
+    conversationId: string,
+    memberType: number,
+    memberId: string
+  ) => Promise<ChannelMember>;
+  removeChannelMember: (
+    conversationId: string,
+    memberType: number,
+    memberId: string
+  ) => Promise<void>;
+  channelMembersByConv: Record<string, ChannelMember[]>;
+  channelMembersLoading: Record<string, boolean>;
 }
 
 export type AppStoreState = AuthSlice & AgentSlice & CommandSlice & ChatSlice;

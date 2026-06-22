@@ -2,13 +2,16 @@ import { create } from "@bufbuild/protobuf";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { commandServiceClient } from "@/connect";
 import {
+  AddChannelMemberRequestSchema,
   CommandEventType,
   CommandSource,
   CommandStatus,
   CreateChannelRequestSchema,
   GetOrCreateConversationRequestSchema,
+  ListChannelMembersRequestSchema,
   ListChannelsRequestSchema,
   ListConversationMessagesRequestSchema,
+  RemoveChannelMemberRequestSchema,
   SendCommandRequestSchema,
   SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
@@ -18,6 +21,8 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
   conversations: {},
   channels: [],
   channelsLoading: false,
+  channelMembersByConv: {},
+  channelMembersLoading: {},
   chatMessages: {},
   chatLoading: {},
   streamingContent: {},
@@ -362,5 +367,74 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       },
     }));
     return res;
+  },
+
+  async listChannelMembers(conversationId) {
+    const convName = `conversations/${conversationId}`;
+    set((s) => ({
+      channelMembersLoading: { ...s.channelMembersLoading, [convName]: true },
+    }));
+    try {
+      const res = await commandServiceClient.listChannelMembers(
+        create(ListChannelMembersRequestSchema, { conversation: convName })
+      );
+      const members = res.members ?? [];
+      set((s) => ({
+        channelMembersByConv: {
+          ...s.channelMembersByConv,
+          [convName]: members,
+        },
+        channelMembersLoading: {
+          ...s.channelMembersLoading,
+          [convName]: false,
+        },
+      }));
+      return members;
+    } catch {
+      set((s) => ({
+        channelMembersLoading: {
+          ...s.channelMembersLoading,
+          [convName]: false,
+        },
+      }));
+      return [];
+    }
+  },
+
+  async addChannelMember(conversationId, memberType, memberId) {
+    const convName = `conversations/${conversationId}`;
+    const newMember = await commandServiceClient.addChannelMember(
+      create(AddChannelMemberRequestSchema, {
+        conversation: convName,
+        memberType,
+        memberId,
+      })
+    );
+    set((s) => ({
+      channelMembersByConv: {
+        ...s.channelMembersByConv,
+        [convName]: [...(s.channelMembersByConv[convName] ?? []), newMember],
+      },
+    }));
+    return newMember;
+  },
+
+  async removeChannelMember(conversationId, memberType, memberId) {
+    const convName = `conversations/${conversationId}`;
+    await commandServiceClient.removeChannelMember(
+      create(RemoveChannelMemberRequestSchema, {
+        conversation: convName,
+        memberType,
+        memberId,
+      })
+    );
+    set((s) => ({
+      channelMembersByConv: {
+        ...s.channelMembersByConv,
+        [convName]: (s.channelMembersByConv[convName] ?? []).filter(
+          (m) => !(m.memberType === memberType && m.memberId === memberId)
+        ),
+      },
+    }));
   },
 });

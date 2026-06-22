@@ -1,4 +1,14 @@
-import { ArrowDown, ArrowLeft, Hash, Loader2, Send } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  Hash,
+  Loader2,
+  Plus,
+  Send,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
 import MarkdownRender, {
   MarkdownCodeBlockNode,
   setCustomComponents,
@@ -6,6 +16,20 @@ import MarkdownRender, {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/react/components/ui/select";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/react/components/ui/sheet";
 import { cn } from "@/react/lib/utils";
 import { useAppStore } from "@/react/stores";
 import type { ChatMessageUI } from "@/react/stores/types";
@@ -28,6 +52,15 @@ function formatTime(date: Date): string {
   return `${hours}:${minutes}`;
 }
 
+function memberTypeLabel(
+  t: (key: string) => string,
+  memberType: number
+): string {
+  return memberType === 2
+    ? t("channel.member-type-agent")
+    : t("channel.member-type-user");
+}
+
 export function ChannelChatPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -38,6 +71,15 @@ export function ChannelChatPage() {
   const chatLoading = useAppStore((s) => s.chatLoading);
   const loadMessages = useAppStore((s) => s.loadMessages);
   const sendChannelMessage = useAppStore((s) => s.sendChannelMessage);
+  const channelMembersByConv = useAppStore((s) => s.channelMembersByConv);
+  const channelMembersLoading = useAppStore((s) => s.channelMembersLoading);
+  const listChannelMembers = useAppStore((s) => s.listChannelMembers);
+  const addChannelMember = useAppStore((s) => s.addChannelMember);
+  const removeChannelMember = useAppStore((s) => s.removeChannelMember);
+  const currentUser = useAppStore((s) => s.currentUser);
+  const agents = useAppStore((s) => s.agents);
+  const fetchAgents = useAppStore((s) => s.fetchAgents);
+  const fetchChannels = useAppStore((s) => s.fetchChannels);
 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -46,11 +88,23 @@ export function ChannelChatPage() {
   const [showScrollDown, setShowScrollDown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [addMemberType, setAddMemberType] = useState(2); // default AGENT
+  const [addMemberId, setAddMemberId] = useState("");
+  const [addingMember, setAddingMember] = useState(false);
+
   const conversationName = channelId ? `conversations/${channelId}` : "";
   const messages = chatMessages[conversationName] ?? [];
   const loading = chatLoading[conversationName] ?? false;
 
   const channel = channels.find((c) => c.name === conversationName);
+  const members = channelMembersByConv[conversationName] ?? [];
+  const membersLoading = channelMembersLoading[conversationName] ?? false;
+  const isOwner =
+    channel && currentUser
+      ? channel.ownerId === currentUser.name.split("/").pop()
+      : false;
 
   const init = useCallback(async () => {
     if (!channelId) return;
@@ -61,7 +115,17 @@ export function ChannelChatPage() {
     } catch {
       // load failed
     }
-  }, [channelId, conversationName, loadMessages]);
+    listChannelMembers(channelId);
+    fetchAgents({ pageSize: 100 });
+    fetchChannels();
+  }, [
+    channelId,
+    conversationName,
+    loadMessages,
+    listChannelMembers,
+    fetchAgents,
+    fetchChannels,
+  ]);
 
   useEffect(() => {
     init();
@@ -114,6 +178,42 @@ export function ChannelChatPage() {
     }
   }, [input, sending, channelId, sendChannelMessage]);
 
+  const handleAddMember = useCallback(async () => {
+    const memberId = addMemberId.trim();
+    if (!memberId || addingMember || !channelId) return;
+    setAddingMember(true);
+    try {
+      await addChannelMember(channelId, addMemberType, memberId);
+      setAddMemberId("");
+      setAddMemberOpen(false);
+      listChannelMembers(channelId);
+    } catch {
+      // add failed
+    } finally {
+      setAddingMember(false);
+    }
+  }, [
+    addMemberId,
+    addMemberType,
+    addingMember,
+    channelId,
+    addChannelMember,
+    listChannelMembers,
+  ]);
+
+  const handleRemoveMember = useCallback(
+    async (memberType: number, memberId: string) => {
+      if (!channelId) return;
+      try {
+        await removeChannelMember(channelId, memberType, memberId);
+        listChannelMembers(channelId);
+      } catch {
+        // remove failed
+      }
+    },
+    [channelId, removeChannelMember, listChannelMembers]
+  );
+
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
       {/* Header */}
@@ -134,6 +234,17 @@ export function ChannelChatPage() {
             {channel?.title ?? channelId ?? ""}
           </h2>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            setMembersOpen(true);
+            if (channelId) listChannelMembers(channelId);
+          }}
+          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-control hover:text-main hover:bg-control-bg transition-colors"
+        >
+          <Users className="size-4" />
+          <span className="hidden sm:inline">{members.length}</span>
+        </button>
       </div>
 
       {/* Messages scroll area */}
@@ -234,6 +345,177 @@ export function ChannelChatPage() {
           </div>
         </div>
       </div>
+
+      {/* Members Sheet */}
+      <Sheet
+        open={membersOpen}
+        onOpenChange={(open) => !open && setMembersOpen(false)}
+      >
+        <SheetContent width="narrow">
+          <SheetHeader>
+            <SheetTitle>
+              {t("channel.members", { count: members.length })}
+            </SheetTitle>
+          </SheetHeader>
+          <SheetBody className="flex flex-col gap-0">
+            {membersLoading && (
+              <div className="flex items-center justify-center gap-2 py-12 text-control-light text-sm">
+                <Loader2 className="size-4 animate-spin" />
+                {t("common.loading")}
+              </div>
+            )}
+            {!membersLoading && (
+              <div className="divide-y divide-control-border">
+                {members.map((m) => (
+                  <div
+                    key={`${m.memberType}-${m.memberId}`}
+                    className="flex items-center gap-3 px-1 py-3"
+                  >
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-control-bg text-control text-xs font-medium">
+                      {m.memberType === 2 ? "A" : "U"}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-main truncate">
+                        {m.displayName || m.memberId}
+                      </p>
+                      <p className="text-xs text-control-placeholder flex items-center gap-1.5 mt-0.5">
+                        <span>{memberTypeLabel(t, m.memberType)}</span>
+                        {m.memberRole === 1 && (
+                          <span className="rounded bg-accent/10 text-accent px-1.5 py-0 text-[10px] font-medium">
+                            Owner
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    {isOwner && m.memberRole !== 1 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleRemoveMember(m.memberType, m.memberId)
+                        }
+                        className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-error hover:bg-error/10 transition-colors"
+                        aria-label={t("common.delete")}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add member section */}
+            {isOwner && (
+              <div className="mt-auto border-t border-control-border pt-4 px-1">
+                {addMemberOpen ? (
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAddMemberType(1)}
+                        className={cn(
+                          "flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                          addMemberType === 1
+                            ? "bg-accent text-accent-foreground"
+                            : "bg-control-bg text-control hover:bg-control-bg/80"
+                        )}
+                      >
+                        {t("channel.member-type-user")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAddMemberType(2)}
+                        className={cn(
+                          "flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                          addMemberType === 2
+                            ? "bg-accent text-accent-foreground"
+                            : "bg-control-bg text-control hover:bg-control-bg/80"
+                        )}
+                      >
+                        {t("channel.member-type-agent")}
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      {addMemberType === 2 ? (
+                        <Select
+                          value={addMemberId}
+                          onValueChange={(v) => v && setAddMemberId(v)}
+                        >
+                          <SelectTrigger className="flex-1 h-auto rounded-md border border-control-border bg-background px-2.5 py-1.5 text-xs text-main">
+                            <SelectValue
+                              placeholder={t("channel.member-id-placeholder")}
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {agents.map((agent) => {
+                              const resourceId =
+                                agent.name.split("/").pop() || agent.name;
+                              return (
+                                <SelectItem key={resourceId} value={resourceId}>
+                                  {agent.title || resourceId}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <input
+                          type="text"
+                          className={cn(
+                            "flex-1 rounded-md border border-control-border bg-background px-2.5 py-1.5 text-xs text-main",
+                            "placeholder:text-control-placeholder focus:outline-none focus:border-accent"
+                          )}
+                          placeholder={t("channel.member-id-placeholder")}
+                          value={addMemberId}
+                          onChange={(e) => setAddMemberId(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleAddMember();
+                          }}
+                          autoFocus
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddMemberOpen(false);
+                          setAddMemberId("");
+                        }}
+                        className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddMember}
+                      disabled={!addMemberId.trim() || addingMember}
+                      className={cn(
+                        "w-full rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                        addMemberId.trim() && !addingMember
+                          ? "bg-accent text-accent-foreground hover:bg-accent-hover"
+                          : "bg-control-bg text-control-placeholder cursor-not-allowed"
+                      )}
+                    >
+                      {addingMember
+                        ? t("common.creating")
+                        : t("channel.add-member")}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setAddMemberOpen(true)}
+                    className="flex w-full items-center gap-1.5 rounded-md px-2.5 py-2 text-sm text-control hover:text-main hover:bg-control-bg transition-colors"
+                  >
+                    <Plus className="size-4" />
+                    {t("channel.add-member")}
+                  </button>
+                )}
+              </div>
+            )}
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
