@@ -468,9 +468,9 @@ type ChatHistoryEntry struct {
 	CreatedAt time.Time
 }
 
-func (s *Store) SearchChatHistory(ctx context.Context, agentID, principalID int, query string, since, until *time.Time, limit int) ([]*ChatHistoryEntry, error) {
-	args := []any{agentID, principalID}
-	where := `c.agent_id = $1 AND cm.principal_id = $2`
+func (s *Store) SearchChatHistory(ctx context.Context, conversationID uuid.UUID, query string, since, until *time.Time, limit int) ([]*ChatHistoryEntry, error) {
+	args := []any{conversationID}
+	where := `cm.conversation_id = $1`
 
 	if query != "" {
 		args = append(args, "%"+query+"%")
@@ -492,7 +492,6 @@ func (s *Store) SearchChatHistory(ctx context.Context, agentID, principalID int,
 	rows, err := s.GetDB().QueryContext(ctx, fmt.Sprintf(`
 		SELECT cm.id, cm.command_id, cm.role, cm.content, cm.created_at
 		FROM chat_message cm
-		JOIN conversation c ON c.id = cm.conversation_id
 		WHERE %s
 		ORDER BY cm.created_at DESC
 		LIMIT $%d

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,14 +12,83 @@ import (
 
 type ConversationMessage struct {
 	ID        uuid.UUID
-	AgentID   int
+	AgentID   sql.NullInt32
 	Title     string
 	Type      int32
 	CreatedBy int
+	OwnerID   int
 	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, principalID int) (*ConversationMessage, error) {
+	agent, err := s.GetAgentResourceIDByID(ctx, agentID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get agent resource ID")
+	}
+	if agent == "" {
+		return nil, errors.Errorf("agent %d not found", agentID)
+	}
+
+	conv, err := s.findDirectConversation(ctx, principalID, agent)
+	if err != nil {
+		return nil, err
+	}
+	if conv != nil {
+		return conv, nil
+	}
+
+	tx, err := s.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var newConv ConversationMessage
+	err = tx.QueryRowContext(ctx, `
+		INSERT INTO conversation (agent_id, title, type, created_by, owner_id)
+		VALUES ($1, '', 1, $2, $2)
+		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at
+	`, agentID, principalID).Scan(
+		&newConv.ID, &newConv.AgentID, &newConv.Title, &newConv.Type, &newConv.CreatedBy, &newConv.OwnerID, &newConv.CreatedAt, &newConv.UpdatedAt,
+	)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to insert conversation")
+	}
+
+	if err := s.AddConversationMember(ctx, newConv.ID, MemberTypeUser, fmt.Sprintf("%d", principalID), MemberRoleOwner); err != nil {
+		return nil, err
+	}
+	if err := s.AddConversationMember(ctx, newConv.ID, MemberTypeAgent, agent, MemberRoleMember); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &newConv, nil
+}
+
+func (s *Store) GetConversation(ctx context.Context, id uuid.UUID) (*ConversationMessage, error) {
+	var conv ConversationMessage
+	err := s.GetDB().QueryRowContext(ctx, `
+		SELECT id, agent_id, title, type, created_by, owner_id, created_at, updated_at
+		FROM conversation
+		WHERE id = $1
+	`, id).Scan(
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Errorf("conversation %s not found", id)
+		}
+		return nil, errors.Wrapf(err, "failed to get conversation")
+	}
+	return &conv, nil
+}
+
+func (s *Store) CreateChannel(ctx context.Context, title string, ownerID int) (*ConversationMessage, error) {
 	tx, err := s.GetDB().BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -27,28 +97,18 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 
 	var conv ConversationMessage
 	err = tx.QueryRowContext(ctx, `
-		INSERT INTO conversation (agent_id, title, type, created_by)
-		VALUES ($1, '', 1, $2)
-		ON CONFLICT DO NOTHING
-		RETURNING id, agent_id, title, type, created_by, created_at
-	`, agentID, principalID).Scan(
-		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.CreatedAt,
+		INSERT INTO conversation (title, type, created_by, owner_id)
+		VALUES ($1, 2, $2, $2)
+		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at
+	`, title, ownerID).Scan(
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt,
 	)
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return nil, errors.Wrapf(err, "failed to insert conversation")
-		}
-		err = tx.QueryRowContext(ctx, `
-			SELECT id, agent_id, title, type, created_by, created_at
-			FROM conversation
-			WHERE agent_id = $1 AND created_by = $2 AND type = 1
-			LIMIT 1
-		`, agentID, principalID).Scan(
-			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.CreatedAt,
-		)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to find existing conversation")
-		}
+		return nil, errors.Wrapf(err, "failed to create channel")
+	}
+
+	if err := s.AddConversationMember(ctx, conv.ID, MemberTypeUser, fmt.Sprintf("%d", ownerID), MemberRoleOwner); err != nil {
+		return nil, err
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -58,20 +118,80 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 	return &conv, nil
 }
 
-func (s *Store) GetConversation(ctx context.Context, id uuid.UUID) (*ConversationMessage, error) {
+func (s *Store) UpdateChannel(ctx context.Context, id uuid.UUID, title string) (*ConversationMessage, error) {
 	var conv ConversationMessage
 	err := s.GetDB().QueryRowContext(ctx, `
-		SELECT id, agent_id, title, type, created_by, created_at
-		FROM conversation
-		WHERE id = $1
-	`, id).Scan(
-		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.CreatedAt,
+		UPDATE conversation SET title = $1, updated_at = now()
+		WHERE id = $2
+		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at
+	`, title, id).Scan(
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.Errorf("conversation %s not found", id)
 		}
-		return nil, errors.Wrapf(err, "failed to get conversation")
+		return nil, errors.Wrapf(err, "failed to update channel")
 	}
 	return &conv, nil
+}
+
+func (s *Store) DeleteChannel(ctx context.Context, id uuid.UUID) error {
+	_, err := s.GetDB().ExecContext(ctx, `DELETE FROM conversation WHERE id = $1`, id)
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete channel")
+	}
+	return nil
+}
+
+func (s *Store) ListUserConversations(ctx context.Context, principalID int, limit, offset int) ([]*ConversationMessage, error) {
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at
+		FROM conversation c
+		JOIN conversation_member cm ON cm.conversation_id = c.id
+		WHERE cm.member_type = $1 AND cm.member_id = $2
+		ORDER BY c.updated_at DESC
+		LIMIT $3 OFFSET $4
+	`, MemberTypeUser, fmt.Sprintf("%d", principalID), limit, offset)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list user conversations")
+	}
+	defer rows.Close()
+
+	var convs []*ConversationMessage
+	for rows.Next() {
+		var conv ConversationMessage
+		if err := rows.Scan(&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan conversation")
+		}
+		convs = append(convs, &conv)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate conversations")
+	}
+
+	return convs, nil
+}
+
+func (s *Store) GetConversationMemberCount(ctx context.Context, id uuid.UUID) (int, error) {
+	var count int
+	err := s.GetDB().QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM conversation_member WHERE conversation_id = $1
+	`, id).Scan(&count)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to get member count")
+	}
+	return count, nil
+}
+
+func (s *Store) GetAgentResourceIDByID(ctx context.Context, agentID int) (string, error) {
+	var resourceID string
+	err := s.GetDB().QueryRowContext(ctx, `SELECT resource_id FROM agent WHERE id = $1`, agentID).Scan(&resourceID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", errors.Wrapf(err, "failed to get agent resource ID")
+	}
+	return resourceID, nil
 }
