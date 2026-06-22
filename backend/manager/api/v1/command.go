@@ -133,7 +133,11 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create command"))
 	}
 
-	_ = s.dispatcher.DispatchCommand(ctx, created)
+	if _, inboxErr := s.store.CreateInboxItem(ctx, agent.ID, created.ID, 0, buildInboxSummary(created)); inboxErr != nil {
+		slog.Warn("failed to create inbox item", "commandID", created.ID, "error", inboxErr)
+	} else {
+		s.dispatcher.NotifyInboxUpdated(ctx, agent.ID)
+	}
 
 	created.PrincipalName = principalName
 	created.AgentResourceID = agent.ResourceID
@@ -215,7 +219,12 @@ func (s *CommandService) CancelCommand(ctx context.Context, req *connect.Request
 	}
 
 	if err := s.dispatcher.CancelCommand(ctx, cmd.AgentID, cmd.ID.String()); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to cancel command"))
+		// agent may not be connected, still proceed to cancel in DB
+		slog.Warn("failed to send cancel to agent", "commandID", cmd.ID, "error", err)
+	}
+
+	if inboxErr := s.store.DeleteInboxItemByCommandID(ctx, cmd.ID); inboxErr != nil {
+		slog.Warn("failed to delete inbox item for cancelled command", "error", inboxErr)
 	}
 
 	status := int32(v1pb.CommandStatus_CANCELLED)
@@ -745,6 +754,23 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 		Messages:      v1msgs,
 		NextPageToken: nextPageToken,
 	}), nil
+}
+
+func buildInboxSummary(cmd *store.CommandMessage) string {
+	switch cmd.ExecutorKind {
+	case int32(v1pb.ExecutorKind_SHELL):
+		if cmd.Command != "" {
+			return cmd.Command
+		}
+		return "shell command"
+	case int32(v1pb.ExecutorKind_ACP):
+		if cmd.Instruction != "" {
+			return cmd.Instruction
+		}
+		return "acp task"
+	default:
+		return "task"
+	}
 }
 
 func buildLightChatContext(msgs []*store.ChatMessage) string {
