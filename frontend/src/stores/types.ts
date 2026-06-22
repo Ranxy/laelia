@@ -107,7 +107,11 @@ export interface ChatSlice {
 
   getOrCreateConversation: (agent: string) => Promise<string>;
   loadMessages: (conversation: string) => Promise<void>;
-  sendChatMessage: (agent: string, instruction: string, conversationId?: string) => Promise<Command>;
+  sendChatMessage: (
+    agent: string,
+    instruction: string,
+    conversationId?: string
+  ) => Promise<Command>;
   streamChatCommand: (
     commandName: string,
     conversation: string,

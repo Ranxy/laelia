@@ -334,5 +334,4 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
     set({ channels });
     return res;
   },
-
 });
