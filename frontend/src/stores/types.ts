@@ -8,6 +8,7 @@ import type {
   Command,
   CommandEvent,
   CommandOutput,
+  Conversation,
 } from "@/types/proto-es/v1/command_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";
 
@@ -21,6 +22,8 @@ export interface ChatMessageUI {
   status?: number;
   streaming?: boolean;
   events?: CommandEvent[];
+  senderName?: string;
+  senderType?: number;
 }
 
 export interface AuthSlice {
@@ -94,6 +97,8 @@ export interface CommandSlice {
 
 export interface ChatSlice {
   conversations: Record<string, string>;
+  channels: Conversation[];
+  channelsLoading: boolean;
   chatMessages: Record<string, ChatMessageUI[]>;
   chatLoading: Record<string, boolean>;
   streamingContent: Record<string, string>;
@@ -102,13 +107,15 @@ export interface ChatSlice {
 
   getOrCreateConversation: (agent: string) => Promise<string>;
   loadMessages: (conversation: string) => Promise<void>;
-  sendChatMessage: (agent: string, instruction: string) => Promise<Command>;
+  sendChatMessage: (agent: string, instruction: string, conversationId?: string) => Promise<Command>;
   streamChatCommand: (
     commandName: string,
     conversation: string,
     signal: AbortSignal
   ) => Promise<void>;
   resetStreaming: (commandName: string) => void;
+  fetchChannels: () => Promise<void>;
+  createChannel: (title: string) => Promise<Conversation>;
 }
 
 export type AppStoreState = AuthSlice & AgentSlice & CommandSlice & ChatSlice;

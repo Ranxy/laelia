@@ -5,7 +5,9 @@ import {
   CommandEventType,
   CommandSource,
   CommandStatus,
+  CreateChannelRequestSchema,
   GetOrCreateConversationRequestSchema,
+  ListChannelsRequestSchema,
   ListConversationMessagesRequestSchema,
   SendCommandRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
@@ -13,6 +15,8 @@ import type { AppSliceCreator, ChatMessageUI, ChatSlice } from "./types";
 
 export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
   conversations: {},
+  channels: [],
+  channelsLoading: false,
   chatMessages: {},
   chatLoading: {},
   streamingContent: {},
@@ -51,6 +55,8 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
         content: msg.content,
         timestamp: msg.createdAt ? timestampDate(msg.createdAt) : new Date(),
         commandId: msg.commandId || undefined,
+        senderName: msg.senderName || undefined,
+        senderType: msg.senderType || undefined,
       }));
 
       set((state) => ({
@@ -64,9 +70,9 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
     }
   },
 
-  async sendChatMessage(agent, instruction) {
+  async sendChatMessage(agent, instruction, conversationId) {
     const tempId = crypto.randomUUID();
-    const conversation = get().conversations[agent];
+    const conversation = conversationId || get().conversations[agent];
     const userMsg: ChatMessageUI = {
       id: tempId,
       role: "user",
@@ -92,6 +98,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
         instruction,
         executorKind: 2,
         source: CommandSource.CHAT,
+        conversationId: conversationId || "",
       })
     );
 
@@ -306,4 +313,26 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       streamingStatus: restStatus,
     });
   },
+
+  async fetchChannels() {
+    set({ channelsLoading: true });
+    try {
+      const res = await commandServiceClient.listChannels(
+        create(ListChannelsRequestSchema, { pageSize: 100, pageToken: "" })
+      );
+      set({ channels: res.channels ?? [], channelsLoading: false });
+    } catch {
+      set({ channelsLoading: false });
+    }
+  },
+
+  async createChannel(title) {
+    const res = await commandServiceClient.createChannel(
+      create(CreateChannelRequestSchema, { title })
+    );
+    const channels = [...get().channels, res];
+    set({ channels });
+    return res;
+  },
+
 });
