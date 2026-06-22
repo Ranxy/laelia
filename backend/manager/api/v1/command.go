@@ -78,22 +78,31 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 
 	var conversationID *uuid.UUID
 	if req.Msg.Source == v1pb.CommandSource_CHAT && instruction != "" {
-		conv, convErr := s.store.GetOrCreateDirectConversation(ctx, agent.ID, principalID)
-		if convErr != nil {
-			slog.Warn("failed to get or create conversation", "error", convErr)
-		} else {
-			conversationID = &conv.ID
+		if req.Msg.ConversationId != "" {
+			if cid, cidErr := uuid.Parse(req.Msg.ConversationId); cidErr == nil {
+				conversationID = &cid
+			}
+		}
+		if conversationID == nil {
+			conv, convErr := s.store.GetOrCreateDirectConversation(ctx, agent.ID, principalID)
+			if convErr != nil {
+				slog.Warn("failed to get or create conversation", "error", convErr)
+			} else {
+				conversationID = &conv.ID
+			}
+		}
+		if conversationID != nil {
 			if _, msgErr := s.store.CreateChatMessage(ctx, &store.ChatMessage{
-				ConversationID: conv.ID,
+				ConversationID: *conversationID,
 				PrincipalID:    principalID,
 				Role:           1, // USER
 				Content:        instruction,
 			}); msgErr != nil {
 				slog.Warn("failed to create user chat message", "error", msgErr)
 			}
-			if recent, recentErr := s.store.GetRecentChatMessages(ctx, conv.ID, 6); recentErr == nil && len(recent) > 0 {
-				if ctx := buildLightChatContext(recent); ctx != "" {
-					instruction = ctx + "\n---\n" + instruction
+			if recent, recentErr := s.store.GetRecentChatMessages(ctx, *conversationID, 6); recentErr == nil && len(recent) > 0 {
+				if chatCtx := buildLightChatContext(recent); chatCtx != "" {
+					instruction = chatCtx + "\n---\n" + instruction
 				}
 			}
 		}
@@ -557,35 +566,47 @@ func (s *CommandService) validateRawEventAccess(ctx context.Context, user *store
 }
 
 func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Request[v1pb.SearchChatHistoryRequest]) (*connect.Response[v1pb.SearchChatHistoryResponse], error) {
-	agentResourceID := parseAgentResourceID(req.Msg.Agent)
-	agent, err := s.store.GetAgentByResourceID(ctx, agentResourceID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get agent"))
-	}
-	if agent == nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", agentResourceID))
-	}
+	var convID uuid.UUID
 
-	principalID := 0
-	if req.Msg.PrincipalId != "" {
-		var pid int
-		if _, err := fmt.Sscanf(req.Msg.PrincipalId, "%d", &pid); err == nil {
-			principalID = pid
+	if req.Msg.Conversation != "" {
+		cid, err := parseConversationID(req.Msg.Conversation)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation"))
 		}
+		convID = cid
+	} else {
+		agentResourceID := parseAgentResourceID(req.Msg.Agent)
+		agent, err := s.store.GetAgentByResourceID(ctx, agentResourceID)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get agent"))
+		}
+		if agent == nil {
+			return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", agentResourceID))
+		}
+		user, _ := GetUserFromContext(ctx)
+		principalID := 1
+		if user != nil {
+			principalID = user.ID
+		}
+		conv, convErr := s.store.GetOrCreateDirectConversation(ctx, agent.ID, principalID)
+		if convErr != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get conversation"))
+		}
+		convID = conv.ID
 	}
 
 	var since, until *time.Time
 	if req.Msg.Since != nil {
-		s := req.Msg.Since.AsTime()
-		since = &s
+		st := req.Msg.Since.AsTime()
+		since = &st
 	}
 	if req.Msg.Until != nil {
-		u := req.Msg.Until.AsTime()
-		until = &u
+		ut := req.Msg.Until.AsTime()
+		until = &ut
 	}
 
 	limit := int(req.Msg.Limit)
-	entries, err := s.store.SearchChatHistory(ctx, agent.ID, principalID, req.Msg.Query, since, until, limit)
+	entries, err := s.store.SearchChatHistory(ctx, convID, req.Msg.Query, since, until, limit)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to search chat history"))
 	}
@@ -698,6 +719,12 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 
 	var v1msgs []*v1pb.ChatMessage
 	for _, msg := range msgs {
+		senderName := msg.PrincipalName
+		senderType := int32(1)
+		if msg.SenderAgentID.Valid {
+			senderName = msg.AgentResourceID
+			senderType = 2
+		}
 		v1m := &v1pb.ChatMessage{
 			Name:          msg.ID.String(),
 			Conversation:  msg.ConversationID.String(),
@@ -705,6 +732,8 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 			Role:          msg.Role,
 			Content:       msg.Content,
 			CreatedAt:     timestamppb.New(msg.CreatedAt),
+			SenderName:    senderName,
+			SenderType:    senderType,
 		}
 		if msg.CommandID.Valid {
 			v1m.CommandId = msg.CommandID.UUID.String()
@@ -725,9 +754,17 @@ func buildLightChatContext(msgs []*store.ChatMessage) string {
 	for i := len(msgs) - 1; i >= 0 && count < 6; i-- {
 		msg := msgs[i]
 		if msg.Role == 1 {
-			_, _ = fmt.Fprintf(&b, "- User: %s\n", msg.Content)
+			sender := msg.PrincipalName
+			if sender == "" {
+				sender = "User"
+			}
+			_, _ = fmt.Fprintf(&b, "- %s: %s\n", sender, msg.Content)
 		} else {
-			_, _ = fmt.Fprintf(&b, "- Assistant: %s\n", msg.Content)
+			sender := msg.AgentResourceID
+			if sender == "" {
+				sender = "Assistant"
+			}
+			_, _ = fmt.Fprintf(&b, "- %s: %s\n", sender, msg.Content)
 		}
 		count++
 	}

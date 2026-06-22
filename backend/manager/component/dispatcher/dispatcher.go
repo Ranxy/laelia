@@ -2,6 +2,7 @@ package dispatcher
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -424,6 +425,7 @@ func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb
 		if _, msgErr := d.store.CreateChatMessage(ctx, &store.ChatMessage{
 			ConversationID: *cmd.ConversationID,
 			PrincipalID:    cmd.PrincipalID,
+			SenderAgentID:  sql.NullInt32{Int32: int32(cmd.AgentID), Valid: true},
 			Role:           2, // ASSISTANT
 			Content:        result.FinalSummary,
 			CommandID:      uuid.NullUUID{UUID: cmdID, Valid: true},
