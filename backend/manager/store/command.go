@@ -460,6 +460,66 @@ func (s *Store) GetRunningCommand(ctx context.Context, agentID int) (*CommandMes
 	return scanCommand(s.GetDB().QueryRowContext(ctx, query, agentID))
 }
 
+// ListPendingCommandsByAgent returns all PENDING (status=1) commands for an
+// agent ordered by created_at ASC. It drives the dispatcher's queue-less
+// next-command dispatch (replacing the removed agent_inbox table).
+func (s *Store) ListPendingCommandsByAgent(ctx context.Context, agentID int) ([]*CommandMessage, error) {
+	query := `SELECT
+		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.executor_kind, c.allow_diff, c.status,
+		c.exit_code, c.duration_ms, c.created_at, c.started_at, c.completed_at,
+		c.error_message, c.final_summary, c.result_json::text, c.env, c.working_dir, c.timeout_seconds, c.last_ack_seq, c.source_type,
+		c.conversation_id, COALESCE(p.name, ''), a.resource_id
+	FROM command c
+	JOIN agent a ON a.id = c.agent_id
+	JOIN principal p ON p.id = c.principal_id
+	WHERE c.agent_id = $1 AND c.status = 1
+	ORDER BY c.created_at ASC`
+
+	rows, err := s.GetDB().QueryContext(ctx, query, agentID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list pending commands")
+	}
+	defer rows.Close()
+
+	var commands []*CommandMessage
+	for rows.Next() {
+		var cmd CommandMessage
+		var exitCode sql.NullInt32
+		var durationMs sql.NullInt64
+		var startedAt sql.NullTime
+		var completedAt sql.NullTime
+		var resultJSON string
+		var conversationID sql.NullString
+
+		if err := rows.Scan(
+			&cmd.ID, &cmd.AgentID, &cmd.PrincipalID, &cmd.Command, &cmd.Instruction, &cmd.Profile, &cmd.ExecutorKind, &cmd.AllowDiff, &cmd.Status,
+			&exitCode, &durationMs, &cmd.CreatedAt, &startedAt, &completedAt,
+			&cmd.ErrorMessage, &cmd.FinalSummary, &resultJSON, &cmd.Env, &cmd.WorkingDir, &cmd.TimeoutSeconds, &cmd.LastAckSeq, &cmd.SourceType,
+			&conversationID, &cmd.PrincipalName, &cmd.AgentResourceID,
+		); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan command row")
+		}
+
+		cmd.ExitCode = exitCode
+		cmd.DurationMs = durationMs
+		cmd.StartedAt = startedAt
+		cmd.CompletedAt = completedAt
+		cmd.ResultJSON = resultJSON
+		if conversationID.Valid {
+			id, parseErr := uuid.Parse(conversationID.String)
+			if parseErr == nil {
+				cmd.ConversationID = &id
+			}
+		}
+		commands = append(commands, &cmd)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate pending command rows")
+	}
+
+	return commands, nil
+}
+
 type ChatHistoryEntry struct {
 	MessageID string
 	CommandID string

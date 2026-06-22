@@ -342,9 +342,6 @@ func (e *ACPExecutor) run() {
 	e.sessionID = string(sessionResp.SessionId)
 
 	promptText := e.request.Instruction
-	if promptText == "" {
-		promptText = e.request.Command
-	}
 
 	promptResp, err := e.conn.Prompt(e.ctx, acp.PromptRequest{
 		SessionId: sessionResp.SessionId,
@@ -366,7 +363,7 @@ func (e *ACPExecutor) run() {
 		finalSummary = fmt.Sprintf("ACP task finished with stop reason %s", promptResp.StopReason)
 	}
 	resultPayload, payloadErr := structpb.NewStruct(map[string]any{
-		"executor_kind":   e.request.ExecutorKind.String(),
+		"executor_kind":   "ACP",
 		"executable":      e.config.Executable,
 		"session_id":      e.sessionID,
 		"stop_reason":     string(promptResp.StopReason),
@@ -1006,7 +1003,11 @@ func maxInt(left int, right int) int {
 }
 
 func (e *ACPExecutor) buildMCPServers() []acp.McpServer {
-	if e.request.SourceType != int32(v1pb.CommandSource_CHAT) || e.request.MCPPort <= 0 {
+	// In Phase 1 the MCP chat-context server is wired only when the runtime
+	// is conversation-linked (ConversationID non-empty). The old SourceType=
+	// CHAT check is now expressed via the conversation linkage kept by the
+	// caller.
+	if e.request.ConversationID == "" || e.request.MCPPort <= 0 {
 		return []acp.McpServer{}
 	}
 

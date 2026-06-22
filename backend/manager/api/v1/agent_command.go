@@ -14,26 +14,26 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
-type AgentCommandService struct {
-	v1connect.UnimplementedAgentCommandServiceHandler
+type AgentStreamService struct {
+	v1connect.UnimplementedAgentStreamServiceHandler
 	store      *store.Store
 	dispatcher *dispatcher.Dispatcher
 }
 
-func NewAgentCommandService(s *store.Store, d *dispatcher.Dispatcher) *AgentCommandService {
-	return &AgentCommandService{store: s, dispatcher: d}
+func NewAgentCommandService(s *store.Store, d *dispatcher.Dispatcher) *AgentStreamService {
+	return &AgentStreamService{store: s, dispatcher: d}
 }
 
-func (s *AgentCommandService) CommandChannel(
+func (s *AgentStreamService) AgentChannel(
 	ctx context.Context,
-	stream *connect.BidiStream[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage],
+	stream *connect.BidiStream[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage],
 ) error {
 	agent, ok := GetAgentFromContext(ctx)
 	if !ok || agent == nil {
 		return connect.NewError(connect.CodeUnauthenticated, nil)
 	}
 
-	sendFunc := func(msg *v1pb.ManagerCommandMessage) error {
+	sendFunc := func(msg *v1pb.ManagerStreamMessage) error {
 		return stream.Send(msg)
 	}
 
@@ -51,43 +51,42 @@ func (s *AgentCommandService) CommandChannel(
 		}
 
 		switch m := msg.Message.(type) {
-		case *v1pb.AgentCommandMessage_AgentReady:
+		case *v1pb.AgentStreamMessage_AgentReady:
 			s.handleAgentReady(ctx, agent, sess, m.AgentReady)
 
-		case *v1pb.AgentCommandMessage_Progress:
+		case *v1pb.AgentStreamMessage_PullMessages:
+			snapshot, pullErr := s.dispatcher.HandlePullMessages(ctx, agent.ID, m.PullMessages.ConversationId, m.PullMessages.AfterVersion)
+			if pullErr != nil {
+				slog.Error("failed to handle pull messages", "error", pullErr)
+				continue
+			}
+			if sendErr := stream.Send(&v1pb.ManagerStreamMessage{
+				Message: &v1pb.ManagerStreamMessage_MessageSnapshot{
+					MessageSnapshot: snapshot,
+				},
+			}); sendErr != nil {
+				slog.Error("failed to send message snapshot", "error", sendErr)
+			}
+
+		case *v1pb.AgentStreamMessage_Progress:
 			if err := s.dispatcher.HandleProgress(ctx, agent.ID, m.Progress); err != nil {
 				slog.Error("failed to handle progress", "error", err)
 			}
 
-		case *v1pb.AgentCommandMessage_Result:
+		case *v1pb.AgentStreamMessage_Result:
 			if err := s.dispatcher.HandleResult(ctx, agent.ID, m.Result); err != nil {
 				slog.Error("failed to handle result", "error", err)
 			}
 
-		case *v1pb.AgentCommandMessage_Event:
+		case *v1pb.AgentStreamMessage_Event:
 			if err := s.dispatcher.HandleEvent(ctx, m.Event); err != nil {
 				slog.Error("failed to handle event", "error", err)
 			}
 
-		case *v1pb.AgentCommandMessage_PullInbox:
-			if err := s.dispatcher.HandlePullInbox(ctx, agent.ID); err != nil {
-				slog.Error("failed to handle pull inbox", "error", err)
-			}
-
-		case *v1pb.AgentCommandMessage_SelectInboxItem:
-			if err := s.dispatcher.HandleSelectInboxItem(ctx, agent.ID, m.SelectInboxItem.InboxItemId); err != nil {
-				slog.Error("failed to handle select inbox item", "error", err)
-			}
-
-		case *v1pb.AgentCommandMessage_DeferInboxItem:
-			if err := s.dispatcher.HandleDeferInboxItem(ctx, agent.ID, m.DeferInboxItem.InboxItemId); err != nil {
-				slog.Error("failed to handle defer inbox item", "error", err)
-			}
-
-		case *v1pb.AgentCommandMessage_Ping:
+		case *v1pb.AgentStreamMessage_Ping:
 			s.dispatcher.HandlePing(agent.ID, m.Ping)
-			pong := &v1pb.ManagerCommandMessage{
-				Message: &v1pb.ManagerCommandMessage_Pong{
+			pong := &v1pb.ManagerStreamMessage{
+				Message: &v1pb.ManagerStreamMessage_Pong{
 					Pong: &v1pb.Pong{
 						Seq:        m.Ping.Seq,
 						ServerTime: 0,
@@ -99,12 +98,12 @@ func (s *AgentCommandService) CommandChannel(
 			}
 
 		default:
-			slog.Warn("unknown agent command message type")
+			slog.Warn("unknown agent stream message type")
 		}
 	}
 }
 
-func (s *AgentCommandService) handleAgentReady(
+func (s *AgentStreamService) handleAgentReady(
 	ctx context.Context,
 	agent *store.AgentMessage,
 	_ *dispatcher.AgentSession,
@@ -115,11 +114,17 @@ func (s *AgentCommandService) handleAgentReady(
 		if err != nil || cmd == nil {
 			return
 		}
-		if cmd.Status == 1 || cmd.Status == 2 {
+		// An in-flight (RUNNING) command on reconnect hands it to the grace
+		// period cleanup path. PENDING commands are handled by the dispatcher's
+		// pending drain, so we only unregister when something is actively
+		// running.
+		if cmd.Status == 2 {
 			slog.Info("agent reconnected with in-flight command", "commandID", ready.LastCommandId)
 			s.dispatcher.UnregisterAgent(agent.ID)
 			return
 		}
 	}
-	s.dispatcher.NotifyInboxUpdated(ctx, agent.ID)
+	// No in-flight command: trigger a drain of any PENDING commands for this
+	// agent. (Idempotent — dispatchNextPending skips when the agent is busy.)
+	s.dispatcher.DispatchPending(ctx, agent.ID)
 }

@@ -323,31 +323,40 @@ ALTER TABLE conversation_member ADD COLUMN IF NOT EXISTS member_role SMALLINT NO
 CREATE INDEX IF NOT EXISTS idx_chat_message_sender_agent ON chat_message(sender_agent_id) WHERE sender_agent_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_conversation_member_lookup ON conversation_member(member_type, member_id);
 
--- agent_inbox stores the task inbox for each agent (pull model)
--- state: 1=PENDING, 2=SELECTED, 3=DEFERRED
-CREATE TABLE agent_inbox (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    agent_id INTEGER NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
-    command_id UUID NOT NULL REFERENCES command(id) ON DELETE CASCADE,
-    priority INTEGER NOT NULL DEFAULT 0,
-    context_summary TEXT NOT NULL DEFAULT '',
-    state SMALLINT NOT NULL DEFAULT 1,
-    deferred_until TIMESTAMPTZ,
-    defer_count INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    selected_at TIMESTAMPTZ
-);
+-- === Phase 1: Message-Driven Architecture ===
+-- Room version control: conversation.version increments on every new
+-- chat_message and is the basis for Agent pull cursors (PullMessages) and
+-- the Phase 2 Held Draft base_version check.
+ALTER TABLE conversation ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 1;
+COMMENT ON COLUMN conversation.version IS 'Room version; increments on every new chat_message';
 
-CREATE INDEX idx_agent_inbox_agent_state ON agent_inbox(agent_id, state);
-CREATE INDEX idx_agent_inbox_command ON agent_inbox(command_id);
+-- chat_message records the room_version at creation time and the sender_type.
+-- sender_type: 1=USER, 2=AGENT, 3=SYSTEM (replaces the deprecated
+-- CommandSource enum at the message layer).
+ALTER TABLE chat_message ADD COLUMN IF NOT EXISTS room_version BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE chat_message ADD COLUMN IF NOT EXISTS sender_type SMALLINT NOT NULL DEFAULT 1;
+COMMENT ON COLUMN chat_message.room_version IS 'conversation.version at message creation';
+COMMENT ON COLUMN chat_message.sender_type IS '1=USER, 2=AGENT, 3=SYSTEM';
 
--- agent_working_state tracks what each agent is currently doing
--- state: 1=IDLE, 2=DECIDING, 3=WORKING
-CREATE TABLE agent_working_state (
-    agent_id INTEGER PRIMARY KEY REFERENCES agent(id) ON DELETE CASCADE,
-    session_id TEXT NOT NULL DEFAULT '',
-    inbox_item_id UUID REFERENCES agent_inbox(id) ON DELETE SET NULL,
-    state SMALLINT NOT NULL DEFAULT 1,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+-- Backfill sender_type from existing rows. System bot (principal_id=1) user
+-- messages are treated as SYSTEM; assistant role with a sender agent is
+-- AGENT; everything else user-authored is USER.
+UPDATE chat_message
+   SET sender_type = 2
+ WHERE role = 2 AND sender_agent_id IS NOT NULL AND sender_type = 1;
+UPDATE chat_message
+   SET sender_type = 3
+ WHERE role = 1 AND principal_id = 1 AND sender_type = 1;
+
+CREATE INDEX IF NOT EXISTS idx_chat_message_room_version ON chat_message(conversation_id, room_version);
+
+-- command retains its historical executor_kind and source_type columns for
+-- audit/back-compat. New commands are written with fixed values (ACP / CHAT).
+
+-- Drop the Phase 1 inbox model. Drop IF EXISTS also covers fresh installs
+-- (the CREATE TABLE statements previously here have been removed so fresh
+-- installs never create these tables, while upgrades from the inbox-era
+-- schema drop them deterministically).
+DROP TABLE IF EXISTS agent_working_state CASCADE;
+DROP TABLE IF EXISTS agent_inbox CASCADE;
 

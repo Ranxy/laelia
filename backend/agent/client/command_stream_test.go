@@ -53,9 +53,8 @@ func TestCommandStreamRunCommandSendsProgressEventAndResult(t *testing.T) {
 	})
 
 	req := &v1pb.CommandRequest{
-		CommandId:    "cmd-1",
-		ExecutorKind: v1pb.ExecutorKind_ACP,
-		Profile:      "opencode",
+		CommandId: "cmd-1",
+		Profile:   "opencode",
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -215,7 +214,7 @@ func (r *scriptedRuntime) Done() <-chan struct{} {
 
 type recordingStreamingClientConn struct {
 	mu       sync.Mutex
-	messages []*v1pb.AgentCommandMessage
+	messages []*v1pb.AgentStreamMessage
 	closed   atomic.Bool
 }
 
@@ -232,7 +231,7 @@ func (*recordingStreamingClientConn) Peer() connect.Peer {
 }
 
 func (s *recordingStreamingClientConn) Send(msg any) error {
-	typed, ok := msg.(*v1pb.AgentCommandMessage)
+	typed, ok := msg.(*v1pb.AgentStreamMessage)
 	if !ok {
 		return io.ErrUnexpectedEOF
 	}
@@ -267,19 +266,19 @@ func (*recordingStreamingClientConn) CloseResponse() error {
 	return nil
 }
 
-func (s *recordingStreamingClientConn) Messages() []*v1pb.AgentCommandMessage {
+func (s *recordingStreamingClientConn) Messages() []*v1pb.AgentStreamMessage {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	msgs := make([]*v1pb.AgentCommandMessage, len(s.messages))
+	msgs := make([]*v1pb.AgentStreamMessage, len(s.messages))
 	copy(msgs, s.messages)
 	return msgs
 }
 
-func newTestCommandChannel(t *testing.T) (*connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], *recordingStreamingClientConn, func()) {
+func newTestCommandChannel(t *testing.T) (*connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], *recordingStreamingClientConn, func()) {
 	t.Helper()
 
 	recorder := newRecordingStreamingClientConn()
-	stream := &connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage]{}
+	stream := &connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage]{}
 	setUnexportedField(t, stream, "conn", recorder)
 
 	cleanup := func() {

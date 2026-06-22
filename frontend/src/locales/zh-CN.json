@@ -107,7 +107,6 @@
     "status-cancelled": "已取消",
     "status-timeout": "已超时",
     "executor-unspecified": "",
-    "executor-shell": "Shell",
     "executor-acp": "ACP",
     "event-unknown": "未知",
     "event-lifecycle": "生命周期",

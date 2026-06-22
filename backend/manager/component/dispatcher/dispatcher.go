@@ -22,7 +22,7 @@ const (
 	watcherBufSize = 256
 )
 
-type SendFunc func(*v1pb.ManagerCommandMessage) error
+type SendFunc func(*v1pb.ManagerStreamMessage) error
 
 type AgentSession struct {
 	agentID         int
@@ -73,7 +73,7 @@ func (d *Dispatcher) RegisterAgent(ctx context.Context, agentID int, agentResour
 		connectedAt:     time.Now(),
 		lastPingAt:      time.Now(),
 	}
-	sess.send = func(msg *v1pb.ManagerCommandMessage) error {
+	sess.send = func(msg *v1pb.ManagerStreamMessage) error {
 		sess.sendMu.Lock()
 		defer sess.sendMu.Unlock()
 		return send(msg)
@@ -82,12 +82,17 @@ func (d *Dispatcher) RegisterAgent(ctx context.Context, agentID int, agentResour
 	d.sessions[agentID] = sess
 	slog.Info("agent registered for command dispatch", "agentID", agentID)
 
-	_ = d.store.UpsertWorkingState(ctx, &store.WorkingStateMessage{
-		AgentID: agentID,
-		State:   store.WorkingStateIdle,
-	})
-
+	// NOTE: PENDING command draining is deferred until the agent sends
+	// AgentReady (see DispatchPending), preserving the legacy ordering where
+	// the agent signals readiness before the manager dispatches work.
 	return sess
+}
+
+// DispatchPending triggers a best-effort drain of PENDING commands for an
+// agent. It is invoked after the agent sends AgentReady and (idempotently)
+// after each HandleResult completes.
+func (d *Dispatcher) DispatchPending(ctx context.Context, agentID int) {
+	d.dispatchNextPending(ctx, agentID)
 }
 
 func (d *Dispatcher) UnregisterAgent(agentID int) {
@@ -107,12 +112,6 @@ func (d *Dispatcher) UnregisterAgent(agentID int) {
 	delete(d.sessions, agentID)
 	slog.Info("agent unregistered from command dispatch", "agentID", agentID)
 
-	_ = d.store.ReleaseSelectedItems(context.Background(), agentID)
-	_ = d.store.UpsertWorkingState(context.Background(), &store.WorkingStateMessage{
-		AgentID: agentID,
-		State:   store.WorkingStateIdle,
-	})
-
 	if cmdID != "" {
 		go d.handleCommandGracePeriod(agentID, cmdID)
 	}
@@ -123,6 +122,69 @@ func (d *Dispatcher) IsAgentConnected(agentID int) bool {
 	defer d.mu.RUnlock()
 	_, ok := d.sessions[agentID]
 	return ok
+}
+
+// EnqueueCommand dispatches a freshly-created PENDING command immediately if the
+// agent is connected and idle; otherwise it relies on the persisted PENDING row
+// being picked up later by RegisterAgent's drain or by HandleResult's
+// dispatchNextPending call. This replaces the removed agent_inbox creation.
+func (d *Dispatcher) EnqueueCommand(ctx context.Context, cmd *store.CommandMessage) error {
+	d.mu.RLock()
+	sess, ok := d.sessions[cmd.AgentID]
+	d.mu.RUnlock()
+
+	if !ok {
+		slog.Info("agent not connected; command remains PENDING until reconnect", "commandID", cmd.ID, "agentID", cmd.AgentID)
+		return nil
+	}
+
+	sess.mu.Lock()
+	busy := sess.currentCmdID != ""
+	sess.mu.Unlock()
+
+	if busy {
+		// Another command is executing; it will be picked up via dispatchNextPending after HandleResult.
+		return nil
+	}
+
+	if err := d.DispatchCommand(ctx, cmd); err != nil {
+		slog.Warn("failed to dispatch command immediately; leaving PENDING for retry", "commandID", cmd.ID, "error", err)
+		return nil
+	}
+	return nil
+}
+
+// dispatchNextPending loads the oldest PENDING command for an agent and
+// dispatches it. It is a no-op if the agent is unknown, busy, or has no pending
+// commands. Used by RegisterAgent and HandleResult to drain the queue.
+func (d *Dispatcher) dispatchNextPending(ctx context.Context, agentID int) {
+	d.mu.RLock()
+	sess, ok := d.sessions[agentID]
+	d.mu.RUnlock()
+
+	if !ok {
+		return
+	}
+
+	sess.mu.Lock()
+	if sess.currentCmdID != "" {
+		sess.mu.Unlock()
+		return
+	}
+	sess.mu.Unlock()
+
+	cmds, err := d.store.ListPendingCommandsByAgent(ctx, agentID)
+	if err != nil {
+		slog.Error("failed to list pending commands", "agentID", agentID, "error", err)
+		return
+	}
+	if len(cmds) == 0 {
+		return
+	}
+
+	if err := d.DispatchCommand(ctx, cmds[0]); err != nil {
+		slog.Warn("failed to dispatch next pending command", "commandID", cmds[0].ID, "error", err)
+	}
 }
 
 func (d *Dispatcher) DispatchCommand(ctx context.Context, cmd *store.CommandMessage) error {
@@ -142,20 +204,24 @@ func (d *Dispatcher) DispatchCommand(ctx context.Context, cmd *store.CommandMess
 	send := sess.send
 	sess.mu.Unlock()
 
-	msg := &v1pb.ManagerCommandMessage{
-		Message: &v1pb.ManagerCommandMessage_CommandRequest{
+	convID := ""
+	if cmd.ConversationID != nil {
+		convID = cmd.ConversationID.String()
+	}
+
+	msg := &v1pb.ManagerStreamMessage{
+		Message: &v1pb.ManagerStreamMessage_CommandRequest{
 			CommandRequest: &v1pb.CommandRequest{
-				CommandId:      cmd.ID.String(),
-				Command:        cmd.Command,
-				Env:            parseEnvJSON(cmd.Env),
-				WorkingDir:     cmd.WorkingDir,
-				TimeoutSeconds: cmd.TimeoutSeconds,
-				ExecutorKind:   v1pb.ExecutorKind(cmd.ExecutorKind),
-				Instruction:    cmd.Instruction,
-				Profile:        cmd.Profile,
-				AllowDiff:      cmd.AllowDiff,
-				Source:         v1pb.CommandSource(cmd.SourceType),
-				PrincipalId:    fmt.Sprintf("%d", cmd.PrincipalID),
+				CommandId:        cmd.ID.String(),
+				Instruction:      cmd.Instruction,
+				Profile:          cmd.Profile,
+				WorkingDir:       cmd.WorkingDir,
+				TimeoutSeconds:   cmd.TimeoutSeconds,
+				Env:              parseEnvJSON(cmd.Env),
+				AllowDiff:        cmd.AllowDiff,
+				PrincipalId:      fmt.Sprintf("%d", cmd.PrincipalID),
+				ConversationId:   convID,
+				ReplyToMessageId: "",
 			},
 		},
 	}
@@ -178,29 +244,46 @@ func (d *Dispatcher) DispatchCommand(ctx context.Context, cmd *store.CommandMess
 	return nil
 }
 
-func (d *Dispatcher) SendInboxSnapshot(ctx context.Context, agentID int) error {
+// HandlePullMessages serves a PullMessages request from an agent, returning the
+// chat messages newer than afterVersion together with the current conversation
+// version. The agent uses the returned current_version as its cursor going
+// forward (and, in Phase 2, as base_version for SubmitAction).
+func (d *Dispatcher) HandlePullMessages(ctx context.Context, _ int, conversationID string, afterVersion int64) (*v1pb.MessageSnapshot, error) {
+	convUUID, err := uuid.Parse(conversationID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "invalid conversation id")
+	}
+
+	msgs, err := d.store.GetMessagesAfterVersion(ctx, convUUID, afterVersion)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get messages after version")
+	}
+
+	currentVersion, err := d.store.GetConversationVersion(ctx, convUUID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get current conversation version")
+	}
+
+	snapshot := &v1pb.MessageSnapshot{
+		CurrentVersion: currentVersion,
+	}
+	for _, m := range msgs {
+		snapshot.Messages = append(snapshot.Messages, convertChatMessageToV1(m))
+	}
+	return snapshot, nil
+}
+
+// NotifyNewMessages pushes a NewMessagesAvailable hint to a connected agent so
+// it knows the conversation has advanced (e.g. another participant posted).
+// Phase 1 primarily calls this after assistant replies so multi-agent channels
+// can be informed; the action-less agent-autonomy gate arrives in Phase 2.
+func (d *Dispatcher) NotifyNewMessages(_ context.Context, agentID int, conversationID string, version int64) {
 	d.mu.RLock()
 	sess, ok := d.sessions[agentID]
 	d.mu.RUnlock()
 
 	if !ok {
-		return errors.New("agent not connected")
-	}
-
-	items, err := d.store.GetInboxItems(ctx, agentID)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get inbox items")
-	}
-
-	var protoItems []*v1pb.InboxItem
-	for _, item := range items {
-		protoItems = append(protoItems, &v1pb.InboxItem{
-			InboxItemId:    item.ID.String(),
-			CommandId:      item.CommandID.String(),
-			Priority:       item.Priority,
-			ContextSummary: item.ContextSummary,
-			CreatedAt:      timestamppb.New(item.CreatedAt),
-		})
+		return
 	}
 
 	sess.mu.Lock()
@@ -208,122 +291,21 @@ func (d *Dispatcher) SendInboxSnapshot(ctx context.Context, agentID int) error {
 	sess.mu.Unlock()
 
 	if send == nil {
-		return errors.New("agent session invalidated")
+		return
 	}
 
-	msg := &v1pb.ManagerCommandMessage{
-		Message: &v1pb.ManagerCommandMessage_InboxSnapshot{
-			InboxSnapshot: &v1pb.InboxSnapshot{
-				Items: protoItems,
+	msg := &v1pb.ManagerStreamMessage{
+		Message: &v1pb.ManagerStreamMessage_NewMessages{
+			NewMessages: &v1pb.NewMessagesAvailable{
+				ConversationIds: []string{conversationID},
+				Versions:        []int64{version},
 			},
 		},
 	}
 
 	if err := send(msg); err != nil {
-		return errors.Wrapf(err, "failed to send inbox snapshot")
+		slog.Warn("failed to send NewMessagesAvailable", "agentID", agentID, "error", err)
 	}
-
-	return nil
-}
-
-func (d *Dispatcher) NotifyInboxUpdated(ctx context.Context, agentID int) {
-	_ = d.SendInboxSnapshot(ctx, agentID)
-}
-
-func (d *Dispatcher) HandlePullInbox(ctx context.Context, agentID int) error {
-	return d.SendInboxSnapshot(ctx, agentID)
-}
-
-func (d *Dispatcher) HandleSelectInboxItem(ctx context.Context, agentID int, itemID string) error {
-	itemUUID, err := uuid.Parse(itemID)
-	if err != nil {
-		return errors.Wrapf(err, "invalid inbox item ID")
-	}
-
-	if err := d.store.SelectInboxItem(ctx, itemUUID); err != nil {
-		return errors.Wrapf(err, "failed to select inbox item")
-	}
-
-	_ = d.store.UpsertWorkingState(ctx, &store.WorkingStateMessage{
-		AgentID: agentID,
-		State:   store.WorkingStateDeciding,
-	})
-
-	itemWithCmd, err := d.store.GetInboxItemWithCommand(ctx, itemUUID)
-	if err != nil {
-		_ = d.store.UpsertWorkingState(ctx, &store.WorkingStateMessage{
-			AgentID: agentID,
-			State:   store.WorkingStateIdle,
-		})
-		return errors.Wrapf(err, "failed to get inbox item with command")
-	}
-
-	cmd := &store.CommandMessage{
-		ID:             itemWithCmd.CommandID,
-		AgentID:        agentID,
-		PrincipalID:    itemWithCmd.PrincipalID,
-		Command:        itemWithCmd.Command,
-		Instruction:    itemWithCmd.Instruction,
-		Profile:        itemWithCmd.Profile,
-		ExecutorKind:   itemWithCmd.ExecutorKind,
-		AllowDiff:      itemWithCmd.AllowDiff,
-		Env:            itemWithCmd.Env,
-		WorkingDir:     itemWithCmd.WorkingDir,
-		TimeoutSeconds: itemWithCmd.TimeoutSecs,
-		SourceType:     itemWithCmd.SourceType,
-	}
-
-	if err := d.DispatchCommand(ctx, cmd); err != nil {
-		_ = d.store.UpsertWorkingState(ctx, &store.WorkingStateMessage{
-			AgentID: agentID,
-			State:   store.WorkingStateIdle,
-		})
-		return errors.Wrapf(err, "failed to dispatch command")
-	}
-
-	_ = d.store.UpsertWorkingState(ctx, &store.WorkingStateMessage{
-		AgentID:     agentID,
-		InboxItemID: uuid.NullUUID{UUID: itemUUID, Valid: true},
-		State:       store.WorkingStateWorking,
-	})
-
-	d.mu.RLock()
-	sess, ok := d.sessions[agentID]
-	d.mu.RUnlock()
-
-	if ok {
-		sess.mu.Lock()
-		send := sess.send
-		sess.mu.Unlock()
-		if send != nil {
-			if err := send(&v1pb.ManagerCommandMessage{
-				Message: &v1pb.ManagerCommandMessage_InboxItemSelected{
-					InboxItemSelected: &v1pb.InboxItemSelected{
-						InboxItemId: itemID,
-						CommandId:   itemWithCmd.CommandID.String(),
-					},
-				},
-			}); err != nil {
-				slog.Warn("failed to send inbox item selected ack", "error", err)
-			}
-		}
-	}
-
-	return nil
-}
-
-func (d *Dispatcher) HandleDeferInboxItem(ctx context.Context, agentID int, itemID string) error {
-	itemUUID, err := uuid.Parse(itemID)
-	if err != nil {
-		return errors.Wrapf(err, "invalid inbox item ID")
-	}
-
-	deferredUntil := time.Now().Add(60 * time.Second)
-	if err := d.store.DeferInboxItem(ctx, itemUUID, deferredUntil); err != nil {
-		return errors.Wrapf(err, "failed to defer inbox item")
-	}
-
-	return d.SendInboxSnapshot(ctx, agentID)
 }
 
 func (d *Dispatcher) CancelCommand(_ context.Context, agentID int, commandID string) error {
@@ -343,8 +325,8 @@ func (d *Dispatcher) CancelCommand(_ context.Context, agentID int, commandID str
 		return errors.New("agent session invalidated")
 	}
 
-	msg := &v1pb.ManagerCommandMessage{
-		Message: &v1pb.ManagerCommandMessage_Cancel{
+	msg := &v1pb.ManagerStreamMessage{
+		Message: &v1pb.ManagerStreamMessage_Cancel{
 			Cancel: &v1pb.CancelMessage{
 				CommandId: commandID,
 			},
@@ -377,8 +359,8 @@ func (d *Dispatcher) RespondPermission(_ context.Context, agentID int, commandID
 		return errors.New("agent session invalidated")
 	}
 
-	msg := &v1pb.ManagerCommandMessage{
-		Message: &v1pb.ManagerCommandMessage_PermissionDecision{
+	msg := &v1pb.ManagerStreamMessage{
+		Message: &v1pb.ManagerStreamMessage_PermissionDecision{
 			PermissionDecision: &v1pb.PermissionDecision{
 				CommandId: commandID,
 				OptionId:  optionID,
@@ -575,16 +557,26 @@ func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb
 		slog.Error("failed to update command result summary", "commandID", cmdID, "error", err)
 	}
 
-	if cmd != nil && cmd.SourceType == 2 && cmd.ConversationID != nil && result.FinalSummary != "" {
-		if _, msgErr := d.store.CreateChatMessage(ctx, &store.ChatMessage{
+	// For conversation-linked commands with a final summary, publish an
+	// assistant chat message that bumps conversation.version. Every agent
+	// involved in the conversation is then notified via NewMessagesAvailable
+	// (used in Phase 2 for multi-agent channels).
+	if cmd != nil && cmd.ConversationID != nil && result.FinalSummary != "" {
+		assistantMsg, newVersion, msgErr := d.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
 			ConversationID: *cmd.ConversationID,
 			PrincipalID:    cmd.PrincipalID,
 			SenderAgentID:  sql.NullInt32{Int32: int32(cmd.AgentID), Valid: true},
-			Role:           2,
+			Role:           2, // ASSISTANT
 			Content:        result.FinalSummary,
 			CommandID:      uuid.NullUUID{UUID: cmdID, Valid: true},
-		}); msgErr != nil {
+			SenderType:     store.SenderTypeAgent,
+		})
+		if msgErr != nil {
 			slog.Error("failed to create assistant chat message", "commandID", cmdID, "error", msgErr)
+		} else {
+			slog.Info("assistant chat message created", "commandID", cmdID, "version", newVersion)
+			d.NotifyNewMessages(ctx, agentID, cmd.ConversationID.String(), newVersion)
+			_ = assistantMsg
 		}
 	}
 
@@ -604,14 +596,8 @@ func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb
 
 	slog.Info("command completed", "commandID", result.CommandId, "exitCode", result.ExitCode, "duration_ms", result.DurationMs)
 
-	if err := d.store.UpsertWorkingState(ctx, &store.WorkingStateMessage{
-		AgentID: agentID,
-		State:   store.WorkingStateIdle,
-	}); err != nil {
-		slog.Error("failed to reset working state", "agentID", agentID, "error", err)
-	}
-
-	d.NotifyInboxUpdated(ctx, agentID)
+	// Agent is now idle; dispatch the next PENDING command for this agent.
+	go d.dispatchNextPending(context.Background(), agentID)
 	return nil
 }
 
@@ -723,6 +709,27 @@ func formatResultMessage(result *v1pb.CommandResult) string {
 		return result.ErrorMessage
 	}
 	return ""
+}
+
+func convertChatMessageToV1(m *store.ChatMessage) *v1pb.ChatMessage {
+	cm := &v1pb.ChatMessage{
+		Name:          m.ID.String(),
+		Conversation:  m.ConversationID.String(),
+		PrincipalName: m.PrincipalName,
+		Role:          m.Role,
+		Content:       m.Content,
+		CreatedAt:     timestamppb.New(m.CreatedAt),
+		SenderName:    m.AgentName,
+		SenderType:    v1pb.SenderType(m.SenderType),
+		RoomVersion:   m.RoomVersion,
+	}
+	if m.CommandID.Valid {
+		cm.CommandId = m.CommandID.UUID.String()
+	}
+	if m.SenderType != store.SenderTypeAgent {
+		cm.SenderName = m.PrincipalName
+	}
+	return cm
 }
 
 func marshalEventPayload(event *v1pb.CommandEvent) ([]byte, error) {

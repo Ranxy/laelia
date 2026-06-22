@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -245,6 +246,11 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 
+	conv, err := s.store.GetConversation(ctx, convID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Wrapf(err, "failed to get conversation"))
+	}
+
 	user, _ := GetUserFromContext(ctx)
 	principalID := 1
 	principalName := "system"
@@ -253,15 +259,26 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		principalName = user.Name
 	}
 
-	msg, err := s.store.CreateChatMessage(ctx, &store.ChatMessage{
+	// Atomically bump conversation.version and write the user message with that
+	// room_version. This is the single source of truth for the room cursor.
+	msg, _, err := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
 		ConversationID: convID,
 		PrincipalID:    principalID,
 		PrincipalName:  principalName,
-		Role:           1,
+		Role:           1, // USER
 		Content:        req.Msg.Content,
+		SenderType:     store.SenderTypeUser,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create message"))
+	}
+
+	// Phase 1: for a direct conversation (type=1) backed by a single agent,
+	// produce and dispatch a command so behavior matches pre-Phase-1 chat tasks.
+	// Multi-agent channels only persist the message in Phase 1; the agent
+	// autonomy gate (PullMessages-driven SubmitAction) arrives in Phase 2.
+	if conv.Type == 1 && conv.AgentID.Valid {
+		s.dispatchDirectConversation(ctx, conv, msg, principalID, user)
 	}
 
 	return connect.NewResponse(&v1pb.ChatMessage{
@@ -272,8 +289,70 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		Content:       msg.Content,
 		CreatedAt:     timestamppb.New(msg.CreatedAt),
 		SenderName:    msg.PrincipalName,
-		SenderType:    1,
+		SenderType:    v1pb.SenderType(msg.SenderType),
+		RoomVersion:   msg.RoomVersion,
 	}), nil
+}
+
+// dispatchDirectConversation is the Phase 1 stand-in for the (now-deprecated)
+// SendCommand with source=CHAT: it materializes a command record scoped to the
+// conversation's agent, injects recent chat context, and queues it for
+// dispatch. Errors are logged but do not fail SendMessage — the user message
+// is already persisted, and execution can be retried via PullMessages / Phase 2.
+func (s *CommandService) dispatchDirectConversation(ctx context.Context, conv *store.ConversationMessage, triggerMsg *store.ChatMessage, principalID int, user *store.UserMessage) {
+	agent, err := s.store.GetAgent(ctx, int(conv.AgentID.Int32))
+	if err != nil || agent == nil {
+		slog.Warn("failed to resolve conversation agent for dispatch", "conversationID", conv.ID, "error", err)
+		return
+	}
+
+	// Validate the agent supports ACP before dispatching. We deliberately do
+	// not surface validation failures as user-visible errors here (the message
+	// is already persisted); they are logged for operator visibility.
+	if vErr := s.validateACPCapability(ctx, agent, v1pb.ExecutorKind_ACP, "", false, 0, user); vErr != nil {
+		slog.Warn("agent not ACP-capable; skipping dispatch", "agent", agent.ResourceID, "error", vErr)
+		return
+	}
+
+	// Inject recent chat context into the instruction so the ACP session has
+	// the same conversational grounding that the legacy SendCommand path
+	// provided. PullMessages remains available for agents that prefer to pull
+	// more context actively.
+	instruction := triggerMsg.Content
+	if recent, recentErr := s.store.GetRecentChatMessages(ctx, conv.ID, 6); recentErr == nil && len(recent) > 0 {
+		if chatCtx := buildLightChatContext(recent); chatCtx != "" {
+			instruction = chatCtx + "\n---\n" + instruction
+		}
+	}
+
+	envBytes, _ := json.Marshal(map[string]string{})
+	cmd := &store.CommandMessage{
+		AgentID:        agent.ID,
+		PrincipalID:    principalID,
+		Command:        "",
+		Instruction:    instruction,
+		ExecutorKind:   int32(v1pb.ExecutorKind_ACP),
+		AllowDiff:      false,
+		Status:         1, // PENDING
+		Env:            string(envBytes),
+		TimeoutSeconds: 0,
+		SourceType:     int32(v1pb.CommandSource_CHAT),
+		ConversationID: &conv.ID,
+	}
+
+	created, err := s.store.CreateCommand(ctx, cmd)
+	if err != nil {
+		slog.Error("failed to create command for message dispatch", "conversationID", conv.ID, "error", err)
+		return
+	}
+
+	created.AgentResourceID = agent.ResourceID
+	created.PrincipalName = ""
+
+	if err := s.dispatcher.EnqueueCommand(ctx, created); err != nil {
+		slog.Warn("failed to enqueue command for dispatch", "commandID", created.ID, "error", err)
+	}
+	s.dispatcher.NotifyNewMessages(ctx, agent.ID, conv.ID.String(), triggerMsg.RoomVersion)
 }
 
 func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, memberCount int) *v1pb.Conversation {

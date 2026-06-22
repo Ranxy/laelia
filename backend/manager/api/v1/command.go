@@ -37,6 +37,13 @@ func (s *CommandService) SetACPEnabled(enabled bool) {
 	s.acpEnabled = enabled
 }
 
+// SendCommand is deprecated as of Phase 1 of the message-driven redesign:
+// SendMessage is now the user-facing entry point. The handler is kept for
+// backward compatibility and dispatches through the same code path the
+// 1:1 SendMessage flow uses (CreateCommand -> EnqueueCommand). It will be
+// removed in Phase 3.
+//
+//nolint:staticcheck // SendCommandRequest is deprecated on purpose until Phase 3 removal.
 func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v1pb.SendCommandRequest]) (*connect.Response[v1pb.Command], error) {
 	executorKind := req.Msg.ExecutorKind
 	if executorKind == v1pb.ExecutorKind_EXECUTOR_KIND_UNSPECIFIED {
@@ -48,12 +55,16 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 		}
 	}
 
+	// Phase 1 removed the BashExecutor from the agent; the SHELL executor_kind
+	// is therefore no longer actionable. Reject explicit SHELL requests here so
+	// clients that still target the (deprecated) SendCommand RPC get a clear
+	// failure instead of a dispatch to an executor that no longer exists.
+	if executorKind == v1pb.ExecutorKind_SHELL {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("shell executor is no longer supported; use ACP (message-driven SendMessage) instead"))
+	}
+
 	commandText := req.Msg.Command
 	instruction := req.Msg.Instruction
-
-	if executorKind == v1pb.ExecutorKind_SHELL && commandText == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("command must not be empty"))
-	}
 
 	agentResourceID := parseAgentResourceID(req.Msg.Agent)
 	agent, err := s.store.GetAgentByResourceID(ctx, agentResourceID)
@@ -133,10 +144,12 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create command"))
 	}
 
-	if _, inboxErr := s.store.CreateInboxItem(ctx, agent.ID, created.ID, 0, buildInboxSummary(created)); inboxErr != nil {
-		slog.Warn("failed to create inbox item", "commandID", created.ID, "error", inboxErr)
-	} else {
-		s.dispatcher.NotifyInboxUpdated(ctx, agent.ID)
+	// Phase 1: send via the queued dispatcher (replaces the removed inbox
+	// item creation + NotifyInboxUpdated). If the agent is offline the command
+	// stays PENDING in the DB and is drained once the agent reconnects via
+	// DispatchPending.
+	if err := s.dispatcher.EnqueueCommand(ctx, created); err != nil {
+		slog.Warn("failed to enqueue command for dispatch", "commandID", created.ID, "error", err)
 	}
 
 	created.PrincipalName = principalName
@@ -221,10 +234,6 @@ func (s *CommandService) CancelCommand(ctx context.Context, req *connect.Request
 	if err := s.dispatcher.CancelCommand(ctx, cmd.AgentID, cmd.ID.String()); err != nil {
 		// agent may not be connected, still proceed to cancel in DB
 		slog.Warn("failed to send cancel to agent", "commandID", cmd.ID, "error", err)
-	}
-
-	if inboxErr := s.store.DeleteInboxItemByCommandID(ctx, cmd.ID); inboxErr != nil {
-		slog.Warn("failed to delete inbox item for cancelled command", "error", inboxErr)
 	}
 
 	status := int32(v1pb.CommandStatus_CANCELLED)
@@ -385,14 +394,14 @@ func convertToV1Command(cmd *store.CommandMessage) *v1pb.Command {
 		Command:       cmd.Command,
 		Instruction:   cmd.Instruction,
 		Profile:       cmd.Profile,
-		ExecutorKind:  v1pb.ExecutorKind(cmd.ExecutorKind),
+		ExecutorKind:  v1pb.ExecutorKind(cmd.ExecutorKind), //nolint:staticcheck // deprecated executor_kind kept for historical command display
 		AllowDiff:     cmd.AllowDiff,
 		Status:        v1pb.CommandStatus(cmd.Status),
 		CreatedAt:     timestamppb.New(cmd.CreatedAt),
 		ErrorMessage:  cmd.ErrorMessage,
 		FinalSummary:  cmd.FinalSummary,
 		WorkingDir:    cmd.WorkingDir,
-		Source:        v1pb.CommandSource(cmd.SourceType),
+		Source:        v1pb.CommandSource(cmd.SourceType), //nolint:staticcheck // deprecated source kept for historical command display
 	}
 
 	if cmd.ConversationID != nil {
@@ -512,6 +521,7 @@ func formatPrincipalID(id int) string {
 	return fmt.Sprintf("%d", id)
 }
 
+//nolint:staticcheck // kind uses the deprecated ExecutorKind until Phase 3 removes SendCommand.
 func (s *CommandService) validateACPCapability(ctx context.Context, agent *store.AgentMessage, kind v1pb.ExecutorKind, _ string, allowDiff bool, timeoutSeconds int32, user *store.UserMessage) error {
 	if kind != v1pb.ExecutorKind_ACP {
 		return nil
@@ -729,10 +739,9 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 	var v1msgs []*v1pb.ChatMessage
 	for _, msg := range msgs {
 		senderName := msg.PrincipalName
-		senderType := int32(1)
-		if msg.SenderAgentID.Valid {
+		senderType := v1pb.SenderType(msg.SenderType)
+		if msg.SenderType == store.SenderTypeAgent && msg.SenderAgentID.Valid {
 			senderName = msg.AgentName
-			senderType = 2
 		}
 		v1m := &v1pb.ChatMessage{
 			Name:          msg.ID.String(),
@@ -743,6 +752,7 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 			CreatedAt:     timestamppb.New(msg.CreatedAt),
 			SenderName:    senderName,
 			SenderType:    senderType,
+			RoomVersion:   msg.RoomVersion,
 		}
 		if msg.CommandID.Valid {
 			v1m.CommandId = msg.CommandID.UUID.String()
@@ -754,23 +764,6 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 		Messages:      v1msgs,
 		NextPageToken: nextPageToken,
 	}), nil
-}
-
-func buildInboxSummary(cmd *store.CommandMessage) string {
-	switch cmd.ExecutorKind {
-	case int32(v1pb.ExecutorKind_SHELL):
-		if cmd.Command != "" {
-			return cmd.Command
-		}
-		return "shell command"
-	case int32(v1pb.ExecutorKind_ACP):
-		if cmd.Instruction != "" {
-			return cmd.Instruction
-		}
-		return "acp task"
-	default:
-		return "task"
-	}
 }
 
 func buildLightChatContext(msgs []*store.ChatMessage) string {

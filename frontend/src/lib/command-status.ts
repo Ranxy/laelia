@@ -31,9 +31,8 @@ const commandStatusToVariant: Record<CommandStatus, BadgeVariant> = {
   [CommandStatus.TIMEOUT]: "destructive",
 };
 
-const executorKindToI18nKey: Record<ExecutorKind, string> = {
+const executorKindToI18nKey: Partial<Record<ExecutorKind, string>> = {
   [ExecutorKind.EXECUTOR_KIND_UNSPECIFIED]: "command.executor-unspecified",
-  [ExecutorKind.SHELL]: "command.executor-shell",
   [ExecutorKind.ACP]: "command.executor-acp",
 };
 

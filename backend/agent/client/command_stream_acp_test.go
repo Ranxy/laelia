@@ -34,7 +34,6 @@ func TestACPCommandStreamReadFile(t *testing.T) {
 		CommandId:      "acp-cs-read",
 		WorkingDir:     workspace,
 		TimeoutSeconds: 120,
-		ExecutorKind:   v1pb.ExecutorKind_ACP,
 		Instruction:    "Read the file target.txt in the current workspace and reply with exactly its contents. Do not add quotes or any extra words.",
 	}
 
@@ -90,7 +89,6 @@ func TestACPCommandStreamWriteFile(t *testing.T) {
 		CommandId:      "acp-cs-write",
 		WorkingDir:     workspace,
 		TimeoutSeconds: 120,
-		ExecutorKind:   v1pb.ExecutorKind_ACP,
 		Instruction:    "Use your file editing tool to replace the entire contents of note.txt with exactly LAELIA_CS_WRITE_OK. After the write succeeds, reply with exactly DONE.",
 		AllowDiff:      true,
 	}
@@ -144,7 +142,6 @@ func TestACPCommandStreamCancel(t *testing.T) {
 		CommandId:      "acp-cs-cancel",
 		WorkingDir:     workspace,
 		TimeoutSeconds: 120,
-		ExecutorKind:   v1pb.ExecutorKind_ACP,
 		Instruction:    "Create a file named big_report.txt. Write a detailed 500-word markdown report about the history of computing, including sections on early mechanical computers, the transistor era, the microprocessor revolution, the internet age, and modern AI computing. After writing, read back the file and count the words.",
 	}
 
@@ -179,7 +176,7 @@ func TestACPCommandStreamCancel(t *testing.T) {
 	assert.NotZero(t, result.ExitCode, "cancelled ACP task should have non-zero exit code")
 }
 
-func assertACPCSLifecycle(t *testing.T, msgs []*v1pb.AgentCommandMessage) {
+func assertACPCSLifecycle(t *testing.T, msgs []*v1pb.AgentStreamMessage) {
 	t.Helper()
 	firstEvent := findACPCSEvent(msgs, v1pb.CommandEventType_LIFECYCLE)
 	require.NotNil(t, firstEvent, "first message should be a LIFECYCLE event")
@@ -190,7 +187,7 @@ func assertACPCSLifecycle(t *testing.T, msgs []*v1pb.AgentCommandMessage) {
 	}
 }
 
-func assertACPCSProgressOutput(t *testing.T, msgs []*v1pb.AgentCommandMessage) {
+func assertACPCSProgressOutput(t *testing.T, msgs []*v1pb.AgentStreamMessage) {
 	t.Helper()
 	var hasProgress bool
 	for _, msg := range msgs {
@@ -202,7 +199,7 @@ func assertACPCSProgressOutput(t *testing.T, msgs []*v1pb.AgentCommandMessage) {
 	assert.True(t, hasProgress, "should have at least one CommandProgress message")
 }
 
-func assertACPCSReadFileResult(t *testing.T, msgs []*v1pb.AgentCommandMessage, want string) {
+func assertACPCSReadFileResult(t *testing.T, msgs []*v1pb.AgentStreamMessage, want string) {
 	t.Helper()
 	result := findACPCSResult(msgs)
 	require.NotNil(t, result, "expected a CommandResult message")
@@ -218,14 +215,14 @@ func assertACPCSReadFileResult(t *testing.T, msgs []*v1pb.AgentCommandMessage, w
 	assert.Contains(t, compactText(combined), want, "ACP output should contain the file content %q; got summary=%q", want, result.FinalSummary)
 }
 
-func assertACPCSToolCalls(t *testing.T, msgs []*v1pb.AgentCommandMessage) {
+func assertACPCSToolCalls(t *testing.T, msgs []*v1pb.AgentStreamMessage) {
 	t.Helper()
 	started := findACPCSEvent(msgs, v1pb.CommandEventType_TOOL_CALL_STARTED)
 	finished := findACPCSEvent(msgs, v1pb.CommandEventType_TOOL_CALL_FINISHED)
 	assert.True(t, started != nil || finished != nil, "should have at least one tool call event")
 }
 
-func assertACPCSEvents(t *testing.T, msgs []*v1pb.AgentCommandMessage) {
+func assertACPCSEvents(t *testing.T, msgs []*v1pb.AgentStreamMessage) {
 	t.Helper()
 	summary := findACPCSEvent(msgs, v1pb.CommandEventType_FINAL_SUMMARY)
 	assert.NotNil(t, summary, "should have a FINAL_SUMMARY event")
@@ -234,7 +231,7 @@ func assertACPCSEvents(t *testing.T, msgs []*v1pb.AgentCommandMessage) {
 	assert.NotNil(t, textDelta, "should have at least one TEXT_DELTA event")
 }
 
-func findACPCSResult(msgs []*v1pb.AgentCommandMessage) *v1pb.CommandResult {
+func findACPCSResult(msgs []*v1pb.AgentStreamMessage) *v1pb.CommandResult {
 	for _, msg := range msgs {
 		if r := msg.GetResult(); r != nil {
 			return r
@@ -243,7 +240,7 @@ func findACPCSResult(msgs []*v1pb.AgentCommandMessage) *v1pb.CommandResult {
 	return nil
 }
 
-func findACPCSEvent(msgs []*v1pb.AgentCommandMessage, wantType v1pb.CommandEventType) *v1pb.CommandEvent {
+func findACPCSEvent(msgs []*v1pb.AgentStreamMessage, wantType v1pb.CommandEventType) *v1pb.CommandEvent {
 	for _, msg := range msgs {
 		if e := msg.GetEvent(); e != nil && e.Type == wantType {
 			return e

@@ -116,7 +116,7 @@ func configureGrpcRouters(
 	connectHandlers[agentPath] = agentHandler
 	commandPath, commandHandler := v1connect.NewCommandServiceHandler(commandService, handlerOpts)
 	connectHandlers[commandPath] = commandHandler
-	agentCmdPath, agentCmdHandler := v1connect.NewAgentCommandServiceHandler(agentCommandService, handlerOpts)
+	agentCmdPath, agentCmdHandler := v1connect.NewAgentStreamServiceHandler(agentCommandService, handlerOpts)
 	connectHandlers[agentCmdPath] = agentCmdHandler
 
 	reflector := grpcreflect.NewStaticReflector(
@@ -124,7 +124,7 @@ func configureGrpcRouters(
 		v1connect.AuthServiceName,
 		v1connect.AgentServiceName,
 		v1connect.CommandServiceName,
-		v1connect.AgentCommandServiceName,
+		v1connect.AgentStreamServiceName,
 	)
 	reflectPath, reflectHandler := grpcreflect.NewHandlerV1(reflector)
 	connectHandlers[reflectPath] = reflectHandler

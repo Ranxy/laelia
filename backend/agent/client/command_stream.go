@@ -42,7 +42,7 @@ func (m *mergedText) append(streamType v1pb.CommandOutput_StreamType, text strin
 	return m.builder.Len() >= mergedTextDeltaFlushBytes
 }
 
-func (m *mergedText) flush(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], commandID string, state *executor.LocalState) error {
+func (m *mergedText) flush(stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, state *executor.LocalState) error {
 	if !m.started {
 		return nil
 	}
@@ -67,7 +67,7 @@ func (m *mergedText) flush(stream *connect.BidiStreamForClient[v1pb.AgentCommand
 }
 
 type commandStream struct {
-	client          v1connect.AgentCommandServiceClient
+	client          v1connect.AgentStreamServiceClient
 	managerURL      string
 	backoff         *ExponentialBackoff
 	getToken        func() string
@@ -80,7 +80,7 @@ type commandStream struct {
 
 func newCommandStream(httpClient *http.Client, managerURL string, mcpPort int, agentResourceID string) *commandStream {
 	return &commandStream{
-		client:          v1connect.NewAgentCommandServiceClient(httpClient, managerURL),
+		client:          v1connect.NewAgentStreamServiceClient(httpClient, managerURL),
 		managerURL:      managerURL,
 		backoff:         NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
 		mcpPort:         mcpPort,
@@ -115,11 +115,11 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 		return nil
 	}
 
-	stream := c.client.CommandChannel(ctx)
+	stream := c.client.AgentChannel(ctx)
 	stream.RequestHeader().Set("Authorization", "Bearer "+token)
 
-	ready := &v1pb.AgentCommandMessage{
-		Message: &v1pb.AgentCommandMessage_AgentReady{
+	ready := &v1pb.AgentStreamMessage{
+		Message: &v1pb.AgentStreamMessage_AgentReady{
 			AgentReady: &v1pb.AgentReady{
 				SessionId: c.getSessID(),
 			},
@@ -157,17 +157,9 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 			}
 
 			switch m := msg.Message.(type) {
-			case *v1pb.ManagerCommandMessage_InboxSnapshot:
-				c.handleInboxSnapshot(stream, m.InboxSnapshot)
-
-			case *v1pb.ManagerCommandMessage_InboxItemSelected:
-				slog.Info("inbox item selected confirmed",
-					"inboxItemID", m.InboxItemSelected.InboxItemId,
-					"commandID", m.InboxItemSelected.CommandId)
-
-			case *v1pb.ManagerCommandMessage_CommandRequest:
+			case *v1pb.ManagerStreamMessage_CommandRequest:
 				req := m.CommandRequest
-				slog.Info("received command", "commandID", req.CommandId, "command", req.Command)
+				slog.Info("received command", "commandID", req.CommandId)
 
 				runtime, err := c.buildRuntime(req)
 				if err != nil {
@@ -188,20 +180,36 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 				go func() {
 					c.runCommand(ctx, runtime, stream, req)
 					c.isExecuting.Store(false)
-					slog.Info("command completed, pulling inbox", "commandID", req.CommandId)
-					sendPullInbox(stream)
 				}()
 
-			case *v1pb.ManagerCommandMessage_Cancel:
+			case *v1pb.ManagerStreamMessage_NewMessages:
+				// Phase 1: the manager still drives dispatch by sending
+				// CommandRequest from its PENDING drain; NewMessagesAvailable is
+				// informational. Agents that want more conversation context for an
+				// in-flight command can issue PullMessages over the same stream
+				// (Phase 2 surfaces this as the autonomy gate).
+				slog.Info("new messages available",
+					"conversation_ids", m.NewMessages.ConversationIds,
+					"versions", m.NewMessages.Versions)
+
+			case *v1pb.ManagerStreamMessage_MessageSnapshot:
+				// Phase 1 does not yet drive execution from snapshots; this is
+				// the response to a PullMessages issued by the agent for context
+				// building. Log the version gained so the agent can cache it.
+				slog.Info("message snapshot received",
+					"messages", len(m.MessageSnapshot.Messages),
+					"current_version", m.MessageSnapshot.CurrentVersion)
+
+			case *v1pb.ManagerStreamMessage_Cancel:
 				if currentExecutor != nil {
 					slog.Info("cancelling command", "commandID", m.Cancel.CommandId)
 					currentExecutor.Cancel()
 				}
 
-			case *v1pb.ManagerCommandMessage_Pong:
+			case *v1pb.ManagerStreamMessage_Pong:
 				// pong received, link acknowledged
 
-			case *v1pb.ManagerCommandMessage_PermissionDecision:
+			case *v1pb.ManagerStreamMessage_PermissionDecision:
 				d := m.PermissionDecision
 				slog.Info("received permission decision", "commandID", d.CommandId, "optionID", d.OptionId)
 				if resolver, ok := currentExecutor.(executor.PermissionResolver); ok {
@@ -224,8 +232,8 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 			return err
 		case <-pingTicker.C:
 			pingSeq++
-			ping := &v1pb.AgentCommandMessage{
-				Message: &v1pb.AgentCommandMessage_Ping{
+			ping := &v1pb.AgentStreamMessage{
+				Message: &v1pb.AgentStreamMessage_Ping{
 					Ping: &v1pb.Ping{
 						Seq:    pingSeq,
 						SentAt: time.Now().UnixMilli(),
@@ -239,57 +247,16 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 	}
 }
 
-func (c *commandStream) handleInboxSnapshot(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], snapshot *v1pb.InboxSnapshot) {
-	if c.isExecuting.Load() {
-		return
-	}
-
-	if len(snapshot.Items) == 0 {
-		slog.Info("inbox is empty, waiting for tasks")
-		return
-	}
-
-	item := snapshot.Items[0]
-	slog.Info("selecting inbox item",
-		"inboxItemID", item.InboxItemId,
-		"commandID", item.CommandId,
-		"summary", item.ContextSummary,
-		"remainingItems", len(snapshot.Items)-1)
-
-	c.isExecuting.Store(true)
-
-	if err := stream.Send(&v1pb.AgentCommandMessage{
-		Message: &v1pb.AgentCommandMessage_SelectInboxItem{
-			SelectInboxItem: &v1pb.SelectInboxItem{
-				InboxItemId: item.InboxItemId,
-			},
-		},
-	}); err != nil {
-		slog.Error("failed to send select inbox item", "error", err)
-		c.isExecuting.Store(false)
-	}
-}
-
-func sendPullInbox(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage]) {
-	if err := stream.Send(&v1pb.AgentCommandMessage{
-		Message: &v1pb.AgentCommandMessage_PullInbox{
-			PullInbox: &v1pb.PullInbox{},
-		},
-	}); err != nil {
-		slog.Error("failed to send pull inbox", "error", err)
-	}
-}
-
 func (*commandStream) runCommand(
 	ctx context.Context,
 	runtime executor.Runtime,
-	stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage],
+	stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage],
 	req *v1pb.CommandRequest,
 ) {
 	commandID := req.CommandId
 	state := &executor.LocalState{
 		CommandID:        commandID,
-		ExecutorKind:     req.ExecutorKind.String(),
+		ExecutorKind:     "ACP",
 		Status:           "running",
 		StartedAt:        time.Now().UnixMilli(),
 		LastSeqSent:      0,
@@ -326,7 +293,7 @@ func (*commandStream) runCommand(
 		Type:    v1pb.CommandEventType_LIFECYCLE,
 		Summary: "command started",
 		Lifecycle: &v1pb.LifecyclePayload{
-			ExecutorKind: req.ExecutorKind.String(),
+			ExecutorKind: "ACP",
 			Profile:      req.Profile,
 		},
 	}); err != nil {
@@ -409,7 +376,7 @@ func (*commandStream) runCommand(
 	}
 }
 
-func drainOutput(runtime executor.Runtime, stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], commandID string, lastSeqNo int32, lastEventSeqNo int32, merged *mergedText) (int32, int32) {
+func drainOutput(runtime executor.Runtime, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, lastSeqNo int32, lastEventSeqNo int32, merged *mergedText) (int32, int32) {
 	for {
 		select {
 		case chunk, ok := <-runtime.OutputChannel():
@@ -434,38 +401,26 @@ func drainOutput(runtime executor.Runtime, stream *connect.BidiStreamForClient[v
 }
 
 func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime, error) {
-	kind := req.ExecutorKind
-	if kind == v1pb.ExecutorKind_EXECUTOR_KIND_UNSPECIFIED {
-		kind = v1pb.ExecutorKind_ACP
-	}
-
-	switch kind {
-	case v1pb.ExecutorKind_SHELL:
-		return executor.New(req.Command, req.Env, req.WorkingDir, req.TimeoutSeconds), nil
-	case v1pb.ExecutorKind_ACP:
-		return executor.NewACP(executor.Request{
-			CommandID:       req.CommandId,
-			Command:         req.Command,
-			Instruction:     req.Instruction,
-			Profile:         req.Profile,
-			WorkingDir:      req.WorkingDir,
-			Env:             req.Env,
-			TimeoutSeconds:  req.TimeoutSeconds,
-			ExecutorKind:    kind,
-			AllowDiff:       req.AllowDiff,
-			SourceType:      int32(req.Source),
-			AgentResourceID: c.agentResourceID,
-			PrincipalID:     req.PrincipalId,
-			MCPPort:         c.mcpPort,
-		}, c.getAcpConfig())
-	default:
-		return nil, connect.NewError(connect.CodeInvalidArgument, io.ErrUnexpectedEOF)
-	}
+	// Phase 1: the BashExecutor is removed; all commands execute via ACP.
+	return executor.NewACP(executor.Request{
+		CommandID:        req.CommandId,
+		Instruction:      req.Instruction,
+		Profile:          req.Profile,
+		WorkingDir:       req.WorkingDir,
+		Env:              req.Env,
+		TimeoutSeconds:   req.TimeoutSeconds,
+		AllowDiff:        req.AllowDiff,
+		ConversationID:   req.ConversationId,
+		ReplyToMessageID: req.ReplyToMessageId,
+		AgentResourceID:  c.agentResourceID,
+		PrincipalID:      req.PrincipalId,
+		MCPPort:          c.mcpPort,
+	}, c.getAcpConfig())
 }
 
-func sendCommandProgress(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], commandID string, chunk executor.OutputChunk) error {
-	return stream.Send(&v1pb.AgentCommandMessage{
-		Message: &v1pb.AgentCommandMessage_Progress{
+func sendCommandProgress(stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, chunk executor.OutputChunk) error {
+	return stream.Send(&v1pb.AgentStreamMessage{
+		Message: &v1pb.AgentStreamMessage_Progress{
 			Progress: &v1pb.CommandProgress{
 				CommandId: commandID,
 				Type:      chunk.StreamType,
@@ -476,7 +431,7 @@ func sendCommandProgress(stream *connect.BidiStreamForClient[v1pb.AgentCommandMe
 	})
 }
 
-func sendCommandEvent(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], commandID string, event *executor.Event) error {
+func sendCommandEvent(stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, event *executor.Event) error {
 	ce := &v1pb.CommandEvent{
 		CommandId: commandID,
 		SeqNo:     event.SeqNo,
@@ -511,14 +466,14 @@ func sendCommandEvent(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessa
 	default:
 	}
 
-	return stream.Send(&v1pb.AgentCommandMessage{
-		Message: &v1pb.AgentCommandMessage_Event{Event: ce},
+	return stream.Send(&v1pb.AgentStreamMessage{
+		Message: &v1pb.AgentStreamMessage_Event{Event: ce},
 	})
 }
 
-func sendCommandResult(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], result *v1pb.CommandResult) error {
-	return stream.Send(&v1pb.AgentCommandMessage{
-		Message: &v1pb.AgentCommandMessage_Result{
+func sendCommandResult(stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], result *v1pb.CommandResult) error {
+	return stream.Send(&v1pb.AgentStreamMessage{
+		Message: &v1pb.AgentStreamMessage_Result{
 			Result: result,
 		},
 	})

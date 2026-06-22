@@ -24,15 +24,30 @@ enum CommandStatus {
 }
 
 enum ExecutorKind {
+  option deprecated = true;
   EXECUTOR_KIND_UNSPECIFIED = 0;
   SHELL = 1;
   ACP = 2;
 }
 
 enum CommandSource {
+  option deprecated = true;
   COMMAND_SOURCE_UNSPECIFIED = 0;
   MANUAL = 1;
   CHAT = 2;
+}
+
+// SenderType distinguishes who authored a chat message. It replaces the
+// deprecated CommandSource enum and covers programmatic (SYSTEM) senders that
+// CommandSource could not express inside chat conversations. Values are
+// prefixed because UserType already occupies the unprefixed USER/SYSTEM_BOT
+// names (protobuf C++ scoping rules forbid sibling enums from sharing value
+// names).
+enum SenderType {
+  SENDER_TYPE_UNSPECIFIED = 0;
+  SENDER_TYPE_USER = 1;
+  SENDER_TYPE_AGENT = 2;
+  SENDER_TYPE_SYSTEM = 3;
 }
 
 enum CommandEventType {
@@ -72,13 +87,13 @@ message Command {
   string error_message = 12;
   map<string, string> env = 13;
   string working_dir = 14;
-  ExecutorKind executor_kind = 15;
+  ExecutorKind executor_kind = 15 [deprecated = true];
   string instruction = 16;
   string profile = 17;
   string final_summary = 18;
   google.protobuf.Struct result = 19;
   bool allow_diff = 20;
-  CommandSource source = 21;
+  CommandSource source = 21 [deprecated = true];
   string conversation_id = 22;
 }
 
@@ -220,7 +235,11 @@ message ChatMessage {
   string command_id = 6;
   google.protobuf.Timestamp created_at = 7;
   string sender_name = 8;
-  int32 sender_type = 9;
+  SenderType sender_type = 9;
+  // room_version is the conversation.version at the time this message was
+  // created. Agents use it together with PullMessages.after_version to track
+  // their cursor into the conversation.
+  int64 room_version = 10;
 }
 
 message Conversation {
@@ -353,6 +372,7 @@ message GetCommandContextResponse {
 
 service CommandService {
   rpc SendCommand(SendCommandRequest) returns (Command) {
+    option deprecated = true;
     option (google.api.http) = {
       post: "/v1/{agent=agents/*}/commands"
       body: "*"
@@ -463,32 +483,37 @@ service CommandService {
   }
 }
 
-service AgentCommandService {
-  rpc CommandChannel(stream AgentCommandMessage) returns (stream ManagerCommandMessage);
+service AgentStreamService {
+  rpc AgentChannel(stream AgentStreamMessage) returns (stream ManagerStreamMessage);
 }
 
-message AgentCommandMessage {
+message AgentStreamMessage {
   oneof message {
     AgentReady agent_ready = 1;
-    CommandProgress progress = 2;
-    CommandResult result = 3;
-    Ping ping = 4;
-    CommandEvent event = 5;
-    PullInbox pull_inbox = 6;
-    SelectInboxItem select_inbox_item = 7;
-    DeferInboxItem defer_inbox_item = 8;
+    PullMessages pull_messages = 2;
+    CommandProgress progress = 5;
+    CommandResult result = 6;
+    CommandEvent event = 7;
+    Ping ping = 8;
   }
+  // Field numbers 3 and 4 are reserved for the Phase 2 Held Draft messages
+  // (SubmitAction, ResolveHeldAction).
+  reserved 3, 4;
+  reserved "submit_action", "resolve_held_action";
 }
 
-message ManagerCommandMessage {
+message ManagerStreamMessage {
   oneof message {
-    CommandRequest command_request = 1;
-    CancelMessage cancel = 2;
-    Pong pong = 3;
-    PermissionDecision permission_decision = 4;
-    InboxSnapshot inbox_snapshot = 5;
-    InboxItemSelected inbox_item_selected = 6;
+    MessageSnapshot message_snapshot = 1;
+    CommandRequest command_request = 3;
+    NewMessagesAvailable new_messages = 4;
+    CancelMessage cancel = 5;
+    Pong pong = 6;
+    PermissionDecision permission_decision = 7;
   }
+  // Field number 2 is reserved for the Phase 2 ActionResponse message.
+  reserved 2;
+  reserved "action_response";
 }
 
 message AgentReady {
@@ -500,16 +525,15 @@ message AgentReady {
 
 message CommandRequest {
   string command_id = 1;
-  string command = 2;
-  map<string, string> env = 3;
-  string working_dir = 4;
-  int32 timeout_seconds = 5;
-  ExecutorKind executor_kind = 6;
-  string instruction = 7;
-  string profile = 8;
-  bool allow_diff = 9;
-  CommandSource source = 10;
-  string principal_id = 11;
+  string instruction = 2;
+  string profile = 3;
+  map<string, string> env = 4;
+  string working_dir = 5;
+  int32 timeout_seconds = 6;
+  bool allow_diff = 7;
+  string principal_id = 8;
+  string conversation_id = 9;
+  string reply_to_message_id = 10;
 }
 
 message CommandProgress {
@@ -544,6 +568,7 @@ message Pong {
 }
 
 message SendCommandRequest {
+  option deprecated = true;
   string agent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference).type = "laelia/Agent"
@@ -611,43 +636,35 @@ message PermissionDecision {
   string option_id = 2;
 }
 
-message InboxItem {
-  string inbox_item_id = 1;
-  string command_id = 2;
-  int32 priority = 3;
-  string context_summary = 4;
-  ExecutorKind executor_kind = 5;
-  string instruction = 6;
-  CommandSource source = 7;
-  google.protobuf.Timestamp created_at = 8;
-}
-
-message PullInbox {
-  // Empty pull request; agent requests current inbox snapshot
-}
-
-message InboxSnapshot {
-  repeated InboxItem items = 1;
-}
-
-message SelectInboxItem {
-  string inbox_item_id = 1;
-}
-
-message InboxItemSelected {
-  string inbox_item_id = 1;
-  string command_id = 2;
-}
-
-message DeferInboxItem {
-  string inbox_item_id = 1;
-  string reason = 2;
-}
-
 message RespondPermissionRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference).type = "laelia/Command"
   ];
   string option_id = 2;
+}
+
+// PullMessages is sent by an agent over the AgentChannel bidi stream to fetch
+// chat messages with room_version greater than after_version for a single
+// conversation. The agent tracks its own cursor per conversation and supplies
+// it explicitly so that reconnection / crash recovery is self-describing.
+message PullMessages {
+  string conversation_id = 1;
+  int64 after_version = 2;
+}
+
+// MessageSnapshot is the Manager reply to PullMessages. It returns the newly
+// available messages and the conversation's current version so the agent can
+// record it as the base_version for any subsequent action.
+message MessageSnapshot {
+  repeated ChatMessage messages = 1;
+  int64 current_version = 2;
+}
+
+// NewMessagesAvailable is pushed from Manager to agent over the bidi stream to
+// notify that a conversation the agent is connected to has produced new
+// messages. The agent should follow up with a PullMessages request.
+message NewMessagesAvailable {
+  repeated string conversation_ids = 1;
+  repeated int64 versions = 2;
 }

@@ -107,7 +107,6 @@
     "status-cancelled": "Cancelled",
     "status-timeout": "Timeout",
     "executor-unspecified": "",
-    "executor-shell": "Shell",
     "executor-acp": "ACP",
     "event-unknown": "Unknown",
     "event-lifecycle": "Lifecycle",

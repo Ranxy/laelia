@@ -1631,8 +1631,19 @@ components:
                 senderName:
                     type: string
                 senderType:
-                    type: integer
-                    format: int32
+                    enum:
+                        - SENDER_TYPE_UNSPECIFIED
+                        - SENDER_TYPE_USER
+                        - SENDER_TYPE_AGENT
+                        - SENDER_TYPE_SYSTEM
+                    type: string
+                    format: enum
+                roomVersion:
+                    type: string
+                    description: |-
+                        room_version is the conversation.version at the time this message was
+                         created. Agents use it together with PullMessages.after_version to track
+                         their cursor into the conversation.
         Command:
             type: object
             properties:

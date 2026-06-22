@@ -46,6 +46,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CommandServiceClient interface {
+	// Deprecated: Do not use.
 	SendCommand(ctx context.Context, in *SendCommandRequest, opts ...grpc.CallOption) (*Command, error)
 	ListCommands(ctx context.Context, in *ListCommandsRequest, opts ...grpc.CallOption) (*ListCommandsResponse, error)
 	GetCommand(ctx context.Context, in *GetCommandRequest, opts ...grpc.CallOption) (*Command, error)
@@ -76,6 +77,7 @@ func NewCommandServiceClient(cc grpc.ClientConnInterface) CommandServiceClient {
 	return &commandServiceClient{cc}
 }
 
+// Deprecated: Do not use.
 func (c *commandServiceClient) SendCommand(ctx context.Context, in *SendCommandRequest, opts ...grpc.CallOption) (*Command, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Command)
@@ -298,6 +300,7 @@ func (c *commandServiceClient) SendMessage(ctx context.Context, in *SendMessageR
 // All implementations must embed UnimplementedCommandServiceServer
 // for forward compatibility.
 type CommandServiceServer interface {
+	// Deprecated: Do not use.
 	SendCommand(context.Context, *SendCommandRequest) (*Command, error)
 	ListCommands(context.Context, *ListCommandsRequest) (*ListCommandsResponse, error)
 	GetCommand(context.Context, *GetCommandRequest) (*Command, error)
@@ -851,94 +854,94 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	AgentCommandService_CommandChannel_FullMethodName = "/laelia.v1.AgentCommandService/CommandChannel"
+	AgentStreamService_AgentChannel_FullMethodName = "/laelia.v1.AgentStreamService/AgentChannel"
 )
 
-// AgentCommandServiceClient is the client API for AgentCommandService service.
+// AgentStreamServiceClient is the client API for AgentStreamService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type AgentCommandServiceClient interface {
-	CommandChannel(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AgentCommandMessage, ManagerCommandMessage], error)
+type AgentStreamServiceClient interface {
+	AgentChannel(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AgentStreamMessage, ManagerStreamMessage], error)
 }
 
-type agentCommandServiceClient struct {
+type agentStreamServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewAgentCommandServiceClient(cc grpc.ClientConnInterface) AgentCommandServiceClient {
-	return &agentCommandServiceClient{cc}
+func NewAgentStreamServiceClient(cc grpc.ClientConnInterface) AgentStreamServiceClient {
+	return &agentStreamServiceClient{cc}
 }
 
-func (c *agentCommandServiceClient) CommandChannel(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AgentCommandMessage, ManagerCommandMessage], error) {
+func (c *agentStreamServiceClient) AgentChannel(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AgentStreamMessage, ManagerStreamMessage], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AgentCommandService_ServiceDesc.Streams[0], AgentCommandService_CommandChannel_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &AgentStreamService_ServiceDesc.Streams[0], AgentStreamService_AgentChannel_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[AgentCommandMessage, ManagerCommandMessage]{ClientStream: stream}
+	x := &grpc.GenericClientStream[AgentStreamMessage, ManagerStreamMessage]{ClientStream: stream}
 	return x, nil
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AgentCommandService_CommandChannelClient = grpc.BidiStreamingClient[AgentCommandMessage, ManagerCommandMessage]
+type AgentStreamService_AgentChannelClient = grpc.BidiStreamingClient[AgentStreamMessage, ManagerStreamMessage]
 
-// AgentCommandServiceServer is the server API for AgentCommandService service.
-// All implementations must embed UnimplementedAgentCommandServiceServer
+// AgentStreamServiceServer is the server API for AgentStreamService service.
+// All implementations must embed UnimplementedAgentStreamServiceServer
 // for forward compatibility.
-type AgentCommandServiceServer interface {
-	CommandChannel(grpc.BidiStreamingServer[AgentCommandMessage, ManagerCommandMessage]) error
-	mustEmbedUnimplementedAgentCommandServiceServer()
+type AgentStreamServiceServer interface {
+	AgentChannel(grpc.BidiStreamingServer[AgentStreamMessage, ManagerStreamMessage]) error
+	mustEmbedUnimplementedAgentStreamServiceServer()
 }
 
-// UnimplementedAgentCommandServiceServer must be embedded to have
+// UnimplementedAgentStreamServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedAgentCommandServiceServer struct{}
+type UnimplementedAgentStreamServiceServer struct{}
 
-func (UnimplementedAgentCommandServiceServer) CommandChannel(grpc.BidiStreamingServer[AgentCommandMessage, ManagerCommandMessage]) error {
-	return status.Error(codes.Unimplemented, "method CommandChannel not implemented")
+func (UnimplementedAgentStreamServiceServer) AgentChannel(grpc.BidiStreamingServer[AgentStreamMessage, ManagerStreamMessage]) error {
+	return status.Error(codes.Unimplemented, "method AgentChannel not implemented")
 }
-func (UnimplementedAgentCommandServiceServer) mustEmbedUnimplementedAgentCommandServiceServer() {}
-func (UnimplementedAgentCommandServiceServer) testEmbeddedByValue()                             {}
+func (UnimplementedAgentStreamServiceServer) mustEmbedUnimplementedAgentStreamServiceServer() {}
+func (UnimplementedAgentStreamServiceServer) testEmbeddedByValue()                            {}
 
-// UnsafeAgentCommandServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to AgentCommandServiceServer will
+// UnsafeAgentStreamServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AgentStreamServiceServer will
 // result in compilation errors.
-type UnsafeAgentCommandServiceServer interface {
-	mustEmbedUnimplementedAgentCommandServiceServer()
+type UnsafeAgentStreamServiceServer interface {
+	mustEmbedUnimplementedAgentStreamServiceServer()
 }
 
-func RegisterAgentCommandServiceServer(s grpc.ServiceRegistrar, srv AgentCommandServiceServer) {
-	// If the following call panics, it indicates UnimplementedAgentCommandServiceServer was
+func RegisterAgentStreamServiceServer(s grpc.ServiceRegistrar, srv AgentStreamServiceServer) {
+	// If the following call panics, it indicates UnimplementedAgentStreamServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&AgentCommandService_ServiceDesc, srv)
+	s.RegisterService(&AgentStreamService_ServiceDesc, srv)
 }
 
-func _AgentCommandService_CommandChannel_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(AgentCommandServiceServer).CommandChannel(&grpc.GenericServerStream[AgentCommandMessage, ManagerCommandMessage]{ServerStream: stream})
+func _AgentStreamService_AgentChannel_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(AgentStreamServiceServer).AgentChannel(&grpc.GenericServerStream[AgentStreamMessage, ManagerStreamMessage]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AgentCommandService_CommandChannelServer = grpc.BidiStreamingServer[AgentCommandMessage, ManagerCommandMessage]
+type AgentStreamService_AgentChannelServer = grpc.BidiStreamingServer[AgentStreamMessage, ManagerStreamMessage]
 
-// AgentCommandService_ServiceDesc is the grpc.ServiceDesc for AgentCommandService service.
+// AgentStreamService_ServiceDesc is the grpc.ServiceDesc for AgentStreamService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var AgentCommandService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "laelia.v1.AgentCommandService",
-	HandlerType: (*AgentCommandServiceServer)(nil),
+var AgentStreamService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "laelia.v1.AgentStreamService",
+	HandlerType: (*AgentStreamServiceServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "CommandChannel",
-			Handler:       _AgentCommandService_CommandChannel_Handler,
+			StreamName:    "AgentChannel",
+			Handler:       _AgentStreamService_AgentChannel_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

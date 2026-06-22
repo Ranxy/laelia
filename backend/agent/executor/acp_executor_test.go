@@ -231,7 +231,6 @@ func TestACPExecutorWithOpencodeReadFile(t *testing.T) {
 		Instruction:    "Read the file context.txt in the current workspace and reply with exactly its contents. Do not add quotes or any extra words.",
 		WorkingDir:     workspace,
 		TimeoutSeconds: 120,
-		ExecutorKind:   v1pb.ExecutorKind_ACP,
 	}, newOpencodeTestConfig(bin, workspace, false))
 	require.NoError(t, err)
 
@@ -258,7 +257,6 @@ func TestACPExecutorWithOpencodeWriteFile(t *testing.T) {
 		Instruction:    "Use your file editing tool to replace the entire contents of note.txt with exactly LAELIA_WRITE_OK. After the write succeeds, reply with exactly DONE.",
 		WorkingDir:     workspace,
 		TimeoutSeconds: 120,
-		ExecutorKind:   v1pb.ExecutorKind_ACP,
 		AllowDiff:      true,
 	}, newOpencodeTestConfig(bin, workspace, true))
 	require.NoError(t, err)

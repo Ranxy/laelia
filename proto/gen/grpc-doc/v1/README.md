@@ -85,8 +85,8 @@
   
 - [v1/command.proto](#v1_command-proto)
     - [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest)
-    - [AgentCommandMessage](#laelia-v1-AgentCommandMessage)
     - [AgentReady](#laelia-v1-AgentReady)
+    - [AgentStreamMessage](#laelia-v1-AgentStreamMessage)
     - [CancelCommandRequest](#laelia-v1-CancelCommandRequest)
     - [CancelMessage](#laelia-v1-CancelMessage)
     - [ChannelMember](#laelia-v1-ChannelMember)
@@ -102,7 +102,6 @@
     - [CommandResult](#laelia-v1-CommandResult)
     - [Conversation](#laelia-v1-Conversation)
     - [CreateChannelRequest](#laelia-v1-CreateChannelRequest)
-    - [DeferInboxItem](#laelia-v1-DeferInboxItem)
     - [DeleteChannelRequest](#laelia-v1-DeleteChannelRequest)
     - [DiffEmittedPayload](#laelia-v1-DiffEmittedPayload)
     - [FinalSummaryPayload](#laelia-v1-FinalSummaryPayload)
@@ -112,9 +111,6 @@
     - [GetCommandRequest](#laelia-v1-GetCommandRequest)
     - [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest)
     - [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse)
-    - [InboxItem](#laelia-v1-InboxItem)
-    - [InboxItemSelected](#laelia-v1-InboxItemSelected)
-    - [InboxSnapshot](#laelia-v1-InboxSnapshot)
     - [LifecyclePayload](#laelia-v1-LifecyclePayload)
     - [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest)
     - [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse)
@@ -124,7 +120,9 @@
     - [ListCommandsResponse](#laelia-v1-ListCommandsResponse)
     - [ListConversationMessagesRequest](#laelia-v1-ListConversationMessagesRequest)
     - [ListConversationMessagesResponse](#laelia-v1-ListConversationMessagesResponse)
-    - [ManagerCommandMessage](#laelia-v1-ManagerCommandMessage)
+    - [ManagerStreamMessage](#laelia-v1-ManagerStreamMessage)
+    - [MessageSnapshot](#laelia-v1-MessageSnapshot)
+    - [NewMessagesAvailable](#laelia-v1-NewMessagesAvailable)
     - [PermissionDecidedPayload](#laelia-v1-PermissionDecidedPayload)
     - [PermissionDecision](#laelia-v1-PermissionDecision)
     - [PermissionOptionPayload](#laelia-v1-PermissionOptionPayload)
@@ -132,13 +130,12 @@
     - [PermissionTimedOutPayload](#laelia-v1-PermissionTimedOutPayload)
     - [Ping](#laelia-v1-Ping)
     - [Pong](#laelia-v1-Pong)
-    - [PullInbox](#laelia-v1-PullInbox)
+    - [PullMessages](#laelia-v1-PullMessages)
     - [RawAcpPayload](#laelia-v1-RawAcpPayload)
     - [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest)
     - [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest)
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
     - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
-    - [SelectInboxItem](#laelia-v1-SelectInboxItem)
     - [SendCommandRequest](#laelia-v1-SendCommandRequest)
     - [SendCommandRequest.EnvEntry](#laelia-v1-SendCommandRequest-EnvEntry)
     - [SendMessageRequest](#laelia-v1-SendMessageRequest)
@@ -155,8 +152,9 @@
     - [CommandSource](#laelia-v1-CommandSource)
     - [CommandStatus](#laelia-v1-CommandStatus)
     - [ExecutorKind](#laelia-v1-ExecutorKind)
+    - [SenderType](#laelia-v1-SenderType)
   
-    - [AgentCommandService](#laelia-v1-AgentCommandService)
+    - [AgentStreamService](#laelia-v1-AgentStreamService)
     - [CommandService](#laelia-v1-CommandService)
   
 - [Scalar Value Types](#scalar-value-types)
@@ -1263,28 +1261,6 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
-<a name="laelia-v1-AgentCommandMessage"></a>
-
-### AgentCommandMessage
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| agent_ready | [AgentReady](#laelia-v1-AgentReady) |  |  |
-| progress | [CommandProgress](#laelia-v1-CommandProgress) |  |  |
-| result | [CommandResult](#laelia-v1-CommandResult) |  |  |
-| ping | [Ping](#laelia-v1-Ping) |  |  |
-| event | [CommandEvent](#laelia-v1-CommandEvent) |  |  |
-| pull_inbox | [PullInbox](#laelia-v1-PullInbox) |  |  |
-| select_inbox_item | [SelectInboxItem](#laelia-v1-SelectInboxItem) |  |  |
-| defer_inbox_item | [DeferInboxItem](#laelia-v1-DeferInboxItem) |  |  |
-
-
-
-
-
-
 <a name="laelia-v1-AgentReady"></a>
 
 ### AgentReady
@@ -1297,6 +1273,26 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | last_command_id | [string](#string) |  |  |
 | last_ack_seq | [int32](#int32) |  |  |
 | last_event_seq | [int32](#int32) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-AgentStreamMessage"></a>
+
+### AgentStreamMessage
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_ready | [AgentReady](#laelia-v1-AgentReady) |  |  |
+| pull_messages | [PullMessages](#laelia-v1-PullMessages) |  |  |
+| progress | [CommandProgress](#laelia-v1-CommandProgress) |  |  |
+| result | [CommandResult](#laelia-v1-CommandResult) |  |  |
+| event | [CommandEvent](#laelia-v1-CommandEvent) |  |  |
+| ping | [Ping](#laelia-v1-Ping) |  |  |
 
 
 
@@ -1388,7 +1384,8 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | command_id | [string](#string) |  |  |
 | created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | sender_name | [string](#string) |  |  |
-| sender_type | [int32](#int32) |  |  |
+| sender_type | [SenderType](#laelia-v1-SenderType) |  |  |
+| room_version | [int64](#int64) |  | room_version is the conversation.version at the time this message was created. Agents use it together with PullMessages.after_version to track their cursor into the conversation. |
 
 
 
@@ -1417,13 +1414,13 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | error_message | [string](#string) |  |  |
 | env | [Command.EnvEntry](#laelia-v1-Command-EnvEntry) | repeated |  |
 | working_dir | [string](#string) |  |  |
-| executor_kind | [ExecutorKind](#laelia-v1-ExecutorKind) |  |  |
+| executor_kind | [ExecutorKind](#laelia-v1-ExecutorKind) |  | **Deprecated.**  |
 | instruction | [string](#string) |  |  |
 | profile | [string](#string) |  |  |
 | final_summary | [string](#string) |  |  |
 | result | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
 | allow_diff | [bool](#bool) |  |  |
-| source | [CommandSource](#laelia-v1-CommandSource) |  |  |
+| source | [CommandSource](#laelia-v1-CommandSource) |  | **Deprecated.**  |
 | conversation_id | [string](#string) |  |  |
 
 
@@ -1523,16 +1520,15 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | command_id | [string](#string) |  |  |
-| command | [string](#string) |  |  |
+| instruction | [string](#string) |  |  |
+| profile | [string](#string) |  |  |
 | env | [CommandRequest.EnvEntry](#laelia-v1-CommandRequest-EnvEntry) | repeated |  |
 | working_dir | [string](#string) |  |  |
 | timeout_seconds | [int32](#int32) |  |  |
-| executor_kind | [ExecutorKind](#laelia-v1-ExecutorKind) |  |  |
-| instruction | [string](#string) |  |  |
-| profile | [string](#string) |  |  |
 | allow_diff | [bool](#bool) |  |  |
-| source | [CommandSource](#laelia-v1-CommandSource) |  |  |
 | principal_id | [string](#string) |  |  |
+| conversation_id | [string](#string) |  |  |
+| reply_to_message_id | [string](#string) |  |  |
 
 
 
@@ -1607,22 +1603,6 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | title | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-DeferInboxItem"></a>
-
-### DeferInboxItem
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| inbox_item_id | [string](#string) |  |  |
-| reason | [string](#string) |  |  |
 
 
 
@@ -1763,59 +1743,6 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-InboxItem"></a>
-
-### InboxItem
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| inbox_item_id | [string](#string) |  |  |
-| command_id | [string](#string) |  |  |
-| priority | [int32](#int32) |  |  |
-| context_summary | [string](#string) |  |  |
-| executor_kind | [ExecutorKind](#laelia-v1-ExecutorKind) |  |  |
-| instruction | [string](#string) |  |  |
-| source | [CommandSource](#laelia-v1-CommandSource) |  |  |
-| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-InboxItemSelected"></a>
-
-### InboxItemSelected
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| inbox_item_id | [string](#string) |  |  |
-| command_id | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-InboxSnapshot"></a>
-
-### InboxSnapshot
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| items | [InboxItem](#laelia-v1-InboxItem) | repeated |  |
 
 
 
@@ -1967,20 +1894,56 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
-<a name="laelia-v1-ManagerCommandMessage"></a>
+<a name="laelia-v1-ManagerStreamMessage"></a>
 
-### ManagerCommandMessage
+### ManagerStreamMessage
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
+| message_snapshot | [MessageSnapshot](#laelia-v1-MessageSnapshot) |  |  |
 | command_request | [CommandRequest](#laelia-v1-CommandRequest) |  |  |
+| new_messages | [NewMessagesAvailable](#laelia-v1-NewMessagesAvailable) |  |  |
 | cancel | [CancelMessage](#laelia-v1-CancelMessage) |  |  |
 | pong | [Pong](#laelia-v1-Pong) |  |  |
 | permission_decision | [PermissionDecision](#laelia-v1-PermissionDecision) |  |  |
-| inbox_snapshot | [InboxSnapshot](#laelia-v1-InboxSnapshot) |  |  |
-| inbox_item_selected | [InboxItemSelected](#laelia-v1-InboxItemSelected) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-MessageSnapshot"></a>
+
+### MessageSnapshot
+MessageSnapshot is the Manager reply to PullMessages. It returns the newly
+available messages and the conversation&#39;s current version so the agent can
+record it as the base_version for any subsequent action.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| messages | [ChatMessage](#laelia-v1-ChatMessage) | repeated |  |
+| current_version | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-NewMessagesAvailable"></a>
+
+### NewMessagesAvailable
+NewMessagesAvailable is pushed from Manager to agent over the bidi stream to
+notify that a conversation the agent is connected to has produced new
+messages. The agent should follow up with a PullMessages request.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation_ids | [string](#string) | repeated |  |
+| versions | [int64](#int64) | repeated |  |
 
 
 
@@ -2105,10 +2068,19 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
-<a name="laelia-v1-PullInbox"></a>
+<a name="laelia-v1-PullMessages"></a>
 
-### PullInbox
-Empty pull request; agent requests current inbox snapshot
+### PullMessages
+PullMessages is sent by an agent over the AgentChannel bidi stream to fetch
+chat messages with room_version greater than after_version for a single
+conversation. The agent tracks its own cursor per conversation and supplies
+it explicitly so that reconnection / crash recovery is self-describing.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation_id | [string](#string) |  |  |
+| after_version | [int64](#int64) |  |  |
 
 
 
@@ -2193,21 +2165,6 @@ Empty pull request; agent requests current inbox snapshot
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | entries | [ChatHistoryEntry](#laelia-v1-ChatHistoryEntry) | repeated |  |
-
-
-
-
-
-
-<a name="laelia-v1-SelectInboxItem"></a>
-
-### SelectInboxItem
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| inbox_item_id | [string](#string) |  |  |
 
 
 
@@ -2462,19 +2419,38 @@ Empty pull request; agent requests current inbox snapshot
 | ACP | 2 |  |
 
 
- 
+
+<a name="laelia-v1-SenderType"></a>
+
+### SenderType
+SenderType distinguishes who authored a chat message. It replaces the
+deprecated CommandSource enum and covers programmatic (SYSTEM) senders that
+CommandSource could not express inside chat conversations. Values are
+prefixed because UserType already occupies the unprefixed USER/SYSTEM_BOT
+names (protobuf C&#43;&#43; scoping rules forbid sibling enums from sharing value
+names).
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| SENDER_TYPE_UNSPECIFIED | 0 |  |
+| SENDER_TYPE_USER | 1 |  |
+| SENDER_TYPE_AGENT | 2 |  |
+| SENDER_TYPE_SYSTEM | 3 |  |
+
 
  
 
+ 
 
-<a name="laelia-v1-AgentCommandService"></a>
 
-### AgentCommandService
+<a name="laelia-v1-AgentStreamService"></a>
+
+### AgentStreamService
 
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| CommandChannel | [AgentCommandMessage](#laelia-v1-AgentCommandMessage) stream | [ManagerCommandMessage](#laelia-v1-ManagerCommandMessage) stream |  |
+| AgentChannel | [AgentStreamMessage](#laelia-v1-AgentStreamMessage) stream | [ManagerStreamMessage](#laelia-v1-ManagerStreamMessage) stream |  |
 
 
 <a name="laelia-v1-CommandService"></a>

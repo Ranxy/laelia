@@ -86,7 +86,8 @@ export declare type Command = Message<"laelia.v1.Command"> & {
   workingDir: string;
 
   /**
-   * @generated from field: laelia.v1.ExecutorKind executor_kind = 15;
+   * @generated from field: laelia.v1.ExecutorKind executor_kind = 15 [deprecated = true];
+   * @deprecated
    */
   executorKind: ExecutorKind;
 
@@ -116,7 +117,8 @@ export declare type Command = Message<"laelia.v1.Command"> & {
   allowDiff: boolean;
 
   /**
-   * @generated from field: laelia.v1.CommandSource source = 21;
+   * @generated from field: laelia.v1.CommandSource source = 21 [deprecated = true];
+   * @deprecated
    */
   source: CommandSource;
 
@@ -725,9 +727,18 @@ export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
   senderName: string;
 
   /**
-   * @generated from field: int32 sender_type = 9;
+   * @generated from field: laelia.v1.SenderType sender_type = 9;
    */
-  senderType: number;
+  senderType: SenderType;
+
+  /**
+   * room_version is the conversation.version at the time this message was
+   * created. Agents use it together with PullMessages.after_version to track
+   * their cursor into the conversation.
+   *
+   * @generated from field: int64 room_version = 10;
+   */
+  roomVersion: bigint;
 };
 
 /**
@@ -1161,11 +1172,11 @@ export declare type GetCommandContextResponse = Message<"laelia.v1.GetCommandCon
 export declare const GetCommandContextResponseSchema: GenMessage<GetCommandContextResponse>;
 
 /**
- * @generated from message laelia.v1.AgentCommandMessage
+ * @generated from message laelia.v1.AgentStreamMessage
  */
-export declare type AgentCommandMessage = Message<"laelia.v1.AgentCommandMessage"> & {
+export declare type AgentStreamMessage = Message<"laelia.v1.AgentStreamMessage"> & {
   /**
-   * @generated from oneof laelia.v1.AgentCommandMessage.message
+   * @generated from oneof laelia.v1.AgentStreamMessage.message
    */
   message: {
     /**
@@ -1175,106 +1186,94 @@ export declare type AgentCommandMessage = Message<"laelia.v1.AgentCommandMessage
     case: "agentReady";
   } | {
     /**
-     * @generated from field: laelia.v1.CommandProgress progress = 2;
+     * @generated from field: laelia.v1.PullMessages pull_messages = 2;
+     */
+    value: PullMessages;
+    case: "pullMessages";
+  } | {
+    /**
+     * @generated from field: laelia.v1.CommandProgress progress = 5;
      */
     value: CommandProgress;
     case: "progress";
   } | {
     /**
-     * @generated from field: laelia.v1.CommandResult result = 3;
+     * @generated from field: laelia.v1.CommandResult result = 6;
      */
     value: CommandResult;
     case: "result";
   } | {
     /**
-     * @generated from field: laelia.v1.Ping ping = 4;
-     */
-    value: Ping;
-    case: "ping";
-  } | {
-    /**
-     * @generated from field: laelia.v1.CommandEvent event = 5;
+     * @generated from field: laelia.v1.CommandEvent event = 7;
      */
     value: CommandEvent;
     case: "event";
   } | {
     /**
-     * @generated from field: laelia.v1.PullInbox pull_inbox = 6;
+     * @generated from field: laelia.v1.Ping ping = 8;
      */
-    value: PullInbox;
-    case: "pullInbox";
-  } | {
-    /**
-     * @generated from field: laelia.v1.SelectInboxItem select_inbox_item = 7;
-     */
-    value: SelectInboxItem;
-    case: "selectInboxItem";
-  } | {
-    /**
-     * @generated from field: laelia.v1.DeferInboxItem defer_inbox_item = 8;
-     */
-    value: DeferInboxItem;
-    case: "deferInboxItem";
+    value: Ping;
+    case: "ping";
   } | { case: undefined; value?: undefined };
 };
 
 /**
- * Describes the message laelia.v1.AgentCommandMessage.
- * Use `create(AgentCommandMessageSchema)` to create a new message.
+ * Describes the message laelia.v1.AgentStreamMessage.
+ * Use `create(AgentStreamMessageSchema)` to create a new message.
  */
-export declare const AgentCommandMessageSchema: GenMessage<AgentCommandMessage>;
+export declare const AgentStreamMessageSchema: GenMessage<AgentStreamMessage>;
 
 /**
- * @generated from message laelia.v1.ManagerCommandMessage
+ * @generated from message laelia.v1.ManagerStreamMessage
  */
-export declare type ManagerCommandMessage = Message<"laelia.v1.ManagerCommandMessage"> & {
+export declare type ManagerStreamMessage = Message<"laelia.v1.ManagerStreamMessage"> & {
   /**
-   * @generated from oneof laelia.v1.ManagerCommandMessage.message
+   * @generated from oneof laelia.v1.ManagerStreamMessage.message
    */
   message: {
     /**
-     * @generated from field: laelia.v1.CommandRequest command_request = 1;
+     * @generated from field: laelia.v1.MessageSnapshot message_snapshot = 1;
+     */
+    value: MessageSnapshot;
+    case: "messageSnapshot";
+  } | {
+    /**
+     * @generated from field: laelia.v1.CommandRequest command_request = 3;
      */
     value: CommandRequest;
     case: "commandRequest";
   } | {
     /**
-     * @generated from field: laelia.v1.CancelMessage cancel = 2;
+     * @generated from field: laelia.v1.NewMessagesAvailable new_messages = 4;
+     */
+    value: NewMessagesAvailable;
+    case: "newMessages";
+  } | {
+    /**
+     * @generated from field: laelia.v1.CancelMessage cancel = 5;
      */
     value: CancelMessage;
     case: "cancel";
   } | {
     /**
-     * @generated from field: laelia.v1.Pong pong = 3;
+     * @generated from field: laelia.v1.Pong pong = 6;
      */
     value: Pong;
     case: "pong";
   } | {
     /**
-     * @generated from field: laelia.v1.PermissionDecision permission_decision = 4;
+     * @generated from field: laelia.v1.PermissionDecision permission_decision = 7;
      */
     value: PermissionDecision;
     case: "permissionDecision";
-  } | {
-    /**
-     * @generated from field: laelia.v1.InboxSnapshot inbox_snapshot = 5;
-     */
-    value: InboxSnapshot;
-    case: "inboxSnapshot";
-  } | {
-    /**
-     * @generated from field: laelia.v1.InboxItemSelected inbox_item_selected = 6;
-     */
-    value: InboxItemSelected;
-    case: "inboxItemSelected";
   } | { case: undefined; value?: undefined };
 };
 
 /**
- * Describes the message laelia.v1.ManagerCommandMessage.
- * Use `create(ManagerCommandMessageSchema)` to create a new message.
+ * Describes the message laelia.v1.ManagerStreamMessage.
+ * Use `create(ManagerStreamMessageSchema)` to create a new message.
  */
-export declare const ManagerCommandMessageSchema: GenMessage<ManagerCommandMessage>;
+export declare const ManagerStreamMessageSchema: GenMessage<ManagerStreamMessage>;
 
 /**
  * @generated from message laelia.v1.AgentReady
@@ -1317,54 +1316,49 @@ export declare type CommandRequest = Message<"laelia.v1.CommandRequest"> & {
   commandId: string;
 
   /**
-   * @generated from field: string command = 2;
-   */
-  command: string;
-
-  /**
-   * @generated from field: map<string, string> env = 3;
-   */
-  env: { [key: string]: string };
-
-  /**
-   * @generated from field: string working_dir = 4;
-   */
-  workingDir: string;
-
-  /**
-   * @generated from field: int32 timeout_seconds = 5;
-   */
-  timeoutSeconds: number;
-
-  /**
-   * @generated from field: laelia.v1.ExecutorKind executor_kind = 6;
-   */
-  executorKind: ExecutorKind;
-
-  /**
-   * @generated from field: string instruction = 7;
+   * @generated from field: string instruction = 2;
    */
   instruction: string;
 
   /**
-   * @generated from field: string profile = 8;
+   * @generated from field: string profile = 3;
    */
   profile: string;
 
   /**
-   * @generated from field: bool allow_diff = 9;
+   * @generated from field: map<string, string> env = 4;
+   */
+  env: { [key: string]: string };
+
+  /**
+   * @generated from field: string working_dir = 5;
+   */
+  workingDir: string;
+
+  /**
+   * @generated from field: int32 timeout_seconds = 6;
+   */
+  timeoutSeconds: number;
+
+  /**
+   * @generated from field: bool allow_diff = 7;
    */
   allowDiff: boolean;
 
   /**
-   * @generated from field: laelia.v1.CommandSource source = 10;
-   */
-  source: CommandSource;
-
-  /**
-   * @generated from field: string principal_id = 11;
+   * @generated from field: string principal_id = 8;
    */
   principalId: string;
+
+  /**
+   * @generated from field: string conversation_id = 9;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: string reply_to_message_id = 10;
+   */
+  replyToMessageId: string;
 };
 
 /**
@@ -1510,6 +1504,7 @@ export declare const PongSchema: GenMessage<Pong>;
 
 /**
  * @generated from message laelia.v1.SendCommandRequest
+ * @deprecated
  */
 export declare type SendCommandRequest = Message<"laelia.v1.SendCommandRequest"> & {
   /**
@@ -1571,6 +1566,7 @@ export declare type SendCommandRequest = Message<"laelia.v1.SendCommandRequest">
 /**
  * Describes the message laelia.v1.SendCommandRequest.
  * Use `create(SendCommandRequestSchema)` to create a new message.
+ * @deprecated
  */
 export declare const SendCommandRequestSchema: GenMessage<SendCommandRequest>;
 
@@ -1727,145 +1723,6 @@ export declare type PermissionDecision = Message<"laelia.v1.PermissionDecision">
 export declare const PermissionDecisionSchema: GenMessage<PermissionDecision>;
 
 /**
- * @generated from message laelia.v1.InboxItem
- */
-export declare type InboxItem = Message<"laelia.v1.InboxItem"> & {
-  /**
-   * @generated from field: string inbox_item_id = 1;
-   */
-  inboxItemId: string;
-
-  /**
-   * @generated from field: string command_id = 2;
-   */
-  commandId: string;
-
-  /**
-   * @generated from field: int32 priority = 3;
-   */
-  priority: number;
-
-  /**
-   * @generated from field: string context_summary = 4;
-   */
-  contextSummary: string;
-
-  /**
-   * @generated from field: laelia.v1.ExecutorKind executor_kind = 5;
-   */
-  executorKind: ExecutorKind;
-
-  /**
-   * @generated from field: string instruction = 6;
-   */
-  instruction: string;
-
-  /**
-   * @generated from field: laelia.v1.CommandSource source = 7;
-   */
-  source: CommandSource;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp created_at = 8;
-   */
-  createdAt?: Timestamp | undefined;
-};
-
-/**
- * Describes the message laelia.v1.InboxItem.
- * Use `create(InboxItemSchema)` to create a new message.
- */
-export declare const InboxItemSchema: GenMessage<InboxItem>;
-
-/**
- * Empty pull request; agent requests current inbox snapshot
- *
- * @generated from message laelia.v1.PullInbox
- */
-export declare type PullInbox = Message<"laelia.v1.PullInbox"> & {
-};
-
-/**
- * Describes the message laelia.v1.PullInbox.
- * Use `create(PullInboxSchema)` to create a new message.
- */
-export declare const PullInboxSchema: GenMessage<PullInbox>;
-
-/**
- * @generated from message laelia.v1.InboxSnapshot
- */
-export declare type InboxSnapshot = Message<"laelia.v1.InboxSnapshot"> & {
-  /**
-   * @generated from field: repeated laelia.v1.InboxItem items = 1;
-   */
-  items: InboxItem[];
-};
-
-/**
- * Describes the message laelia.v1.InboxSnapshot.
- * Use `create(InboxSnapshotSchema)` to create a new message.
- */
-export declare const InboxSnapshotSchema: GenMessage<InboxSnapshot>;
-
-/**
- * @generated from message laelia.v1.SelectInboxItem
- */
-export declare type SelectInboxItem = Message<"laelia.v1.SelectInboxItem"> & {
-  /**
-   * @generated from field: string inbox_item_id = 1;
-   */
-  inboxItemId: string;
-};
-
-/**
- * Describes the message laelia.v1.SelectInboxItem.
- * Use `create(SelectInboxItemSchema)` to create a new message.
- */
-export declare const SelectInboxItemSchema: GenMessage<SelectInboxItem>;
-
-/**
- * @generated from message laelia.v1.InboxItemSelected
- */
-export declare type InboxItemSelected = Message<"laelia.v1.InboxItemSelected"> & {
-  /**
-   * @generated from field: string inbox_item_id = 1;
-   */
-  inboxItemId: string;
-
-  /**
-   * @generated from field: string command_id = 2;
-   */
-  commandId: string;
-};
-
-/**
- * Describes the message laelia.v1.InboxItemSelected.
- * Use `create(InboxItemSelectedSchema)` to create a new message.
- */
-export declare const InboxItemSelectedSchema: GenMessage<InboxItemSelected>;
-
-/**
- * @generated from message laelia.v1.DeferInboxItem
- */
-export declare type DeferInboxItem = Message<"laelia.v1.DeferInboxItem"> & {
-  /**
-   * @generated from field: string inbox_item_id = 1;
-   */
-  inboxItemId: string;
-
-  /**
-   * @generated from field: string reason = 2;
-   */
-  reason: string;
-};
-
-/**
- * Describes the message laelia.v1.DeferInboxItem.
- * Use `create(DeferInboxItemSchema)` to create a new message.
- */
-export declare const DeferInboxItemSchema: GenMessage<DeferInboxItem>;
-
-/**
  * @generated from message laelia.v1.RespondPermissionRequest
  */
 export declare type RespondPermissionRequest = Message<"laelia.v1.RespondPermissionRequest"> & {
@@ -1885,6 +1742,82 @@ export declare type RespondPermissionRequest = Message<"laelia.v1.RespondPermiss
  * Use `create(RespondPermissionRequestSchema)` to create a new message.
  */
 export declare const RespondPermissionRequestSchema: GenMessage<RespondPermissionRequest>;
+
+/**
+ * PullMessages is sent by an agent over the AgentChannel bidi stream to fetch
+ * chat messages with room_version greater than after_version for a single
+ * conversation. The agent tracks its own cursor per conversation and supplies
+ * it explicitly so that reconnection / crash recovery is self-describing.
+ *
+ * @generated from message laelia.v1.PullMessages
+ */
+export declare type PullMessages = Message<"laelia.v1.PullMessages"> & {
+  /**
+   * @generated from field: string conversation_id = 1;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: int64 after_version = 2;
+   */
+  afterVersion: bigint;
+};
+
+/**
+ * Describes the message laelia.v1.PullMessages.
+ * Use `create(PullMessagesSchema)` to create a new message.
+ */
+export declare const PullMessagesSchema: GenMessage<PullMessages>;
+
+/**
+ * MessageSnapshot is the Manager reply to PullMessages. It returns the newly
+ * available messages and the conversation's current version so the agent can
+ * record it as the base_version for any subsequent action.
+ *
+ * @generated from message laelia.v1.MessageSnapshot
+ */
+export declare type MessageSnapshot = Message<"laelia.v1.MessageSnapshot"> & {
+  /**
+   * @generated from field: repeated laelia.v1.ChatMessage messages = 1;
+   */
+  messages: ChatMessage[];
+
+  /**
+   * @generated from field: int64 current_version = 2;
+   */
+  currentVersion: bigint;
+};
+
+/**
+ * Describes the message laelia.v1.MessageSnapshot.
+ * Use `create(MessageSnapshotSchema)` to create a new message.
+ */
+export declare const MessageSnapshotSchema: GenMessage<MessageSnapshot>;
+
+/**
+ * NewMessagesAvailable is pushed from Manager to agent over the bidi stream to
+ * notify that a conversation the agent is connected to has produced new
+ * messages. The agent should follow up with a PullMessages request.
+ *
+ * @generated from message laelia.v1.NewMessagesAvailable
+ */
+export declare type NewMessagesAvailable = Message<"laelia.v1.NewMessagesAvailable"> & {
+  /**
+   * @generated from field: repeated string conversation_ids = 1;
+   */
+  conversationIds: string[];
+
+  /**
+   * @generated from field: repeated int64 versions = 2;
+   */
+  versions: bigint[];
+};
+
+/**
+ * Describes the message laelia.v1.NewMessagesAvailable.
+ * Use `create(NewMessagesAvailableSchema)` to create a new message.
+ */
+export declare const NewMessagesAvailableSchema: GenMessage<NewMessagesAvailable>;
 
 /**
  * @generated from enum laelia.v1.CommandStatus
@@ -1933,6 +1866,7 @@ export declare const CommandStatusSchema: GenEnum<CommandStatus>;
 
 /**
  * @generated from enum laelia.v1.ExecutorKind
+ * @deprecated
  */
 export enum ExecutorKind {
   /**
@@ -1953,11 +1887,13 @@ export enum ExecutorKind {
 
 /**
  * Describes the enum laelia.v1.ExecutorKind.
+ * @deprecated
  */
 export declare const ExecutorKindSchema: GenEnum<ExecutorKind>;
 
 /**
  * @generated from enum laelia.v1.CommandSource
+ * @deprecated
  */
 export enum CommandSource {
   /**
@@ -1978,8 +1914,46 @@ export enum CommandSource {
 
 /**
  * Describes the enum laelia.v1.CommandSource.
+ * @deprecated
  */
 export declare const CommandSourceSchema: GenEnum<CommandSource>;
+
+/**
+ * SenderType distinguishes who authored a chat message. It replaces the
+ * deprecated CommandSource enum and covers programmatic (SYSTEM) senders that
+ * CommandSource could not express inside chat conversations. Values are
+ * prefixed because UserType already occupies the unprefixed USER/SYSTEM_BOT
+ * names (protobuf C++ scoping rules forbid sibling enums from sharing value
+ * names).
+ *
+ * @generated from enum laelia.v1.SenderType
+ */
+export enum SenderType {
+  /**
+   * @generated from enum value: SENDER_TYPE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: SENDER_TYPE_USER = 1;
+   */
+  USER = 1,
+
+  /**
+   * @generated from enum value: SENDER_TYPE_AGENT = 2;
+   */
+  AGENT = 2,
+
+  /**
+   * @generated from enum value: SENDER_TYPE_SYSTEM = 3;
+   */
+  SYSTEM = 3,
+}
+
+/**
+ * Describes the enum laelia.v1.SenderType.
+ */
+export declare const SenderTypeSchema: GenEnum<SenderType>;
 
 /**
  * @generated from enum laelia.v1.CommandEventType
@@ -2057,6 +2031,7 @@ export declare const CommandEventTypeSchema: GenEnum<CommandEventType>;
 export declare const CommandService: GenService<{
   /**
    * @generated from rpc laelia.v1.CommandService.SendCommand
+   * @deprecated
    */
   sendCommand: {
     methodKind: "unary";
@@ -2218,16 +2193,16 @@ export declare const CommandService: GenService<{
 }>;
 
 /**
- * @generated from service laelia.v1.AgentCommandService
+ * @generated from service laelia.v1.AgentStreamService
  */
-export declare const AgentCommandService: GenService<{
+export declare const AgentStreamService: GenService<{
   /**
-   * @generated from rpc laelia.v1.AgentCommandService.CommandChannel
+   * @generated from rpc laelia.v1.AgentStreamService.AgentChannel
    */
-  commandChannel: {
+  agentChannel: {
     methodKind: "bidi_streaming";
-    input: typeof AgentCommandMessageSchema;
-    output: typeof ManagerCommandMessageSchema;
+    input: typeof AgentStreamMessageSchema;
+    output: typeof ManagerStreamMessageSchema;
   },
 }>;
 
