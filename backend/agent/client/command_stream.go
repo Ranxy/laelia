@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
@@ -74,6 +75,7 @@ type commandStream struct {
 	getAcpConfig    func() *executor.ACPConfig
 	mcpPort         int
 	agentResourceID string
+	isExecuting     atomic.Bool
 }
 
 func newCommandStream(httpClient *http.Client, managerURL string, mcpPort int, agentResourceID string) *commandStream {
@@ -155,6 +157,14 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 			}
 
 			switch m := msg.Message.(type) {
+			case *v1pb.ManagerCommandMessage_InboxSnapshot:
+				c.handleInboxSnapshot(stream, m.InboxSnapshot)
+
+			case *v1pb.ManagerCommandMessage_InboxItemSelected:
+				slog.Info("inbox item selected confirmed",
+					"inboxItemID", m.InboxItemSelected.InboxItemId,
+					"commandID", m.InboxItemSelected.CommandId)
+
 			case *v1pb.ManagerCommandMessage_CommandRequest:
 				req := m.CommandRequest
 				slog.Info("received command", "commandID", req.CommandId, "command", req.Command)
@@ -170,11 +180,17 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 					}); sendErr != nil {
 						errCh <- sendErr
 					}
+					c.isExecuting.Store(false)
 					continue
 				}
 
 				currentExecutor = runtime
-				go c.runCommand(ctx, runtime, stream, req)
+				go func() {
+					c.runCommand(ctx, runtime, stream, req)
+					c.isExecuting.Store(false)
+					slog.Info("command completed, pulling inbox", "commandID", req.CommandId)
+					c.sendPullInbox(stream)
+				}()
 
 			case *v1pb.ManagerCommandMessage_Cancel:
 				if currentExecutor != nil {
@@ -220,6 +236,47 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 				return err
 			}
 		}
+	}
+}
+
+func (c *commandStream) handleInboxSnapshot(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage], snapshot *v1pb.InboxSnapshot) {
+	if c.isExecuting.Load() {
+		return
+	}
+
+	if len(snapshot.Items) == 0 {
+		slog.Info("inbox is empty, waiting for tasks")
+		return
+	}
+
+	item := snapshot.Items[0]
+	slog.Info("selecting inbox item",
+		"inboxItemID", item.InboxItemId,
+		"commandID", item.CommandId,
+		"summary", item.ContextSummary,
+		"remainingItems", len(snapshot.Items)-1)
+
+	c.isExecuting.Store(true)
+
+	if err := stream.Send(&v1pb.AgentCommandMessage{
+		Message: &v1pb.AgentCommandMessage_SelectInboxItem{
+			SelectInboxItem: &v1pb.SelectInboxItem{
+				InboxItemId: item.InboxItemId,
+			},
+		},
+	}); err != nil {
+		slog.Error("failed to send select inbox item", "error", err)
+		c.isExecuting.Store(false)
+	}
+}
+
+func (c *commandStream) sendPullInbox(stream *connect.BidiStreamForClient[v1pb.AgentCommandMessage, v1pb.ManagerCommandMessage]) {
+	if err := stream.Send(&v1pb.AgentCommandMessage{
+		Message: &v1pb.AgentCommandMessage_PullInbox{
+			PullInbox: &v1pb.PullInbox{},
+		},
+	}); err != nil {
+		slog.Error("failed to send pull inbox", "error", err)
 	}
 }
 
@@ -290,7 +347,6 @@ func (*commandStream) runCommand(
 		case <-runtime.Done():
 			_ = merged.flush(stream, commandID, state)
 
-			// Drain any remaining output chunks before reading the result.
 			lastSeqNo, lastEventSeqNo := drainOutput(runtime, stream, commandID, state.LastSeqSent, state.LastEventSeqSent, &merged)
 			state.LastSeqSent = lastSeqNo
 			state.LastEventSeqSent = lastEventSeqNo
