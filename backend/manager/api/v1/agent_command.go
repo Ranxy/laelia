@@ -40,8 +40,6 @@ func (s *AgentCommandService) CommandChannel(
 	sess := s.dispatcher.RegisterAgent(ctx, agent.ID, agent.ResourceID, sendFunc)
 	defer s.dispatcher.UnregisterAgent(agent.ID)
 
-	s.dispatcher.TryDispatchNext(ctx, agent.ID)
-
 	for {
 		msg, err := stream.Receive()
 		if err != nil {
@@ -69,6 +67,21 @@ func (s *AgentCommandService) CommandChannel(
 		case *v1pb.AgentCommandMessage_Event:
 			if err := s.dispatcher.HandleEvent(ctx, m.Event); err != nil {
 				slog.Error("failed to handle event", "error", err)
+			}
+
+		case *v1pb.AgentCommandMessage_PullInbox:
+			if err := s.dispatcher.HandlePullInbox(ctx, agent.ID); err != nil {
+				slog.Error("failed to handle pull inbox", "error", err)
+			}
+
+		case *v1pb.AgentCommandMessage_SelectInboxItem:
+			if err := s.dispatcher.HandleSelectInboxItem(ctx, agent.ID, m.SelectInboxItem.InboxItemId); err != nil {
+				slog.Error("failed to handle select inbox item", "error", err)
+			}
+
+		case *v1pb.AgentCommandMessage_DeferInboxItem:
+			if err := s.dispatcher.HandleDeferInboxItem(ctx, agent.ID, m.DeferInboxItem.InboxItemId); err != nil {
+				slog.Error("failed to handle defer inbox item", "error", err)
 			}
 
 		case *v1pb.AgentCommandMessage_Ping:
@@ -108,5 +121,5 @@ func (s *AgentCommandService) handleAgentReady(
 			return
 		}
 	}
-	s.dispatcher.TryDispatchNext(ctx, agent.ID)
+	s.dispatcher.NotifyInboxUpdated(ctx, agent.ID)
 }
