@@ -56,10 +56,10 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 		return nil, errors.Wrapf(err, "failed to insert conversation")
 	}
 
-	if err := s.AddConversationMember(ctx, newConv.ID, MemberTypeUser, fmt.Sprintf("%d", principalID), MemberRoleOwner); err != nil {
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, fmt.Sprintf("%d", principalID), MemberRoleOwner); err != nil {
 		return nil, err
 	}
-	if err := s.AddConversationMember(ctx, newConv.ID, MemberTypeAgent, agent, MemberRoleMember); err != nil {
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeAgent, agent, MemberRoleMember); err != nil {
 		return nil, err
 	}
 
@@ -107,7 +107,7 @@ func (s *Store) CreateChannel(ctx context.Context, title string, ownerID int) (*
 		return nil, errors.Wrapf(err, "failed to create channel")
 	}
 
-	if err := s.AddConversationMember(ctx, conv.ID, MemberTypeUser, fmt.Sprintf("%d", ownerID), MemberRoleOwner); err != nil {
+	if err := addConversationMemberTx(ctx, tx, conv.ID, MemberTypeUser, fmt.Sprintf("%d", ownerID), MemberRoleOwner); err != nil {
 		return nil, err
 	}
 

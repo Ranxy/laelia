@@ -38,6 +38,18 @@ func (s *Store) AddConversationMember(ctx context.Context, convID uuid.UUID, mem
 	return nil
 }
 
+func addConversationMemberTx(ctx context.Context, tx *sql.Tx, convID uuid.UUID, memberType int32, memberID string, role int32) error {
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO conversation_member (conversation_id, member_type, member_id, member_role)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (conversation_id, member_type, member_id) DO UPDATE SET member_role = $4
+	`, convID, memberType, memberID, role)
+	if err != nil {
+		return errors.Wrapf(err, "failed to add conversation member")
+	}
+	return nil
+}
+
 func (s *Store) RemoveConversationMember(ctx context.Context, convID uuid.UUID, memberType int32, memberID string) error {
 	_, err := s.GetDB().ExecContext(ctx, `
 		DELETE FROM conversation_member
