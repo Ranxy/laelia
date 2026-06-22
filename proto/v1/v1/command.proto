@@ -474,6 +474,9 @@ message AgentCommandMessage {
     CommandResult result = 3;
     Ping ping = 4;
     CommandEvent event = 5;
+    PullInbox pull_inbox = 6;
+    SelectInboxItem select_inbox_item = 7;
+    DeferInboxItem defer_inbox_item = 8;
   }
 }
 
@@ -483,6 +486,8 @@ message ManagerCommandMessage {
     CancelMessage cancel = 2;
     Pong pong = 3;
     PermissionDecision permission_decision = 4;
+    InboxSnapshot inbox_snapshot = 5;
+    InboxItemSelected inbox_item_selected = 6;
   }
 }
 
@@ -604,6 +609,39 @@ message WatchCommandEventsRequest {
 message PermissionDecision {
   string command_id = 1;
   string option_id = 2;
+}
+
+message InboxItem {
+  string inbox_item_id = 1;
+  string command_id = 2;
+  int32 priority = 3;
+  string context_summary = 4;
+  ExecutorKind executor_kind = 5;
+  string instruction = 6;
+  CommandSource source = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message PullInbox {
+  // Empty pull request; agent requests current inbox snapshot
+}
+
+message InboxSnapshot {
+  repeated InboxItem items = 1;
+}
+
+message SelectInboxItem {
+  string inbox_item_id = 1;
+}
+
+message InboxItemSelected {
+  string inbox_item_id = 1;
+  string command_id = 2;
+}
+
+message DeferInboxItem {
+  string inbox_item_id = 1;
+  string reason = 2;
 }
 
 message RespondPermissionRequest {
