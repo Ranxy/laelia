@@ -10,6 +10,7 @@ import {
   ListChannelsRequestSchema,
   ListConversationMessagesRequestSchema,
   SendCommandRequestSchema,
+  SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import type { AppSliceCreator, ChatMessageUI, ChatSlice } from "./types";
 
@@ -332,6 +333,34 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
     );
     const channels = [...get().channels, res];
     set({ channels });
+    return res;
+  },
+
+  async sendChannelMessage(conversationId, content) {
+    const conversationName = `conversations/${conversationId}`;
+    const res = await commandServiceClient.sendMessage(
+      create(SendMessageRequestSchema, {
+        conversation: conversationName,
+        content,
+      })
+    );
+    const chatMsg: ChatMessageUI = {
+      id: res.name,
+      role: "user",
+      content: res.content,
+      timestamp: res.createdAt ? timestampDate(res.createdAt) : new Date(),
+      senderName: res.senderName || undefined,
+      senderType: res.senderType || undefined,
+    };
+    set((state) => ({
+      chatMessages: {
+        ...state.chatMessages,
+        [conversationName]: [
+          ...(state.chatMessages[conversationName] ?? []),
+          chatMsg,
+        ],
+      },
+    }));
     return res;
   },
 });

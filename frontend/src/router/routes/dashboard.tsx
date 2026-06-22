@@ -4,6 +4,8 @@ import { AgentWorkspaceLayout } from "@/react/app/layouts/agent-workspace-layout
 import { DashboardLayout } from "@/react/app/layouts/dashboard-layout";
 import {
   AGENT_ROUTE_LIST,
+  CHANNEL_ROUTE_DETAIL,
+  CHANNEL_ROUTE_LIST,
   CHAT_ROUTE,
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
@@ -60,6 +62,22 @@ export const dashboardRoutes: RouteObject[] = [
               })),
           },
         ],
+      },
+      {
+        path: "channels",
+        handle: { name: CHANNEL_ROUTE_LIST },
+        lazy: () =>
+          import("@/react/pages/dashboard/channel-list").then((m) => ({
+            Component: m.ChannelListPage,
+          })),
+      },
+      {
+        path: "channels/:channelId",
+        handle: { name: CHANNEL_ROUTE_DETAIL },
+        lazy: () =>
+          import("@/react/pages/dashboard/channel-chat").then((m) => ({
+            Component: m.ChannelChatPage,
+          })),
       },
     ],
   },

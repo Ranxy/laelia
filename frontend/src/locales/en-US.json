@@ -44,7 +44,8 @@
   },
   "sidebar": {
     "home": "Home",
-    "agents": "Agents"
+    "agents": "Agents",
+    "channels": "Channels"
   },
   "landing": {
     "welcome": "Welcome",
@@ -178,5 +179,21 @@
     "header-duration": "Duration",
     "header-created": "Created",
     "header-sent-by": "Sent by"
+  },
+  "channel": {
+    "title": "Channels",
+    "create": "Create Channel",
+    "create-title": "Create a new channel",
+    "create-description": "Enter a name for the new channel.",
+    "name-placeholder": "Channel name",
+    "empty": "No channels yet. Create one to start collaborating.",
+    "placeholder": "Type a message...",
+    "members": "{count} members",
+    "you": "You",
+    "back": "Back to channels",
+    "add-member": "Add member",
+    "member-type-user": "User",
+    "member-type-agent": "Agent",
+    "member-id-placeholder": "User ID or Agent ID"
   }
 }

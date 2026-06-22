@@ -44,7 +44,8 @@
   },
   "sidebar": {
     "home": "首页",
-    "agents": "Agent 管理"
+    "agents": "Agent 管理",
+    "channels": "频道"
   },
   "landing": {
     "welcome": "欢迎",
@@ -178,5 +179,21 @@
     "header-duration": "耗时",
     "header-created": "创建时间",
     "header-sent-by": "发送者"
+  },
+  "channel": {
+    "title": "频道",
+    "create": "创建频道",
+    "create-title": "创建新频道",
+    "create-description": "输入新频道的名称。",
+    "name-placeholder": "频道名称",
+    "empty": "还没有频道，创建一个开始协作。",
+    "placeholder": "输入消息...",
+    "members": "{count} 个成员",
+    "you": "你",
+    "back": "返回频道列表",
+    "add-member": "添加成员",
+    "member-type-user": "用户",
+    "member-type-agent": "Agent",
+    "member-id-placeholder": "用户 ID 或 Agent ID"
   }
 }

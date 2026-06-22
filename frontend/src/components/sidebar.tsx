@@ -5,6 +5,7 @@ import {
   Home,
   type LucideIcon,
   Menu,
+  MessageCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -14,6 +15,8 @@ import { getLayerRoot, LAYER_SURFACE_CLASS } from "@/react/components/ui/layer";
 import { cn } from "@/react/lib/utils";
 import {
   AGENT_ROUTE_LIST,
+  CHANNEL_ROUTE_DETAIL,
+  CHANNEL_ROUTE_LIST,
   CHAT_ROUTE,
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
@@ -53,6 +56,12 @@ function getItemClass(item: SidebarItem, currentRouteName: string): string {
   ) {
     return cn("router-link-active", "bg-link-hover");
   }
+  if (
+    item.name === CHANNEL_ROUTE_LIST &&
+    currentRouteName === CHANNEL_ROUTE_DETAIL
+  ) {
+    return cn("router-link-active", "bg-link-hover");
+  }
   return "";
 }
 
@@ -75,6 +84,12 @@ function useSidebarItems(): SidebarItem[] {
         title: t("sidebar.agents"),
         icon: Bot,
         name: AGENT_ROUTE_LIST,
+        type: "route",
+      },
+      {
+        title: t("sidebar.channels"),
+        icon: MessageCircle,
+        name: CHANNEL_ROUTE_LIST,
         type: "route",
       },
     ],
