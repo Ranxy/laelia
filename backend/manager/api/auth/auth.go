@@ -360,6 +360,12 @@ func GenerateAgentToken(agentName string, resourceID string, tokenVersion int, t
 	return signAgentToken(agentName, resourceID, tokenVersion, tokenType, "", resourceID, fmt.Sprintf(AgentAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
 }
 
+// GenerateAgentTokenWithFamily generates an agent token with a custom token family.
+func GenerateAgentTokenWithFamily(agentName string, resourceID string, tokenVersion int, tokenType string, tokenFamily string, mode common.ReleaseMode, secret string, duration time.Duration) (string, error) {
+	expirationTime := time.Now().Add(duration)
+	return signAgentToken(agentName, resourceID, tokenVersion, tokenType, "", tokenFamily, fmt.Sprintf(AgentAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
+}
+
 // GenerateAgentTokenWithSession generates an agent token with session ID.
 func GenerateAgentTokenWithSession(agentName string, resourceID string, tokenVersion int, tokenType string, sessionID string, mode common.ReleaseMode, secret string, duration time.Duration) (string, error) {
 	expirationTime := time.Now().Add(duration)

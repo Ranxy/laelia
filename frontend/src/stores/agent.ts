@@ -5,6 +5,8 @@ import {
   AgentSchema,
   CreateAgentRequestSchema,
   DeleteAgentRequestSchema,
+  RevokeAgentTokenRequestSchema,
+  RotateAgentTokenRequestSchema,
   UpdateAgentACPConfigRequestSchema,
 } from "@/types/proto-es/v1/agent_pb";
 import type { AgentSlice, AppSliceCreator } from "./types";
@@ -68,6 +70,29 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     );
     set((state) => ({
       agents: state.agents.filter((a) => a.name !== name),
+      agentCache: Object.fromEntries(
+        Object.entries(state.agentCache).filter(([k]) => k !== name)
+      ),
+    }));
+  },
+
+  async rotateAgentToken(name: string, reason?: string) {
+    const res = await agentServiceClient.rotateAgentToken(
+      create(RotateAgentTokenRequestSchema, { name, reason: reason ?? "" })
+    );
+    set((state) => ({
+      agentCache: Object.fromEntries(
+        Object.entries(state.agentCache).filter(([k]) => k !== name)
+      ),
+    }));
+    return res;
+  },
+
+  async revokeAgentToken(name: string, reason?: string) {
+    await agentServiceClient.revokeAgentToken(
+      create(RevokeAgentTokenRequestSchema, { name, reason: reason ?? "" })
+    );
+    set((state) => ({
       agentCache: Object.fromEntries(
         Object.entries(state.agentCache).filter(([k]) => k !== name)
       ),

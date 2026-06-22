@@ -1,5 +1,9 @@
 import type { StateCreator } from "zustand";
-import type { Agent, CreateAgentResponse } from "@/types/proto-es/v1/agent_pb";
+import type {
+  Agent,
+  CreateAgentResponse,
+  RotateAgentTokenResponse,
+} from "@/types/proto-es/v1/agent_pb";
 import type {
   Command,
   CommandEvent,
@@ -50,6 +54,11 @@ export interface AgentSlice {
     labels?: Record<string, string>
   ) => Promise<CreateAgentResponse>;
   deleteAgent: (name: string) => Promise<void>;
+  rotateAgentToken: (
+    name: string,
+    reason?: string
+  ) => Promise<RotateAgentTokenResponse>;
+  revokeAgentToken: (name: string, reason?: string) => Promise<void>;
   updateAgentACPConfig: (name: string, acpConfigYaml: string) => Promise<void>;
 }
 

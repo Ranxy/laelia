@@ -4,6 +4,14 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ConnectionBadge } from "@/react/components/connection-badge";
 import { Alert } from "@/react/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from "@/react/components/ui/alert-dialog";
 import { Button } from "@/react/components/ui/button";
 import {
   Dialog,
@@ -43,6 +51,7 @@ export function AgentsPage() {
   const [name, setName] = useState("");
   const [token, setToken] = useState<string | null>(null);
   const [tokenOpen, setTokenOpen] = useState(false);
+  const [tokenFromRotation, setTokenFromRotation] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -50,6 +59,11 @@ export function AgentsPage() {
   const [acpConfigYaml, setAcpConfigYaml] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [rotateOpen, setRotateOpen] = useState(false);
+  const [revokeOpen, setRevokeOpen] = useState(false);
+  const [rotating, setRotating] = useState(false);
+  const [revoking, setRevoking] = useState(false);
+  const [actionError, setActionError] = useState("");
 
   const load = useCallback(() => {
     fetchAgents({ pageSize: 100 });
@@ -67,6 +81,7 @@ export function AgentsPage() {
       const agent = await createAgent(name.trim());
       if (agent.bootstrapToken) {
         setToken(agent.bootstrapToken);
+        setTokenFromRotation(false);
         setTokenOpen(true);
       }
       setName("");
@@ -97,6 +112,47 @@ export function AgentsPage() {
     setAcpConfigYaml(agent.info?.acpConfigYaml ?? "");
     setSaveError("");
     setAcpConfigOpen(true);
+  }
+
+  async function handleRotateToken() {
+    if (!selectedAgent?.name) return;
+    setRotating(true);
+    setActionError("");
+    try {
+      const rotateAgentToken = useAppStore.getState().rotateAgentToken;
+      const res = await rotateAgentToken(selectedAgent.name);
+      if (res.bootstrapToken) {
+        setToken(res.bootstrapToken);
+        setTokenFromRotation(true);
+        setTokenOpen(true);
+      }
+      setRotateOpen(false);
+      load();
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : t("agent.rotate-token-error");
+      setActionError(msg);
+    } finally {
+      setRotating(false);
+    }
+  }
+
+  async function handleRevokeToken() {
+    if (!selectedAgent?.name) return;
+    setRevoking(true);
+    setActionError("");
+    try {
+      const revokeAgentToken = useAppStore.getState().revokeAgentToken;
+      await revokeAgentToken(selectedAgent.name);
+      setRevokeOpen(false);
+      load();
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : t("agent.revoke-token-error");
+      setActionError(msg);
+    } finally {
+      setRevoking(false);
+    }
   }
 
   async function handleSaveACPConfig() {
@@ -154,9 +210,15 @@ export function AgentsPage() {
         onOpenChange={(next) => !next && setTokenOpen(false)}
       >
         <DialogContent className="max-w-lg">
-          <DialogTitle>{t("agent.created-title")}</DialogTitle>
+          <DialogTitle>
+            {tokenFromRotation
+              ? t("agent.rotate-token-success-title")
+              : t("agent.created-title")}
+          </DialogTitle>
           <DialogDescription>
-            {t("agent.created-description")}
+            {tokenFromRotation
+              ? t("agent.rotate-token-success-description")
+              : t("agent.created-description")}
           </DialogDescription>
           <div className="mt-4 space-y-3">
             <p className="text-sm text-control-light">
@@ -269,8 +331,22 @@ export function AgentsPage() {
                     <span>{formatTimestamp(selectedAgent.createdAt)}</span>
                   </>
                 )}
+                <span className="text-control-light whitespace-nowrap">
+                  {t("agent.detail-token-version")}
+                </span>
+                <span>{selectedAgent.tokenVersion ?? "-"}</span>
+                {selectedAgent.lastTokenRotatedAt && (
+                  <>
+                    <span className="text-control-light whitespace-nowrap">
+                      {t("agent.detail-last-rotated")}
+                    </span>
+                    <span>
+                      {formatTimestamp(selectedAgent.lastTokenRotatedAt)}
+                    </span>
+                  </>
+                )}
               </div>
-              <div className="pt-3 border-t border-control-border">
+              <div className="pt-3 border-t border-control-border flex flex-col gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -278,6 +354,35 @@ export function AgentsPage() {
                 >
                   ACP Config
                 </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setActionError("");
+                      setRotateOpen(true);
+                    }}
+                  >
+                    {t("agent.rotate-token")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setActionError("");
+                      setRevokeOpen(true);
+                    }}
+                  >
+                    {t("agent.revoke-token")}
+                  </Button>
+                </div>
+                {actionError && (
+                  <Alert
+                    variant="error"
+                    description={actionError}
+                    className="mt-2"
+                  />
+                )}
               </div>
             </div>
           )}
@@ -325,6 +430,60 @@ export function AgentsPage() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog
+        open={rotateOpen}
+        onOpenChange={(next) => !next && setRotateOpen(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogTitle>
+            {t("agent.rotate-token-confirm-title")}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("agent.rotate-token-confirm-description")}
+          </AlertDialogDescription>
+          {actionError && (
+            <Alert variant="error" description={actionError} className="mt-2" />
+          )}
+          <AlertDialogFooter>
+            <AlertDialogClose>
+              <Button variant="outline" disabled={rotating}>
+                {t("common.cancel")}
+              </Button>
+            </AlertDialogClose>
+            <Button disabled={rotating} onClick={handleRotateToken}>
+              {rotating ? t("common.creating") : t("agent.rotate-token")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={revokeOpen}
+        onOpenChange={(next) => !next && setRevokeOpen(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogTitle>
+            {t("agent.revoke-token-confirm-title")}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("agent.revoke-token-confirm-description")}
+          </AlertDialogDescription>
+          {actionError && (
+            <Alert variant="error" description={actionError} className="mt-2" />
+          )}
+          <AlertDialogFooter>
+            <AlertDialogClose>
+              <Button variant="outline" disabled={revoking}>
+                {t("common.cancel")}
+              </Button>
+            </AlertDialogClose>
+            <Button disabled={revoking} onClick={handleRevokeToken}>
+              {revoking ? t("common.creating") : t("agent.revoke-token")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {loading ? (
         <p className="text-control-light">{t("common.loading")}</p>

@@ -185,6 +185,13 @@ func (s *AgentService) RotateAgentToken(ctx context.Context, req *connect.Reques
 	}
 
 	newTokenVersion := agent.TokenVersion + 1
+	newTokenFamily := fmt.Sprintf("%s:v%d", agent.ResourceID, newTokenVersion)
+
+	bootstrapToken, err := auth.GenerateAgentTokenWithFamily(agent.Name, agent.ResourceID, newTokenVersion, auth.TokenTypeBootstrap, newTokenFamily, s.profile.Mode, s.secret, bootstrapTokenDuration)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate agent token, error: %v", err))
+	}
+
 	nowRotated := time.Now()
 	if _, err := s.store.UpdateAgent(ctx, agent, &store.UpdateAgentMessage{
 		TokenVersion:       &newTokenVersion,
@@ -193,9 +200,8 @@ func (s *AgentService) RotateAgentToken(ctx context.Context, req *connect.Reques
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent token version, error: %v", err))
 	}
 
-	bootstrapToken, err := auth.GenerateAgentToken(agent.Name, agent.ResourceID, newTokenVersion, auth.TokenTypeBootstrap, s.profile.Mode, s.secret, bootstrapTokenDuration)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate agent token, error: %v", err))
+	if err := s.store.RevokeAllAgentTokens(ctx, agent.ID); err != nil {
+		slog.Warn("failed to revoke old tokens after rotation", "agent", resourceID, "error", err)
 	}
 
 	tokenHash := hashToken(bootstrapToken)
@@ -203,12 +209,21 @@ func (s *AgentService) RotateAgentToken(ctx context.Context, req *connect.Reques
 		AgentID:     agent.ID,
 		TokenHash:   tokenHash,
 		TokenType:   storepb.AgentTokenType_BOOTSTRAP,
-		TokenFamily: agent.ResourceID,
+		TokenFamily: newTokenFamily,
 		State:       storepb.AgentTokenState_ACTIVE,
 		ExpiresAt:   time.Now().Add(bootstrapTokenDuration),
 		CreatedBy:   "system",
 	}); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store agent token, error: %v", err))
+		slog.Error("failed to store new token after rotation — agent has no valid bootstrap token", "agent", resourceID, "error", err)
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store new agent token, error: %v", err))
+	}
+
+	terminateReason := "token_rotated"
+	if req.Msg.Reason != "" {
+		terminateReason = req.Msg.Reason
+	}
+	if err := s.store.TerminateAllAgentSessions(ctx, agent.ID, terminateReason); err != nil {
+		slog.Warn("failed to terminate agent sessions after rotation", "agent", resourceID, "error", err)
 	}
 
 	return connect.NewResponse(&v1pb.RotateAgentTokenResponse{
@@ -242,7 +257,11 @@ func (s *AgentService) RevokeAgentToken(ctx context.Context, req *connect.Reques
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to revoke agent tokens, error: %v", err))
 	}
 
-	if err := s.store.TerminateAllAgentSessions(ctx, agent.ID, "token_revoked"); err != nil {
+	terminateReason := "token_revoked"
+	if req.Msg.Reason != "" {
+		terminateReason = req.Msg.Reason
+	}
+	if err := s.store.TerminateAllAgentSessions(ctx, agent.ID, terminateReason); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to terminate agent sessions, error: %v", err))
 	}
 
@@ -309,15 +328,20 @@ func (s *AgentService) ListAgentSessions(ctx context.Context, req *connect.Reque
 
 func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1pb.ConnectAgentRequest]) (*connect.Response[v1pb.ConnectAgentResponse], error) {
 	agent, ok := GetAgentFromContext(ctx)
+	tokenFamily := ""
 	if !ok || agent == nil {
 		if req.Msg.BootstrapToken == "" {
 			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent not authenticated and no bootstrap token provided"))
 		}
-		var err error
-		agent, err = s.authenticateBootstrapToken(req.Msg.BootstrapToken)
+		authResult, err := s.authenticateBootstrapToken(req.Msg.BootstrapToken)
 		if err != nil {
 			return nil, err
 		}
+		agent = authResult.agent
+		tokenFamily = authResult.tokenFamily
+	}
+	if tokenFamily == "" {
+		tokenFamily = agent.ResourceID
 	}
 
 	sessionID := generateRandomString(sessionIDLength)
@@ -381,7 +405,7 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 	if err := s.store.CreateAgentSession(ctx, &store.AgentSessionMessage{
 		SessionID:    sessionID,
 		AgentID:      agent.ID,
-		TokenFamily:  agent.ResourceID,
+		TokenFamily:  tokenFamily,
 		State:        "ACTIVE",
 		SourceIP:     sourceIP,
 		Fingerprint:  req.Msg.Fingerprint,
@@ -406,7 +430,7 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 		AgentID:     agent.ID,
 		TokenHash:   refreshTokenHash,
 		TokenType:   storepb.AgentTokenType_REFRESH,
-		TokenFamily: agent.ResourceID,
+		TokenFamily: tokenFamily,
 		State:       storepb.AgentTokenState_ACTIVE,
 		Fingerprint: req.Msg.Fingerprint,
 		ExpiresAt:   time.Now().Add(refreshTokenDuration),
@@ -655,10 +679,16 @@ type bootstrapClaims struct {
 	Name         string `json:"name"`
 	TokenVersion int    `json:"token_version"`
 	TokenType    string `json:"token_type"`
+	TokenFamily  string `json:"token_family"`
 	jwt.RegisteredClaims
 }
 
-func (s *AgentService) authenticateBootstrapToken(tokenStr string) (*store.AgentMessage, error) {
+type bootstrapAuthResult struct {
+	agent       *store.AgentMessage
+	tokenFamily string
+}
+
+func (s *AgentService) authenticateBootstrapToken(tokenStr string) (*bootstrapAuthResult, error) {
 	claims := &bootstrapClaims{}
 	parsedToken, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
 		if t.Method.Alg() != jwt.SigningMethodHS256.Name {
@@ -705,7 +735,12 @@ func (s *AgentService) authenticateBootstrapToken(tokenStr string) (*store.Agent
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("bootstrap token expired"))
 	}
 
-	return agent, nil
+	tokenFamily := claims.TokenFamily
+	if tokenFamily == "" {
+		tokenFamily = claims.Subject
+	}
+
+	return &bootstrapAuthResult{agent: agent, tokenFamily: tokenFamily}, nil
 }
 
 func convertToAgent(agent *store.AgentMessage) *v1pb.Agent {
