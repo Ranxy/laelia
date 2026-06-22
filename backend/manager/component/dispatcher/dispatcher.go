@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -51,18 +52,18 @@ func New(s *store.Store) *Dispatcher {
 		watchers:      make(map[string]map[chan *v1pb.CommandOutput]struct{}),
 		eventWatchers: make(map[string]map[chan *v1pb.CommandEvent]struct{}),
 		pingInterval:  15 * time.Second,
-		pingTimeout:   45 * time.Second, // allow 3 missed pings
+		pingTimeout:   45 * time.Second,
 	}
 }
 
-func (d *Dispatcher) RegisterAgent(_ context.Context, agentID int, agentResourceID string, send SendFunc) *AgentSession {
+func (d *Dispatcher) RegisterAgent(ctx context.Context, agentID int, agentResourceID string, send SendFunc) *AgentSession {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	if old, ok := d.sessions[agentID]; ok {
 		slog.Info("replacing existing agent session", "agentID", agentID)
 		old.mu.Lock()
-		old.send = nil // invalidate old session's send function
+		old.send = nil
 		old.mu.Unlock()
 	}
 
@@ -79,8 +80,13 @@ func (d *Dispatcher) RegisterAgent(_ context.Context, agentID int, agentResource
 	}
 
 	d.sessions[agentID] = sess
-
 	slog.Info("agent registered for command dispatch", "agentID", agentID)
+
+	_ = d.store.UpsertWorkingState(ctx, &store.WorkingStateMessage{
+		AgentID: agentID,
+		State:   store.WorkingStateIdle,
+	})
+
 	return sess
 }
 
@@ -100,6 +106,12 @@ func (d *Dispatcher) UnregisterAgent(agentID int) {
 
 	delete(d.sessions, agentID)
 	slog.Info("agent unregistered from command dispatch", "agentID", agentID)
+
+	_ = d.store.ReleaseSelectedItems(context.Background(), agentID)
+	_ = d.store.UpsertWorkingState(context.Background(), &store.WorkingStateMessage{
+		AgentID: agentID,
+		State:   store.WorkingStateIdle,
+	})
 
 	if cmdID != "" {
 		go d.handleCommandGracePeriod(agentID, cmdID)
@@ -123,10 +135,6 @@ func (d *Dispatcher) DispatchCommand(ctx context.Context, cmd *store.CommandMess
 	}
 
 	sess.mu.Lock()
-	if sess.currentCmdID != "" {
-		sess.mu.Unlock()
-		return nil // agent is busy, command stays PENDING in DB
-	}
 	if sess.send == nil {
 		sess.mu.Unlock()
 		return errors.New("agent session invalidated")
@@ -168,6 +176,154 @@ func (d *Dispatcher) DispatchCommand(ctx context.Context, cmd *store.CommandMess
 
 	slog.Info("command dispatched to agent", "commandID", cmd.ID, "agentID", cmd.AgentID)
 	return nil
+}
+
+func (d *Dispatcher) SendInboxSnapshot(ctx context.Context, agentID int) error {
+	d.mu.RLock()
+	sess, ok := d.sessions[agentID]
+	d.mu.RUnlock()
+
+	if !ok {
+		return errors.New("agent not connected")
+	}
+
+	items, err := d.store.GetInboxItems(ctx, agentID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get inbox items")
+	}
+
+	var protoItems []*v1pb.InboxItem
+	for _, item := range items {
+		protoItems = append(protoItems, &v1pb.InboxItem{
+			InboxItemId:    item.ID.String(),
+			CommandId:      item.CommandID.String(),
+			Priority:       item.Priority,
+			ContextSummary: item.ContextSummary,
+			CreatedAt:      timestamppb.New(item.CreatedAt),
+		})
+	}
+
+	sess.mu.Lock()
+	send := sess.send
+	sess.mu.Unlock()
+
+	if send == nil {
+		return errors.New("agent session invalidated")
+	}
+
+	msg := &v1pb.ManagerCommandMessage{
+		Message: &v1pb.ManagerCommandMessage_InboxSnapshot{
+			InboxSnapshot: &v1pb.InboxSnapshot{
+				Items: protoItems,
+			},
+		},
+	}
+
+	if err := send(msg); err != nil {
+		return errors.Wrapf(err, "failed to send inbox snapshot")
+	}
+
+	return nil
+}
+
+func (d *Dispatcher) NotifyInboxUpdated(ctx context.Context, agentID int) {
+	_ = d.SendInboxSnapshot(ctx, agentID)
+}
+
+func (d *Dispatcher) HandlePullInbox(ctx context.Context, agentID int) error {
+	return d.SendInboxSnapshot(ctx, agentID)
+}
+
+func (d *Dispatcher) HandleSelectInboxItem(ctx context.Context, agentID int, itemID string) error {
+	itemUUID, err := uuid.Parse(itemID)
+	if err != nil {
+		return errors.Wrapf(err, "invalid inbox item ID")
+	}
+
+	if err := d.store.SelectInboxItem(ctx, itemUUID); err != nil {
+		return errors.Wrapf(err, "failed to select inbox item")
+	}
+
+	_ = d.store.UpsertWorkingState(ctx, &store.WorkingStateMessage{
+		AgentID: agentID,
+		State:   store.WorkingStateDeciding,
+	})
+
+	itemWithCmd, err := d.store.GetInboxItemWithCommand(ctx, itemUUID)
+	if err != nil {
+		_ = d.store.UpsertWorkingState(ctx, &store.WorkingStateMessage{
+			AgentID: agentID,
+			State:   store.WorkingStateIdle,
+		})
+		return errors.Wrapf(err, "failed to get inbox item with command")
+	}
+
+	cmd := &store.CommandMessage{
+		ID:             itemWithCmd.CommandID,
+		AgentID:        agentID,
+		PrincipalID:    itemWithCmd.PrincipalID,
+		Command:        itemWithCmd.Command,
+		Instruction:    itemWithCmd.Instruction,
+		Profile:        itemWithCmd.Profile,
+		ExecutorKind:   itemWithCmd.ExecutorKind,
+		AllowDiff:      itemWithCmd.AllowDiff,
+		Env:            itemWithCmd.Env,
+		WorkingDir:     itemWithCmd.WorkingDir,
+		TimeoutSeconds: itemWithCmd.TimeoutSecs,
+		SourceType:     itemWithCmd.SourceType,
+	}
+
+	if err := d.DispatchCommand(ctx, cmd); err != nil {
+		_ = d.store.UpsertWorkingState(ctx, &store.WorkingStateMessage{
+			AgentID: agentID,
+			State:   store.WorkingStateIdle,
+		})
+		return errors.Wrapf(err, "failed to dispatch command")
+	}
+
+	_ = d.store.UpsertWorkingState(ctx, &store.WorkingStateMessage{
+		AgentID:     agentID,
+		InboxItemID: uuid.NullUUID{UUID: itemUUID, Valid: true},
+		State:       store.WorkingStateWorking,
+	})
+
+	d.mu.RLock()
+	sess, ok := d.sessions[agentID]
+	d.mu.RUnlock()
+
+	if ok {
+		sess.mu.Lock()
+		send := sess.send
+		sess.mu.Unlock()
+		if send != nil {
+			if err := send(&v1pb.ManagerCommandMessage{
+				Message: &v1pb.ManagerCommandMessage_InboxItemSelected{
+					InboxItemSelected: &v1pb.InboxItemSelected{
+						InboxItemId: itemID,
+						CommandId:   itemWithCmd.CommandID.String(),
+					},
+				},
+			}); err != nil {
+				slog.Warn("failed to send inbox item selected ack", "error", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (d *Dispatcher) HandleDeferInboxItem(ctx context.Context, agentID int, itemID string) error {
+	itemUUID, err := uuid.Parse(itemID)
+	if err != nil {
+		return errors.Wrapf(err, "invalid inbox item ID")
+	}
+
+	deferredUntil := time.Now().Add(60 * time.Second)
+	if err := d.store.DeferInboxItem(ctx, itemUUID, deferredUntil); err != nil {
+		return errors.Wrapf(err, "failed to defer inbox item")
+	}
+
+	return d.SendInboxSnapshot(ctx, agentID)
 }
 
 func (d *Dispatcher) CancelCommand(_ context.Context, agentID int, commandID string) error {
@@ -299,7 +455,6 @@ func (d *Dispatcher) broadcast(commandID string, output *v1pb.CommandOutput) {
 		select {
 		case ch <- output:
 		default:
-			// watcher too slow, drop
 		}
 	}
 }
@@ -312,7 +467,6 @@ func (d *Dispatcher) broadcastEvent(commandID string, event *v1pb.CommandEvent) 
 		select {
 		case ch <- event:
 		default:
-			// watcher too slow, drop
 		}
 	}
 }
@@ -426,7 +580,7 @@ func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb
 			ConversationID: *cmd.ConversationID,
 			PrincipalID:    cmd.PrincipalID,
 			SenderAgentID:  sql.NullInt32{Int32: int32(cmd.AgentID), Valid: true},
-			Role:           2, // ASSISTANT
+			Role:           2,
 			Content:        result.FinalSummary,
 			CommandID:      uuid.NullUUID{UUID: cmdID, Valid: true},
 		}); msgErr != nil {
@@ -442,7 +596,6 @@ func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb
 	}
 	d.broadcast(result.CommandId, output)
 
-	// close watchers after a short delay so they can consume the final message
 	go func() {
 		time.Sleep(100 * time.Millisecond)
 		d.closeWatchers(result.CommandId)
@@ -451,38 +604,15 @@ func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb
 
 	slog.Info("command completed", "commandID", result.CommandId, "exitCode", result.ExitCode, "duration_ms", result.DurationMs)
 
-	// dispatch next pending command if available
-	d.TryDispatchNext(ctx, agentID)
+	if err := d.store.UpsertWorkingState(ctx, &store.WorkingStateMessage{
+		AgentID: agentID,
+		State:   store.WorkingStateIdle,
+	}); err != nil {
+		slog.Error("failed to reset working state", "agentID", agentID, "error", err)
+	}
+
+	d.NotifyInboxUpdated(ctx, agentID)
 	return nil
-}
-
-func (d *Dispatcher) TryDispatchNext(ctx context.Context, agentID int) {
-	d.mu.RLock()
-	sess, ok := d.sessions[agentID]
-	d.mu.RUnlock()
-	if !ok {
-		return
-	}
-
-	sess.mu.Lock()
-	busy := sess.currentCmdID != ""
-	sess.mu.Unlock()
-	if busy {
-		return
-	}
-
-	cmd, err := d.store.GetNextPendingCommand(ctx, agentID)
-	if err != nil {
-		slog.Error("failed to get next pending command", "agentID", agentID, "error", err)
-		return
-	}
-	if cmd == nil {
-		return
-	}
-
-	if err := d.DispatchCommand(ctx, cmd); err != nil {
-		slog.Error("failed to dispatch next command", "commandID", cmd.ID, "error", err)
-	}
 }
 
 func (d *Dispatcher) HandlePing(agentID int, _ *v1pb.Ping) {
@@ -497,11 +627,6 @@ func (d *Dispatcher) HandlePing(agentID int, _ *v1pb.Ping) {
 	}
 }
 
-// StartPingMonitor starts a goroutine that periodically checks agent liveness.
-// If an agent has not sent a Ping within pingTimeout, it is unregistered.
-// This goroutine does NOT send any messages on the bidi stream (to avoid
-// concurrent writes with the handler goroutine). Ping/Pong responses are
-// handled exclusively by the AgentCommandService handler.
 func (d *Dispatcher) StartPingMonitor() {
 	go func() {
 		ticker := time.NewTicker(d.pingInterval)

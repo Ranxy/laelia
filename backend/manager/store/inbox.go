@@ -136,6 +136,48 @@ func (s *Store) DeleteInboxItemByCommandID(ctx context.Context, commandID uuid.U
 	return nil
 }
 
+type InboxItemWithCommand struct {
+	InboxItemID  uuid.UUID
+	CommandID    uuid.UUID
+	Priority     int32
+	CreatedAt    time.Time
+
+	Command     string
+	Instruction string
+	ExecutorKind int32
+	Profile     string
+	AllowDiff   bool
+	SourceType  int32
+	Env         string
+	WorkingDir  string
+	TimeoutSecs int32
+	PrincipalID int
+}
+
+func (s *Store) GetInboxItemWithCommand(ctx context.Context, itemID uuid.UUID) (*InboxItemWithCommand, error) {
+	var item InboxItemWithCommand
+	err := s.GetDB().QueryRowContext(ctx, `
+		SELECT
+			ai.id, ai.command_id, ai.priority, ai.created_at,
+			c.command, c.instruction, c.executor_kind, c.profile, c.allow_diff,
+			c.source_type, c.env, c.working_dir, c.timeout_seconds, c.principal_id
+		FROM agent_inbox ai
+		JOIN command c ON c.id = ai.command_id
+		WHERE ai.id = $1 AND ai.state = $2
+	`, itemID, InboxStateSelected).Scan(
+		&item.InboxItemID, &item.CommandID, &item.Priority, &item.CreatedAt,
+		&item.Command, &item.Instruction, &item.ExecutorKind, &item.Profile, &item.AllowDiff,
+		&item.SourceType, &item.Env, &item.WorkingDir, &item.TimeoutSecs, &item.PrincipalID,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Errorf("inbox item %s not found or not selected", itemID)
+		}
+		return nil, errors.Wrapf(err, "failed to get inbox item with command")
+	}
+	return &item, nil
+}
+
 func (s *Store) GetWorkingState(ctx context.Context, agentID int) (*WorkingStateMessage, error) {
 	var state WorkingStateMessage
 	err := s.GetDB().QueryRowContext(ctx, `
