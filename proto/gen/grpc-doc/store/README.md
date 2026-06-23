@@ -93,6 +93,7 @@
 | supports_tool_traces | [bool](#bool) |  |  |
 | max_event_count | [int32](#int32) |  |  |
 | max_output_bytes | [int64](#int64) |  |  |
+| supports_autonomous_decision | [bool](#bool) |  |  |
 
 
 

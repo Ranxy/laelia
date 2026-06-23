@@ -289,16 +289,17 @@ func (x *AgentInfo) GetAcpConfigYaml() string {
 }
 
 type AgentCapability struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	SupportsAcp        bool                   `protobuf:"varint,1,opt,name=supports_acp,json=supportsAcp,proto3" json:"supports_acp,omitempty"`
-	MaxTimeoutSeconds  int32                  `protobuf:"varint,3,opt,name=max_timeout_seconds,json=maxTimeoutSeconds,proto3" json:"max_timeout_seconds,omitempty"`
-	SupportsDiff       bool                   `protobuf:"varint,4,opt,name=supports_diff,json=supportsDiff,proto3" json:"supports_diff,omitempty"`
-	SupportsRawEvents  bool                   `protobuf:"varint,5,opt,name=supports_raw_events,json=supportsRawEvents,proto3" json:"supports_raw_events,omitempty"`
-	SupportsToolTraces bool                   `protobuf:"varint,6,opt,name=supports_tool_traces,json=supportsToolTraces,proto3" json:"supports_tool_traces,omitempty"`
-	MaxEventCount      int32                  `protobuf:"varint,7,opt,name=max_event_count,json=maxEventCount,proto3" json:"max_event_count,omitempty"`
-	MaxOutputBytes     int64                  `protobuf:"varint,8,opt,name=max_output_bytes,json=maxOutputBytes,proto3" json:"max_output_bytes,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state                      protoimpl.MessageState `protogen:"open.v1"`
+	SupportsAcp                bool                   `protobuf:"varint,1,opt,name=supports_acp,json=supportsAcp,proto3" json:"supports_acp,omitempty"`
+	MaxTimeoutSeconds          int32                  `protobuf:"varint,3,opt,name=max_timeout_seconds,json=maxTimeoutSeconds,proto3" json:"max_timeout_seconds,omitempty"`
+	SupportsDiff               bool                   `protobuf:"varint,4,opt,name=supports_diff,json=supportsDiff,proto3" json:"supports_diff,omitempty"`
+	SupportsRawEvents          bool                   `protobuf:"varint,5,opt,name=supports_raw_events,json=supportsRawEvents,proto3" json:"supports_raw_events,omitempty"`
+	SupportsToolTraces         bool                   `protobuf:"varint,6,opt,name=supports_tool_traces,json=supportsToolTraces,proto3" json:"supports_tool_traces,omitempty"`
+	MaxEventCount              int32                  `protobuf:"varint,7,opt,name=max_event_count,json=maxEventCount,proto3" json:"max_event_count,omitempty"`
+	MaxOutputBytes             int64                  `protobuf:"varint,8,opt,name=max_output_bytes,json=maxOutputBytes,proto3" json:"max_output_bytes,omitempty"`
+	SupportsAutonomousDecision bool                   `protobuf:"varint,9,opt,name=supports_autonomous_decision,json=supportsAutonomousDecision,proto3" json:"supports_autonomous_decision,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *AgentCapability) Reset() {
@@ -378,6 +379,13 @@ func (x *AgentCapability) GetMaxOutputBytes() int64 {
 		return x.MaxOutputBytes
 	}
 	return 0
+}
+
+func (x *AgentCapability) GetSupportsAutonomousDecision() bool {
+	if x != nil {
+		return x.SupportsAutonomousDecision
+	}
+	return false
 }
 
 type AgentStatus struct {
@@ -477,7 +485,7 @@ const file_store_agent_proto_rawDesc = "" +
 	" \x01(\tR\racpConfigYaml\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xbd\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xff\x02\n" +
 	"\x0fAgentCapability\x12!\n" +
 	"\fsupports_acp\x18\x01 \x01(\bR\vsupportsAcp\x12.\n" +
 	"\x13max_timeout_seconds\x18\x03 \x01(\x05R\x11maxTimeoutSeconds\x12#\n" +
@@ -485,7 +493,8 @@ const file_store_agent_proto_rawDesc = "" +
 	"\x13supports_raw_events\x18\x05 \x01(\bR\x11supportsRawEvents\x120\n" +
 	"\x14supports_tool_traces\x18\x06 \x01(\bR\x12supportsToolTraces\x12&\n" +
 	"\x0fmax_event_count\x18\a \x01(\x05R\rmaxEventCount\x12(\n" +
-	"\x10max_output_bytes\x18\b \x01(\x03R\x0emaxOutputBytes\"\xd3\x02\n" +
+	"\x10max_output_bytes\x18\b \x01(\x03R\x0emaxOutputBytes\x12@\n" +
+	"\x1csupports_autonomous_decision\x18\t \x01(\bR\x1asupportsAutonomousDecision\"\xd3\x02\n" +
 	"\vAgentStatus\x12?\n" +
 	"\x05state\x18\x01 \x01(\x0e2).laelia.store.AgentStatus.ConnectionStateR\x05state\x12*\n" +
 	"\x11last_heartbeat_at\x18\x02 \x01(\x03R\x0flastHeartbeatAt\x12!\n" +

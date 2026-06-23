@@ -486,6 +486,10 @@
             <ul>
               
                 <li>
+                  <a href="#laelia.v1.ActionResponse"><span class="badge">M</span>ActionResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.AddChannelMemberRequest"><span class="badge">M</span>AddChannelMemberRequest</a>
                 </li>
               
@@ -682,6 +686,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ResolveHeldAction"><span class="badge">M</span>ResolveHeldAction</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.RespondPermissionRequest"><span class="badge">M</span>RespondPermissionRequest</a>
                 </li>
               
@@ -703,6 +711,14 @@
               
                 <li>
                   <a href="#laelia.v1.SendMessageRequest"><span class="badge">M</span>SendMessageRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SubmitAction"><span class="badge">M</span>SubmitAction</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SubmitAction.EnvEntry"><span class="badge">M</span>SubmitAction.EnvEntry</a>
                 </li>
               
                 <li>
@@ -733,6 +749,10 @@
                   <a href="#laelia.v1.WatchCommandRequest"><span class="badge">M</span>WatchCommandRequest</a>
                 </li>
               
+              
+                <li>
+                  <a href="#laelia.v1.ActionResolution"><span class="badge">E</span>ActionResolution</a>
+                </li>
               
                 <li>
                   <a href="#laelia.v1.CommandEventType"><span class="badge">E</span>CommandEventType</a>
@@ -1174,6 +1194,13 @@
                 <tr>
                   <td>max_output_bytes</td>
                   <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>supports_autonomous_decision</td>
+                  <td><a href="#bool">bool</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -3524,6 +3551,58 @@ Format: idps/{idp} </p></td>
       <p></p>
 
       
+        <h3 id="laelia.v1.ActionResponse">ActionResponse</h3>
+        <p>ActionResponse is the manager's reply to SubmitAction. When committed=true</p><p>the action was accepted and a command was created; when committed=false the</p><p>action is held pending agent resolution via ResolveHeldAction.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>action_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>committed</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>command_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>current_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>new_messages</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.AddChannelMemberRequest">AddChannelMemberRequest</h3>
         <p></p>
 
@@ -3627,6 +3706,20 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>pull_messages</td>
                   <td><a href="#laelia.v1.PullMessages">PullMessages</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>submit_action</td>
+                  <td><a href="#laelia.v1.SubmitAction">SubmitAction</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>resolve_held_action</td>
+                  <td><a href="#laelia.v1.ResolveHeldAction">ResolveHeldAction</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -5204,6 +5297,13 @@ their cursor into the conversation. </p></td>
                 </tr>
               
                 <tr>
+                  <td>action_response</td>
+                  <td><a href="#laelia.v1.ActionResponse">ActionResponse</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
                   <td>command_request</td>
                   <td><a href="#laelia.v1.CommandRequest">CommandRequest</a></td>
                   <td></td>
@@ -5659,6 +5759,37 @@ their cursor into the conversation. </p></td>
 
         
       
+        <h3 id="laelia.v1.ResolveHeldAction">ResolveHeldAction</h3>
+        <p>ResolveHeldAction is sent by the agent to resolve a held action (one where</p><p>ActionResponse.committed was false).</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>action_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>resolution</td>
+                  <td><a href="#laelia.v1.ActionResolution">ActionResolution</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.RespondPermissionRequest">RespondPermissionRequest</h3>
         <p></p>
 
@@ -5936,6 +6067,117 @@ their cursor into the conversation. </p></td>
 
         
       
+        <h3 id="laelia.v1.SubmitAction">SubmitAction</h3>
+        <p>SubmitAction is the Phase 2 execution trigger. It replaces the Phase 1</p><p>manager-driven dispatch: after PullMessages the agent autonomously decides</p><p>whether to act and sends SubmitAction. The manager performs a Held Draft</p><p>check comparing base_version against the conversation's current version.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reply_to_message_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>base_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>instruction</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>profile</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>env</td>
+                  <td><a href="#laelia.v1.SubmitAction.EnvEntry">SubmitAction.EnvEntry</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>working_dir</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>timeout_seconds</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>allow_diff</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SubmitAction.EnvEntry">SubmitAction.EnvEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.TextDeltaPayload">TextDeltaPayload</h3>
         <p></p>
 
@@ -6147,6 +6389,47 @@ their cursor into the conversation. </p></td>
         
       
 
+      
+        <h3 id="laelia.v1.ActionResolution">ActionResolution</h3>
+        <p>ActionResolution is the agent's decision when a SubmitAction is held due</p><p>to a version mismatch (new messages arrived between PullMessages and</p><p>SubmitAction).</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>ACTION_RESOLUTION_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>REVISE</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>SEND_AS_IS</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>DISCARD</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>FORCE_SEND</td>
+                <td>4</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
       
         <h3 id="laelia.v1.CommandEventType">CommandEventType</h3>
         <p></p>

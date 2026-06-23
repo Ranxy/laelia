@@ -87,23 +87,25 @@ func LoadACPConfigFromYAML(yamlStr string) (*ACPConfig, error) {
 func (c *ACPConfig) Capability() *v1pb.AgentCapability {
 	if c == nil || c.Executable == "" {
 		return &v1pb.AgentCapability{
-			SupportsAcp:        false,
-			MaxTimeoutSeconds:  defaultACPMaxTimeoutSeconds,
-			SupportsDiff:       false,
-			SupportsRawEvents:  false,
-			SupportsToolTraces: false,
-			MaxEventCount:      defaultACPMaxEventCount,
-			MaxOutputBytes:     defaultACPMaxOutputBytes,
+			SupportsAcp:                false,
+			MaxTimeoutSeconds:          defaultACPMaxTimeoutSeconds,
+			SupportsDiff:               false,
+			SupportsRawEvents:          false,
+			SupportsToolTraces:         false,
+			MaxEventCount:              defaultACPMaxEventCount,
+			MaxOutputBytes:             defaultACPMaxOutputBytes,
+			SupportsAutonomousDecision: false,
 		}
 	}
 
 	return &v1pb.AgentCapability{
-		SupportsAcp:        true,
-		MaxTimeoutSeconds:  c.MaxTimeoutSeconds,
-		SupportsDiff:       c.SupportsDiff,
-		SupportsRawEvents:  c.SupportsRawEvents,
-		SupportsToolTraces: c.SupportsToolTraces,
-		MaxEventCount:      c.MaxEventCount,
-		MaxOutputBytes:     c.MaxOutputBytes,
+		SupportsAcp:                true,
+		MaxTimeoutSeconds:          c.MaxTimeoutSeconds,
+		SupportsDiff:               c.SupportsDiff,
+		SupportsRawEvents:          c.SupportsRawEvents,
+		SupportsToolTraces:         c.SupportsToolTraces,
+		MaxEventCount:              c.MaxEventCount,
+		MaxOutputBytes:             c.MaxOutputBytes,
+		SupportsAutonomousDecision: true,
 	}
 }

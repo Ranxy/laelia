@@ -74,6 +74,7 @@ func configureGrpcRouters(
 
 	cmdDispatcher := dispatcher.New(stores)
 	cmdDispatcher.StartPingMonitor()
+	cmdDispatcher.StartExpireHeldActions()
 
 	userService := apiv1.NewUserService(stores, profile, stateCfg)
 	authService := apiv1.NewAuthService(stores, secret, profile, stateCfg)

@@ -84,6 +84,7 @@
     - [AuthService](#laelia-v1-AuthService)
   
 - [v1/command.proto](#v1_command-proto)
+    - [ActionResponse](#laelia-v1-ActionResponse)
     - [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest)
     - [AgentReady](#laelia-v1-AgentReady)
     - [AgentStreamMessage](#laelia-v1-AgentStreamMessage)
@@ -133,12 +134,15 @@
     - [PullMessages](#laelia-v1-PullMessages)
     - [RawAcpPayload](#laelia-v1-RawAcpPayload)
     - [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest)
+    - [ResolveHeldAction](#laelia-v1-ResolveHeldAction)
     - [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest)
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
     - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
     - [SendCommandRequest](#laelia-v1-SendCommandRequest)
     - [SendCommandRequest.EnvEntry](#laelia-v1-SendCommandRequest-EnvEntry)
     - [SendMessageRequest](#laelia-v1-SendMessageRequest)
+    - [SubmitAction](#laelia-v1-SubmitAction)
+    - [SubmitAction.EnvEntry](#laelia-v1-SubmitAction-EnvEntry)
     - [TextDeltaPayload](#laelia-v1-TextDeltaPayload)
     - [ToolCallFinishedPayload](#laelia-v1-ToolCallFinishedPayload)
     - [ToolCallStartedPayload](#laelia-v1-ToolCallStartedPayload)
@@ -147,6 +151,7 @@
     - [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest)
     - [WatchCommandRequest](#laelia-v1-WatchCommandRequest)
   
+    - [ActionResolution](#laelia-v1-ActionResolution)
     - [CommandEventType](#laelia-v1-CommandEventType)
     - [CommandOutput.StreamType](#laelia-v1-CommandOutput-StreamType)
     - [CommandSource](#laelia-v1-CommandSource)
@@ -338,6 +343,7 @@ RiskLevel is the risk level.
 | supports_tool_traces | [bool](#bool) |  |  |
 | max_event_count | [int32](#int32) |  |  |
 | max_output_bytes | [int64](#int64) |  |  |
+| supports_autonomous_decision | [bool](#bool) |  |  |
 
 
 
@@ -1244,6 +1250,27 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-ActionResponse"></a>
+
+### ActionResponse
+ActionResponse is the manager&#39;s reply to SubmitAction. When committed=true
+the action was accepted and a command was created; when committed=false the
+action is held pending agent resolution via ResolveHeldAction.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| action_id | [string](#string) |  |  |
+| committed | [bool](#bool) |  |  |
+| command_id | [string](#string) |  |  |
+| current_version | [int64](#int64) |  |  |
+| new_messages | [ChatMessage](#laelia-v1-ChatMessage) | repeated |  |
+
+
+
+
+
+
 <a name="laelia-v1-AddChannelMemberRequest"></a>
 
 ### AddChannelMemberRequest
@@ -1289,6 +1316,8 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | ----- | ---- | ----- | ----------- |
 | agent_ready | [AgentReady](#laelia-v1-AgentReady) |  |  |
 | pull_messages | [PullMessages](#laelia-v1-PullMessages) |  |  |
+| submit_action | [SubmitAction](#laelia-v1-SubmitAction) |  |  |
+| resolve_held_action | [ResolveHeldAction](#laelia-v1-ResolveHeldAction) |  |  |
 | progress | [CommandProgress](#laelia-v1-CommandProgress) |  |  |
 | result | [CommandResult](#laelia-v1-CommandResult) |  |  |
 | event | [CommandEvent](#laelia-v1-CommandEvent) |  |  |
@@ -1903,6 +1932,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | message_snapshot | [MessageSnapshot](#laelia-v1-MessageSnapshot) |  |  |
+| action_response | [ActionResponse](#laelia-v1-ActionResponse) |  |  |
 | command_request | [CommandRequest](#laelia-v1-CommandRequest) |  |  |
 | new_messages | [NewMessagesAvailable](#laelia-v1-NewMessagesAvailable) |  |  |
 | cancel | [CancelMessage](#laelia-v1-CancelMessage) |  |  |
@@ -2119,6 +2149,23 @@ it explicitly so that reconnection / crash recovery is self-describing.
 
 
 
+<a name="laelia-v1-ResolveHeldAction"></a>
+
+### ResolveHeldAction
+ResolveHeldAction is sent by the agent to resolve a held action (one where
+ActionResponse.committed was false).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| action_id | [string](#string) |  |  |
+| resolution | [ActionResolution](#laelia-v1-ActionResolution) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-RespondPermissionRequest"></a>
 
 ### RespondPermissionRequest
@@ -2222,6 +2269,48 @@ it explicitly so that reconnection / crash recovery is self-describing.
 | ----- | ---- | ----- | ----------- |
 | conversation | [string](#string) |  |  |
 | content | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SubmitAction"></a>
+
+### SubmitAction
+SubmitAction is the Phase 2 execution trigger. It replaces the Phase 1
+manager-driven dispatch: after PullMessages the agent autonomously decides
+whether to act and sends SubmitAction. The manager performs a Held Draft
+check comparing base_version against the conversation&#39;s current version.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation_id | [string](#string) |  |  |
+| reply_to_message_id | [string](#string) |  |  |
+| base_version | [int64](#int64) |  |  |
+| instruction | [string](#string) |  |  |
+| profile | [string](#string) |  |  |
+| env | [SubmitAction.EnvEntry](#laelia-v1-SubmitAction-EnvEntry) | repeated |  |
+| working_dir | [string](#string) |  |  |
+| timeout_seconds | [int32](#int32) |  |  |
+| allow_diff | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SubmitAction-EnvEntry"></a>
+
+### SubmitAction.EnvEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
 
 
 
@@ -2339,6 +2428,23 @@ it explicitly so that reconnection / crash recovery is self-describing.
 
 
  
+
+
+<a name="laelia-v1-ActionResolution"></a>
+
+### ActionResolution
+ActionResolution is the agent&#39;s decision when a SubmitAction is held due
+to a version mismatch (new messages arrived between PullMessages and
+SubmitAction).
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| ACTION_RESOLUTION_UNSPECIFIED | 0 |  |
+| REVISE | 1 |  |
+| SEND_AS_IS | 2 |  |
+| DISCARD | 3 |  |
+| FORCE_SEND | 4 |  |
+
 
 
 <a name="laelia-v1-CommandEventType"></a>

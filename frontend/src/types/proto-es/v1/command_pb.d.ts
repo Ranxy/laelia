@@ -1192,6 +1192,18 @@ export declare type AgentStreamMessage = Message<"laelia.v1.AgentStreamMessage">
     case: "pullMessages";
   } | {
     /**
+     * @generated from field: laelia.v1.SubmitAction submit_action = 3;
+     */
+    value: SubmitAction;
+    case: "submitAction";
+  } | {
+    /**
+     * @generated from field: laelia.v1.ResolveHeldAction resolve_held_action = 4;
+     */
+    value: ResolveHeldAction;
+    case: "resolveHeldAction";
+  } | {
+    /**
      * @generated from field: laelia.v1.CommandProgress progress = 5;
      */
     value: CommandProgress;
@@ -1236,6 +1248,12 @@ export declare type ManagerStreamMessage = Message<"laelia.v1.ManagerStreamMessa
      */
     value: MessageSnapshot;
     case: "messageSnapshot";
+  } | {
+    /**
+     * @generated from field: laelia.v1.ActionResponse action_response = 2;
+     */
+    value: ActionResponse;
+    case: "actionResponse";
   } | {
     /**
      * @generated from field: laelia.v1.CommandRequest command_request = 3;
@@ -1820,6 +1838,131 @@ export declare type NewMessagesAvailable = Message<"laelia.v1.NewMessagesAvailab
 export declare const NewMessagesAvailableSchema: GenMessage<NewMessagesAvailable>;
 
 /**
+ * SubmitAction is the Phase 2 execution trigger. It replaces the Phase 1
+ * manager-driven dispatch: after PullMessages the agent autonomously decides
+ * whether to act and sends SubmitAction. The manager performs a Held Draft
+ * check comparing base_version against the conversation's current version.
+ *
+ * @generated from message laelia.v1.SubmitAction
+ */
+export declare type SubmitAction = Message<"laelia.v1.SubmitAction"> & {
+  /**
+   * @generated from field: string conversation_id = 1;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: string reply_to_message_id = 2;
+   */
+  replyToMessageId: string;
+
+  /**
+   * @generated from field: int64 base_version = 3;
+   */
+  baseVersion: bigint;
+
+  /**
+   * @generated from field: string instruction = 4;
+   */
+  instruction: string;
+
+  /**
+   * @generated from field: string profile = 5;
+   */
+  profile: string;
+
+  /**
+   * @generated from field: map<string, string> env = 6;
+   */
+  env: { [key: string]: string };
+
+  /**
+   * @generated from field: string working_dir = 7;
+   */
+  workingDir: string;
+
+  /**
+   * @generated from field: int32 timeout_seconds = 8;
+   */
+  timeoutSeconds: number;
+
+  /**
+   * @generated from field: bool allow_diff = 9;
+   */
+  allowDiff: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.SubmitAction.
+ * Use `create(SubmitActionSchema)` to create a new message.
+ */
+export declare const SubmitActionSchema: GenMessage<SubmitAction>;
+
+/**
+ * ActionResponse is the manager's reply to SubmitAction. When committed=true
+ * the action was accepted and a command was created; when committed=false the
+ * action is held pending agent resolution via ResolveHeldAction.
+ *
+ * @generated from message laelia.v1.ActionResponse
+ */
+export declare type ActionResponse = Message<"laelia.v1.ActionResponse"> & {
+  /**
+   * @generated from field: string action_id = 1;
+   */
+  actionId: string;
+
+  /**
+   * @generated from field: bool committed = 2;
+   */
+  committed: boolean;
+
+  /**
+   * @generated from field: string command_id = 3;
+   */
+  commandId: string;
+
+  /**
+   * @generated from field: int64 current_version = 4;
+   */
+  currentVersion: bigint;
+
+  /**
+   * @generated from field: repeated laelia.v1.ChatMessage new_messages = 5;
+   */
+  newMessages: ChatMessage[];
+};
+
+/**
+ * Describes the message laelia.v1.ActionResponse.
+ * Use `create(ActionResponseSchema)` to create a new message.
+ */
+export declare const ActionResponseSchema: GenMessage<ActionResponse>;
+
+/**
+ * ResolveHeldAction is sent by the agent to resolve a held action (one where
+ * ActionResponse.committed was false).
+ *
+ * @generated from message laelia.v1.ResolveHeldAction
+ */
+export declare type ResolveHeldAction = Message<"laelia.v1.ResolveHeldAction"> & {
+  /**
+   * @generated from field: string action_id = 1;
+   */
+  actionId: string;
+
+  /**
+   * @generated from field: laelia.v1.ActionResolution resolution = 2;
+   */
+  resolution: ActionResolution;
+};
+
+/**
+ * Describes the message laelia.v1.ResolveHeldAction.
+ * Use `create(ResolveHeldActionSchema)` to create a new message.
+ */
+export declare const ResolveHeldActionSchema: GenMessage<ResolveHeldAction>;
+
+/**
  * @generated from enum laelia.v1.CommandStatus
  */
 export enum CommandStatus {
@@ -2024,6 +2167,45 @@ export enum CommandEventType {
  * Describes the enum laelia.v1.CommandEventType.
  */
 export declare const CommandEventTypeSchema: GenEnum<CommandEventType>;
+
+/**
+ * ActionResolution is the agent's decision when a SubmitAction is held due
+ * to a version mismatch (new messages arrived between PullMessages and
+ * SubmitAction).
+ *
+ * @generated from enum laelia.v1.ActionResolution
+ */
+export enum ActionResolution {
+  /**
+   * @generated from enum value: ACTION_RESOLUTION_UNSPECIFIED = 0;
+   */
+  ACTION_RESOLUTION_UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: REVISE = 1;
+   */
+  REVISE = 1,
+
+  /**
+   * @generated from enum value: SEND_AS_IS = 2;
+   */
+  SEND_AS_IS = 2,
+
+  /**
+   * @generated from enum value: DISCARD = 3;
+   */
+  DISCARD = 3,
+
+  /**
+   * @generated from enum value: FORCE_SEND = 4;
+   */
+  FORCE_SEND = 4,
+}
+
+/**
+ * Describes the enum laelia.v1.ActionResolution.
+ */
+export declare const ActionResolutionSchema: GenEnum<ActionResolution>;
 
 /**
  * @generated from service laelia.v1.CommandService

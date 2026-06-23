@@ -275,17 +275,19 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create message"))
 	}
 
-	// Phase 1: for a direct conversation (type=1) backed by a single agent,
-	// produce and dispatch a command so behavior matches pre-Phase-1 chat tasks.
-	// Multi-agent channels only persist the message in Phase 1; the agent
-	// autonomy gate (PullMessages-driven SubmitAction) arrives in Phase 2.
+	// Phase 2: for agents that support autonomous decision making, skip the
+	// legacy auto-dispatch. The agent will pull messages and submit actions
+	// independently after receiving NewMessagesAvailable.
 	var commandID string
 	if conv.Type == 1 && conv.AgentID.Valid {
-		commandName := s.dispatchDirectConversation(ctx, conv, msg, principalID, user)
-		if commandName != "" {
-			// Extract the UUID portion from "agents/{agent}/commands/{commandID}"
-			if parts := strings.Split(commandName, "/"); len(parts) == 4 {
-				commandID = parts[3]
+		if s.isAgentAutonomous(ctx, conv) {
+			slog.Info("skipping auto-dispatch for autonomous agent", "conversationID", conv.ID)
+		} else {
+			commandName := s.dispatchDirectConversation(ctx, conv, msg, principalID, user)
+			if commandName != "" {
+				if parts := strings.Split(commandName, "/"); len(parts) == 4 {
+					commandID = parts[3]
+				}
 			}
 		}
 	}
@@ -378,6 +380,21 @@ func (s *CommandService) dispatchDirectConversation(ctx context.Context, conv *s
 		slog.Warn("failed to link user message to command", "messageID", triggerMsg.ID, "commandID", created.ID, "error", linkErr)
 	}
 	return commandName
+}
+
+// isAgentAutonomous checks whether the agent backing a direct conversation
+// supports Phase 2 autonomous decision making (PullMessages → SubmitAction).
+// If true, the manager skips auto-dispatch; the agent drives its own execution.
+func (s *CommandService) isAgentAutonomous(ctx context.Context, conv *store.ConversationMessage) bool {
+	if !conv.AgentID.Valid {
+		return false
+	}
+	agent, err := s.store.GetAgent(ctx, int(conv.AgentID.Int32))
+	if err != nil || agent == nil {
+		return false
+	}
+	capability := agent.Info.GetCapability()
+	return capability != nil && capability.SupportsAutonomousDecision
 }
 
 // notifyConversationAgents sends NewMessagesAvailable to every connected agent

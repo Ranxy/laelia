@@ -366,7 +366,59 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
         ],
       },
     }));
+
+    // Phase 2: poll for agent responses in channel conversations.
+    // Agents receive NewMessagesAvailable on their bidi stream and respond
+    // asynchronously; the frontend has no push mechanism, so we poll.
+    get().pollChannelMessages(conversationName);
+
     return res;
+  },
+
+  // pollChannelMessages periodically reloads messages for a conversation
+  // until new messages appear (count increases) or the timeout expires.
+  async pollChannelMessages(conversationName) {
+    const POLL_INTERVAL_MS = 2000;
+    const POLL_TIMEOUT_MS = 30000;
+    const start = Date.now();
+
+    const currentCount = get().chatMessages[conversationName]?.length ?? 0;
+
+    while (Date.now() - start < POLL_TIMEOUT_MS) {
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+
+      try {
+        const res = await commandServiceClient.listConversationMessages(
+          create(ListConversationMessagesRequestSchema, {
+            conversation: conversationName,
+            pageSize: 200,
+            pageToken: "",
+          })
+        );
+
+        const uiMsgs: ChatMessageUI[] = (res.messages ?? []).map((msg) => ({
+          id: msg.name,
+          role: msg.role === 1 ? "user" : "assistant",
+          content: msg.content,
+          timestamp: msg.createdAt ? timestampDate(msg.createdAt) : new Date(),
+          commandId: msg.commandId || undefined,
+          senderName: msg.senderName || undefined,
+          senderType: msg.senderType || undefined,
+        }));
+
+        if (uiMsgs.length > currentCount) {
+          set((state) => ({
+            chatMessages: {
+              ...state.chatMessages,
+              [conversationName]: uiMsgs,
+            },
+          }));
+          return;
+        }
+      } catch {
+        // network error — keep polling
+      }
+    }
   },
 
   async listChannelMembers(conversationId) {

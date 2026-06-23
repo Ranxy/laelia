@@ -126,6 +126,7 @@ export interface ChatSlice {
     conversationId: string,
     content: string
   ) => Promise<ChatMessage>;
+  pollChannelMessages: (conversationName: string) => Promise<void>;
   listChannelMembers: (conversationId: string) => Promise<ChannelMember[]>;
   addChannelMember: (
     conversationId: string,

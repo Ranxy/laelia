@@ -819,6 +819,11 @@ export declare type AgentCapability = Message<"laelia.v1.AgentCapability"> & {
    * @generated from field: int64 max_output_bytes = 8;
    */
   maxOutputBytes: bigint;
+
+  /**
+   * @generated from field: bool supports_autonomous_decision = 9;
+   */
+  supportsAutonomousDecision: boolean;
 };
 
 /**

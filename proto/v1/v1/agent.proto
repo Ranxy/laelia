@@ -361,6 +361,7 @@ message AgentCapability {
   bool supports_tool_traces = 6;
   int32 max_event_count = 7;
   int64 max_output_bytes = 8;
+  bool supports_autonomous_decision = 9;
 }
 
 message AgentStatus {

@@ -321,6 +321,64 @@ func (CommandEventType) EnumDescriptor() ([]byte, []int) {
 	return file_v1_command_proto_rawDescGZIP(), []int{4}
 }
 
+// ActionResolution is the agent's decision when a SubmitAction is held due
+// to a version mismatch (new messages arrived between PullMessages and
+// SubmitAction).
+type ActionResolution int32
+
+const (
+	ActionResolution_ACTION_RESOLUTION_UNSPECIFIED ActionResolution = 0
+	ActionResolution_REVISE                        ActionResolution = 1
+	ActionResolution_SEND_AS_IS                    ActionResolution = 2
+	ActionResolution_DISCARD                       ActionResolution = 3
+	ActionResolution_FORCE_SEND                    ActionResolution = 4
+)
+
+// Enum value maps for ActionResolution.
+var (
+	ActionResolution_name = map[int32]string{
+		0: "ACTION_RESOLUTION_UNSPECIFIED",
+		1: "REVISE",
+		2: "SEND_AS_IS",
+		3: "DISCARD",
+		4: "FORCE_SEND",
+	}
+	ActionResolution_value = map[string]int32{
+		"ACTION_RESOLUTION_UNSPECIFIED": 0,
+		"REVISE":                        1,
+		"SEND_AS_IS":                    2,
+		"DISCARD":                       3,
+		"FORCE_SEND":                    4,
+	}
+)
+
+func (x ActionResolution) Enum() *ActionResolution {
+	p := new(ActionResolution)
+	*p = x
+	return p
+}
+
+func (x ActionResolution) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ActionResolution) Descriptor() protoreflect.EnumDescriptor {
+	return file_v1_command_proto_enumTypes[5].Descriptor()
+}
+
+func (ActionResolution) Type() protoreflect.EnumType {
+	return &file_v1_command_proto_enumTypes[5]
+}
+
+func (x ActionResolution) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ActionResolution.Descriptor instead.
+func (ActionResolution) EnumDescriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{5}
+}
+
 type CommandOutput_StreamType int32
 
 const (
@@ -357,11 +415,11 @@ func (x CommandOutput_StreamType) String() string {
 }
 
 func (CommandOutput_StreamType) Descriptor() protoreflect.EnumDescriptor {
-	return file_v1_command_proto_enumTypes[5].Descriptor()
+	return file_v1_command_proto_enumTypes[6].Descriptor()
 }
 
 func (CommandOutput_StreamType) Type() protoreflect.EnumType {
-	return &file_v1_command_proto_enumTypes[5]
+	return &file_v1_command_proto_enumTypes[6]
 }
 
 func (x CommandOutput_StreamType) Number() protoreflect.EnumNumber {
@@ -2960,6 +3018,8 @@ type AgentStreamMessage struct {
 	//
 	//	*AgentStreamMessage_AgentReady
 	//	*AgentStreamMessage_PullMessages
+	//	*AgentStreamMessage_SubmitAction
+	//	*AgentStreamMessage_ResolveHeldAction
 	//	*AgentStreamMessage_Progress
 	//	*AgentStreamMessage_Result
 	//	*AgentStreamMessage_Event
@@ -3024,6 +3084,24 @@ func (x *AgentStreamMessage) GetPullMessages() *PullMessages {
 	return nil
 }
 
+func (x *AgentStreamMessage) GetSubmitAction() *SubmitAction {
+	if x != nil {
+		if x, ok := x.Message.(*AgentStreamMessage_SubmitAction); ok {
+			return x.SubmitAction
+		}
+	}
+	return nil
+}
+
+func (x *AgentStreamMessage) GetResolveHeldAction() *ResolveHeldAction {
+	if x != nil {
+		if x, ok := x.Message.(*AgentStreamMessage_ResolveHeldAction); ok {
+			return x.ResolveHeldAction
+		}
+	}
+	return nil
+}
+
 func (x *AgentStreamMessage) GetProgress() *CommandProgress {
 	if x != nil {
 		if x, ok := x.Message.(*AgentStreamMessage_Progress); ok {
@@ -3072,6 +3150,14 @@ type AgentStreamMessage_PullMessages struct {
 	PullMessages *PullMessages `protobuf:"bytes,2,opt,name=pull_messages,json=pullMessages,proto3,oneof"`
 }
 
+type AgentStreamMessage_SubmitAction struct {
+	SubmitAction *SubmitAction `protobuf:"bytes,3,opt,name=submit_action,json=submitAction,proto3,oneof"`
+}
+
+type AgentStreamMessage_ResolveHeldAction struct {
+	ResolveHeldAction *ResolveHeldAction `protobuf:"bytes,4,opt,name=resolve_held_action,json=resolveHeldAction,proto3,oneof"`
+}
+
 type AgentStreamMessage_Progress struct {
 	Progress *CommandProgress `protobuf:"bytes,5,opt,name=progress,proto3,oneof"`
 }
@@ -3092,6 +3178,10 @@ func (*AgentStreamMessage_AgentReady) isAgentStreamMessage_Message() {}
 
 func (*AgentStreamMessage_PullMessages) isAgentStreamMessage_Message() {}
 
+func (*AgentStreamMessage_SubmitAction) isAgentStreamMessage_Message() {}
+
+func (*AgentStreamMessage_ResolveHeldAction) isAgentStreamMessage_Message() {}
+
 func (*AgentStreamMessage_Progress) isAgentStreamMessage_Message() {}
 
 func (*AgentStreamMessage_Result) isAgentStreamMessage_Message() {}
@@ -3105,6 +3195,7 @@ type ManagerStreamMessage struct {
 	// Types that are valid to be assigned to Message:
 	//
 	//	*ManagerStreamMessage_MessageSnapshot
+	//	*ManagerStreamMessage_ActionResponse
 	//	*ManagerStreamMessage_CommandRequest
 	//	*ManagerStreamMessage_NewMessages
 	//	*ManagerStreamMessage_Cancel
@@ -3156,6 +3247,15 @@ func (x *ManagerStreamMessage) GetMessageSnapshot() *MessageSnapshot {
 	if x != nil {
 		if x, ok := x.Message.(*ManagerStreamMessage_MessageSnapshot); ok {
 			return x.MessageSnapshot
+		}
+	}
+	return nil
+}
+
+func (x *ManagerStreamMessage) GetActionResponse() *ActionResponse {
+	if x != nil {
+		if x, ok := x.Message.(*ManagerStreamMessage_ActionResponse); ok {
+			return x.ActionResponse
 		}
 	}
 	return nil
@@ -3214,6 +3314,10 @@ type ManagerStreamMessage_MessageSnapshot struct {
 	MessageSnapshot *MessageSnapshot `protobuf:"bytes,1,opt,name=message_snapshot,json=messageSnapshot,proto3,oneof"`
 }
 
+type ManagerStreamMessage_ActionResponse struct {
+	ActionResponse *ActionResponse `protobuf:"bytes,2,opt,name=action_response,json=actionResponse,proto3,oneof"`
+}
+
 type ManagerStreamMessage_CommandRequest struct {
 	CommandRequest *CommandRequest `protobuf:"bytes,3,opt,name=command_request,json=commandRequest,proto3,oneof"`
 }
@@ -3235,6 +3339,8 @@ type ManagerStreamMessage_PermissionDecision struct {
 }
 
 func (*ManagerStreamMessage_MessageSnapshot) isManagerStreamMessage_Message() {}
+
+func (*ManagerStreamMessage_ActionResponse) isManagerStreamMessage_Message() {}
 
 func (*ManagerStreamMessage_CommandRequest) isManagerStreamMessage_Message() {}
 
@@ -4453,6 +4559,251 @@ func (x *NewMessagesAvailable) GetVersions() []int64 {
 	return nil
 }
 
+// SubmitAction is the Phase 2 execution trigger. It replaces the Phase 1
+// manager-driven dispatch: after PullMessages the agent autonomously decides
+// whether to act and sends SubmitAction. The manager performs a Held Draft
+// check comparing base_version against the conversation's current version.
+type SubmitAction struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ConversationId   string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	ReplyToMessageId string                 `protobuf:"bytes,2,opt,name=reply_to_message_id,json=replyToMessageId,proto3" json:"reply_to_message_id,omitempty"`
+	BaseVersion      int64                  `protobuf:"varint,3,opt,name=base_version,json=baseVersion,proto3" json:"base_version,omitempty"`
+	Instruction      string                 `protobuf:"bytes,4,opt,name=instruction,proto3" json:"instruction,omitempty"`
+	Profile          string                 `protobuf:"bytes,5,opt,name=profile,proto3" json:"profile,omitempty"`
+	Env              map[string]string      `protobuf:"bytes,6,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	WorkingDir       string                 `protobuf:"bytes,7,opt,name=working_dir,json=workingDir,proto3" json:"working_dir,omitempty"`
+	TimeoutSeconds   int32                  `protobuf:"varint,8,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"`
+	AllowDiff        bool                   `protobuf:"varint,9,opt,name=allow_diff,json=allowDiff,proto3" json:"allow_diff,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *SubmitAction) Reset() {
+	*x = SubmitAction{}
+	mi := &file_v1_command_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubmitAction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubmitAction) ProtoMessage() {}
+
+func (x *SubmitAction) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubmitAction.ProtoReflect.Descriptor instead.
+func (*SubmitAction) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *SubmitAction) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *SubmitAction) GetReplyToMessageId() string {
+	if x != nil {
+		return x.ReplyToMessageId
+	}
+	return ""
+}
+
+func (x *SubmitAction) GetBaseVersion() int64 {
+	if x != nil {
+		return x.BaseVersion
+	}
+	return 0
+}
+
+func (x *SubmitAction) GetInstruction() string {
+	if x != nil {
+		return x.Instruction
+	}
+	return ""
+}
+
+func (x *SubmitAction) GetProfile() string {
+	if x != nil {
+		return x.Profile
+	}
+	return ""
+}
+
+func (x *SubmitAction) GetEnv() map[string]string {
+	if x != nil {
+		return x.Env
+	}
+	return nil
+}
+
+func (x *SubmitAction) GetWorkingDir() string {
+	if x != nil {
+		return x.WorkingDir
+	}
+	return ""
+}
+
+func (x *SubmitAction) GetTimeoutSeconds() int32 {
+	if x != nil {
+		return x.TimeoutSeconds
+	}
+	return 0
+}
+
+func (x *SubmitAction) GetAllowDiff() bool {
+	if x != nil {
+		return x.AllowDiff
+	}
+	return false
+}
+
+// ActionResponse is the manager's reply to SubmitAction. When committed=true
+// the action was accepted and a command was created; when committed=false the
+// action is held pending agent resolution via ResolveHeldAction.
+type ActionResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ActionId       string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
+	Committed      bool                   `protobuf:"varint,2,opt,name=committed,proto3" json:"committed,omitempty"`
+	CommandId      string                 `protobuf:"bytes,3,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	CurrentVersion int64                  `protobuf:"varint,4,opt,name=current_version,json=currentVersion,proto3" json:"current_version,omitempty"`
+	NewMessages    []*ChatMessage         `protobuf:"bytes,5,rep,name=new_messages,json=newMessages,proto3" json:"new_messages,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ActionResponse) Reset() {
+	*x = ActionResponse{}
+	mi := &file_v1_command_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActionResponse) ProtoMessage() {}
+
+func (x *ActionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActionResponse.ProtoReflect.Descriptor instead.
+func (*ActionResponse) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *ActionResponse) GetActionId() string {
+	if x != nil {
+		return x.ActionId
+	}
+	return ""
+}
+
+func (x *ActionResponse) GetCommitted() bool {
+	if x != nil {
+		return x.Committed
+	}
+	return false
+}
+
+func (x *ActionResponse) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+func (x *ActionResponse) GetCurrentVersion() int64 {
+	if x != nil {
+		return x.CurrentVersion
+	}
+	return 0
+}
+
+func (x *ActionResponse) GetNewMessages() []*ChatMessage {
+	if x != nil {
+		return x.NewMessages
+	}
+	return nil
+}
+
+// ResolveHeldAction is sent by the agent to resolve a held action (one where
+// ActionResponse.committed was false).
+type ResolveHeldAction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ActionId      string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
+	Resolution    ActionResolution       `protobuf:"varint,2,opt,name=resolution,proto3,enum=laelia.v1.ActionResolution" json:"resolution,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveHeldAction) Reset() {
+	*x = ResolveHeldAction{}
+	mi := &file_v1_command_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveHeldAction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveHeldAction) ProtoMessage() {}
+
+func (x *ResolveHeldAction) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveHeldAction.ProtoReflect.Descriptor instead.
+func (*ResolveHeldAction) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *ResolveHeldAction) GetActionId() string {
+	if x != nil {
+		return x.ActionId
+	}
+	return ""
+}
+
+func (x *ResolveHeldAction) GetResolution() ActionResolution {
+	if x != nil {
+		return x.Resolution
+	}
+	return ActionResolution_ACTION_RESOLUTION_UNSPECIFIED
+}
+
 var File_v1_command_proto protoreflect.FileDescriptor
 
 const file_v1_command_proto_rawDesc = "" +
@@ -4693,24 +5044,27 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x19GetCommandContextResponse\x12,\n" +
 	"\acommand\x18\x01 \x01(\v2\x12.laelia.v1.CommandR\acommand\x122\n" +
 	"\aoutputs\x18\x02 \x03(\v2\x18.laelia.v1.CommandOutputR\aoutputs\x12/\n" +
-	"\x06events\x18\x03 \x03(\v2\x17.laelia.v1.CommandEventR\x06events\"\x8f\x03\n" +
+	"\x06events\x18\x03 \x03(\v2\x17.laelia.v1.CommandEventR\x06events\"\xef\x03\n" +
 	"\x12AgentStreamMessage\x128\n" +
 	"\vagent_ready\x18\x01 \x01(\v2\x15.laelia.v1.AgentReadyH\x00R\n" +
 	"agentReady\x12>\n" +
-	"\rpull_messages\x18\x02 \x01(\v2\x17.laelia.v1.PullMessagesH\x00R\fpullMessages\x128\n" +
+	"\rpull_messages\x18\x02 \x01(\v2\x17.laelia.v1.PullMessagesH\x00R\fpullMessages\x12>\n" +
+	"\rsubmit_action\x18\x03 \x01(\v2\x17.laelia.v1.SubmitActionH\x00R\fsubmitAction\x12N\n" +
+	"\x13resolve_held_action\x18\x04 \x01(\v2\x1c.laelia.v1.ResolveHeldActionH\x00R\x11resolveHeldAction\x128\n" +
 	"\bprogress\x18\x05 \x01(\v2\x1a.laelia.v1.CommandProgressH\x00R\bprogress\x122\n" +
 	"\x06result\x18\x06 \x01(\v2\x18.laelia.v1.CommandResultH\x00R\x06result\x12/\n" +
 	"\x05event\x18\a \x01(\v2\x17.laelia.v1.CommandEventH\x00R\x05event\x12%\n" +
 	"\x04ping\x18\b \x01(\v2\x0f.laelia.v1.PingH\x00R\x04pingB\t\n" +
-	"\amessageJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05R\rsubmit_actionR\x13resolve_held_action\"\xba\x03\n" +
+	"\amessage\"\xe9\x03\n" +
 	"\x14ManagerStreamMessage\x12G\n" +
 	"\x10message_snapshot\x18\x01 \x01(\v2\x1a.laelia.v1.MessageSnapshotH\x00R\x0fmessageSnapshot\x12D\n" +
+	"\x0faction_response\x18\x02 \x01(\v2\x19.laelia.v1.ActionResponseH\x00R\x0eactionResponse\x12D\n" +
 	"\x0fcommand_request\x18\x03 \x01(\v2\x19.laelia.v1.CommandRequestH\x00R\x0ecommandRequest\x12D\n" +
 	"\fnew_messages\x18\x04 \x01(\v2\x1f.laelia.v1.NewMessagesAvailableH\x00R\vnewMessages\x122\n" +
 	"\x06cancel\x18\x05 \x01(\v2\x18.laelia.v1.CancelMessageH\x00R\x06cancel\x12%\n" +
 	"\x04pong\x18\x06 \x01(\v2\x0f.laelia.v1.PongH\x00R\x04pong\x12P\n" +
 	"\x13permission_decision\x18\a \x01(\v2\x1d.laelia.v1.PermissionDecisionH\x00R\x12permissionDecisionB\t\n" +
-	"\amessageJ\x04\b\x02\x10\x03R\x0faction_response\"\x9b\x01\n" +
+	"\amessage\"\x9b\x01\n" +
 	"\n" +
 	"AgentReady\x12\x1d\n" +
 	"\n" +
@@ -4825,7 +5179,34 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x0fcurrent_version\x18\x02 \x01(\x03R\x0ecurrentVersion\"]\n" +
 	"\x14NewMessagesAvailable\x12)\n" +
 	"\x10conversation_ids\x18\x01 \x03(\tR\x0fconversationIds\x12\x1a\n" +
-	"\bversions\x18\x02 \x03(\x03R\bversions*\x80\x01\n" +
+	"\bversions\x18\x02 \x03(\x03R\bversions\"\x9a\x03\n" +
+	"\fSubmitAction\x12'\n" +
+	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12-\n" +
+	"\x13reply_to_message_id\x18\x02 \x01(\tR\x10replyToMessageId\x12!\n" +
+	"\fbase_version\x18\x03 \x01(\x03R\vbaseVersion\x12 \n" +
+	"\vinstruction\x18\x04 \x01(\tR\vinstruction\x12\x18\n" +
+	"\aprofile\x18\x05 \x01(\tR\aprofile\x122\n" +
+	"\x03env\x18\x06 \x03(\v2 .laelia.v1.SubmitAction.EnvEntryR\x03env\x12\x1f\n" +
+	"\vworking_dir\x18\a \x01(\tR\n" +
+	"workingDir\x12'\n" +
+	"\x0ftimeout_seconds\x18\b \x01(\x05R\x0etimeoutSeconds\x12\x1d\n" +
+	"\n" +
+	"allow_diff\x18\t \x01(\bR\tallowDiff\x1a6\n" +
+	"\bEnvEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xce\x01\n" +
+	"\x0eActionResponse\x12\x1b\n" +
+	"\taction_id\x18\x01 \x01(\tR\bactionId\x12\x1c\n" +
+	"\tcommitted\x18\x02 \x01(\bR\tcommitted\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x03 \x01(\tR\tcommandId\x12'\n" +
+	"\x0fcurrent_version\x18\x04 \x01(\x03R\x0ecurrentVersion\x129\n" +
+	"\fnew_messages\x18\x05 \x03(\v2\x16.laelia.v1.ChatMessageR\vnewMessages\"m\n" +
+	"\x11ResolveHeldAction\x12\x1b\n" +
+	"\taction_id\x18\x01 \x01(\tR\bactionId\x12;\n" +
+	"\n" +
+	"resolution\x18\x02 \x01(\x0e2\x1b.laelia.v1.ActionResolutionR\n" +
+	"resolution*\x80\x01\n" +
 	"\rCommandStatus\x12\x1e\n" +
 	"\x1aCOMMAND_STATUS_UNSPECIFIED\x10\x00\x12\v\n" +
 	"\aPENDING\x10\x01\x12\v\n" +
@@ -4864,7 +5245,16 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x14PERMISSION_REQUESTED\x10\t\x12\x18\n" +
 	"\x14PERMISSION_TIMED_OUT\x10\n" +
 	"\x12\x16\n" +
-	"\x12PERMISSION_DECIDED\x10\v2\xe2\x14\n" +
+	"\x12PERMISSION_DECIDED\x10\v*n\n" +
+	"\x10ActionResolution\x12!\n" +
+	"\x1dACTION_RESOLUTION_UNSPECIFIED\x10\x00\x12\n" +
+	"\n" +
+	"\x06REVISE\x10\x01\x12\x0e\n" +
+	"\n" +
+	"SEND_AS_IS\x10\x02\x12\v\n" +
+	"\aDISCARD\x10\x03\x12\x0e\n" +
+	"\n" +
+	"FORCE_SEND\x10\x042\xe2\x14\n" +
 	"\x0eCommandService\x12q\n" +
 	"\vSendCommand\x12\x1d.laelia.v1.SendCommandRequest\x1a\x12.laelia.v1.Command\"/\x98\xea0\x01\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/v1/{agent=agents/*}/commands\x88\x02\x01\x12v\n" +
 	"\fListCommands\x12\x1e.laelia.v1.ListCommandsRequest\x1a\x1f.laelia.v1.ListCommandsResponse\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/v1/{agent=agents/*}/commands\x12f\n" +
@@ -4903,195 +5293,206 @@ func file_v1_command_proto_rawDescGZIP() []byte {
 	return file_v1_command_proto_rawDescData
 }
 
-var file_v1_command_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 62)
+var file_v1_command_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
+var file_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 66)
 var file_v1_command_proto_goTypes = []any{
 	(CommandStatus)(0),                       // 0: laelia.v1.CommandStatus
 	(ExecutorKind)(0),                        // 1: laelia.v1.ExecutorKind
 	(CommandSource)(0),                       // 2: laelia.v1.CommandSource
 	(SenderType)(0),                          // 3: laelia.v1.SenderType
 	(CommandEventType)(0),                    // 4: laelia.v1.CommandEventType
-	(CommandOutput_StreamType)(0),            // 5: laelia.v1.CommandOutput.StreamType
-	(*Command)(nil),                          // 6: laelia.v1.Command
-	(*CommandOutput)(nil),                    // 7: laelia.v1.CommandOutput
-	(*CommandEvent)(nil),                     // 8: laelia.v1.CommandEvent
-	(*LifecyclePayload)(nil),                 // 9: laelia.v1.LifecyclePayload
-	(*TextDeltaPayload)(nil),                 // 10: laelia.v1.TextDeltaPayload
-	(*ToolCallStartedPayload)(nil),           // 11: laelia.v1.ToolCallStartedPayload
-	(*ToolCallFinishedPayload)(nil),          // 12: laelia.v1.ToolCallFinishedPayload
-	(*DiffEmittedPayload)(nil),               // 13: laelia.v1.DiffEmittedPayload
-	(*WarningPayload)(nil),                   // 14: laelia.v1.WarningPayload
-	(*RawAcpPayload)(nil),                    // 15: laelia.v1.RawAcpPayload
-	(*FinalSummaryPayload)(nil),              // 16: laelia.v1.FinalSummaryPayload
-	(*PermissionRequestedPayload)(nil),       // 17: laelia.v1.PermissionRequestedPayload
-	(*PermissionOptionPayload)(nil),          // 18: laelia.v1.PermissionOptionPayload
-	(*PermissionTimedOutPayload)(nil),        // 19: laelia.v1.PermissionTimedOutPayload
-	(*PermissionDecidedPayload)(nil),         // 20: laelia.v1.PermissionDecidedPayload
-	(*SearchChatHistoryRequest)(nil),         // 21: laelia.v1.SearchChatHistoryRequest
-	(*SearchChatHistoryResponse)(nil),        // 22: laelia.v1.SearchChatHistoryResponse
-	(*ChatHistoryEntry)(nil),                 // 23: laelia.v1.ChatHistoryEntry
-	(*ChatMessage)(nil),                      // 24: laelia.v1.ChatMessage
-	(*Conversation)(nil),                     // 25: laelia.v1.Conversation
-	(*ChannelMember)(nil),                    // 26: laelia.v1.ChannelMember
-	(*ListConversationMessagesRequest)(nil),  // 27: laelia.v1.ListConversationMessagesRequest
-	(*ListConversationMessagesResponse)(nil), // 28: laelia.v1.ListConversationMessagesResponse
-	(*GetOrCreateConversationRequest)(nil),   // 29: laelia.v1.GetOrCreateConversationRequest
-	(*GetOrCreateConversationResponse)(nil),  // 30: laelia.v1.GetOrCreateConversationResponse
-	(*CreateChannelRequest)(nil),             // 31: laelia.v1.CreateChannelRequest
-	(*ListChannelsRequest)(nil),              // 32: laelia.v1.ListChannelsRequest
-	(*ListChannelsResponse)(nil),             // 33: laelia.v1.ListChannelsResponse
-	(*GetChannelRequest)(nil),                // 34: laelia.v1.GetChannelRequest
-	(*UpdateChannelRequest)(nil),             // 35: laelia.v1.UpdateChannelRequest
-	(*DeleteChannelRequest)(nil),             // 36: laelia.v1.DeleteChannelRequest
-	(*AddChannelMemberRequest)(nil),          // 37: laelia.v1.AddChannelMemberRequest
-	(*RemoveChannelMemberRequest)(nil),       // 38: laelia.v1.RemoveChannelMemberRequest
-	(*ListChannelMembersRequest)(nil),        // 39: laelia.v1.ListChannelMembersRequest
-	(*ListChannelMembersResponse)(nil),       // 40: laelia.v1.ListChannelMembersResponse
-	(*SendMessageRequest)(nil),               // 41: laelia.v1.SendMessageRequest
-	(*GetCommandContextRequest)(nil),         // 42: laelia.v1.GetCommandContextRequest
-	(*GetCommandContextResponse)(nil),        // 43: laelia.v1.GetCommandContextResponse
-	(*AgentStreamMessage)(nil),               // 44: laelia.v1.AgentStreamMessage
-	(*ManagerStreamMessage)(nil),             // 45: laelia.v1.ManagerStreamMessage
-	(*AgentReady)(nil),                       // 46: laelia.v1.AgentReady
-	(*CommandRequest)(nil),                   // 47: laelia.v1.CommandRequest
-	(*CommandProgress)(nil),                  // 48: laelia.v1.CommandProgress
-	(*CommandResult)(nil),                    // 49: laelia.v1.CommandResult
-	(*CancelMessage)(nil),                    // 50: laelia.v1.CancelMessage
-	(*Ping)(nil),                             // 51: laelia.v1.Ping
-	(*Pong)(nil),                             // 52: laelia.v1.Pong
-	(*SendCommandRequest)(nil),               // 53: laelia.v1.SendCommandRequest
-	(*ListCommandsRequest)(nil),              // 54: laelia.v1.ListCommandsRequest
-	(*ListCommandsResponse)(nil),             // 55: laelia.v1.ListCommandsResponse
-	(*GetCommandRequest)(nil),                // 56: laelia.v1.GetCommandRequest
-	(*CancelCommandRequest)(nil),             // 57: laelia.v1.CancelCommandRequest
-	(*WatchCommandRequest)(nil),              // 58: laelia.v1.WatchCommandRequest
-	(*WatchCommandEventsRequest)(nil),        // 59: laelia.v1.WatchCommandEventsRequest
-	(*PermissionDecision)(nil),               // 60: laelia.v1.PermissionDecision
-	(*RespondPermissionRequest)(nil),         // 61: laelia.v1.RespondPermissionRequest
-	(*PullMessages)(nil),                     // 62: laelia.v1.PullMessages
-	(*MessageSnapshot)(nil),                  // 63: laelia.v1.MessageSnapshot
-	(*NewMessagesAvailable)(nil),             // 64: laelia.v1.NewMessagesAvailable
-	nil,                                      // 65: laelia.v1.Command.EnvEntry
-	nil,                                      // 66: laelia.v1.CommandRequest.EnvEntry
-	nil,                                      // 67: laelia.v1.SendCommandRequest.EnvEntry
-	(*timestamppb.Timestamp)(nil),            // 68: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),                  // 69: google.protobuf.Struct
-	(*fieldmaskpb.FieldMask)(nil),            // 70: google.protobuf.FieldMask
-	(*emptypb.Empty)(nil),                    // 71: google.protobuf.Empty
+	(ActionResolution)(0),                    // 5: laelia.v1.ActionResolution
+	(CommandOutput_StreamType)(0),            // 6: laelia.v1.CommandOutput.StreamType
+	(*Command)(nil),                          // 7: laelia.v1.Command
+	(*CommandOutput)(nil),                    // 8: laelia.v1.CommandOutput
+	(*CommandEvent)(nil),                     // 9: laelia.v1.CommandEvent
+	(*LifecyclePayload)(nil),                 // 10: laelia.v1.LifecyclePayload
+	(*TextDeltaPayload)(nil),                 // 11: laelia.v1.TextDeltaPayload
+	(*ToolCallStartedPayload)(nil),           // 12: laelia.v1.ToolCallStartedPayload
+	(*ToolCallFinishedPayload)(nil),          // 13: laelia.v1.ToolCallFinishedPayload
+	(*DiffEmittedPayload)(nil),               // 14: laelia.v1.DiffEmittedPayload
+	(*WarningPayload)(nil),                   // 15: laelia.v1.WarningPayload
+	(*RawAcpPayload)(nil),                    // 16: laelia.v1.RawAcpPayload
+	(*FinalSummaryPayload)(nil),              // 17: laelia.v1.FinalSummaryPayload
+	(*PermissionRequestedPayload)(nil),       // 18: laelia.v1.PermissionRequestedPayload
+	(*PermissionOptionPayload)(nil),          // 19: laelia.v1.PermissionOptionPayload
+	(*PermissionTimedOutPayload)(nil),        // 20: laelia.v1.PermissionTimedOutPayload
+	(*PermissionDecidedPayload)(nil),         // 21: laelia.v1.PermissionDecidedPayload
+	(*SearchChatHistoryRequest)(nil),         // 22: laelia.v1.SearchChatHistoryRequest
+	(*SearchChatHistoryResponse)(nil),        // 23: laelia.v1.SearchChatHistoryResponse
+	(*ChatHistoryEntry)(nil),                 // 24: laelia.v1.ChatHistoryEntry
+	(*ChatMessage)(nil),                      // 25: laelia.v1.ChatMessage
+	(*Conversation)(nil),                     // 26: laelia.v1.Conversation
+	(*ChannelMember)(nil),                    // 27: laelia.v1.ChannelMember
+	(*ListConversationMessagesRequest)(nil),  // 28: laelia.v1.ListConversationMessagesRequest
+	(*ListConversationMessagesResponse)(nil), // 29: laelia.v1.ListConversationMessagesResponse
+	(*GetOrCreateConversationRequest)(nil),   // 30: laelia.v1.GetOrCreateConversationRequest
+	(*GetOrCreateConversationResponse)(nil),  // 31: laelia.v1.GetOrCreateConversationResponse
+	(*CreateChannelRequest)(nil),             // 32: laelia.v1.CreateChannelRequest
+	(*ListChannelsRequest)(nil),              // 33: laelia.v1.ListChannelsRequest
+	(*ListChannelsResponse)(nil),             // 34: laelia.v1.ListChannelsResponse
+	(*GetChannelRequest)(nil),                // 35: laelia.v1.GetChannelRequest
+	(*UpdateChannelRequest)(nil),             // 36: laelia.v1.UpdateChannelRequest
+	(*DeleteChannelRequest)(nil),             // 37: laelia.v1.DeleteChannelRequest
+	(*AddChannelMemberRequest)(nil),          // 38: laelia.v1.AddChannelMemberRequest
+	(*RemoveChannelMemberRequest)(nil),       // 39: laelia.v1.RemoveChannelMemberRequest
+	(*ListChannelMembersRequest)(nil),        // 40: laelia.v1.ListChannelMembersRequest
+	(*ListChannelMembersResponse)(nil),       // 41: laelia.v1.ListChannelMembersResponse
+	(*SendMessageRequest)(nil),               // 42: laelia.v1.SendMessageRequest
+	(*GetCommandContextRequest)(nil),         // 43: laelia.v1.GetCommandContextRequest
+	(*GetCommandContextResponse)(nil),        // 44: laelia.v1.GetCommandContextResponse
+	(*AgentStreamMessage)(nil),               // 45: laelia.v1.AgentStreamMessage
+	(*ManagerStreamMessage)(nil),             // 46: laelia.v1.ManagerStreamMessage
+	(*AgentReady)(nil),                       // 47: laelia.v1.AgentReady
+	(*CommandRequest)(nil),                   // 48: laelia.v1.CommandRequest
+	(*CommandProgress)(nil),                  // 49: laelia.v1.CommandProgress
+	(*CommandResult)(nil),                    // 50: laelia.v1.CommandResult
+	(*CancelMessage)(nil),                    // 51: laelia.v1.CancelMessage
+	(*Ping)(nil),                             // 52: laelia.v1.Ping
+	(*Pong)(nil),                             // 53: laelia.v1.Pong
+	(*SendCommandRequest)(nil),               // 54: laelia.v1.SendCommandRequest
+	(*ListCommandsRequest)(nil),              // 55: laelia.v1.ListCommandsRequest
+	(*ListCommandsResponse)(nil),             // 56: laelia.v1.ListCommandsResponse
+	(*GetCommandRequest)(nil),                // 57: laelia.v1.GetCommandRequest
+	(*CancelCommandRequest)(nil),             // 58: laelia.v1.CancelCommandRequest
+	(*WatchCommandRequest)(nil),              // 59: laelia.v1.WatchCommandRequest
+	(*WatchCommandEventsRequest)(nil),        // 60: laelia.v1.WatchCommandEventsRequest
+	(*PermissionDecision)(nil),               // 61: laelia.v1.PermissionDecision
+	(*RespondPermissionRequest)(nil),         // 62: laelia.v1.RespondPermissionRequest
+	(*PullMessages)(nil),                     // 63: laelia.v1.PullMessages
+	(*MessageSnapshot)(nil),                  // 64: laelia.v1.MessageSnapshot
+	(*NewMessagesAvailable)(nil),             // 65: laelia.v1.NewMessagesAvailable
+	(*SubmitAction)(nil),                     // 66: laelia.v1.SubmitAction
+	(*ActionResponse)(nil),                   // 67: laelia.v1.ActionResponse
+	(*ResolveHeldAction)(nil),                // 68: laelia.v1.ResolveHeldAction
+	nil,                                      // 69: laelia.v1.Command.EnvEntry
+	nil,                                      // 70: laelia.v1.CommandRequest.EnvEntry
+	nil,                                      // 71: laelia.v1.SendCommandRequest.EnvEntry
+	nil,                                      // 72: laelia.v1.SubmitAction.EnvEntry
+	(*timestamppb.Timestamp)(nil),            // 73: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                  // 74: google.protobuf.Struct
+	(*fieldmaskpb.FieldMask)(nil),            // 75: google.protobuf.FieldMask
+	(*emptypb.Empty)(nil),                    // 76: google.protobuf.Empty
 }
 var file_v1_command_proto_depIdxs = []int32{
 	0,  // 0: laelia.v1.Command.status:type_name -> laelia.v1.CommandStatus
-	68, // 1: laelia.v1.Command.created_at:type_name -> google.protobuf.Timestamp
-	68, // 2: laelia.v1.Command.started_at:type_name -> google.protobuf.Timestamp
-	68, // 3: laelia.v1.Command.completed_at:type_name -> google.protobuf.Timestamp
-	65, // 4: laelia.v1.Command.env:type_name -> laelia.v1.Command.EnvEntry
+	73, // 1: laelia.v1.Command.created_at:type_name -> google.protobuf.Timestamp
+	73, // 2: laelia.v1.Command.started_at:type_name -> google.protobuf.Timestamp
+	73, // 3: laelia.v1.Command.completed_at:type_name -> google.protobuf.Timestamp
+	69, // 4: laelia.v1.Command.env:type_name -> laelia.v1.Command.EnvEntry
 	1,  // 5: laelia.v1.Command.executor_kind:type_name -> laelia.v1.ExecutorKind
-	69, // 6: laelia.v1.Command.result:type_name -> google.protobuf.Struct
+	74, // 6: laelia.v1.Command.result:type_name -> google.protobuf.Struct
 	2,  // 7: laelia.v1.Command.source:type_name -> laelia.v1.CommandSource
-	5,  // 8: laelia.v1.CommandOutput.type:type_name -> laelia.v1.CommandOutput.StreamType
-	68, // 9: laelia.v1.CommandOutput.timestamp:type_name -> google.protobuf.Timestamp
+	6,  // 8: laelia.v1.CommandOutput.type:type_name -> laelia.v1.CommandOutput.StreamType
+	73, // 9: laelia.v1.CommandOutput.timestamp:type_name -> google.protobuf.Timestamp
 	4,  // 10: laelia.v1.CommandEvent.type:type_name -> laelia.v1.CommandEventType
-	68, // 11: laelia.v1.CommandEvent.timestamp:type_name -> google.protobuf.Timestamp
-	9,  // 12: laelia.v1.CommandEvent.lifecycle:type_name -> laelia.v1.LifecyclePayload
-	10, // 13: laelia.v1.CommandEvent.text_delta:type_name -> laelia.v1.TextDeltaPayload
-	11, // 14: laelia.v1.CommandEvent.tool_call_started:type_name -> laelia.v1.ToolCallStartedPayload
-	12, // 15: laelia.v1.CommandEvent.tool_call_finished:type_name -> laelia.v1.ToolCallFinishedPayload
-	13, // 16: laelia.v1.CommandEvent.diff_emitted:type_name -> laelia.v1.DiffEmittedPayload
-	14, // 17: laelia.v1.CommandEvent.warning:type_name -> laelia.v1.WarningPayload
-	15, // 18: laelia.v1.CommandEvent.raw_acp:type_name -> laelia.v1.RawAcpPayload
-	16, // 19: laelia.v1.CommandEvent.final_summary:type_name -> laelia.v1.FinalSummaryPayload
-	17, // 20: laelia.v1.CommandEvent.permission_requested:type_name -> laelia.v1.PermissionRequestedPayload
-	19, // 21: laelia.v1.CommandEvent.permission_timed_out:type_name -> laelia.v1.PermissionTimedOutPayload
-	20, // 22: laelia.v1.CommandEvent.permission_decided:type_name -> laelia.v1.PermissionDecidedPayload
-	69, // 23: laelia.v1.ToolCallStartedPayload.raw_input:type_name -> google.protobuf.Struct
-	69, // 24: laelia.v1.ToolCallFinishedPayload.raw_output:type_name -> google.protobuf.Struct
-	69, // 25: laelia.v1.RawAcpPayload.data:type_name -> google.protobuf.Struct
-	18, // 26: laelia.v1.PermissionRequestedPayload.options:type_name -> laelia.v1.PermissionOptionPayload
-	68, // 27: laelia.v1.SearchChatHistoryRequest.since:type_name -> google.protobuf.Timestamp
-	68, // 28: laelia.v1.SearchChatHistoryRequest.until:type_name -> google.protobuf.Timestamp
-	23, // 29: laelia.v1.SearchChatHistoryResponse.entries:type_name -> laelia.v1.ChatHistoryEntry
-	68, // 30: laelia.v1.ChatHistoryEntry.created_at:type_name -> google.protobuf.Timestamp
-	68, // 31: laelia.v1.ChatMessage.created_at:type_name -> google.protobuf.Timestamp
+	73, // 11: laelia.v1.CommandEvent.timestamp:type_name -> google.protobuf.Timestamp
+	10, // 12: laelia.v1.CommandEvent.lifecycle:type_name -> laelia.v1.LifecyclePayload
+	11, // 13: laelia.v1.CommandEvent.text_delta:type_name -> laelia.v1.TextDeltaPayload
+	12, // 14: laelia.v1.CommandEvent.tool_call_started:type_name -> laelia.v1.ToolCallStartedPayload
+	13, // 15: laelia.v1.CommandEvent.tool_call_finished:type_name -> laelia.v1.ToolCallFinishedPayload
+	14, // 16: laelia.v1.CommandEvent.diff_emitted:type_name -> laelia.v1.DiffEmittedPayload
+	15, // 17: laelia.v1.CommandEvent.warning:type_name -> laelia.v1.WarningPayload
+	16, // 18: laelia.v1.CommandEvent.raw_acp:type_name -> laelia.v1.RawAcpPayload
+	17, // 19: laelia.v1.CommandEvent.final_summary:type_name -> laelia.v1.FinalSummaryPayload
+	18, // 20: laelia.v1.CommandEvent.permission_requested:type_name -> laelia.v1.PermissionRequestedPayload
+	20, // 21: laelia.v1.CommandEvent.permission_timed_out:type_name -> laelia.v1.PermissionTimedOutPayload
+	21, // 22: laelia.v1.CommandEvent.permission_decided:type_name -> laelia.v1.PermissionDecidedPayload
+	74, // 23: laelia.v1.ToolCallStartedPayload.raw_input:type_name -> google.protobuf.Struct
+	74, // 24: laelia.v1.ToolCallFinishedPayload.raw_output:type_name -> google.protobuf.Struct
+	74, // 25: laelia.v1.RawAcpPayload.data:type_name -> google.protobuf.Struct
+	19, // 26: laelia.v1.PermissionRequestedPayload.options:type_name -> laelia.v1.PermissionOptionPayload
+	73, // 27: laelia.v1.SearchChatHistoryRequest.since:type_name -> google.protobuf.Timestamp
+	73, // 28: laelia.v1.SearchChatHistoryRequest.until:type_name -> google.protobuf.Timestamp
+	24, // 29: laelia.v1.SearchChatHistoryResponse.entries:type_name -> laelia.v1.ChatHistoryEntry
+	73, // 30: laelia.v1.ChatHistoryEntry.created_at:type_name -> google.protobuf.Timestamp
+	73, // 31: laelia.v1.ChatMessage.created_at:type_name -> google.protobuf.Timestamp
 	3,  // 32: laelia.v1.ChatMessage.sender_type:type_name -> laelia.v1.SenderType
-	68, // 33: laelia.v1.Conversation.created_at:type_name -> google.protobuf.Timestamp
-	68, // 34: laelia.v1.Conversation.updated_at:type_name -> google.protobuf.Timestamp
-	68, // 35: laelia.v1.ChannelMember.joined_at:type_name -> google.protobuf.Timestamp
-	24, // 36: laelia.v1.ListConversationMessagesResponse.messages:type_name -> laelia.v1.ChatMessage
-	25, // 37: laelia.v1.ListChannelsResponse.channels:type_name -> laelia.v1.Conversation
-	25, // 38: laelia.v1.UpdateChannelRequest.conversation:type_name -> laelia.v1.Conversation
-	70, // 39: laelia.v1.UpdateChannelRequest.update_mask:type_name -> google.protobuf.FieldMask
-	26, // 40: laelia.v1.ListChannelMembersResponse.members:type_name -> laelia.v1.ChannelMember
-	6,  // 41: laelia.v1.GetCommandContextResponse.command:type_name -> laelia.v1.Command
-	7,  // 42: laelia.v1.GetCommandContextResponse.outputs:type_name -> laelia.v1.CommandOutput
-	8,  // 43: laelia.v1.GetCommandContextResponse.events:type_name -> laelia.v1.CommandEvent
-	46, // 44: laelia.v1.AgentStreamMessage.agent_ready:type_name -> laelia.v1.AgentReady
-	62, // 45: laelia.v1.AgentStreamMessage.pull_messages:type_name -> laelia.v1.PullMessages
-	48, // 46: laelia.v1.AgentStreamMessage.progress:type_name -> laelia.v1.CommandProgress
-	49, // 47: laelia.v1.AgentStreamMessage.result:type_name -> laelia.v1.CommandResult
-	8,  // 48: laelia.v1.AgentStreamMessage.event:type_name -> laelia.v1.CommandEvent
-	51, // 49: laelia.v1.AgentStreamMessage.ping:type_name -> laelia.v1.Ping
-	63, // 50: laelia.v1.ManagerStreamMessage.message_snapshot:type_name -> laelia.v1.MessageSnapshot
-	47, // 51: laelia.v1.ManagerStreamMessage.command_request:type_name -> laelia.v1.CommandRequest
-	64, // 52: laelia.v1.ManagerStreamMessage.new_messages:type_name -> laelia.v1.NewMessagesAvailable
-	50, // 53: laelia.v1.ManagerStreamMessage.cancel:type_name -> laelia.v1.CancelMessage
-	52, // 54: laelia.v1.ManagerStreamMessage.pong:type_name -> laelia.v1.Pong
-	60, // 55: laelia.v1.ManagerStreamMessage.permission_decision:type_name -> laelia.v1.PermissionDecision
-	66, // 56: laelia.v1.CommandRequest.env:type_name -> laelia.v1.CommandRequest.EnvEntry
-	5,  // 57: laelia.v1.CommandProgress.type:type_name -> laelia.v1.CommandOutput.StreamType
-	69, // 58: laelia.v1.CommandResult.result:type_name -> google.protobuf.Struct
-	67, // 59: laelia.v1.SendCommandRequest.env:type_name -> laelia.v1.SendCommandRequest.EnvEntry
-	1,  // 60: laelia.v1.SendCommandRequest.executor_kind:type_name -> laelia.v1.ExecutorKind
-	2,  // 61: laelia.v1.SendCommandRequest.source:type_name -> laelia.v1.CommandSource
-	0,  // 62: laelia.v1.ListCommandsRequest.status:type_name -> laelia.v1.CommandStatus
-	6,  // 63: laelia.v1.ListCommandsResponse.commands:type_name -> laelia.v1.Command
-	24, // 64: laelia.v1.MessageSnapshot.messages:type_name -> laelia.v1.ChatMessage
-	53, // 65: laelia.v1.CommandService.SendCommand:input_type -> laelia.v1.SendCommandRequest
-	54, // 66: laelia.v1.CommandService.ListCommands:input_type -> laelia.v1.ListCommandsRequest
-	56, // 67: laelia.v1.CommandService.GetCommand:input_type -> laelia.v1.GetCommandRequest
-	57, // 68: laelia.v1.CommandService.CancelCommand:input_type -> laelia.v1.CancelCommandRequest
-	58, // 69: laelia.v1.CommandService.WatchCommand:input_type -> laelia.v1.WatchCommandRequest
-	59, // 70: laelia.v1.CommandService.WatchCommandEvents:input_type -> laelia.v1.WatchCommandEventsRequest
-	61, // 71: laelia.v1.CommandService.RespondPermission:input_type -> laelia.v1.RespondPermissionRequest
-	21, // 72: laelia.v1.CommandService.SearchChatHistory:input_type -> laelia.v1.SearchChatHistoryRequest
-	42, // 73: laelia.v1.CommandService.GetCommandContext:input_type -> laelia.v1.GetCommandContextRequest
-	29, // 74: laelia.v1.CommandService.GetOrCreateConversation:input_type -> laelia.v1.GetOrCreateConversationRequest
-	27, // 75: laelia.v1.CommandService.ListConversationMessages:input_type -> laelia.v1.ListConversationMessagesRequest
-	31, // 76: laelia.v1.CommandService.CreateChannel:input_type -> laelia.v1.CreateChannelRequest
-	32, // 77: laelia.v1.CommandService.ListChannels:input_type -> laelia.v1.ListChannelsRequest
-	34, // 78: laelia.v1.CommandService.GetChannel:input_type -> laelia.v1.GetChannelRequest
-	35, // 79: laelia.v1.CommandService.UpdateChannel:input_type -> laelia.v1.UpdateChannelRequest
-	36, // 80: laelia.v1.CommandService.DeleteChannel:input_type -> laelia.v1.DeleteChannelRequest
-	37, // 81: laelia.v1.CommandService.AddChannelMember:input_type -> laelia.v1.AddChannelMemberRequest
-	38, // 82: laelia.v1.CommandService.RemoveChannelMember:input_type -> laelia.v1.RemoveChannelMemberRequest
-	39, // 83: laelia.v1.CommandService.ListChannelMembers:input_type -> laelia.v1.ListChannelMembersRequest
-	41, // 84: laelia.v1.CommandService.SendMessage:input_type -> laelia.v1.SendMessageRequest
-	44, // 85: laelia.v1.AgentStreamService.AgentChannel:input_type -> laelia.v1.AgentStreamMessage
-	6,  // 86: laelia.v1.CommandService.SendCommand:output_type -> laelia.v1.Command
-	55, // 87: laelia.v1.CommandService.ListCommands:output_type -> laelia.v1.ListCommandsResponse
-	6,  // 88: laelia.v1.CommandService.GetCommand:output_type -> laelia.v1.Command
-	6,  // 89: laelia.v1.CommandService.CancelCommand:output_type -> laelia.v1.Command
-	7,  // 90: laelia.v1.CommandService.WatchCommand:output_type -> laelia.v1.CommandOutput
-	8,  // 91: laelia.v1.CommandService.WatchCommandEvents:output_type -> laelia.v1.CommandEvent
-	71, // 92: laelia.v1.CommandService.RespondPermission:output_type -> google.protobuf.Empty
-	22, // 93: laelia.v1.CommandService.SearchChatHistory:output_type -> laelia.v1.SearchChatHistoryResponse
-	43, // 94: laelia.v1.CommandService.GetCommandContext:output_type -> laelia.v1.GetCommandContextResponse
-	30, // 95: laelia.v1.CommandService.GetOrCreateConversation:output_type -> laelia.v1.GetOrCreateConversationResponse
-	28, // 96: laelia.v1.CommandService.ListConversationMessages:output_type -> laelia.v1.ListConversationMessagesResponse
-	25, // 97: laelia.v1.CommandService.CreateChannel:output_type -> laelia.v1.Conversation
-	33, // 98: laelia.v1.CommandService.ListChannels:output_type -> laelia.v1.ListChannelsResponse
-	25, // 99: laelia.v1.CommandService.GetChannel:output_type -> laelia.v1.Conversation
-	25, // 100: laelia.v1.CommandService.UpdateChannel:output_type -> laelia.v1.Conversation
-	71, // 101: laelia.v1.CommandService.DeleteChannel:output_type -> google.protobuf.Empty
-	26, // 102: laelia.v1.CommandService.AddChannelMember:output_type -> laelia.v1.ChannelMember
-	71, // 103: laelia.v1.CommandService.RemoveChannelMember:output_type -> google.protobuf.Empty
-	40, // 104: laelia.v1.CommandService.ListChannelMembers:output_type -> laelia.v1.ListChannelMembersResponse
-	24, // 105: laelia.v1.CommandService.SendMessage:output_type -> laelia.v1.ChatMessage
-	45, // 106: laelia.v1.AgentStreamService.AgentChannel:output_type -> laelia.v1.ManagerStreamMessage
-	86, // [86:107] is the sub-list for method output_type
-	65, // [65:86] is the sub-list for method input_type
-	65, // [65:65] is the sub-list for extension type_name
-	65, // [65:65] is the sub-list for extension extendee
-	0,  // [0:65] is the sub-list for field type_name
+	73, // 33: laelia.v1.Conversation.created_at:type_name -> google.protobuf.Timestamp
+	73, // 34: laelia.v1.Conversation.updated_at:type_name -> google.protobuf.Timestamp
+	73, // 35: laelia.v1.ChannelMember.joined_at:type_name -> google.protobuf.Timestamp
+	25, // 36: laelia.v1.ListConversationMessagesResponse.messages:type_name -> laelia.v1.ChatMessage
+	26, // 37: laelia.v1.ListChannelsResponse.channels:type_name -> laelia.v1.Conversation
+	26, // 38: laelia.v1.UpdateChannelRequest.conversation:type_name -> laelia.v1.Conversation
+	75, // 39: laelia.v1.UpdateChannelRequest.update_mask:type_name -> google.protobuf.FieldMask
+	27, // 40: laelia.v1.ListChannelMembersResponse.members:type_name -> laelia.v1.ChannelMember
+	7,  // 41: laelia.v1.GetCommandContextResponse.command:type_name -> laelia.v1.Command
+	8,  // 42: laelia.v1.GetCommandContextResponse.outputs:type_name -> laelia.v1.CommandOutput
+	9,  // 43: laelia.v1.GetCommandContextResponse.events:type_name -> laelia.v1.CommandEvent
+	47, // 44: laelia.v1.AgentStreamMessage.agent_ready:type_name -> laelia.v1.AgentReady
+	63, // 45: laelia.v1.AgentStreamMessage.pull_messages:type_name -> laelia.v1.PullMessages
+	66, // 46: laelia.v1.AgentStreamMessage.submit_action:type_name -> laelia.v1.SubmitAction
+	68, // 47: laelia.v1.AgentStreamMessage.resolve_held_action:type_name -> laelia.v1.ResolveHeldAction
+	49, // 48: laelia.v1.AgentStreamMessage.progress:type_name -> laelia.v1.CommandProgress
+	50, // 49: laelia.v1.AgentStreamMessage.result:type_name -> laelia.v1.CommandResult
+	9,  // 50: laelia.v1.AgentStreamMessage.event:type_name -> laelia.v1.CommandEvent
+	52, // 51: laelia.v1.AgentStreamMessage.ping:type_name -> laelia.v1.Ping
+	64, // 52: laelia.v1.ManagerStreamMessage.message_snapshot:type_name -> laelia.v1.MessageSnapshot
+	67, // 53: laelia.v1.ManagerStreamMessage.action_response:type_name -> laelia.v1.ActionResponse
+	48, // 54: laelia.v1.ManagerStreamMessage.command_request:type_name -> laelia.v1.CommandRequest
+	65, // 55: laelia.v1.ManagerStreamMessage.new_messages:type_name -> laelia.v1.NewMessagesAvailable
+	51, // 56: laelia.v1.ManagerStreamMessage.cancel:type_name -> laelia.v1.CancelMessage
+	53, // 57: laelia.v1.ManagerStreamMessage.pong:type_name -> laelia.v1.Pong
+	61, // 58: laelia.v1.ManagerStreamMessage.permission_decision:type_name -> laelia.v1.PermissionDecision
+	70, // 59: laelia.v1.CommandRequest.env:type_name -> laelia.v1.CommandRequest.EnvEntry
+	6,  // 60: laelia.v1.CommandProgress.type:type_name -> laelia.v1.CommandOutput.StreamType
+	74, // 61: laelia.v1.CommandResult.result:type_name -> google.protobuf.Struct
+	71, // 62: laelia.v1.SendCommandRequest.env:type_name -> laelia.v1.SendCommandRequest.EnvEntry
+	1,  // 63: laelia.v1.SendCommandRequest.executor_kind:type_name -> laelia.v1.ExecutorKind
+	2,  // 64: laelia.v1.SendCommandRequest.source:type_name -> laelia.v1.CommandSource
+	0,  // 65: laelia.v1.ListCommandsRequest.status:type_name -> laelia.v1.CommandStatus
+	7,  // 66: laelia.v1.ListCommandsResponse.commands:type_name -> laelia.v1.Command
+	25, // 67: laelia.v1.MessageSnapshot.messages:type_name -> laelia.v1.ChatMessage
+	72, // 68: laelia.v1.SubmitAction.env:type_name -> laelia.v1.SubmitAction.EnvEntry
+	25, // 69: laelia.v1.ActionResponse.new_messages:type_name -> laelia.v1.ChatMessage
+	5,  // 70: laelia.v1.ResolveHeldAction.resolution:type_name -> laelia.v1.ActionResolution
+	54, // 71: laelia.v1.CommandService.SendCommand:input_type -> laelia.v1.SendCommandRequest
+	55, // 72: laelia.v1.CommandService.ListCommands:input_type -> laelia.v1.ListCommandsRequest
+	57, // 73: laelia.v1.CommandService.GetCommand:input_type -> laelia.v1.GetCommandRequest
+	58, // 74: laelia.v1.CommandService.CancelCommand:input_type -> laelia.v1.CancelCommandRequest
+	59, // 75: laelia.v1.CommandService.WatchCommand:input_type -> laelia.v1.WatchCommandRequest
+	60, // 76: laelia.v1.CommandService.WatchCommandEvents:input_type -> laelia.v1.WatchCommandEventsRequest
+	62, // 77: laelia.v1.CommandService.RespondPermission:input_type -> laelia.v1.RespondPermissionRequest
+	22, // 78: laelia.v1.CommandService.SearchChatHistory:input_type -> laelia.v1.SearchChatHistoryRequest
+	43, // 79: laelia.v1.CommandService.GetCommandContext:input_type -> laelia.v1.GetCommandContextRequest
+	30, // 80: laelia.v1.CommandService.GetOrCreateConversation:input_type -> laelia.v1.GetOrCreateConversationRequest
+	28, // 81: laelia.v1.CommandService.ListConversationMessages:input_type -> laelia.v1.ListConversationMessagesRequest
+	32, // 82: laelia.v1.CommandService.CreateChannel:input_type -> laelia.v1.CreateChannelRequest
+	33, // 83: laelia.v1.CommandService.ListChannels:input_type -> laelia.v1.ListChannelsRequest
+	35, // 84: laelia.v1.CommandService.GetChannel:input_type -> laelia.v1.GetChannelRequest
+	36, // 85: laelia.v1.CommandService.UpdateChannel:input_type -> laelia.v1.UpdateChannelRequest
+	37, // 86: laelia.v1.CommandService.DeleteChannel:input_type -> laelia.v1.DeleteChannelRequest
+	38, // 87: laelia.v1.CommandService.AddChannelMember:input_type -> laelia.v1.AddChannelMemberRequest
+	39, // 88: laelia.v1.CommandService.RemoveChannelMember:input_type -> laelia.v1.RemoveChannelMemberRequest
+	40, // 89: laelia.v1.CommandService.ListChannelMembers:input_type -> laelia.v1.ListChannelMembersRequest
+	42, // 90: laelia.v1.CommandService.SendMessage:input_type -> laelia.v1.SendMessageRequest
+	45, // 91: laelia.v1.AgentStreamService.AgentChannel:input_type -> laelia.v1.AgentStreamMessage
+	7,  // 92: laelia.v1.CommandService.SendCommand:output_type -> laelia.v1.Command
+	56, // 93: laelia.v1.CommandService.ListCommands:output_type -> laelia.v1.ListCommandsResponse
+	7,  // 94: laelia.v1.CommandService.GetCommand:output_type -> laelia.v1.Command
+	7,  // 95: laelia.v1.CommandService.CancelCommand:output_type -> laelia.v1.Command
+	8,  // 96: laelia.v1.CommandService.WatchCommand:output_type -> laelia.v1.CommandOutput
+	9,  // 97: laelia.v1.CommandService.WatchCommandEvents:output_type -> laelia.v1.CommandEvent
+	76, // 98: laelia.v1.CommandService.RespondPermission:output_type -> google.protobuf.Empty
+	23, // 99: laelia.v1.CommandService.SearchChatHistory:output_type -> laelia.v1.SearchChatHistoryResponse
+	44, // 100: laelia.v1.CommandService.GetCommandContext:output_type -> laelia.v1.GetCommandContextResponse
+	31, // 101: laelia.v1.CommandService.GetOrCreateConversation:output_type -> laelia.v1.GetOrCreateConversationResponse
+	29, // 102: laelia.v1.CommandService.ListConversationMessages:output_type -> laelia.v1.ListConversationMessagesResponse
+	26, // 103: laelia.v1.CommandService.CreateChannel:output_type -> laelia.v1.Conversation
+	34, // 104: laelia.v1.CommandService.ListChannels:output_type -> laelia.v1.ListChannelsResponse
+	26, // 105: laelia.v1.CommandService.GetChannel:output_type -> laelia.v1.Conversation
+	26, // 106: laelia.v1.CommandService.UpdateChannel:output_type -> laelia.v1.Conversation
+	76, // 107: laelia.v1.CommandService.DeleteChannel:output_type -> google.protobuf.Empty
+	27, // 108: laelia.v1.CommandService.AddChannelMember:output_type -> laelia.v1.ChannelMember
+	76, // 109: laelia.v1.CommandService.RemoveChannelMember:output_type -> google.protobuf.Empty
+	41, // 110: laelia.v1.CommandService.ListChannelMembers:output_type -> laelia.v1.ListChannelMembersResponse
+	25, // 111: laelia.v1.CommandService.SendMessage:output_type -> laelia.v1.ChatMessage
+	46, // 112: laelia.v1.AgentStreamService.AgentChannel:output_type -> laelia.v1.ManagerStreamMessage
+	92, // [92:113] is the sub-list for method output_type
+	71, // [71:92] is the sub-list for method input_type
+	71, // [71:71] is the sub-list for extension type_name
+	71, // [71:71] is the sub-list for extension extendee
+	0,  // [0:71] is the sub-list for field type_name
 }
 
 func init() { file_v1_command_proto_init() }
@@ -5116,6 +5517,8 @@ func file_v1_command_proto_init() {
 	file_v1_command_proto_msgTypes[38].OneofWrappers = []any{
 		(*AgentStreamMessage_AgentReady)(nil),
 		(*AgentStreamMessage_PullMessages)(nil),
+		(*AgentStreamMessage_SubmitAction)(nil),
+		(*AgentStreamMessage_ResolveHeldAction)(nil),
 		(*AgentStreamMessage_Progress)(nil),
 		(*AgentStreamMessage_Result)(nil),
 		(*AgentStreamMessage_Event)(nil),
@@ -5123,6 +5526,7 @@ func file_v1_command_proto_init() {
 	}
 	file_v1_command_proto_msgTypes[39].OneofWrappers = []any{
 		(*ManagerStreamMessage_MessageSnapshot)(nil),
+		(*ManagerStreamMessage_ActionResponse)(nil),
 		(*ManagerStreamMessage_CommandRequest)(nil),
 		(*ManagerStreamMessage_NewMessages)(nil),
 		(*ManagerStreamMessage_Cancel)(nil),
@@ -5134,8 +5538,8 @@ func file_v1_command_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_command_proto_rawDesc), len(file_v1_command_proto_rawDesc)),
-			NumEnums:      6,
-			NumMessages:   62,
+			NumEnums:      7,
+			NumMessages:   66,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

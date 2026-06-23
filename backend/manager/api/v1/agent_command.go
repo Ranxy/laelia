@@ -8,6 +8,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 
+	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
@@ -68,6 +69,32 @@ func (s *AgentStreamService) AgentChannel(
 				slog.Error("failed to send message snapshot", "error", sendErr)
 			}
 
+		case *v1pb.AgentStreamMessage_SubmitAction:
+			resp, submitErr := s.dispatcher.HandleSubmitAction(ctx, agent.ID, m.SubmitAction)
+			if submitErr != nil {
+				slog.Error("failed to handle submit action", "error", submitErr)
+				continue
+			}
+			if sendErr := stream.Send(&v1pb.ManagerStreamMessage{
+				Message: &v1pb.ManagerStreamMessage_ActionResponse{
+					ActionResponse: resp,
+				},
+			}); sendErr != nil {
+				slog.Error("failed to send action response", "error", sendErr)
+			}
+
+		case *v1pb.AgentStreamMessage_ResolveHeldAction:
+			followUp, resolveErr := s.dispatcher.HandleResolveHeldAction(ctx, agent.ID, m.ResolveHeldAction)
+			if resolveErr != nil {
+				slog.Error("failed to handle resolve held action", "error", resolveErr)
+				continue
+			}
+			if followUp != nil {
+				if sendErr := stream.Send(followUp); sendErr != nil {
+					slog.Error("failed to send command request after held action resolution", "error", sendErr)
+				}
+			}
+
 		case *v1pb.AgentStreamMessage_Progress:
 			if err := s.dispatcher.HandleProgress(ctx, agent.ID, m.Progress); err != nil {
 				slog.Error("failed to handle progress", "error", err)
@@ -106,7 +133,7 @@ func (s *AgentStreamService) AgentChannel(
 func (s *AgentStreamService) handleAgentReady(
 	ctx context.Context,
 	agent *store.AgentMessage,
-	_ *dispatcher.AgentSession,
+	sess *dispatcher.AgentSession,
 	ready *v1pb.AgentReady,
 ) {
 	if ready.LastCommandId != "" {
@@ -124,7 +151,45 @@ func (s *AgentStreamService) handleAgentReady(
 			return
 		}
 	}
-	// No in-flight command: trigger a drain of any PENDING commands for this
-	// agent. (Idempotent — dispatchNextPending skips when the agent is busy.)
-	s.dispatcher.DispatchPending(ctx, agent.ID)
+
+	// Phase 2: check for held actions that the agent needs to resolve.
+	heldActions, haErr := s.dispatcher.GetHeldActionsForAgent(ctx, agent.ID)
+	if haErr != nil {
+		slog.Error("failed to check held actions on reconnect", "agentID", agent.ID, "error", haErr)
+	}
+	for _, ha := range heldActions {
+		var submitReq v1pb.SubmitAction
+		if unmarshalErr := common.ProtojsonUnmarshaler.Unmarshal([]byte(ha.ActionJSON), &submitReq); unmarshalErr != nil {
+			slog.Error("failed to unmarshal held action on reconnect", "actionID", ha.ID, "error", unmarshalErr)
+			continue
+		}
+		newMsgs, msgErr := s.store.GetMessagesAfterVersion(ctx, ha.ConversationID, ha.BaseVersion)
+		if msgErr != nil {
+			slog.Error("failed to get new messages for held action on reconnect", "error", msgErr)
+			continue
+		}
+		actionResp := &v1pb.ActionResponse{
+			ActionId:       ha.ID.String(),
+			Committed:      false,
+			CurrentVersion: ha.CurrentVersion,
+		}
+		for _, m := range newMsgs {
+			actionResp.NewMessages = append(actionResp.NewMessages, dispatcher.ConvertChatMessageToV1(m))
+		}
+		msg := &v1pb.ManagerStreamMessage{
+			Message: &v1pb.ManagerStreamMessage_ActionResponse{
+				ActionResponse: actionResp,
+			},
+		}
+		if sendErr := sess.Send(msg); sendErr != nil {
+			slog.Warn("failed to re-prompt held action on reconnect", "agentID", agent.ID, "actionID", ha.ID, "error", sendErr)
+		}
+		slog.Info("re-prompted agent with held action on reconnect", "agentID", agent.ID, "actionID", ha.ID)
+	}
+
+	if len(heldActions) == 0 {
+		// No held actions: trigger a drain of PENDING commands, and notify
+		// the agent of any new messages it may have missed while disconnected.
+		s.dispatcher.DispatchPending(ctx, agent.ID)
+	}
 }

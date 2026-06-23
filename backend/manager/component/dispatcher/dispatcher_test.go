@@ -32,7 +32,7 @@ func TestConvertChatMessageToV1(t *testing.T) {
 		SenderType:     store.SenderTypeUser,
 	}
 
-	result := convertChatMessageToV1(msg)
+	result := ConvertChatMessageToV1(msg)
 
 	if result.Name != msgID.String() {
 		t.Errorf("expected name %s, got %s", msgID.String(), result.Name)
@@ -76,7 +76,7 @@ func TestConvertChatMessageToV1_AgentSender(t *testing.T) {
 		SenderType:     store.SenderTypeAgent,
 	}
 
-	result := convertChatMessageToV1(msg)
+	result := ConvertChatMessageToV1(msg)
 
 	if result.SenderName != "agent-007" {
 		t.Errorf("expected senderName 'agent-007' for agent, got %s", result.SenderName)
@@ -98,7 +98,7 @@ func TestConvertChatMessageToV1_NoCommand(t *testing.T) {
 		SenderType:     store.SenderTypeUser,
 	}
 
-	result := convertChatMessageToV1(msg)
+	result := ConvertChatMessageToV1(msg)
 
 	if result.CommandId != "" {
 		t.Errorf("expected empty commandId, got %s", result.CommandId)
@@ -117,7 +117,7 @@ func TestConvertChatMessageToV1_SystemSender(t *testing.T) {
 		SenderType:     store.SenderTypeSystem,
 	}
 
-	result := convertChatMessageToV1(msg)
+	result := ConvertChatMessageToV1(msg)
 
 	if result.SenderType != v1pb.SenderType(store.SenderTypeSystem) {
 		t.Errorf("expected senderType SENDER_TYPE_SYSTEM, got %v", result.SenderType)
@@ -266,7 +266,7 @@ func TestConvertChatMessageToV1_Timestamp(t *testing.T) {
 		RoomVersion:    1,
 		SenderType:     store.SenderTypeUser,
 	}
-	result := convertChatMessageToV1(msg)
+	result := ConvertChatMessageToV1(msg)
 	ts := result.CreatedAt.AsTime()
 	if !ts.Equal(now) {
 		t.Errorf("expected timestamp %v, got %v", now, ts)
@@ -286,7 +286,7 @@ func TestConvertChatMessageToV1_RoomVersionZero(t *testing.T) {
 		RoomVersion:    0,
 		SenderType:     store.SenderTypeUser,
 	}
-	result := convertChatMessageToV1(msg)
+	result := ConvertChatMessageToV1(msg)
 	if result.RoomVersion != 0 {
 		t.Errorf("expected roomVersion 0 for legacy message, got %d", result.RoomVersion)
 	}
@@ -305,7 +305,7 @@ func TestConvertChatMessageToV1_NullCommand(t *testing.T) {
 		RoomVersion:    1,
 		SenderType:     store.SenderTypeUser,
 	}
-	result := convertChatMessageToV1(msg)
+	result := ConvertChatMessageToV1(msg)
 	if result.CommandId != "" {
 		t.Errorf("expected empty commandId for NullUUID(Valid=false), got %s", result.CommandId)
 	}
@@ -325,7 +325,7 @@ func TestConvertChatMessageToV1_AgentSenderWithNullAgentName(t *testing.T) {
 		SenderType:     store.SenderTypeAgent,
 		SenderAgentID:  sql.NullInt32{Int32: 101, Valid: true},
 	}
-	result := convertChatMessageToV1(msg)
+	result := ConvertChatMessageToV1(msg)
 	// SenderType = Agent -> uses AgentName; if AgentName is empty, senderName is empty.
 	if result.SenderName != "" {
 		t.Errorf("expected empty senderName when AgentName is empty, got %s", result.SenderName)
@@ -345,7 +345,7 @@ func TestConvertChatMessageToV1_TimestampProto(t *testing.T) {
 		RoomVersion:    1,
 		SenderType:     store.SenderTypeUser,
 	}
-	result := convertChatMessageToV1(msg)
+	result := ConvertChatMessageToV1(msg)
 	expected := timestamppb.New(ts)
 	if !result.CreatedAt.AsTime().Equal(expected.AsTime()) {
 		t.Errorf("expected created_at %v, got %v", expected.AsTime(), result.CreatedAt.AsTime())

@@ -491,29 +491,25 @@ message AgentStreamMessage {
   oneof message {
     AgentReady agent_ready = 1;
     PullMessages pull_messages = 2;
+    SubmitAction submit_action = 3;
+    ResolveHeldAction resolve_held_action = 4;
     CommandProgress progress = 5;
     CommandResult result = 6;
     CommandEvent event = 7;
     Ping ping = 8;
   }
-  // Field numbers 3 and 4 are reserved for the Phase 2 Held Draft messages
-  // (SubmitAction, ResolveHeldAction).
-  reserved 3, 4;
-  reserved "submit_action", "resolve_held_action";
 }
 
 message ManagerStreamMessage {
   oneof message {
     MessageSnapshot message_snapshot = 1;
+    ActionResponse action_response = 2;
     CommandRequest command_request = 3;
     NewMessagesAvailable new_messages = 4;
     CancelMessage cancel = 5;
     Pong pong = 6;
     PermissionDecision permission_decision = 7;
   }
-  // Field number 2 is reserved for the Phase 2 ActionResponse message.
-  reserved 2;
-  reserved "action_response";
 }
 
 message AgentReady {
@@ -667,4 +663,49 @@ message MessageSnapshot {
 message NewMessagesAvailable {
   repeated string conversation_ids = 1;
   repeated int64 versions = 2;
+}
+
+// SubmitAction is the Phase 2 execution trigger. It replaces the Phase 1
+// manager-driven dispatch: after PullMessages the agent autonomously decides
+// whether to act and sends SubmitAction. The manager performs a Held Draft
+// check comparing base_version against the conversation's current version.
+message SubmitAction {
+  string conversation_id = 1;
+  string reply_to_message_id = 2;
+  int64 base_version = 3;
+  string instruction = 4;
+  string profile = 5;
+  map<string, string> env = 6;
+  string working_dir = 7;
+  int32 timeout_seconds = 8;
+  bool allow_diff = 9;
+}
+
+// ActionResolution is the agent's decision when a SubmitAction is held due
+// to a version mismatch (new messages arrived between PullMessages and
+// SubmitAction).
+enum ActionResolution {
+  ACTION_RESOLUTION_UNSPECIFIED = 0;
+  REVISE = 1;
+  SEND_AS_IS = 2;
+  DISCARD = 3;
+  FORCE_SEND = 4;
+}
+
+// ActionResponse is the manager's reply to SubmitAction. When committed=true
+// the action was accepted and a command was created; when committed=false the
+// action is held pending agent resolution via ResolveHeldAction.
+message ActionResponse {
+  string action_id = 1;
+  bool committed = 2;
+  string command_id = 3;
+  int64 current_version = 4;
+  repeated ChatMessage new_messages = 5;
+}
+
+// ResolveHeldAction is sent by the agent to resolve a held action (one where
+// ActionResponse.committed was false).
+message ResolveHeldAction {
+  string action_id = 1;
+  ActionResolution resolution = 2;
 }

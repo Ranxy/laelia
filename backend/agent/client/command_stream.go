@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -76,15 +77,20 @@ type commandStream struct {
 	mcpPort         int
 	agentResourceID string
 	isExecuting     atomic.Bool
+
+	// Phase 2: per-conversation version cursors for autonomous message pull.
+	conversationCursors   map[string]int64
+	conversationCursorsMu sync.Mutex
 }
 
 func newCommandStream(httpClient *http.Client, managerURL string, mcpPort int, agentResourceID string) *commandStream {
 	return &commandStream{
-		client:          v1connect.NewAgentStreamServiceClient(httpClient, managerURL),
-		managerURL:      managerURL,
-		backoff:         NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
-		mcpPort:         mcpPort,
-		agentResourceID: agentResourceID,
+		client:              v1connect.NewAgentStreamServiceClient(httpClient, managerURL),
+		managerURL:          managerURL,
+		backoff:             NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
+		mcpPort:             mcpPort,
+		agentResourceID:     agentResourceID,
+		conversationCursors: make(map[string]int64),
 	}
 }
 
@@ -183,22 +189,15 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 				}()
 
 			case *v1pb.ManagerStreamMessage_NewMessages:
-				// Phase 1: the manager still drives dispatch by sending
-				// CommandRequest from its PENDING drain; NewMessagesAvailable is
-				// informational. Agents that want more conversation context for an
-				// in-flight command can issue PullMessages over the same stream
-				// (Phase 2 surfaces this as the autonomy gate).
-				slog.Info("new messages available",
-					"conversation_ids", m.NewMessages.ConversationIds,
-					"versions", m.NewMessages.Versions)
+				c.handleNewMessages(ctx, stream, m.NewMessages)
 
 			case *v1pb.ManagerStreamMessage_MessageSnapshot:
-				// Phase 1 does not yet drive execution from snapshots; this is
-				// the response to a PullMessages issued by the agent for context
-				// building. Log the version gained so the agent can cache it.
-				slog.Info("message snapshot received",
-					"messages", len(m.MessageSnapshot.Messages),
-					"current_version", m.MessageSnapshot.CurrentVersion)
+				c.handleMessageSnapshot(ctx, stream, m.MessageSnapshot)
+
+			case *v1pb.ManagerStreamMessage_ActionResponse:
+				// Phase 2: manager replies to SubmitAction. If held, resolve.
+				// If committed, the CommandRequest follows in a subsequent message.
+				c.handleActionResponse(ctx, stream, m.ActionResponse)
 
 			case *v1pb.ManagerStreamMessage_Cancel:
 				if currentExecutor != nil {
@@ -489,4 +488,145 @@ func maxSeq(current int32, next int32) int32 {
 func nextEventSeq(state *executor.LocalState) int32 {
 	state.LastEventSeqSent++
 	return state.LastEventSeqSent
+}
+
+// ---- Phase 2: Agent Autonomy ----
+
+// conversationCursor returns the last-seen room_version for a conversation,
+// defaulting to 0 (pull all messages) on first access.
+func (c *commandStream) conversationCursor(convID string) int64 {
+	c.conversationCursorsMu.Lock()
+	defer c.conversationCursorsMu.Unlock()
+	return c.conversationCursors[convID]
+}
+
+func (c *commandStream) setConversationCursor(convID string, v int64) {
+	c.conversationCursorsMu.Lock()
+	defer c.conversationCursorsMu.Unlock()
+	if v > c.conversationCursors[convID] {
+		c.conversationCursors[convID] = v
+	}
+}
+
+// handleNewMessages is the Phase 2 response to NewMessagesAvailable: for each
+// conversation that has new messages, pull the delta since the last-seen
+// version.
+func (c *commandStream) handleNewMessages(_ context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], nm *v1pb.NewMessagesAvailable) {
+	for i, convID := range nm.ConversationIds {
+		afterVersion := c.conversationCursor(convID)
+		version := int64(0)
+		if i < len(nm.Versions) {
+			version = nm.Versions[i]
+		}
+		slog.Info("pulling messages for conversation",
+			"conversation_id", convID,
+			"after_version", afterVersion,
+			"latest_version", version)
+
+		req := &v1pb.AgentStreamMessage{
+			Message: &v1pb.AgentStreamMessage_PullMessages{
+				PullMessages: &v1pb.PullMessages{
+					ConversationId: convID,
+					AfterVersion:   afterVersion,
+				},
+			},
+		}
+		if err := stream.Send(req); err != nil {
+			slog.Error("failed to send PullMessages", "conversation_id", convID, "error", err)
+		}
+	}
+}
+
+// handleMessageSnapshot is the Phase 2 autonomy gate. It processes a
+// PullMessages response: updates the cursor, finds the latest USER message, and
+// if the agent is not already executing, submits an action for it.
+func (c *commandStream) handleMessageSnapshot(_ context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], snap *v1pb.MessageSnapshot) {
+	convID := "" // snapshot doesn't carry conversation_id; we track implicit context
+	if len(snap.Messages) > 0 {
+		convID = snap.Messages[0].Conversation
+		c.setConversationCursor(convID, snap.CurrentVersion)
+	}
+
+	slog.Info("message snapshot received",
+		"messages", len(snap.Messages),
+		"current_version", snap.CurrentVersion)
+
+	if c.isExecuting.Load() {
+		slog.Info("skipping submit — agent is already executing")
+		return
+	}
+	if convID == "" {
+		return
+	}
+
+	// Find the latest USER message to act on.
+	var latestUser *v1pb.ChatMessage
+	for _, msg := range snap.Messages {
+		if msg.SenderType == v1pb.SenderType_SENDER_TYPE_USER && msg.Content != "" {
+			latestUser = msg
+		}
+	}
+	if latestUser == nil {
+		return
+	}
+
+	c.submitAction(stream, convID, latestUser, snap.CurrentVersion)
+}
+
+// handleActionResponse is the Phase 2 held-draft handler. Committed actions
+// are followed by a CommandRequest (handled elsewhere). Held actions are
+// resolved with REVISE by default: the agent re-pulls and re-submits with
+// fresh context.
+func (c *commandStream) handleActionResponse(_ context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], resp *v1pb.ActionResponse) {
+	if resp.Committed {
+		slog.Info("action committed", "action_id", resp.ActionId, "command_id", resp.CommandId)
+		return
+	}
+
+	slog.Info("action held — resolving with REVISE",
+		"action_id", resp.ActionId,
+		"current_version", resp.CurrentVersion,
+		"new_messages", len(resp.NewMessages))
+
+	// Update cursor from the held response so the next pull starts from here.
+	if len(resp.NewMessages) > 0 {
+		convID := resp.NewMessages[0].Conversation
+		c.setConversationCursor(convID, resp.CurrentVersion)
+	}
+
+	// Resolve with REVISE: the agent will re-pull and re-decide.
+	req := &v1pb.AgentStreamMessage{
+		Message: &v1pb.AgentStreamMessage_ResolveHeldAction{
+			ResolveHeldAction: &v1pb.ResolveHeldAction{
+				ActionId:   resp.ActionId,
+				Resolution: v1pb.ActionResolution_REVISE,
+			},
+		},
+	}
+	if err := stream.Send(req); err != nil {
+		slog.Error("failed to send ResolveHeldAction", "action_id", resp.ActionId, "error", err)
+	}
+}
+
+// submitAction sends a SubmitAction for the given message. It is the
+// autonomous execution trigger replacing the Phase 1 manager-driven dispatch.
+func (c *commandStream) submitAction(stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], convID string, msg *v1pb.ChatMessage, baseVersion int64) {
+	c.isExecuting.Store(true)
+
+	req := &v1pb.AgentStreamMessage{
+		Message: &v1pb.AgentStreamMessage_SubmitAction{
+			SubmitAction: &v1pb.SubmitAction{
+				ConversationId:   convID,
+				ReplyToMessageId: msg.Name,
+				BaseVersion:      baseVersion,
+				Instruction:      msg.Content,
+			},
+		},
+	}
+	if err := stream.Send(req); err != nil {
+		slog.Error("failed to send SubmitAction", "conversation_id", convID, "error", err)
+		c.isExecuting.Store(false)
+		return
+	}
+	slog.Info("submit action sent", "conversation_id", convID, "base_version", baseVersion, "message_id", msg.Name)
 }

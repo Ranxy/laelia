@@ -3,6 +3,7 @@ package dispatcher
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -33,6 +35,17 @@ type AgentSession struct {
 	lastPingAt      time.Time
 	connectedAt     time.Time
 	mu              sync.Mutex
+}
+
+// Send sends a message to the agent over its bidi stream. It is safe for
+// concurrent use (e.g. from the Phase 2 held-action re-prompt path).
+func (s *AgentSession) Send(msg *v1pb.ManagerStreamMessage) error {
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
+	if s.send == nil {
+		return errors.New("agent session invalidated")
+	}
+	return s.send(msg)
 }
 
 type Dispatcher struct {
@@ -268,7 +281,7 @@ func (d *Dispatcher) HandlePullMessages(ctx context.Context, _ int, conversation
 		CurrentVersion: currentVersion,
 	}
 	for _, m := range msgs {
-		snapshot.Messages = append(snapshot.Messages, convertChatMessageToV1(m))
+		snapshot.Messages = append(snapshot.Messages, ConvertChatMessageToV1(m))
 	}
 	return snapshot, nil
 }
@@ -306,6 +319,200 @@ func (d *Dispatcher) NotifyNewMessages(_ context.Context, agentID int, conversat
 	if err := send(msg); err != nil {
 		slog.Warn("failed to send NewMessagesAvailable", "agentID", agentID, "error", err)
 	}
+}
+
+// ---- Phase 2: Held Draft ----
+
+// HandleSubmitAction processes an agent's SubmitAction request. It performs the
+// Held Draft version check: if base_version matches the current conversation
+// version the action is committed (command created + dispatched); otherwise it
+// is held for the agent to resolve via ResolveHeldAction.
+func (d *Dispatcher) HandleSubmitAction(ctx context.Context, agentID int, req *v1pb.SubmitAction) (*v1pb.ActionResponse, error) {
+	convUUID, err := uuid.Parse(req.ConversationId)
+	if err != nil {
+		return nil, errors.Wrapf(err, "invalid conversation id")
+	}
+
+	currentVersion, err := d.store.GetConversationVersion(ctx, convUUID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get conversation version")
+	}
+
+	// Version match: commit immediately.
+	if req.BaseVersion == currentVersion {
+		cmd, cmdErr := d.createCommandFromAction(ctx, agentID, req, convUUID)
+		if cmdErr != nil {
+			return nil, cmdErr
+		}
+		return &v1pb.ActionResponse{
+			ActionId:       uuid.New().String(),
+			Committed:      true,
+			CommandId:      cmd.ID.String(),
+			CurrentVersion: currentVersion,
+		}, nil
+	}
+
+	// Version mismatch: hold the action.
+	newMsgs, msgErr := d.store.GetMessagesAfterVersion(ctx, convUUID, req.BaseVersion)
+	if msgErr != nil {
+		return nil, errors.Wrapf(msgErr, "failed to get new messages for held action")
+	}
+
+	ha, haErr := d.store.CreateHeldAction(ctx, agentID, convUUID, req, req.BaseVersion, currentVersion)
+	if haErr != nil {
+		return nil, errors.Wrapf(haErr, "failed to create held action")
+	}
+
+	resp := &v1pb.ActionResponse{
+		ActionId:       ha.ID.String(),
+		Committed:      false,
+		CurrentVersion: currentVersion,
+	}
+	for _, m := range newMsgs {
+		resp.NewMessages = append(resp.NewMessages, ConvertChatMessageToV1(m))
+	}
+	return resp, nil
+}
+
+// HandleResolveHeldAction processes an agent's resolution of a previously held
+// action. REVISE returns without creating a command (the agent re-pulls and
+// re-submits). SEND_AS_IS and FORCE_SEND create and dispatch the command.
+// DISCARD simply marks the action resolved.
+func (d *Dispatcher) HandleResolveHeldAction(ctx context.Context, agentID int, req *v1pb.ResolveHeldAction) (*v1pb.ManagerStreamMessage, error) {
+	actionUUID, err := uuid.Parse(req.ActionId)
+	if err != nil {
+		return nil, errors.Wrapf(err, "invalid action id")
+	}
+
+	switch req.Resolution {
+	case v1pb.ActionResolution_REVISE:
+		if err := d.store.ResolveHeldAction(ctx, actionUUID, int32(req.Resolution), uuid.NullUUID{}); err != nil {
+			return nil, errors.Wrapf(err, "failed to resolve held action")
+		}
+		// Agent will re-PullMessages and re-SubmitAction; nothing to send now.
+		return nil, nil
+
+	case v1pb.ActionResolution_SEND_AS_IS, v1pb.ActionResolution_FORCE_SEND:
+		// Parse the original SubmitAction from the held action record.
+		actions, lookupErr := d.store.GetHeldActionsByAgent(ctx, agentID)
+		if lookupErr != nil {
+			return nil, errors.Wrapf(lookupErr, "failed to look up held actions")
+		}
+		var ha *store.HeldAction
+		for _, a := range actions {
+			if a.ID == actionUUID {
+				ha = a
+				break
+			}
+		}
+		if ha == nil {
+			return nil, errors.Errorf("held action %s not found", req.ActionId)
+		}
+
+		var submitReq v1pb.SubmitAction
+		if unmarshalErr := common.ProtojsonUnmarshaler.Unmarshal([]byte(ha.ActionJSON), &submitReq); unmarshalErr != nil {
+			return nil, errors.Wrapf(unmarshalErr, "failed to unmarshal held submit action")
+		}
+
+		cmd, cmdErr := d.createCommandFromAction(ctx, agentID, &submitReq, ha.ConversationID)
+		if cmdErr != nil {
+			return nil, cmdErr
+		}
+
+		cmdUUID := uuid.NullUUID{UUID: cmd.ID, Valid: true}
+		if err := d.store.ResolveHeldAction(ctx, actionUUID, int32(req.Resolution), cmdUUID); err != nil {
+			return nil, errors.Wrapf(err, "failed to resolve held action")
+		}
+
+		return &v1pb.ManagerStreamMessage{
+			Message: &v1pb.ManagerStreamMessage_CommandRequest{
+				CommandRequest: &v1pb.CommandRequest{
+					CommandId:        cmd.ID.String(),
+					Instruction:      cmd.Instruction,
+					Profile:          cmd.Profile,
+					WorkingDir:       cmd.WorkingDir,
+					TimeoutSeconds:   cmd.TimeoutSeconds,
+					Env:              parseEnvJSON(cmd.Env),
+					AllowDiff:        cmd.AllowDiff,
+					PrincipalId:      fmt.Sprintf("%d", cmd.PrincipalID),
+					ConversationId:   ha.ConversationID.String(),
+					ReplyToMessageId: submitReq.ReplyToMessageId,
+				},
+			},
+		}, nil
+
+	case v1pb.ActionResolution_DISCARD:
+		if err := d.store.ResolveHeldAction(ctx, actionUUID, int32(req.Resolution), uuid.NullUUID{}); err != nil {
+			return nil, errors.Wrapf(err, "failed to resolve held action")
+		}
+		return nil, nil
+
+	default:
+		return nil, errors.Errorf("unknown action resolution: %v", req.Resolution)
+	}
+}
+
+// createCommandFromAction creates a PENDING command from a SubmitAction and
+// enqueues it for dispatch. It is the shared path for both committed (version
+// match) and force-resolved (SEND_AS_IS / FORCE_SEND) submissions.
+func (d *Dispatcher) createCommandFromAction(ctx context.Context, agentID int, req *v1pb.SubmitAction, convUUID uuid.UUID) (*store.CommandMessage, error) {
+	agent, err := d.store.GetAgent(ctx, agentID)
+	if err != nil || agent == nil {
+		return nil, errors.New("agent not found")
+	}
+
+	principalID := 1 // default to system bot; the caller can override
+	envBytes, _ := json.Marshal(req.Env)
+
+	cmd := &store.CommandMessage{
+		AgentID:        agentID,
+		PrincipalID:    principalID,
+		Command:        "",
+		Instruction:    req.Instruction,
+		Profile:        req.Profile,
+		ExecutorKind:   int32(v1pb.ExecutorKind_ACP),
+		AllowDiff:      req.AllowDiff,
+		Status:         1, // PENDING
+		Env:            string(envBytes),
+		WorkingDir:     req.WorkingDir,
+		TimeoutSeconds: req.TimeoutSeconds,
+		SourceType:     int32(v1pb.CommandSource_CHAT),
+		ConversationID: &convUUID,
+	}
+
+	created, err := d.store.CreateCommand(ctx, cmd)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create command from action")
+	}
+	created.AgentResourceID = agent.ResourceID
+
+	if err := d.EnqueueCommand(ctx, created); err != nil {
+		slog.Warn("failed to enqueue command from action", "commandID", created.ID, "error", err)
+	}
+	return created, nil
+}
+
+// GetHeldActionsForAgent returns the held actions (state=HELD) for an agent.
+// Used by the API handler during AgentReady to re-prompt the agent.
+func (d *Dispatcher) GetHeldActionsForAgent(ctx context.Context, agentID int) ([]*store.HeldAction, error) {
+	return d.store.GetHeldActionsByAgent(ctx, agentID)
+}
+
+// StartExpireHeldActions starts a background goroutine that scans for expired
+// held actions every minute and marks them state=EXPIRED.
+func (d *Dispatcher) StartExpireHeldActions() {
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			n, err := d.store.ExpireHeldActions(context.Background())
+			if err != nil {
+				slog.Error("failed to expire held actions", "error", err)
+			} else if n > 0 {
+				slog.Info("expired held actions", "count", n)
+			}
+		}
+	}()
 }
 
 func (d *Dispatcher) CancelCommand(_ context.Context, agentID int, commandID string) error {
@@ -711,7 +918,7 @@ func formatResultMessage(result *v1pb.CommandResult) string {
 	return ""
 }
 
-func convertChatMessageToV1(m *store.ChatMessage) *v1pb.ChatMessage {
+func ConvertChatMessageToV1(m *store.ChatMessage) *v1pb.ChatMessage {
 	cm := &v1pb.ChatMessage{
 		Name:          m.ID.String(),
 		Conversation:  m.ConversationID.String(),

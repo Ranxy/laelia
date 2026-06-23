@@ -360,3 +360,27 @@ CREATE INDEX IF NOT EXISTS idx_chat_message_room_version ON chat_message(convers
 DROP TABLE IF EXISTS agent_working_state CASCADE;
 DROP TABLE IF EXISTS agent_inbox CASCADE;
 
+-- === Phase 2: Held Draft mechanism ===
+-- held_action stores agent actions that were submitted but could not be
+-- committed because the conversation had advanced (version mismatch).
+-- The agent must resolve them via ResolveHeldAction (REVISE / SEND_AS_IS /
+-- DISCARD / FORCE_SEND). Unresolved actions expire after 10 minutes.
+CREATE TABLE IF NOT EXISTS held_action (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_id INTEGER NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
+    conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+    action_json JSONB NOT NULL,
+    base_version BIGINT NOT NULL,
+    current_version BIGINT NOT NULL,
+    state SMALLINT NOT NULL DEFAULT 1,
+    resolution SMALLINT,
+    command_id UUID REFERENCES command(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    resolved_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '10 minutes')
+);
+
+CREATE INDEX IF NOT EXISTS idx_held_action_agent_state ON held_action(agent_id, state);
+CREATE INDEX IF NOT EXISTS idx_held_action_conversation ON held_action(conversation_id, state);
+CREATE INDEX IF NOT EXISTS idx_held_action_expires ON held_action(state, expires_at) WHERE state = 1;
+

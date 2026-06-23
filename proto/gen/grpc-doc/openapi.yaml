@@ -1430,6 +1430,8 @@ components:
                     format: int32
                 maxOutputBytes:
                     type: string
+                supportsAutonomousDecision:
+                    type: boolean
         AgentDisconnectRequest:
             type: object
             properties:
