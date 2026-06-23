@@ -158,16 +158,16 @@ paths:
                   schema:
                     type: string
                     format: date-time
-                - name: principalId
-                  in: query
-                  schema:
-                    type: string
                 - name: limit
                   in: query
                   schema:
                     type: integer
                     format: int32
                 - name: conversation
+                  in: query
+                  schema:
+                    type: string
+                - name: pageToken
                   in: query
                   schema:
                     type: string
@@ -1603,20 +1603,6 @@ components:
                 joinedAt:
                     type: string
                     format: date-time
-        ChatHistoryEntry:
-            type: object
-            properties:
-                messageId:
-                    type: string
-                commandId:
-                    type: string
-                role:
-                    type: string
-                content:
-                    type: string
-                createdAt:
-                    type: string
-                    format: date-time
         ChatMessage:
             type: object
             properties:
@@ -2150,7 +2136,9 @@ components:
                 entries:
                     type: array
                     items:
-                        $ref: '#/components/schemas/ChatHistoryEntry'
+                        $ref: '#/components/schemas/ChatMessage'
+                nextPageToken:
+                    type: string
         SendMessageRequest:
             required:
                 - conversation

@@ -5909,13 +5909,6 @@ their cursor into the conversation. </p></td>
                 </tr>
               
                 <tr>
-                  <td>principal_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
                   <td>limit</td>
                   <td><a href="#int32">int32</a></td>
                   <td></td>
@@ -5924,6 +5917,13 @@ their cursor into the conversation. </p></td>
               
                 <tr>
                   <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -5948,8 +5948,15 @@ their cursor into the conversation. </p></td>
               
                 <tr>
                   <td>entries</td>
-                  <td><a href="#laelia.v1.ChatHistoryEntry">ChatHistoryEntry</a></td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
                   <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
                   <td><p> </p></td>
                 </tr>
               

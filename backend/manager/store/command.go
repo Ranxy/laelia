@@ -514,15 +514,11 @@ func (s *Store) ListPendingCommandsByAgent(ctx context.Context, agentID int) ([]
 	return commands, nil
 }
 
-type ChatHistoryEntry struct {
-	MessageID string
-	CommandID string
-	Role      string
-	Content   string
-	CreatedAt time.Time
-}
-
-func (s *Store) SearchChatHistory(ctx context.Context, conversationID uuid.UUID, query string, since, until *time.Time, limit int) ([]*ChatHistoryEntry, error) {
+// SearchChatHistory searches chat messages in a conversation by keyword,
+// optional time range, with pagination support via offset.
+// Results include sender identity (principal name, agent name, sender type)
+// via JOINs to the principal and agent tables.
+func (s *Store) SearchChatHistory(ctx context.Context, conversationID uuid.UUID, query string, since, until *time.Time, limit, offset int) ([]*ChatMessage, error) {
 	args := []any{conversationID}
 	where := `cm.conversation_id = $1`
 
@@ -541,39 +537,38 @@ func (s *Store) SearchChatHistory(ctx context.Context, conversationID uuid.UUID,
 	if limit <= 0 || limit > 50 {
 		limit = 10
 	}
-	args = append(args, limit)
+	if offset < 0 {
+		offset = 0
+	}
+	args = append(args, limit, offset)
 
 	rows, err := s.GetDB().QueryContext(ctx, fmt.Sprintf(`
-		SELECT cm.id, cm.command_id, cm.role, cm.content, cm.created_at
+		SELECT `+chatMessageColumns+`
 		FROM chat_message cm
+		JOIN principal p ON p.id = cm.principal_id
+		LEFT JOIN agent a ON a.id = cm.sender_agent_id
 		WHERE %s
-		ORDER BY cm.created_at DESC
-		LIMIT $%d
-	`, where, len(args)), args...)
+		ORDER BY cm.created_at DESC, cm.id DESC
+		LIMIT $%d OFFSET $%d
+	`, where, len(args)-1, len(args)), args...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to search chat history")
 	}
 	defer rows.Close()
 
-	var entries []*ChatHistoryEntry
+	var msgs []*ChatMessage
 	for rows.Next() {
-		var e ChatHistoryEntry
-		var msgID uuid.UUID
-		var cmdID uuid.NullUUID
-		if err := rows.Scan(&msgID, &cmdID, &e.Role, &e.Content, &e.CreatedAt); err != nil {
-			return nil, errors.Wrapf(err, "failed to scan chat history row")
+		msg, scanErr := scanChatMessageRow(rows)
+		if scanErr != nil {
+			return nil, scanErr
 		}
-		e.MessageID = msgID.String()
-		if cmdID.Valid {
-			e.CommandID = cmdID.UUID.String()
-		}
-		entries = append(entries, &e)
+		msgs = append(msgs, msg)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, errors.Wrapf(err, "failed to iterate chat history rows")
 	}
 
-	return entries, nil
+	return msgs, nil
 }
 
 // RunningCommandInfo holds the minimal data needed to derive agent execution

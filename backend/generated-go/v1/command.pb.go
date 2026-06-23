@@ -1539,9 +1539,9 @@ type SearchChatHistoryRequest struct {
 	Query         string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
 	Since         *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=since,proto3" json:"since,omitempty"`
 	Until         *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=until,proto3" json:"until,omitempty"`
-	PrincipalId   string                 `protobuf:"bytes,5,opt,name=principal_id,json=principalId,proto3" json:"principal_id,omitempty"`
 	Limit         int32                  `protobuf:"varint,6,opt,name=limit,proto3" json:"limit,omitempty"`
 	Conversation  string                 `protobuf:"bytes,7,opt,name=conversation,proto3" json:"conversation,omitempty"`
+	PageToken     string                 `protobuf:"bytes,8,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1604,13 +1604,6 @@ func (x *SearchChatHistoryRequest) GetUntil() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *SearchChatHistoryRequest) GetPrincipalId() string {
-	if x != nil {
-		return x.PrincipalId
-	}
-	return ""
-}
-
 func (x *SearchChatHistoryRequest) GetLimit() int32 {
 	if x != nil {
 		return x.Limit
@@ -1625,9 +1618,17 @@ func (x *SearchChatHistoryRequest) GetConversation() string {
 	return ""
 }
 
+func (x *SearchChatHistoryRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
 type SearchChatHistoryResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Entries       []*ChatHistoryEntry    `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	Entries       []*ChatMessage         `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1662,11 +1663,18 @@ func (*SearchChatHistoryResponse) Descriptor() ([]byte, []int) {
 	return file_v1_command_proto_rawDescGZIP(), []int{16}
 }
 
-func (x *SearchChatHistoryResponse) GetEntries() []*ChatHistoryEntry {
+func (x *SearchChatHistoryResponse) GetEntries() []*ChatMessage {
 	if x != nil {
 		return x.Entries
 	}
 	return nil
+}
+
+func (x *SearchChatHistoryResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
 }
 
 type ChatHistoryEntry struct {
@@ -4840,18 +4848,20 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x1b\n" +
 	"\toption_id\x18\x03 \x01(\tR\boptionId\x12\x1f\n" +
 	"\voption_kind\x18\x04 \x01(\tR\n" +
-	"optionKind\"\x9d\x02\n" +
+	"optionKind\"\x9f\x02\n" +
 	"\x18SearchChatHistoryRequest\x12*\n" +
 	"\x05agent\x18\x01 \x01(\tB\x14\xe0A\x02\xfaA\x0e\n" +
 	"\flaelia/AgentR\x05agent\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x120\n" +
 	"\x05since\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x05since\x120\n" +
-	"\x05until\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x05until\x12!\n" +
-	"\fprincipal_id\x18\x05 \x01(\tR\vprincipalId\x12\x14\n" +
+	"\x05until\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x05until\x12\x14\n" +
 	"\x05limit\x18\x06 \x01(\x05R\x05limit\x12\"\n" +
-	"\fconversation\x18\a \x01(\tR\fconversation\"R\n" +
-	"\x19SearchChatHistoryResponse\x125\n" +
-	"\aentries\x18\x01 \x03(\v2\x1b.laelia.v1.ChatHistoryEntryR\aentries\"\xb9\x01\n" +
+	"\fconversation\x18\a \x01(\tR\fconversation\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\b \x01(\tR\tpageTokenJ\x04\b\x05\x10\x06\"u\n" +
+	"\x19SearchChatHistoryResponse\x120\n" +
+	"\aentries\x18\x01 \x03(\v2\x16.laelia.v1.ChatMessageR\aentries\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xb9\x01\n" +
 	"\x10ChatHistoryEntry\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12\x1d\n" +
@@ -5296,7 +5306,7 @@ var file_v1_command_proto_depIdxs = []int32{
 	17, // 24: laelia.v1.PermissionRequestedPayload.options:type_name -> laelia.v1.PermissionOptionPayload
 	72, // 25: laelia.v1.SearchChatHistoryRequest.since:type_name -> google.protobuf.Timestamp
 	72, // 26: laelia.v1.SearchChatHistoryRequest.until:type_name -> google.protobuf.Timestamp
-	22, // 27: laelia.v1.SearchChatHistoryResponse.entries:type_name -> laelia.v1.ChatHistoryEntry
+	23, // 27: laelia.v1.SearchChatHistoryResponse.entries:type_name -> laelia.v1.ChatMessage
 	72, // 28: laelia.v1.ChatHistoryEntry.created_at:type_name -> google.protobuf.Timestamp
 	72, // 29: laelia.v1.ChatMessage.created_at:type_name -> google.protobuf.Timestamp
 	1,  // 30: laelia.v1.ChatMessage.sender_type:type_name -> laelia.v1.SenderType

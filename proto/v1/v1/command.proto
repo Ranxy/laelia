@@ -196,13 +196,15 @@ message SearchChatHistoryRequest {
   string query = 2;
   google.protobuf.Timestamp since = 3;
   google.protobuf.Timestamp until = 4;
-  string principal_id = 5;
+  reserved 5; // removed: principal_id
   int32 limit = 6;
   string conversation = 7;
+  string page_token = 8;
 }
 
 message SearchChatHistoryResponse {
-  repeated ChatHistoryEntry entries = 1;
+  repeated ChatMessage entries = 1;
+  string next_page_token = 2;
 }
 
 message ChatHistoryEntry {

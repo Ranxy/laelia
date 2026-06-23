@@ -459,33 +459,9 @@ func (s *CommandService) validateRawEventAccess(ctx context.Context, user *store
 }
 
 func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Request[v1pb.SearchChatHistoryRequest]) (*connect.Response[v1pb.SearchChatHistoryResponse], error) {
-	var convID uuid.UUID
-
-	if req.Msg.Conversation != "" {
-		cid, err := parseConversationID(req.Msg.Conversation)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation"))
-		}
-		convID = cid
-	} else {
-		agentResourceID := parseAgentResourceID(req.Msg.Agent)
-		agent, err := s.store.GetAgentByResourceID(ctx, agentResourceID)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get agent"))
-		}
-		if agent == nil {
-			return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", agentResourceID))
-		}
-		user, _ := GetUserFromContext(ctx)
-		principalID := 1
-		if user != nil {
-			principalID = user.ID
-		}
-		conv, convErr := s.store.GetOrCreateDirectConversation(ctx, agent.ID, principalID)
-		if convErr != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get conversation"))
-		}
-		convID = conv.ID
+	convID, err := parseConversationID(req.Msg.Conversation)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation"))
 	}
 
 	var since, until *time.Time
@@ -498,24 +474,55 @@ func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Req
 		until = &ut
 	}
 
-	limit := int(req.Msg.Limit)
-	entries, err := s.store.SearchChatHistory(ctx, convID, req.Msg.Query, since, until, limit)
+	offset, err := parseLimitAndOffset(&pageSize{
+		token:   req.Msg.PageToken,
+		limit:   int(req.Msg.Limit),
+		maximum: 50,
+	})
+	if err != nil {
+		return nil, err
+	}
+	limitPlusOne := offset.limit + 1
+
+	msgs, err := s.store.SearchChatHistory(ctx, convID, req.Msg.Query, since, until, limitPlusOne, offset.offset)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to search chat history"))
 	}
 
-	var v1Entries []*v1pb.ChatHistoryEntry
-	for _, e := range entries {
-		v1Entries = append(v1Entries, &v1pb.ChatHistoryEntry{
-			MessageId: e.MessageID,
-			CommandId: e.CommandID,
-			Role:      e.Role,
-			Content:   e.Content,
-			CreatedAt: timestamppb.New(e.CreatedAt),
-		})
+	nextPageToken := ""
+	if len(msgs) == limitPlusOne {
+		msgs = msgs[:offset.limit]
+		nextPageToken, _ = offset.getNextPageToken()
 	}
 
-	return connect.NewResponse(&v1pb.SearchChatHistoryResponse{Entries: v1Entries}), nil
+	var v1Entries []*v1pb.ChatMessage
+	for _, msg := range msgs {
+		senderName := msg.PrincipalName
+		senderType := v1pb.SenderType(msg.SenderType)
+		if msg.SenderType == store.SenderTypeAgent && msg.SenderAgentID.Valid {
+			senderName = msg.AgentName
+		}
+		v1m := &v1pb.ChatMessage{
+			Name:          msg.ID.String(),
+			Conversation:  msg.ConversationID.String(),
+			PrincipalName: msg.PrincipalName,
+			Role:          msg.Role,
+			Content:       msg.Content,
+			CreatedAt:     timestamppb.New(msg.CreatedAt),
+			SenderName:    senderName,
+			SenderType:    senderType,
+			RoomVersion:   msg.RoomVersion,
+		}
+		if msg.CommandID.Valid {
+			v1m.CommandId = msg.CommandID.UUID.String()
+		}
+		v1Entries = append(v1Entries, v1m)
+	}
+
+	return connect.NewResponse(&v1pb.SearchChatHistoryResponse{
+		Entries:       v1Entries,
+		NextPageToken: nextPageToken,
+	}), nil
 }
 
 func (s *CommandService) GetCommandContext(ctx context.Context, req *connect.Request[v1pb.GetCommandContextRequest]) (*connect.Response[v1pb.GetCommandContextResponse], error) {

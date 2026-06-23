@@ -2241,9 +2241,9 @@ ActionResponse.committed was false).
 | query | [string](#string) |  |  |
 | since | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | until | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| principal_id | [string](#string) |  |  |
 | limit | [int32](#int32) |  |  |
 | conversation | [string](#string) |  |  |
+| page_token | [string](#string) |  |  |
 
 
 
@@ -2258,7 +2258,8 @@ ActionResponse.committed was false).
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| entries | [ChatHistoryEntry](#laelia-v1-ChatHistoryEntry) | repeated |  |
+| entries | [ChatMessage](#laelia-v1-ChatMessage) | repeated |  |
+| next_page_token | [string](#string) |  |  |
 
 
 

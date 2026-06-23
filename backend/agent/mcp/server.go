@@ -137,31 +137,26 @@ func contextMiddleware(next http.Handler) http.Handler {
 }
 
 type searchChatHistoryInput struct {
-	Query string `json:"query"`
-	Since string `json:"since,omitempty"`
-	Limit int    `json:"limit,omitempty"`
+	Query     string `json:"query"`
+	Since     string `json:"since,omitempty"`
+	Limit     int    `json:"limit,omitempty"`
+	PageToken string `json:"page_token,omitempty"`
 }
 
 type chatHistoryResult struct {
-	MessageID string `json:"message_id"`
-	Role      string `json:"role"`
-	Content   string `json:"content"`
-	Timestamp string `json:"timestamp"`
+	MessageID  string `json:"message_id"`
+	SenderName string `json:"sender_name"`
+	SenderType string `json:"sender_type"`
+	Content    string `json:"content"`
+	Timestamp  string `json:"timestamp"`
 }
 
 type searchChatHistoryOutput struct {
-	Results []chatHistoryResult `json:"results"`
+	Results       []chatHistoryResult `json:"results"`
+	NextPageToken string              `json:"next_page_token,omitempty"`
 }
 
 func (s *Server) handleSearchChatHistory(ctx context.Context, _ *mcp.CallToolRequest, input searchChatHistoryInput) (*mcp.CallToolResult, searchChatHistoryOutput, error) {
-	agentName := s.agentName
-	principalID := "0"
-	if v, ok := ctx.Value(ctxKeyAgentID).(string); ok && v != "" {
-		agentName = v
-	}
-	if v, ok := ctx.Value(ctxKeyPrincipalID).(string); ok && v != "" {
-		principalID = v
-	}
 	conversationID := ""
 	if v, ok := ctx.Value(ctxKeyConversationID).(string); ok && v != "" {
 		conversationID = v
@@ -173,10 +168,9 @@ func (s *Server) handleSearchChatHistory(ctx context.Context, _ *mcp.CallToolReq
 	}
 
 	reqMsg := &v1pb.SearchChatHistoryRequest{
-		Agent:       fmt.Sprintf("agents/%s", agentName),
-		Query:       input.Query,
-		PrincipalId: principalID,
-		Limit:       int32(limit),
+		Query:     input.Query,
+		Limit:     int32(limit),
+		PageToken: input.PageToken,
 	}
 	if conversationID != "" {
 		reqMsg.Conversation = fmt.Sprintf("conversations/%s", conversationID)
@@ -191,24 +185,42 @@ func (s *Server) handleSearchChatHistory(ctx context.Context, _ *mcp.CallToolReq
 	var results []chatHistoryResult
 	for _, e := range resp.Msg.Entries {
 		results = append(results, chatHistoryResult{
-			MessageID: e.MessageId,
-			Role:      e.Role,
-			Content:   e.Content,
-			Timestamp: e.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
+			MessageID:  e.Name,
+			SenderName: e.SenderName,
+			SenderType: senderTypeString(e.SenderType),
+			Content:    e.Content,
+			Timestamp:  e.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
 		})
 	}
 	if len(results) == 0 {
 		results = []chatHistoryResult{}
 	}
 
-	text := fmt.Sprintf("Found %d matching messages:\n", len(results))
+	text := fmt.Sprintf("Found %d matching messages", len(results))
+	if resp.Msg.NextPageToken != "" {
+		text += " (more results available — use page_token to continue)"
+	}
+	text += ":\n"
 	for _, r := range results {
-		text += fmt.Sprintf("[%s] %s (%s): %s\n", r.Timestamp, r.Role, r.MessageID, r.Content)
+		text += fmt.Sprintf("[%s] %s (%s): %s\n", r.Timestamp, r.SenderName, r.SenderType, r.Content)
 	}
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: text}},
-	}, searchChatHistoryOutput{Results: results}, nil
+	}, searchChatHistoryOutput{Results: results, NextPageToken: resp.Msg.NextPageToken}, nil
+}
+
+func senderTypeString(t v1pb.SenderType) string {
+	switch t {
+	case v1pb.SenderType_SENDER_TYPE_USER:
+		return "user"
+	case v1pb.SenderType_SENDER_TYPE_AGENT:
+		return "agent"
+	case v1pb.SenderType_SENDER_TYPE_SYSTEM:
+		return "system"
+	default:
+		return "unknown"
+	}
 }
 
 type getCommandContextInput struct {

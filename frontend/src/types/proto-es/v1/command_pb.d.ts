@@ -597,11 +597,6 @@ export declare type SearchChatHistoryRequest = Message<"laelia.v1.SearchChatHist
   until?: Timestamp | undefined;
 
   /**
-   * @generated from field: string principal_id = 5;
-   */
-  principalId: string;
-
-  /**
    * @generated from field: int32 limit = 6;
    */
   limit: number;
@@ -610,6 +605,11 @@ export declare type SearchChatHistoryRequest = Message<"laelia.v1.SearchChatHist
    * @generated from field: string conversation = 7;
    */
   conversation: string;
+
+  /**
+   * @generated from field: string page_token = 8;
+   */
+  pageToken: string;
 };
 
 /**
@@ -623,9 +623,14 @@ export declare const SearchChatHistoryRequestSchema: GenMessage<SearchChatHistor
  */
 export declare type SearchChatHistoryResponse = Message<"laelia.v1.SearchChatHistoryResponse"> & {
   /**
-   * @generated from field: repeated laelia.v1.ChatHistoryEntry entries = 1;
+   * @generated from field: repeated laelia.v1.ChatMessage entries = 1;
    */
-  entries: ChatHistoryEntry[];
+  entries: ChatMessage[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
 };
 
 /**
