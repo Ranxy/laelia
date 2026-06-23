@@ -18,8 +18,9 @@ import (
 type contextKey string
 
 const (
-	ctxKeyAgentID     contextKey = "laelia_agent_id"
-	ctxKeyPrincipalID contextKey = "laelia_principal_id"
+	ctxKeyAgentID        contextKey = "laelia_agent_id"
+	ctxKeyPrincipalID    contextKey = "laelia_principal_id"
+	ctxKeyConversationID contextKey = "laelia_conversation_id"
 )
 
 type Server struct {
@@ -128,6 +129,9 @@ func contextMiddleware(next http.Handler) http.Handler {
 		if pid := r.URL.Query().Get("principal"); pid != "" {
 			ctx = context.WithValue(ctx, ctxKeyPrincipalID, pid)
 		}
+		if cid := r.URL.Query().Get("conversation"); cid != "" {
+			ctx = context.WithValue(ctx, ctxKeyConversationID, cid)
+		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -158,18 +162,26 @@ func (s *Server) handleSearchChatHistory(ctx context.Context, _ *mcp.CallToolReq
 	if v, ok := ctx.Value(ctxKeyPrincipalID).(string); ok && v != "" {
 		principalID = v
 	}
+	conversationID := ""
+	if v, ok := ctx.Value(ctxKeyConversationID).(string); ok && v != "" {
+		conversationID = v
+	}
 
 	limit := input.Limit
 	if limit <= 0 || limit > 50 {
 		limit = 10
 	}
 
-	req := connect.NewRequest(&v1pb.SearchChatHistoryRequest{
+	reqMsg := &v1pb.SearchChatHistoryRequest{
 		Agent:       fmt.Sprintf("agents/%s", agentName),
 		Query:       input.Query,
 		PrincipalId: principalID,
 		Limit:       int32(limit),
-	})
+	}
+	if conversationID != "" {
+		reqMsg.Conversation = fmt.Sprintf("conversations/%s", conversationID)
+	}
+	req := connect.NewRequest(reqMsg)
 
 	resp, err := s.client().SearchChatHistory(ctx, req)
 	if err != nil {

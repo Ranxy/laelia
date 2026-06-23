@@ -1011,8 +1011,8 @@ func (e *ACPExecutor) buildMCPServers() []acp.McpServer {
 		return []acp.McpServer{}
 	}
 
-	url := fmt.Sprintf("http://127.0.0.1:%d/mcp?agent=%s&principal=%s",
-		e.request.MCPPort, e.request.AgentResourceID, e.request.PrincipalID)
+	url := fmt.Sprintf("http://127.0.0.1:%d/mcp?agent=%s&principal=%s&conversation=%s",
+		e.request.MCPPort, e.request.AgentResourceID, e.request.PrincipalID, e.request.ConversationID)
 
 	return []acp.McpServer{{
 		Http: &acp.McpServerHttpInline{
