@@ -328,7 +328,7 @@ func (s *CommandService) dispatchDirectConversation(ctx context.Context, conv *s
 	// Validate the agent supports ACP before dispatching. We deliberately do
 	// not surface validation failures as user-visible errors here (the message
 	// is already persisted); they are logged for operator visibility.
-	if vErr := s.validateACPCapability(ctx, agent, v1pb.ExecutorKind_ACP, "", false, 0, user); vErr != nil {
+	if vErr := s.validateACPCapability(ctx, agent, "", false, 0, user); vErr != nil {
 		slog.Warn("agent not ACP-capable; skipping dispatch", "agent", agent.ResourceID, "error", vErr)
 		return ""
 	}
@@ -350,12 +350,10 @@ func (s *CommandService) dispatchDirectConversation(ctx context.Context, conv *s
 		PrincipalID:    principalID,
 		Command:        "",
 		Instruction:    instruction,
-		ExecutorKind:   int32(v1pb.ExecutorKind_ACP),
 		AllowDiff:      false,
 		Status:         1, // PENDING
 		Env:            string(envBytes),
 		TimeoutSeconds: 0,
-		SourceType:     int32(v1pb.CommandSource_CHAT),
 		ConversationID: &conv.ID,
 	}
 

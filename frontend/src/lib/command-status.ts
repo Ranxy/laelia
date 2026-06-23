@@ -1,7 +1,6 @@
 import {
   CommandEventType,
   CommandStatus,
-  ExecutorKind,
 } from "@/types/proto-es/v1/command_pb";
 
 type BadgeVariant =
@@ -29,11 +28,6 @@ const commandStatusToVariant: Record<CommandStatus, BadgeVariant> = {
   [CommandStatus.FAILED]: "destructive",
   [CommandStatus.CANCELLED]: "destructive",
   [CommandStatus.TIMEOUT]: "destructive",
-};
-
-const executorKindToI18nKey: Partial<Record<ExecutorKind, string>> = {
-  [ExecutorKind.EXECUTOR_KIND_UNSPECIFIED]: "command.executor-unspecified",
-  [ExecutorKind.ACP]: "command.executor-acp",
 };
 
 const commandEventTypeToI18nKey: Record<CommandEventType, string> = {
@@ -93,7 +87,6 @@ export {
   commandResourceName,
   commandStatusToI18nKey,
   commandStatusToVariant,
-  executorKindToI18nKey,
   formatDuration,
   formatTimeOfDay,
   formatTimestamp,

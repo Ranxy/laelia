@@ -141,8 +141,6 @@
     - [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest)
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
     - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
-    - [SendCommandRequest](#laelia-v1-SendCommandRequest)
-    - [SendCommandRequest.EnvEntry](#laelia-v1-SendCommandRequest-EnvEntry)
     - [SendMessageRequest](#laelia-v1-SendMessageRequest)
     - [SubmitAction](#laelia-v1-SubmitAction)
     - [SubmitAction.EnvEntry](#laelia-v1-SubmitAction-EnvEntry)
@@ -157,9 +155,7 @@
     - [ActionResolution](#laelia-v1-ActionResolution)
     - [CommandEventType](#laelia-v1-CommandEventType)
     - [CommandOutput.StreamType](#laelia-v1-CommandOutput-StreamType)
-    - [CommandSource](#laelia-v1-CommandSource)
     - [CommandStatus](#laelia-v1-CommandStatus)
-    - [ExecutorKind](#laelia-v1-ExecutorKind)
     - [SenderType](#laelia-v1-SenderType)
   
     - [AgentStreamService](#laelia-v1-AgentStreamService)
@@ -1464,13 +1460,11 @@ action is held pending agent resolution via ResolveHeldAction.
 | error_message | [string](#string) |  |  |
 | env | [Command.EnvEntry](#laelia-v1-Command-EnvEntry) | repeated |  |
 | working_dir | [string](#string) |  |  |
-| executor_kind | [ExecutorKind](#laelia-v1-ExecutorKind) |  | **Deprecated.**  |
 | instruction | [string](#string) |  |  |
 | profile | [string](#string) |  |  |
 | final_summary | [string](#string) |  |  |
 | result | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
 | allow_diff | [bool](#bool) |  |  |
-| source | [CommandSource](#laelia-v1-CommandSource) |  | **Deprecated.**  |
 | conversation_id | [string](#string) |  |  |
 
 
@@ -2271,47 +2265,6 @@ ActionResponse.committed was false).
 
 
 
-<a name="laelia-v1-SendCommandRequest"></a>
-
-### SendCommandRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| agent | [string](#string) |  |  |
-| command | [string](#string) |  |  |
-| env | [SendCommandRequest.EnvEntry](#laelia-v1-SendCommandRequest-EnvEntry) | repeated |  |
-| working_dir | [string](#string) |  |  |
-| timeout_seconds | [int32](#int32) |  |  |
-| executor_kind | [ExecutorKind](#laelia-v1-ExecutorKind) |  |  |
-| instruction | [string](#string) |  |  |
-| profile | [string](#string) |  |  |
-| allow_diff | [bool](#bool) |  |  |
-| source | [CommandSource](#laelia-v1-CommandSource) |  |  |
-| conversation_id | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-SendCommandRequest-EnvEntry"></a>
-
-### SendCommandRequest.EnvEntry
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| key | [string](#string) |  |  |
-| value | [string](#string) |  |  |
-
-
-
-
-
-
 <a name="laelia-v1-SendMessageRequest"></a>
 
 ### SendMessageRequest
@@ -2536,19 +2489,6 @@ SubmitAction).
 
 
 
-<a name="laelia-v1-CommandSource"></a>
-
-### CommandSource
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| COMMAND_SOURCE_UNSPECIFIED | 0 |  |
-| MANUAL | 1 |  |
-| CHAT | 2 |  |
-
-
-
 <a name="laelia-v1-CommandStatus"></a>
 
 ### CommandStatus
@@ -2563,19 +2503,6 @@ SubmitAction).
 | FAILED | 4 |  |
 | CANCELLED | 5 |  |
 | TIMEOUT | 6 |  |
-
-
-
-<a name="laelia-v1-ExecutorKind"></a>
-
-### ExecutorKind
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| EXECUTOR_KIND_UNSPECIFIED | 0 |  |
-| SHELL | 1 |  |
-| ACP | 2 |  |
 
 
 
@@ -2619,7 +2546,6 @@ names).
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| SendCommand | [SendCommandRequest](#laelia-v1-SendCommandRequest) | [Command](#laelia-v1-Command) |  |
 | ListCommands | [ListCommandsRequest](#laelia-v1-ListCommandsRequest) | [ListCommandsResponse](#laelia-v1-ListCommandsResponse) |  |
 | GetCommand | [GetCommandRequest](#laelia-v1-GetCommandRequest) | [Command](#laelia-v1-Command) |  |
 | CancelCommand | [CancelCommandRequest](#laelia-v1-CancelCommandRequest) | [Command](#laelia-v1-Command) |  |

@@ -74,19 +74,6 @@ export interface CommandSlice {
   activeOutputs: Record<string, CommandOutput[]>;
   activeEvents: Record<string, CommandEvent[]>;
 
-  sendCommand: (
-    agent: string,
-    command: string,
-    opts?: {
-      env?: Record<string, string>;
-      workingDir?: string;
-      timeoutSeconds?: number;
-      executorKind?: number;
-      instruction?: string;
-      allowDiff?: boolean;
-      source?: number;
-    }
-  ) => Promise<Command>;
   cancelCommand: (name: string) => Promise<Command>;
   listCommands: (
     agent: string,

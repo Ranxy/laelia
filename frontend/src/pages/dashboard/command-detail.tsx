@@ -20,7 +20,6 @@ import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
 import {
   CommandEventType,
   CommandStatus,
-  ExecutorKind,
 } from "@/types/proto-es/v1/command_pb";
 
 const eventTypeColors: Record<number, string> = {
@@ -117,7 +116,6 @@ export function CommandDetailPage() {
     command: string;
     instruction: string;
     profile: string;
-    executorKind: number;
     finalSummary: string;
     status: number;
     exitCode: number;
@@ -139,7 +137,6 @@ export function CommandDetailPage() {
       command: c.command,
       instruction: c.instruction,
       profile: c.profile,
-      executorKind: c.executorKind,
       finalSummary: c.finalSummary,
       status: c.status,
       exitCode: c.exitCode,
@@ -178,7 +175,6 @@ export function CommandDetailPage() {
     cmd &&
     (cmd.status === CommandStatus.PENDING ||
       cmd.status === CommandStatus.RUNNING);
-  const isACP = cmd && cmd.executorKind === ExecutorKind.ACP;
 
   const pendingPermission = useMemo(() => {
     if (!isRunning) return null;
@@ -249,7 +245,7 @@ export function CommandDetailPage() {
                 <h1 className="text-lg font-mono font-semibold text-main truncate max-w-xl">
                   {cmd.instruction || cmd.command}
                 </h1>
-                {isACP && <Badge variant="secondary">ACP</Badge>}
+                <Badge variant="secondary">ACP</Badge>
                 <CommandStatusBadge status={cmd.status} />
               </div>
               {isRunning && (
@@ -305,7 +301,7 @@ export function CommandDetailPage() {
             <CommandTerminal outputs={outputs} className="min-h-[300px]" />
           </div>
 
-          {isACP && visibleEvents.length > 0 && (
+          {visibleEvents.length > 0 && (
             <div className="flex-1 flex flex-col gap-2">
               <h2 className="text-sm font-medium text-control">
                 {t("command.events")}
@@ -318,7 +314,7 @@ export function CommandDetailPage() {
             </div>
           )}
 
-          {isACP &&
+          {cmd &&
             visibleEvents.length === 0 &&
             cmd.status === CommandStatus.RUNNING && (
               <div className="flex-1 flex flex-col gap-2">

@@ -3,7 +3,6 @@ import { commandServiceClient } from "@/connect";
 import {
   CancelCommandRequestSchema,
   RespondPermissionRequestSchema,
-  SendCommandRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import type { AppSliceCreator, CommandSlice } from "./types";
 
@@ -15,23 +14,6 @@ export const createCommandSlice: AppSliceCreator<CommandSlice> = (
   commandsLoading: false,
   activeOutputs: {},
   activeEvents: {},
-
-  async sendCommand(agent, command, opts) {
-    const res = await commandServiceClient.sendCommand(
-      create(SendCommandRequestSchema, {
-        agent,
-        command,
-        env: opts?.env ?? {},
-        workingDir: opts?.workingDir ?? "",
-        timeoutSeconds: opts?.timeoutSeconds ?? 0,
-        executorKind: opts?.executorKind ?? 0,
-        instruction: opts?.instruction ?? "",
-        allowDiff: opts?.allowDiff ?? false,
-        source: opts?.source ?? 0,
-      })
-    );
-    return res;
-  },
 
   async cancelCommand(name) {
     const res = await commandServiceClient.cancelCommand(

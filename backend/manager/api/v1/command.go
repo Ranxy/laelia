@@ -37,127 +37,7 @@ func (s *CommandService) SetACPEnabled(enabled bool) {
 	s.acpEnabled = enabled
 }
 
-// SendCommand is deprecated as of Phase 1 of the message-driven redesign:
-// SendMessage is now the user-facing entry point. The handler is kept for
-// backward compatibility and dispatches through the same code path the
-// 1:1 SendMessage flow uses (CreateCommand -> EnqueueCommand). It will be
-// removed in Phase 3.
-//
-//nolint:staticcheck // SendCommandRequest is deprecated on purpose until Phase 3 removal.
-func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v1pb.SendCommandRequest]) (*connect.Response[v1pb.Command], error) {
-	executorKind := req.Msg.ExecutorKind
-	if executorKind == v1pb.ExecutorKind_EXECUTOR_KIND_UNSPECIFIED {
-		executorKind = v1pb.ExecutorKind_ACP
-	}
-	if executorKind == v1pb.ExecutorKind_ACP {
-		if req.Msg.Instruction == "" {
-			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("instruction must not be empty for ACP tasks"))
-		}
-	}
-
-	// Phase 1 removed the BashExecutor from the agent; the SHELL executor_kind
-	// is therefore no longer actionable. Reject explicit SHELL requests here so
-	// clients that still target the (deprecated) SendCommand RPC get a clear
-	// failure instead of a dispatch to an executor that no longer exists.
-	if executorKind == v1pb.ExecutorKind_SHELL {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("shell executor is no longer supported; use ACP (message-driven SendMessage) instead"))
-	}
-
-	commandText := req.Msg.Command
-	instruction := req.Msg.Instruction
-
-	agentResourceID := parseAgentResourceID(req.Msg.Agent)
-	agent, err := s.store.GetAgentByResourceID(ctx, agentResourceID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get agent"))
-	}
-	if agent == nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", agentResourceID))
-	}
-
-	user, _ := GetUserFromContext(ctx)
-	principalID := 1 // system bot default
-	principalName := "system"
-	if user != nil {
-		principalID = user.ID
-		principalName = user.Name
-	}
-
-	if err := s.validateACPCapability(ctx, agent, executorKind, req.Msg.Profile, req.Msg.AllowDiff, req.Msg.TimeoutSeconds, user); err != nil {
-		return nil, err
-	}
-
-	var conversationID *uuid.UUID
-	if req.Msg.Source == v1pb.CommandSource_CHAT && instruction != "" {
-		if req.Msg.ConversationId != "" {
-			if cid, cidErr := uuid.Parse(req.Msg.ConversationId); cidErr == nil {
-				conversationID = &cid
-			}
-		}
-		if conversationID == nil {
-			conv, convErr := s.store.GetOrCreateDirectConversation(ctx, agent.ID, principalID)
-			if convErr != nil {
-				slog.Warn("failed to get or create conversation", "error", convErr)
-			} else {
-				conversationID = &conv.ID
-			}
-		}
-		if conversationID != nil {
-			if _, _, msgErr := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
-				ConversationID: *conversationID,
-				PrincipalID:    principalID,
-				Role:           1, // USER
-				Content:        instruction,
-				SenderType:     store.SenderTypeUser,
-			}); msgErr != nil {
-				slog.Warn("failed to create user chat message", "error", msgErr)
-			}
-			if recent, recentErr := s.store.GetRecentChatMessages(ctx, *conversationID, 6); recentErr == nil && len(recent) > 0 {
-				if chatCtx := buildLightChatContext(recent); chatCtx != "" {
-					instruction = chatCtx + "\n---\n" + instruction
-				}
-			}
-		}
-	}
-
-	envBytes, err := json.Marshal(req.Msg.Env)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to marshal env"))
-	}
-
-	cmd := &store.CommandMessage{
-		AgentID:        agent.ID,
-		PrincipalID:    principalID,
-		Command:        commandText,
-		Instruction:    instruction,
-		ExecutorKind:   int32(executorKind),
-		AllowDiff:      req.Msg.AllowDiff,
-		Status:         1, // PENDING
-		Env:            string(envBytes),
-		WorkingDir:     req.Msg.WorkingDir,
-		TimeoutSeconds: req.Msg.TimeoutSeconds,
-		SourceType:     int32(req.Msg.Source),
-		ConversationID: conversationID,
-	}
-
-	created, err := s.store.CreateCommand(ctx, cmd)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create command"))
-	}
-
-	// Phase 1: send via the queued dispatcher (replaces the removed inbox
-	// item creation + NotifyInboxUpdated). If the agent is offline the command
-	// stays PENDING in the DB and is drained once the agent reconnects via
-	// DispatchPending.
-	if err := s.dispatcher.EnqueueCommand(ctx, created); err != nil {
-		slog.Warn("failed to enqueue command for dispatch", "commandID", created.ID, "error", err)
-	}
-
-	created.PrincipalName = principalName
-	created.AgentResourceID = agent.ResourceID
-
-	return connect.NewResponse(convertToV1Command(created)), nil
-}
+// SendCommand has been removed in Phase 3. Use SendMessage instead.
 
 func (s *CommandService) ListCommands(ctx context.Context, req *connect.Request[v1pb.ListCommandsRequest]) (*connect.Response[v1pb.ListCommandsResponse], error) {
 	agentResourceID := parseAgentResourceID(req.Msg.Agent)
@@ -395,14 +275,12 @@ func convertToV1Command(cmd *store.CommandMessage) *v1pb.Command {
 		Command:       cmd.Command,
 		Instruction:   cmd.Instruction,
 		Profile:       cmd.Profile,
-		ExecutorKind:  v1pb.ExecutorKind(cmd.ExecutorKind), //nolint:staticcheck // deprecated executor_kind kept for historical command display
 		AllowDiff:     cmd.AllowDiff,
 		Status:        v1pb.CommandStatus(cmd.Status),
 		CreatedAt:     timestamppb.New(cmd.CreatedAt),
 		ErrorMessage:  cmd.ErrorMessage,
 		FinalSummary:  cmd.FinalSummary,
 		WorkingDir:    cmd.WorkingDir,
-		Source:        v1pb.CommandSource(cmd.SourceType), //nolint:staticcheck // deprecated source kept for historical command display
 	}
 
 	if cmd.ConversationID != nil {
@@ -522,12 +400,7 @@ func formatPrincipalID(id int) string {
 	return fmt.Sprintf("%d", id)
 }
 
-//nolint:staticcheck // kind uses the deprecated ExecutorKind until Phase 3 removes SendCommand.
-func (s *CommandService) validateACPCapability(ctx context.Context, agent *store.AgentMessage, kind v1pb.ExecutorKind, _ string, allowDiff bool, timeoutSeconds int32, user *store.UserMessage) error {
-	if kind != v1pb.ExecutorKind_ACP {
-		return nil
-	}
-
+func (s *CommandService) validateACPCapability(ctx context.Context, agent *store.AgentMessage, _ string, allowDiff bool, timeoutSeconds int32, user *store.UserMessage) error {
 	capability := agent.Info.GetCapability()
 	if capability == nil || !capability.SupportsAcp {
 		return connect.NewError(connect.CodeInvalidArgument,

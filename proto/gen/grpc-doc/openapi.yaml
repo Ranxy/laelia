@@ -231,36 +231,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-        post:
-            tags:
-                - CommandService
-            operationId: CommandService_SendCommand
-            parameters:
-                - name: agent
-                  in: path
-                  description: The agent id.
-                  required: true
-                  schema:
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/SendCommandRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Command'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}/commands/{command}:
         get:
             tags:
@@ -1728,13 +1698,6 @@ components:
                         type: string
                 workingDir:
                     type: string
-                executorKind:
-                    enum:
-                        - EXECUTOR_KIND_UNSPECIFIED
-                        - SHELL
-                        - ACP
-                    type: string
-                    format: enum
                 instruction:
                     type: string
                 profile:
@@ -1745,13 +1708,6 @@ components:
                     type: object
                 allowDiff:
                     type: boolean
-                source:
-                    enum:
-                        - COMMAND_SOURCE_UNSPECIFIED
-                        - MANUAL
-                        - CHAT
-                    type: string
-                    format: enum
                 conversationId:
                     type: string
         CommandEvent:
@@ -2195,47 +2151,6 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/ChatHistoryEntry'
-        SendCommandRequest:
-            required:
-                - agent
-                - command
-            type: object
-            properties:
-                agent:
-                    type: string
-                command:
-                    type: string
-                env:
-                    type: object
-                    additionalProperties:
-                        type: string
-                workingDir:
-                    type: string
-                timeoutSeconds:
-                    type: integer
-                    format: int32
-                executorKind:
-                    enum:
-                        - EXECUTOR_KIND_UNSPECIFIED
-                        - SHELL
-                        - ACP
-                    type: string
-                    format: enum
-                instruction:
-                    type: string
-                profile:
-                    type: string
-                allowDiff:
-                    type: boolean
-                source:
-                    enum:
-                        - COMMAND_SOURCE_UNSPECIFIED
-                        - MANUAL
-                        - CHAT
-                    type: string
-                    format: enum
-                conversationId:
-                    type: string
         SendMessageRequest:
             required:
                 - conversation

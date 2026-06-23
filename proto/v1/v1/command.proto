@@ -23,20 +23,6 @@ enum CommandStatus {
   TIMEOUT = 6;
 }
 
-enum ExecutorKind {
-  option deprecated = true;
-  EXECUTOR_KIND_UNSPECIFIED = 0;
-  SHELL = 1;
-  ACP = 2;
-}
-
-enum CommandSource {
-  option deprecated = true;
-  COMMAND_SOURCE_UNSPECIFIED = 0;
-  MANUAL = 1;
-  CHAT = 2;
-}
-
 // SenderType distinguishes who authored a chat message. It replaces the
 // deprecated CommandSource enum and covers programmatic (SYSTEM) senders that
 // CommandSource could not express inside chat conversations. Values are
@@ -87,14 +73,15 @@ message Command {
   string error_message = 12;
   map<string, string> env = 13;
   string working_dir = 14;
-  ExecutorKind executor_kind = 15 [deprecated = true];
   string instruction = 16;
   string profile = 17;
   string final_summary = 18;
   google.protobuf.Struct result = 19;
   bool allow_diff = 20;
-  CommandSource source = 21 [deprecated = true];
   string conversation_id = 22;
+
+  reserved 15, 21;
+  reserved "executor_kind", "source";
 }
 
 message CommandOutput {
@@ -371,15 +358,6 @@ message GetCommandContextResponse {
 }
 
 service CommandService {
-  rpc SendCommand(SendCommandRequest) returns (Command) {
-    option deprecated = true;
-    option (google.api.http) = {
-      post: "/v1/{agent=agents/*}/commands"
-      body: "*"
-    };
-    option (laelia.v1.audit) = true;
-  }
-
   rpc ListCommands(ListCommandsRequest) returns (ListCommandsResponse) {
     option (google.api.http) = {get: "/v1/{agent=agents/*}/commands"};
   }
@@ -565,24 +543,6 @@ message Ping {
 message Pong {
   int64 seq = 1;
   int64 server_time = 2;
-}
-
-message SendCommandRequest {
-  option deprecated = true;
-  string agent = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference).type = "laelia/Agent"
-  ];
-  string command = 2 [(google.api.field_behavior) = REQUIRED];
-  map<string, string> env = 3;
-  string working_dir = 4;
-  int32 timeout_seconds = 5;
-  ExecutorKind executor_kind = 6;
-  string instruction = 7;
-  string profile = 8;
-  bool allow_diff = 9;
-  CommandSource source = 10;
-  string conversation_id = 11;
 }
 
 message ListCommandsRequest {

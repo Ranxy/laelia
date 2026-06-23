@@ -20,7 +20,6 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CommandService_SendCommand_FullMethodName               = "/laelia.v1.CommandService/SendCommand"
 	CommandService_ListCommands_FullMethodName              = "/laelia.v1.CommandService/ListCommands"
 	CommandService_GetCommand_FullMethodName                = "/laelia.v1.CommandService/GetCommand"
 	CommandService_CancelCommand_FullMethodName             = "/laelia.v1.CommandService/CancelCommand"
@@ -47,8 +46,6 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CommandServiceClient interface {
-	// Deprecated: Do not use.
-	SendCommand(ctx context.Context, in *SendCommandRequest, opts ...grpc.CallOption) (*Command, error)
 	ListCommands(ctx context.Context, in *ListCommandsRequest, opts ...grpc.CallOption) (*ListCommandsResponse, error)
 	GetCommand(ctx context.Context, in *GetCommandRequest, opts ...grpc.CallOption) (*Command, error)
 	CancelCommand(ctx context.Context, in *CancelCommandRequest, opts ...grpc.CallOption) (*Command, error)
@@ -77,17 +74,6 @@ type commandServiceClient struct {
 
 func NewCommandServiceClient(cc grpc.ClientConnInterface) CommandServiceClient {
 	return &commandServiceClient{cc}
-}
-
-// Deprecated: Do not use.
-func (c *commandServiceClient) SendCommand(ctx context.Context, in *SendCommandRequest, opts ...grpc.CallOption) (*Command, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Command)
-	err := c.cc.Invoke(ctx, CommandService_SendCommand_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *commandServiceClient) ListCommands(ctx context.Context, in *ListCommandsRequest, opts ...grpc.CallOption) (*ListCommandsResponse, error) {
@@ -312,8 +298,6 @@ func (c *commandServiceClient) FetchConversationActivity(ctx context.Context, in
 // All implementations must embed UnimplementedCommandServiceServer
 // for forward compatibility.
 type CommandServiceServer interface {
-	// Deprecated: Do not use.
-	SendCommand(context.Context, *SendCommandRequest) (*Command, error)
 	ListCommands(context.Context, *ListCommandsRequest) (*ListCommandsResponse, error)
 	GetCommand(context.Context, *GetCommandRequest) (*Command, error)
 	CancelCommand(context.Context, *CancelCommandRequest) (*Command, error)
@@ -344,9 +328,6 @@ type CommandServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedCommandServiceServer struct{}
 
-func (UnimplementedCommandServiceServer) SendCommand(context.Context, *SendCommandRequest) (*Command, error) {
-	return nil, status.Error(codes.Unimplemented, "method SendCommand not implemented")
-}
 func (UnimplementedCommandServiceServer) ListCommands(context.Context, *ListCommandsRequest) (*ListCommandsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListCommands not implemented")
 }
@@ -426,24 +407,6 @@ func RegisterCommandServiceServer(s grpc.ServiceRegistrar, srv CommandServiceSer
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&CommandService_ServiceDesc, srv)
-}
-
-func _CommandService_SendCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SendCommandRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(CommandServiceServer).SendCommand(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: CommandService_SendCommand_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CommandServiceServer).SendCommand(ctx, req.(*SendCommandRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _CommandService_ListCommands_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -799,10 +762,6 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "laelia.v1.CommandService",
 	HandlerType: (*CommandServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "SendCommand",
-			Handler:    _CommandService_SendCommand_Handler,
-		},
 		{
 			MethodName: "ListCommands",
 			Handler:    _CommandService_ListCommands_Handler,

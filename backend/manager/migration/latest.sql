@@ -201,7 +201,6 @@ CREATE TABLE command (
     command TEXT NOT NULL,
     instruction TEXT NOT NULL DEFAULT '',
     profile TEXT NOT NULL DEFAULT '',
-    executor_kind SMALLINT NOT NULL DEFAULT 1,
     allow_diff BOOLEAN NOT NULL DEFAULT FALSE,
     -- status: 1=PENDING, 2=RUNNING, 3=COMPLETED, 4=FAILED, 5=CANCELLED, 6=TIMEOUT
     status SMALLINT NOT NULL DEFAULT 1,
@@ -250,9 +249,8 @@ CREATE TABLE command_event (
 CREATE UNIQUE INDEX idx_command_event_seq ON command_event(command_id, seq_no);
 CREATE INDEX idx_command_event_created_at ON command_event(command_id, created_at);
 
-ALTER TABLE command ADD COLUMN source_type SMALLINT NOT NULL DEFAULT 0;
 ALTER TABLE command ADD COLUMN conversation_id UUID;
-CREATE INDEX idx_command_chat_history ON command(agent_id, principal_id, source_type, created_at DESC) WHERE source_type = 2;
+CREATE INDEX idx_command_chat_history ON command(agent_id, principal_id, created_at DESC) WHERE conversation_id IS NOT NULL;
 
 CREATE TABLE conversation (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -350,8 +348,10 @@ UPDATE chat_message
 
 CREATE INDEX IF NOT EXISTS idx_chat_message_room_version ON chat_message(conversation_id, room_version);
 
--- command retains its historical executor_kind and source_type columns for
--- audit/back-compat. New commands are written with fixed values (ACP / CHAT).
+-- Phase 3: drop the deprecated executor_kind and source_type columns.
+-- All commands now execute via ACP and originate from chat messages.
+ALTER TABLE command DROP COLUMN IF EXISTS executor_kind;
+ALTER TABLE command DROP COLUMN IF EXISTS source_type;
 
 -- Drop the Phase 1 inbox model. Drop IF EXISTS also covers fresh installs
 -- (the CREATE TABLE statements previously here have been removed so fresh

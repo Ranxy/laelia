@@ -714,14 +714,6 @@
                 </li>
               
                 <li>
-                  <a href="#laelia.v1.SendCommandRequest"><span class="badge">M</span>SendCommandRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.SendCommandRequest.EnvEntry"><span class="badge">M</span>SendCommandRequest.EnvEntry</a>
-                </li>
-              
-                <li>
                   <a href="#laelia.v1.SendMessageRequest"><span class="badge">M</span>SendMessageRequest</a>
                 </li>
               
@@ -775,15 +767,7 @@
                 </li>
               
                 <li>
-                  <a href="#laelia.v1.CommandSource"><span class="badge">E</span>CommandSource</a>
-                </li>
-              
-                <li>
                   <a href="#laelia.v1.CommandStatus"><span class="badge">E</span>CommandStatus</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.ExecutorKind"><span class="badge">E</span>ExecutorKind</a>
                 </li>
               
                 <li>
@@ -4173,13 +4157,6 @@ their cursor into the conversation. </p></td>
                 </tr>
               
                 <tr>
-                  <td>executor_kind</td>
-                  <td><a href="#laelia.v1.ExecutorKind">ExecutorKind</a></td>
-                  <td></td>
-                  <td><p><strong>Deprecated.</strong>  </p></td>
-                </tr>
-              
-                <tr>
                   <td>instruction</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
@@ -4215,13 +4192,6 @@ their cursor into the conversation. </p></td>
                 </tr>
               
                 <tr>
-                  <td>source</td>
-                  <td><a href="#laelia.v1.CommandSource">CommandSource</a></td>
-                  <td></td>
-                  <td><p><strong>Deprecated.</strong>  </p></td>
-                </tr>
-              
-                <tr>
                   <td>conversation_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
@@ -4231,32 +4201,6 @@ their cursor into the conversation. </p></td>
             </tbody>
           </table>
 
-          
-            
-            
-            <h4>Fields with deprecated option</h4>
-            <table>
-              <thead>
-                <tr>
-                  <td>Name</td>
-                  <td>Option</td>
-                </tr>
-              </thead>
-              <tbody>
-              
-                <tr>
-                  <td>executor_kind</td>
-                  <td><p>true</p></td>
-                </tr>
-              
-                <tr>
-                  <td>source</td>
-                  <td><p>true</p></td>
-                </tr>
-              
-              </tbody>
-            </table>
-            
           
 
         
@@ -6016,131 +5960,6 @@ their cursor into the conversation. </p></td>
 
         
       
-        <h3 id="laelia.v1.SendCommandRequest">SendCommandRequest</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>agent</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>command</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>env</td>
-                  <td><a href="#laelia.v1.SendCommandRequest.EnvEntry">SendCommandRequest.EnvEntry</a></td>
-                  <td>repeated</td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>working_dir</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>timeout_seconds</td>
-                  <td><a href="#int32">int32</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>executor_kind</td>
-                  <td><a href="#laelia.v1.ExecutorKind">ExecutorKind</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>instruction</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>profile</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>allow_diff</td>
-                  <td><a href="#bool">bool</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>source</td>
-                  <td><a href="#laelia.v1.CommandSource">CommandSource</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>conversation_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.SendCommandRequest.EnvEntry">SendCommandRequest.EnvEntry</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>key</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>value</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
         <h3 id="laelia.v1.SendMessageRequest">SendMessageRequest</h3>
         <p></p>
 
@@ -6654,35 +6473,6 @@ their cursor into the conversation. </p></td>
           </tbody>
         </table>
       
-        <h3 id="laelia.v1.CommandSource">CommandSource</h3>
-        <p></p>
-        <table class="enum-table">
-          <thead>
-            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
-          </thead>
-          <tbody>
-            
-              <tr>
-                <td>COMMAND_SOURCE_UNSPECIFIED</td>
-                <td>0</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>MANUAL</td>
-                <td>1</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>CHAT</td>
-                <td>2</td>
-                <td><p></p></td>
-              </tr>
-            
-          </tbody>
-        </table>
-      
         <h3 id="laelia.v1.CommandStatus">CommandStatus</h3>
         <p></p>
         <table class="enum-table">
@@ -6730,35 +6520,6 @@ their cursor into the conversation. </p></td>
               <tr>
                 <td>TIMEOUT</td>
                 <td>6</td>
-                <td><p></p></td>
-              </tr>
-            
-          </tbody>
-        </table>
-      
-        <h3 id="laelia.v1.ExecutorKind">ExecutorKind</h3>
-        <p></p>
-        <table class="enum-table">
-          <thead>
-            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
-          </thead>
-          <tbody>
-            
-              <tr>
-                <td>EXECUTOR_KIND_UNSPECIFIED</td>
-                <td>0</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>SHELL</td>
-                <td>1</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>ACP</td>
-                <td>2</td>
                 <td><p></p></td>
               </tr>
             
@@ -6830,13 +6591,6 @@ their cursor into the conversation. </p></td>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
           </thead>
           <tbody>
-            
-              <tr>
-                <td>SendCommand</td>
-                <td><a href="#laelia.v1.SendCommandRequest">SendCommandRequest</a></td>
-                <td><a href="#laelia.v1.Command">Command</a></td>
-                <td><p></p></td>
-              </tr>
             
               <tr>
                 <td>ListCommands</td>
@@ -6984,27 +6738,6 @@ their cursor into the conversation. </p></td>
         
           
           
-          <h4>Methods with deprecated option</h4>
-          <table>
-            <thead>
-              <tr>
-                <td>Method Name</td>
-                <td>Option</td>
-              </tr>
-            </thead>
-            <tbody>
-            
-              <tr>
-                <td>SendCommand</td>
-                <td><p>true</p></td>
-              </tr>
-            
-            </tbody>
-          </table>
-          
-        
-          
-          
           <h4>Methods with HTTP bindings</h4>
           <table>
             <thead>
@@ -7016,16 +6749,6 @@ their cursor into the conversation. </p></td>
               </tr>
             </thead>
             <tbody>
-            
-              
-              
-              <tr>
-                <td>SendCommand</td>
-                <td>POST</td>
-                <td>/v1/{agent=agents/*}/commands</td>
-                <td>*</td>
-              </tr>
-              
             
               
               

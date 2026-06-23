@@ -25,13 +25,12 @@ import {
 import { Textarea } from "@/react/components/ui/textarea";
 import {
   agentResourceName,
-  executorKindToI18nKey,
   formatDuration,
   formatTimestamp,
 } from "@/react/lib/command-status";
 import { useAppStore } from "@/react/stores";
 import type { Command } from "@/types/proto-es/v1/command_pb";
-import { CommandStatus, ExecutorKind } from "@/types/proto-es/v1/command_pb";
+import { CommandStatus } from "@/types/proto-es/v1/command_pb";
 
 type StatusFilter = "all" | "pending" | "running" | "done" | "failed";
 
@@ -56,7 +55,7 @@ export function CommandListPage() {
   const commands = useAppStore((s) => s.commands);
   const loading = useAppStore((s) => s.commandsLoading);
   const listCommands = useAppStore((s) => s.listCommands);
-  const sendCommand = useAppStore((s) => s.sendCommand);
+  const sendChatMessage = useAppStore((s) => s.sendChatMessage);
 
   const [sendOpen, setSendOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
@@ -90,10 +89,7 @@ export function CommandListPage() {
     if (!agent || !instruction.trim()) return;
     setSending(true);
     try {
-      await sendCommand(agent, instruction.trim(), {
-        executorKind: ExecutorKind.ACP,
-        instruction: instruction.trim(),
-      });
+      await sendChatMessage(agent, instruction.trim());
       setInstruction("");
       setSendOpen(false);
       load();
@@ -111,12 +107,7 @@ export function CommandListPage() {
     return cmd.instruction || cmd.command || "";
   }
 
-  const executorLabel = (cmd: Command) => {
-    const key = executorKindToI18nKey[cmd.executorKind as ExecutorKind];
-    if (!key) return "ACP";
-    const label = t(key);
-    return label || "ACP";
-  };
+  const executorLabel = (_cmd: Command) => "ACP";
 
   return (
     <div className="flex h-full flex-col">

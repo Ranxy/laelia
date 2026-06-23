@@ -36,9 +36,6 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// CommandServiceSendCommandProcedure is the fully-qualified name of the CommandService's
-	// SendCommand RPC.
-	CommandServiceSendCommandProcedure = "/laelia.v1.CommandService/SendCommand"
 	// CommandServiceListCommandsProcedure is the fully-qualified name of the CommandService's
 	// ListCommands RPC.
 	CommandServiceListCommandsProcedure = "/laelia.v1.CommandService/ListCommands"
@@ -106,8 +103,6 @@ const (
 
 // CommandServiceClient is a client for the laelia.v1.CommandService service.
 type CommandServiceClient interface {
-	// Deprecated: do not use.
-	SendCommand(context.Context, *connect.Request[v1.SendCommandRequest]) (*connect.Response[v1.Command], error)
 	ListCommands(context.Context, *connect.Request[v1.ListCommandsRequest]) (*connect.Response[v1.ListCommandsResponse], error)
 	GetCommand(context.Context, *connect.Request[v1.GetCommandRequest]) (*connect.Response[v1.Command], error)
 	CancelCommand(context.Context, *connect.Request[v1.CancelCommandRequest]) (*connect.Response[v1.Command], error)
@@ -141,12 +136,6 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 	baseURL = strings.TrimRight(baseURL, "/")
 	commandServiceMethods := v1.File_v1_command_proto.Services().ByName("CommandService").Methods()
 	return &commandServiceClient{
-		sendCommand: connect.NewClient[v1.SendCommandRequest, v1.Command](
-			httpClient,
-			baseURL+CommandServiceSendCommandProcedure,
-			connect.WithSchema(commandServiceMethods.ByName("SendCommand")),
-			connect.WithClientOptions(opts...),
-		),
 		listCommands: connect.NewClient[v1.ListCommandsRequest, v1.ListCommandsResponse](
 			httpClient,
 			baseURL+CommandServiceListCommandsProcedure,
@@ -272,7 +261,6 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 
 // commandServiceClient implements CommandServiceClient.
 type commandServiceClient struct {
-	sendCommand               *connect.Client[v1.SendCommandRequest, v1.Command]
 	listCommands              *connect.Client[v1.ListCommandsRequest, v1.ListCommandsResponse]
 	getCommand                *connect.Client[v1.GetCommandRequest, v1.Command]
 	cancelCommand             *connect.Client[v1.CancelCommandRequest, v1.Command]
@@ -293,13 +281,6 @@ type commandServiceClient struct {
 	listChannelMembers        *connect.Client[v1.ListChannelMembersRequest, v1.ListChannelMembersResponse]
 	sendMessage               *connect.Client[v1.SendMessageRequest, v1.ChatMessage]
 	fetchConversationActivity *connect.Client[v1.FetchConversationActivityRequest, v1.FetchConversationActivityResponse]
-}
-
-// SendCommand calls laelia.v1.CommandService.SendCommand.
-//
-// Deprecated: do not use.
-func (c *commandServiceClient) SendCommand(ctx context.Context, req *connect.Request[v1.SendCommandRequest]) (*connect.Response[v1.Command], error) {
-	return c.sendCommand.CallUnary(ctx, req)
 }
 
 // ListCommands calls laelia.v1.CommandService.ListCommands.
@@ -404,8 +385,6 @@ func (c *commandServiceClient) FetchConversationActivity(ctx context.Context, re
 
 // CommandServiceHandler is an implementation of the laelia.v1.CommandService service.
 type CommandServiceHandler interface {
-	// Deprecated: do not use.
-	SendCommand(context.Context, *connect.Request[v1.SendCommandRequest]) (*connect.Response[v1.Command], error)
 	ListCommands(context.Context, *connect.Request[v1.ListCommandsRequest]) (*connect.Response[v1.ListCommandsResponse], error)
 	GetCommand(context.Context, *connect.Request[v1.GetCommandRequest]) (*connect.Response[v1.Command], error)
 	CancelCommand(context.Context, *connect.Request[v1.CancelCommandRequest]) (*connect.Response[v1.Command], error)
@@ -435,12 +414,6 @@ type CommandServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	commandServiceMethods := v1.File_v1_command_proto.Services().ByName("CommandService").Methods()
-	commandServiceSendCommandHandler := connect.NewUnaryHandler(
-		CommandServiceSendCommandProcedure,
-		svc.SendCommand,
-		connect.WithSchema(commandServiceMethods.ByName("SendCommand")),
-		connect.WithHandlerOptions(opts...),
-	)
 	commandServiceListCommandsHandler := connect.NewUnaryHandler(
 		CommandServiceListCommandsProcedure,
 		svc.ListCommands,
@@ -563,8 +536,6 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 	)
 	return "/laelia.v1.CommandService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case CommandServiceSendCommandProcedure:
-			commandServiceSendCommandHandler.ServeHTTP(w, r)
 		case CommandServiceListCommandsProcedure:
 			commandServiceListCommandsHandler.ServeHTTP(w, r)
 		case CommandServiceGetCommandProcedure:
@@ -613,10 +584,6 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 
 // UnimplementedCommandServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedCommandServiceHandler struct{}
-
-func (UnimplementedCommandServiceHandler) SendCommand(context.Context, *connect.Request[v1.SendCommandRequest]) (*connect.Response[v1.Command], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.SendCommand is not implemented"))
-}
 
 func (UnimplementedCommandServiceHandler) ListCommands(context.Context, *connect.Request[v1.ListCommandsRequest]) (*connect.Response[v1.ListCommandsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListCommands is not implemented"))

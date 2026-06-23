@@ -573,13 +573,11 @@ func (d *Dispatcher) createCommandFromAction(ctx context.Context, agentID int, r
 		Command:        "",
 		Instruction:    req.Instruction,
 		Profile:        req.Profile,
-		ExecutorKind:   int32(v1pb.ExecutorKind_ACP),
 		AllowDiff:      req.AllowDiff,
 		Status:         1, // PENDING
 		Env:            string(envBytes),
 		WorkingDir:     req.WorkingDir,
 		TimeoutSeconds: req.TimeoutSeconds,
-		SourceType:     int32(v1pb.CommandSource_CHAT),
 		ConversationID: &convUUID,
 	}
 

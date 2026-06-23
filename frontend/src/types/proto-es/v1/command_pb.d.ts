@@ -86,12 +86,6 @@ export declare type Command = Message<"laelia.v1.Command"> & {
   workingDir: string;
 
   /**
-   * @generated from field: laelia.v1.ExecutorKind executor_kind = 15 [deprecated = true];
-   * @deprecated
-   */
-  executorKind: ExecutorKind;
-
-  /**
    * @generated from field: string instruction = 16;
    */
   instruction: string;
@@ -115,12 +109,6 @@ export declare type Command = Message<"laelia.v1.Command"> & {
    * @generated from field: bool allow_diff = 20;
    */
   allowDiff: boolean;
-
-  /**
-   * @generated from field: laelia.v1.CommandSource source = 21 [deprecated = true];
-   * @deprecated
-   */
-  source: CommandSource;
 
   /**
    * @generated from field: string conversation_id = 22;
@@ -1521,74 +1509,6 @@ export declare type Pong = Message<"laelia.v1.Pong"> & {
 export declare const PongSchema: GenMessage<Pong>;
 
 /**
- * @generated from message laelia.v1.SendCommandRequest
- * @deprecated
- */
-export declare type SendCommandRequest = Message<"laelia.v1.SendCommandRequest"> & {
-  /**
-   * @generated from field: string agent = 1;
-   */
-  agent: string;
-
-  /**
-   * @generated from field: string command = 2;
-   */
-  command: string;
-
-  /**
-   * @generated from field: map<string, string> env = 3;
-   */
-  env: { [key: string]: string };
-
-  /**
-   * @generated from field: string working_dir = 4;
-   */
-  workingDir: string;
-
-  /**
-   * @generated from field: int32 timeout_seconds = 5;
-   */
-  timeoutSeconds: number;
-
-  /**
-   * @generated from field: laelia.v1.ExecutorKind executor_kind = 6;
-   */
-  executorKind: ExecutorKind;
-
-  /**
-   * @generated from field: string instruction = 7;
-   */
-  instruction: string;
-
-  /**
-   * @generated from field: string profile = 8;
-   */
-  profile: string;
-
-  /**
-   * @generated from field: bool allow_diff = 9;
-   */
-  allowDiff: boolean;
-
-  /**
-   * @generated from field: laelia.v1.CommandSource source = 10;
-   */
-  source: CommandSource;
-
-  /**
-   * @generated from field: string conversation_id = 11;
-   */
-  conversationId: string;
-};
-
-/**
- * Describes the message laelia.v1.SendCommandRequest.
- * Use `create(SendCommandRequestSchema)` to create a new message.
- * @deprecated
- */
-export declare const SendCommandRequestSchema: GenMessage<SendCommandRequest>;
-
-/**
  * @generated from message laelia.v1.ListCommandsRequest
  */
 export declare type ListCommandsRequest = Message<"laelia.v1.ListCommandsRequest"> & {
@@ -2075,60 +1995,6 @@ export enum CommandStatus {
 export declare const CommandStatusSchema: GenEnum<CommandStatus>;
 
 /**
- * @generated from enum laelia.v1.ExecutorKind
- * @deprecated
- */
-export enum ExecutorKind {
-  /**
-   * @generated from enum value: EXECUTOR_KIND_UNSPECIFIED = 0;
-   */
-  EXECUTOR_KIND_UNSPECIFIED = 0,
-
-  /**
-   * @generated from enum value: SHELL = 1;
-   */
-  SHELL = 1,
-
-  /**
-   * @generated from enum value: ACP = 2;
-   */
-  ACP = 2,
-}
-
-/**
- * Describes the enum laelia.v1.ExecutorKind.
- * @deprecated
- */
-export declare const ExecutorKindSchema: GenEnum<ExecutorKind>;
-
-/**
- * @generated from enum laelia.v1.CommandSource
- * @deprecated
- */
-export enum CommandSource {
-  /**
-   * @generated from enum value: COMMAND_SOURCE_UNSPECIFIED = 0;
-   */
-  COMMAND_SOURCE_UNSPECIFIED = 0,
-
-  /**
-   * @generated from enum value: MANUAL = 1;
-   */
-  MANUAL = 1,
-
-  /**
-   * @generated from enum value: CHAT = 2;
-   */
-  CHAT = 2,
-}
-
-/**
- * Describes the enum laelia.v1.CommandSource.
- * @deprecated
- */
-export declare const CommandSourceSchema: GenEnum<CommandSource>;
-
-/**
  * SenderType distinguishes who authored a chat message. It replaces the
  * deprecated CommandSource enum and covers programmatic (SYSTEM) senders that
  * CommandSource could not express inside chat conversations. Values are
@@ -2278,15 +2144,6 @@ export declare const ActionResolutionSchema: GenEnum<ActionResolution>;
  * @generated from service laelia.v1.CommandService
  */
 export declare const CommandService: GenService<{
-  /**
-   * @generated from rpc laelia.v1.CommandService.SendCommand
-   * @deprecated
-   */
-  sendCommand: {
-    methodKind: "unary";
-    input: typeof SendCommandRequestSchema;
-    output: typeof CommandSchema;
-  },
   /**
    * @generated from rpc laelia.v1.CommandService.ListCommands
    */
