@@ -86,6 +86,7 @@
 - [v1/command.proto](#v1_command-proto)
     - [ActionResponse](#laelia-v1-ActionResponse)
     - [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest)
+    - [AgentActivity](#laelia-v1-AgentActivity)
     - [AgentReady](#laelia-v1-AgentReady)
     - [AgentStreamMessage](#laelia-v1-AgentStreamMessage)
     - [CancelCommandRequest](#laelia-v1-CancelCommandRequest)
@@ -105,6 +106,8 @@
     - [CreateChannelRequest](#laelia-v1-CreateChannelRequest)
     - [DeleteChannelRequest](#laelia-v1-DeleteChannelRequest)
     - [DiffEmittedPayload](#laelia-v1-DiffEmittedPayload)
+    - [FetchConversationActivityRequest](#laelia-v1-FetchConversationActivityRequest)
+    - [FetchConversationActivityResponse](#laelia-v1-FetchConversationActivityResponse)
     - [FinalSummaryPayload](#laelia-v1-FinalSummaryPayload)
     - [GetChannelRequest](#laelia-v1-GetChannelRequest)
     - [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest)
@@ -1288,6 +1291,24 @@ action is held pending agent resolution via ResolveHeldAction.
 
 
 
+<a name="laelia-v1-AgentActivity"></a>
+
+### AgentActivity
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_id | [string](#string) |  |  |
+| display_name | [string](#string) |  |  |
+| status | [string](#string) |  |  |
+| tool_name | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-AgentReady"></a>
 
 ### AgentReady
@@ -1664,6 +1685,38 @@ action is held pending agent resolution via ResolveHeldAction.
 | path | [string](#string) |  |  |
 | old_text | [string](#string) |  |  |
 | new_text | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-FetchConversationActivityRequest"></a>
+
+### FetchConversationActivityRequest
+FetchConversationActivity returns the execution status of each agent member
+in a conversation. It is polled by the frontend to show real-time agent
+status in the channel header.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-FetchConversationActivityResponse"></a>
+
+### FetchConversationActivityResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| activities | [AgentActivity](#laelia-v1-AgentActivity) | repeated |  |
 
 
 
@@ -2586,6 +2639,7 @@ names).
 | RemoveChannelMember | [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 | ListChannelMembers | [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest) | [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse) |  |
 | SendMessage | [SendMessageRequest](#laelia-v1-SendMessageRequest) | [ChatMessage](#laelia-v1-ChatMessage) |  |
+| FetchConversationActivity | [FetchConversationActivityRequest](#laelia-v1-FetchConversationActivityRequest) | [FetchConversationActivityResponse](#laelia-v1-FetchConversationActivityResponse) |  |
 
  
 

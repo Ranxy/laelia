@@ -321,6 +321,109 @@ func (d *Dispatcher) NotifyNewMessages(_ context.Context, agentID int, conversat
 	}
 }
 
+// FetchConversationActivity returns the execution status of every agent member
+// in a conversation. It combines member list, connection state, and running
+// command events to derive a human-readable status per agent.
+func (d *Dispatcher) FetchConversationActivity(ctx context.Context, conversationID string) ([]*v1pb.AgentActivity, error) {
+	convUUID, err := uuid.Parse(conversationID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "invalid conversation id")
+	}
+
+	members, err := d.store.ListConversationMembers(ctx, convUUID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list conversation members")
+	}
+
+	// Collect agent members: member_id is the agent resource ID.
+	type agentEntry struct {
+		resourceID string
+		name       string
+		id         int
+	}
+	var agents []agentEntry
+	var agentIDs []int
+	for _, m := range members {
+		if m.MemberType != store.MemberTypeAgent {
+			continue
+		}
+		ag, agErr := d.store.GetAgentByResourceID(ctx, m.MemberID)
+		if agErr != nil || ag == nil {
+			continue
+		}
+		agents = append(agents, agentEntry{resourceID: ag.ResourceID, name: ag.Name, id: ag.ID})
+		agentIDs = append(agentIDs, ag.ID)
+	}
+
+	// Batch-query running commands for these agents in this conversation.
+	running, runErr := d.store.GetRunningCommandsForConversation(ctx, agentIDs, convUUID)
+	if runErr != nil {
+		return nil, errors.Wrapf(runErr, "failed to get running commands")
+	}
+	runningByAgent := make(map[int]*store.RunningCommandInfo, len(running))
+	for _, r := range running {
+		runningByAgent[r.AgentID] = r
+	}
+
+	// Build activity entries.
+	activities := make([]*v1pb.AgentActivity, 0, len(agents))
+	for _, ag := range agents {
+		act := &v1pb.AgentActivity{
+			AgentId:     ag.resourceID,
+			DisplayName: ag.name,
+			Status:      "idle",
+		}
+
+		d.mu.RLock()
+		sess, connected := d.sessions[ag.id]
+		d.mu.RUnlock()
+
+		if !connected {
+			act.Status = "offline"
+			activities = append(activities, act)
+			continue
+		}
+
+		rci, hasRunning := runningByAgent[ag.id]
+		if !hasRunning {
+			activities = append(activities, act) // stays "idle"
+			continue
+		}
+
+		// Derive status from the latest command event.
+		switch rci.EventType {
+		case 0:
+			act.Status = "starting"
+		case int32(v1pb.CommandEventType_LIFECYCLE):
+			act.Status = "starting"
+		case int32(v1pb.CommandEventType_TEXT_DELTA):
+			act.Status = "output"
+		case int32(v1pb.CommandEventType_TOOL_CALL_STARTED):
+			if rci.Summary.Valid {
+				act.Status = rci.Summary.String
+				act.ToolName = rci.Summary.String
+			} else {
+				act.Status = "tool"
+			}
+		case int32(v1pb.CommandEventType_TOOL_CALL_FINISHED):
+			act.Status = "thinking"
+		default:
+			act.Status = "starting"
+		}
+
+		// Suppress idle for active agents that might have a stale session.
+		sess.mu.Lock()
+		if sess.currentCmdID == "" {
+			act.Status = "idle"
+		}
+		sess.mu.Unlock()
+
+		activities = append(activities, act)
+	}
+
+	return activities, nil
+}
+
 // ---- Phase 2: Held Draft ----
 
 // HandleSubmitAction processes an agent's SubmitAction request. It performs the

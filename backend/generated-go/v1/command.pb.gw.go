@@ -939,6 +939,45 @@ func local_request_CommandService_SendMessage_0(ctx context.Context, marshaler r
 	return msg, metadata, err
 }
 
+func request_CommandService_FetchConversationActivity_0(ctx context.Context, marshaler runtime.Marshaler, client CommandServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq FetchConversationActivityRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	val, ok := pathParams["conversation"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "conversation")
+	}
+	protoReq.Conversation, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "conversation", err)
+	}
+	msg, err := client.FetchConversationActivity(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_CommandService_FetchConversationActivity_0(ctx context.Context, marshaler runtime.Marshaler, server CommandServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq FetchConversationActivityRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	val, ok := pathParams["conversation"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "conversation")
+	}
+	protoReq.Conversation, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "conversation", err)
+	}
+	msg, err := server.FetchConversationActivity(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 // RegisterCommandServiceHandlerServer registers the http handlers for service CommandService to "mux".
 // UnaryRPC     :call CommandServiceServer directly.
 // StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
@@ -1318,6 +1357,26 @@ func RegisterCommandServiceHandlerServer(ctx context.Context, mux *runtime.Serve
 			return
 		}
 		forward_CommandService_SendMessage_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_CommandService_FetchConversationActivity_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.CommandService/FetchConversationActivity", runtime.WithHTTPPathPattern("/v1/{conversation=conversations/*}/activity"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_CommandService_FetchConversationActivity_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_CommandService_FetchConversationActivity_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 
 	return nil
@@ -1699,51 +1758,70 @@ func RegisterCommandServiceHandlerClient(ctx context.Context, mux *runtime.Serve
 		}
 		forward_CommandService_SendMessage_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_CommandService_FetchConversationActivity_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.CommandService/FetchConversationActivity", runtime.WithHTTPPathPattern("/v1/{conversation=conversations/*}/activity"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_CommandService_FetchConversationActivity_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_CommandService_FetchConversationActivity_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	return nil
 }
 
 var (
-	pattern_CommandService_SendCommand_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "agents", "agent", "commands"}, ""))
-	pattern_CommandService_ListCommands_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "agents", "agent", "commands"}, ""))
-	pattern_CommandService_GetCommand_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "agents", "commands", "name"}, ""))
-	pattern_CommandService_CancelCommand_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "agents", "commands", "name"}, "cancel"))
-	pattern_CommandService_WatchCommand_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "agents", "commands", "name"}, "watch"))
-	pattern_CommandService_WatchCommandEvents_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "agents", "commands", "name"}, "watchEvents"))
-	pattern_CommandService_RespondPermission_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "agents", "commands", "name"}, "respondPermission"))
-	pattern_CommandService_SearchChatHistory_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "agents", "agent", "chat-history"}, ""))
-	pattern_CommandService_GetCommandContext_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "agents", "commands", "name", "context"}, ""))
-	pattern_CommandService_GetOrCreateConversation_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "agents", "agent", "conversations"}, ""))
-	pattern_CommandService_ListConversationMessages_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "conversations", "conversation", "messages"}, ""))
-	pattern_CommandService_CreateChannel_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "channels"}, ""))
-	pattern_CommandService_ListChannels_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "channels"}, ""))
-	pattern_CommandService_GetChannel_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "conversations", "name"}, ""))
-	pattern_CommandService_UpdateChannel_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "conversations", "conversation.name"}, ""))
-	pattern_CommandService_DeleteChannel_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "conversations", "name"}, ""))
-	pattern_CommandService_AddChannelMember_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "conversations", "conversation", "members"}, ""))
-	pattern_CommandService_RemoveChannelMember_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"v1", "conversations", "conversation", "members", "member_id"}, ""))
-	pattern_CommandService_ListChannelMembers_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "conversations", "conversation", "members"}, ""))
-	pattern_CommandService_SendMessage_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "conversations", "conversation", "messages"}, "send"))
+	pattern_CommandService_SendCommand_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "agents", "agent", "commands"}, ""))
+	pattern_CommandService_ListCommands_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "agents", "agent", "commands"}, ""))
+	pattern_CommandService_GetCommand_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "agents", "commands", "name"}, ""))
+	pattern_CommandService_CancelCommand_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "agents", "commands", "name"}, "cancel"))
+	pattern_CommandService_WatchCommand_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "agents", "commands", "name"}, "watch"))
+	pattern_CommandService_WatchCommandEvents_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "agents", "commands", "name"}, "watchEvents"))
+	pattern_CommandService_RespondPermission_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "agents", "commands", "name"}, "respondPermission"))
+	pattern_CommandService_SearchChatHistory_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "agents", "agent", "chat-history"}, ""))
+	pattern_CommandService_GetCommandContext_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "agents", "commands", "name", "context"}, ""))
+	pattern_CommandService_GetOrCreateConversation_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "agents", "agent", "conversations"}, ""))
+	pattern_CommandService_ListConversationMessages_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "conversations", "conversation", "messages"}, ""))
+	pattern_CommandService_CreateChannel_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "channels"}, ""))
+	pattern_CommandService_ListChannels_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "channels"}, ""))
+	pattern_CommandService_GetChannel_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "conversations", "name"}, ""))
+	pattern_CommandService_UpdateChannel_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "conversations", "conversation.name"}, ""))
+	pattern_CommandService_DeleteChannel_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "conversations", "name"}, ""))
+	pattern_CommandService_AddChannelMember_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "conversations", "conversation", "members"}, ""))
+	pattern_CommandService_RemoveChannelMember_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"v1", "conversations", "conversation", "members", "member_id"}, ""))
+	pattern_CommandService_ListChannelMembers_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "conversations", "conversation", "members"}, ""))
+	pattern_CommandService_SendMessage_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "conversations", "conversation", "messages"}, "send"))
+	pattern_CommandService_FetchConversationActivity_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "conversations", "conversation", "activity"}, ""))
 )
 
 var (
-	forward_CommandService_SendCommand_0              = runtime.ForwardResponseMessage
-	forward_CommandService_ListCommands_0             = runtime.ForwardResponseMessage
-	forward_CommandService_GetCommand_0               = runtime.ForwardResponseMessage
-	forward_CommandService_CancelCommand_0            = runtime.ForwardResponseMessage
-	forward_CommandService_WatchCommand_0             = runtime.ForwardResponseStream
-	forward_CommandService_WatchCommandEvents_0       = runtime.ForwardResponseStream
-	forward_CommandService_RespondPermission_0        = runtime.ForwardResponseMessage
-	forward_CommandService_SearchChatHistory_0        = runtime.ForwardResponseMessage
-	forward_CommandService_GetCommandContext_0        = runtime.ForwardResponseMessage
-	forward_CommandService_GetOrCreateConversation_0  = runtime.ForwardResponseMessage
-	forward_CommandService_ListConversationMessages_0 = runtime.ForwardResponseMessage
-	forward_CommandService_CreateChannel_0            = runtime.ForwardResponseMessage
-	forward_CommandService_ListChannels_0             = runtime.ForwardResponseMessage
-	forward_CommandService_GetChannel_0               = runtime.ForwardResponseMessage
-	forward_CommandService_UpdateChannel_0            = runtime.ForwardResponseMessage
-	forward_CommandService_DeleteChannel_0            = runtime.ForwardResponseMessage
-	forward_CommandService_AddChannelMember_0         = runtime.ForwardResponseMessage
-	forward_CommandService_RemoveChannelMember_0      = runtime.ForwardResponseMessage
-	forward_CommandService_ListChannelMembers_0       = runtime.ForwardResponseMessage
-	forward_CommandService_SendMessage_0              = runtime.ForwardResponseMessage
+	forward_CommandService_SendCommand_0               = runtime.ForwardResponseMessage
+	forward_CommandService_ListCommands_0              = runtime.ForwardResponseMessage
+	forward_CommandService_GetCommand_0                = runtime.ForwardResponseMessage
+	forward_CommandService_CancelCommand_0             = runtime.ForwardResponseMessage
+	forward_CommandService_WatchCommand_0              = runtime.ForwardResponseStream
+	forward_CommandService_WatchCommandEvents_0        = runtime.ForwardResponseStream
+	forward_CommandService_RespondPermission_0         = runtime.ForwardResponseMessage
+	forward_CommandService_SearchChatHistory_0         = runtime.ForwardResponseMessage
+	forward_CommandService_GetCommandContext_0         = runtime.ForwardResponseMessage
+	forward_CommandService_GetOrCreateConversation_0   = runtime.ForwardResponseMessage
+	forward_CommandService_ListConversationMessages_0  = runtime.ForwardResponseMessage
+	forward_CommandService_CreateChannel_0             = runtime.ForwardResponseMessage
+	forward_CommandService_ListChannels_0              = runtime.ForwardResponseMessage
+	forward_CommandService_GetChannel_0                = runtime.ForwardResponseMessage
+	forward_CommandService_UpdateChannel_0             = runtime.ForwardResponseMessage
+	forward_CommandService_DeleteChannel_0             = runtime.ForwardResponseMessage
+	forward_CommandService_AddChannelMember_0          = runtime.ForwardResponseMessage
+	forward_CommandService_RemoveChannelMember_0       = runtime.ForwardResponseMessage
+	forward_CommandService_ListChannelMembers_0        = runtime.ForwardResponseMessage
+	forward_CommandService_SendMessage_0               = runtime.ForwardResponseMessage
+	forward_CommandService_FetchConversationActivity_0 = runtime.ForwardResponseMessage
 )

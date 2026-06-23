@@ -5,6 +5,7 @@ import type {
   RotateAgentTokenResponse,
 } from "@/types/proto-es/v1/agent_pb";
 import type {
+  AgentActivity,
   ChannelMember,
   ChatMessage,
   Command,
@@ -106,6 +107,7 @@ export interface ChatSlice {
   streamingContent: Record<string, string>;
   streamingEvents: Record<string, CommandEvent[]>;
   streamingStatus: Record<string, number>;
+  agentActivities: Record<string, AgentActivity[]>;
 
   getOrCreateConversation: (agent: string) => Promise<string>;
   loadMessages: (conversation: string) => Promise<void>;
@@ -127,6 +129,9 @@ export interface ChatSlice {
     content: string
   ) => Promise<ChatMessage>;
   pollChannelMessages: (conversationName: string) => Promise<void>;
+  fetchConversationActivity: (conversationId: string) => Promise<void>;
+  startWatchingChannel: (conversationName: string) => void;
+  stopWatchingChannel: (conversationName: string) => void;
   listChannelMembers: (conversationId: string) => Promise<ChannelMember[]>;
   addChannelMember: (
     conversationId: string,

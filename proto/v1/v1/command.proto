@@ -481,6 +481,10 @@ service CommandService {
     };
     option (laelia.v1.audit) = true;
   }
+
+  rpc FetchConversationActivity(FetchConversationActivityRequest) returns (FetchConversationActivityResponse) {
+    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/activity"};
+  }
 }
 
 service AgentStreamService {
@@ -708,4 +712,22 @@ message ActionResponse {
 message ResolveHeldAction {
   string action_id = 1;
   ActionResolution resolution = 2;
+}
+
+// FetchConversationActivity returns the execution status of each agent member
+// in a conversation. It is polled by the frontend to show real-time agent
+// status in the channel header.
+message FetchConversationActivityRequest {
+  string conversation = 1;
+}
+
+message FetchConversationActivityResponse {
+  repeated AgentActivity activities = 1;
+}
+
+message AgentActivity {
+  string agent_id = 1;
+  string display_name = 2;
+  string status = 3;
+  string tool_name = 4;
 }

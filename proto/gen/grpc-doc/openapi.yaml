@@ -928,6 +928,31 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/activity:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_FetchConversationActivity
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/FetchConversationActivityResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/conversations/{conversation}/members:
         get:
             tags:
@@ -1411,6 +1436,17 @@ components:
                 tokenVersion:
                     type: integer
                     format: int32
+        AgentActivity:
+            type: object
+            properties:
+                agentId:
+                    type: string
+                displayName:
+                    type: string
+                status:
+                    type: string
+                toolName:
+                    type: string
         AgentCapability:
             type: object
             properties:
@@ -1863,6 +1899,13 @@ components:
                     type: string
                 newText:
                     type: string
+        FetchConversationActivityResponse:
+            type: object
+            properties:
+                activities:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AgentActivity'
         FinalSummaryPayload:
             type: object
             properties:

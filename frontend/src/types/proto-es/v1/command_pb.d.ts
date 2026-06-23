@@ -1963,6 +1963,73 @@ export declare type ResolveHeldAction = Message<"laelia.v1.ResolveHeldAction"> &
 export declare const ResolveHeldActionSchema: GenMessage<ResolveHeldAction>;
 
 /**
+ * FetchConversationActivity returns the execution status of each agent member
+ * in a conversation. It is polled by the frontend to show real-time agent
+ * status in the channel header.
+ *
+ * @generated from message laelia.v1.FetchConversationActivityRequest
+ */
+export declare type FetchConversationActivityRequest = Message<"laelia.v1.FetchConversationActivityRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+};
+
+/**
+ * Describes the message laelia.v1.FetchConversationActivityRequest.
+ * Use `create(FetchConversationActivityRequestSchema)` to create a new message.
+ */
+export declare const FetchConversationActivityRequestSchema: GenMessage<FetchConversationActivityRequest>;
+
+/**
+ * @generated from message laelia.v1.FetchConversationActivityResponse
+ */
+export declare type FetchConversationActivityResponse = Message<"laelia.v1.FetchConversationActivityResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.AgentActivity activities = 1;
+   */
+  activities: AgentActivity[];
+};
+
+/**
+ * Describes the message laelia.v1.FetchConversationActivityResponse.
+ * Use `create(FetchConversationActivityResponseSchema)` to create a new message.
+ */
+export declare const FetchConversationActivityResponseSchema: GenMessage<FetchConversationActivityResponse>;
+
+/**
+ * @generated from message laelia.v1.AgentActivity
+ */
+export declare type AgentActivity = Message<"laelia.v1.AgentActivity"> & {
+  /**
+   * @generated from field: string agent_id = 1;
+   */
+  agentId: string;
+
+  /**
+   * @generated from field: string display_name = 2;
+   */
+  displayName: string;
+
+  /**
+   * @generated from field: string status = 3;
+   */
+  status: string;
+
+  /**
+   * @generated from field: string tool_name = 4;
+   */
+  toolName: string;
+};
+
+/**
+ * Describes the message laelia.v1.AgentActivity.
+ * Use `create(AgentActivitySchema)` to create a new message.
+ */
+export declare const AgentActivitySchema: GenMessage<AgentActivity>;
+
+/**
  * @generated from enum laelia.v1.CommandStatus
  */
 export enum CommandStatus {
@@ -2371,6 +2438,14 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof SendMessageRequestSchema;
     output: typeof ChatMessageSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.FetchConversationActivity
+   */
+  fetchConversationActivity: {
+    methodKind: "unary";
+    input: typeof FetchConversationActivityRequestSchema;
+    output: typeof FetchConversationActivityResponseSchema;
   },
 }>;
 

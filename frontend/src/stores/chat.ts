@@ -6,6 +6,7 @@ import {
   CommandEventType,
   CommandStatus,
   CreateChannelRequestSchema,
+  FetchConversationActivityRequestSchema,
   GetOrCreateConversationRequestSchema,
   ListChannelMembersRequestSchema,
   ListChannelsRequestSchema,
@@ -14,6 +15,9 @@ import {
   SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import type { AppSliceCreator, ChatMessageUI, ChatSlice } from "./types";
+
+// Module-level map of active channel poll intervals, keyed by conversation name.
+const channelWatchers: Record<string, ReturnType<typeof setInterval>> = {};
 
 export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
   conversations: {},
@@ -26,6 +30,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
   streamingContent: {},
   streamingEvents: {},
   streamingStatus: {},
+  agentActivities: {},
 
   async getOrCreateConversation(agent) {
     const existing = get().conversations[agent];
@@ -388,6 +393,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
 
       try {
+        // Poll for new messages.
         const res = await commandServiceClient.listConversationMessages(
           create(ListConversationMessagesRequestSchema, {
             conversation: conversationName,
@@ -418,6 +424,81 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       } catch {
         // network error — keep polling
       }
+
+      // Poll for agent execution status in parallel.
+      get().fetchConversationActivity(conversationName);
+    }
+  },
+
+  async fetchConversationActivity(conversationId) {
+    const conversationName = conversationId.startsWith("conversations/")
+      ? conversationId
+      : `conversations/${conversationId}`;
+    try {
+      const res = await commandServiceClient.fetchConversationActivity(
+        create(FetchConversationActivityRequestSchema, {
+          conversation: conversationName,
+        })
+      );
+      set({
+        agentActivities: {
+          ...get().agentActivities,
+          [conversationName]: res.activities ?? [],
+        },
+      });
+    } catch {
+      // network error — will retry on next poll
+    }
+  },
+
+  startWatchingChannel(conversationName) {
+    // Already watching — avoid duplicate intervals.
+    if (channelWatchers[conversationName]) return;
+
+    const POLL_INTERVAL_MS = 2000;
+
+    const poll = async () => {
+      try {
+        const res = await commandServiceClient.listConversationMessages(
+          create(ListConversationMessagesRequestSchema, {
+            conversation: conversationName,
+            pageSize: 200,
+            pageToken: "",
+          })
+        );
+        const uiMsgs: ChatMessageUI[] = (res.messages ?? []).map((msg) => ({
+          id: msg.name,
+          role: msg.role === 1 ? "user" : "assistant",
+          content: msg.content,
+          timestamp: msg.createdAt ? timestampDate(msg.createdAt) : new Date(),
+          commandId: msg.commandId || undefined,
+          senderName: msg.senderName || undefined,
+          senderType: msg.senderType || undefined,
+        }));
+        set({
+          chatMessages: {
+            ...get().chatMessages,
+            [conversationName]: uiMsgs,
+          },
+        });
+      } catch {
+        // network error — will retry on next tick
+      }
+
+      // Also poll agent activity.
+      get().fetchConversationActivity(conversationName);
+    };
+
+    // Run immediately, then on interval.
+    poll();
+    channelWatchers[conversationName] = setInterval(poll, POLL_INTERVAL_MS);
+  },
+
+  stopWatchingChannel(conversationName) {
+    const id = channelWatchers[conversationName];
+    if (id) {
+      clearInterval(id);
+      delete channelWatchers[conversationName];
     }
   },
 

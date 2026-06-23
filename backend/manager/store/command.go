@@ -581,3 +581,63 @@ func (s *Store) SearchChatHistory(ctx context.Context, conversationID uuid.UUID,
 
 	return entries, nil
 }
+
+// RunningCommandInfo holds the minimal data needed to derive agent execution
+// status for a conversation activity feed. AgentID is the internal integer ID;
+// CommandID is the UUID of the running command; EventType and Summary come from
+// the latest command_event (both zero/nil when no event has been recorded yet).
+type RunningCommandInfo struct {
+	AgentID   int
+	CommandID uuid.UUID
+	EventType int32
+	Summary   sql.NullString
+}
+
+// GetRunningCommandsForConversation returns the running commands (status=2)
+// for a set of agents within a conversation, joined with their latest
+// command_event. This is the data source for FetchConversationActivity.
+func (s *Store) GetRunningCommandsForConversation(ctx context.Context, agentIDs []int, conversationID uuid.UUID) ([]*RunningCommandInfo, error) {
+	if len(agentIDs) == 0 {
+		return nil, nil
+	}
+
+	// Build the $1 array parameter as a PostgreSQL int[] literal.
+	// Using pq.Array would require an extra dependency; constructing the
+	// literal is safe because agentIDs are integers from the database.
+	arr := make([]string, len(agentIDs))
+	for i, id := range agentIDs {
+		arr[i] = fmt.Sprintf("%d", id)
+	}
+	arrayLiteral := "{" + strings.Join(arr, ",") + "}"
+
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT c.agent_id, c.id, ce.event_type, ce.summary
+		FROM command c
+		LEFT JOIN LATERAL (
+			SELECT event_type, summary FROM command_event
+			WHERE command_id = c.id
+			ORDER BY seq_no DESC
+			LIMIT 1
+		) ce ON true
+		WHERE c.agent_id = ANY($1::int[])
+		  AND c.conversation_id = $2
+		  AND c.status = 2
+	`, arrayLiteral, conversationID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query running commands")
+	}
+	defer rows.Close()
+
+	var result []*RunningCommandInfo
+	for rows.Next() {
+		var rci RunningCommandInfo
+		if scanErr := rows.Scan(&rci.AgentID, &rci.CommandID, &rci.EventType, &rci.Summary); scanErr != nil {
+			return nil, errors.Wrapf(scanErr, "failed to scan running command row")
+		}
+		result = append(result, &rci)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate running commands")
+	}
+	return result, nil
+}

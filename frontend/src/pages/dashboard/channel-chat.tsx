@@ -16,6 +16,7 @@ import MarkdownRender, {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
+import { AgentStatusBar } from "@/components/agent-status-bar";
 import {
   Select,
   SelectContent,
@@ -73,7 +74,10 @@ export function ChannelChatPage() {
   const sendChannelMessage = useAppStore((s) => s.sendChannelMessage);
   const channelMembersByConv = useAppStore((s) => s.channelMembersByConv);
   const channelMembersLoading = useAppStore((s) => s.channelMembersLoading);
+  const agentActivities = useAppStore((s) => s.agentActivities);
   const listChannelMembers = useAppStore((s) => s.listChannelMembers);
+  const startWatchingChannel = useAppStore((s) => s.startWatchingChannel);
+  const stopWatchingChannel = useAppStore((s) => s.stopWatchingChannel);
   const addChannelMember = useAppStore((s) => s.addChannelMember);
   const removeChannelMember = useAppStore((s) => s.removeChannelMember);
   const currentUser = useAppStore((s) => s.currentUser);
@@ -109,6 +113,11 @@ export function ChannelChatPage() {
   const init = useCallback(async () => {
     if (!channelId) return;
     if (lastChannelRef.current === channelId) return;
+    // Stop watching the previous channel.
+    if (lastChannelRef.current) {
+      const prevName = `conversations/${lastChannelRef.current}`;
+      stopWatchingChannel(prevName);
+    }
     lastChannelRef.current = channelId;
     try {
       await loadMessages(conversationName);
@@ -118,6 +127,9 @@ export function ChannelChatPage() {
     listChannelMembers(channelId);
     fetchAgents({ pageSize: 100 });
     fetchChannels();
+
+    // Start background polling for new messages and agent activity.
+    startWatchingChannel(conversationName);
   }, [
     channelId,
     conversationName,
@@ -125,11 +137,19 @@ export function ChannelChatPage() {
     listChannelMembers,
     fetchAgents,
     fetchChannels,
+    startWatchingChannel,
+    stopWatchingChannel,
   ]);
 
   useEffect(() => {
     init();
-  }, [init]);
+    return () => {
+      if (lastChannelRef.current) {
+        stopWatchingChannel(`conversations/${lastChannelRef.current}`);
+        lastChannelRef.current = null;
+      }
+    };
+  }, [init, stopWatchingChannel]);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -229,10 +249,13 @@ export function ChannelChatPage() {
         <div className="flex size-8 items-center justify-center rounded-lg bg-control-bg text-control">
           <Hash className="size-4" />
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 flex items-center gap-3">
           <h2 className="text-sm font-semibold text-main truncate">
             {channel?.title ?? channelId ?? ""}
           </h2>
+          <AgentStatusBar
+            activities={agentActivities[conversationName] ?? []}
+          />
         </div>
         <button
           type="button"

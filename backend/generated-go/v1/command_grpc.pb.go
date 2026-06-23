@@ -20,26 +20,27 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CommandService_SendCommand_FullMethodName              = "/laelia.v1.CommandService/SendCommand"
-	CommandService_ListCommands_FullMethodName             = "/laelia.v1.CommandService/ListCommands"
-	CommandService_GetCommand_FullMethodName               = "/laelia.v1.CommandService/GetCommand"
-	CommandService_CancelCommand_FullMethodName            = "/laelia.v1.CommandService/CancelCommand"
-	CommandService_WatchCommand_FullMethodName             = "/laelia.v1.CommandService/WatchCommand"
-	CommandService_WatchCommandEvents_FullMethodName       = "/laelia.v1.CommandService/WatchCommandEvents"
-	CommandService_RespondPermission_FullMethodName        = "/laelia.v1.CommandService/RespondPermission"
-	CommandService_SearchChatHistory_FullMethodName        = "/laelia.v1.CommandService/SearchChatHistory"
-	CommandService_GetCommandContext_FullMethodName        = "/laelia.v1.CommandService/GetCommandContext"
-	CommandService_GetOrCreateConversation_FullMethodName  = "/laelia.v1.CommandService/GetOrCreateConversation"
-	CommandService_ListConversationMessages_FullMethodName = "/laelia.v1.CommandService/ListConversationMessages"
-	CommandService_CreateChannel_FullMethodName            = "/laelia.v1.CommandService/CreateChannel"
-	CommandService_ListChannels_FullMethodName             = "/laelia.v1.CommandService/ListChannels"
-	CommandService_GetChannel_FullMethodName               = "/laelia.v1.CommandService/GetChannel"
-	CommandService_UpdateChannel_FullMethodName            = "/laelia.v1.CommandService/UpdateChannel"
-	CommandService_DeleteChannel_FullMethodName            = "/laelia.v1.CommandService/DeleteChannel"
-	CommandService_AddChannelMember_FullMethodName         = "/laelia.v1.CommandService/AddChannelMember"
-	CommandService_RemoveChannelMember_FullMethodName      = "/laelia.v1.CommandService/RemoveChannelMember"
-	CommandService_ListChannelMembers_FullMethodName       = "/laelia.v1.CommandService/ListChannelMembers"
-	CommandService_SendMessage_FullMethodName              = "/laelia.v1.CommandService/SendMessage"
+	CommandService_SendCommand_FullMethodName               = "/laelia.v1.CommandService/SendCommand"
+	CommandService_ListCommands_FullMethodName              = "/laelia.v1.CommandService/ListCommands"
+	CommandService_GetCommand_FullMethodName                = "/laelia.v1.CommandService/GetCommand"
+	CommandService_CancelCommand_FullMethodName             = "/laelia.v1.CommandService/CancelCommand"
+	CommandService_WatchCommand_FullMethodName              = "/laelia.v1.CommandService/WatchCommand"
+	CommandService_WatchCommandEvents_FullMethodName        = "/laelia.v1.CommandService/WatchCommandEvents"
+	CommandService_RespondPermission_FullMethodName         = "/laelia.v1.CommandService/RespondPermission"
+	CommandService_SearchChatHistory_FullMethodName         = "/laelia.v1.CommandService/SearchChatHistory"
+	CommandService_GetCommandContext_FullMethodName         = "/laelia.v1.CommandService/GetCommandContext"
+	CommandService_GetOrCreateConversation_FullMethodName   = "/laelia.v1.CommandService/GetOrCreateConversation"
+	CommandService_ListConversationMessages_FullMethodName  = "/laelia.v1.CommandService/ListConversationMessages"
+	CommandService_CreateChannel_FullMethodName             = "/laelia.v1.CommandService/CreateChannel"
+	CommandService_ListChannels_FullMethodName              = "/laelia.v1.CommandService/ListChannels"
+	CommandService_GetChannel_FullMethodName                = "/laelia.v1.CommandService/GetChannel"
+	CommandService_UpdateChannel_FullMethodName             = "/laelia.v1.CommandService/UpdateChannel"
+	CommandService_DeleteChannel_FullMethodName             = "/laelia.v1.CommandService/DeleteChannel"
+	CommandService_AddChannelMember_FullMethodName          = "/laelia.v1.CommandService/AddChannelMember"
+	CommandService_RemoveChannelMember_FullMethodName       = "/laelia.v1.CommandService/RemoveChannelMember"
+	CommandService_ListChannelMembers_FullMethodName        = "/laelia.v1.CommandService/ListChannelMembers"
+	CommandService_SendMessage_FullMethodName               = "/laelia.v1.CommandService/SendMessage"
+	CommandService_FetchConversationActivity_FullMethodName = "/laelia.v1.CommandService/FetchConversationActivity"
 )
 
 // CommandServiceClient is the client API for CommandService service.
@@ -67,6 +68,7 @@ type CommandServiceClient interface {
 	RemoveChannelMember(ctx context.Context, in *RemoveChannelMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ListChannelMembers(ctx context.Context, in *ListChannelMembersRequest, opts ...grpc.CallOption) (*ListChannelMembersResponse, error)
 	SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*ChatMessage, error)
+	FetchConversationActivity(ctx context.Context, in *FetchConversationActivityRequest, opts ...grpc.CallOption) (*FetchConversationActivityResponse, error)
 }
 
 type commandServiceClient struct {
@@ -296,6 +298,16 @@ func (c *commandServiceClient) SendMessage(ctx context.Context, in *SendMessageR
 	return out, nil
 }
 
+func (c *commandServiceClient) FetchConversationActivity(ctx context.Context, in *FetchConversationActivityRequest, opts ...grpc.CallOption) (*FetchConversationActivityResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FetchConversationActivityResponse)
+	err := c.cc.Invoke(ctx, CommandService_FetchConversationActivity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CommandServiceServer is the server API for CommandService service.
 // All implementations must embed UnimplementedCommandServiceServer
 // for forward compatibility.
@@ -321,6 +333,7 @@ type CommandServiceServer interface {
 	RemoveChannelMember(context.Context, *RemoveChannelMemberRequest) (*emptypb.Empty, error)
 	ListChannelMembers(context.Context, *ListChannelMembersRequest) (*ListChannelMembersResponse, error)
 	SendMessage(context.Context, *SendMessageRequest) (*ChatMessage, error)
+	FetchConversationActivity(context.Context, *FetchConversationActivityRequest) (*FetchConversationActivityResponse, error)
 	mustEmbedUnimplementedCommandServiceServer()
 }
 
@@ -390,6 +403,9 @@ func (UnimplementedCommandServiceServer) ListChannelMembers(context.Context, *Li
 }
 func (UnimplementedCommandServiceServer) SendMessage(context.Context, *SendMessageRequest) (*ChatMessage, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendMessage not implemented")
+}
+func (UnimplementedCommandServiceServer) FetchConversationActivity(context.Context, *FetchConversationActivityRequest) (*FetchConversationActivityResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method FetchConversationActivity not implemented")
 }
 func (UnimplementedCommandServiceServer) mustEmbedUnimplementedCommandServiceServer() {}
 func (UnimplementedCommandServiceServer) testEmbeddedByValue()                        {}
@@ -758,6 +774,24 @@ func _CommandService_SendMessage_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommandService_FetchConversationActivity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FetchConversationActivityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).FetchConversationActivity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_FetchConversationActivity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).FetchConversationActivity(ctx, req.(*FetchConversationActivityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CommandService_ServiceDesc is the grpc.ServiceDesc for CommandService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -836,6 +870,10 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendMessage",
 			Handler:    _CommandService_SendMessage_Handler,
+		},
+		{
+			MethodName: "FetchConversationActivity",
+			Handler:    _CommandService_FetchConversationActivity_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

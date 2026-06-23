@@ -494,6 +494,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.AgentActivity"><span class="badge">M</span>AgentActivity</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.AgentReady"><span class="badge">M</span>AgentReady</a>
                 </li>
               
@@ -567,6 +571,14 @@
               
                 <li>
                   <a href="#laelia.v1.DiffEmittedPayload"><span class="badge">M</span>DiffEmittedPayload</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.FetchConversationActivityRequest"><span class="badge">M</span>FetchConversationActivityRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.FetchConversationActivityResponse"><span class="badge">M</span>FetchConversationActivityResponse</a>
                 </li>
               
                 <li>
@@ -3641,6 +3653,51 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.AgentActivity">AgentActivity</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>display_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>status</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>tool_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.AgentReady">AgentReady</h3>
         <p></p>
 
@@ -4794,6 +4851,54 @@ their cursor into the conversation. </p></td>
                   <td>new_text</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.FetchConversationActivityRequest">FetchConversationActivityRequest</h3>
+        <p>FetchConversationActivity returns the execution status of each agent member</p><p>in a conversation. It is polled by the frontend to show real-time agent</p><p>status in the channel header.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.FetchConversationActivityResponse">FetchConversationActivityResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>activities</td>
+                  <td><a href="#laelia.v1.AgentActivity">AgentActivity</a></td>
+                  <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
               
@@ -6866,6 +6971,13 @@ their cursor into the conversation. </p></td>
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>FetchConversationActivity</td>
+                <td><a href="#laelia.v1.FetchConversationActivityRequest">FetchConversationActivityRequest</a></td>
+                <td><a href="#laelia.v1.FetchConversationActivityResponse">FetchConversationActivityResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
           </tbody>
         </table>
 
@@ -7102,6 +7214,16 @@ their cursor into the conversation. </p></td>
                 <td>POST</td>
                 <td>/v1/{conversation=conversations/*}/messages:send</td>
                 <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>FetchConversationActivity</td>
+                <td>GET</td>
+                <td>/v1/{conversation=conversations/*}/activity</td>
+                <td></td>
               </tr>
               
             

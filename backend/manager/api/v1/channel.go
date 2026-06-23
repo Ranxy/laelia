@@ -444,6 +444,21 @@ func resolveUserName(ctx context.Context, s *store.Store, principalID int) strin
 	return u.Name
 }
 
+// FetchConversationActivity returns the execution status of every agent in a
+// conversation. The frontend polls this to show real-time agent status in the
+// channel header.
+func (s *CommandService) FetchConversationActivity(ctx context.Context, req *connect.Request[v1pb.FetchConversationActivityRequest]) (*connect.Response[v1pb.FetchConversationActivityResponse], error) {
+	convID, err := parseConversationID(req.Msg.Conversation)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation"))
+	}
+	activities, err := s.dispatcher.FetchConversationActivity(ctx, convID.String())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to fetch conversation activity"))
+	}
+	return connect.NewResponse(&v1pb.FetchConversationActivityResponse{Activities: activities}), nil
+}
+
 func resolveMemberDisplayName(ctx context.Context, s *store.Store, memberType int32, memberID string) string {
 	if memberType == store.MemberTypeUser {
 		uid, err := strconv.Atoi(memberID)
