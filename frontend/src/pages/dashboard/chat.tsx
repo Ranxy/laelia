@@ -154,7 +154,10 @@ export function ChatPage() {
 
     try {
       const res = await sendChatMessage(agent, text);
-      if (!res.name) return;
+      const commandName = res.commandId
+        ? `${agent}/commands/${res.commandId}`
+        : undefined;
+      if (!commandName) return;
 
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -163,9 +166,11 @@ export function ChatPage() {
       const convName = useAppStore.getState().conversations[agent];
       if (!convName) return;
 
-      streamChatCommand(res.name, convName, controller.signal).finally(() => {
-        setSending(false);
-      });
+      streamChatCommand(commandName, convName, controller.signal).finally(
+        () => {
+          setSending(false);
+        }
+      );
     } catch {
       setSending(false);
     }

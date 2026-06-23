@@ -105,7 +105,7 @@ func (s *Store) IsConversationMember(ctx context.Context, convID uuid.UUID, memb
 func (s *Store) findDirectConversation(ctx context.Context, userPrincipalID int, agentResourceID string) (*ConversationMessage, error) {
 	var conv ConversationMessage
 	err := s.GetDB().QueryRowContext(ctx, `
-		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at
+		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version
 		FROM conversation c
 		WHERE c.id IN (
 			SELECT cmu.conversation_id
@@ -119,7 +119,7 @@ func (s *Store) findDirectConversation(ctx context.Context, userPrincipalID int,
 		AND c.type = 1
 		LIMIT 1
 	`, MemberTypeUser, fmt.Sprintf("%d", userPrincipalID), MemberTypeAgent, agentResourceID).Scan(
-		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt,
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

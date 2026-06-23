@@ -56,7 +56,7 @@ func New(s *store.Store) *Dispatcher {
 	}
 }
 
-func (d *Dispatcher) RegisterAgent(ctx context.Context, agentID int, agentResourceID string, send SendFunc) *AgentSession {
+func (d *Dispatcher) RegisterAgent(_ context.Context, agentID int, agentResourceID string, send SendFunc) *AgentSession {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 

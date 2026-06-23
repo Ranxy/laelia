@@ -4,7 +4,6 @@ import { commandServiceClient } from "@/connect";
 import {
   AddChannelMemberRequestSchema,
   CommandEventType,
-  CommandSource,
   CommandStatus,
   CreateChannelRequestSchema,
   GetOrCreateConversationRequestSchema,
@@ -12,7 +11,6 @@ import {
   ListChannelsRequestSchema,
   ListConversationMessagesRequestSchema,
   RemoveChannelMemberRequestSchema,
-  SendCommandRequestSchema,
   SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import type { AppSliceCreator, ChatMessageUI, ChatSlice } from "./types";
@@ -97,26 +95,27 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       }));
     }
 
-    const res = await commandServiceClient.sendCommand(
-      create(SendCommandRequestSchema, {
-        agent,
-        command: instruction,
-        instruction,
-        executorKind: 2,
-        source: CommandSource.CHAT,
-        conversationId: conversationId || "",
+    const res = await commandServiceClient.sendMessage(
+      create(SendMessageRequestSchema, {
+        conversation: conversation || "",
+        content: instruction,
       })
     );
 
-    if (conversation && res.name) {
+    const commandName = res.commandId
+      ? `${agent}/commands/${res.commandId}`
+      : undefined;
+
+    if (conversation && commandName) {
+      const commandId = res.commandId || undefined;
       const assistantMsg: ChatMessageUI = {
-        id: `assistant-${res.name}`,
+        id: `assistant-${commandName}`,
         role: "assistant",
         content: "",
         timestamp: new Date(),
-        commandName: res.name,
-        commandId: res.name.split("/").pop(),
-        status: res.status,
+        commandName,
+        commandId,
+        status: 1, // PENDING
         streaming: true,
         events: [],
       };
@@ -128,12 +127,13 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
             assistantMsg,
           ],
         },
-        streamingContent: { ...state.streamingContent, [res.name]: "" },
-        streamingEvents: { ...state.streamingEvents, [res.name]: [] },
-        streamingStatus: { ...state.streamingStatus, [res.name]: res.status },
+        streamingContent: { ...state.streamingContent, [commandName]: "" },
+        streamingEvents: { ...state.streamingEvents, [commandName]: [] },
+        streamingStatus: { ...state.streamingStatus, [commandName]: 1 },
       }));
     }
 
+    // Return shape compatible with callers that read .name for commandName
     return res;
   },
 

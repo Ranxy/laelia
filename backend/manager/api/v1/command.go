@@ -103,11 +103,12 @@ func (s *CommandService) SendCommand(ctx context.Context, req *connect.Request[v
 			}
 		}
 		if conversationID != nil {
-			if _, msgErr := s.store.CreateChatMessage(ctx, &store.ChatMessage{
+			if _, _, msgErr := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
 				ConversationID: *conversationID,
 				PrincipalID:    principalID,
 				Role:           1, // USER
 				Content:        instruction,
+				SenderType:     store.SenderTypeUser,
 			}); msgErr != nil {
 				slog.Warn("failed to create user chat message", "error", msgErr)
 			}

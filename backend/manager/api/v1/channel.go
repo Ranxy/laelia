@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -277,9 +279,20 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 	// produce and dispatch a command so behavior matches pre-Phase-1 chat tasks.
 	// Multi-agent channels only persist the message in Phase 1; the agent
 	// autonomy gate (PullMessages-driven SubmitAction) arrives in Phase 2.
+	var commandID string
 	if conv.Type == 1 && conv.AgentID.Valid {
-		s.dispatchDirectConversation(ctx, conv, msg, principalID, user)
+		commandName := s.dispatchDirectConversation(ctx, conv, msg, principalID, user)
+		if commandName != "" {
+			// Extract the UUID portion from "agents/{agent}/commands/{commandID}"
+			if parts := strings.Split(commandName, "/"); len(parts) == 4 {
+				commandID = parts[3]
+			}
+		}
 	}
+
+	// Notify all agent members of the conversation that new messages are
+	// available, not just the single agent backing a direct conversation.
+	s.notifyConversationAgents(ctx, conv.ID, msg.RoomVersion)
 
 	return connect.NewResponse(&v1pb.ChatMessage{
 		Name:          msg.ID.String(),
@@ -291,6 +304,7 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		SenderName:    msg.PrincipalName,
 		SenderType:    v1pb.SenderType(msg.SenderType),
 		RoomVersion:   msg.RoomVersion,
+		CommandId:     commandID,
 	}), nil
 }
 
@@ -299,11 +313,14 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 // conversation's agent, injects recent chat context, and queues it for
 // dispatch. Errors are logged but do not fail SendMessage — the user message
 // is already persisted, and execution can be retried via PullMessages / Phase 2.
-func (s *CommandService) dispatchDirectConversation(ctx context.Context, conv *store.ConversationMessage, triggerMsg *store.ChatMessage, principalID int, user *store.UserMessage) {
+// Returns the command resource name ("agents/{agent}/commands/{commandID}")
+// so the caller can link the user chat_message and surface the command to the
+// frontend for streaming.
+func (s *CommandService) dispatchDirectConversation(ctx context.Context, conv *store.ConversationMessage, triggerMsg *store.ChatMessage, principalID int, user *store.UserMessage) string {
 	agent, err := s.store.GetAgent(ctx, int(conv.AgentID.Int32))
 	if err != nil || agent == nil {
 		slog.Warn("failed to resolve conversation agent for dispatch", "conversationID", conv.ID, "error", err)
-		return
+		return ""
 	}
 
 	// Validate the agent supports ACP before dispatching. We deliberately do
@@ -311,7 +328,7 @@ func (s *CommandService) dispatchDirectConversation(ctx context.Context, conv *s
 	// is already persisted); they are logged for operator visibility.
 	if vErr := s.validateACPCapability(ctx, agent, v1pb.ExecutorKind_ACP, "", false, 0, user); vErr != nil {
 		slog.Warn("agent not ACP-capable; skipping dispatch", "agent", agent.ResourceID, "error", vErr)
-		return
+		return ""
 	}
 
 	// Inject recent chat context into the instruction so the ACP session has
@@ -343,7 +360,7 @@ func (s *CommandService) dispatchDirectConversation(ctx context.Context, conv *s
 	created, err := s.store.CreateCommand(ctx, cmd)
 	if err != nil {
 		slog.Error("failed to create command for message dispatch", "conversationID", conv.ID, "error", err)
-		return
+		return ""
 	}
 
 	created.AgentResourceID = agent.ResourceID
@@ -353,6 +370,36 @@ func (s *CommandService) dispatchDirectConversation(ctx context.Context, conv *s
 		slog.Warn("failed to enqueue command for dispatch", "commandID", created.ID, "error", err)
 	}
 	s.dispatcher.NotifyNewMessages(ctx, agent.ID, conv.ID.String(), triggerMsg.RoomVersion)
+
+	// Link the user message to the command so the SendMessage response can
+	// carry the command_id for frontend streaming.
+	commandName := formatCommandName(agent.ResourceID, created.ID)
+	if linkErr := s.store.SetChatMessageCommandID(ctx, triggerMsg.ID, created.ID); linkErr != nil {
+		slog.Warn("failed to link user message to command", "messageID", triggerMsg.ID, "commandID", created.ID, "error", linkErr)
+	}
+	return commandName
+}
+
+// notifyConversationAgents sends NewMessagesAvailable to every connected agent
+// that is a member of the conversation. This covers both direct conversations
+// (type=1) and multi-agent channels (type=2).
+func (s *CommandService) notifyConversationAgents(ctx context.Context, convID uuid.UUID, version int64) {
+	members, err := s.store.ListConversationMembers(ctx, convID)
+	if err != nil {
+		slog.Warn("failed to list conversation members for notification", "conversationID", convID, "error", err)
+		return
+	}
+	for _, m := range members {
+		if m.MemberType != store.MemberTypeAgent {
+			continue
+		}
+		agent, agentErr := s.store.GetAgentByResourceID(ctx, m.MemberID)
+		if agentErr != nil || agent == nil {
+			slog.Warn("failed to resolve agent for notification", "agentResourceID", m.MemberID, "error", agentErr)
+			continue
+		}
+		s.dispatcher.NotifyNewMessages(ctx, agent.ID, convID.String(), version)
+	}
 }
 
 func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, memberCount int) *v1pb.Conversation {

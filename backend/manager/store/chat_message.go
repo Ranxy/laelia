@@ -199,3 +199,17 @@ func (s *Store) GetRecentChatMessages(ctx context.Context, conversationID uuid.U
 
 	return msgs, nil
 }
+
+// SetChatMessageCommandID links a chat_message to the command that was
+// internally created for it (e.g. by dispatchDirectConversation inside
+// SendMessage). This lets the SendMessage response carry the command_id so
+// the frontend can stream execution progress.
+func (s *Store) SetChatMessageCommandID(ctx context.Context, messageID, commandID uuid.UUID) error {
+	_, err := s.GetDB().ExecContext(ctx, `
+		UPDATE chat_message SET command_id = $1 WHERE id = $2
+	`, commandID, messageID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to set chat message command ID")
+	}
+	return nil
+}

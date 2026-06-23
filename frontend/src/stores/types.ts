@@ -113,7 +113,7 @@ export interface ChatSlice {
     agent: string,
     instruction: string,
     conversationId?: string
-  ) => Promise<Command>;
+  ) => Promise<ChatMessage>;
   streamChatCommand: (
     commandName: string,
     conversation: string,

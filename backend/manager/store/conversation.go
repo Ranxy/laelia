@@ -19,6 +19,7 @@ type ConversationMessage struct {
 	OwnerID   int
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	Version   int64
 }
 
 func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, principalID int) (*ConversationMessage, error) {
@@ -48,9 +49,9 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 	err = tx.QueryRowContext(ctx, `
 		INSERT INTO conversation (agent_id, title, type, created_by, owner_id)
 		VALUES ($1, '', 1, $2, $2)
-		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at
+		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
 	`, agentID, principalID).Scan(
-		&newConv.ID, &newConv.AgentID, &newConv.Title, &newConv.Type, &newConv.CreatedBy, &newConv.OwnerID, &newConv.CreatedAt, &newConv.UpdatedAt,
+		&newConv.ID, &newConv.AgentID, &newConv.Title, &newConv.Type, &newConv.CreatedBy, &newConv.OwnerID, &newConv.CreatedAt, &newConv.UpdatedAt, &newConv.Version,
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to insert conversation")
@@ -73,11 +74,11 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 func (s *Store) GetConversation(ctx context.Context, id uuid.UUID) (*ConversationMessage, error) {
 	var conv ConversationMessage
 	err := s.GetDB().QueryRowContext(ctx, `
-		SELECT id, agent_id, title, type, created_by, owner_id, created_at, updated_at
+		SELECT id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
 		FROM conversation
 		WHERE id = $1
 	`, id).Scan(
-		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt,
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -99,9 +100,9 @@ func (s *Store) CreateChannel(ctx context.Context, title string, ownerID int) (*
 	err = tx.QueryRowContext(ctx, `
 		INSERT INTO conversation (title, type, created_by, owner_id)
 		VALUES ($1, 2, $2, $2)
-		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at
+		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
 	`, title, ownerID).Scan(
-		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt,
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create channel")
@@ -123,9 +124,9 @@ func (s *Store) UpdateChannel(ctx context.Context, id uuid.UUID, title string) (
 	err := s.GetDB().QueryRowContext(ctx, `
 		UPDATE conversation SET title = $1, updated_at = now()
 		WHERE id = $2
-		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at
+		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
 	`, title, id).Scan(
-		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt,
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -146,7 +147,7 @@ func (s *Store) DeleteChannel(ctx context.Context, id uuid.UUID) error {
 
 func (s *Store) ListUserConversations(ctx context.Context, principalID int, limit, offset int) ([]*ConversationMessage, error) {
 	rows, err := s.GetDB().QueryContext(ctx, `
-		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at
+		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version
 		FROM conversation c
 		JOIN conversation_member cm ON cm.conversation_id = c.id
 		WHERE cm.member_type = $1 AND cm.member_id = $2
@@ -161,7 +162,7 @@ func (s *Store) ListUserConversations(ctx context.Context, principalID int, limi
 	var convs []*ConversationMessage
 	for rows.Next() {
 		var conv ConversationMessage
-		if err := rows.Scan(&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt); err != nil {
+		if err := rows.Scan(&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan conversation")
 		}
 		convs = append(convs, &conv)
