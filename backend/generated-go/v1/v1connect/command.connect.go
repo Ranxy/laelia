@@ -93,6 +93,9 @@ const (
 	// CommandServiceSendMessageProcedure is the fully-qualified name of the CommandService's
 	// SendMessage RPC.
 	CommandServiceSendMessageProcedure = "/laelia.v1.CommandService/SendMessage"
+	// CommandServicePostMessageProcedure is the fully-qualified name of the CommandService's
+	// PostMessage RPC.
+	CommandServicePostMessageProcedure = "/laelia.v1.CommandService/PostMessage"
 	// CommandServiceFetchConversationActivityProcedure is the fully-qualified name of the
 	// CommandService's FetchConversationActivity RPC.
 	CommandServiceFetchConversationActivityProcedure = "/laelia.v1.CommandService/FetchConversationActivity"
@@ -122,6 +125,7 @@ type CommandServiceClient interface {
 	RemoveChannelMember(context.Context, *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error)
 	ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error)
 	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.ChatMessage], error)
+	PostMessage(context.Context, *connect.Request[v1.PostMessageRequest]) (*connect.Response[v1.PostMessageResponse], error)
 	FetchConversationActivity(context.Context, *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error)
 }
 
@@ -250,6 +254,12 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("SendMessage")),
 			connect.WithClientOptions(opts...),
 		),
+		postMessage: connect.NewClient[v1.PostMessageRequest, v1.PostMessageResponse](
+			httpClient,
+			baseURL+CommandServicePostMessageProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("PostMessage")),
+			connect.WithClientOptions(opts...),
+		),
 		fetchConversationActivity: connect.NewClient[v1.FetchConversationActivityRequest, v1.FetchConversationActivityResponse](
 			httpClient,
 			baseURL+CommandServiceFetchConversationActivityProcedure,
@@ -280,6 +290,7 @@ type commandServiceClient struct {
 	removeChannelMember       *connect.Client[v1.RemoveChannelMemberRequest, emptypb.Empty]
 	listChannelMembers        *connect.Client[v1.ListChannelMembersRequest, v1.ListChannelMembersResponse]
 	sendMessage               *connect.Client[v1.SendMessageRequest, v1.ChatMessage]
+	postMessage               *connect.Client[v1.PostMessageRequest, v1.PostMessageResponse]
 	fetchConversationActivity *connect.Client[v1.FetchConversationActivityRequest, v1.FetchConversationActivityResponse]
 }
 
@@ -378,6 +389,11 @@ func (c *commandServiceClient) SendMessage(ctx context.Context, req *connect.Req
 	return c.sendMessage.CallUnary(ctx, req)
 }
 
+// PostMessage calls laelia.v1.CommandService.PostMessage.
+func (c *commandServiceClient) PostMessage(ctx context.Context, req *connect.Request[v1.PostMessageRequest]) (*connect.Response[v1.PostMessageResponse], error) {
+	return c.postMessage.CallUnary(ctx, req)
+}
+
 // FetchConversationActivity calls laelia.v1.CommandService.FetchConversationActivity.
 func (c *commandServiceClient) FetchConversationActivity(ctx context.Context, req *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error) {
 	return c.fetchConversationActivity.CallUnary(ctx, req)
@@ -404,6 +420,7 @@ type CommandServiceHandler interface {
 	RemoveChannelMember(context.Context, *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error)
 	ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error)
 	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.ChatMessage], error)
+	PostMessage(context.Context, *connect.Request[v1.PostMessageRequest]) (*connect.Response[v1.PostMessageResponse], error)
 	FetchConversationActivity(context.Context, *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error)
 }
 
@@ -528,6 +545,12 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("SendMessage")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServicePostMessageHandler := connect.NewUnaryHandler(
+		CommandServicePostMessageProcedure,
+		svc.PostMessage,
+		connect.WithSchema(commandServiceMethods.ByName("PostMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
 	commandServiceFetchConversationActivityHandler := connect.NewUnaryHandler(
 		CommandServiceFetchConversationActivityProcedure,
 		svc.FetchConversationActivity,
@@ -574,6 +597,8 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceListChannelMembersHandler.ServeHTTP(w, r)
 		case CommandServiceSendMessageProcedure:
 			commandServiceSendMessageHandler.ServeHTTP(w, r)
+		case CommandServicePostMessageProcedure:
+			commandServicePostMessageHandler.ServeHTTP(w, r)
 		case CommandServiceFetchConversationActivityProcedure:
 			commandServiceFetchConversationActivityHandler.ServeHTTP(w, r)
 		default:
@@ -659,6 +684,10 @@ func (UnimplementedCommandServiceHandler) ListChannelMembers(context.Context, *c
 
 func (UnimplementedCommandServiceHandler) SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.ChatMessage], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.SendMessage is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) PostMessage(context.Context, *connect.Request[v1.PostMessageRequest]) (*connect.Response[v1.PostMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.PostMessage is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) FetchConversationActivity(context.Context, *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error) {

@@ -39,6 +39,7 @@ const (
 	CommandService_RemoveChannelMember_FullMethodName       = "/laelia.v1.CommandService/RemoveChannelMember"
 	CommandService_ListChannelMembers_FullMethodName        = "/laelia.v1.CommandService/ListChannelMembers"
 	CommandService_SendMessage_FullMethodName               = "/laelia.v1.CommandService/SendMessage"
+	CommandService_PostMessage_FullMethodName               = "/laelia.v1.CommandService/PostMessage"
 	CommandService_FetchConversationActivity_FullMethodName = "/laelia.v1.CommandService/FetchConversationActivity"
 )
 
@@ -65,6 +66,7 @@ type CommandServiceClient interface {
 	RemoveChannelMember(ctx context.Context, in *RemoveChannelMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ListChannelMembers(ctx context.Context, in *ListChannelMembersRequest, opts ...grpc.CallOption) (*ListChannelMembersResponse, error)
 	SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*ChatMessage, error)
+	PostMessage(ctx context.Context, in *PostMessageRequest, opts ...grpc.CallOption) (*PostMessageResponse, error)
 	FetchConversationActivity(ctx context.Context, in *FetchConversationActivityRequest, opts ...grpc.CallOption) (*FetchConversationActivityResponse, error)
 }
 
@@ -284,6 +286,16 @@ func (c *commandServiceClient) SendMessage(ctx context.Context, in *SendMessageR
 	return out, nil
 }
 
+func (c *commandServiceClient) PostMessage(ctx context.Context, in *PostMessageRequest, opts ...grpc.CallOption) (*PostMessageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PostMessageResponse)
+	err := c.cc.Invoke(ctx, CommandService_PostMessage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *commandServiceClient) FetchConversationActivity(ctx context.Context, in *FetchConversationActivityRequest, opts ...grpc.CallOption) (*FetchConversationActivityResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(FetchConversationActivityResponse)
@@ -317,6 +329,7 @@ type CommandServiceServer interface {
 	RemoveChannelMember(context.Context, *RemoveChannelMemberRequest) (*emptypb.Empty, error)
 	ListChannelMembers(context.Context, *ListChannelMembersRequest) (*ListChannelMembersResponse, error)
 	SendMessage(context.Context, *SendMessageRequest) (*ChatMessage, error)
+	PostMessage(context.Context, *PostMessageRequest) (*PostMessageResponse, error)
 	FetchConversationActivity(context.Context, *FetchConversationActivityRequest) (*FetchConversationActivityResponse, error)
 	mustEmbedUnimplementedCommandServiceServer()
 }
@@ -384,6 +397,9 @@ func (UnimplementedCommandServiceServer) ListChannelMembers(context.Context, *Li
 }
 func (UnimplementedCommandServiceServer) SendMessage(context.Context, *SendMessageRequest) (*ChatMessage, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendMessage not implemented")
+}
+func (UnimplementedCommandServiceServer) PostMessage(context.Context, *PostMessageRequest) (*PostMessageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PostMessage not implemented")
 }
 func (UnimplementedCommandServiceServer) FetchConversationActivity(context.Context, *FetchConversationActivityRequest) (*FetchConversationActivityResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method FetchConversationActivity not implemented")
@@ -737,6 +753,24 @@ func _CommandService_SendMessage_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommandService_PostMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PostMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).PostMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_PostMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).PostMessage(ctx, req.(*PostMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CommandService_FetchConversationActivity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(FetchConversationActivityRequest)
 	if err := dec(in); err != nil {
@@ -829,6 +863,10 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendMessage",
 			Handler:    _CommandService_SendMessage_Handler,
+		},
+		{
+			MethodName: "PostMessage",
+			Handler:    _CommandService_PostMessage_Handler,
 		},
 		{
 			MethodName: "FetchConversationActivity",

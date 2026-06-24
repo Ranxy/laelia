@@ -845,6 +845,11 @@ export declare type ListConversationMessagesRequest = Message<"laelia.v1.ListCon
    * @generated from field: string page_token = 3;
    */
   pageToken: string;
+
+  /**
+   * @generated from field: int64 after_version = 4;
+   */
+  afterVersion: bigint;
 };
 
 /**
@@ -866,6 +871,11 @@ export declare type ListConversationMessagesResponse = Message<"laelia.v1.ListCo
    * @generated from field: string next_page_token = 2;
    */
   nextPageToken: string;
+
+  /**
+   * @generated from field: int64 current_version = 3;
+   */
+  currentVersion: bigint;
 };
 
 /**
@@ -1163,6 +1173,73 @@ export declare type GetCommandContextResponse = Message<"laelia.v1.GetCommandCon
  * Use `create(GetCommandContextResponseSchema)` to create a new message.
  */
 export declare const GetCommandContextResponseSchema: GenMessage<GetCommandContextResponse>;
+
+/**
+ * @generated from message laelia.v1.PostMessageRequest
+ */
+export declare type PostMessageRequest = Message<"laelia.v1.PostMessageRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: string content = 2;
+   */
+  content: string;
+
+  /**
+   * @generated from field: int64 base_version = 3;
+   */
+  baseVersion: bigint;
+
+  /**
+   * @generated from field: string command_id = 4;
+   */
+  commandId: string;
+};
+
+/**
+ * Describes the message laelia.v1.PostMessageRequest.
+ * Use `create(PostMessageRequestSchema)` to create a new message.
+ */
+export declare const PostMessageRequestSchema: GenMessage<PostMessageRequest>;
+
+/**
+ * @generated from message laelia.v1.PostMessageResponse
+ */
+export declare type PostMessageResponse = Message<"laelia.v1.PostMessageResponse"> & {
+  /**
+   * @generated from field: bool committed = 1;
+   */
+  committed: boolean;
+
+  /**
+   * @generated from field: laelia.v1.ChatMessage message = 2;
+   */
+  message?: ChatMessage | undefined;
+
+  /**
+   * @generated from field: int64 current_version = 3;
+   */
+  currentVersion: bigint;
+
+  /**
+   * @generated from field: repeated laelia.v1.ChatMessage new_messages = 4;
+   */
+  newMessages: ChatMessage[];
+
+  /**
+   * @generated from field: string conflict_description = 5;
+   */
+  conflictDescription: string;
+};
+
+/**
+ * Describes the message laelia.v1.PostMessageResponse.
+ * Use `create(PostMessageResponseSchema)` to create a new message.
+ */
+export declare const PostMessageResponseSchema: GenMessage<PostMessageResponse>;
 
 /**
  * @generated from message laelia.v1.AgentStreamMessage
@@ -2300,6 +2377,14 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof SendMessageRequestSchema;
     output: typeof ChatMessageSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.PostMessage
+   */
+  postMessage: {
+    methodKind: "unary";
+    input: typeof PostMessageRequestSchema;
+    output: typeof PostMessageResponseSchema;
   },
   /**
    * @generated from rpc laelia.v1.CommandService.FetchConversationActivity

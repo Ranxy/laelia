@@ -261,11 +261,13 @@ message ListConversationMessagesRequest {
   string conversation = 1 [(google.api.field_behavior) = REQUIRED];
   int32 page_size = 2;
   string page_token = 3;
+  int64 after_version = 4;
 }
 
 message ListConversationMessagesResponse {
   repeated ChatMessage messages = 1;
   string next_page_token = 2;
+  int64 current_version = 3;
 }
 
 message GetOrCreateConversationRequest {
@@ -357,6 +359,24 @@ message GetCommandContextResponse {
   Command command = 1;
   repeated CommandOutput outputs = 2;
   repeated CommandEvent events = 3;
+}
+
+message PostMessageRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+  string content = 2 [(google.api.field_behavior) = REQUIRED];
+  int64 base_version = 3 [(google.api.field_behavior) = REQUIRED];
+  string command_id = 4;
+}
+
+message PostMessageResponse {
+  bool committed = 1;
+  ChatMessage message = 2;
+  int64 current_version = 3;
+  repeated ChatMessage new_messages = 4;
+  string conflict_description = 5;
 }
 
 service CommandService {
@@ -460,6 +480,13 @@ service CommandService {
       body: "*"
     };
     option (laelia.v1.audit) = true;
+  }
+
+  rpc PostMessage(PostMessageRequest) returns (PostMessageResponse) {
+    option (google.api.http) = {
+      post: "/v1/{conversation=conversations/*}:postMessage"
+      body: "*"
+    };
   }
 
   rpc FetchConversationActivity(FetchConversationActivityRequest) returns (FetchConversationActivityResponse) {
