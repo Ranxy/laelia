@@ -1447,6 +1447,11 @@ export declare type CommandRequest = Message<"laelia.v1.CommandRequest"> & {
    * @generated from field: string reply_to_message_id = 10;
    */
   replyToMessageId: string;
+
+  /**
+   * @generated from field: string agent_display_name = 11;
+   */
+  agentDisplayName: string;
 };
 
 /**

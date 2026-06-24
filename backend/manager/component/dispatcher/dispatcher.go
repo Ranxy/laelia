@@ -221,6 +221,11 @@ func (d *Dispatcher) DispatchCommand(ctx context.Context, cmd *store.CommandMess
 		convID = cmd.ConversationID.String()
 	}
 
+	agentDisplayName := ""
+	if ag, agErr := d.store.GetAgent(ctx, cmd.AgentID); agErr == nil && ag != nil {
+		agentDisplayName = ag.Name
+	}
+
 	msg := &v1pb.ManagerStreamMessage{
 		Message: &v1pb.ManagerStreamMessage_CommandRequest{
 			CommandRequest: &v1pb.CommandRequest{
@@ -234,6 +239,7 @@ func (d *Dispatcher) DispatchCommand(ctx context.Context, cmd *store.CommandMess
 				PrincipalId:      fmt.Sprintf("%d", cmd.PrincipalID),
 				ConversationId:   convID,
 				ReplyToMessageId: "",
+				AgentDisplayName: agentDisplayName,
 			},
 		},
 	}
@@ -526,6 +532,11 @@ func (d *Dispatcher) HandleResolveHeldAction(ctx context.Context, agentID int, r
 			return nil, errors.Wrapf(err, "failed to resolve held action")
 		}
 
+		agentDisplayName := ""
+		if ag, agErr := d.store.GetAgent(ctx, agentID); agErr == nil && ag != nil {
+			agentDisplayName = ag.Name
+		}
+
 		return &v1pb.ManagerStreamMessage{
 			Message: &v1pb.ManagerStreamMessage_CommandRequest{
 				CommandRequest: &v1pb.CommandRequest{
@@ -539,6 +550,7 @@ func (d *Dispatcher) HandleResolveHeldAction(ctx context.Context, agentID int, r
 					PrincipalId:      fmt.Sprintf("%d", cmd.PrincipalID),
 					ConversationId:   ha.ConversationID.String(),
 					ReplyToMessageId: submitReq.ReplyToMessageId,
+					AgentDisplayName: agentDisplayName,
 				},
 			},
 		}, nil

@@ -3480,6 +3480,7 @@ type CommandRequest struct {
 	PrincipalId      string                 `protobuf:"bytes,8,opt,name=principal_id,json=principalId,proto3" json:"principal_id,omitempty"`
 	ConversationId   string                 `protobuf:"bytes,9,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
 	ReplyToMessageId string                 `protobuf:"bytes,10,opt,name=reply_to_message_id,json=replyToMessageId,proto3" json:"reply_to_message_id,omitempty"`
+	AgentDisplayName string                 `protobuf:"bytes,11,opt,name=agent_display_name,json=agentDisplayName,proto3" json:"agent_display_name,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -3580,6 +3581,13 @@ func (x *CommandRequest) GetConversationId() string {
 func (x *CommandRequest) GetReplyToMessageId() string {
 	if x != nil {
 		return x.ReplyToMessageId
+	}
+	return ""
+}
+
+func (x *CommandRequest) GetAgentDisplayName() string {
+	if x != nil {
+		return x.AgentDisplayName
 	}
 	return ""
 }
@@ -5169,7 +5177,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x0flast_command_id\x18\x02 \x01(\tR\rlastCommandId\x12 \n" +
 	"\flast_ack_seq\x18\x03 \x01(\x05R\n" +
 	"lastAckSeq\x12$\n" +
-	"\x0elast_event_seq\x18\x04 \x01(\x05R\flastEventSeq\"\xbd\x03\n" +
+	"\x0elast_event_seq\x18\x04 \x01(\x05R\flastEventSeq\"\xeb\x03\n" +
 	"\x0eCommandRequest\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12 \n" +
@@ -5184,7 +5192,8 @@ const file_v1_command_proto_rawDesc = "" +
 	"\fprincipal_id\x18\b \x01(\tR\vprincipalId\x12'\n" +
 	"\x0fconversation_id\x18\t \x01(\tR\x0econversationId\x12-\n" +
 	"\x13reply_to_message_id\x18\n" +
-	" \x01(\tR\x10replyToMessageId\x1a6\n" +
+	" \x01(\tR\x10replyToMessageId\x12,\n" +
+	"\x12agent_display_name\x18\v \x01(\tR\x10agentDisplayName\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9a\x01\n" +

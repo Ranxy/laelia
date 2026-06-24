@@ -411,6 +411,7 @@ func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime
 		ConversationID:       req.ConversationId,
 		ReplyToMessageID:     req.ReplyToMessageId,
 		AgentResourceID:      c.agentResourceID,
+		AgentDisplayName:     req.AgentDisplayName,
 		PrincipalID:          req.PrincipalId,
 		MCPPort:              c.mcpPort,
 		LastProcessedVersion: c.conversationCursor(req.ConversationId),

@@ -357,7 +357,10 @@ func (e *ACPExecutor) run() {
 	}
 	e.sessionID = string(sessionResp.SessionId)
 
-	identityName := e.initializedAgent
+	fmt.Printf("ACP session started: %s (agent: %s)\n", e.sessionID, e.initializedAgent)
+	fmt.Printf("REQUEST: %+v\n", e.request)
+
+	identityName := e.request.AgentDisplayName
 	if identityName == "" {
 		identityName = e.request.AgentResourceID
 	}
@@ -370,6 +373,8 @@ func (e *ACPExecutor) run() {
 			promptText = promptText + "\n\n" + replyRulesText
 		}
 	}
+
+	fmt.Println("ACP prompt text: " + promptText)
 
 	promptResp, err := e.conn.Prompt(e.ctx, acp.PromptRequest{
 		SessionId: sessionResp.SessionId,

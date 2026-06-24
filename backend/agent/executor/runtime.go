@@ -21,6 +21,7 @@ type Request struct {
 	ConversationID       string
 	ReplyToMessageID     string
 	AgentResourceID      string
+	AgentDisplayName     string
 	PrincipalID          string
 	MCPPort              int
 	LastProcessedVersion int64
