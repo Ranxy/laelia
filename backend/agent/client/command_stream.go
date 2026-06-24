@@ -400,20 +400,20 @@ func drainOutput(runtime executor.Runtime, stream *connect.BidiStreamForClient[v
 }
 
 func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime, error) {
-	// Phase 1: the BashExecutor is removed; all commands execute via ACP.
 	return executor.NewACP(executor.Request{
-		CommandID:        req.CommandId,
-		Instruction:      req.Instruction,
-		Profile:          req.Profile,
-		WorkingDir:       req.WorkingDir,
-		Env:              req.Env,
-		TimeoutSeconds:   req.TimeoutSeconds,
-		AllowDiff:        req.AllowDiff,
-		ConversationID:   req.ConversationId,
-		ReplyToMessageID: req.ReplyToMessageId,
-		AgentResourceID:  c.agentResourceID,
-		PrincipalID:      req.PrincipalId,
-		MCPPort:          c.mcpPort,
+		CommandID:            req.CommandId,
+		Instruction:          req.Instruction,
+		Profile:              req.Profile,
+		WorkingDir:           req.WorkingDir,
+		Env:                  req.Env,
+		TimeoutSeconds:       req.TimeoutSeconds,
+		AllowDiff:            req.AllowDiff,
+		ConversationID:       req.ConversationId,
+		ReplyToMessageID:     req.ReplyToMessageId,
+		AgentResourceID:      c.agentResourceID,
+		PrincipalID:          req.PrincipalId,
+		MCPPort:              c.mcpPort,
+		LastProcessedVersion: c.conversationCursor(req.ConversationId),
 	}, c.getAcpConfig())
 }
 

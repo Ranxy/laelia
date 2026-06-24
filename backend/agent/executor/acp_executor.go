@@ -342,6 +342,10 @@ func (e *ACPExecutor) run() {
 	e.sessionID = string(sessionResp.SessionId)
 
 	promptText := e.request.Instruction
+	if e.request.LastProcessedVersion > 0 {
+		promptText = fmt.Sprintf("## Conversation State\nlast_processed_version: %d\n\n%s",
+			e.request.LastProcessedVersion, promptText)
+	}
 
 	promptResp, err := e.conn.Prompt(e.ctx, acp.PromptRequest{
 		SessionId: sessionResp.SessionId,
