@@ -606,7 +606,7 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 	}
 	limitPlusOne := offset.limit + 1
 
-	msgs, err := s.store.ListConversationMessages(ctx, convID, limitPlusOne, offset.offset)
+	msgs, currentVersion, err := s.store.ListConversationMessages(ctx, convID, req.Msg.AfterVersion, limitPlusOne, offset.offset)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list conversation messages"))
 	}
@@ -642,8 +642,9 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 	}
 
 	return connect.NewResponse(&v1pb.ListConversationMessagesResponse{
-		Messages:      v1msgs,
-		NextPageToken: nextPageToken,
+		Messages:       v1msgs,
+		NextPageToken:  nextPageToken,
+		CurrentVersion: currentVersion,
 	}), nil
 }
 

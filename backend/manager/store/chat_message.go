@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -140,18 +141,28 @@ func (s *Store) CreateChatMessageBumpVersion(ctx context.Context, msg *ChatMessa
 	}, newVersion, nil
 }
 
-func (s *Store) ListConversationMessages(ctx context.Context, conversationID uuid.UUID, limit, offset int) ([]*ChatMessage, error) {
-	rows, err := s.GetDB().QueryContext(ctx, `
-		SELECT `+chatMessageColumns+`
+func (s *Store) ListConversationMessages(ctx context.Context, conversationID uuid.UUID, afterVersion int64, limit, offset int) ([]*ChatMessage, int64, error) {
+	var whereClause string
+	args := []any{conversationID}
+	argIdx := 2
+	if afterVersion > 0 {
+		whereClause = ` AND cm.room_version > $` + itoa(argIdx)
+		args = append(args, afterVersion)
+		argIdx++
+	}
+
+	query := `SELECT ` + chatMessageColumns + `
 		FROM chat_message cm
 		JOIN principal p ON p.id = cm.principal_id
 		LEFT JOIN agent a ON a.id = cm.sender_agent_id
-		WHERE cm.conversation_id = $1
+		WHERE cm.conversation_id = $1` + whereClause + `
 		ORDER BY cm.created_at ASC
-		LIMIT $2 OFFSET $3
-	`, conversationID, limit, offset)
+		LIMIT $` + itoa(argIdx) + ` OFFSET $` + itoa(argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := s.GetDB().QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to list conversation messages")
+		return nil, 0, errors.Wrapf(err, "failed to list conversation messages")
 	}
 	defer rows.Close()
 
@@ -159,15 +170,26 @@ func (s *Store) ListConversationMessages(ctx context.Context, conversationID uui
 	for rows.Next() {
 		msg, scanErr := scanChatMessageRow(rows)
 		if scanErr != nil {
-			return nil, scanErr
+			return nil, 0, scanErr
 		}
 		msgs = append(msgs, msg)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrapf(err, "failed to iterate chat messages")
+		return nil, 0, errors.Wrapf(err, "failed to iterate chat messages")
 	}
 
-	return msgs, nil
+	var currentVersion int64
+	if err := s.GetDB().QueryRowContext(ctx,
+		`SELECT version FROM conversation WHERE id = $1`, conversationID,
+	).Scan(&currentVersion); err != nil {
+		return nil, 0, errors.Wrapf(err, "failed to get conversation version")
+	}
+
+	return msgs, currentVersion, nil
+}
+
+func itoa(n int) string {
+	return strconv.Itoa(n)
 }
 
 func (s *Store) GetRecentChatMessages(ctx context.Context, conversationID uuid.UUID, limit int) ([]*ChatMessage, error) {
