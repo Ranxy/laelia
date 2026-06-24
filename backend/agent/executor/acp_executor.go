@@ -26,6 +26,19 @@ const flushOutputInterval = 500 * time.Millisecond
 const maxRawEventBatchSize = 256
 const permissionTimeout = 120 * time.Second
 
+const replyRulesText = `## Reply Rules
+To reply in this conversation, follow these steps:
+1. Call get_conversation_messages to obtain the latest messages and current_version.
+   - If you have a last_processed_version, pass it as after_version to only get new messages.
+   - Save the returned current_version — you will need it as base_version for post_message.
+2. Decide whether to reply and what to say based on the messages.
+3. Call post_message(content="your reply", base_version=<saved current_version>).
+4. If post_message returns committed=false, a version conflict occurred:
+   - Read the returned new_messages — they arrived while you were thinking.
+   - Call get_conversation_messages(after_version=<your previous base_version>) for full context.
+   - Revise your reply (or decide not to reply) and call post_message again with the new base_version.
+5. If you decide NOT to reply, simply don't call any reply tool — silence is valid behavior.`
+
 type outputBuffer struct {
 	mu        sync.Mutex
 	stdout    strings.Builder
@@ -342,9 +355,13 @@ func (e *ACPExecutor) run() {
 	e.sessionID = string(sessionResp.SessionId)
 
 	promptText := e.request.Instruction
-	if e.request.LastProcessedVersion > 0 {
-		promptText = fmt.Sprintf("## Conversation State\nlast_processed_version: %d\n\n%s",
-			e.request.LastProcessedVersion, promptText)
+	if e.request.ConversationID != "" {
+		if e.request.LastProcessedVersion > 0 {
+			promptText = fmt.Sprintf("## Conversation State\nlast_processed_version: %d\n\n%s\n\n%s",
+				e.request.LastProcessedVersion, promptText, replyRulesText)
+		} else {
+			promptText = promptText + "\n\n" + replyRulesText
+		}
 	}
 
 	promptResp, err := e.conn.Prompt(e.ctx, acp.PromptRequest{
