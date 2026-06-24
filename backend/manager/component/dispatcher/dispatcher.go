@@ -2,7 +2,6 @@ package dispatcher
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -816,11 +815,6 @@ func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb
 		return errors.Wrapf(err, "invalid command ID in result")
 	}
 
-	cmd, cmdLoadErr := d.store.GetCommand(ctx, cmdID)
-	if cmdLoadErr != nil {
-		slog.Warn("failed to load command for result handling", "commandID", cmdID, "error", cmdLoadErr)
-	}
-
 	d.mu.RLock()
 	sess, ok := d.sessions[agentID]
 	d.mu.RUnlock()
@@ -863,29 +857,6 @@ func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb
 	}
 	if err := d.store.UpdateCommandResultSummary(ctx, cmdID, result.FinalSummary, resultJSON); err != nil {
 		slog.Error("failed to update command result summary", "commandID", cmdID, "error", err)
-	}
-
-	// For conversation-linked commands with a final summary, publish an
-	// assistant chat message that bumps conversation.version. Every agent
-	// involved in the conversation is then notified via NewMessagesAvailable
-	// (used in Phase 2 for multi-agent channels).
-	if cmd != nil && cmd.ConversationID != nil && result.FinalSummary != "" {
-		assistantMsg, newVersion, msgErr := d.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
-			ConversationID: *cmd.ConversationID,
-			PrincipalID:    cmd.PrincipalID,
-			SenderAgentID:  sql.NullInt32{Int32: int32(cmd.AgentID), Valid: true},
-			Role:           2, // ASSISTANT
-			Content:        result.FinalSummary,
-			CommandID:      uuid.NullUUID{UUID: cmdID, Valid: true},
-			SenderType:     store.SenderTypeAgent,
-		})
-		if msgErr != nil {
-			slog.Error("failed to create assistant chat message", "commandID", cmdID, "error", msgErr)
-		} else {
-			slog.Info("assistant chat message created", "commandID", cmdID, "version", newVersion)
-			d.NotifyNewMessages(ctx, agentID, cmd.ConversationID.String(), newVersion)
-			_ = assistantMsg
-		}
 	}
 
 	output := &v1pb.CommandOutput{
