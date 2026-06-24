@@ -1575,6 +1575,7 @@ action is held pending agent resolution via ResolveHeldAction.
 | principal_id | [string](#string) |  |  |
 | conversation_id | [string](#string) |  |  |
 | reply_to_message_id | [string](#string) |  |  |
+| agent_display_name | [string](#string) |  |  |
 
 
 
