@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -646,6 +647,103 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 		NextPageToken:  nextPageToken,
 		CurrentVersion: currentVersion,
 	}), nil
+}
+
+func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v1pb.PostMessageRequest]) (*connect.Response[v1pb.PostMessageResponse], error) {
+	agent, ok := GetAgentFromContext(ctx)
+	if !ok || agent == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent authentication required"))
+	}
+
+	convUUID, err := parseConversationID(req.Msg.Conversation)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation id"))
+	}
+
+	conv, err := s.store.GetConversation(ctx, convUUID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+
+	currentVersion := conv.Version
+	if req.Msg.BaseVersion == currentVersion {
+		principalID := 1
+		if conv.OwnerID > 0 {
+			principalID = conv.OwnerID
+		}
+
+		var commandID uuid.NullUUID
+		if req.Msg.CommandId != "" {
+			if cid, parseErr := uuid.Parse(req.Msg.CommandId); parseErr == nil {
+				commandID = uuid.NullUUID{UUID: cid, Valid: true}
+			}
+		}
+
+		msg, newVersion, createErr := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
+			ConversationID: convUUID,
+			PrincipalID:    principalID,
+			SenderAgentID:  toNullInt32(int32(agent.ID)),
+			Role:           2,
+			Content:        req.Msg.Content,
+			CommandID:      commandID,
+			SenderType:     store.SenderTypeAgent,
+		})
+		if createErr != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(createErr, "failed to create assistant message"))
+		}
+
+		s.dispatcher.NotifyNewMessages(ctx, agent.ID, convUUID.String(), newVersion)
+
+		return connect.NewResponse(&v1pb.PostMessageResponse{
+			Committed:      true,
+			Message:        storeToV1ChatMessage(msg),
+			CurrentVersion: newVersion,
+		}), nil
+	}
+
+	newMsgs, _, listErr := s.store.ListConversationMessages(ctx, convUUID, req.Msg.BaseVersion, 50, 0)
+	if listErr != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(listErr, "failed to list new messages"))
+	}
+
+	var v1NewMsgs []*v1pb.ChatMessage
+	for _, m := range newMsgs {
+		v1NewMsgs = append(v1NewMsgs, storeToV1ChatMessage(m))
+	}
+
+	return connect.NewResponse(&v1pb.PostMessageResponse{
+		Committed:           false,
+		CurrentVersion:      currentVersion,
+		NewMessages:         v1NewMsgs,
+		ConflictDescription: fmt.Sprintf("Version conflict: base_version=%d, current=%d. %d new messages arrived.", req.Msg.BaseVersion, currentVersion, len(v1NewMsgs)),
+	}), nil
+}
+
+func storeToV1ChatMessage(msg *store.ChatMessage) *v1pb.ChatMessage {
+	senderName := msg.PrincipalName
+	senderType := v1pb.SenderType(msg.SenderType)
+	if msg.SenderType == store.SenderTypeAgent && msg.SenderAgentID.Valid {
+		senderName = msg.AgentName
+	}
+	v1m := &v1pb.ChatMessage{
+		Name:          msg.ID.String(),
+		Conversation:  msg.ConversationID.String(),
+		PrincipalName: msg.PrincipalName,
+		Role:          msg.Role,
+		Content:       msg.Content,
+		CreatedAt:     timestamppb.New(msg.CreatedAt),
+		SenderName:    senderName,
+		SenderType:    senderType,
+		RoomVersion:   msg.RoomVersion,
+	}
+	if msg.CommandID.Valid {
+		v1m.CommandId = msg.CommandID.UUID.String()
+	}
+	return v1m
+}
+
+func toNullInt32(v int32) sql.NullInt32 {
+	return sql.NullInt32{Int32: v, Valid: true}
 }
 
 func buildLightChatContext(msgs []*store.ChatMessage) string {
