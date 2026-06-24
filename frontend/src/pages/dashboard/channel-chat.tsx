@@ -293,7 +293,10 @@ export function ChannelChatPage() {
           )}
           {messages.map((msg, idx) => {
             const prevMsg = idx > 0 ? messages[idx - 1] : null;
-            const showAvatar = !prevMsg || prevMsg.role !== msg.role;
+            const showAvatar =
+              !prevMsg ||
+              prevMsg.role !== msg.role ||
+              prevMsg.senderName !== msg.senderName;
             return (
               <ChannelMessageRow
                 key={msg.id}
