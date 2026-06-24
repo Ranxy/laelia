@@ -17,6 +17,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
+import { MentionDetailSheet } from "@/components/chat/MentionDetailSheet";
+import { MentionPopup } from "@/components/chat/MentionPopup";
+import { detectMention } from "@/composables/useMentionDetect";
+import {
+  MentionTarget,
+  targetToMention,
+  useMentionTargets,
+} from "@/composables/useMentionTargets";
+import { getCaretCoordinates } from "@/lib/caret-position";
 import {
   Select,
   SelectContent,
@@ -98,6 +107,21 @@ export function ChannelChatPage() {
   const [addMemberId, setAddMemberId] = useState("");
   const [addingMember, setAddingMember] = useState(false);
 
+  const [mentionState, setMentionState] = useState<{
+    active: boolean;
+    query: string;
+    startIndex: number;
+    matched: MentionTarget[];
+  } | null>(null);
+  const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
+  const [mentionMap, setMentionMap] = useState<MentionTarget[]>([]);
+  const [cursorPos, setCursorPos] = useState(0);
+  const [detailMention, setDetailMention] = useState<{
+    type: "user" | "agent";
+    id: string;
+    name: string;
+  } | null>(null);
+
   const conversationName = channelId ? `conversations/${channelId}` : "";
   const messages = chatMessages[conversationName] ?? [];
   const loading = chatLoading[conversationName] ?? false;
@@ -109,6 +133,8 @@ export function ChannelChatPage() {
     channel && currentUser
       ? channel.ownerId === currentUser.name.split("/").pop()
       : false;
+
+  const mentionTargets = useMentionTargets(channelId);
 
   const init = useCallback(async () => {
     if (!channelId) return;
@@ -188,15 +214,55 @@ export function ChannelChatPage() {
     const text = input.trim();
     if (!text || sending || !channelId) return;
     setInput("");
+    setMentionState(null);
     setSending(true);
+    const mentions = mentionMap.map(targetToMention);
     try {
-      await sendChannelMessage(channelId, text);
+      await sendChannelMessage(channelId, text, mentions);
     } catch {
       // send failed
     } finally {
       setSending(false);
     }
-  }, [input, sending, channelId, sendChannelMessage]);
+  }, [input, sending, channelId, mentionMap, sendChannelMessage]);
+
+  const handleMentionClick = useCallback(
+    (type: string, id: string, name: string) => {
+      setDetailMention({
+        type: type as "user" | "agent",
+        id,
+        name,
+      });
+    },
+    []
+  );
+
+  const handleMentionSelect = useCallback(
+    (target: MentionTarget) => {
+      if (!mentionState) return;
+      const before = input.slice(0, mentionState.startIndex);
+      const after = input.slice(cursorPos);
+      const newInput = `${before}@${target.name} ${after}`;
+      setInput(newInput);
+      setMentionMap((prev) => {
+        if (prev.some((m) => m.id === target.id && m.type === target.type)) {
+          return prev;
+        }
+        return [...prev, target];
+      });
+      setMentionState(null);
+      setMentionSelectedIndex(0);
+      setTimeout(() => {
+        const el = textareaRef.current;
+        if (el) {
+          const newPos = mentionState.startIndex + target.name.length + 2;
+          el.focus();
+          el.setSelectionRange(newPos, newPos);
+        }
+      }, 0);
+    },
+    [input, cursorPos, mentionState]
+  );
 
   const handleAddMember = useCallback(async () => {
     const memberId = addMemberId.trim();
@@ -302,6 +368,7 @@ export function ChannelChatPage() {
                 key={msg.id}
                 msg={msg}
                 showAvatar={showAvatar}
+                onMentionClick={handleMentionClick}
               />
             );
           })}
@@ -340,12 +407,71 @@ export function ChannelChatPage() {
               rows={1}
               placeholder={t("channel.placeholder")}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setInput(value);
+                const pos = e.target.selectionStart ?? 0;
+                setCursorPos(pos);
+                const state = detectMention(value, pos, mentionTargets);
+                setMentionState(state);
+                setMentionSelectedIndex(0);
+                if (state?.active) {
+                  const newMap: MentionTarget[] = [];
+                  const re = /(?:^|\s)@(\S+)/g;
+                  let m: RegExpExecArray | null;
+                  while ((m = re.exec(value)) !== null) {
+                    const name = m[1];
+                    const found = mentionTargets.find((t) => t.name === name);
+                    if (found) newMap.push(found);
+                  }
+                  setMentionMap(newMap);
+                }
+              }}
               onKeyDown={(e) => {
+                if (mentionState?.active) {
+                  const total = mentionState.matched.length;
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setMentionSelectedIndex((idx) =>
+                      idx + 1 < total ? idx + 1 : 0
+                    );
+                    return;
+                  }
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setMentionSelectedIndex((idx) =>
+                      idx - 1 >= 0 ? idx - 1 : total - 1
+                    );
+                    return;
+                  }
+                  if (e.key === "Enter" || e.key === "Tab") {
+                    if (total === 0) return;
+                    e.preventDefault();
+                    if (mentionState.matched[mentionSelectedIndex]) {
+                      handleMentionSelect(
+                        mentionState.matched[mentionSelectedIndex]
+                      );
+                    }
+                    return;
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setMentionState(null);
+                    return;
+                  }
+                }
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   handleSend();
                 }
+              }}
+              onSelect={(e) => {
+                const target = e.target as HTMLTextAreaElement;
+                const pos = target.selectionStart ?? 0;
+                setCursorPos(pos);
+                const state = detectMention(target.value, pos, mentionTargets);
+                setMentionState(state);
+                setMentionSelectedIndex(0);
               }}
               disabled={sending}
             />
@@ -369,6 +495,16 @@ export function ChannelChatPage() {
               </button>
             </div>
           </div>
+          {mentionState?.active && textareaRef.current && (
+            <MentionPopup
+              targets={mentionState.matched}
+              query={mentionState.query}
+              position={getCaretCoordinates(textareaRef.current, cursorPos)}
+              selectedIndex={mentionSelectedIndex}
+              onSelect={handleMentionSelect}
+              onClose={() => setMentionState(null)}
+            />
+          )}
         </div>
       </div>
 
@@ -542,6 +678,14 @@ export function ChannelChatPage() {
           </SheetBody>
         </SheetContent>
       </Sheet>
+
+      <MentionDetailSheet
+        open={detailMention !== null}
+        type={detailMention?.type ?? "user"}
+        id={detailMention?.id ?? ""}
+        name={detailMention?.name ?? ""}
+        onClose={() => setDetailMention(null)}
+      />
     </div>
   );
 }
@@ -561,18 +705,100 @@ function Avatar({ label }: { label: string }) {
   );
 }
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function splitByMentions(
+  content: string,
+  mentions: { type: string; id: string; name: string }[]
+): {
+  text: string;
+  mention: { type: string; id: string; name: string } | null;
+}[] {
+  if (mentions.length === 0) return [{ text: content, mention: null }];
+
+  const segments: {
+    text: string;
+    mention: { type: string; id: string; name: string } | null;
+  }[] = [];
+  const sorted = [...mentions].sort((a, b) => {
+    const ai = content.indexOf(`@${a.name}`);
+    const bi = content.indexOf(`@${b.name}`);
+    return ai - bi;
+  });
+
+  let lastIndex = 0;
+  const used = new Set<string>();
+
+  for (const m of sorted) {
+    const pattern = `@${escapeRegex(m.name)}`;
+    const re = new RegExp(pattern, "g");
+    re.lastIndex = lastIndex;
+    const match = re.exec(content);
+    if (!match) continue;
+
+    const idx = match.index;
+    const key = `${idx}-${m.name}`;
+    if (used.has(key)) continue;
+    used.add(key);
+
+    if (idx > lastIndex) {
+      segments.push({ text: content.slice(lastIndex, idx), mention: null });
+    }
+    segments.push({ text: "", mention: m });
+    lastIndex = idx + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    segments.push({ text: content.slice(lastIndex), mention: null });
+  }
+
+  return segments;
+}
+
+function MentionBadge({
+  name,
+  onClick,
+}: {
+  name: string;
+  onClick: () => void;
+}) {
+  return (
+    <span
+      className="inline-flex items-center px-1 py-0.5 rounded bg-accent/15 text-accent font-medium cursor-pointer hover:bg-accent/25"
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onClick();
+      }}
+    >
+      @{name}
+    </span>
+  );
+}
+
 function ChannelMessageRow({
   msg,
   showAvatar,
+  onMentionClick,
 }: {
   msg: ChatMessageUI;
   showAvatar: boolean;
+  onMentionClick?: (type: string, id: string, name: string) => void;
 }) {
   const { t } = useTranslation();
   const isUser = msg.role === "user";
   const senderName =
     msg.senderName || (isUser ? t("channel.you") : t("chat.agent"));
   const content = msg.content;
+  const mentions = msg.mentions ?? [];
+
+  const handleClick = (type: string, id: string, name: string) => {
+    onMentionClick?.(type, id, name);
+  };
+
+  const segments = splitByMentions(content, mentions);
+
   return (
     <div className={cn("flex gap-3", isUser ? "flex-row-reverse" : "flex-row")}>
       <div className="flex shrink-0 flex-col items-center pt-0.5">
@@ -609,20 +835,42 @@ function ChannelMessageRow({
                 : "hidden"
           )}
         >
-          {isUser ? (
-            <div className="whitespace-pre-wrap break-words">
-              {content || ""}
-            </div>
-          ) : content ? (
-            <div className="markstream-chat break-words">
-              <MarkdownRender
-                customId="channel-chat"
-                content={content}
-                final={true}
-                fade={true}
-              />
-            </div>
-          ) : null}
+          {segments.length > 0 &&
+            segments.map((seg, i) => {
+              if (seg.mention) {
+                return (
+                  <MentionBadge
+                    key={`${i}-${seg.mention.name}`}
+                    name={seg.mention.name}
+                    onClick={() =>
+                      handleClick(
+                        seg.mention!.type,
+                        seg.mention!.id,
+                        seg.mention!.name
+                      )
+                    }
+                  />
+                );
+              }
+              if (!seg.text) return null;
+              if (isUser) {
+                return (
+                  <span key={i} className="whitespace-pre-wrap break-words">
+                    {seg.text}
+                  </span>
+                );
+              }
+              return (
+                <span key={i} className="markstream-chat break-words inline">
+                  <MarkdownRender
+                    customId="channel-chat"
+                    content={seg.text}
+                    final
+                    fade
+                  />
+                </span>
+              );
+            })}
         </div>
       </div>
     </div>

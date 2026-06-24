@@ -348,6 +348,8 @@ UPDATE chat_message
 
 CREATE INDEX IF NOT EXISTS idx_chat_message_room_version ON chat_message(conversation_id, room_version);
 
+ALTER TABLE chat_message ADD COLUMN IF NOT EXISTS mentions JSONB NOT NULL DEFAULT '[]';
+
 -- Phase 3: drop the deprecated executor_kind and source_type columns.
 -- All commands now execute via ACP and originate from chat messages.
 ALTER TABLE command DROP COLUMN IF EXISTS executor_kind;

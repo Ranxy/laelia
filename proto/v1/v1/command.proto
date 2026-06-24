@@ -215,6 +215,12 @@ message ChatHistoryEntry {
   google.protobuf.Timestamp created_at = 5;
 }
 
+message Mention {
+  string type = 1;
+  string id = 2;
+  string name = 3;
+}
+
 message ChatMessage {
   string name = 1;
   string conversation = 2;
@@ -229,6 +235,7 @@ message ChatMessage {
   // created. Agents use it together with PullMessages.after_version to track
   // their cursor into the conversation.
   int64 room_version = 10;
+  repeated Mention mentions = 11;
 }
 
 message Conversation {
@@ -346,6 +353,7 @@ message SendMessageRequest {
     (google.api.resource_reference) = {type: "laelia/Conversation"}
   ];
   string content = 2 [(google.api.field_behavior) = REQUIRED];
+  repeated Mention mentions = 3;
 }
 
 message GetCommandContextRequest {

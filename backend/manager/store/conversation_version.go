@@ -40,7 +40,7 @@ func (s *Store) GetMessagesAfterVersion(ctx context.Context, conversationID uuid
 	rows, err := s.GetDB().QueryContext(ctx, `
 		SELECT cm.id, cm.conversation_id, cm.principal_id, COALESCE(p.name, ''),
 		       cm.sender_agent_id, COALESCE(a.resource_id, ''), COALESCE(a.name, ''),
-		       cm.role, cm.content, cm.command_id, cm.created_at, cm.room_version, cm.sender_type
+		       cm.role, cm.content, cm.command_id, cm.created_at, cm.room_version, cm.sender_type, cm.mentions
 		FROM chat_message cm
 		JOIN principal p ON p.id = cm.principal_id
 		LEFT JOIN agent a ON a.id = cm.sender_agent_id

@@ -650,6 +650,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.Mention"><span class="badge">M</span>Mention</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.MessageSnapshot"><span class="badge">M</span>MessageSnapshot</a>
                 </li>
               
@@ -4049,6 +4053,13 @@ created. Agents use it together with PullMessages.after_version to track
 their cursor into the conversation. </p></td>
                 </tr>
               
+                <tr>
+                  <td>mentions</td>
+                  <td><a href="#laelia.v1.Mention">Mention</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -5423,6 +5434,44 @@ their cursor into the conversation. </p></td>
 
         
       
+        <h3 id="laelia.v1.Mention">Mention</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.MessageSnapshot">MessageSnapshot</h3>
         <p>MessageSnapshot is the Manager reply to PullMessages. It returns the newly</p><p>available messages and the conversation's current version so the agent can</p><p>record it as the base_version for any subsequent action.</p>
 
@@ -6114,6 +6163,13 @@ their cursor into the conversation. </p></td>
                   <td>content</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mentions</td>
+                  <td><a href="#laelia.v1.Mention">Mention</a></td>
+                  <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
               

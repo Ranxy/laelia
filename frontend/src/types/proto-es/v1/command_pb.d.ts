@@ -676,6 +676,32 @@ export declare type ChatHistoryEntry = Message<"laelia.v1.ChatHistoryEntry"> & {
 export declare const ChatHistoryEntrySchema: GenMessage<ChatHistoryEntry>;
 
 /**
+ * @generated from message laelia.v1.Mention
+ */
+export declare type Mention = Message<"laelia.v1.Mention"> & {
+  /**
+   * @generated from field: string type = 1;
+   */
+  type: string;
+
+  /**
+   * @generated from field: string id = 2;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string name = 3;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.Mention.
+ * Use `create(MentionSchema)` to create a new message.
+ */
+export declare const MentionSchema: GenMessage<Mention>;
+
+/**
  * @generated from message laelia.v1.ChatMessage
  */
 export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
@@ -732,6 +758,11 @@ export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
    * @generated from field: int64 room_version = 10;
    */
   roomVersion: bigint;
+
+  /**
+   * @generated from field: repeated laelia.v1.Mention mentions = 11;
+   */
+  mentions: Mention[];
 };
 
 /**
@@ -1124,6 +1155,11 @@ export declare type SendMessageRequest = Message<"laelia.v1.SendMessageRequest">
    * @generated from field: string content = 2;
    */
   content: string;
+
+  /**
+   * @generated from field: repeated laelia.v1.Mention mentions = 3;
+   */
+  mentions: Mention[];
 };
 
 /**

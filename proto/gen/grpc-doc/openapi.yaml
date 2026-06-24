@@ -1673,6 +1673,10 @@ components:
                         room_version is the conversation.version at the time this message was
                          created. Agents use it together with PullMessages.after_version to track
                          their cursor into the conversation.
+                mentions:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Mention'
         Command:
             type: object
             properties:
@@ -2047,6 +2051,15 @@ components:
         LogoutRequest:
             type: object
             properties: {}
+        Mention:
+            type: object
+            properties:
+                type:
+                    type: string
+                id:
+                    type: string
+                name:
+                    type: string
         OAuth2IdentityProviderContext:
             type: object
             properties:
@@ -2216,6 +2229,10 @@ components:
                     type: string
                 content:
                     type: string
+                mentions:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Mention'
         Status:
             type: object
             properties:

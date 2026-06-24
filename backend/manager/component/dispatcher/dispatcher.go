@@ -1013,6 +1013,7 @@ func ConvertChatMessageToV1(m *store.ChatMessage) *v1pb.ChatMessage {
 		SenderName:    m.AgentName,
 		SenderType:    v1pb.SenderType(m.SenderType),
 		RoomVersion:   m.RoomVersion,
+		Mentions:      m.Mentions,
 	}
 	if m.CommandID.Valid {
 		cm.CommandId = m.CommandID.UUID.String()

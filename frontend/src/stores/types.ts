@@ -12,6 +12,7 @@ import type {
   CommandEvent,
   CommandOutput,
   Conversation,
+  Mention,
 } from "@/types/proto-es/v1/command_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";
 
@@ -27,6 +28,7 @@ export interface ChatMessageUI {
   events?: CommandEvent[];
   senderName?: string;
   senderType?: number;
+  mentions?: Mention[];
 }
 
 export interface AuthSlice {
@@ -113,7 +115,8 @@ export interface ChatSlice {
   createChannel: (title: string) => Promise<Conversation>;
   sendChannelMessage: (
     conversationId: string,
-    content: string
+    content: string,
+    mentions?: Mention[]
   ) => Promise<ChatMessage>;
   pollChannelMessages: (conversationName: string) => Promise<void>;
   fetchConversationActivity: (conversationId: string) => Promise<void>;

@@ -3,11 +3,14 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
 // SenderType values mirror the laelia.v1.SenderType enum (sender_type column
@@ -37,39 +40,54 @@ type ChatMessage struct {
 	RoomVersion int64
 	// SenderType: 1=USER, 2=AGENT, 3=SYSTEM.
 	SenderType int32
+	Mentions   []*v1pb.Mention
 }
 
 // chatMessageScanner scans a chat_message row from the common column order
 // produced by scanChatMessageRow: id, conversation_id, principal_id,
 // principal_name, sender_agent_id, agent_resource_id, agent_name, role,
-// content, command_id, created_at, room_version, sender_type.
+// content, command_id, created_at, room_version, sender_type, mentions.
 func scanChatMessageRow(row interface {
 	Scan(dest ...any) error
 }) (*ChatMessage, error) {
 	var msg ChatMessage
+	var mentionsBytes []byte
 	if err := row.Scan(
 		&msg.ID, &msg.ConversationID, &msg.PrincipalID, &msg.PrincipalName,
 		&msg.SenderAgentID, &msg.AgentResourceID, &msg.AgentName,
 		&msg.Role, &msg.Content, &msg.CommandID, &msg.CreatedAt, &msg.RoomVersion, &msg.SenderType,
+		&mentionsBytes,
 	); err != nil {
 		return nil, errors.Wrapf(err, "failed to scan chat message")
+	}
+	if len(mentionsBytes) > 0 {
+		var mentions []*v1pb.Mention
+		if err := json.Unmarshal(mentionsBytes, &mentions); err != nil {
+			return nil, errors.Wrapf(err, "failed to unmarshal mentions")
+		}
+		msg.Mentions = mentions
 	}
 	return &msg, nil
 }
 
 const chatMessageColumns = `cm.id, cm.conversation_id, cm.principal_id, COALESCE(p.name, ''),
        cm.sender_agent_id, COALESCE(a.resource_id, ''), COALESCE(a.name, ''),
-       cm.role, cm.content, cm.command_id, cm.created_at, cm.room_version, cm.sender_type`
+       cm.role, cm.content, cm.command_id, cm.created_at, cm.room_version, cm.sender_type, cm.mentions`
 
 func (s *Store) CreateChatMessage(ctx context.Context, msg *ChatMessage) (*ChatMessage, error) {
 	var id uuid.UUID
 	var createdAt time.Time
 	var roomVersion int64
-	err := s.GetDB().QueryRowContext(ctx, `
-		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+
+	mentionsBytes, err := marshalMentions(msg.Mentions)
+	if err != nil {
+		return nil, err
+	}
+	err = s.GetDB().QueryRowContext(ctx, `
+		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at, room_version
-	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, msg.RoomVersion, msg.SenderType).Scan(&id, &createdAt, &roomVersion)
+	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, msg.RoomVersion, msg.SenderType, mentionsBytes).Scan(&id, &createdAt, &roomVersion)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create chat message")
 	}
@@ -87,6 +105,7 @@ func (s *Store) CreateChatMessage(ctx context.Context, msg *ChatMessage) (*ChatM
 		CreatedAt:       createdAt,
 		RoomVersion:     roomVersion,
 		SenderType:      msg.SenderType,
+		Mentions:        msg.Mentions,
 	}, nil
 }
 
@@ -111,13 +130,18 @@ func (s *Store) CreateChatMessageBumpVersion(ctx context.Context, msg *ChatMessa
 		return nil, 0, errors.Wrapf(err, "failed to bump conversation version")
 	}
 
+	mentionsBytes, err := marshalMentions(msg.Mentions)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	var id uuid.UUID
 	var createdAt time.Time
 	if err := tx.QueryRowContext(ctx, `
-		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at
-	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, newVersion, msg.SenderType).Scan(&id, &createdAt); err != nil {
+	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, newVersion, msg.SenderType, mentionsBytes).Scan(&id, &createdAt); err != nil {
 		return nil, 0, errors.Wrapf(err, "failed to create chat message")
 	}
 
@@ -138,6 +162,7 @@ func (s *Store) CreateChatMessageBumpVersion(ctx context.Context, msg *ChatMessa
 		CreatedAt:       createdAt,
 		RoomVersion:     newVersion,
 		SenderType:      msg.SenderType,
+		Mentions:        msg.Mentions,
 	}, newVersion, nil
 }
 
@@ -234,4 +259,15 @@ func (s *Store) SetChatMessageCommandID(ctx context.Context, messageID, commandI
 		return errors.Wrapf(err, "failed to set chat message command ID")
 	}
 	return nil
+}
+
+func marshalMentions(mentions []*v1pb.Mention) ([]byte, error) {
+	if mentions == nil {
+		mentions = []*v1pb.Mention{}
+	}
+	b, err := json.Marshal(mentions)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal mentions")
+	}
+	return b, nil
 }

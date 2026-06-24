@@ -125,6 +125,7 @@
     - [ListConversationMessagesRequest](#laelia-v1-ListConversationMessagesRequest)
     - [ListConversationMessagesResponse](#laelia-v1-ListConversationMessagesResponse)
     - [ManagerStreamMessage](#laelia-v1-ManagerStreamMessage)
+    - [Mention](#laelia-v1-Mention)
     - [MessageSnapshot](#laelia-v1-MessageSnapshot)
     - [NewMessagesAvailable](#laelia-v1-NewMessagesAvailable)
     - [PermissionDecidedPayload](#laelia-v1-PermissionDecidedPayload)
@@ -1434,6 +1435,7 @@ action is held pending agent resolution via ResolveHeldAction.
 | sender_name | [string](#string) |  |  |
 | sender_type | [SenderType](#laelia-v1-SenderType) |  |  |
 | room_version | [int64](#int64) |  | room_version is the conversation.version at the time this message was created. Agents use it together with PullMessages.after_version to track their cursor into the conversation. |
+| mentions | [Mention](#laelia-v1-Mention) | repeated |  |
 
 
 
@@ -1996,6 +1998,23 @@ status in the channel header.
 
 
 
+<a name="laelia-v1-Mention"></a>
+
+### Mention
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| type | [string](#string) |  |  |
+| id | [string](#string) |  |  |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-MessageSnapshot"></a>
 
 ### MessageSnapshot
@@ -2318,6 +2337,7 @@ ActionResponse.committed was false).
 | ----- | ---- | ----- | ----------- |
 | conversation | [string](#string) |  |  |
 | content | [string](#string) |  |  |
+| mentions | [Mention](#laelia-v1-Mention) | repeated |  |
 
 
 

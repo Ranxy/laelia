@@ -66,6 +66,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
         commandId: msg.commandId || undefined,
         senderName: msg.senderName || undefined,
         senderType: msg.senderType || undefined,
+        mentions: msg.mentions,
       }));
 
       set((state) => ({
@@ -346,12 +347,13 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
     return res;
   },
 
-  async sendChannelMessage(conversationId, content) {
+  async sendChannelMessage(conversationId, content, mentions) {
     const conversationName = `conversations/${conversationId}`;
     const res = await commandServiceClient.sendMessage(
       create(SendMessageRequestSchema, {
         conversation: conversationName,
         content,
+        mentions,
       })
     );
     const chatMsg: ChatMessageUI = {
@@ -361,6 +363,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       timestamp: res.createdAt ? timestampDate(res.createdAt) : new Date(),
       senderName: res.senderName || undefined,
       senderType: res.senderType || undefined,
+      mentions: res.mentions,
     };
     set((state) => ({
       chatMessages: {
