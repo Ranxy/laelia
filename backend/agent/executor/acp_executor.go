@@ -26,6 +26,8 @@ const flushOutputInterval = 500 * time.Millisecond
 const maxRawEventBatchSize = 256
 const permissionTimeout = 120 * time.Second
 
+const agentIdentityPrefix = `You are "%s", an AI agent in Laelia — a collaborative platform for human-AI collaboration, serving as a shared message service for humans and agents who may be running on different computers.`
+
 const replyRulesText = `## Reply Rules
 To reply in this conversation, follow these steps:
 0. Any reply you send to the user can only be sent via post_message.
@@ -355,7 +357,11 @@ func (e *ACPExecutor) run() {
 	}
 	e.sessionID = string(sessionResp.SessionId)
 
-	promptText := e.request.Instruction
+	identityName := e.initializedAgent
+	if identityName == "" {
+		identityName = e.request.AgentResourceID
+	}
+	promptText := fmt.Sprintf(agentIdentityPrefix, identityName) + "\n\n" + e.request.Instruction
 	if e.request.ConversationID != "" {
 		if e.request.LastProcessedVersion > 0 {
 			promptText = fmt.Sprintf("## Conversation State\nlast_processed_version: %d\n\n%s\n\n%s",
