@@ -20,7 +20,7 @@ max_output_bytes: 1048576
 executable: npx
 args:
   - -y
-  - "@zed-industries/claude-code-acp@latest"
+  - "@agentclientprotocol/claude-agent-acp@latest"
 
 # -- Workspace roots --
 working_dir: /home/ran/gocode/laelia
