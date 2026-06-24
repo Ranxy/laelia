@@ -134,6 +134,8 @@
     - [PermissionTimedOutPayload](#laelia-v1-PermissionTimedOutPayload)
     - [Ping](#laelia-v1-Ping)
     - [Pong](#laelia-v1-Pong)
+    - [PostMessageRequest](#laelia-v1-PostMessageRequest)
+    - [PostMessageResponse](#laelia-v1-PostMessageResponse)
     - [PullMessages](#laelia-v1-PullMessages)
     - [RawAcpPayload](#laelia-v1-RawAcpPayload)
     - [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest)
@@ -1948,6 +1950,7 @@ status in the channel header.
 | conversation | [string](#string) |  |  |
 | page_size | [int32](#int32) |  |  |
 | page_token | [string](#string) |  |  |
+| after_version | [int64](#int64) |  |  |
 
 
 
@@ -1964,6 +1967,7 @@ status in the channel header.
 | ----- | ---- | ----- | ----------- |
 | messages | [ChatMessage](#laelia-v1-ChatMessage) | repeated |  |
 | next_page_token | [string](#string) |  |  |
+| current_version | [int64](#int64) |  |  |
 
 
 
@@ -2139,6 +2143,43 @@ messages. The agent should follow up with a PullMessages request.
 | ----- | ---- | ----- | ----------- |
 | seq | [int64](#int64) |  |  |
 | server_time | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-PostMessageRequest"></a>
+
+### PostMessageRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| content | [string](#string) |  |  |
+| base_version | [int64](#int64) |  |  |
+| command_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-PostMessageResponse"></a>
+
+### PostMessageResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| committed | [bool](#bool) |  |  |
+| message | [ChatMessage](#laelia-v1-ChatMessage) |  |  |
+| current_version | [int64](#int64) |  |  |
+| new_messages | [ChatMessage](#laelia-v1-ChatMessage) | repeated |  |
+| conflict_description | [string](#string) |  |  |
 
 
 
@@ -2566,6 +2607,7 @@ names).
 | RemoveChannelMember | [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 | ListChannelMembers | [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest) | [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse) |  |
 | SendMessage | [SendMessageRequest](#laelia-v1-SendMessageRequest) | [ChatMessage](#laelia-v1-ChatMessage) |  |
+| PostMessage | [PostMessageRequest](#laelia-v1-PostMessageRequest) | [PostMessageResponse](#laelia-v1-PostMessageResponse) |  |
 | FetchConversationActivity | [FetchConversationActivityRequest](#laelia-v1-FetchConversationActivityRequest) | [FetchConversationActivityResponse](#laelia-v1-FetchConversationActivityResponse) |  |
 
  

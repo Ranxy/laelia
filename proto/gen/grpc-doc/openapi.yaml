@@ -1037,6 +1037,10 @@ paths:
                   in: query
                   schema:
                     type: string
+                - name: afterVersion
+                  in: query
+                  schema:
+                    type: string
             responses:
                 "200":
                     description: OK
@@ -1075,6 +1079,37 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/ChatMessage'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}:postMessage:
+        post:
+            tags:
+                - CommandService
+            operationId: CommandService_PostMessage
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/PostMessageRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/PostMessageResponse'
                 default:
                     description: Default error response
                     content:
@@ -1964,6 +1999,8 @@ components:
                         $ref: '#/components/schemas/ChatMessage'
                 nextPageToken:
                     type: string
+                currentVersion:
+                    type: string
         ListUsersResponse:
             type: object
             properties:
@@ -2072,6 +2109,36 @@ components:
                 toolCallId:
                     type: string
                 kind:
+                    type: string
+        PostMessageRequest:
+            required:
+                - conversation
+                - content
+                - baseVersion
+            type: object
+            properties:
+                conversation:
+                    type: string
+                content:
+                    type: string
+                baseVersion:
+                    type: string
+                commandId:
+                    type: string
+        PostMessageResponse:
+            type: object
+            properties:
+                committed:
+                    type: boolean
+                message:
+                    $ref: '#/components/schemas/ChatMessage'
+                currentVersion:
+                    type: string
+                newMessages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ChatMessage'
+                conflictDescription:
                     type: string
         RawAcpPayload:
             type: object

@@ -383,11 +383,11 @@ type postMessageInput struct {
 }
 
 type postMessageOutput struct {
-	Committed            bool           `json:"committed"`
-	MessageID            string         `json:"message_id,omitempty"`
-	CurrentVersion       int64          `json:"current_version"`
-	NewMessages          []messageEntry `json:"new_messages,omitempty"`
-	ConflictDescription  string         `json:"conflict_description,omitempty"`
+	Committed           bool           `json:"committed"`
+	MessageID           string         `json:"message_id,omitempty"`
+	CurrentVersion      int64          `json:"current_version"`
+	NewMessages         []messageEntry `json:"new_messages,omitempty"`
+	ConflictDescription string         `json:"conflict_description,omitempty"`
 }
 
 func (s *Server) handlePostMessage(ctx context.Context, _ *mcp.CallToolRequest, input postMessageInput) (*mcp.CallToolResult, postMessageOutput, error) {

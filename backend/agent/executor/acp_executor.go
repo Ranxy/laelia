@@ -28,11 +28,12 @@ const permissionTimeout = 120 * time.Second
 
 const replyRulesText = `## Reply Rules
 To reply in this conversation, follow these steps:
+0. Any reply you send to the user can only be sent via post_message.
 1. Call get_conversation_messages to obtain the latest messages and current_version.
    - If you have a last_processed_version, pass it as after_version to only get new messages.
    - Save the returned current_version — you will need it as base_version for post_message.
 2. Decide whether to reply and what to say based on the messages.
-3. Call post_message(content="your reply", base_version=<saved current_version>).
+3. If you want to reply, then you must Call post_message(content="your reply", base_version=<saved current_version>) to reply.
 4. If post_message returns committed=false, a version conflict occurred:
    - Read the returned new_messages — they arrived while you were thinking.
    - Call get_conversation_messages(after_version=<your previous base_version>) for full context.

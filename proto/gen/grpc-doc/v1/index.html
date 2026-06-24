@@ -686,6 +686,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.PostMessageRequest"><span class="badge">M</span>PostMessageRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.PostMessageResponse"><span class="badge">M</span>PostMessageResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.PullMessages"><span class="badge">M</span>PullMessages</a>
                 </li>
               
@@ -5290,6 +5298,13 @@ their cursor into the conversation. </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>after_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -5317,6 +5332,13 @@ their cursor into the conversation. </p></td>
                 <tr>
                   <td>next_page_token</td>
                   <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>current_version</td>
+                  <td><a href="#int64">int64</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -5704,6 +5726,103 @@ their cursor into the conversation. </p></td>
                 <tr>
                   <td>server_time</td>
                   <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.PostMessageRequest">PostMessageRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>content</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>base_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>command_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.PostMessageResponse">PostMessageResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>committed</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>current_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>new_messages</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>conflict_description</td>
+                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -6733,6 +6852,13 @@ their cursor into the conversation. </p></td>
               </tr>
             
               <tr>
+                <td>PostMessage</td>
+                <td><a href="#laelia.v1.PostMessageRequest">PostMessageRequest</a></td>
+                <td><a href="#laelia.v1.PostMessageResponse">PostMessageResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
                 <td>FetchConversationActivity</td>
                 <td><a href="#laelia.v1.FetchConversationActivityRequest">FetchConversationActivityRequest</a></td>
                 <td><a href="#laelia.v1.FetchConversationActivityResponse">FetchConversationActivityResponse</a></td>
@@ -6943,6 +7069,16 @@ their cursor into the conversation. </p></td>
                 <td>SendMessage</td>
                 <td>POST</td>
                 <td>/v1/{conversation=conversations/*}/messages:send</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>PostMessage</td>
+                <td>POST</td>
+                <td>/v1/{conversation=conversations/*}:postMessage</td>
                 <td>*</td>
               </tr>
               
