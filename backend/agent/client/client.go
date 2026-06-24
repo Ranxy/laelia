@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 
 	"github.com/Ranxy/laelia/backend/agent/credential"
@@ -109,6 +110,11 @@ func New(managerURL, token string, insecure bool, allowHTTP bool, acpConfigPath,
 	}
 
 	tokenDir := filepath.Join(os.Getenv("HOME"), ".laelia")
+	resourceID, err := parseResourceIDFromBootstrapToken(token)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse agent identity from bootstrap token")
+	}
+	tokenFile := filepath.Join(tokenDir, "agent-token-"+resourceID)
 	httpClient := &http.Client{Timeout: defaultConnectTimeout}
 
 	// Separate HTTP client for the bidi command stream: no global timeout
@@ -142,7 +148,7 @@ func New(managerURL, token string, insecure bool, allowHTTP bool, acpConfigPath,
 		httpClient:   httpClient,
 		streamClient: streamClient,
 		client:       client,
-		credential:   credential.New(filepath.Join(tokenDir, "agent-token"), token),
+		credential:   credential.New(tokenFile, token),
 		backoff:      NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
 		acpConfig:    acpConfig,
 		agentName:    agentName,
@@ -445,4 +451,18 @@ func getOutboundIP() string {
 		return ""
 	}
 	return localAddr.IP.String()
+}
+
+func parseResourceIDFromBootstrapToken(tokenStr string) (string, error) {
+	parser := jwt.Parser{}
+	claims := jwt.MapClaims{}
+	_, _, err := parser.ParseUnverified(tokenStr, claims)
+	if err != nil {
+		return "", errors.Wrap(err, "invalid bootstrap token format")
+	}
+	sub, ok := claims["sub"].(string)
+	if !ok || sub == "" {
+		return "", errors.New("bootstrap token missing sub claim")
+	}
+	return sub, nil
 }

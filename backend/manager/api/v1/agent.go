@@ -466,6 +466,9 @@ func (s *AgentService) AgentHeartbeat(ctx context.Context, req *connect.Request[
 		if session.State == "KICKED" {
 			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("session has been replaced by a new connection"))
 		}
+		if session.AgentID != agent.ID {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("session does not belong to this agent"))
+		}
 
 		if !s.stateCfg.NonceManager.VerifyNonce(req.Msg.PreviousNonce, agent.ResourceID, req.Msg.SessionId) {
 			if req.Msg.PreviousNonce != "" {
