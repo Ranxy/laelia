@@ -1007,16 +1007,12 @@ func maxInt(left int, right int) int {
 }
 
 func (e *ACPExecutor) buildMCPServers() []acp.McpServer {
-	// In Phase 1 the MCP chat-context server is wired only when the runtime
-	// is conversation-linked (ConversationID non-empty). The old SourceType=
-	// CHAT check is now expressed via the conversation linkage kept by the
-	// caller.
 	if e.request.ConversationID == "" || e.request.MCPPort <= 0 {
 		return []acp.McpServer{}
 	}
 
-	url := fmt.Sprintf("http://127.0.0.1:%d/mcp?agent=%s&principal=%s&conversation=%s",
-		e.request.MCPPort, e.request.AgentResourceID, e.request.PrincipalID, e.request.ConversationID)
+	url := fmt.Sprintf("http://127.0.0.1:%d/mcp?agent=%s&principal=%s&conversation=%s&command=%s",
+		e.request.MCPPort, e.request.AgentResourceID, e.request.PrincipalID, e.request.ConversationID, e.request.CommandID)
 
 	return []acp.McpServer{{
 		Http: &acp.McpServerHttpInline{

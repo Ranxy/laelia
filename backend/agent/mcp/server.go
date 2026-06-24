@@ -21,6 +21,7 @@ const (
 	ctxKeyAgentID        contextKey = "laelia_agent_id"
 	ctxKeyPrincipalID    contextKey = "laelia_principal_id"
 	ctxKeyConversationID contextKey = "laelia_conversation_id"
+	ctxKeyCommandID      contextKey = "laelia_command_id"
 )
 
 type Server struct {
@@ -61,6 +62,20 @@ func New(managerURL, agentName string, getToken func() string, httpClient *http.
 			Description: "Get the full execution context (thinking process, tool calls, outputs) behind a specific agent reply, by its command/message ID.",
 		},
 		ms.handleGetCommandContext,
+	)
+	mcp.AddTool(srv,
+		&mcp.Tool{
+			Name:        "get_conversation_messages",
+			Description: "Get recent messages from the current conversation with the current room version. Use after_version to only fetch messages newer than a known version. You MUST call this before calling post_message to obtain the latest base_version.",
+		},
+		ms.handleGetConversationMessages,
+	)
+	mcp.AddTool(srv,
+		&mcp.Tool{
+			Name:        "post_message",
+			Description: "Post a reply to the current conversation. You MUST call get_conversation_messages first to obtain the base_version. If committed=false, new messages arrived while you were thinking — read them, reconsider, and call post_message again with the updated base_version.",
+		},
+		ms.handlePostMessage,
 	)
 
 	return ms, nil
@@ -131,6 +146,9 @@ func contextMiddleware(next http.Handler) http.Handler {
 		}
 		if cid := r.URL.Query().Get("conversation"); cid != "" {
 			ctx = context.WithValue(ctx, ctxKeyConversationID, cid)
+		}
+		if cmd := r.URL.Query().Get("command"); cmd != "" {
+			ctx = context.WithValue(ctx, ctxKeyCommandID, cmd)
 		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -282,6 +300,163 @@ func (s *Server) handleGetCommandContext(ctx context.Context, _ *mcp.CallToolReq
 	for _, ev := range events {
 		text += fmt.Sprintf("  [%d] %s: %s\n", ev.SeqNo, ev.Type, ev.Summary)
 	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: text}},
+	}, output, nil
+}
+
+type getConversationMessagesInput struct {
+	AfterVersion int64 `json:"after_version,omitempty"`
+	Limit        int   `json:"limit,omitempty"`
+}
+
+type messageEntry struct {
+	MessageID  string `json:"message_id"`
+	SenderName string `json:"sender_name"`
+	SenderType string `json:"sender_type"`
+	Content    string `json:"content"`
+	Timestamp  string `json:"timestamp"`
+}
+
+type getConversationMessagesOutput struct {
+	Messages       []messageEntry `json:"messages"`
+	CurrentVersion int64          `json:"current_version"`
+}
+
+func (s *Server) handleGetConversationMessages(ctx context.Context, _ *mcp.CallToolRequest, input getConversationMessagesInput) (*mcp.CallToolResult, getConversationMessagesOutput, error) {
+	conversationID := ""
+	if v, ok := ctx.Value(ctxKeyConversationID).(string); ok && v != "" {
+		conversationID = v
+	}
+	if conversationID == "" {
+		return nil, getConversationMessagesOutput{}, errors.New("no conversation context available")
+	}
+
+	limit := input.Limit
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+
+	req := connect.NewRequest(&v1pb.ListConversationMessagesRequest{
+		Conversation: fmt.Sprintf("conversations/%s", conversationID),
+		PageSize:     int32(limit),
+		AfterVersion: input.AfterVersion,
+	})
+
+	resp, err := s.client().ListConversationMessages(ctx, req)
+	if err != nil {
+		return nil, getConversationMessagesOutput{}, errors.Wrap(err, "failed to list conversation messages")
+	}
+
+	var messages []messageEntry
+	for _, m := range resp.Msg.Messages {
+		messages = append(messages, messageEntry{
+			MessageID:  m.Name,
+			SenderName: m.SenderName,
+			SenderType: senderTypeString(m.SenderType),
+			Content:    m.Content,
+			Timestamp:  m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
+		})
+	}
+	if messages == nil {
+		messages = []messageEntry{}
+	}
+
+	text := fmt.Sprintf("Conversation messages (current_version: %d):\n", resp.Msg.CurrentVersion)
+	if len(messages) == 0 {
+		text += "(no new messages)\n"
+	} else {
+		for _, m := range messages {
+			text += fmt.Sprintf("[%s] %s (%s): %s\n", m.Timestamp, m.SenderName, m.SenderType, m.Content)
+		}
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: text}},
+	}, getConversationMessagesOutput{Messages: messages, CurrentVersion: resp.Msg.CurrentVersion}, nil
+}
+
+type postMessageInput struct {
+	Content     string `json:"content"`
+	BaseVersion int64  `json:"base_version"`
+}
+
+type postMessageOutput struct {
+	Committed            bool           `json:"committed"`
+	MessageID            string         `json:"message_id,omitempty"`
+	CurrentVersion       int64          `json:"current_version"`
+	NewMessages          []messageEntry `json:"new_messages,omitempty"`
+	ConflictDescription  string         `json:"conflict_description,omitempty"`
+}
+
+func (s *Server) handlePostMessage(ctx context.Context, _ *mcp.CallToolRequest, input postMessageInput) (*mcp.CallToolResult, postMessageOutput, error) {
+	conversationID := ""
+	if v, ok := ctx.Value(ctxKeyConversationID).(string); ok && v != "" {
+		conversationID = v
+	}
+	if conversationID == "" {
+		return nil, postMessageOutput{}, errors.New("no conversation context available")
+	}
+
+	commandID := ""
+	if v, ok := ctx.Value(ctxKeyCommandID).(string); ok {
+		commandID = v
+	}
+
+	req := connect.NewRequest(&v1pb.PostMessageRequest{
+		Conversation: fmt.Sprintf("conversations/%s", conversationID),
+		Content:      input.Content,
+		BaseVersion:  input.BaseVersion,
+		CommandId:    commandID,
+	})
+
+	resp, err := s.client().PostMessage(ctx, req)
+	if err != nil {
+		return nil, postMessageOutput{}, errors.Wrap(err, "failed to post message")
+	}
+
+	output := postMessageOutput{
+		Committed:      resp.Msg.Committed,
+		CurrentVersion: resp.Msg.CurrentVersion,
+	}
+
+	if resp.Msg.Committed {
+		output.MessageID = resp.Msg.Message.Name
+		text := fmt.Sprintf("Message posted successfully (version: %d)", resp.Msg.CurrentVersion)
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: text}},
+		}, output, nil
+	}
+
+	output.ConflictDescription = resp.Msg.ConflictDescription
+	for _, m := range resp.Msg.NewMessages {
+		timestamp := ""
+		if m.CreatedAt != nil {
+			timestamp = m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z")
+		}
+		output.NewMessages = append(output.NewMessages, messageEntry{
+			MessageID:  m.Name,
+			SenderName: m.SenderName,
+			SenderType: senderTypeString(m.SenderType),
+			Content:    m.Content,
+			Timestamp:  timestamp,
+		})
+	}
+
+	text := resp.Msg.ConflictDescription + "\nNew messages:\n"
+	if len(resp.Msg.NewMessages) == 0 {
+		text += "(no new messages)\n"
+	} else {
+		for _, m := range resp.Msg.NewMessages {
+			ts := ""
+			if m.CreatedAt != nil {
+				ts = m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z")
+			}
+			text += fmt.Sprintf("[%s] %s: %s\n", ts, m.SenderName, m.Content)
+		}
+	}
+	text += fmt.Sprintf("\nTo resolve: call get_conversation_messages(after_version=%d) to get full context, then call post_message again with the updated base_version=%d.", input.BaseVersion, resp.Msg.CurrentVersion)
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: text}},
