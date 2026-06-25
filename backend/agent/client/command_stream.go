@@ -280,6 +280,7 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 func (c *commandStream) drainLoop(ctx context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], doneCh <-chan struct{}) {
 	var lastSessionStart time.Time
 	for {
+	START:
 		select {
 		case <-ctx.Done():
 			return
@@ -317,7 +318,7 @@ func (c *commandStream) drainLoop(ctx context.Context, stream *connect.BidiStrea
 				return
 			}
 			if resp.Idle {
-				return
+				goto START
 			}
 
 			lastSessionStart = time.Now()
