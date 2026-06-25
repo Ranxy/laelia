@@ -169,7 +169,6 @@ func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb
 		PrincipalID: 1,  // system bot; the session is agent-initiated, not user-scoped
 		Instruction: "", // the agent-first prompt is supplied by the agent client
 		Status:      int32(v1pb.CommandStatus_RUNNING),
-		Env:         "{}", // env is JSONB NOT NULL; empty string is not valid JSON
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create session command")

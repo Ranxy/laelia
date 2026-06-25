@@ -63,12 +63,25 @@ type FindCommandMessage struct {
 	Offset  *int
 }
 
+// coerceEnvJSON returns a valid JSON string for the JSONB NOT NULL command.env
+// column. An empty string is not valid JSON and would make the INSERT fail with
+// "invalid input syntax for type json"; fall back to the column's default so
+// callers that don't care about env don't have to set it.
+func coerceEnvJSON(env string) string {
+	if env == "" {
+		return "{}"
+	}
+	return env
+}
+
 func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*CommandMessage, error) {
 	tx, err := s.GetDB().BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
+
+	env := coerceEnvJSON(cmd.Env)
 
 	var commandID uuid.UUID
 	var createdAt time.Time
@@ -85,7 +98,7 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 		cmd.Profile,
 		cmd.AllowDiff,
 		cmd.Status,
-		cmd.Env,
+		env,
 		cmd.WorkingDir,
 		cmd.TimeoutSeconds,
 		cmd.ConversationID,
@@ -107,7 +120,7 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 		AllowDiff:      cmd.AllowDiff,
 		Status:         cmd.Status,
 		CreatedAt:      createdAt,
-		Env:            cmd.Env,
+		Env:            env,
 		WorkingDir:     cmd.WorkingDir,
 		TimeoutSeconds: cmd.TimeoutSeconds,
 		ConversationID: cmd.ConversationID,
