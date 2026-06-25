@@ -19,6 +19,38 @@ import type { AppSliceCreator, ChatMessageUI, ChatSlice } from "./types";
 // Module-level map of active channel poll intervals, keyed by conversation name.
 const channelWatchers: Record<string, ReturnType<typeof setInterval>> = {};
 
+// mergeMessages reconciles a freshly polled message list with the cached one.
+// Unchanged messages keep their previous object reference so React.memo can skip
+// re-rendering them, and an unchanged list returns the exact same reference so
+// the store setter (and its subscribers) can bail out entirely.
+function mergeMessages(
+  prev: ChatMessageUI[],
+  next: ChatMessageUI[]
+): ChatMessageUI[] {
+  if (prev.length === 0 || next.length === 0) return next;
+  if (prev[0].id !== next[0].id) return next;
+
+  const prevById = new Map(prev.map((m) => [m.id, m]));
+  let changed = false;
+  const out: ChatMessageUI[] = [];
+  for (const n of next) {
+    const p = prevById.get(n.id);
+    if (
+      p &&
+      p.content === n.content &&
+      p.role === n.role &&
+      p.senderName === n.senderName &&
+      p.senderType === n.senderType
+    ) {
+      out.push(p);
+    } else {
+      out.push(n);
+      changed = true;
+    }
+  }
+  return changed || out.length !== prev.length ? out : prev;
+}
+
 export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
   conversations: {},
   channels: [],
@@ -478,12 +510,19 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
           senderName: msg.senderName || undefined,
           senderType: msg.senderType || undefined,
         }));
-        set({
-          chatMessages: {
-            ...get().chatMessages,
-            [conversationName]: uiMsgs,
-          },
-        });
+        // Reuse cached references for unchanged messages and skip the store
+        // update entirely when nothing changed, so polling does not churn the
+        // array identity (which would force a scroll snap and re-render).
+        const prev = get().chatMessages[conversationName] ?? [];
+        const merged = mergeMessages(prev, uiMsgs);
+        if (merged !== prev) {
+          set({
+            chatMessages: {
+              ...get().chatMessages,
+              [conversationName]: merged,
+            },
+          });
+        }
       } catch {
         // network error — will retry on next tick
       }

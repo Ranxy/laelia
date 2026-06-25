@@ -13,7 +13,7 @@ import MarkdownRender, {
   MarkdownCodeBlockNode,
   setCustomComponents,
 } from "markstream-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
@@ -98,6 +98,7 @@ export function ChannelChatPage() {
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastChannelRef = useRef<string | null>(null);
+  const stickToBottomRef = useRef(true);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -145,6 +146,7 @@ export function ChannelChatPage() {
       stopWatchingChannel(prevName);
     }
     lastChannelRef.current = channelId;
+    stickToBottomRef.current = true;
     try {
       await loadMessages(conversationName);
     } catch {
@@ -178,6 +180,7 @@ export function ChannelChatPage() {
   }, [init, stopWatchingChannel]);
 
   const scrollToBottom = useCallback(() => {
+    stickToBottomRef.current = true;
     if (scrollRef.current) {
       scrollRef.current.scrollTo({
         top: scrollRef.current.scrollHeight,
@@ -186,8 +189,11 @@ export function ChannelChatPage() {
     }
   }, []);
 
+  // Auto-stick to the bottom only when the user is already viewing the latest
+  // messages. When they have scrolled up to read history, new polling updates
+  // must not yank them back down.
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && stickToBottomRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
@@ -196,6 +202,7 @@ export function ChannelChatPage() {
     if (!scrollRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
     const nearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    stickToBottomRef.current = nearBottom;
     setShowScrollDown(!nearBottom);
   }, []);
 
@@ -777,7 +784,7 @@ function MentionBadge({
   );
 }
 
-function ChannelMessageRow({
+const ChannelMessageRow = memo(function ChannelMessageRow({
   msg,
   showAvatar,
   onMentionClick,
@@ -875,4 +882,4 @@ function ChannelMessageRow({
       </div>
     </div>
   );
-}
+});
