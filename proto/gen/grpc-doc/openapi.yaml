@@ -1766,6 +1766,13 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/Mention'
+                isOwn:
+                    type: boolean
+                    description: |-
+                        is_own is true when this message was sent by the calling agent itself. It is
+                         caller-relative (computed by the manager from the authenticated agent vs the
+                         message's sender_agent_id) so an agent can recognize its own past messages as
+                         context-only and avoid replying to itself.
         Command:
             type: object
             properties:

@@ -3839,6 +3839,16 @@ Format: idps/{idp} </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>agent_display_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>agent_display_name is the posting agent&#39;s human-readable name, sourced from
+the manager (the source of truth for agent identity). The agent client injects
+it into its system prompt so it knows who it is and can recognize its own
+messages and @mentions of itself. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -4138,6 +4148,16 @@ the conversation. </p></td>
                   <td><a href="#laelia.v1.Mention">Mention</a></td>
                   <td>repeated</td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>is_own</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>is_own is true when this message was sent by the calling agent itself. It is
+caller-relative (computed by the manager from the authenticated agent vs the
+message&#39;s sender_agent_id) so an agent can recognize its own past messages as
+context-only and avoid replying to itself. </p></td>
                 </tr>
               
             </tbody>

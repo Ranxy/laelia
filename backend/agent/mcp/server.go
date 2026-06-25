@@ -205,6 +205,7 @@ type chatHistoryResult struct {
 	MessageID  string `json:"message_id"`
 	SenderName string `json:"sender_name"`
 	SenderType string `json:"sender_type"`
+	IsOwn      bool   `json:"is_own"`
 	Content    string `json:"content"`
 	Timestamp  string `json:"timestamp"`
 }
@@ -243,6 +244,7 @@ func (s *Server) handleSearchChatHistory(ctx context.Context, _ *mcp.CallToolReq
 			MessageID:  e.Name,
 			SenderName: e.SenderName,
 			SenderType: senderTypeString(e.SenderType),
+			IsOwn:      e.IsOwn,
 			Content:    e.Content,
 			Timestamp:  e.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
 		})
@@ -257,7 +259,7 @@ func (s *Server) handleSearchChatHistory(ctx context.Context, _ *mcp.CallToolReq
 	}
 	text += ":\n"
 	for _, r := range results {
-		text += fmt.Sprintf("[%s] %s (%s): %s\n", r.Timestamp, r.SenderName, r.SenderType, r.Content)
+		text += formatMessageLine(r.Timestamp, r.SenderName, r.SenderType, r.IsOwn, r.Content)
 	}
 
 	return &mcp.CallToolResult{
@@ -276,6 +278,16 @@ func senderTypeString(t v1pb.SenderType) string {
 	default:
 		return "unknown"
 	}
+}
+
+// formatMessageLine renders one message for the tool's text output. Own
+// messages are tagged "(YOU)" so the agent can recognize its own past messages
+// at a glance and avoid replying to itself.
+func formatMessageLine(timestamp, senderName, senderType string, isOwn bool, content string) string {
+	if isOwn {
+		return fmt.Sprintf("[%s] %s (%s, YOU): %s\n", timestamp, senderName, senderType, content)
+	}
+	return fmt.Sprintf("[%s] %s (%s): %s\n", timestamp, senderName, senderType, content)
 }
 
 type getCommandContextInput struct {
@@ -353,6 +365,7 @@ type messageEntry struct {
 	MessageID  string `json:"message_id"`
 	SenderName string `json:"sender_name"`
 	SenderType string `json:"sender_type"`
+	IsOwn      bool   `json:"is_own"`
 	Content    string `json:"content"`
 	Timestamp  string `json:"timestamp"`
 }
@@ -390,6 +403,7 @@ func (s *Server) handleGetConversationMessages(ctx context.Context, _ *mcp.CallT
 			MessageID:  m.Name,
 			SenderName: m.SenderName,
 			SenderType: senderTypeString(m.SenderType),
+			IsOwn:      m.IsOwn,
 			Content:    m.Content,
 			Timestamp:  m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
 		})
@@ -403,7 +417,7 @@ func (s *Server) handleGetConversationMessages(ctx context.Context, _ *mcp.CallT
 		text += "(no new messages)\n"
 	} else {
 		for _, m := range messages {
-			text += fmt.Sprintf("[%s] %s (%s): %s\n", m.Timestamp, m.SenderName, m.SenderType, m.Content)
+			text += formatMessageLine(m.Timestamp, m.SenderName, m.SenderType, m.IsOwn, m.Content)
 		}
 	}
 

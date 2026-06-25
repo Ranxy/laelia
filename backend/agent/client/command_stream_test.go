@@ -359,7 +359,7 @@ func TestRunSessionExecutesRuntime(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1")
+		cs.runSession(ctx, stream, "drain-1", "TestAgent")
 		close(done)
 	}()
 

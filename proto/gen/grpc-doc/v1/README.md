@@ -1386,6 +1386,7 @@ the agent uses to anchor its execution events and link any posted replies.
 | ----- | ---- | ----- | ----------- |
 | command_id | [string](#string) |  |  |
 | idle | [bool](#bool) |  |  |
+| agent_display_name | [string](#string) |  | agent_display_name is the posting agent&#39;s human-readable name, sourced from the manager (the source of truth for agent identity). The agent client injects it into its system prompt so it knows who it is and can recognize its own messages and @mentions of itself. |
 
 
 
@@ -1500,6 +1501,7 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | sender_type | [SenderType](#laelia-v1-SenderType) |  |  |
 | room_version | [int64](#int64) |  | room_version is the conversation.version at the time this message was created. Agents use it together with their per-channel cursor (managed via the ListChannelUpdates / AckProcessedVersion RPCs) to track progress into the conversation. |
 | mentions | [Mention](#laelia-v1-Mention) | repeated |  |
+| is_own | [bool](#bool) |  | is_own is true when this message was sent by the calling agent itself. It is caller-relative (computed by the manager from the authenticated agent vs the message&#39;s sender_agent_id) so an agent can recognize its own past messages as context-only and avoid replying to itself. |
 
 
 

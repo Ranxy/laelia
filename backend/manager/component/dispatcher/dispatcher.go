@@ -190,7 +190,7 @@ func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb
 	}
 
 	slog.Info("agent session begun", "commandID", cmd.ID, "agentID", agentID)
-	return &v1pb.BeginSessionResponse{CommandId: cmd.ID.String()}, nil
+	return &v1pb.BeginSessionResponse{CommandId: cmd.ID.String(), AgentDisplayName: agent.Name}, nil
 }
 
 // NotifyNewMessages pushes a NewMessagesAvailable hint to a connected agent so

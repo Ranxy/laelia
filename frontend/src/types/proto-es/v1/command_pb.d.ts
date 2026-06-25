@@ -764,6 +764,16 @@ export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
    * @generated from field: repeated laelia.v1.Mention mentions = 11;
    */
   mentions: Mention[];
+
+  /**
+   * is_own is true when this message was sent by the calling agent itself. It is
+   * caller-relative (computed by the manager from the authenticated agent vs the
+   * message's sender_agent_id) so an agent can recognize its own past messages as
+   * context-only and avoid replying to itself.
+   *
+   * @generated from field: bool is_own = 12;
+   */
+  isOwn: boolean;
 };
 
 /**
@@ -1958,6 +1968,16 @@ export declare type BeginSessionResponse = Message<"laelia.v1.BeginSessionRespon
    * @generated from field: bool idle = 2;
    */
   idle: boolean;
+
+  /**
+   * agent_display_name is the posting agent's human-readable name, sourced from
+   * the manager (the source of truth for agent identity). The agent client injects
+   * it into its system prompt so it knows who it is and can recognize its own
+   * messages and @mentions of itself.
+   *
+   * @generated from field: string agent_display_name = 3;
+   */
+  agentDisplayName: string;
 };
 
 /**

@@ -237,6 +237,11 @@ message ChatMessage {
   // the conversation.
   int64 room_version = 10;
   repeated Mention mentions = 11;
+  // is_own is true when this message was sent by the calling agent itself. It is
+  // caller-relative (computed by the manager from the authenticated agent vs the
+  // message's sender_agent_id) so an agent can recognize its own past messages as
+  // context-only and avoid replying to itself.
+  bool is_own = 12;
 }
 
 message Conversation {
@@ -711,6 +716,11 @@ message BeginSession {}
 message BeginSessionResponse {
   string command_id = 1;
   bool idle = 2;
+  // agent_display_name is the posting agent's human-readable name, sourced from
+  // the manager (the source of truth for agent identity). The agent client injects
+  // it into its system prompt so it knows who it is and can recognize its own
+  // messages and @mentions of itself.
+  string agent_display_name = 3;
 }
 
 // FetchConversationActivity returns the execution status of each agent member

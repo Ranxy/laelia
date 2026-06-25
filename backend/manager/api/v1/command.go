@@ -452,6 +452,7 @@ func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Req
 	}
 
 	var v1Entries []*v1pb.ChatMessage
+	callerAgent, _ := GetAgentFromContext(ctx)
 	for _, msg := range msgs {
 		senderName := msg.PrincipalName
 		senderType := v1pb.SenderType(msg.SenderType)
@@ -468,6 +469,7 @@ func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Req
 			SenderName:    senderName,
 			SenderType:    senderType,
 			RoomVersion:   msg.RoomVersion,
+			IsOwn:         callerAgent != nil && msg.SenderAgentID.Valid && int(msg.SenderAgentID.Int32) == callerAgent.ID,
 		}
 		if msg.CommandID.Valid {
 			v1m.CommandId = msg.CommandID.UUID.String()
@@ -573,6 +575,11 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 		nextPageToken, _ = offset.getNextPageToken()
 	}
 
+	// is_own is caller-relative: only the agent itself (authenticated via the MCP
+	// server's bearer token) can mark its own messages. Frontend/user callers get
+	// is_own=false for every message.
+	callerAgent, _ := GetAgentFromContext(ctx)
+
 	var v1msgs []*v1pb.ChatMessage
 	for _, msg := range msgs {
 		senderName := msg.PrincipalName
@@ -590,6 +597,7 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 			SenderName:    senderName,
 			SenderType:    senderType,
 			RoomVersion:   msg.RoomVersion,
+			IsOwn:         callerAgent != nil && msg.SenderAgentID.Valid && int(msg.SenderAgentID.Int32) == callerAgent.ID,
 		}
 		if msg.CommandID.Valid {
 			v1m.CommandId = msg.CommandID.UUID.String()
@@ -653,6 +661,16 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 		// the single change that enables agent→agent conversation.
 		s.notifyConversationAgents(ctx, convUUID, newVersion, &agent.ID)
 
+		// The posting agent has produced this message, so it has processed up to
+		// and including newVersion. Advance its durable cursor now so its own
+		// reply is never re-surfaced as "new" on the next BeginSession (which
+		// would make the agent re-read and mistake its own message for another
+		// agent's). UpsertCursor is monotonic (GREATEST), so a later explicit
+		// ack_processed_version from the agent cannot rewind it.
+		if _, err := s.store.UpsertCursor(ctx, agent.ID, convUUID, newVersion); err != nil {
+			slog.Warn("failed to advance posting agent cursor", "agentID", agent.ID, "conversationID", convUUID, "version", newVersion, "error", err)
+		}
+
 		return connect.NewResponse(&v1pb.PostMessageResponse{
 			Committed:      true,
 			Message:        storeToV1ChatMessage(msg),
@@ -667,7 +685,9 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 
 	var v1NewMsgs []*v1pb.ChatMessage
 	for _, m := range newMsgs {
-		v1NewMsgs = append(v1NewMsgs, storeToV1ChatMessage(m))
+		v1m := storeToV1ChatMessage(m)
+		v1m.IsOwn = m.SenderAgentID.Valid && int(m.SenderAgentID.Int32) == agent.ID
+		v1NewMsgs = append(v1NewMsgs, v1m)
 	}
 
 	return connect.NewResponse(&v1pb.PostMessageResponse{

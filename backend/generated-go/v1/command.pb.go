@@ -1770,8 +1770,13 @@ type ChatMessage struct {
 	// created. Agents use it together with their per-channel cursor (managed via
 	// the ListChannelUpdates / AckProcessedVersion RPCs) to track progress into
 	// the conversation.
-	RoomVersion   int64      `protobuf:"varint,10,opt,name=room_version,json=roomVersion,proto3" json:"room_version,omitempty"`
-	Mentions      []*Mention `protobuf:"bytes,11,rep,name=mentions,proto3" json:"mentions,omitempty"`
+	RoomVersion int64      `protobuf:"varint,10,opt,name=room_version,json=roomVersion,proto3" json:"room_version,omitempty"`
+	Mentions    []*Mention `protobuf:"bytes,11,rep,name=mentions,proto3" json:"mentions,omitempty"`
+	// is_own is true when this message was sent by the calling agent itself. It is
+	// caller-relative (computed by the manager from the authenticated agent vs the
+	// message's sender_agent_id) so an agent can recognize its own past messages as
+	// context-only and avoid replying to itself.
+	IsOwn         bool `protobuf:"varint,12,opt,name=is_own,json=isOwn,proto3" json:"is_own,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1881,6 +1886,13 @@ func (x *ChatMessage) GetMentions() []*Mention {
 		return x.Mentions
 	}
 	return nil
+}
+
+func (x *ChatMessage) GetIsOwn() bool {
+	if x != nil {
+		return x.IsOwn
+	}
+	return false
 }
 
 type Conversation struct {
@@ -4645,11 +4657,16 @@ func (*BeginSession) Descriptor() ([]byte, []int) {
 }
 
 type BeginSessionResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CommandId     string                 `protobuf:"bytes,1,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
-	Idle          bool                   `protobuf:"varint,2,opt,name=idle,proto3" json:"idle,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	CommandId string                 `protobuf:"bytes,1,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	Idle      bool                   `protobuf:"varint,2,opt,name=idle,proto3" json:"idle,omitempty"`
+	// agent_display_name is the posting agent's human-readable name, sourced from
+	// the manager (the source of truth for agent identity). The agent client injects
+	// it into its system prompt so it knows who it is and can recognize its own
+	// messages and @mentions of itself.
+	AgentDisplayName string `protobuf:"bytes,3,opt,name=agent_display_name,json=agentDisplayName,proto3" json:"agent_display_name,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *BeginSessionResponse) Reset() {
@@ -4694,6 +4711,13 @@ func (x *BeginSessionResponse) GetIdle() bool {
 		return x.Idle
 	}
 	return false
+}
+
+func (x *BeginSessionResponse) GetAgentDisplayName() string {
+	if x != nil {
+		return x.AgentDisplayName
+	}
+	return ""
 }
 
 // FetchConversationActivity returns the execution status of each agent member
@@ -5003,7 +5027,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\aMention\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\"\xa0\x03\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\"\xb7\x03\n" +
 	"\vChatMessage\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\"\n" +
 	"\fconversation\x18\x02 \x01(\tR\fconversation\x12%\n" +
@@ -5020,7 +5044,8 @@ const file_v1_command_proto_rawDesc = "" +
 	"senderType\x12!\n" +
 	"\froom_version\x18\n" +
 	" \x01(\x03R\vroomVersion\x12.\n" +
-	"\bmentions\x18\v \x03(\v2\x12.laelia.v1.MentionR\bmentions\"\xf4\x02\n" +
+	"\bmentions\x18\v \x03(\v2\x12.laelia.v1.MentionR\bmentions\x12\x15\n" +
+	"\x06is_own\x18\f \x01(\bR\x05isOwn\"\xf4\x02\n" +
 	"\fConversation\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
@@ -5241,11 +5266,12 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x14NewMessagesAvailable\x12)\n" +
 	"\x10conversation_ids\x18\x01 \x03(\tR\x0fconversationIds\x12\x1a\n" +
 	"\bversions\x18\x02 \x03(\x03R\bversions\"\x0e\n" +
-	"\fBeginSession\"I\n" +
+	"\fBeginSession\"w\n" +
 	"\x14BeginSessionResponse\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12\x12\n" +
-	"\x04idle\x18\x02 \x01(\bR\x04idle\"F\n" +
+	"\x04idle\x18\x02 \x01(\bR\x04idle\x12,\n" +
+	"\x12agent_display_name\x18\x03 \x01(\tR\x10agentDisplayName\"F\n" +
 	" FetchConversationActivityRequest\x12\"\n" +
 	"\fconversation\x18\x01 \x01(\tR\fconversation\"]\n" +
 	"!FetchConversationActivityResponse\x128\n" +

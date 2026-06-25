@@ -28,3 +28,13 @@ func TestResolveConversationName(t *testing.T) {
 		assert.Equal(t, "", resolveConversationName(context.Background(), ""))
 	})
 }
+
+func TestFormatMessageLine(t *testing.T) {
+	got := formatMessageLine("2026-06-25T06:33:31Z", "REI", "agent", true, "Hi admin")
+	assert.Contains(t, got, "REI (agent, YOU): Hi admin")
+	assert.Contains(t, got, "[2026-06-25T06:33:31Z]")
+
+	notOwn := formatMessageLine("2026-06-25T06:18:07Z", "admin", "user", false, "hi everyone")
+	assert.Contains(t, notOwn, "admin (user): hi everyone")
+	assert.NotContains(t, notOwn, "YOU")
+}

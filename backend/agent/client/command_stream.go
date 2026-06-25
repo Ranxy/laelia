@@ -321,7 +321,7 @@ func (c *commandStream) drainLoop(ctx context.Context, stream *connect.BidiStrea
 			}
 
 			lastSessionStart = time.Now()
-			c.runSession(ctx, stream, resp.CommandId)
+			c.runSession(ctx, stream, resp.CommandId, resp.AgentDisplayName)
 		}
 	}
 }
@@ -352,12 +352,13 @@ func (c *commandStream) beginSession(ctx context.Context, stream *connect.BidiSt
 // (fixed prompt) and pumps progress/events/result over the bidi stream via
 // runCommand. The agent itself decides which channel to process and how,
 // entirely through MCP tools. Blocking: returns when the session finishes.
-func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string) {
+func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, agentDisplayName string) {
 	req := &v1pb.CommandRequest{
-		CommandId:      commandID,
-		Instruction:    executor.AgentFirstPromptBody,
-		PrincipalId:    c.agentResourceID,
-		TimeoutSeconds: 0,
+		CommandId:        commandID,
+		Instruction:      executor.AgentFirstPromptBody,
+		PrincipalId:      c.agentResourceID,
+		AgentDisplayName: agentDisplayName,
+		TimeoutSeconds:   0,
 	}
 
 	runtime, err := c.newSessionRuntime(req)

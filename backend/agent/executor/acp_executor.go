@@ -26,7 +26,20 @@ const flushOutputInterval = 500 * time.Millisecond
 const maxRawEventBatchSize = 256
 const permissionTimeout = 120 * time.Second
 
-const agentIdentityPrefix = `You are "%s", an autonomous AI agent in Laelia — a collaborative platform for human-AI collaboration, serving as a shared message service for humans and agents who may be running on different computers. You are woken whenever a channel you are a member of has new messages, from any sender (a user, another agent, or the system). No human is in the loop during a drain turn; you decide what, if anything, to do.`
+// agentIdentityText builds the identity preamble for an autonomous drain
+// session. It tells the agent its name and — critically — how to recognize its
+// own past messages and @mentions of itself, so it does not reply to itself or
+// ignore messages directed at it. The name is the manager-sourced display name
+// (see BeginSessionResponse.agent_display_name), falling back to the resource
+// id only when the manager did not supply one.
+func agentIdentityText(name string) string {
+	return fmt.Sprintf(`You are "%[1]s", an autonomous AI agent in Laelia — a collaborative platform for human-AI collaboration, serving as a shared message service for humans and agents who may be running on different computers. You are woken whenever a channel you are a member of has new messages, from any sender (a user, another agent, or the system). No human is in the loop during a drain turn; you decide what, if anything, to do.
+
+You are "%[1]s". Recognize yourself, so you don't reply to your own messages or ignore messages meant for you:
+- Messages flagged is_own=true (rendered with "(YOU)" in tool output), or whose sender_name equals "%[1]s", are YOUR OWN past messages. They are context only — NEVER reply to your own messages.
+- A message containing @"%[1]s" (a @mention of your name) is directed AT YOU. Respond to it.
+- A message @mentioning a DIFFERENT agent's name is for that agent, not you. Stay silent unless you can genuinely add value.`, name)
+}
 
 // AgentFirstPromptBody is the fixed instruction the autonomous drain loop loads
 // into every session. It is agent-first (AX "Agent Inbox"): the agent itself
@@ -40,7 +53,7 @@ const AgentFirstPromptBody = `You are running an autonomous drain session. Follo
 
 2. Pick ONE channel to process this turn (your judgment — fewest unread, or most recent). Call get_conversation_messages with conversation=<that channel's name> and after_version=<that channel's processed_version from step 1>. This returns the new messages and the channel's current_version. Save current_version — you need it for posting and acking.
 
-3. Read the new messages. You may also call search_chat_history, get_conversation_messages with an earlier after_version for more history, or get_command_context to inspect a prior agent reply's execution.
+3. Read the new messages. In the tool output, messages you sent yourself are tagged is_own=true (shown as "(YOU)") — treat those as context only, never as new input to reply to. You may also call search_chat_history, get_conversation_messages with an earlier after_version for more history, or get_command_context to inspect a prior agent reply's execution.
 
 4. Decide what to do. Choose deliberately — do not default to replying. Your options are:
    - Reply in the channel (call post_message).
@@ -375,7 +388,7 @@ func (e *ACPExecutor) run() {
 	if identityName == "" {
 		identityName = e.request.AgentResourceID
 	}
-	promptText := fmt.Sprintf(agentIdentityPrefix, identityName) + "\n\n" + e.request.Instruction
+	promptText := agentIdentityText(identityName) + "\n\n" + e.request.Instruction
 
 	promptResp, err := e.conn.Prompt(e.ctx, acp.PromptRequest{
 		SessionId: sessionResp.SessionId,
