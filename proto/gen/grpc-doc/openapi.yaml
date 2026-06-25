@@ -1513,6 +1513,22 @@ components:
                 tokenVersion:
                     type: integer
                     format: int32
+        AgentACPConfig:
+            type: object
+            properties:
+                executable:
+                    type: string
+                args:
+                    type: array
+                    items:
+                        type: string
+                allowEnv:
+                    type: array
+                    items:
+                        type: string
+            description: |-
+                User-configurable ACP settings. Everything else (working dir, capabilities,
+                 permissions) is derived from a built-in template, not set by the admin.
         AgentActivity:
             type: object
             properties:
@@ -1600,8 +1616,8 @@ components:
                         type: string
                 capability:
                     $ref: '#/components/schemas/AgentCapability'
-                acpConfigYaml:
-                    type: string
+                acpConfig:
+                    $ref: '#/components/schemas/AgentACPConfig'
         AgentMetrics:
             type: object
             properties:
@@ -1928,8 +1944,8 @@ components:
                     format: date-time
                 initialStatus:
                     $ref: '#/components/schemas/AgentStatus'
-                acpConfigYaml:
-                    type: string
+                acpConfig:
+                    $ref: '#/components/schemas/AgentACPConfig'
         Conversation:
             type: object
             properties:
@@ -2386,13 +2402,13 @@ components:
         UpdateAgentACPConfigRequest:
             required:
                 - name
-                - acpConfigYaml
+                - acpConfig
             type: object
             properties:
                 name:
                     type: string
-                acpConfigYaml:
-                    type: string
+                acpConfig:
+                    $ref: '#/components/schemas/AgentACPConfig'
         User:
             type: object
             properties:

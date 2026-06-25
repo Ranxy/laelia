@@ -58,7 +58,7 @@ func TestACPCommandStreamReadFile(t *testing.T) {
 
 	require.NoError(t, stream.CloseRequest())
 
-	state, stateErr := executor.LoadLocalState()
+	state, stateErr := executor.LoadLocalState("")
 	require.NoError(t, stateErr)
 	assert.Nil(t, state, "local state should be cleared after completion")
 

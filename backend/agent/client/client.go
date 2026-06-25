@@ -61,6 +61,9 @@ type Client struct {
 	acpConfig   *executor.ACPConfig
 	mcpServer   *mcpsrv.Server
 	agentName   string
+	// resourceID is the agent's stable server-assigned UUID, parsed from the
+	// bootstrap token. It keys the per-agent working dir and local state file.
+	resourceID string
 }
 
 type ExponentialBackoff struct {
@@ -88,19 +91,11 @@ func (eb *ExponentialBackoff) Reset() {
 	eb.attempt = 0
 }
 
-func New(managerURL, token string, insecure bool, allowHTTP bool, acpConfigPath, agentName string, acpConfigServer bool) (*Client, error) {
+func New(managerURL, token string, insecure bool, allowHTTP bool, agentName string) (*Client, error) {
 	managerURL = strings.TrimRight(managerURL, "/")
 
+	// ACP config is always server-provided on connect (handleServerACPConfig).
 	var acpConfig *executor.ACPConfig
-	var err error
-
-	if !acpConfigServer {
-		acpConfig, err = executor.LoadACPConfigFromFile(acpConfigPath)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return nil, errors.Wrap(err, "failed to load ACP config")
-		}
-	}
-	// acpConfigServer=true: acpConfig stays nil, will be populated from server connect response
 
 	if strings.HasPrefix(managerURL, "http://") {
 		if !allowHTTP {
@@ -152,6 +147,7 @@ func New(managerURL, token string, insecure bool, allowHTTP bool, acpConfigPath,
 		backoff:      NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
 		acpConfig:    acpConfig,
 		agentName:    agentName,
+		resourceID:   resourceID,
 	}, nil
 }
 
@@ -211,18 +207,23 @@ func (c *Client) Connect(ctx context.Context, info *v1pb.AgentInfo) error {
 }
 
 func (c *Client) handleServerACPConfig(connectResp *v1pb.ConnectAgentResponse) {
-	if connectResp.AcpConfigYaml == "" {
+	cfg := executor.BuildACPConfig(connectResp.AcpConfig, c.resourceID)
+	if cfg == nil {
+		// Agent not configured yet (no executable). Stay inert until the admin
+		// sets one via UpdateAgentACPConfig; the next connect will pick it up.
+		c.mu.Lock()
+		c.acpConfig = nil
+		c.mu.Unlock()
 		return
 	}
-	cfg, err := executor.LoadACPConfigFromYAML(connectResp.AcpConfigYaml)
-	if err != nil {
-		slog.Warn("failed to load server-provided ACP config", "error", err)
+	if err := os.MkdirAll(cfg.WorkingDir, 0o700); err != nil {
+		slog.Warn("failed to create agent working dir", "dir", cfg.WorkingDir, "error", err)
 		return
 	}
 	c.mu.Lock()
 	c.acpConfig = cfg
 	c.mu.Unlock()
-	slog.Info("loaded ACP config from server (overrides local)")
+	slog.Info("loaded ACP config from server", "workingDir", cfg.WorkingDir)
 }
 
 func (c *Client) Heartbeat(ctx context.Context) error {
@@ -308,7 +309,7 @@ func (c *Client) Run(ctx context.Context) error {
 	c.mcpServer = mcpSrv
 	defer mcpSrv.Stop()
 
-	c.cmdStream = newCommandStream(c.streamClient, c.managerURL, mcpSrv.Port(), c.agentName)
+	c.cmdStream = newCommandStream(c.streamClient, c.managerURL, mcpSrv.Port(), c.agentName, c.resourceID)
 	c.cmdStream.getToken = func() string {
 		c.mu.RLock()
 		defer c.mu.RUnlock()

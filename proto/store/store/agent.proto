@@ -27,7 +27,13 @@ message AgentInfo {
   string version = 6;
   map<string, string> labels = 7;
   AgentCapability capability = 8;
-  string acp_config_yaml = 10;
+  AgentACPConfig acp_config = 10;
+}
+
+message AgentACPConfig {
+  string executable = 1;
+  repeated string args = 2;
+  repeated string allow_env = 3;
 }
 
 message AgentCapability {

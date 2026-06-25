@@ -851,18 +851,10 @@ func (e *ACPExecutor) validatePath(path string, enabled bool) (string, error) {
 	return "", pkgerrors.Errorf("path %s is outside ACP workspace roots", path)
 }
 
-func resolveACPWorkingDir(req Request, cfg *ACPConfig) (string, []string, error) {
-	workingDir := req.WorkingDir
-	if workingDir == "" {
-		workingDir = cfg.WorkingDir
-	}
-	if workingDir == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return "", nil, err
-		}
-		workingDir = cwd
-	}
+func resolveACPWorkingDir(_ Request, cfg *ACPConfig) (string, []string, error) {
+	// working_dir is always the per-agent dir baked into cfg by BuildACPConfig;
+	// the per-request WorkingDir is ignored.
+	workingDir := cfg.WorkingDir
 	absWorkingDir, err := filepath.Abs(workingDir)
 	if err != nil {
 		return "", nil, err

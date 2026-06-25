@@ -37,9 +37,39 @@ import {
   TableHeader,
   TableRow,
 } from "@/react/components/ui/table";
-import { Textarea } from "@/react/components/ui/textarea";
 import { useAppStore } from "@/react/stores";
-import type { Agent } from "@/types/proto-es/v1/agent_pb";
+import {
+  type Agent,
+  AgentStatus_ConnectionState,
+} from "@/types/proto-es/v1/agent_pb";
+
+type Lifecycle =
+  | "waiting-connection"
+  | "pending-config"
+  | "ready"
+  | "configured-offline";
+
+function agentLifecycle(agent: Agent): Lifecycle {
+  const online = agent.status?.state === AgentStatus_ConnectionState.ONLINE;
+  const configured = !!agent.info?.acpConfig?.executable;
+  if (online && configured) return "ready";
+  if (online && !configured) return "pending-config";
+  if (!online && configured) return "configured-offline";
+  return "waiting-connection";
+}
+
+function lifecycleLabel(state: Lifecycle): string {
+  switch (state) {
+    case "ready":
+      return "Ready";
+    case "pending-config":
+      return "Connected — pending configuration";
+    case "configured-offline":
+      return "Configured (offline)";
+    case "waiting-connection":
+      return "Waiting for connection";
+  }
+}
 
 export function AgentsPage() {
   const { t } = useTranslation();
@@ -56,7 +86,9 @@ export function AgentsPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [acpConfigOpen, setAcpConfigOpen] = useState(false);
-  const [acpConfigYaml, setAcpConfigYaml] = useState("");
+  const [executable, setExecutable] = useState("");
+  const [args, setArgs] = useState<string[]>([]);
+  const [allowEnv, setAllowEnv] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [rotateOpen, setRotateOpen] = useState(false);
@@ -72,6 +104,28 @@ export function AgentsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Refresh while any agent is not yet ready (waiting for connection or
+  // pending configuration), so the page flips to "pending config" / "ready"
+  // promptly once the agent connects or gets configured. Silent refreshes skip
+  // the loading flag and skip the state update when nothing changed, so polls
+  // cause no re-render/flicker unless the data actually changed.
+  const anyNonReady = agents.some((a) => agentLifecycle(a) !== "ready");
+  useEffect(() => {
+    if (!anyNonReady) return;
+    const id = setInterval(
+      () => fetchAgents({ pageSize: 100 }, { silent: true }),
+      3000
+    );
+    return () => clearInterval(id);
+  }, [anyNonReady, fetchAgents]);
+
+  // Keep the open detail dialog in sync with refreshed agent data.
+  useEffect(() => {
+    if (!detailOpen || !selectedAgent?.name) return;
+    const latest = agents.find((a) => a.name === selectedAgent.name);
+    if (latest && latest !== selectedAgent) setSelectedAgent(latest);
+  }, [agents, detailOpen, selectedAgent]);
 
   async function handleCreate() {
     if (!name.trim()) return;
@@ -109,7 +163,11 @@ export function AgentsPage() {
 
   function handleEditACPConfig(agent: Agent) {
     setSelectedAgent(agent);
-    setAcpConfigYaml(agent.info?.acpConfigYaml ?? "");
+    setExecutable(agent.info?.acpConfig?.executable ?? "");
+    setArgs(agent.info?.acpConfig?.args ? [...agent.info.acpConfig.args] : []);
+    setAllowEnv(
+      agent.info?.acpConfig?.allowEnv ? [...agent.info.acpConfig.allowEnv] : []
+    );
     setSaveError("");
     setAcpConfigOpen(true);
   }
@@ -160,8 +218,13 @@ export function AgentsPage() {
     setSaving(true);
     setSaveError("");
     try {
+      const acpConfig = {
+        executable: executable.trim(),
+        args: args.map((a) => a.trim()).filter((a) => a !== ""),
+        allowEnv: allowEnv.map((e) => e.trim()).filter((e) => e !== ""),
+      };
       const updateAgentACPConfig = useAppStore.getState().updateAgentACPConfig;
-      await updateAgentACPConfig(selectedAgent.name, acpConfigYaml);
+      await updateAgentACPConfig(selectedAgent.name, acpConfig);
       setAcpConfigOpen(false);
       load();
       const getAgent = useAppStore.getState().getAgent;
@@ -265,6 +328,11 @@ export function AgentsPage() {
                   <ConnectionBadge state={selectedAgent.status?.state} />
                 </span>
 
+                <span className="text-control-light whitespace-nowrap">
+                  Configuration
+                </span>
+                <span>{lifecycleLabel(agentLifecycle(selectedAgent))}</span>
+
                 {selectedAgent.info && (
                   <>
                     {selectedAgent.info.hostname && (
@@ -346,6 +414,20 @@ export function AgentsPage() {
                   </>
                 )}
               </div>
+              {agentLifecycle(selectedAgent) === "waiting-connection" && (
+                <Alert
+                  variant="info"
+                  description="Run the bootstrap command on the host to connect this agent, then configure its executable."
+                  className="mt-1"
+                />
+              )}
+              {agentLifecycle(selectedAgent) === "pending-config" && (
+                <Alert
+                  variant="info"
+                  description="Agent is connected. Set its executable to make it usable."
+                  className="mt-1"
+                />
+              )}
               <div className="pt-3 border-t border-control-border flex flex-col gap-2">
                 <Button
                   variant="outline"
@@ -397,21 +479,47 @@ export function AgentsPage() {
           <SheetHeader>
             <SheetTitle>ACP Config — {selectedAgent?.title ?? ""}</SheetTitle>
             <SheetDescription>
-              Edit the ACP YAML configuration for this agent
+              Configure the LLM agent to run. Everything else uses built-in
+              defaults.
             </SheetDescription>
           </SheetHeader>
           <SheetBody>
             {saveError && (
               <Alert variant="error" description={saveError} className="mb-4" />
             )}
-            <Textarea
-              className="font-mono text-sm min-h-[360px]"
-              value={acpConfigYaml}
-              onChange={(e) => {
-                setAcpConfigYaml(e.target.value);
-                setSaveError("");
-              }}
-            />
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Executable</label>
+                <Input
+                  placeholder="npx"
+                  value={executable}
+                  onChange={(e) => {
+                    setExecutable((e.target as HTMLInputElement).value);
+                    setSaveError("");
+                  }}
+                />
+              </div>
+
+              <StringListEditor
+                label="Args"
+                placeholder="@agentclientprotocol/claude-agent-acp@latest"
+                values={args}
+                onChange={(next) => {
+                  setArgs(next);
+                  setSaveError("");
+                }}
+              />
+
+              <StringListEditor
+                label="Allow env"
+                placeholder="MY_CUSTOM_VAR"
+                values={allowEnv}
+                onChange={(next) => {
+                  setAllowEnv(next);
+                  setSaveError("");
+                }}
+              />
+            </div>
           </SheetBody>
           <SheetFooter>
             <Button
@@ -422,7 +530,7 @@ export function AgentsPage() {
               Cancel
             </Button>
             <Button
-              disabled={saving || !acpConfigYaml.trim()}
+              disabled={saving || !executable.trim()}
               onClick={handleSaveACPConfig}
             >
               {saving ? "Saving..." : "Save"}
@@ -583,6 +691,55 @@ export function AgentsPage() {
           </TableBody>
         </Table>
       )}
+    </div>
+  );
+}
+
+function StringListEditor({
+  label,
+  placeholder,
+  values,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  values: string[];
+  onChange: (next: string[]) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium">{label}</label>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onChange([...values, ""])}
+        >
+          Add
+        </Button>
+      </div>
+      <div className="flex flex-col gap-2">
+        {values.map((value, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <Input
+              placeholder={placeholder}
+              value={value}
+              onChange={(e) => {
+                const next = [...values];
+                next[index] = (e.target as HTMLInputElement).value;
+                onChange(next);
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onChange(values.filter((_, i) => i !== index))}
+            >
+              Remove
+            </Button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

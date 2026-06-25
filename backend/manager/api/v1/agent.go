@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"sync"
 	"time"
 
@@ -36,6 +37,9 @@ const (
 	refreshTokenReuseWindow      = 30 * time.Second
 	sessionIDLength              = 32
 )
+
+// envVarNameRegex matches a valid environment variable name.
+var envVarNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 type AgentService struct {
 	v1connect.UnimplementedAgentServiceHandler
@@ -72,6 +76,9 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 		TokenVersion: 1,
 		Info: &storepb.AgentInfo{
 			Labels: req.Msg.Agent.Labels,
+			AcpConfig: &storepb.AgentACPConfig{
+				AllowEnv: executor.DefaultAllowEnv,
+			},
 		},
 		Status: &storepb.AgentStatus{},
 	}
@@ -350,12 +357,12 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 	now := time.Now()
 	nowSec := now.Unix()
 
-	acpConfigYaml := ""
-	if agent.Info != nil && agent.Info.AcpConfigYaml != "" {
-		agentCap := req.Msg.Info.GetCapability()
-		if agentCap == nil || !agentCap.SupportsAcp {
-			acpConfigYaml = agent.Info.AcpConfigYaml
-		}
+	// ACP config is owned by the server (set by the admin via
+	// UpdateAgentACPConfig). Always echo it back to the agent and derive the
+	// capability from it, regardless of what the agent reports.
+	var storedAcpConfig *storepb.AgentACPConfig
+	if agent.Info != nil {
+		storedAcpConfig = agent.Info.GetAcpConfig()
 	}
 
 	patch := &store.UpdateAgentMessage{
@@ -368,17 +375,11 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 	}
 	if req.Msg.Info != nil {
 		patch.Info = convertToStoreAgentInfo(req.Msg.Info)
+	} else {
+		patch.Info = &storepb.AgentInfo{}
 	}
-
-	if acpConfigYaml != "" {
-		cfg, err := executor.LoadACPConfigFromYAML(acpConfigYaml)
-		if err != nil {
-			slog.Warn("failed to parse stored ACP config, skipping capability override", "agent", agent.ResourceID, "error", err)
-		} else {
-			patch.Info.Capability = convertToStoreAgentCapability(cfg.Capability())
-			patch.Info.AcpConfigYaml = acpConfigYaml
-		}
-	}
+	patch.Info.Capability = convertToStoreAgentCapability(executor.BuildCapability(convertToV1AgentACPConfig(storedAcpConfig)))
+	patch.Info.AcpConfig = storedAcpConfig
 
 	updated, err := s.store.UpdateAgent(ctx, agent, patch)
 	if err != nil {
@@ -445,7 +446,7 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 		NextNonce:            nonce,
 		AccessTokenExpiresAt: timestamppb.New(time.Now().Add(accessTokenDuration)),
 		InitialStatus:        convertToV1AgentStatus(updated.Status, updated.Deleted),
-		AcpConfigYaml:        acpConfigYaml,
+		AcpConfig:            convertToV1AgentACPConfig(storedAcpConfig),
 	}), nil
 }
 
@@ -775,15 +776,15 @@ func convertToV1AgentInfo(info *storepb.AgentInfo) *v1pb.AgentInfo {
 		return nil
 	}
 	return &v1pb.AgentInfo{
-		AgentType:     info.AgentType,
-		Hostname:      info.Hostname,
-		Os:            info.Os,
-		Arch:          info.Arch,
-		Ip:            info.Ip,
-		Version:       info.Version,
-		Labels:        info.Labels,
-		Capability:    convertToV1AgentCapability(info.Capability),
-		AcpConfigYaml: info.AcpConfigYaml,
+		AgentType:  info.AgentType,
+		Hostname:   info.Hostname,
+		Os:         info.Os,
+		Arch:       info.Arch,
+		Ip:         info.Ip,
+		Version:    info.Version,
+		Labels:     info.Labels,
+		Capability: convertToV1AgentCapability(info.Capability),
+		AcpConfig:  convertToV1AgentACPConfig(info.AcpConfig),
 	}
 }
 
@@ -792,15 +793,38 @@ func convertToStoreAgentInfo(info *v1pb.AgentInfo) *storepb.AgentInfo {
 		return nil
 	}
 	return &storepb.AgentInfo{
-		AgentType:     info.AgentType,
-		Hostname:      info.Hostname,
-		Os:            info.Os,
-		Arch:          info.Arch,
-		Ip:            info.Ip,
-		Version:       info.Version,
-		Labels:        info.Labels,
-		Capability:    convertToStoreAgentCapability(info.Capability),
-		AcpConfigYaml: info.AcpConfigYaml,
+		AgentType:  info.AgentType,
+		Hostname:   info.Hostname,
+		Os:         info.Os,
+		Arch:       info.Arch,
+		Ip:         info.Ip,
+		Version:    info.Version,
+		Labels:     info.Labels,
+		Capability: convertToStoreAgentCapability(info.Capability),
+		// AcpConfig is server-owned; never overwrite it from agent-reported info.
+		AcpConfig: nil,
+	}
+}
+
+func convertToV1AgentACPConfig(cfg *storepb.AgentACPConfig) *v1pb.AgentACPConfig {
+	if cfg == nil {
+		return nil
+	}
+	return &v1pb.AgentACPConfig{
+		Executable: cfg.Executable,
+		Args:       cfg.Args,
+		AllowEnv:   cfg.AllowEnv,
+	}
+}
+
+func convertToStoreAgentACPConfig(cfg *v1pb.AgentACPConfig) *storepb.AgentACPConfig {
+	if cfg == nil {
+		return nil
+	}
+	return &storepb.AgentACPConfig{
+		Executable: cfg.Executable,
+		Args:       cfg.Args,
+		AllowEnv:   cfg.AllowEnv,
 	}
 }
 
@@ -935,9 +959,8 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
-	if _, err := executor.LoadACPConfigFromYAML(req.Msg.AcpConfigYaml); err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument,
-			errors.Errorf("invalid ACP config YAML: %v", err))
+	if err := validateAgentACPConfig(req.Msg.AcpConfig); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
 	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
@@ -950,11 +973,28 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 
 	patch := &store.UpdateAgentMessage{
 		Info: &storepb.AgentInfo{
-			AcpConfigYaml: req.Msg.AcpConfigYaml,
+			AcpConfig: convertToStoreAgentACPConfig(req.Msg.AcpConfig),
 		},
 	}
 	if _, err := s.store.UpdateAgent(ctx, agent, patch); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
+}
+
+// validateAgentACPConfig checks the user-configurable ACP fields. executable
+// is required and every allow_env entry must be a valid env var name.
+func validateAgentACPConfig(cfg *v1pb.AgentACPConfig) error {
+	if cfg == nil {
+		return errors.New("acp_config must be set")
+	}
+	if cfg.Executable == "" {
+		return errors.New("acp_config.executable must be set")
+	}
+	for _, name := range cfg.AllowEnv {
+		if !envVarNameRegex.MatchString(name) {
+			return errors.Errorf("invalid allow_env entry %q: must match ^[A-Za-z_][A-Za-z0-9_]*$", name)
+		}
+	}
+	return nil
 }

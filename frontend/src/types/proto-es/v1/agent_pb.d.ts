@@ -334,11 +334,11 @@ export declare type ConnectAgentResponse = Message<"laelia.v1.ConnectAgentRespon
   initialStatus?: AgentStatus | undefined;
 
   /**
-   * server-provided ACP YAML config (empty when agent uses local file)
+   * server-provided structured ACP config
    *
-   * @generated from field: string acp_config_yaml = 7;
+   * @generated from field: laelia.v1.AgentACPConfig acp_config = 7;
    */
-  acpConfigYaml: string;
+  acpConfig?: AgentACPConfig | undefined;
 };
 
 /**
@@ -625,9 +625,9 @@ export declare type UpdateAgentACPConfigRequest = Message<"laelia.v1.UpdateAgent
   name: string;
 
   /**
-   * @generated from field: string acp_config_yaml = 2;
+   * @generated from field: laelia.v1.AgentACPConfig acp_config = 2;
    */
-  acpConfigYaml: string;
+  acpConfig?: AgentACPConfig | undefined;
 };
 
 /**
@@ -770,9 +770,9 @@ export declare type AgentInfo = Message<"laelia.v1.AgentInfo"> & {
   capability?: AgentCapability | undefined;
 
   /**
-   * @generated from field: string acp_config_yaml = 10;
+   * @generated from field: laelia.v1.AgentACPConfig acp_config = 10;
    */
-  acpConfigYaml: string;
+  acpConfig?: AgentACPConfig | undefined;
 };
 
 /**
@@ -780,6 +780,41 @@ export declare type AgentInfo = Message<"laelia.v1.AgentInfo"> & {
  * Use `create(AgentInfoSchema)` to create a new message.
  */
 export declare const AgentInfoSchema: GenMessage<AgentInfo>;
+
+/**
+ * User-configurable ACP settings. Everything else (working dir, capabilities,
+ * permissions) is derived from a built-in template, not set by the admin.
+ *
+ * @generated from message laelia.v1.AgentACPConfig
+ */
+export declare type AgentACPConfig = Message<"laelia.v1.AgentACPConfig"> & {
+  /**
+   * command to run, e.g. "npx"
+   *
+   * @generated from field: string executable = 1;
+   */
+  executable: string;
+
+  /**
+   * args passed to executable, e.g. ["-y", "@agentclientprotocol/claude-agent-acp@latest"]
+   *
+   * @generated from field: repeated string args = 2;
+   */
+  args: string[];
+
+  /**
+   * env var names the child process may inherit
+   *
+   * @generated from field: repeated string allow_env = 3;
+   */
+  allowEnv: string[];
+};
+
+/**
+ * Describes the message laelia.v1.AgentACPConfig.
+ * Use `create(AgentACPConfigSchema)` to create a new message.
+ */
+export declare const AgentACPConfigSchema: GenMessage<AgentACPConfig>;
 
 /**
  * @generated from message laelia.v1.AgentCapability

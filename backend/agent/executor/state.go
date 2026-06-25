@@ -17,8 +17,8 @@ type LocalState struct {
 	OutputBuffer     []OutputChunk `json:"output_buffer"`
 }
 
-func LoadLocalState() (*LocalState, error) {
-	data, err := os.ReadFile(statePath())
+func LoadLocalState(agentID string) (*LocalState, error) {
+	data, err := os.ReadFile(statePath(agentID))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -33,28 +33,28 @@ func LoadLocalState() (*LocalState, error) {
 	return &state, nil
 }
 
-func SaveLocalState(state *LocalState) error {
+func SaveLocalState(agentID string, state *LocalState) error {
 	data, err := json.Marshal(state)
 	if err != nil {
 		return err
 	}
 
-	dir := filepath.Dir(statePath())
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	dir := filepath.Dir(statePath(agentID))
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 
-	return os.WriteFile(statePath(), data, 0600)
+	return os.WriteFile(statePath(agentID), data, 0o600)
 }
 
-func ClearLocalState() error {
-	if err := os.Remove(statePath()); err != nil && !os.IsNotExist(err) {
+func ClearLocalState(agentID string) error {
+	if err := os.Remove(statePath(agentID)); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
 }
 
-func statePath() string {
+func statePath(agentID string) string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".laelia", "command-state.json")
+	return filepath.Join(home, ".laelia", agentID, "command-state.json")
 }

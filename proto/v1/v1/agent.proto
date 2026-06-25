@@ -223,7 +223,7 @@ message ConnectAgentResponse {
   string next_nonce = 4; // server-signed nonce for next heartbeat
   google.protobuf.Timestamp access_token_expires_at = 5;
   AgentStatus initial_status = 6;
-  string acp_config_yaml = 7; // server-provided ACP YAML config (empty when agent uses local file)
+  AgentACPConfig acp_config = 7; // server-provided structured ACP config
 }
 
 // --- Agent Heartbeat ---
@@ -306,7 +306,7 @@ message UpdateAgentACPConfigRequest {
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "laelia/Agent"}
   ];
-  string acp_config_yaml = 2 [(google.api.field_behavior) = REQUIRED];
+  AgentACPConfig acp_config = 2 [(google.api.field_behavior) = REQUIRED];
 }
 
 // --- Hello ---
@@ -350,7 +350,15 @@ message AgentInfo {
   string version = 6;
   map<string, string> labels = 7;
   AgentCapability capability = 8;
-  string acp_config_yaml = 10;
+  AgentACPConfig acp_config = 10;
+}
+
+// User-configurable ACP settings. Everything else (working dir, capabilities,
+// permissions) is derived from a built-in template, not set by the admin.
+message AgentACPConfig {
+  string executable = 1; // command to run, e.g. "npx"
+  repeated string args = 2; // args passed to executable, e.g. ["-y", "@agentclientprotocol/claude-agent-acp@latest"]
+  repeated string allow_env = 3; // env var names the child process may inherit
 }
 
 message AgentCapability {

@@ -4,6 +4,7 @@
 ## Table of Contents
 
 - [store/agent.proto](#store_agent-proto)
+    - [AgentACPConfig](#laelia-store-AgentACPConfig)
     - [AgentCapability](#laelia-store-AgentCapability)
     - [AgentInfo](#laelia-store-AgentInfo)
     - [AgentInfo.LabelsEntry](#laelia-store-AgentInfo-LabelsEntry)
@@ -78,6 +79,23 @@
 
 
 
+<a name="laelia-store-AgentACPConfig"></a>
+
+### AgentACPConfig
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| executable | [string](#string) |  |  |
+| args | [string](#string) | repeated |  |
+| allow_env | [string](#string) | repeated |  |
+
+
+
+
+
+
 <a name="laelia-store-AgentCapability"></a>
 
 ### AgentCapability
@@ -116,7 +134,7 @@
 | version | [string](#string) |  |  |
 | labels | [AgentInfo.LabelsEntry](#laelia-store-AgentInfo-LabelsEntry) | repeated |  |
 | capability | [AgentCapability](#laelia-store-AgentCapability) |  |  |
-| acp_config_yaml | [string](#string) |  |  |
+| acp_config | [AgentACPConfig](#laelia-store-AgentACPConfig) |  |  |
 
 
 

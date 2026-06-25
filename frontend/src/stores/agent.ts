@@ -1,7 +1,8 @@
-import { create } from "@bufbuild/protobuf";
+import { create, equals } from "@bufbuild/protobuf";
 import { agentServiceClient } from "@/connect";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
 import {
+  AgentACPConfigSchema,
   AgentSchema,
   CreateAgentRequestSchema,
   DeleteAgentRequestSchema,
@@ -16,13 +17,21 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
   agentsLoading: false,
   agentCache: {},
 
-  async fetchAgents(params) {
-    set({ agentsLoading: true });
+  async fetchAgents(params, opts) {
+    const silent = opts?.silent;
+    // Silent (background) refreshes must not flip the loading flag — otherwise
+    // the table swaps to "Loading…" and back on every poll, causing flicker.
+    if (!silent) set({ agentsLoading: true });
     try {
       const res = await agentServiceClient.listAgents({
         pageSize: params?.pageSize ?? 100,
         pageToken: params?.pageToken ?? "",
       });
+      // Skip the state update entirely when nothing changed, so unchanged
+      // polls cause no re-render at all.
+      if (silent && agentsEqual(get().agents, res.agents)) {
+        return { nextPageToken: res.nextPageToken };
+      }
       const cache: Record<string, Agent> = {};
       for (const a of res.agents) {
         if (a.name) cache[a.name] = a;
@@ -34,7 +43,9 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
       }));
       return { nextPageToken: res.nextPageToken };
     } catch {
-      set({ agents: [], agentsLoading: false });
+      // On a silent refresh, keep the existing list instead of wiping it on a
+      // transient error; only an explicit load reports failure + clears.
+      if (!silent) set({ agents: [], agentsLoading: false });
       return undefined;
     }
   },
@@ -99,9 +110,26 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     }));
   },
 
-  async updateAgentACPConfig(name: string, acpConfigYaml: string) {
+  async updateAgentACPConfig(
+    name: string,
+    acpConfig: { executable: string; args: string[]; allowEnv: string[] }
+  ) {
     await agentServiceClient.updateAgentACPConfig(
-      create(UpdateAgentACPConfigRequestSchema, { name, acpConfigYaml })
+      create(UpdateAgentACPConfigRequestSchema, {
+        name,
+        acpConfig: create(AgentACPConfigSchema, acpConfig),
+      })
     );
   },
 });
+
+// agentsEqual reports whether two agent lists are structurally identical, used
+// to skip redundant state updates during background polling.
+function agentsEqual(prev: Agent[], next: Agent[]): boolean {
+  if (prev.length !== next.length) return false;
+  for (let i = 0; i < prev.length; i++) {
+    if (prev[i].name !== next[i].name) return false;
+    if (!equals(AgentSchema, prev[i], next[i])) return false;
+  }
+  return true;
+}

@@ -245,6 +245,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.AgentACPConfig"><span class="badge">M</span>AgentACPConfig</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.AgentCapability"><span class="badge">M</span>AgentCapability</a>
                 </li>
               
@@ -1147,6 +1151,44 @@
 
         
       
+        <h3 id="laelia.v1.AgentACPConfig">AgentACPConfig</h3>
+        <p>User-configurable ACP settings. Everything else (working dir, capabilities,</p><p>permissions) is derived from a built-in template, not set by the admin.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>executable</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>command to run, e.g. &#34;npx&#34; </p></td>
+                </tr>
+              
+                <tr>
+                  <td>args</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>args passed to executable, e.g. [&#34;-y&#34;, &#34;@agentclientprotocol/claude-agent-acp@latest&#34;] </p></td>
+                </tr>
+              
+                <tr>
+                  <td>allow_env</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>env var names the child process may inherit </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.AgentCapability">AgentCapability</h3>
         <p></p>
 
@@ -1415,8 +1457,8 @@
                 </tr>
               
                 <tr>
-                  <td>acp_config_yaml</td>
-                  <td><a href="#string">string</a></td>
+                  <td>acp_config</td>
+                  <td><a href="#laelia.v1.AgentACPConfig">AgentACPConfig</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -1755,10 +1797,10 @@
                 </tr>
               
                 <tr>
-                  <td>acp_config_yaml</td>
-                  <td><a href="#string">string</a></td>
+                  <td>acp_config</td>
+                  <td><a href="#laelia.v1.AgentACPConfig">AgentACPConfig</a></td>
                   <td></td>
-                  <td><p>server-provided ACP YAML config (empty when agent uses local file) </p></td>
+                  <td><p>server-provided structured ACP config </p></td>
                 </tr>
               
             </tbody>
@@ -2348,8 +2390,8 @@
                 </tr>
               
                 <tr>
-                  <td>acp_config_yaml</td>
-                  <td><a href="#string">string</a></td>
+                  <td>acp_config</td>
+                  <td><a href="#laelia.v1.AgentACPConfig">AgentACPConfig</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>

@@ -177,7 +177,7 @@ func (x AgentStatus_ConnectionState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AgentStatus_ConnectionState.Descriptor instead.
 func (AgentStatus_ConnectionState) EnumDescriptor() ([]byte, []int) {
-	return file_store_agent_proto_rawDescGZIP(), []int{2, 0}
+	return file_store_agent_proto_rawDescGZIP(), []int{3, 0}
 }
 
 type AgentInfo struct {
@@ -190,7 +190,7 @@ type AgentInfo struct {
 	Version       string                 `protobuf:"bytes,6,opt,name=version,proto3" json:"version,omitempty"`
 	Labels        map[string]string      `protobuf:"bytes,7,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Capability    *AgentCapability       `protobuf:"bytes,8,opt,name=capability,proto3" json:"capability,omitempty"`
-	AcpConfigYaml string                 `protobuf:"bytes,10,opt,name=acp_config_yaml,json=acpConfigYaml,proto3" json:"acp_config_yaml,omitempty"`
+	AcpConfig     *AgentACPConfig        `protobuf:"bytes,10,opt,name=acp_config,json=acpConfig,proto3" json:"acp_config,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -281,11 +281,71 @@ func (x *AgentInfo) GetCapability() *AgentCapability {
 	return nil
 }
 
-func (x *AgentInfo) GetAcpConfigYaml() string {
+func (x *AgentInfo) GetAcpConfig() *AgentACPConfig {
 	if x != nil {
-		return x.AcpConfigYaml
+		return x.AcpConfig
+	}
+	return nil
+}
+
+type AgentACPConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Executable    string                 `protobuf:"bytes,1,opt,name=executable,proto3" json:"executable,omitempty"`
+	Args          []string               `protobuf:"bytes,2,rep,name=args,proto3" json:"args,omitempty"`
+	AllowEnv      []string               `protobuf:"bytes,3,rep,name=allow_env,json=allowEnv,proto3" json:"allow_env,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentACPConfig) Reset() {
+	*x = AgentACPConfig{}
+	mi := &file_store_agent_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentACPConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentACPConfig) ProtoMessage() {}
+
+func (x *AgentACPConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_store_agent_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentACPConfig.ProtoReflect.Descriptor instead.
+func (*AgentACPConfig) Descriptor() ([]byte, []int) {
+	return file_store_agent_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *AgentACPConfig) GetExecutable() string {
+	if x != nil {
+		return x.Executable
 	}
 	return ""
+}
+
+func (x *AgentACPConfig) GetArgs() []string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
+func (x *AgentACPConfig) GetAllowEnv() []string {
+	if x != nil {
+		return x.AllowEnv
+	}
+	return nil
 }
 
 type AgentCapability struct {
@@ -304,7 +364,7 @@ type AgentCapability struct {
 
 func (x *AgentCapability) Reset() {
 	*x = AgentCapability{}
-	mi := &file_store_agent_proto_msgTypes[1]
+	mi := &file_store_agent_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -316,7 +376,7 @@ func (x *AgentCapability) String() string {
 func (*AgentCapability) ProtoMessage() {}
 
 func (x *AgentCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_store_agent_proto_msgTypes[1]
+	mi := &file_store_agent_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -329,7 +389,7 @@ func (x *AgentCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentCapability.ProtoReflect.Descriptor instead.
 func (*AgentCapability) Descriptor() ([]byte, []int) {
-	return file_store_agent_proto_rawDescGZIP(), []int{1}
+	return file_store_agent_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *AgentCapability) GetSupportsAcp() bool {
@@ -401,7 +461,7 @@ type AgentStatus struct {
 
 func (x *AgentStatus) Reset() {
 	*x = AgentStatus{}
-	mi := &file_store_agent_proto_msgTypes[2]
+	mi := &file_store_agent_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -413,7 +473,7 @@ func (x *AgentStatus) String() string {
 func (*AgentStatus) ProtoMessage() {}
 
 func (x *AgentStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_store_agent_proto_msgTypes[2]
+	mi := &file_store_agent_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -426,7 +486,7 @@ func (x *AgentStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentStatus.ProtoReflect.Descriptor instead.
 func (*AgentStatus) Descriptor() ([]byte, []int) {
-	return file_store_agent_proto_rawDescGZIP(), []int{2}
+	return file_store_agent_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *AgentStatus) GetState() AgentStatus_ConnectionState {
@@ -468,7 +528,7 @@ var File_store_agent_proto protoreflect.FileDescriptor
 
 const file_store_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x11store/agent.proto\x12\flaelia.store\"\xf3\x02\n" +
+	"\x11store/agent.proto\x12\flaelia.store\"\x88\x03\n" +
 	"\tAgentInfo\x12\x1d\n" +
 	"\n" +
 	"agent_type\x18\x01 \x01(\tR\tagentType\x12\x1a\n" +
@@ -480,12 +540,19 @@ const file_store_agent_proto_rawDesc = "" +
 	"\x06labels\x18\a \x03(\v2#.laelia.store.AgentInfo.LabelsEntryR\x06labels\x12=\n" +
 	"\n" +
 	"capability\x18\b \x01(\v2\x1d.laelia.store.AgentCapabilityR\n" +
-	"capability\x12&\n" +
-	"\x0facp_config_yaml\x18\n" +
-	" \x01(\tR\racpConfigYaml\x1a9\n" +
+	"capability\x12;\n" +
+	"\n" +
+	"acp_config\x18\n" +
+	" \x01(\v2\x1c.laelia.store.AgentACPConfigR\tacpConfig\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xff\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"a\n" +
+	"\x0eAgentACPConfig\x12\x1e\n" +
+	"\n" +
+	"executable\x18\x01 \x01(\tR\n" +
+	"executable\x12\x12\n" +
+	"\x04args\x18\x02 \x03(\tR\x04args\x12\x1b\n" +
+	"\tallow_env\x18\x03 \x03(\tR\ballowEnv\"\xff\x02\n" +
 	"\x0fAgentCapability\x12!\n" +
 	"\fsupports_acp\x18\x01 \x01(\bR\vsupportsAcp\x12.\n" +
 	"\x13max_timeout_seconds\x18\x03 \x01(\x05R\x11maxTimeoutSeconds\x12#\n" +
@@ -535,25 +602,27 @@ func file_store_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_store_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_store_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_store_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_store_agent_proto_goTypes = []any{
 	(AgentTokenType)(0),              // 0: laelia.store.AgentTokenType
 	(AgentTokenState)(0),             // 1: laelia.store.AgentTokenState
 	(AgentStatus_ConnectionState)(0), // 2: laelia.store.AgentStatus.ConnectionState
 	(*AgentInfo)(nil),                // 3: laelia.store.AgentInfo
-	(*AgentCapability)(nil),          // 4: laelia.store.AgentCapability
-	(*AgentStatus)(nil),              // 5: laelia.store.AgentStatus
-	nil,                              // 6: laelia.store.AgentInfo.LabelsEntry
+	(*AgentACPConfig)(nil),           // 4: laelia.store.AgentACPConfig
+	(*AgentCapability)(nil),          // 5: laelia.store.AgentCapability
+	(*AgentStatus)(nil),              // 6: laelia.store.AgentStatus
+	nil,                              // 7: laelia.store.AgentInfo.LabelsEntry
 }
 var file_store_agent_proto_depIdxs = []int32{
-	6, // 0: laelia.store.AgentInfo.labels:type_name -> laelia.store.AgentInfo.LabelsEntry
-	4, // 1: laelia.store.AgentInfo.capability:type_name -> laelia.store.AgentCapability
-	2, // 2: laelia.store.AgentStatus.state:type_name -> laelia.store.AgentStatus.ConnectionState
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	7, // 0: laelia.store.AgentInfo.labels:type_name -> laelia.store.AgentInfo.LabelsEntry
+	5, // 1: laelia.store.AgentInfo.capability:type_name -> laelia.store.AgentCapability
+	4, // 2: laelia.store.AgentInfo.acp_config:type_name -> laelia.store.AgentACPConfig
+	2, // 3: laelia.store.AgentStatus.state:type_name -> laelia.store.AgentStatus.ConnectionState
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_store_agent_proto_init() }
@@ -567,7 +636,7 @@ func file_store_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_store_agent_proto_rawDesc), len(file_store_agent_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

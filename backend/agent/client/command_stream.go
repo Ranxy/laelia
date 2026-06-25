@@ -83,7 +83,11 @@ type commandStream struct {
 	getAcpConfig    func() *executor.ACPConfig
 	mcpPort         int
 	agentResourceID string
-	isExecuting     atomic.Bool
+	// resourceID is the agent's stable server-assigned UUID (parsed from the
+	// bootstrap token). It keys the per-agent working dir and local state file,
+	// distinct from agentResourceID (the --agent-name flag / PrincipalId).
+	resourceID  string
+	isExecuting atomic.Bool
 
 	// drain loop coordination. wakeCh is buffered(1): a wake while one is
 	// already pending is coalesced. beginRespCh carries the manager's reply
@@ -99,13 +103,14 @@ type commandStream struct {
 	newSessionRuntime func(req *v1pb.CommandRequest) (executor.Runtime, error)
 }
 
-func newCommandStream(httpClient *http.Client, managerURL string, mcpPort int, agentResourceID string) *commandStream {
+func newCommandStream(httpClient *http.Client, managerURL string, mcpPort int, agentResourceID, resourceID string) *commandStream {
 	c := &commandStream{
 		client:          v1connect.NewAgentStreamServiceClient(httpClient, managerURL),
 		managerURL:      managerURL,
 		backoff:         NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
 		mcpPort:         mcpPort,
 		agentResourceID: agentResourceID,
+		resourceID:      resourceID,
 		wakeCh:          make(chan struct{}, 1),
 		beginRespCh:     make(chan *v1pb.BeginSessionResponse, 1),
 	}
@@ -160,7 +165,7 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 			},
 		},
 	}
-	if state, err := executor.LoadLocalState(); err != nil {
+	if state, err := executor.LoadLocalState(c.resourceID); err != nil {
 		slog.Warn("failed to load local command state", "error", err)
 	} else if state != nil {
 		ready.GetAgentReady().LastCommandId = state.CommandID
@@ -396,7 +401,7 @@ func (c *commandStream) getCurrentExecutor() executor.Runtime {
 	return c.currentExecutor
 }
 
-func (*commandStream) runCommand(
+func (c *commandStream) runCommand(
 	ctx context.Context,
 	runtime executor.Runtime,
 	stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage],
@@ -411,7 +416,7 @@ func (*commandStream) runCommand(
 		LastSeqSent:      0,
 		LastEventSeqSent: 0,
 	}
-	if err := executor.SaveLocalState(state); err != nil {
+	if err := executor.SaveLocalState(c.resourceID, state); err != nil {
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 	}
 
@@ -426,7 +431,7 @@ func (*commandStream) runCommand(
 			return
 		}
 		runtime.Cancel()
-		_ = executor.ClearLocalState()
+		_ = executor.ClearLocalState(c.resourceID)
 		_ = sendCommandResult(stream, &v1pb.CommandResult{
 			CommandId:    commandID,
 			ExitCode:     -1,
@@ -449,7 +454,7 @@ func (*commandStream) runCommand(
 		slog.Error("failed to send command start event", "commandID", commandID, "error", err)
 		return
 	}
-	if err := executor.SaveLocalState(state); err != nil {
+	if err := executor.SaveLocalState(c.resourceID, state); err != nil {
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 	}
 
@@ -485,7 +490,7 @@ func (*commandStream) runCommand(
 			} else {
 				slog.Info("command result sent", "commandID", commandID, "exitCode", result.ExitCode)
 			}
-			_ = executor.ClearLocalState()
+			_ = executor.ClearLocalState(c.resourceID)
 			return
 
 		case event, ok := <-runtime.EventChannel():
@@ -497,7 +502,7 @@ func (*commandStream) runCommand(
 				slog.Error("failed to send command event", "commandID", commandID, "error", err)
 				return
 			}
-			if err := executor.SaveLocalState(state); err != nil {
+			if err := executor.SaveLocalState(c.resourceID, state); err != nil {
 				slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 			}
 
@@ -518,7 +523,7 @@ func (*commandStream) runCommand(
 				}
 				_ = merged.append(chunk.StreamType, chunk.Content)
 			}
-			if err := executor.SaveLocalState(state); err != nil {
+			if err := executor.SaveLocalState(c.resourceID, state); err != nil {
 				slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 			}
 		}

@@ -49,10 +49,13 @@ export interface AgentSlice {
   agentsLoading: boolean;
   agentCache: Record<string, Agent>;
 
-  fetchAgents: (params?: {
-    pageSize?: number;
-    pageToken?: string;
-  }) => Promise<{ nextPageToken: string } | undefined>;
+  fetchAgents: (
+    params?: {
+      pageSize?: number;
+      pageToken?: string;
+    },
+    opts?: { silent?: boolean }
+  ) => Promise<{ nextPageToken: string } | undefined>;
   getAgent: (
     name: string,
     opts?: { force?: boolean }
@@ -67,7 +70,10 @@ export interface AgentSlice {
     reason?: string
   ) => Promise<RotateAgentTokenResponse>;
   revokeAgentToken: (name: string, reason?: string) => Promise<void>;
-  updateAgentACPConfig: (name: string, acpConfigYaml: string) => Promise<void>;
+  updateAgentACPConfig: (
+    name: string,
+    acpConfig: { executable: string; args: string[]; allowEnv: string[] }
+  ) => Promise<void>;
 }
 
 export interface CommandSlice {

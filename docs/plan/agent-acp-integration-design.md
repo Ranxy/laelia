@@ -1094,24 +1094,21 @@ ACPExecutor 是本次集成的核心新增执行器，实现职责包括：
 9. 收到完成或错误后收口结果。
 10. 如果被取消，先发 ACP cancel/interrupt，超时后再 kill 子进程。
 
-### 5. 本地 profile 配置建议
+### 5. ACP 配置模型
 
-profile 建议字段如下：
+配置由 manager 集中管理，agent 不再读取本地 YAML 文件，也不再提供 `--acp-config` / `--acp-config-server` 启动参数。agent 连接时 manager 在 `ConnectAgentResponse.acp_config` 中下发结构化配置，agent 用 `BuildACPConfig` 套用内置模板生成完整的 `ACPConfig`。
 
-1. `name`
-2. `command`
-3. `args`
-4. `working_dir_mode`
-5. `default_model`
-6. `allowed_tools`
-7. `env_allowlist`
-8. `max_timeout_seconds`
-9. `max_event_count`
-10. `max_output_bytes`
-11. `allow_diff`
-12. `persist_raw_events`
+用户只需配置三项（`AgentACPConfig`）：
 
-agent 启动时应验证 profile 完整性，并只将合法 profile 摘要上报给 manager。
+1. `executable` — 要执行的 LLM agent，如 `npx`
+2. `args` — 传给 executable 的参数，如 `["-y", "@agentclientprotocol/claude-agent-acp@latest"]`
+3. `allow_env` — 子进程允许继承的环境变量名白名单，创建时预置默认列表（PATH/HOME/LANG/TERM/XDG_*/代理变量），可在配置页增删
+
+其余字段（max_timeout/max_event_count/max_output_bytes、read/write_text_files、supports_diff/raw_events/tool_traces、auto_approve_tool_kinds）均由模板默认值填充，用户无需干预。
+
+`working_dir` 不再由用户配置：每个 agent 在 `~/.laelia/<agent_id>/` 下拥有独立的持久工作目录，agent 启动连接时创建该目录并作为 `working_dir`，使 agent 能持久地在自己的目录中工作。`agent_id` 取自 bootstrap token 中解析出的 resource UUID。本地命令状态文件也随之移至 `~/.laelia/<agent_id>/command-state.json`，实现多 agent 同主机隔离。
+
+未配置 executable 的 agent 处于 inert 状态：`BuildACPConfig` 返回 nil，`Capability()` 上报 `supports_acp=false`，无法运行会话，直至管理员通过 `UpdateAgentACPConfig` 设置 executable。
 
 ### 6. 会话快照与恢复
 

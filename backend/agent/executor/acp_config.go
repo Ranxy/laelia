@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"gopkg.in/yaml.v3"
-
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -16,6 +14,28 @@ const (
 	defaultOutputFlushBytes     = 4096
 )
 
+// DefaultAllowEnv is the env var whitelist seeded onto every newly created
+// agent. The admin may add or remove entries per agent via the config UI.
+var DefaultAllowEnv = []string{
+	"PATH",
+	"HOME",
+	"LANG",
+	"TERM",
+	"XDG_CONFIG_HOME",
+	"XDG_DATA_HOME",
+	"XDG_CACHE_HOME",
+	"HTTP_PROXY",
+	"HTTPS_PROXY",
+	"NO_PROXY",
+}
+
+// defaultAutoApproveToolKinds is the template default for tool kinds the agent
+// may run without asking for permission.
+var defaultAutoApproveToolKinds = []string{"read", "search", "think", "fetch", "edit", "move"}
+
+// ACPConfig is the internal, fully-resolved executor configuration. It is
+// never user-authored: the admin only sets the AgentACPConfig proto fields
+// (executable, args, allow_env), and BuildACPConfig fills in the template.
 type ACPConfig struct {
 	MaxTimeoutSeconds int32 `yaml:"max_timeout_seconds"`
 	MaxEventCount     int32 `yaml:"max_event_count"`
@@ -36,52 +56,48 @@ type ACPConfig struct {
 	SupportsToolTraces    bool              `yaml:"supports_tool_traces"`
 }
 
-func DefaultACPConfigPath() string {
+// AgentWorkingDir returns the per-agent persistent working directory under
+// ~/.laelia/<agentID>/. The caller is responsible for creating it.
+func AgentWorkingDir(agentID string) string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".laelia", "acp.yaml")
+	return filepath.Join(home, ".laelia", agentID)
 }
 
-func LoadACPConfigFromFile(path string) (*ACPConfig, error) {
-	if path == "" {
-		path = DefaultACPConfigPath()
+// BuildACPConfig resolves the user-configurable AgentACPConfig (executable,
+// args, allow_env) into a fully-populated ACPConfig by applying the built-in
+// template. It returns nil when the agent has not been configured yet
+// (executable empty), which keeps the "not configured" gating in NewACP and
+// reports supports_acp=false via Capability().
+func BuildACPConfig(user *v1pb.AgentACPConfig, agentID string) *ACPConfig {
+	if user == nil || user.Executable == "" {
+		return nil
 	}
 
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
+	cfg := &ACPConfig{
+		MaxTimeoutSeconds: defaultACPMaxTimeoutSeconds,
+		MaxEventCount:     defaultACPMaxEventCount,
+		MaxOutputBytes:    defaultACPMaxOutputBytes,
+		OutputFlushBytes:  defaultOutputFlushBytes,
 
-	return LoadACPConfigFromYAML(string(data))
+		Executable:           user.Executable,
+		Args:                 user.Args,
+		AllowEnv:             user.AllowEnv,
+		WorkingDir:           AgentWorkingDir(agentID),
+		ReadTextFiles:        true,
+		WriteTextFiles:       true,
+		AutoApproveToolKinds: defaultAutoApproveToolKinds,
+		SupportsDiff:         true,
+		SupportsRawEvents:    true,
+		SupportsToolTraces:   true,
+	}
+	return cfg
 }
 
-func LoadACPConfigFromYAML(yamlStr string) (*ACPConfig, error) {
-	if yamlStr == "" {
-		return nil, nil
-	}
-
-	var cfg ACPConfig
-	if err := yaml.Unmarshal([]byte(yamlStr), &cfg); err != nil {
-		return nil, err
-	}
-
-	if cfg.Executable == "" {
-		return nil, nil
-	}
-
-	if cfg.MaxTimeoutSeconds <= 0 {
-		cfg.MaxTimeoutSeconds = defaultACPMaxTimeoutSeconds
-	}
-	if cfg.MaxEventCount <= 0 {
-		cfg.MaxEventCount = defaultACPMaxEventCount
-	}
-	if cfg.MaxOutputBytes <= 0 {
-		cfg.MaxOutputBytes = defaultACPMaxOutputBytes
-	}
-	if cfg.OutputFlushBytes <= 0 {
-		cfg.OutputFlushBytes = defaultOutputFlushBytes
-	}
-
-	return &cfg, nil
+// BuildCapability derives the agent capability from the user-configurable ACP
+// settings (template-provided flags + whether an executable is configured). It
+// does not touch the filesystem and ignores the agent id.
+func BuildCapability(user *v1pb.AgentACPConfig) *v1pb.AgentCapability {
+	return BuildACPConfig(user, "").Capability()
 }
 
 func (c *ACPConfig) Capability() *v1pb.AgentCapability {

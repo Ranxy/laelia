@@ -21,6 +21,7 @@
 - [v1/agent.proto](#v1_agent-proto)
     - [Agent](#laelia-v1-Agent)
     - [Agent.LabelsEntry](#laelia-v1-Agent-LabelsEntry)
+    - [AgentACPConfig](#laelia-v1-AgentACPConfig)
     - [AgentCapability](#laelia-v1-AgentCapability)
     - [AgentDisconnectRequest](#laelia-v1-AgentDisconnectRequest)
     - [AgentHeartbeatRequest](#laelia-v1-AgentHeartbeatRequest)
@@ -330,6 +331,24 @@ RiskLevel is the risk level.
 
 
 
+<a name="laelia-v1-AgentACPConfig"></a>
+
+### AgentACPConfig
+User-configurable ACP settings. Everything else (working dir, capabilities,
+permissions) is derived from a built-in template, not set by the admin.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| executable | [string](#string) |  | command to run, e.g. &#34;npx&#34; |
+| args | [string](#string) | repeated | args passed to executable, e.g. [&#34;-y&#34;, &#34;@agentclientprotocol/claude-agent-acp@latest&#34;] |
+| allow_env | [string](#string) | repeated | env var names the child process may inherit |
+
+
+
+
+
+
 <a name="laelia-v1-AgentCapability"></a>
 
 ### AgentCapability
@@ -421,7 +440,7 @@ RiskLevel is the risk level.
 | version | [string](#string) |  |  |
 | labels | [AgentInfo.LabelsEntry](#laelia-v1-AgentInfo-LabelsEntry) | repeated |  |
 | capability | [AgentCapability](#laelia-v1-AgentCapability) |  |  |
-| acp_config_yaml | [string](#string) |  |  |
+| acp_config | [AgentACPConfig](#laelia-v1-AgentACPConfig) |  |  |
 
 
 
@@ -539,7 +558,7 @@ RiskLevel is the risk level.
 | next_nonce | [string](#string) |  | server-signed nonce for next heartbeat |
 | access_token_expires_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | initial_status | [AgentStatus](#laelia-v1-AgentStatus) |  |  |
-| acp_config_yaml | [string](#string) |  | server-provided ACP YAML config (empty when agent uses local file) |
+| acp_config | [AgentACPConfig](#laelia-v1-AgentACPConfig) |  | server-provided structured ACP config |
 
 
 
@@ -850,7 +869,7 @@ RiskLevel is the risk level.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  |  |
-| acp_config_yaml | [string](#string) |  |  |
+| acp_config | [AgentACPConfig](#laelia-v1-AgentACPConfig) |  |  |
 
 
 
