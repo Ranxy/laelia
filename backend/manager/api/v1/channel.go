@@ -2,11 +2,9 @@ package v1
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strconv"
-	"strings"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -157,11 +155,13 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 
 	memberType := req.Msg.MemberType
 	memberID := req.Msg.MemberId
+	var addedAgent *store.AgentMessage
 	if memberType == store.MemberTypeAgent {
 		agent, agentErr := s.store.GetAgentByResourceID(ctx, memberID)
 		if agentErr != nil || agent == nil {
 			return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", memberID))
 		}
+		addedAgent = agent
 	}
 	if memberType == store.MemberTypeUser {
 		if _, uidErr := strconv.Atoi(memberID); uidErr != nil {
@@ -171,6 +171,16 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 
 	if err := s.store.AddConversationMember(ctx, convID, memberType, memberID, store.MemberRoleMember); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to add member"))
+	}
+
+	// Seed the agent's per-channel cursor to the current room version so a
+	// newly joined agent starts "caught up" and only sees future messages.
+	// SeedCursorOnJoin is monotonic, so re-adding an agent never rewinds an
+	// existing cursor.
+	if addedAgent != nil {
+		if seedErr := s.store.SeedCursorOnJoin(ctx, addedAgent.ID, convID); seedErr != nil {
+			slog.Warn("failed to seed agent channel cursor on join", "agent", addedAgent.ResourceID, "conversationID", convID, "error", seedErr)
+		}
 	}
 
 	displayName := resolveMemberDisplayName(ctx, s.store, memberType, memberID)
@@ -276,26 +286,12 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create message"))
 	}
 
-	// Phase 2: for agents that support autonomous decision making, skip the
-	// legacy auto-dispatch. The agent will pull messages and submit actions
-	// independently after receiving NewMessagesAvailable.
-	var commandID string
-	if conv.Type == 1 && conv.AgentID.Valid {
-		if s.isAgentAutonomous(ctx, conv) {
-			slog.Info("skipping auto-dispatch for autonomous agent", "conversationID", conv.ID)
-		} else {
-			commandName := s.dispatchDirectConversation(ctx, conv, msg, principalID, user)
-			if commandName != "" {
-				if parts := strings.Split(commandName, "/"); len(parts) == 4 {
-					commandID = parts[3]
-				}
-			}
-		}
-	}
-
-	// Notify all agent members of the conversation that new messages are
-	// available, not just the single agent backing a direct conversation.
-	s.notifyConversationAgents(ctx, conv.ID, msg.RoomVersion)
+	// Agent-first: the manager never dispatches work on a user message. It only
+	// notifies every agent member of the conversation that new messages are
+	// available; each agent's autonomous drain loop then decides whether and
+	// how to respond. (Agents are conversation_member rows of their direct
+	// conversations too, so this covers 1:1 chats.)
+	s.notifyConversationAgents(ctx, conv.ID, msg.RoomVersion, nil)
 
 	return connect.NewResponse(&v1pb.ChatMessage{
 		Name:          msg.ID.String(),
@@ -307,100 +303,17 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		SenderName:    msg.PrincipalName,
 		SenderType:    v1pb.SenderType(msg.SenderType),
 		RoomVersion:   msg.RoomVersion,
-		CommandId:     commandID,
 		Mentions:      msg.Mentions,
 	}), nil
 }
 
-// dispatchDirectConversation is the Phase 1 stand-in for the (now-deprecated)
-// SendCommand with source=CHAT: it materializes a command record scoped to the
-// conversation's agent, injects recent chat context, and queues it for
-// dispatch. Errors are logged but do not fail SendMessage — the user message
-// is already persisted, and execution can be retried via PullMessages / Phase 2.
-// Returns the command resource name ("agents/{agent}/commands/{commandID}")
-// so the caller can link the user chat_message and surface the command to the
-// frontend for streaming.
-func (s *CommandService) dispatchDirectConversation(ctx context.Context, conv *store.ConversationMessage, triggerMsg *store.ChatMessage, principalID int, user *store.UserMessage) string {
-	agent, err := s.store.GetAgent(ctx, int(conv.AgentID.Int32))
-	if err != nil || agent == nil {
-		slog.Warn("failed to resolve conversation agent for dispatch", "conversationID", conv.ID, "error", err)
-		return ""
-	}
-
-	// Validate the agent supports ACP before dispatching. We deliberately do
-	// not surface validation failures as user-visible errors here (the message
-	// is already persisted); they are logged for operator visibility.
-	if vErr := s.validateACPCapability(ctx, agent, "", false, 0, user); vErr != nil {
-		slog.Warn("agent not ACP-capable; skipping dispatch", "agent", agent.ResourceID, "error", vErr)
-		return ""
-	}
-
-	// Inject recent chat context into the instruction so the ACP session has
-	// the same conversational grounding that the legacy SendCommand path
-	// provided. PullMessages remains available for agents that prefer to pull
-	// more context actively.
-	instruction := triggerMsg.Content
-	if recent, recentErr := s.store.GetRecentChatMessages(ctx, conv.ID, 6); recentErr == nil && len(recent) > 0 {
-		if chatCtx := buildLightChatContext(recent); chatCtx != "" {
-			instruction = chatCtx + "\n---\n" + instruction
-		}
-	}
-
-	envBytes, _ := json.Marshal(map[string]string{})
-	cmd := &store.CommandMessage{
-		AgentID:        agent.ID,
-		PrincipalID:    principalID,
-		Command:        "",
-		Instruction:    instruction,
-		AllowDiff:      false,
-		Status:         1, // PENDING
-		Env:            string(envBytes),
-		TimeoutSeconds: 0,
-		ConversationID: &conv.ID,
-	}
-
-	created, err := s.store.CreateCommand(ctx, cmd)
-	if err != nil {
-		slog.Error("failed to create command for message dispatch", "conversationID", conv.ID, "error", err)
-		return ""
-	}
-
-	created.AgentResourceID = agent.ResourceID
-	created.PrincipalName = ""
-
-	if err := s.dispatcher.EnqueueCommand(ctx, created); err != nil {
-		slog.Warn("failed to enqueue command for dispatch", "commandID", created.ID, "error", err)
-	}
-	s.dispatcher.NotifyNewMessages(ctx, agent.ID, conv.ID.String(), triggerMsg.RoomVersion)
-
-	// Link the user message to the command so the SendMessage response can
-	// carry the command_id for frontend streaming.
-	commandName := formatCommandName(agent.ResourceID, created.ID)
-	if linkErr := s.store.SetChatMessageCommandID(ctx, triggerMsg.ID, created.ID); linkErr != nil {
-		slog.Warn("failed to link user message to command", "messageID", triggerMsg.ID, "commandID", created.ID, "error", linkErr)
-	}
-	return commandName
-}
-
-// isAgentAutonomous checks whether the agent backing a direct conversation
-// supports Phase 2 autonomous decision making (PullMessages → SubmitAction).
-// If true, the manager skips auto-dispatch; the agent drives its own execution.
-func (s *CommandService) isAgentAutonomous(ctx context.Context, conv *store.ConversationMessage) bool {
-	if !conv.AgentID.Valid {
-		return false
-	}
-	agent, err := s.store.GetAgent(ctx, int(conv.AgentID.Int32))
-	if err != nil || agent == nil {
-		return false
-	}
-	capability := agent.Info.GetCapability()
-	return capability != nil && capability.SupportsAutonomousDecision
-}
-
-// notifyConversationAgents sends NewMessagesAvailable to every connected agent
-// that is a member of the conversation. This covers both direct conversations
-// (type=1) and multi-agent channels (type=2).
-func (s *CommandService) notifyConversationAgents(ctx context.Context, convID uuid.UUID, version int64) {
+// notifyConversationAgents sends NewMessagesAvailable to every connected
+// agent that is a member of the conversation, except the agent identified by
+// exceptAgentID (used by PostMessage so an agent's own reply does not wake
+// itself). A nil exceptAgentID notifies all agent members. This covers both
+// direct conversations (type=1) and multi-agent channels (type=2), and is the
+// single wake path that lets agents talk to each other.
+func (s *CommandService) notifyConversationAgents(ctx context.Context, convID uuid.UUID, version int64, exceptAgentID *int) {
 	members, err := s.store.ListConversationMembers(ctx, convID)
 	if err != nil {
 		slog.Warn("failed to list conversation members for notification", "conversationID", convID, "error", err)
@@ -413,6 +326,9 @@ func (s *CommandService) notifyConversationAgents(ctx context.Context, convID uu
 		agent, agentErr := s.store.GetAgentByResourceID(ctx, m.MemberID)
 		if agentErr != nil || agent == nil {
 			slog.Warn("failed to resolve agent for notification", "agentResourceID", m.MemberID, "error", agentErr)
+			continue
+		}
+		if exceptAgentID != nil && agent.ID == *exceptAgentID {
 			continue
 		}
 		s.dispatcher.NotifyNewMessages(ctx, agent.ID, convID.String(), version)

@@ -74,13 +74,11 @@ func configureGrpcRouters(
 
 	cmdDispatcher := dispatcher.New(stores)
 	cmdDispatcher.StartPingMonitor()
-	cmdDispatcher.StartExpireHeldActions()
 
 	userService := apiv1.NewUserService(stores, profile, stateCfg)
 	authService := apiv1.NewAuthService(stores, secret, profile, stateCfg)
 	agentService := apiv1.NewAgentService(stores, secret, profile, stateCfg, cmdDispatcher)
 	commandService := apiv1.NewCommandService(stores, cmdDispatcher)
-	commandService.SetACPEnabled(!profile.DisableACP)
 	agentCommandService := apiv1.NewAgentCommandService(stores, cmdDispatcher)
 
 	rateLimiter, err := ratelimit.New(ratelimit.DefaultConfig())

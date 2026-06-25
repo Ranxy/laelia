@@ -209,13 +209,6 @@ func TestMarshalEventPayload_NilForUnknown(t *testing.T) {
 	}
 }
 
-func TestParseEnvJSON(t *testing.T) {
-	result := parseEnvJSON("irrelevant")
-	if result != nil {
-		t.Errorf("expected nil, got %v", result)
-	}
-}
-
 func TestFormatResultMessage(t *testing.T) {
 	result := formatResultMessage(&v1pb.CommandResult{
 		ErrorMessage: "something went wrong",

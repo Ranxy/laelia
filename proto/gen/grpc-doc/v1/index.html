@@ -486,7 +486,11 @@
             <ul>
               
                 <li>
-                  <a href="#laelia.v1.ActionResponse"><span class="badge">M</span>ActionResponse</a>
+                  <a href="#laelia.v1.AckProcessedVersionRequest"><span class="badge">M</span>AckProcessedVersionRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AckProcessedVersionResponse"><span class="badge">M</span>AckProcessedVersionResponse</a>
                 </li>
               
                 <li>
@@ -506,6 +510,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.BeginSession"><span class="badge">M</span>BeginSession</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.BeginSessionResponse"><span class="badge">M</span>BeginSessionResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.CancelCommandRequest"><span class="badge">M</span>CancelCommandRequest</a>
                 </li>
               
@@ -515,6 +527,10 @@
               
                 <li>
                   <a href="#laelia.v1.ChannelMember"><span class="badge">M</span>ChannelMember</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ChannelUpdate"><span class="badge">M</span>ChannelUpdate</a>
                 </li>
               
                 <li>
@@ -622,6 +638,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ListChannelUpdatesRequest"><span class="badge">M</span>ListChannelUpdatesRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListChannelUpdatesResponse"><span class="badge">M</span>ListChannelUpdatesResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ListChannelsRequest"><span class="badge">M</span>ListChannelsRequest</a>
                 </li>
               
@@ -651,10 +675,6 @@
               
                 <li>
                   <a href="#laelia.v1.Mention"><span class="badge">M</span>Mention</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.MessageSnapshot"><span class="badge">M</span>MessageSnapshot</a>
                 </li>
               
                 <li>
@@ -698,19 +718,11 @@
                 </li>
               
                 <li>
-                  <a href="#laelia.v1.PullMessages"><span class="badge">M</span>PullMessages</a>
-                </li>
-              
-                <li>
                   <a href="#laelia.v1.RawAcpPayload"><span class="badge">M</span>RawAcpPayload</a>
                 </li>
               
                 <li>
                   <a href="#laelia.v1.RemoveChannelMemberRequest"><span class="badge">M</span>RemoveChannelMemberRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.ResolveHeldAction"><span class="badge">M</span>ResolveHeldAction</a>
                 </li>
               
                 <li>
@@ -727,14 +739,6 @@
               
                 <li>
                   <a href="#laelia.v1.SendMessageRequest"><span class="badge">M</span>SendMessageRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.SubmitAction"><span class="badge">M</span>SubmitAction</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.SubmitAction.EnvEntry"><span class="badge">M</span>SubmitAction.EnvEntry</a>
                 </li>
               
                 <li>
@@ -765,10 +769,6 @@
                   <a href="#laelia.v1.WatchCommandRequest"><span class="badge">M</span>WatchCommandRequest</a>
                 </li>
               
-              
-                <li>
-                  <a href="#laelia.v1.ActionResolution"><span class="badge">E</span>ActionResolution</a>
-                </li>
               
                 <li>
                   <a href="#laelia.v1.CommandEventType"><span class="badge">E</span>CommandEventType</a>
@@ -3559,8 +3559,8 @@ Format: idps/{idp} </p></td>
       <p></p>
 
       
-        <h3 id="laelia.v1.ActionResponse">ActionResponse</h3>
-        <p>ActionResponse is the manager's reply to SubmitAction. When committed=true</p><p>the action was accepted and a command was created; when committed=false the</p><p>action is held pending agent resolution via ResolveHeldAction.</p>
+        <h3 id="laelia.v1.AckProcessedVersionRequest">AckProcessedVersionRequest</h3>
+        <p>AckProcessedVersion advances the agent's durable per-channel cursor to</p><p>processed_version, marking the channel as processed up to that room_version so</p><p>that subsequent ListChannelUpdates no longer report it. command_id, when</p><p>supplied, links the current session's command to this conversation so the</p><p>frontend can associate execution events with the channel.</p>
 
         
           <table class="field-table">
@@ -3570,15 +3570,15 @@ Format: idps/{idp} </p></td>
             <tbody>
               
                 <tr>
-                  <td>action_id</td>
+                  <td>conversation</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
               
                 <tr>
-                  <td>committed</td>
-                  <td><a href="#bool">bool</a></td>
+                  <td>processed_version</td>
+                  <td><a href="#int64">int64</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -3590,17 +3590,27 @@ Format: idps/{idp} </p></td>
                   <td><p> </p></td>
                 </tr>
               
-                <tr>
-                  <td>current_version</td>
-                  <td><a href="#int64">int64</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.AckProcessedVersionResponse">AckProcessedVersionResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
               
                 <tr>
-                  <td>new_messages</td>
-                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
-                  <td>repeated</td>
+                  <td>processed_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
                   <td><p> </p></td>
                 </tr>
               
@@ -3757,22 +3767,8 @@ Format: idps/{idp} </p></td>
                 </tr>
               
                 <tr>
-                  <td>pull_messages</td>
-                  <td><a href="#laelia.v1.PullMessages">PullMessages</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>submit_action</td>
-                  <td><a href="#laelia.v1.SubmitAction">SubmitAction</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>resolve_held_action</td>
-                  <td><a href="#laelia.v1.ResolveHeldAction">ResolveHeldAction</a></td>
+                  <td>begin_session</td>
+                  <td><a href="#laelia.v1.BeginSession">BeginSession</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -3801,6 +3797,44 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>ping</td>
                   <td><a href="#laelia.v1.Ping">Ping</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.BeginSession">BeginSession</h3>
+        <p>BeginSession is sent by an agent to ask the Manager to start a new</p><p>autonomous processing session. The Manager checks the agent's per-channel</p><p>cursors: if no conversation has room_version greater than the agent's cursor,</p><p>it replies BeginSessionResponse{idle=true} and the agent stays idle;</p><p>otherwise it creates a RUNNING command and replies with its command_id, which</p><p>the agent uses to anchor its execution events and link any posted replies.</p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.BeginSessionResponse">BeginSessionResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>command_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>idle</td>
+                  <td><a href="#bool">bool</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -3908,6 +3942,51 @@ Format: idps/{idp} </p></td>
                 <tr>
                   <td>joined_at</td>
                   <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ChannelUpdate">ChannelUpdate</h3>
+        <p>ChannelUpdate describes one conversation that has unread messages for the</p><p>agent. new_message_count is the number of chat_message rows with</p><p>room_version greater than the agent's processed_version for that channel.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>current_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>processed_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>new_message_count</td>
+                  <td><a href="#int32">int32</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -4049,8 +4128,9 @@ Format: idps/{idp} </p></td>
                   <td><a href="#int64">int64</a></td>
                   <td></td>
                   <td><p>room_version is the conversation.version at the time this message was
-created. Agents use it together with PullMessages.after_version to track
-their cursor into the conversation. </p></td>
+created. Agents use it together with their per-channel cursor (managed via
+the ListChannelUpdates / AckProcessedVersion RPCs) to track progress into
+the conversation. </p></td>
                 </tr>
               
                 <tr>
@@ -5147,6 +5227,37 @@ their cursor into the conversation. </p></td>
 
         
       
+        <h3 id="laelia.v1.ListChannelUpdatesRequest">ListChannelUpdatesRequest</h3>
+        <p>ListChannelUpdates returns, for the authenticated agent, every conversation</p><p>it is a member of whose current room_version is greater than the agent's</p><p>stored per-channel cursor — i.e. the channels that have unread messages. It</p><p>is the agent's "what is worth my context" discovery and drives the autonomous</p><p>drain loop. The agent identity is resolved from the auth context.</p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.ListChannelUpdatesResponse">ListChannelUpdatesResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>updates</td>
+                  <td><a href="#laelia.v1.ChannelUpdate">ChannelUpdate</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ListChannelsRequest">ListChannelsRequest</h3>
         <p></p>
 
@@ -5379,29 +5490,15 @@ their cursor into the conversation. </p></td>
             <tbody>
               
                 <tr>
-                  <td>message_snapshot</td>
-                  <td><a href="#laelia.v1.MessageSnapshot">MessageSnapshot</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>action_response</td>
-                  <td><a href="#laelia.v1.ActionResponse">ActionResponse</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>command_request</td>
-                  <td><a href="#laelia.v1.CommandRequest">CommandRequest</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
                   <td>new_messages</td>
                   <td><a href="#laelia.v1.NewMessagesAvailable">NewMessagesAvailable</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>begin_session_response</td>
+                  <td><a href="#laelia.v1.BeginSessionResponse">BeginSessionResponse</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -5472,39 +5569,8 @@ their cursor into the conversation. </p></td>
 
         
       
-        <h3 id="laelia.v1.MessageSnapshot">MessageSnapshot</h3>
-        <p>MessageSnapshot is the Manager reply to PullMessages. It returns the newly</p><p>available messages and the conversation's current version so the agent can</p><p>record it as the base_version for any subsequent action.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>messages</td>
-                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
-                  <td>repeated</td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>current_version</td>
-                  <td><a href="#int64">int64</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
         <h3 id="laelia.v1.NewMessagesAvailable">NewMessagesAvailable</h3>
-        <p>NewMessagesAvailable is pushed from Manager to agent over the bidi stream to</p><p>notify that a conversation the agent is connected to has produced new</p><p>messages. The agent should follow up with a PullMessages request.</p>
+        <p>NewMessagesAvailable is a best-effort wake signal pushed from the Manager to</p><p>an agent over the bidi stream whenever a conversation the agent is a member</p><p>of produces a new message (from any sender: user, agent, or system). It is</p><p>NOT the source of truth: the agent's durable per-channel cursor is. If a wake</p><p>is missed (agent offline), the agent rediscovers pending work on reconnect by</p><p>calling ListChannelUpdates, which compares conversation.version to the cursor.</p>
 
         
           <table class="field-table">
@@ -5890,37 +5956,6 @@ their cursor into the conversation. </p></td>
 
         
       
-        <h3 id="laelia.v1.PullMessages">PullMessages</h3>
-        <p>PullMessages is sent by an agent over the AgentChannel bidi stream to fetch</p><p>chat messages with room_version greater than after_version for a single</p><p>conversation. The agent tracks its own cursor per conversation and supplies</p><p>it explicitly so that reconnection / crash recovery is self-describing.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>conversation_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>after_version</td>
-                  <td><a href="#int64">int64</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
         <h3 id="laelia.v1.RawAcpPayload">RawAcpPayload</h3>
         <p></p>
 
@@ -5972,37 +6007,6 @@ their cursor into the conversation. </p></td>
                 <tr>
                   <td>member_type</td>
                   <td><a href="#int32">int32</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.ResolveHeldAction">ResolveHeldAction</h3>
-        <p>ResolveHeldAction is sent by the agent to resolve a held action (one where</p><p>ActionResponse.committed was false).</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>action_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>resolution</td>
-                  <td><a href="#laelia.v1.ActionResolution">ActionResolution</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -6170,117 +6174,6 @@ their cursor into the conversation. </p></td>
                   <td>mentions</td>
                   <td><a href="#laelia.v1.Mention">Mention</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.SubmitAction">SubmitAction</h3>
-        <p>SubmitAction is the Phase 2 execution trigger. It replaces the Phase 1</p><p>manager-driven dispatch: after PullMessages the agent autonomously decides</p><p>whether to act and sends SubmitAction. The manager performs a Held Draft</p><p>check comparing base_version against the conversation's current version.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>conversation_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>reply_to_message_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>base_version</td>
-                  <td><a href="#int64">int64</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>instruction</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>profile</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>env</td>
-                  <td><a href="#laelia.v1.SubmitAction.EnvEntry">SubmitAction.EnvEntry</a></td>
-                  <td>repeated</td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>working_dir</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>timeout_seconds</td>
-                  <td><a href="#int32">int32</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>allow_diff</td>
-                  <td><a href="#bool">bool</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.SubmitAction.EnvEntry">SubmitAction.EnvEntry</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>key</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>value</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
                   <td><p> </p></td>
                 </tr>
               
@@ -6502,47 +6395,6 @@ their cursor into the conversation. </p></td>
         
       
 
-      
-        <h3 id="laelia.v1.ActionResolution">ActionResolution</h3>
-        <p>ActionResolution is the agent's decision when a SubmitAction is held due</p><p>to a version mismatch (new messages arrived between PullMessages and</p><p>SubmitAction).</p>
-        <table class="enum-table">
-          <thead>
-            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
-          </thead>
-          <tbody>
-            
-              <tr>
-                <td>ACTION_RESOLUTION_UNSPECIFIED</td>
-                <td>0</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>REVISE</td>
-                <td>1</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>SEND_AS_IS</td>
-                <td>2</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>DISCARD</td>
-                <td>3</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>FORCE_SEND</td>
-                <td>4</td>
-                <td><p></p></td>
-              </tr>
-            
-          </tbody>
-        </table>
       
         <h3 id="laelia.v1.CommandEventType">CommandEventType</h3>
         <p></p>
@@ -6922,6 +6774,20 @@ their cursor into the conversation. </p></td>
               </tr>
             
               <tr>
+                <td>ListChannelUpdates</td>
+                <td><a href="#laelia.v1.ListChannelUpdatesRequest">ListChannelUpdatesRequest</a></td>
+                <td><a href="#laelia.v1.ListChannelUpdatesResponse">ListChannelUpdatesResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>AckProcessedVersion</td>
+                <td><a href="#laelia.v1.AckProcessedVersionRequest">AckProcessedVersionRequest</a></td>
+                <td><a href="#laelia.v1.AckProcessedVersionResponse">AckProcessedVersionResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
                 <td>FetchConversationActivity</td>
                 <td><a href="#laelia.v1.FetchConversationActivityRequest">FetchConversationActivityRequest</a></td>
                 <td><a href="#laelia.v1.FetchConversationActivityResponse">FetchConversationActivityResponse</a></td>
@@ -7142,6 +7008,26 @@ their cursor into the conversation. </p></td>
                 <td>PostMessage</td>
                 <td>POST</td>
                 <td>/v1/{conversation=conversations/*}:postMessage</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListChannelUpdates</td>
+                <td>GET</td>
+                <td>/v1/agents/-/channelUpdates</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>AckProcessedVersion</td>
+                <td>POST</td>
+                <td>/v1/{conversation=conversations/*}:ackProcessedVersion</td>
                 <td>*</td>
               </tr>
               

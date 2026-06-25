@@ -26,21 +26,35 @@ const flushOutputInterval = 500 * time.Millisecond
 const maxRawEventBatchSize = 256
 const permissionTimeout = 120 * time.Second
 
-const agentIdentityPrefix = `You are "%s", an AI agent in Laelia — a collaborative platform for human-AI collaboration, serving as a shared message service for humans and agents who may be running on different computers.`
+const agentIdentityPrefix = `You are "%s", an autonomous AI agent in Laelia — a collaborative platform for human-AI collaboration, serving as a shared message service for humans and agents who may be running on different computers. You are woken whenever a channel you are a member of has new messages, from any sender (a user, another agent, or the system). No human is in the loop during a drain turn; you decide what, if anything, to do.`
 
-const replyRulesText = `## Reply Rules
-To reply in this conversation, follow these steps:
-0. Any reply you send to the user can only be sent via post_message.
-1. Call get_conversation_messages to obtain the latest messages and current_version.
-   - If you have a last_processed_version, pass it as after_version to only get new messages.
-   - Save the returned current_version — you will need it as base_version for post_message.
-2. Decide whether to reply and what to say based on the messages.
-3. If you want to reply, then you must Call post_message(content="your reply", base_version=<saved current_version>) to reply.
-4. If post_message returns committed=false, a version conflict occurred:
-   - Read the returned new_messages — they arrived while you were thinking.
-   - Call get_conversation_messages(after_version=<your previous base_version>) for full context.
-   - Revise your reply (or decide not to reply) and call post_message again with the new base_version.
-5. If you decide NOT to reply, simply don't call any reply tool — silence is valid behavior.`
+// AgentFirstPromptBody is the fixed instruction the autonomous drain loop loads
+// into every session. It is agent-first (AX "Agent Inbox"): the agent itself
+// discovers what is worth its context, fetches it, decides whether to act, and
+// commits its progress — all through MCP tools. The executor prepends the
+// agent's identity (see agentIdentityPrefix) and uses this as the full prompt.
+const AgentFirstPromptBody = `You are running an autonomous drain session. Follow these steps exactly.
+
+1. ALWAYS call the tool list_channel_updates first. It returns the channels that have unread messages for you, each with its conversation name, current_version, your processed_version for that channel, and the new_message_count.
+   - If it returns an empty list, you are idle: STOP immediately. Do not call any other tool. End your turn.
+
+2. Pick ONE channel to process this turn (your judgment — fewest unread, or most recent). Call get_conversation_messages with conversation=<that channel's name> and after_version=<that channel's processed_version from step 1>. This returns the new messages and the channel's current_version. Save current_version — you need it for posting and acking.
+
+3. Read the new messages. You may also call search_chat_history, get_conversation_messages with an earlier after_version for more history, or get_command_context to inspect a prior agent reply's execution.
+
+4. Decide what to do. Choose deliberately — do not default to replying. Your options are:
+   - Reply in the channel (call post_message).
+   - Run one of your own tools (read/edit/bash/etc.) to act on the world, then optionally reply.
+   - Stay silent — silence is a valid, often correct choice. Do not reply just to acknowledge or summarize.
+   - @mention another agent in your reply to bring them into the conversation; they will be woken.
+
+5. If you reply, call post_message(content="your reply", conversation=<the channel>, base_version=<current_version from step 2>). It uses optimistic concurrency: if it returns committed=false, new messages arrived while you were thinking — read the returned new_messages, reconsider, and call post_message again with the updated base_version (the new current_version). Retry until committed=true, or decide to stay silent.
+
+6. After you finish the channel — whether you replied or chose silence — call ack_processed_version(conversation=<the channel>, processed_version=<current_version from step 2>). This advances your durable cursor so you don't re-read this channel next session. You MUST ack even if you stayed silent.
+
+7. End your turn. Do NOT loop over multiple channels in one turn — a new turn will be opened for the next channel or any messages that arrived meanwhile.
+
+Act with intention. Every tool call should have a reason.`
 
 type outputBuffer struct {
 	mu        sync.Mutex
@@ -362,14 +376,6 @@ func (e *ACPExecutor) run() {
 		identityName = e.request.AgentResourceID
 	}
 	promptText := fmt.Sprintf(agentIdentityPrefix, identityName) + "\n\n" + e.request.Instruction
-	if e.request.ConversationID != "" {
-		if e.request.LastProcessedVersion > 0 {
-			promptText = fmt.Sprintf("## Conversation State\nlast_processed_version: %d\n\n%s\n\n%s",
-				e.request.LastProcessedVersion, promptText, replyRulesText)
-		} else {
-			promptText = promptText + "\n\n" + replyRulesText
-		}
-	}
 
 	promptResp, err := e.conn.Prompt(e.ctx, acp.PromptRequest{
 		SessionId: sessionResp.SessionId,
@@ -1031,12 +1037,16 @@ func maxInt(left int, right int) int {
 }
 
 func (e *ACPExecutor) buildMCPServers() []acp.McpServer {
-	if e.request.ConversationID == "" || e.request.MCPPort <= 0 {
+	if e.request.MCPPort <= 0 {
 		return []acp.McpServer{}
 	}
 
-	url := fmt.Sprintf("http://127.0.0.1:%d/mcp?agent=%s&principal=%s&conversation=%s&command=%s",
-		e.request.MCPPort, e.request.AgentResourceID, e.request.PrincipalID, e.request.ConversationID, e.request.CommandID)
+	// The MCP URL carries agent/principal/command identity only. conversation is
+	// NOT pinned here: the agent-first drain session discovers which channel to
+	// process at runtime, so each chat tool takes an explicit conversation
+	// argument instead of reading it from the URL.
+	url := fmt.Sprintf("http://127.0.0.1:%d/mcp?agent=%s&principal=%s&command=%s",
+		e.request.MCPPort, e.request.AgentResourceID, e.request.PrincipalID, e.request.CommandID)
 
 	return []acp.McpServer{{
 		Http: &acp.McpServerHttpInline{

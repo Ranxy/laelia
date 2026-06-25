@@ -96,6 +96,12 @@ const (
 	// CommandServicePostMessageProcedure is the fully-qualified name of the CommandService's
 	// PostMessage RPC.
 	CommandServicePostMessageProcedure = "/laelia.v1.CommandService/PostMessage"
+	// CommandServiceListChannelUpdatesProcedure is the fully-qualified name of the CommandService's
+	// ListChannelUpdates RPC.
+	CommandServiceListChannelUpdatesProcedure = "/laelia.v1.CommandService/ListChannelUpdates"
+	// CommandServiceAckProcessedVersionProcedure is the fully-qualified name of the CommandService's
+	// AckProcessedVersion RPC.
+	CommandServiceAckProcessedVersionProcedure = "/laelia.v1.CommandService/AckProcessedVersion"
 	// CommandServiceFetchConversationActivityProcedure is the fully-qualified name of the
 	// CommandService's FetchConversationActivity RPC.
 	CommandServiceFetchConversationActivityProcedure = "/laelia.v1.CommandService/FetchConversationActivity"
@@ -126,6 +132,8 @@ type CommandServiceClient interface {
 	ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error)
 	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.ChatMessage], error)
 	PostMessage(context.Context, *connect.Request[v1.PostMessageRequest]) (*connect.Response[v1.PostMessageResponse], error)
+	ListChannelUpdates(context.Context, *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error)
+	AckProcessedVersion(context.Context, *connect.Request[v1.AckProcessedVersionRequest]) (*connect.Response[v1.AckProcessedVersionResponse], error)
 	FetchConversationActivity(context.Context, *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error)
 }
 
@@ -260,6 +268,18 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("PostMessage")),
 			connect.WithClientOptions(opts...),
 		),
+		listChannelUpdates: connect.NewClient[v1.ListChannelUpdatesRequest, v1.ListChannelUpdatesResponse](
+			httpClient,
+			baseURL+CommandServiceListChannelUpdatesProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ListChannelUpdates")),
+			connect.WithClientOptions(opts...),
+		),
+		ackProcessedVersion: connect.NewClient[v1.AckProcessedVersionRequest, v1.AckProcessedVersionResponse](
+			httpClient,
+			baseURL+CommandServiceAckProcessedVersionProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("AckProcessedVersion")),
+			connect.WithClientOptions(opts...),
+		),
 		fetchConversationActivity: connect.NewClient[v1.FetchConversationActivityRequest, v1.FetchConversationActivityResponse](
 			httpClient,
 			baseURL+CommandServiceFetchConversationActivityProcedure,
@@ -291,6 +311,8 @@ type commandServiceClient struct {
 	listChannelMembers        *connect.Client[v1.ListChannelMembersRequest, v1.ListChannelMembersResponse]
 	sendMessage               *connect.Client[v1.SendMessageRequest, v1.ChatMessage]
 	postMessage               *connect.Client[v1.PostMessageRequest, v1.PostMessageResponse]
+	listChannelUpdates        *connect.Client[v1.ListChannelUpdatesRequest, v1.ListChannelUpdatesResponse]
+	ackProcessedVersion       *connect.Client[v1.AckProcessedVersionRequest, v1.AckProcessedVersionResponse]
 	fetchConversationActivity *connect.Client[v1.FetchConversationActivityRequest, v1.FetchConversationActivityResponse]
 }
 
@@ -394,6 +416,16 @@ func (c *commandServiceClient) PostMessage(ctx context.Context, req *connect.Req
 	return c.postMessage.CallUnary(ctx, req)
 }
 
+// ListChannelUpdates calls laelia.v1.CommandService.ListChannelUpdates.
+func (c *commandServiceClient) ListChannelUpdates(ctx context.Context, req *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error) {
+	return c.listChannelUpdates.CallUnary(ctx, req)
+}
+
+// AckProcessedVersion calls laelia.v1.CommandService.AckProcessedVersion.
+func (c *commandServiceClient) AckProcessedVersion(ctx context.Context, req *connect.Request[v1.AckProcessedVersionRequest]) (*connect.Response[v1.AckProcessedVersionResponse], error) {
+	return c.ackProcessedVersion.CallUnary(ctx, req)
+}
+
 // FetchConversationActivity calls laelia.v1.CommandService.FetchConversationActivity.
 func (c *commandServiceClient) FetchConversationActivity(ctx context.Context, req *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error) {
 	return c.fetchConversationActivity.CallUnary(ctx, req)
@@ -421,6 +453,8 @@ type CommandServiceHandler interface {
 	ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error)
 	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.ChatMessage], error)
 	PostMessage(context.Context, *connect.Request[v1.PostMessageRequest]) (*connect.Response[v1.PostMessageResponse], error)
+	ListChannelUpdates(context.Context, *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error)
+	AckProcessedVersion(context.Context, *connect.Request[v1.AckProcessedVersionRequest]) (*connect.Response[v1.AckProcessedVersionResponse], error)
 	FetchConversationActivity(context.Context, *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error)
 }
 
@@ -551,6 +585,18 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("PostMessage")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceListChannelUpdatesHandler := connect.NewUnaryHandler(
+		CommandServiceListChannelUpdatesProcedure,
+		svc.ListChannelUpdates,
+		connect.WithSchema(commandServiceMethods.ByName("ListChannelUpdates")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceAckProcessedVersionHandler := connect.NewUnaryHandler(
+		CommandServiceAckProcessedVersionProcedure,
+		svc.AckProcessedVersion,
+		connect.WithSchema(commandServiceMethods.ByName("AckProcessedVersion")),
+		connect.WithHandlerOptions(opts...),
+	)
 	commandServiceFetchConversationActivityHandler := connect.NewUnaryHandler(
 		CommandServiceFetchConversationActivityProcedure,
 		svc.FetchConversationActivity,
@@ -599,6 +645,10 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceSendMessageHandler.ServeHTTP(w, r)
 		case CommandServicePostMessageProcedure:
 			commandServicePostMessageHandler.ServeHTTP(w, r)
+		case CommandServiceListChannelUpdatesProcedure:
+			commandServiceListChannelUpdatesHandler.ServeHTTP(w, r)
+		case CommandServiceAckProcessedVersionProcedure:
+			commandServiceAckProcessedVersionHandler.ServeHTTP(w, r)
 		case CommandServiceFetchConversationActivityProcedure:
 			commandServiceFetchConversationActivityHandler.ServeHTTP(w, r)
 		default:
@@ -688,6 +738,14 @@ func (UnimplementedCommandServiceHandler) SendMessage(context.Context, *connect.
 
 func (UnimplementedCommandServiceHandler) PostMessage(context.Context, *connect.Request[v1.PostMessageRequest]) (*connect.Response[v1.PostMessageResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.PostMessage is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ListChannelUpdates(context.Context, *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListChannelUpdates is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) AckProcessedVersion(context.Context, *connect.Request[v1.AckProcessedVersionRequest]) (*connect.Response[v1.AckProcessedVersionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.AckProcessedVersion is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) FetchConversationActivity(context.Context, *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error) {

@@ -2,8 +2,6 @@ package dispatcher
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -13,7 +11,6 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -45,6 +42,16 @@ func (s *AgentSession) Send(msg *v1pb.ManagerStreamMessage) error {
 		return errors.New("agent session invalidated")
 	}
 	return s.send(msg)
+}
+
+// ClearCurrentCommand clears the session's current command id when it matches
+// the given id. Used during reconnect cleanup to drop a stale in-flight command.
+func (s *AgentSession) ClearCurrentCommand(commandID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.currentCmdID == commandID {
+		s.currentCmdID = ""
+	}
 }
 
 type Dispatcher struct {
@@ -94,17 +101,10 @@ func (d *Dispatcher) RegisterAgent(_ context.Context, agentID int, agentResource
 	d.sessions[agentID] = sess
 	slog.Info("agent registered for command dispatch", "agentID", agentID)
 
-	// NOTE: PENDING command draining is deferred until the agent sends
-	// AgentReady (see DispatchPending), preserving the legacy ordering where
-	// the agent signals readiness before the manager dispatches work.
+	// The agent drives its own work via BeginSession; the manager no longer
+	// pushes commands on connect. The agent sends AgentReady (handled in the
+	// bidi loop) and then its drain loop calls BeginSession as needed.
 	return sess
-}
-
-// DispatchPending triggers a best-effort drain of PENDING commands for an
-// agent. It is invoked after the agent sends AgentReady and (idempotently)
-// after each HandleResult completes.
-func (d *Dispatcher) DispatchPending(ctx context.Context, agentID int) {
-	d.dispatchNextPending(ctx, agentID)
 }
 
 func (d *Dispatcher) UnregisterAgent(agentID int) {
@@ -136,159 +136,62 @@ func (d *Dispatcher) IsAgentConnected(agentID int) bool {
 	return ok
 }
 
-// EnqueueCommand dispatches a freshly-created PENDING command immediately if the
-// agent is connected and idle; otherwise it relies on the persisted PENDING row
-// being picked up later by RegisterAgent's drain or by HandleResult's
-// dispatchNextPending call. This replaces the removed agent_inbox creation.
-func (d *Dispatcher) EnqueueCommand(ctx context.Context, cmd *store.CommandMessage) error {
-	d.mu.RLock()
-	sess, ok := d.sessions[cmd.AgentID]
-	d.mu.RUnlock()
-
-	if !ok {
-		slog.Info("agent not connected; command remains PENDING until reconnect", "commandID", cmd.ID, "agentID", cmd.AgentID)
-		return nil
+// HandleBeginSession serves an agent's request to start a new autonomous
+// processing session. The manager checks the agent's durable per-channel
+// cursors: if no conversation has room_version beyond the cursor, it replies
+// idle=true and the agent stays idle. Otherwise it creates a RUNNING command
+// (the session's execution/event anchor, linked to a conversation later via
+// AckProcessedVersion) and replies with its command_id.
+func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb.BeginSessionResponse, error) {
+	hasUpdates, err := d.store.HasUpdates(ctx, agentID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to check channel updates")
+	}
+	if !hasUpdates {
+		return &v1pb.BeginSessionResponse{Idle: true}, nil
 	}
 
-	sess.mu.Lock()
-	busy := sess.currentCmdID != ""
-	sess.mu.Unlock()
-
-	if busy {
-		// Another command is executing; it will be picked up via dispatchNextPending after HandleResult.
-		return nil
+	agent, err := d.store.GetAgent(ctx, agentID)
+	if err != nil || agent == nil {
+		return nil, errors.New("agent not found")
 	}
 
-	if err := d.DispatchCommand(ctx, cmd); err != nil {
-		slog.Warn("failed to dispatch command immediately; leaving PENDING for retry", "commandID", cmd.ID, "error", err)
-		return nil
+	// An agent must support ACP tasks to run an autonomous drain session. A
+	// non-ACP agent stays idle (it has no executor to process messages); the
+	// agent connection itself is the primary gate, this is the server-side backstop.
+	if capability := agent.Info.GetCapability(); capability == nil || !capability.GetSupportsAcp() {
+		slog.Warn("agent is not ACP-capable; staying idle", "agent", agent.ResourceID)
+		return &v1pb.BeginSessionResponse{Idle: true}, nil
 	}
-	return nil
-}
 
-// dispatchNextPending loads the oldest PENDING command for an agent and
-// dispatches it. It is a no-op if the agent is unknown, busy, or has no pending
-// commands. Used by RegisterAgent and HandleResult to drain the queue.
-func (d *Dispatcher) dispatchNextPending(ctx context.Context, agentID int) {
+	cmd, err := d.store.CreateCommand(ctx, &store.CommandMessage{
+		AgentID:     agentID,
+		PrincipalID: 1,  // system bot; the session is agent-initiated, not user-scoped
+		Instruction: "", // the agent-first prompt is supplied by the agent client
+		Status:      int32(v1pb.CommandStatus_RUNNING),
+		Env:         "{}", // env is JSONB NOT NULL; empty string is not valid JSON
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create session command")
+	}
+	cmd.AgentResourceID = agent.ResourceID
+
+	now := time.Now()
+	if err := d.store.UpdateCommandStatus(ctx, cmd.ID, int32(v1pb.CommandStatus_RUNNING), &now, nil, nil, nil, ""); err != nil {
+		slog.Error("failed to mark session command RUNNING", "commandID", cmd.ID, "error", err)
+	}
+
 	d.mu.RLock()
 	sess, ok := d.sessions[agentID]
 	d.mu.RUnlock()
-
-	if !ok {
-		return
-	}
-
-	sess.mu.Lock()
-	if sess.currentCmdID != "" {
+	if ok {
+		sess.mu.Lock()
+		sess.currentCmdID = cmd.ID.String()
 		sess.mu.Unlock()
-		return
-	}
-	sess.mu.Unlock()
-
-	cmds, err := d.store.ListPendingCommandsByAgent(ctx, agentID)
-	if err != nil {
-		slog.Error("failed to list pending commands", "agentID", agentID, "error", err)
-		return
-	}
-	if len(cmds) == 0 {
-		return
 	}
 
-	if err := d.DispatchCommand(ctx, cmds[0]); err != nil {
-		slog.Warn("failed to dispatch next pending command", "commandID", cmds[0].ID, "error", err)
-	}
-}
-
-func (d *Dispatcher) DispatchCommand(ctx context.Context, cmd *store.CommandMessage) error {
-	d.mu.RLock()
-	sess, ok := d.sessions[cmd.AgentID]
-	d.mu.RUnlock()
-
-	if !ok {
-		return errors.New("agent not connected")
-	}
-
-	sess.mu.Lock()
-	if sess.send == nil {
-		sess.mu.Unlock()
-		return errors.New("agent session invalidated")
-	}
-	send := sess.send
-	sess.mu.Unlock()
-
-	convID := ""
-	if cmd.ConversationID != nil {
-		convID = cmd.ConversationID.String()
-	}
-
-	agentDisplayName := ""
-	if ag, agErr := d.store.GetAgent(ctx, cmd.AgentID); agErr == nil && ag != nil {
-		agentDisplayName = ag.Name
-	}
-
-	msg := &v1pb.ManagerStreamMessage{
-		Message: &v1pb.ManagerStreamMessage_CommandRequest{
-			CommandRequest: &v1pb.CommandRequest{
-				CommandId:        cmd.ID.String(),
-				Instruction:      cmd.Instruction,
-				Profile:          cmd.Profile,
-				WorkingDir:       cmd.WorkingDir,
-				TimeoutSeconds:   cmd.TimeoutSeconds,
-				Env:              parseEnvJSON(cmd.Env),
-				AllowDiff:        cmd.AllowDiff,
-				PrincipalId:      fmt.Sprintf("%d", cmd.PrincipalID),
-				ConversationId:   convID,
-				ReplyToMessageId: "",
-				AgentDisplayName: agentDisplayName,
-			},
-		},
-	}
-
-	if err := send(msg); err != nil {
-		d.UnregisterAgent(cmd.AgentID)
-		return errors.Wrapf(err, "failed to send command to agent")
-	}
-
-	sess.mu.Lock()
-	sess.currentCmdID = cmd.ID.String()
-	sess.mu.Unlock()
-
-	now := time.Now()
-	if err := d.store.UpdateCommandStatus(ctx, cmd.ID, 2, &now, nil, nil, nil, ""); err != nil {
-		slog.Error("failed to update command status to RUNNING", "commandID", cmd.ID, "error", err)
-	}
-
-	slog.Info("command dispatched to agent", "commandID", cmd.ID, "agentID", cmd.AgentID)
-	return nil
-}
-
-// HandlePullMessages serves a PullMessages request from an agent, returning the
-// chat messages newer than afterVersion together with the current conversation
-// version. The agent uses the returned current_version as its cursor going
-// forward (and, in Phase 2, as base_version for SubmitAction).
-func (d *Dispatcher) HandlePullMessages(ctx context.Context, _ int, conversationID string, afterVersion int64) (*v1pb.MessageSnapshot, error) {
-	convUUID, err := uuid.Parse(conversationID)
-	if err != nil {
-		return nil, errors.Wrapf(err, "invalid conversation id")
-	}
-
-	msgs, err := d.store.GetMessagesAfterVersion(ctx, convUUID, afterVersion)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get messages after version")
-	}
-
-	currentVersion, err := d.store.GetConversationVersion(ctx, convUUID)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get current conversation version")
-	}
-
-	snapshot := &v1pb.MessageSnapshot{
-		CurrentVersion: currentVersion,
-	}
-	for _, m := range msgs {
-		snapshot.Messages = append(snapshot.Messages, ConvertChatMessageToV1(m))
-	}
-	return snapshot, nil
+	slog.Info("agent session begun", "commandID", cmd.ID, "agentID", agentID)
+	return &v1pb.BeginSessionResponse{CommandId: cmd.ID.String()}, nil
 }
 
 // NotifyNewMessages pushes a NewMessagesAvailable hint to a connected agent so
@@ -323,6 +226,36 @@ func (d *Dispatcher) NotifyNewMessages(_ context.Context, agentID int, conversat
 
 	if err := send(msg); err != nil {
 		slog.Warn("failed to send NewMessagesAvailable", "agentID", agentID, "error", err)
+	}
+}
+
+// NotifyWake sends an empty NewMessagesAvailable to a connected agent as a
+// best-effort "check for work" tick. The agent's drain loop responds by calling
+// BeginSession, which authoritatively checks the per-channel cursors; the wake
+// itself carries no payload. Used on reconnect and (via NotifyNewMessages) when
+// any message lands in a conversation the agent is a member of.
+func (d *Dispatcher) NotifyWake(_ context.Context, agentID int) {
+	d.mu.RLock()
+	sess, ok := d.sessions[agentID]
+	d.mu.RUnlock()
+	if !ok {
+		return
+	}
+
+	sess.mu.Lock()
+	send := sess.send
+	sess.mu.Unlock()
+	if send == nil {
+		return
+	}
+
+	msg := &v1pb.ManagerStreamMessage{
+		Message: &v1pb.ManagerStreamMessage_NewMessages{
+			NewMessages: &v1pb.NewMessagesAvailable{},
+		},
+	}
+	if err := send(msg); err != nil {
+		slog.Warn("failed to send wake to agent", "agentID", agentID, "error", err)
 	}
 }
 
@@ -430,202 +363,6 @@ func (d *Dispatcher) FetchConversationActivity(ctx context.Context, conversation
 }
 
 // ---- Phase 2: Held Draft ----
-
-// HandleSubmitAction processes an agent's SubmitAction request. It performs the
-// Held Draft version check: if base_version matches the current conversation
-// version the action is committed (command created + dispatched); otherwise it
-// is held for the agent to resolve via ResolveHeldAction.
-func (d *Dispatcher) HandleSubmitAction(ctx context.Context, agentID int, req *v1pb.SubmitAction) (*v1pb.ActionResponse, error) {
-	convUUID, err := uuid.Parse(req.ConversationId)
-	if err != nil {
-		return nil, errors.Wrapf(err, "invalid conversation id")
-	}
-
-	currentVersion, err := d.store.GetConversationVersion(ctx, convUUID)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get conversation version")
-	}
-
-	// Version match: commit immediately.
-	if req.BaseVersion == currentVersion {
-		cmd, cmdErr := d.createCommandFromAction(ctx, agentID, req, convUUID)
-		if cmdErr != nil {
-			return nil, cmdErr
-		}
-		return &v1pb.ActionResponse{
-			ActionId:       uuid.New().String(),
-			Committed:      true,
-			CommandId:      cmd.ID.String(),
-			CurrentVersion: currentVersion,
-		}, nil
-	}
-
-	// Version mismatch: hold the action.
-	newMsgs, msgErr := d.store.GetMessagesAfterVersion(ctx, convUUID, req.BaseVersion)
-	if msgErr != nil {
-		return nil, errors.Wrapf(msgErr, "failed to get new messages for held action")
-	}
-
-	ha, haErr := d.store.CreateHeldAction(ctx, agentID, convUUID, req, req.BaseVersion, currentVersion)
-	if haErr != nil {
-		return nil, errors.Wrapf(haErr, "failed to create held action")
-	}
-
-	resp := &v1pb.ActionResponse{
-		ActionId:       ha.ID.String(),
-		Committed:      false,
-		CurrentVersion: currentVersion,
-	}
-	for _, m := range newMsgs {
-		resp.NewMessages = append(resp.NewMessages, ConvertChatMessageToV1(m))
-	}
-	return resp, nil
-}
-
-// HandleResolveHeldAction processes an agent's resolution of a previously held
-// action. REVISE returns without creating a command (the agent re-pulls and
-// re-submits). SEND_AS_IS and FORCE_SEND create and dispatch the command.
-// DISCARD simply marks the action resolved.
-func (d *Dispatcher) HandleResolveHeldAction(ctx context.Context, agentID int, req *v1pb.ResolveHeldAction) (*v1pb.ManagerStreamMessage, error) {
-	actionUUID, err := uuid.Parse(req.ActionId)
-	if err != nil {
-		return nil, errors.Wrapf(err, "invalid action id")
-	}
-
-	switch req.Resolution {
-	case v1pb.ActionResolution_REVISE:
-		if err := d.store.ResolveHeldAction(ctx, actionUUID, int32(req.Resolution), uuid.NullUUID{}); err != nil {
-			return nil, errors.Wrapf(err, "failed to resolve held action")
-		}
-		// Agent will re-PullMessages and re-SubmitAction; nothing to send now.
-		return nil, nil
-
-	case v1pb.ActionResolution_SEND_AS_IS, v1pb.ActionResolution_FORCE_SEND:
-		// Parse the original SubmitAction from the held action record.
-		actions, lookupErr := d.store.GetHeldActionsByAgent(ctx, agentID)
-		if lookupErr != nil {
-			return nil, errors.Wrapf(lookupErr, "failed to look up held actions")
-		}
-		var ha *store.HeldAction
-		for _, a := range actions {
-			if a.ID == actionUUID {
-				ha = a
-				break
-			}
-		}
-		if ha == nil {
-			return nil, errors.Errorf("held action %s not found", req.ActionId)
-		}
-
-		var submitReq v1pb.SubmitAction
-		if unmarshalErr := common.ProtojsonUnmarshaler.Unmarshal([]byte(ha.ActionJSON), &submitReq); unmarshalErr != nil {
-			return nil, errors.Wrapf(unmarshalErr, "failed to unmarshal held submit action")
-		}
-
-		cmd, cmdErr := d.createCommandFromAction(ctx, agentID, &submitReq, ha.ConversationID)
-		if cmdErr != nil {
-			return nil, cmdErr
-		}
-
-		cmdUUID := uuid.NullUUID{UUID: cmd.ID, Valid: true}
-		if err := d.store.ResolveHeldAction(ctx, actionUUID, int32(req.Resolution), cmdUUID); err != nil {
-			return nil, errors.Wrapf(err, "failed to resolve held action")
-		}
-
-		agentDisplayName := ""
-		if ag, agErr := d.store.GetAgent(ctx, agentID); agErr == nil && ag != nil {
-			agentDisplayName = ag.Name
-		}
-
-		return &v1pb.ManagerStreamMessage{
-			Message: &v1pb.ManagerStreamMessage_CommandRequest{
-				CommandRequest: &v1pb.CommandRequest{
-					CommandId:        cmd.ID.String(),
-					Instruction:      cmd.Instruction,
-					Profile:          cmd.Profile,
-					WorkingDir:       cmd.WorkingDir,
-					TimeoutSeconds:   cmd.TimeoutSeconds,
-					Env:              parseEnvJSON(cmd.Env),
-					AllowDiff:        cmd.AllowDiff,
-					PrincipalId:      fmt.Sprintf("%d", cmd.PrincipalID),
-					ConversationId:   ha.ConversationID.String(),
-					ReplyToMessageId: submitReq.ReplyToMessageId,
-					AgentDisplayName: agentDisplayName,
-				},
-			},
-		}, nil
-
-	case v1pb.ActionResolution_DISCARD:
-		if err := d.store.ResolveHeldAction(ctx, actionUUID, int32(req.Resolution), uuid.NullUUID{}); err != nil {
-			return nil, errors.Wrapf(err, "failed to resolve held action")
-		}
-		return nil, nil
-
-	default:
-		return nil, errors.Errorf("unknown action resolution: %v", req.Resolution)
-	}
-}
-
-// createCommandFromAction creates a PENDING command from a SubmitAction and
-// enqueues it for dispatch. It is the shared path for both committed (version
-// match) and force-resolved (SEND_AS_IS / FORCE_SEND) submissions.
-func (d *Dispatcher) createCommandFromAction(ctx context.Context, agentID int, req *v1pb.SubmitAction, convUUID uuid.UUID) (*store.CommandMessage, error) {
-	agent, err := d.store.GetAgent(ctx, agentID)
-	if err != nil || agent == nil {
-		return nil, errors.New("agent not found")
-	}
-
-	principalID := 1 // default to system bot; the caller can override
-	envBytes, _ := json.Marshal(req.Env)
-
-	cmd := &store.CommandMessage{
-		AgentID:        agentID,
-		PrincipalID:    principalID,
-		Command:        "",
-		Instruction:    req.Instruction,
-		Profile:        req.Profile,
-		AllowDiff:      req.AllowDiff,
-		Status:         1, // PENDING
-		Env:            string(envBytes),
-		WorkingDir:     req.WorkingDir,
-		TimeoutSeconds: req.TimeoutSeconds,
-		ConversationID: &convUUID,
-	}
-
-	created, err := d.store.CreateCommand(ctx, cmd)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create command from action")
-	}
-	created.AgentResourceID = agent.ResourceID
-
-	if err := d.EnqueueCommand(ctx, created); err != nil {
-		slog.Warn("failed to enqueue command from action", "commandID", created.ID, "error", err)
-	}
-	return created, nil
-}
-
-// GetHeldActionsForAgent returns the held actions (state=HELD) for an agent.
-// Used by the API handler during AgentReady to re-prompt the agent.
-func (d *Dispatcher) GetHeldActionsForAgent(ctx context.Context, agentID int) ([]*store.HeldAction, error) {
-	return d.store.GetHeldActionsByAgent(ctx, agentID)
-}
-
-// StartExpireHeldActions starts a background goroutine that scans for expired
-// held actions every minute and marks them state=EXPIRED.
-func (d *Dispatcher) StartExpireHeldActions() {
-	go func() {
-		ticker := time.NewTicker(1 * time.Minute)
-		defer ticker.Stop()
-		for range ticker.C {
-			n, err := d.store.ExpireHeldActions(context.Background())
-			if err != nil {
-				slog.Error("failed to expire held actions", "error", err)
-			} else if n > 0 {
-				slog.Info("expired held actions", "count", n)
-			}
-		}
-	}()
-}
 
 func (d *Dispatcher) CancelCommand(_ context.Context, agentID int, commandID string) error {
 	d.mu.RLock()
@@ -887,8 +624,9 @@ func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb
 
 	slog.Info("command completed", "commandID", result.CommandId, "exitCode", result.ExitCode, "duration_ms", result.DurationMs)
 
-	// Agent is now idle; dispatch the next PENDING command for this agent.
-	go d.dispatchNextPending(context.Background(), agentID)
+	// The agent's autonomous drain loop decides whether to open another
+	// session (BeginSession will report idle if no channel has updates), so
+	// the manager no longer pushes the next command here.
 	return nil
 }
 
@@ -989,10 +727,6 @@ func (d *Dispatcher) closeEventWatchers(commandID string) {
 		close(ch)
 	}
 	delete(d.eventWatchers, commandID)
-}
-
-func parseEnvJSON(_ string) map[string]string {
-	return nil
 }
 
 func formatResultMessage(result *v1pb.CommandResult) string {

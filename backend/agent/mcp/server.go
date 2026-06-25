@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 
 	"connectrpc.com/connect"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -66,16 +67,30 @@ func New(managerURL, agentName string, getToken func() string, httpClient *http.
 	mcp.AddTool(srv,
 		&mcp.Tool{
 			Name:        "get_conversation_messages",
-			Description: "Get recent messages from the current conversation with the current room version. Use after_version to only fetch messages newer than a known version. You MUST call this before calling post_message to obtain the latest base_version.",
+			Description: "Get messages from a conversation, with the current room version. Pass conversation (e.g. \"conversations/<id>\") and after_version to fetch only messages newer than a known version (use the processed_version returned by list_channel_updates). You MUST call this before post_message to obtain the latest base_version.",
 		},
 		ms.handleGetConversationMessages,
 	)
 	mcp.AddTool(srv,
 		&mcp.Tool{
 			Name:        "post_message",
-			Description: "Post a reply to the current conversation. You MUST call get_conversation_messages first to obtain the base_version. If committed=false, new messages arrived while you were thinking — read them, reconsider, and call post_message again with the updated base_version.",
+			Description: "Post a reply to a conversation. Pass conversation (e.g. \"conversations/<id>\"), content, and base_version (the current_version from get_conversation_messages). If committed=false, new messages arrived while you were thinking — read them, reconsider, and call post_message again with the updated base_version.",
 		},
 		ms.handlePostMessage,
+	)
+	mcp.AddTool(srv,
+		&mcp.Tool{
+			Name:        "list_channel_updates",
+			Description: "Call this first, every session. Returns the channels you are a member of that have unread messages, each with its conversation name, current_version, your processed_version, and new_message_count. If the list is empty, you are idle — end your turn without calling any other tool.",
+		},
+		ms.handleListChannelUpdates,
+	)
+	mcp.AddTool(srv,
+		&mcp.Tool{
+			Name:        "ack_processed_version",
+			Description: "Advance your durable per-channel cursor to processed_version so the channel no longer reports as unread. Call this after you finish processing a channel — whether or not you replied — so you don't re-read it next session. Pass conversation (e.g. \"conversations/<id>\") and processed_version (the current_version from get_conversation_messages).",
+		},
+		ms.handleAckProcessedVersion,
 	)
 
 	return ms, nil
@@ -154,11 +169,36 @@ func contextMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// resolveConversationName picks the conversation name from the tool input,
+// falling back to the conversation pinned in the MCP URL. It normalizes a raw
+// conversation ID into the "conversations/<id>" form the manager expects.
+// Returns "" when neither is available.
+func resolveConversationName(ctx context.Context, input string) string {
+	if input != "" {
+		return normalizeConversationName(input)
+	}
+	if v, ok := ctx.Value(ctxKeyConversationID).(string); ok && v != "" {
+		return normalizeConversationName(v)
+	}
+	return ""
+}
+
+func normalizeConversationName(s string) string {
+	if s == "" {
+		return ""
+	}
+	if strings.HasPrefix(s, "conversations/") {
+		return s
+	}
+	return fmt.Sprintf("conversations/%s", s)
+}
+
 type searchChatHistoryInput struct {
-	Query     string `json:"query"`
-	Since     string `json:"since,omitempty"`
-	Limit     int    `json:"limit,omitempty"`
-	PageToken string `json:"page_token,omitempty"`
+	Conversation string `json:"conversation,omitempty"`
+	Query        string `json:"query"`
+	Since        string `json:"since,omitempty"`
+	Limit        int    `json:"limit,omitempty"`
+	PageToken    string `json:"page_token,omitempty"`
 }
 
 type chatHistoryResult struct {
@@ -175,10 +215,7 @@ type searchChatHistoryOutput struct {
 }
 
 func (s *Server) handleSearchChatHistory(ctx context.Context, _ *mcp.CallToolRequest, input searchChatHistoryInput) (*mcp.CallToolResult, searchChatHistoryOutput, error) {
-	conversationID := ""
-	if v, ok := ctx.Value(ctxKeyConversationID).(string); ok && v != "" {
-		conversationID = v
-	}
+	conversationName := resolveConversationName(ctx, input.Conversation)
 
 	limit := input.Limit
 	if limit <= 0 || limit > 50 {
@@ -190,8 +227,8 @@ func (s *Server) handleSearchChatHistory(ctx context.Context, _ *mcp.CallToolReq
 		Limit:     int32(limit),
 		PageToken: input.PageToken,
 	}
-	if conversationID != "" {
-		reqMsg.Conversation = fmt.Sprintf("conversations/%s", conversationID)
+	if conversationName != "" {
+		reqMsg.Conversation = conversationName
 	}
 	req := connect.NewRequest(reqMsg)
 
@@ -307,8 +344,9 @@ func (s *Server) handleGetCommandContext(ctx context.Context, _ *mcp.CallToolReq
 }
 
 type getConversationMessagesInput struct {
-	AfterVersion int64 `json:"after_version,omitempty"`
-	Limit        int   `json:"limit,omitempty"`
+	Conversation string `json:"conversation"`
+	AfterVersion int64  `json:"after_version,omitempty"`
+	Limit        int    `json:"limit,omitempty"`
 }
 
 type messageEntry struct {
@@ -325,12 +363,9 @@ type getConversationMessagesOutput struct {
 }
 
 func (s *Server) handleGetConversationMessages(ctx context.Context, _ *mcp.CallToolRequest, input getConversationMessagesInput) (*mcp.CallToolResult, getConversationMessagesOutput, error) {
-	conversationID := ""
-	if v, ok := ctx.Value(ctxKeyConversationID).(string); ok && v != "" {
-		conversationID = v
-	}
-	if conversationID == "" {
-		return nil, getConversationMessagesOutput{}, errors.New("no conversation context available")
+	conversationName := resolveConversationName(ctx, input.Conversation)
+	if conversationName == "" {
+		return nil, getConversationMessagesOutput{}, errors.New("conversation is required (pass the conversation name from list_channel_updates)")
 	}
 
 	limit := input.Limit
@@ -339,7 +374,7 @@ func (s *Server) handleGetConversationMessages(ctx context.Context, _ *mcp.CallT
 	}
 
 	req := connect.NewRequest(&v1pb.ListConversationMessagesRequest{
-		Conversation: fmt.Sprintf("conversations/%s", conversationID),
+		Conversation: conversationName,
 		PageSize:     int32(limit),
 		AfterVersion: input.AfterVersion,
 	})
@@ -378,8 +413,9 @@ func (s *Server) handleGetConversationMessages(ctx context.Context, _ *mcp.CallT
 }
 
 type postMessageInput struct {
-	Content     string `json:"content"`
-	BaseVersion int64  `json:"base_version"`
+	Conversation string `json:"conversation"`
+	Content      string `json:"content"`
+	BaseVersion  int64  `json:"base_version"`
 }
 
 type postMessageOutput struct {
@@ -391,12 +427,9 @@ type postMessageOutput struct {
 }
 
 func (s *Server) handlePostMessage(ctx context.Context, _ *mcp.CallToolRequest, input postMessageInput) (*mcp.CallToolResult, postMessageOutput, error) {
-	conversationID := ""
-	if v, ok := ctx.Value(ctxKeyConversationID).(string); ok && v != "" {
-		conversationID = v
-	}
-	if conversationID == "" {
-		return nil, postMessageOutput{}, errors.New("no conversation context available")
+	conversationName := resolveConversationName(ctx, input.Conversation)
+	if conversationName == "" {
+		return nil, postMessageOutput{}, errors.New("conversation is required (pass the conversation name from list_channel_updates)")
 	}
 
 	commandID := ""
@@ -405,7 +438,7 @@ func (s *Server) handlePostMessage(ctx context.Context, _ *mcp.CallToolRequest, 
 	}
 
 	req := connect.NewRequest(&v1pb.PostMessageRequest{
-		Conversation: fmt.Sprintf("conversations/%s", conversationID),
+		Conversation: conversationName,
 		Content:      input.Content,
 		BaseVersion:  input.BaseVersion,
 		CommandId:    commandID,
@@ -461,4 +494,97 @@ func (s *Server) handlePostMessage(ctx context.Context, _ *mcp.CallToolRequest, 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: text}},
 	}, output, nil
+}
+
+type channelUpdateEntry struct {
+	Conversation     string `json:"conversation"`
+	CurrentVersion   int64  `json:"current_version"`
+	ProcessedVersion int64  `json:"processed_version"`
+	NewMessageCount  int32  `json:"new_message_count"`
+}
+
+type listChannelUpdatesOutput struct {
+	Updates []channelUpdateEntry `json:"updates"`
+}
+
+// handleListChannelUpdates is the agent's "what's worth my context" discovery
+// (AX Agent Inbox). It returns every channel the agent is a member of whose
+// room_version is beyond the agent's durable cursor. An empty list means idle.
+func (s *Server) handleListChannelUpdates(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, listChannelUpdatesOutput, error) {
+	req := connect.NewRequest(&v1pb.ListChannelUpdatesRequest{})
+	resp, err := s.client().ListChannelUpdates(ctx, req)
+	if err != nil {
+		return nil, listChannelUpdatesOutput{}, errors.Wrap(err, "failed to list channel updates")
+	}
+
+	var updates []channelUpdateEntry
+	for _, u := range resp.Msg.Updates {
+		updates = append(updates, channelUpdateEntry{
+			Conversation:     u.Conversation,
+			CurrentVersion:   u.CurrentVersion,
+			ProcessedVersion: u.ProcessedVersion,
+			NewMessageCount:  u.NewMessageCount,
+		})
+	}
+	if updates == nil {
+		updates = []channelUpdateEntry{}
+	}
+
+	text := fmt.Sprintf("Channels with unread messages (%d):\n", len(updates))
+	if len(updates) == 0 {
+		text += "(none — you are idle; end your turn without calling any other tool)\n"
+	} else {
+		for _, u := range updates {
+			text += fmt.Sprintf("- %s: %d new (current_version=%d, your processed_version=%d)\n",
+				u.Conversation, u.NewMessageCount, u.CurrentVersion, u.ProcessedVersion)
+		}
+		text += "\nPick ONE channel. Call get_conversation_messages(conversation=<name>, after_version=<processed_version>) to read the new messages.\n"
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: text}},
+	}, listChannelUpdatesOutput{Updates: updates}, nil
+}
+
+type ackProcessedVersionInput struct {
+	Conversation     string `json:"conversation"`
+	ProcessedVersion int64  `json:"processed_version"`
+}
+
+type ackProcessedVersionOutput struct {
+	ProcessedVersion int64 `json:"processed_version"`
+}
+
+// handleAckProcessedVersion advances the agent's durable per-channel cursor.
+// The agent MUST call this after finishing a channel (reply or silence) so the
+// next list_channel_updates no longer reports it. command_id from the MCP URL
+// links the session's command to the conversation for frontend visibility.
+func (s *Server) handleAckProcessedVersion(ctx context.Context, _ *mcp.CallToolRequest, input ackProcessedVersionInput) (*mcp.CallToolResult, ackProcessedVersionOutput, error) {
+	conversationName := resolveConversationName(ctx, input.Conversation)
+	if conversationName == "" {
+		return nil, ackProcessedVersionOutput{}, errors.New("conversation is required")
+	}
+	if input.ProcessedVersion <= 0 {
+		return nil, ackProcessedVersionOutput{}, errors.New("processed_version must be positive")
+	}
+
+	commandID := ""
+	if v, ok := ctx.Value(ctxKeyCommandID).(string); ok {
+		commandID = v
+	}
+
+	req := connect.NewRequest(&v1pb.AckProcessedVersionRequest{
+		Conversation:     conversationName,
+		ProcessedVersion: input.ProcessedVersion,
+		CommandId:        commandID,
+	})
+	resp, err := s.client().AckProcessedVersion(ctx, req)
+	if err != nil {
+		return nil, ackProcessedVersionOutput{}, errors.Wrap(err, "failed to ack processed version")
+	}
+
+	text := fmt.Sprintf("Cursor advanced to processed_version=%d for %s.", resp.Msg.ProcessedVersion, conversationName)
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: text}},
+	}, ackProcessedVersionOutput{ProcessedVersion: resp.Msg.ProcessedVersion}, nil
 }

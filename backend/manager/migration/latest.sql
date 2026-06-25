@@ -323,8 +323,8 @@ CREATE INDEX IF NOT EXISTS idx_conversation_member_lookup ON conversation_member
 
 -- === Phase 1: Message-Driven Architecture ===
 -- Room version control: conversation.version increments on every new
--- chat_message and is the basis for Agent pull cursors (PullMessages) and
--- the Phase 2 Held Draft base_version check.
+-- chat_message and is the basis for each agent's durable per-channel cursor
+-- (agent_channel_cursor) and the post_message Held Draft base_version check.
 ALTER TABLE conversation ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 1;
 COMMENT ON COLUMN conversation.version IS 'Room version; increments on every new chat_message';
 
@@ -362,27 +362,28 @@ ALTER TABLE command DROP COLUMN IF EXISTS source_type;
 DROP TABLE IF EXISTS agent_working_state CASCADE;
 DROP TABLE IF EXISTS agent_inbox CASCADE;
 
--- === Phase 2: Held Draft mechanism ===
--- held_action stores agent actions that were submitted but could not be
--- committed because the conversation had advanced (version mismatch).
--- The agent must resolve them via ResolveHeldAction (REVISE / SEND_AS_IS /
--- DISCARD / FORCE_SEND). Unresolved actions expire after 10 minutes.
-CREATE TABLE IF NOT EXISTS held_action (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- === Agent-first: durable per-channel cursor ===
+-- agent_channel_cursor records how far an agent has processed each
+-- conversation it is a member of. The autonomous drain loop compares
+-- conversation.version against processed_version to decide whether a channel
+-- has unread messages. A missing row is treated as "caught up to current
+-- version" on first read (backfill-on-read), so newly joined agents see only
+-- future messages unless they fetch history explicitly.
+CREATE TABLE IF NOT EXISTS agent_channel_cursor (
     agent_id INTEGER NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
     conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
-    action_json JSONB NOT NULL,
-    base_version BIGINT NOT NULL,
-    current_version BIGINT NOT NULL,
-    state SMALLINT NOT NULL DEFAULT 1,
-    resolution SMALLINT,
-    command_id UUID REFERENCES command(id) ON DELETE SET NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    resolved_at TIMESTAMPTZ,
-    expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '10 minutes')
+    processed_version BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (agent_id, conversation_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_held_action_agent_state ON held_action(agent_id, state);
-CREATE INDEX IF NOT EXISTS idx_held_action_conversation ON held_action(conversation_id, state);
-CREATE INDEX IF NOT EXISTS idx_held_action_expires ON held_action(state, expires_at) WHERE state = 1;
+CREATE INDEX IF NOT EXISTS idx_agent_channel_cursor_agent ON agent_channel_cursor(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_channel_cursor_conv ON agent_channel_cursor(conversation_id);
+
+-- The previous Phase 2 held_action table is obsolete in the agent-first model:
+-- the agent runs tools and posts replies directly within its own session, and
+-- the send-time Held Draft is handled inline by post_message's base_version
+-- optimistic-concurrency check. Drop it on upgrade; fresh installs never
+-- create it.
+DROP TABLE IF EXISTS held_action CASCADE;
 

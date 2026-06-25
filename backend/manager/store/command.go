@@ -115,6 +115,20 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 	return created, nil
 }
 
+// SetCommandConversationID links a command to the conversation the agent ended
+// up processing during its autonomous session. A session's command is created
+// before the agent has chosen which channel to work on, so the link is filled
+// in when the agent commits to a channel (via AckProcessedVersion).
+func (s *Store) SetCommandConversationID(ctx context.Context, commandID, conversationID uuid.UUID) error {
+	_, err := s.GetDB().ExecContext(ctx, `
+		UPDATE command SET conversation_id = $1 WHERE id = $2
+	`, conversationID, commandID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to set command conversation id")
+	}
+	return nil
+}
+
 func (s *Store) GetCommand(ctx context.Context, id uuid.UUID) (*CommandMessage, error) {
 	query := `SELECT
 		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.allow_diff, c.status,

@@ -293,3 +293,98 @@ func setUnexportedField(t *testing.T, target any, fieldName string, value any) {
 	require.True(t, field.IsValid(), "field %s must exist", fieldName)
 	reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem().Set(reflect.ValueOf(value))
 }
+
+// TestDrainLoopIdleResponseEndsPass verifies that when BeginSession replies
+// idle=true, the drain loop sends a BeginSession message, builds no runtime,
+// and ends the drain pass without running a session.
+func TestDrainLoopIdleResponseEndsPass(t *testing.T) {
+	stream, recorder, cleanup := newTestCommandChannel(t)
+	defer cleanup()
+
+	cs := &commandStream{
+		wakeCh:      make(chan struct{}, 1),
+		beginRespCh: make(chan *v1pb.BeginSessionResponse, 1),
+		newSessionRuntime: func(_ *v1pb.CommandRequest) (executor.Runtime, error) {
+			t.Fatal("runtime must not be built for an idle session")
+			return nil, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	doneCh := make(chan struct{})
+
+	go func() {
+		cs.drainLoop(ctx, stream, doneCh)
+		close(doneCh)
+	}()
+
+	cs.wake()
+	cs.beginRespCh <- &v1pb.BeginSessionResponse{Idle: true}
+
+	select {
+	case <-doneCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("drain loop did not end on idle response")
+	}
+
+	require.NoError(t, stream.CloseRequest())
+	msgs := recorder.Messages()
+	require.Len(t, msgs, 1, "drain loop should send exactly one BeginSession message")
+	require.NotNil(t, msgs[0].GetBeginSession())
+}
+
+// TestRunSessionExecutesRuntime verifies that a non-idle session builds the
+// runtime and pumps lifecycle + result over the stream via runCommand.
+func TestRunSessionExecutesRuntime(t *testing.T) {
+	stream, recorder, cleanup := newTestCommandChannel(t)
+	defer cleanup()
+
+	runtime := newScriptedRuntime(func(r *scriptedRuntime) {
+		close(r.outputCh)
+		close(r.eventCh)
+		r.resultCh <- executor.Result{ExitCode: 0, FinalSummary: "drain done"}
+		close(r.resultCh)
+		close(r.doneCh)
+	})
+
+	cs := &commandStream{
+		newSessionRuntime: func(_ *v1pb.CommandRequest) (executor.Runtime, error) {
+			return runtime, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		cs.runSession(ctx, stream, "drain-1")
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		runtime.Cancel()
+		t.Fatal("runSession did not complete")
+	}
+
+	require.NoError(t, stream.CloseRequest())
+	msgs := recorder.Messages()
+	require.NotEmpty(t, msgs)
+
+	lifecycle := msgs[0].GetEvent()
+	require.NotNil(t, lifecycle)
+	assert.Equal(t, v1pb.CommandEventType_LIFECYCLE, lifecycle.Type)
+	assert.Equal(t, "ACP", lifecycle.GetLifecycle().GetExecutorKind())
+
+	result := msgs[len(msgs)-1].GetResult()
+	require.NotNil(t, result)
+	assert.Equal(t, "drain-1", result.CommandId)
+	assert.Equal(t, int32(0), result.ExitCode)
+	assert.Equal(t, "drain done", result.FinalSummary)
+
+	assert.Equal(t, int32(1), runtime.startInvoked.Load())
+	assert.False(t, cs.isExecuting.Load(), "isExecuting must be cleared after the session")
+}

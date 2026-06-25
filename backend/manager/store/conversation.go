@@ -68,6 +68,14 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 		return nil, err
 	}
 
+	// Seed the agent's per-channel cursor to the new conversation's version so
+	// it starts caught up and only sees future messages. Seeding only on the
+	// creation path is intentional: returning an existing conversation must not
+	// re-seed (and thus skip) unread messages.
+	if seedErr := s.SeedCursorOnJoin(ctx, agentID, newConv.ID); seedErr != nil {
+		return nil, errors.Wrapf(seedErr, "failed to seed agent cursor for new direct conversation")
+	}
+
 	return &newConv, nil
 }
 

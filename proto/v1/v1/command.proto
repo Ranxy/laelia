@@ -232,8 +232,9 @@ message ChatMessage {
   string sender_name = 8;
   SenderType sender_type = 9;
   // room_version is the conversation.version at the time this message was
-  // created. Agents use it together with PullMessages.after_version to track
-  // their cursor into the conversation.
+  // created. Agents use it together with their per-channel cursor (managed via
+  // the ListChannelUpdates / AckProcessedVersion RPCs) to track progress into
+  // the conversation.
   int64 room_version = 10;
   repeated Mention mentions = 11;
 }
@@ -387,6 +388,45 @@ message PostMessageResponse {
   string conflict_description = 5;
 }
 
+// ListChannelUpdates returns, for the authenticated agent, every conversation
+// it is a member of whose current room_version is greater than the agent's
+// stored per-channel cursor — i.e. the channels that have unread messages. It
+// is the agent's "what is worth my context" discovery and drives the autonomous
+// drain loop. The agent identity is resolved from the auth context.
+message ListChannelUpdatesRequest {}
+
+// ChannelUpdate describes one conversation that has unread messages for the
+// agent. new_message_count is the number of chat_message rows with
+// room_version greater than the agent's processed_version for that channel.
+message ChannelUpdate {
+  string conversation = 1 [(google.api.resource_reference).type = "laelia/Conversation"];
+  int64 current_version = 2;
+  int64 processed_version = 3;
+  int32 new_message_count = 4;
+}
+
+message ListChannelUpdatesResponse {
+  repeated ChannelUpdate updates = 1;
+}
+
+// AckProcessedVersion advances the agent's durable per-channel cursor to
+// processed_version, marking the channel as processed up to that room_version so
+// that subsequent ListChannelUpdates no longer report it. command_id, when
+// supplied, links the current session's command to this conversation so the
+// frontend can associate execution events with the channel.
+message AckProcessedVersionRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+  int64 processed_version = 2 [(google.api.field_behavior) = REQUIRED];
+  string command_id = 3;
+}
+
+message AckProcessedVersionResponse {
+  int64 processed_version = 1;
+}
+
 service CommandService {
   rpc ListCommands(ListCommandsRequest) returns (ListCommandsResponse) {
     option (google.api.http) = {get: "/v1/{agent=agents/*}/commands"};
@@ -497,6 +537,17 @@ service CommandService {
     };
   }
 
+  rpc ListChannelUpdates(ListChannelUpdatesRequest) returns (ListChannelUpdatesResponse) {
+    option (google.api.http) = {get: "/v1/agents/-/channelUpdates"};
+  }
+
+  rpc AckProcessedVersion(AckProcessedVersionRequest) returns (AckProcessedVersionResponse) {
+    option (google.api.http) = {
+      post: "/v1/{conversation=conversations/*}:ackProcessedVersion"
+      body: "*"
+    };
+  }
+
   rpc FetchConversationActivity(FetchConversationActivityRequest) returns (FetchConversationActivityResponse) {
     option (google.api.http) = {get: "/v1/{conversation=conversations/*}/activity"};
   }
@@ -509,9 +560,7 @@ service AgentStreamService {
 message AgentStreamMessage {
   oneof message {
     AgentReady agent_ready = 1;
-    PullMessages pull_messages = 2;
-    SubmitAction submit_action = 3;
-    ResolveHeldAction resolve_held_action = 4;
+    BeginSession begin_session = 2;
     CommandProgress progress = 5;
     CommandResult result = 6;
     CommandEvent event = 7;
@@ -521,10 +570,8 @@ message AgentStreamMessage {
 
 message ManagerStreamMessage {
   oneof message {
-    MessageSnapshot message_snapshot = 1;
-    ActionResponse action_response = 2;
-    CommandRequest command_request = 3;
     NewMessagesAvailable new_messages = 4;
+    BeginSessionResponse begin_session_response = 8;
     CancelMessage cancel = 5;
     Pong pong = 6;
     PermissionDecision permission_decision = 7;
@@ -642,74 +689,28 @@ message RespondPermissionRequest {
   string option_id = 2;
 }
 
-// PullMessages is sent by an agent over the AgentChannel bidi stream to fetch
-// chat messages with room_version greater than after_version for a single
-// conversation. The agent tracks its own cursor per conversation and supplies
-// it explicitly so that reconnection / crash recovery is self-describing.
-message PullMessages {
-  string conversation_id = 1;
-  int64 after_version = 2;
-}
-
-// MessageSnapshot is the Manager reply to PullMessages. It returns the newly
-// available messages and the conversation's current version so the agent can
-// record it as the base_version for any subsequent action.
-message MessageSnapshot {
-  repeated ChatMessage messages = 1;
-  int64 current_version = 2;
-}
-
-// NewMessagesAvailable is pushed from Manager to agent over the bidi stream to
-// notify that a conversation the agent is connected to has produced new
-// messages. The agent should follow up with a PullMessages request.
+// NewMessagesAvailable is a best-effort wake signal pushed from the Manager to
+// an agent over the bidi stream whenever a conversation the agent is a member
+// of produces a new message (from any sender: user, agent, or system). It is
+// NOT the source of truth: the agent's durable per-channel cursor is. If a wake
+// is missed (agent offline), the agent rediscovers pending work on reconnect by
+// calling ListChannelUpdates, which compares conversation.version to the cursor.
 message NewMessagesAvailable {
   repeated string conversation_ids = 1;
   repeated int64 versions = 2;
 }
 
-// SubmitAction is the Phase 2 execution trigger. It replaces the Phase 1
-// manager-driven dispatch: after PullMessages the agent autonomously decides
-// whether to act and sends SubmitAction. The manager performs a Held Draft
-// check comparing base_version against the conversation's current version.
-message SubmitAction {
-  string conversation_id = 1;
-  string reply_to_message_id = 2;
-  int64 base_version = 3;
-  string instruction = 4;
-  string profile = 5;
-  map<string, string> env = 6;
-  string working_dir = 7;
-  int32 timeout_seconds = 8;
-  bool allow_diff = 9;
-}
+// BeginSession is sent by an agent to ask the Manager to start a new
+// autonomous processing session. The Manager checks the agent's per-channel
+// cursors: if no conversation has room_version greater than the agent's cursor,
+// it replies BeginSessionResponse{idle=true} and the agent stays idle;
+// otherwise it creates a RUNNING command and replies with its command_id, which
+// the agent uses to anchor its execution events and link any posted replies.
+message BeginSession {}
 
-// ActionResolution is the agent's decision when a SubmitAction is held due
-// to a version mismatch (new messages arrived between PullMessages and
-// SubmitAction).
-enum ActionResolution {
-  ACTION_RESOLUTION_UNSPECIFIED = 0;
-  REVISE = 1;
-  SEND_AS_IS = 2;
-  DISCARD = 3;
-  FORCE_SEND = 4;
-}
-
-// ActionResponse is the manager's reply to SubmitAction. When committed=true
-// the action was accepted and a command was created; when committed=false the
-// action is held pending agent resolution via ResolveHeldAction.
-message ActionResponse {
-  string action_id = 1;
-  bool committed = 2;
-  string command_id = 3;
-  int64 current_version = 4;
-  repeated ChatMessage new_messages = 5;
-}
-
-// ResolveHeldAction is sent by the agent to resolve a held action (one where
-// ActionResponse.committed was false).
-message ResolveHeldAction {
-  string action_id = 1;
-  ActionResolution resolution = 2;
+message BeginSessionResponse {
+  string command_id = 1;
+  bool idle = 2;
 }
 
 // FetchConversationActivity returns the execution status of each agent member

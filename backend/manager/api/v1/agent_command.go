@@ -4,11 +4,11 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 
-	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
@@ -55,44 +55,18 @@ func (s *AgentStreamService) AgentChannel(
 		case *v1pb.AgentStreamMessage_AgentReady:
 			s.handleAgentReady(ctx, agent, sess, m.AgentReady)
 
-		case *v1pb.AgentStreamMessage_PullMessages:
-			snapshot, pullErr := s.dispatcher.HandlePullMessages(ctx, agent.ID, m.PullMessages.ConversationId, m.PullMessages.AfterVersion)
-			if pullErr != nil {
-				slog.Error("failed to handle pull messages", "error", pullErr)
+		case *v1pb.AgentStreamMessage_BeginSession:
+			resp, beginErr := s.dispatcher.HandleBeginSession(ctx, agent.ID)
+			if beginErr != nil {
+				slog.Error("failed to handle begin session", "error", beginErr)
 				continue
 			}
 			if sendErr := stream.Send(&v1pb.ManagerStreamMessage{
-				Message: &v1pb.ManagerStreamMessage_MessageSnapshot{
-					MessageSnapshot: snapshot,
+				Message: &v1pb.ManagerStreamMessage_BeginSessionResponse{
+					BeginSessionResponse: resp,
 				},
 			}); sendErr != nil {
-				slog.Error("failed to send message snapshot", "error", sendErr)
-			}
-
-		case *v1pb.AgentStreamMessage_SubmitAction:
-			resp, submitErr := s.dispatcher.HandleSubmitAction(ctx, agent.ID, m.SubmitAction)
-			if submitErr != nil {
-				slog.Error("failed to handle submit action", "error", submitErr)
-				continue
-			}
-			if sendErr := stream.Send(&v1pb.ManagerStreamMessage{
-				Message: &v1pb.ManagerStreamMessage_ActionResponse{
-					ActionResponse: resp,
-				},
-			}); sendErr != nil {
-				slog.Error("failed to send action response", "error", sendErr)
-			}
-
-		case *v1pb.AgentStreamMessage_ResolveHeldAction:
-			followUp, resolveErr := s.dispatcher.HandleResolveHeldAction(ctx, agent.ID, m.ResolveHeldAction)
-			if resolveErr != nil {
-				slog.Error("failed to handle resolve held action", "error", resolveErr)
-				continue
-			}
-			if followUp != nil {
-				if sendErr := stream.Send(followUp); sendErr != nil {
-					slog.Error("failed to send command request after held action resolution", "error", sendErr)
-				}
+				slog.Error("failed to send begin session response", "error", sendErr)
 			}
 
 		case *v1pb.AgentStreamMessage_Progress:
@@ -138,58 +112,23 @@ func (s *AgentStreamService) handleAgentReady(
 ) {
 	if ready.LastCommandId != "" {
 		cmd, err := s.store.GetCommandByName(ctx, formatCommandName(agent.ResourceID, uuid.MustParse(ready.LastCommandId)))
-		if err != nil || cmd == nil {
-			return
-		}
-		// An in-flight (RUNNING) command on reconnect hands it to the grace
-		// period cleanup path. PENDING commands are handled by the dispatcher's
-		// pending drain, so we only unregister when something is actively
-		// running.
-		if cmd.Status == 2 {
-			slog.Info("agent reconnected with in-flight command", "commandID", ready.LastCommandId)
-			s.dispatcher.UnregisterAgent(agent.ID)
-			return
+		if err == nil && cmd != nil {
+			// An in-flight (RUNNING) command from before the disconnect is not
+			// resumed — the agent's drain loop starts a fresh session — so mark
+			// it FAILED here rather than leaving it stale.
+			if cmd.Status == int32(v1pb.CommandStatus_RUNNING) {
+				now := time.Now()
+				if err := s.store.UpdateCommandStatus(ctx, cmd.ID, int32(v1pb.CommandStatus_FAILED), nil, &now, nil, nil, "agent disconnected during execution"); err != nil {
+					slog.Error("failed to mark in-flight command failed on reconnect", "commandID", ready.LastCommandId, "error", err)
+				}
+				sess.ClearCurrentCommand(ready.LastCommandId)
+			}
 		}
 	}
 
-	// Phase 2: check for held actions that the agent needs to resolve.
-	heldActions, haErr := s.dispatcher.GetHeldActionsForAgent(ctx, agent.ID)
-	if haErr != nil {
-		slog.Error("failed to check held actions on reconnect", "agentID", agent.ID, "error", haErr)
-	}
-	for _, ha := range heldActions {
-		var submitReq v1pb.SubmitAction
-		if unmarshalErr := common.ProtojsonUnmarshaler.Unmarshal([]byte(ha.ActionJSON), &submitReq); unmarshalErr != nil {
-			slog.Error("failed to unmarshal held action on reconnect", "actionID", ha.ID, "error", unmarshalErr)
-			continue
-		}
-		newMsgs, msgErr := s.store.GetMessagesAfterVersion(ctx, ha.ConversationID, ha.BaseVersion)
-		if msgErr != nil {
-			slog.Error("failed to get new messages for held action on reconnect", "error", msgErr)
-			continue
-		}
-		actionResp := &v1pb.ActionResponse{
-			ActionId:       ha.ID.String(),
-			Committed:      false,
-			CurrentVersion: ha.CurrentVersion,
-		}
-		for _, m := range newMsgs {
-			actionResp.NewMessages = append(actionResp.NewMessages, dispatcher.ConvertChatMessageToV1(m))
-		}
-		msg := &v1pb.ManagerStreamMessage{
-			Message: &v1pb.ManagerStreamMessage_ActionResponse{
-				ActionResponse: actionResp,
-			},
-		}
-		if sendErr := sess.Send(msg); sendErr != nil {
-			slog.Warn("failed to re-prompt held action on reconnect", "agentID", agent.ID, "actionID", ha.ID, "error", sendErr)
-		}
-		slog.Info("re-prompted agent with held action on reconnect", "agentID", agent.ID, "actionID", ha.ID)
-	}
-
-	if len(heldActions) == 0 {
-		// No held actions: trigger a drain of PENDING commands, and notify
-		// the agent of any new messages it may have missed while disconnected.
-		s.dispatcher.DispatchPending(ctx, agent.ID)
-	}
+	// Kick the agent's drain loop so it discovers any messages missed while
+	// offline. The wake is best-effort: the durable per-channel cursor is the
+	// source of truth, so a missed wake just means the loop is idle until the
+	// next BeginSession. The agent client also self-kicks after AgentReady.
+	s.dispatcher.NotifyWake(ctx, agent.ID)
 }

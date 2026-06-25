@@ -11,20 +11,18 @@ import (
 const outputBufferSize = 1024
 
 type Request struct {
-	CommandID            string
-	Instruction          string
-	Profile              string
-	WorkingDir           string
-	Env                  map[string]string
-	TimeoutSeconds       int32
-	AllowDiff            bool
-	ConversationID       string
-	ReplyToMessageID     string
-	AgentResourceID      string
-	AgentDisplayName     string
-	PrincipalID          string
-	MCPPort              int
-	LastProcessedVersion int64
+	CommandID        string
+	Instruction      string
+	Profile          string
+	WorkingDir       string
+	Env              map[string]string
+	TimeoutSeconds   int32
+	AllowDiff        bool
+	ConversationID   string
+	AgentResourceID  string
+	AgentDisplayName string
+	PrincipalID      string
+	MCPPort          int
 }
 
 type Event struct {

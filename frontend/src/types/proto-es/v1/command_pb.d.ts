@@ -752,8 +752,9 @@ export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
 
   /**
    * room_version is the conversation.version at the time this message was
-   * created. Agents use it together with PullMessages.after_version to track
-   * their cursor into the conversation.
+   * created. Agents use it together with their per-channel cursor (managed via
+   * the ListChannelUpdates / AckProcessedVersion RPCs) to track progress into
+   * the conversation.
    *
    * @generated from field: int64 room_version = 10;
    */
@@ -1278,6 +1279,123 @@ export declare type PostMessageResponse = Message<"laelia.v1.PostMessageResponse
 export declare const PostMessageResponseSchema: GenMessage<PostMessageResponse>;
 
 /**
+ * ListChannelUpdates returns, for the authenticated agent, every conversation
+ * it is a member of whose current room_version is greater than the agent's
+ * stored per-channel cursor — i.e. the channels that have unread messages. It
+ * is the agent's "what is worth my context" discovery and drives the autonomous
+ * drain loop. The agent identity is resolved from the auth context.
+ *
+ * @generated from message laelia.v1.ListChannelUpdatesRequest
+ */
+export declare type ListChannelUpdatesRequest = Message<"laelia.v1.ListChannelUpdatesRequest"> & {
+};
+
+/**
+ * Describes the message laelia.v1.ListChannelUpdatesRequest.
+ * Use `create(ListChannelUpdatesRequestSchema)` to create a new message.
+ */
+export declare const ListChannelUpdatesRequestSchema: GenMessage<ListChannelUpdatesRequest>;
+
+/**
+ * ChannelUpdate describes one conversation that has unread messages for the
+ * agent. new_message_count is the number of chat_message rows with
+ * room_version greater than the agent's processed_version for that channel.
+ *
+ * @generated from message laelia.v1.ChannelUpdate
+ */
+export declare type ChannelUpdate = Message<"laelia.v1.ChannelUpdate"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: int64 current_version = 2;
+   */
+  currentVersion: bigint;
+
+  /**
+   * @generated from field: int64 processed_version = 3;
+   */
+  processedVersion: bigint;
+
+  /**
+   * @generated from field: int32 new_message_count = 4;
+   */
+  newMessageCount: number;
+};
+
+/**
+ * Describes the message laelia.v1.ChannelUpdate.
+ * Use `create(ChannelUpdateSchema)` to create a new message.
+ */
+export declare const ChannelUpdateSchema: GenMessage<ChannelUpdate>;
+
+/**
+ * @generated from message laelia.v1.ListChannelUpdatesResponse
+ */
+export declare type ListChannelUpdatesResponse = Message<"laelia.v1.ListChannelUpdatesResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.ChannelUpdate updates = 1;
+   */
+  updates: ChannelUpdate[];
+};
+
+/**
+ * Describes the message laelia.v1.ListChannelUpdatesResponse.
+ * Use `create(ListChannelUpdatesResponseSchema)` to create a new message.
+ */
+export declare const ListChannelUpdatesResponseSchema: GenMessage<ListChannelUpdatesResponse>;
+
+/**
+ * AckProcessedVersion advances the agent's durable per-channel cursor to
+ * processed_version, marking the channel as processed up to that room_version so
+ * that subsequent ListChannelUpdates no longer report it. command_id, when
+ * supplied, links the current session's command to this conversation so the
+ * frontend can associate execution events with the channel.
+ *
+ * @generated from message laelia.v1.AckProcessedVersionRequest
+ */
+export declare type AckProcessedVersionRequest = Message<"laelia.v1.AckProcessedVersionRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: int64 processed_version = 2;
+   */
+  processedVersion: bigint;
+
+  /**
+   * @generated from field: string command_id = 3;
+   */
+  commandId: string;
+};
+
+/**
+ * Describes the message laelia.v1.AckProcessedVersionRequest.
+ * Use `create(AckProcessedVersionRequestSchema)` to create a new message.
+ */
+export declare const AckProcessedVersionRequestSchema: GenMessage<AckProcessedVersionRequest>;
+
+/**
+ * @generated from message laelia.v1.AckProcessedVersionResponse
+ */
+export declare type AckProcessedVersionResponse = Message<"laelia.v1.AckProcessedVersionResponse"> & {
+  /**
+   * @generated from field: int64 processed_version = 1;
+   */
+  processedVersion: bigint;
+};
+
+/**
+ * Describes the message laelia.v1.AckProcessedVersionResponse.
+ * Use `create(AckProcessedVersionResponseSchema)` to create a new message.
+ */
+export declare const AckProcessedVersionResponseSchema: GenMessage<AckProcessedVersionResponse>;
+
+/**
  * @generated from message laelia.v1.AgentStreamMessage
  */
 export declare type AgentStreamMessage = Message<"laelia.v1.AgentStreamMessage"> & {
@@ -1292,22 +1410,10 @@ export declare type AgentStreamMessage = Message<"laelia.v1.AgentStreamMessage">
     case: "agentReady";
   } | {
     /**
-     * @generated from field: laelia.v1.PullMessages pull_messages = 2;
+     * @generated from field: laelia.v1.BeginSession begin_session = 2;
      */
-    value: PullMessages;
-    case: "pullMessages";
-  } | {
-    /**
-     * @generated from field: laelia.v1.SubmitAction submit_action = 3;
-     */
-    value: SubmitAction;
-    case: "submitAction";
-  } | {
-    /**
-     * @generated from field: laelia.v1.ResolveHeldAction resolve_held_action = 4;
-     */
-    value: ResolveHeldAction;
-    case: "resolveHeldAction";
+    value: BeginSession;
+    case: "beginSession";
   } | {
     /**
      * @generated from field: laelia.v1.CommandProgress progress = 5;
@@ -1350,28 +1456,16 @@ export declare type ManagerStreamMessage = Message<"laelia.v1.ManagerStreamMessa
    */
   message: {
     /**
-     * @generated from field: laelia.v1.MessageSnapshot message_snapshot = 1;
-     */
-    value: MessageSnapshot;
-    case: "messageSnapshot";
-  } | {
-    /**
-     * @generated from field: laelia.v1.ActionResponse action_response = 2;
-     */
-    value: ActionResponse;
-    case: "actionResponse";
-  } | {
-    /**
-     * @generated from field: laelia.v1.CommandRequest command_request = 3;
-     */
-    value: CommandRequest;
-    case: "commandRequest";
-  } | {
-    /**
      * @generated from field: laelia.v1.NewMessagesAvailable new_messages = 4;
      */
     value: NewMessagesAvailable;
     case: "newMessages";
+  } | {
+    /**
+     * @generated from field: laelia.v1.BeginSessionResponse begin_session_response = 8;
+     */
+    value: BeginSessionResponse;
+    case: "beginSessionResponse";
   } | {
     /**
      * @generated from field: laelia.v1.CancelMessage cancel = 5;
@@ -1805,60 +1899,12 @@ export declare type RespondPermissionRequest = Message<"laelia.v1.RespondPermiss
 export declare const RespondPermissionRequestSchema: GenMessage<RespondPermissionRequest>;
 
 /**
- * PullMessages is sent by an agent over the AgentChannel bidi stream to fetch
- * chat messages with room_version greater than after_version for a single
- * conversation. The agent tracks its own cursor per conversation and supplies
- * it explicitly so that reconnection / crash recovery is self-describing.
- *
- * @generated from message laelia.v1.PullMessages
- */
-export declare type PullMessages = Message<"laelia.v1.PullMessages"> & {
-  /**
-   * @generated from field: string conversation_id = 1;
-   */
-  conversationId: string;
-
-  /**
-   * @generated from field: int64 after_version = 2;
-   */
-  afterVersion: bigint;
-};
-
-/**
- * Describes the message laelia.v1.PullMessages.
- * Use `create(PullMessagesSchema)` to create a new message.
- */
-export declare const PullMessagesSchema: GenMessage<PullMessages>;
-
-/**
- * MessageSnapshot is the Manager reply to PullMessages. It returns the newly
- * available messages and the conversation's current version so the agent can
- * record it as the base_version for any subsequent action.
- *
- * @generated from message laelia.v1.MessageSnapshot
- */
-export declare type MessageSnapshot = Message<"laelia.v1.MessageSnapshot"> & {
-  /**
-   * @generated from field: repeated laelia.v1.ChatMessage messages = 1;
-   */
-  messages: ChatMessage[];
-
-  /**
-   * @generated from field: int64 current_version = 2;
-   */
-  currentVersion: bigint;
-};
-
-/**
- * Describes the message laelia.v1.MessageSnapshot.
- * Use `create(MessageSnapshotSchema)` to create a new message.
- */
-export declare const MessageSnapshotSchema: GenMessage<MessageSnapshot>;
-
-/**
- * NewMessagesAvailable is pushed from Manager to agent over the bidi stream to
- * notify that a conversation the agent is connected to has produced new
- * messages. The agent should follow up with a PullMessages request.
+ * NewMessagesAvailable is a best-effort wake signal pushed from the Manager to
+ * an agent over the bidi stream whenever a conversation the agent is a member
+ * of produces a new message (from any sender: user, agent, or system). It is
+ * NOT the source of truth: the agent's durable per-channel cursor is. If a wake
+ * is missed (agent offline), the agent rediscovers pending work on reconnect by
+ * calling ListChannelUpdates, which compares conversation.version to the cursor.
  *
  * @generated from message laelia.v1.NewMessagesAvailable
  */
@@ -1881,129 +1927,44 @@ export declare type NewMessagesAvailable = Message<"laelia.v1.NewMessagesAvailab
 export declare const NewMessagesAvailableSchema: GenMessage<NewMessagesAvailable>;
 
 /**
- * SubmitAction is the Phase 2 execution trigger. It replaces the Phase 1
- * manager-driven dispatch: after PullMessages the agent autonomously decides
- * whether to act and sends SubmitAction. The manager performs a Held Draft
- * check comparing base_version against the conversation's current version.
+ * BeginSession is sent by an agent to ask the Manager to start a new
+ * autonomous processing session. The Manager checks the agent's per-channel
+ * cursors: if no conversation has room_version greater than the agent's cursor,
+ * it replies BeginSessionResponse{idle=true} and the agent stays idle;
+ * otherwise it creates a RUNNING command and replies with its command_id, which
+ * the agent uses to anchor its execution events and link any posted replies.
  *
- * @generated from message laelia.v1.SubmitAction
+ * @generated from message laelia.v1.BeginSession
  */
-export declare type SubmitAction = Message<"laelia.v1.SubmitAction"> & {
-  /**
-   * @generated from field: string conversation_id = 1;
-   */
-  conversationId: string;
-
-  /**
-   * @generated from field: string reply_to_message_id = 2;
-   */
-  replyToMessageId: string;
-
-  /**
-   * @generated from field: int64 base_version = 3;
-   */
-  baseVersion: bigint;
-
-  /**
-   * @generated from field: string instruction = 4;
-   */
-  instruction: string;
-
-  /**
-   * @generated from field: string profile = 5;
-   */
-  profile: string;
-
-  /**
-   * @generated from field: map<string, string> env = 6;
-   */
-  env: { [key: string]: string };
-
-  /**
-   * @generated from field: string working_dir = 7;
-   */
-  workingDir: string;
-
-  /**
-   * @generated from field: int32 timeout_seconds = 8;
-   */
-  timeoutSeconds: number;
-
-  /**
-   * @generated from field: bool allow_diff = 9;
-   */
-  allowDiff: boolean;
+export declare type BeginSession = Message<"laelia.v1.BeginSession"> & {
 };
 
 /**
- * Describes the message laelia.v1.SubmitAction.
- * Use `create(SubmitActionSchema)` to create a new message.
+ * Describes the message laelia.v1.BeginSession.
+ * Use `create(BeginSessionSchema)` to create a new message.
  */
-export declare const SubmitActionSchema: GenMessage<SubmitAction>;
+export declare const BeginSessionSchema: GenMessage<BeginSession>;
 
 /**
- * ActionResponse is the manager's reply to SubmitAction. When committed=true
- * the action was accepted and a command was created; when committed=false the
- * action is held pending agent resolution via ResolveHeldAction.
- *
- * @generated from message laelia.v1.ActionResponse
+ * @generated from message laelia.v1.BeginSessionResponse
  */
-export declare type ActionResponse = Message<"laelia.v1.ActionResponse"> & {
+export declare type BeginSessionResponse = Message<"laelia.v1.BeginSessionResponse"> & {
   /**
-   * @generated from field: string action_id = 1;
-   */
-  actionId: string;
-
-  /**
-   * @generated from field: bool committed = 2;
-   */
-  committed: boolean;
-
-  /**
-   * @generated from field: string command_id = 3;
+   * @generated from field: string command_id = 1;
    */
   commandId: string;
 
   /**
-   * @generated from field: int64 current_version = 4;
+   * @generated from field: bool idle = 2;
    */
-  currentVersion: bigint;
-
-  /**
-   * @generated from field: repeated laelia.v1.ChatMessage new_messages = 5;
-   */
-  newMessages: ChatMessage[];
+  idle: boolean;
 };
 
 /**
- * Describes the message laelia.v1.ActionResponse.
- * Use `create(ActionResponseSchema)` to create a new message.
+ * Describes the message laelia.v1.BeginSessionResponse.
+ * Use `create(BeginSessionResponseSchema)` to create a new message.
  */
-export declare const ActionResponseSchema: GenMessage<ActionResponse>;
-
-/**
- * ResolveHeldAction is sent by the agent to resolve a held action (one where
- * ActionResponse.committed was false).
- *
- * @generated from message laelia.v1.ResolveHeldAction
- */
-export declare type ResolveHeldAction = Message<"laelia.v1.ResolveHeldAction"> & {
-  /**
-   * @generated from field: string action_id = 1;
-   */
-  actionId: string;
-
-  /**
-   * @generated from field: laelia.v1.ActionResolution resolution = 2;
-   */
-  resolution: ActionResolution;
-};
-
-/**
- * Describes the message laelia.v1.ResolveHeldAction.
- * Use `create(ResolveHeldActionSchema)` to create a new message.
- */
-export declare const ResolveHeldActionSchema: GenMessage<ResolveHeldAction>;
+export declare const BeginSessionResponseSchema: GenMessage<BeginSessionResponse>;
 
 /**
  * FetchConversationActivity returns the execution status of each agent member
@@ -2225,45 +2186,6 @@ export enum CommandEventType {
 export declare const CommandEventTypeSchema: GenEnum<CommandEventType>;
 
 /**
- * ActionResolution is the agent's decision when a SubmitAction is held due
- * to a version mismatch (new messages arrived between PullMessages and
- * SubmitAction).
- *
- * @generated from enum laelia.v1.ActionResolution
- */
-export enum ActionResolution {
-  /**
-   * @generated from enum value: ACTION_RESOLUTION_UNSPECIFIED = 0;
-   */
-  ACTION_RESOLUTION_UNSPECIFIED = 0,
-
-  /**
-   * @generated from enum value: REVISE = 1;
-   */
-  REVISE = 1,
-
-  /**
-   * @generated from enum value: SEND_AS_IS = 2;
-   */
-  SEND_AS_IS = 2,
-
-  /**
-   * @generated from enum value: DISCARD = 3;
-   */
-  DISCARD = 3,
-
-  /**
-   * @generated from enum value: FORCE_SEND = 4;
-   */
-  FORCE_SEND = 4,
-}
-
-/**
- * Describes the enum laelia.v1.ActionResolution.
- */
-export declare const ActionResolutionSchema: GenEnum<ActionResolution>;
-
-/**
  * @generated from service laelia.v1.CommandService
  */
 export declare const CommandService: GenService<{
@@ -2426,6 +2348,22 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof PostMessageRequestSchema;
     output: typeof PostMessageResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.ListChannelUpdates
+   */
+  listChannelUpdates: {
+    methodKind: "unary";
+    input: typeof ListChannelUpdatesRequestSchema;
+    output: typeof ListChannelUpdatesResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.AckProcessedVersion
+   */
+  ackProcessedVersion: {
+    methodKind: "unary";
+    input: typeof AckProcessedVersionRequestSchema;
+    output: typeof AckProcessedVersionResponseSchema;
   },
   /**
    * @generated from rpc laelia.v1.CommandService.FetchConversationActivity

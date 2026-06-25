@@ -86,6 +86,24 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/-/channelUpdates:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_ListChannelUpdates
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListChannelUpdatesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}:
         get:
             tags:
@@ -1085,6 +1103,37 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}:ackProcessedVersion:
+        post:
+            tags:
+                - CommandService
+            operationId: CommandService_AckProcessedVersion
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/AckProcessedVersionRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AckProcessedVersionResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/conversations/{conversation}:postMessage:
         post:
             tags:
@@ -1397,6 +1446,29 @@ paths:
                                 $ref: '#/components/schemas/Status'
 components:
     schemas:
+        AckProcessedVersionRequest:
+            required:
+                - conversation
+                - processedVersion
+            type: object
+            properties:
+                conversation:
+                    type: string
+                processedVersion:
+                    type: string
+                commandId:
+                    type: string
+            description: |-
+                AckProcessedVersion advances the agent's durable per-channel cursor to
+                 processed_version, marking the channel as processed up to that room_version so
+                 that subsequent ListChannelUpdates no longer report it. command_id, when
+                 supplied, links the current session's command to this conversation so the
+                 frontend can associate execution events with the channel.
+        AckProcessedVersionResponse:
+            type: object
+            properties:
+                processedVersion:
+                    type: string
         AddChannelMemberRequest:
             required:
                 - conversation
@@ -1638,6 +1710,22 @@ components:
                 joinedAt:
                     type: string
                     format: date-time
+        ChannelUpdate:
+            type: object
+            properties:
+                conversation:
+                    type: string
+                currentVersion:
+                    type: string
+                processedVersion:
+                    type: string
+                newMessageCount:
+                    type: integer
+                    format: int32
+            description: |-
+                ChannelUpdate describes one conversation that has unread messages for the
+                 agent. new_message_count is the number of chat_message rows with
+                 room_version greater than the agent's processed_version for that channel.
         ChatMessage:
             type: object
             properties:
@@ -1671,8 +1759,9 @@ components:
                     type: string
                     description: |-
                         room_version is the conversation.version at the time this message was
-                         created. Agents use it together with PullMessages.after_version to track
-                         their cursor into the conversation.
+                         created. Agents use it together with their per-channel cursor (managed via
+                         the ListChannelUpdates / AckProcessedVersion RPCs) to track progress into
+                         the conversation.
                 mentions:
                     type: array
                     items:
@@ -1976,6 +2065,13 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/ChannelMember'
+        ListChannelUpdatesResponse:
+            type: object
+            properties:
+                updates:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ChannelUpdate'
         ListChannelsResponse:
             type: object
             properties:

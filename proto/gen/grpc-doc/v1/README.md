@@ -84,14 +84,18 @@
     - [AuthService](#laelia-v1-AuthService)
   
 - [v1/command.proto](#v1_command-proto)
-    - [ActionResponse](#laelia-v1-ActionResponse)
+    - [AckProcessedVersionRequest](#laelia-v1-AckProcessedVersionRequest)
+    - [AckProcessedVersionResponse](#laelia-v1-AckProcessedVersionResponse)
     - [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest)
     - [AgentActivity](#laelia-v1-AgentActivity)
     - [AgentReady](#laelia-v1-AgentReady)
     - [AgentStreamMessage](#laelia-v1-AgentStreamMessage)
+    - [BeginSession](#laelia-v1-BeginSession)
+    - [BeginSessionResponse](#laelia-v1-BeginSessionResponse)
     - [CancelCommandRequest](#laelia-v1-CancelCommandRequest)
     - [CancelMessage](#laelia-v1-CancelMessage)
     - [ChannelMember](#laelia-v1-ChannelMember)
+    - [ChannelUpdate](#laelia-v1-ChannelUpdate)
     - [ChatHistoryEntry](#laelia-v1-ChatHistoryEntry)
     - [ChatMessage](#laelia-v1-ChatMessage)
     - [Command](#laelia-v1-Command)
@@ -118,6 +122,8 @@
     - [LifecyclePayload](#laelia-v1-LifecyclePayload)
     - [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest)
     - [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse)
+    - [ListChannelUpdatesRequest](#laelia-v1-ListChannelUpdatesRequest)
+    - [ListChannelUpdatesResponse](#laelia-v1-ListChannelUpdatesResponse)
     - [ListChannelsRequest](#laelia-v1-ListChannelsRequest)
     - [ListChannelsResponse](#laelia-v1-ListChannelsResponse)
     - [ListCommandsRequest](#laelia-v1-ListCommandsRequest)
@@ -126,7 +132,6 @@
     - [ListConversationMessagesResponse](#laelia-v1-ListConversationMessagesResponse)
     - [ManagerStreamMessage](#laelia-v1-ManagerStreamMessage)
     - [Mention](#laelia-v1-Mention)
-    - [MessageSnapshot](#laelia-v1-MessageSnapshot)
     - [NewMessagesAvailable](#laelia-v1-NewMessagesAvailable)
     - [PermissionDecidedPayload](#laelia-v1-PermissionDecidedPayload)
     - [PermissionDecision](#laelia-v1-PermissionDecision)
@@ -137,16 +142,12 @@
     - [Pong](#laelia-v1-Pong)
     - [PostMessageRequest](#laelia-v1-PostMessageRequest)
     - [PostMessageResponse](#laelia-v1-PostMessageResponse)
-    - [PullMessages](#laelia-v1-PullMessages)
     - [RawAcpPayload](#laelia-v1-RawAcpPayload)
     - [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest)
-    - [ResolveHeldAction](#laelia-v1-ResolveHeldAction)
     - [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest)
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
     - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
     - [SendMessageRequest](#laelia-v1-SendMessageRequest)
-    - [SubmitAction](#laelia-v1-SubmitAction)
-    - [SubmitAction.EnvEntry](#laelia-v1-SubmitAction-EnvEntry)
     - [TextDeltaPayload](#laelia-v1-TextDeltaPayload)
     - [ToolCallFinishedPayload](#laelia-v1-ToolCallFinishedPayload)
     - [ToolCallStartedPayload](#laelia-v1-ToolCallStartedPayload)
@@ -155,7 +156,6 @@
     - [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest)
     - [WatchCommandRequest](#laelia-v1-WatchCommandRequest)
   
-    - [ActionResolution](#laelia-v1-ActionResolution)
     - [CommandEventType](#laelia-v1-CommandEventType)
     - [CommandOutput.StreamType](#laelia-v1-CommandOutput-StreamType)
     - [CommandStatus](#laelia-v1-CommandStatus)
@@ -1252,21 +1252,36 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
-<a name="laelia-v1-ActionResponse"></a>
+<a name="laelia-v1-AckProcessedVersionRequest"></a>
 
-### ActionResponse
-ActionResponse is the manager&#39;s reply to SubmitAction. When committed=true
-the action was accepted and a command was created; when committed=false the
-action is held pending agent resolution via ResolveHeldAction.
+### AckProcessedVersionRequest
+AckProcessedVersion advances the agent&#39;s durable per-channel cursor to
+processed_version, marking the channel as processed up to that room_version so
+that subsequent ListChannelUpdates no longer report it. command_id, when
+supplied, links the current session&#39;s command to this conversation so the
+frontend can associate execution events with the channel.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| action_id | [string](#string) |  |  |
-| committed | [bool](#bool) |  |  |
+| conversation | [string](#string) |  |  |
+| processed_version | [int64](#int64) |  |  |
 | command_id | [string](#string) |  |  |
-| current_version | [int64](#int64) |  |  |
-| new_messages | [ChatMessage](#laelia-v1-ChatMessage) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-AckProcessedVersionResponse"></a>
+
+### AckProcessedVersionResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| processed_version | [int64](#int64) |  |  |
 
 
 
@@ -1335,13 +1350,42 @@ action is held pending agent resolution via ResolveHeldAction.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | agent_ready | [AgentReady](#laelia-v1-AgentReady) |  |  |
-| pull_messages | [PullMessages](#laelia-v1-PullMessages) |  |  |
-| submit_action | [SubmitAction](#laelia-v1-SubmitAction) |  |  |
-| resolve_held_action | [ResolveHeldAction](#laelia-v1-ResolveHeldAction) |  |  |
+| begin_session | [BeginSession](#laelia-v1-BeginSession) |  |  |
 | progress | [CommandProgress](#laelia-v1-CommandProgress) |  |  |
 | result | [CommandResult](#laelia-v1-CommandResult) |  |  |
 | event | [CommandEvent](#laelia-v1-CommandEvent) |  |  |
 | ping | [Ping](#laelia-v1-Ping) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-BeginSession"></a>
+
+### BeginSession
+BeginSession is sent by an agent to ask the Manager to start a new
+autonomous processing session. The Manager checks the agent&#39;s per-channel
+cursors: if no conversation has room_version greater than the agent&#39;s cursor,
+it replies BeginSessionResponse{idle=true} and the agent stays idle;
+otherwise it creates a RUNNING command and replies with its command_id, which
+the agent uses to anchor its execution events and link any posted replies.
+
+
+
+
+
+
+<a name="laelia-v1-BeginSessionResponse"></a>
+
+### BeginSessionResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_id | [string](#string) |  |  |
+| idle | [bool](#bool) |  |  |
 
 
 
@@ -1398,6 +1442,26 @@ action is held pending agent resolution via ResolveHeldAction.
 
 
 
+<a name="laelia-v1-ChannelUpdate"></a>
+
+### ChannelUpdate
+ChannelUpdate describes one conversation that has unread messages for the
+agent. new_message_count is the number of chat_message rows with
+room_version greater than the agent&#39;s processed_version for that channel.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| current_version | [int64](#int64) |  |  |
+| processed_version | [int64](#int64) |  |  |
+| new_message_count | [int32](#int32) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-ChatHistoryEntry"></a>
 
 ### ChatHistoryEntry
@@ -1434,7 +1498,7 @@ action is held pending agent resolution via ResolveHeldAction.
 | created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | sender_name | [string](#string) |  |  |
 | sender_type | [SenderType](#laelia-v1-SenderType) |  |  |
-| room_version | [int64](#int64) |  | room_version is the conversation.version at the time this message was created. Agents use it together with PullMessages.after_version to track their cursor into the conversation. |
+| room_version | [int64](#int64) |  | room_version is the conversation.version at the time this message was created. Agents use it together with their per-channel cursor (managed via the ListChannelUpdates / AckProcessedVersion RPCs) to track progress into the conversation. |
 | mentions | [Mention](#laelia-v1-Mention) | repeated |  |
 
 
@@ -1876,6 +1940,35 @@ status in the channel header.
 
 
 
+<a name="laelia-v1-ListChannelUpdatesRequest"></a>
+
+### ListChannelUpdatesRequest
+ListChannelUpdates returns, for the authenticated agent, every conversation
+it is a member of whose current room_version is greater than the agent&#39;s
+stored per-channel cursor — i.e. the channels that have unread messages. It
+is the agent&#39;s &#34;what is worth my context&#34; discovery and drives the autonomous
+drain loop. The agent identity is resolved from the auth context.
+
+
+
+
+
+
+<a name="laelia-v1-ListChannelUpdatesResponse"></a>
+
+### ListChannelUpdatesResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| updates | [ChannelUpdate](#laelia-v1-ChannelUpdate) | repeated |  |
+
+
+
+
+
+
 <a name="laelia-v1-ListChannelsRequest"></a>
 
 ### ListChannelsRequest
@@ -1985,10 +2078,8 @@ status in the channel header.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| message_snapshot | [MessageSnapshot](#laelia-v1-MessageSnapshot) |  |  |
-| action_response | [ActionResponse](#laelia-v1-ActionResponse) |  |  |
-| command_request | [CommandRequest](#laelia-v1-CommandRequest) |  |  |
 | new_messages | [NewMessagesAvailable](#laelia-v1-NewMessagesAvailable) |  |  |
+| begin_session_response | [BeginSessionResponse](#laelia-v1-BeginSessionResponse) |  |  |
 | cancel | [CancelMessage](#laelia-v1-CancelMessage) |  |  |
 | pong | [Pong](#laelia-v1-Pong) |  |  |
 | permission_decision | [PermissionDecision](#laelia-v1-PermissionDecision) |  |  |
@@ -2015,30 +2106,15 @@ status in the channel header.
 
 
 
-<a name="laelia-v1-MessageSnapshot"></a>
-
-### MessageSnapshot
-MessageSnapshot is the Manager reply to PullMessages. It returns the newly
-available messages and the conversation&#39;s current version so the agent can
-record it as the base_version for any subsequent action.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| messages | [ChatMessage](#laelia-v1-ChatMessage) | repeated |  |
-| current_version | [int64](#int64) |  |  |
-
-
-
-
-
-
 <a name="laelia-v1-NewMessagesAvailable"></a>
 
 ### NewMessagesAvailable
-NewMessagesAvailable is pushed from Manager to agent over the bidi stream to
-notify that a conversation the agent is connected to has produced new
-messages. The agent should follow up with a PullMessages request.
+NewMessagesAvailable is a best-effort wake signal pushed from the Manager to
+an agent over the bidi stream whenever a conversation the agent is a member
+of produces a new message (from any sender: user, agent, or system). It is
+NOT the source of truth: the agent&#39;s durable per-channel cursor is. If a wake
+is missed (agent offline), the agent rediscovers pending work on reconnect by
+calling ListChannelUpdates, which compares conversation.version to the cursor.
 
 
 | Field | Type | Label | Description |
@@ -2206,25 +2282,6 @@ messages. The agent should follow up with a PullMessages request.
 
 
 
-<a name="laelia-v1-PullMessages"></a>
-
-### PullMessages
-PullMessages is sent by an agent over the AgentChannel bidi stream to fetch
-chat messages with room_version greater than after_version for a single
-conversation. The agent tracks its own cursor per conversation and supplies
-it explicitly so that reconnection / crash recovery is self-describing.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| conversation_id | [string](#string) |  |  |
-| after_version | [int64](#int64) |  |  |
-
-
-
-
-
-
 <a name="laelia-v1-RawAcpPayload"></a>
 
 ### RawAcpPayload
@@ -2251,23 +2308,6 @@ it explicitly so that reconnection / crash recovery is self-describing.
 | conversation | [string](#string) |  |  |
 | member_id | [string](#string) |  |  |
 | member_type | [int32](#int32) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-ResolveHeldAction"></a>
-
-### ResolveHeldAction
-ResolveHeldAction is sent by the agent to resolve a held action (one where
-ActionResponse.committed was false).
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| action_id | [string](#string) |  |  |
-| resolution | [ActionResolution](#laelia-v1-ActionResolution) |  |  |
 
 
 
@@ -2338,48 +2378,6 @@ ActionResponse.committed was false).
 | conversation | [string](#string) |  |  |
 | content | [string](#string) |  |  |
 | mentions | [Mention](#laelia-v1-Mention) | repeated |  |
-
-
-
-
-
-
-<a name="laelia-v1-SubmitAction"></a>
-
-### SubmitAction
-SubmitAction is the Phase 2 execution trigger. It replaces the Phase 1
-manager-driven dispatch: after PullMessages the agent autonomously decides
-whether to act and sends SubmitAction. The manager performs a Held Draft
-check comparing base_version against the conversation&#39;s current version.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| conversation_id | [string](#string) |  |  |
-| reply_to_message_id | [string](#string) |  |  |
-| base_version | [int64](#int64) |  |  |
-| instruction | [string](#string) |  |  |
-| profile | [string](#string) |  |  |
-| env | [SubmitAction.EnvEntry](#laelia-v1-SubmitAction-EnvEntry) | repeated |  |
-| working_dir | [string](#string) |  |  |
-| timeout_seconds | [int32](#int32) |  |  |
-| allow_diff | [bool](#bool) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-SubmitAction-EnvEntry"></a>
-
-### SubmitAction.EnvEntry
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| key | [string](#string) |  |  |
-| value | [string](#string) |  |  |
 
 
 
@@ -2499,23 +2497,6 @@ check comparing base_version against the conversation&#39;s current version.
  
 
 
-<a name="laelia-v1-ActionResolution"></a>
-
-### ActionResolution
-ActionResolution is the agent&#39;s decision when a SubmitAction is held due
-to a version mismatch (new messages arrived between PullMessages and
-SubmitAction).
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| ACTION_RESOLUTION_UNSPECIFIED | 0 |  |
-| REVISE | 1 |  |
-| SEND_AS_IS | 2 |  |
-| DISCARD | 3 |  |
-| FORCE_SEND | 4 |  |
-
-
-
 <a name="laelia-v1-CommandEventType"></a>
 
 ### CommandEventType
@@ -2629,6 +2610,8 @@ names).
 | ListChannelMembers | [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest) | [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse) |  |
 | SendMessage | [SendMessageRequest](#laelia-v1-SendMessageRequest) | [ChatMessage](#laelia-v1-ChatMessage) |  |
 | PostMessage | [PostMessageRequest](#laelia-v1-PostMessageRequest) | [PostMessageResponse](#laelia-v1-PostMessageResponse) |  |
+| ListChannelUpdates | [ListChannelUpdatesRequest](#laelia-v1-ListChannelUpdatesRequest) | [ListChannelUpdatesResponse](#laelia-v1-ListChannelUpdatesResponse) |  |
+| AckProcessedVersion | [AckProcessedVersionRequest](#laelia-v1-AckProcessedVersionRequest) | [AckProcessedVersionResponse](#laelia-v1-AckProcessedVersionResponse) |  |
 | FetchConversationActivity | [FetchConversationActivityRequest](#laelia-v1-FetchConversationActivityRequest) | [FetchConversationActivityResponse](#laelia-v1-FetchConversationActivityResponse) |  |
 
  

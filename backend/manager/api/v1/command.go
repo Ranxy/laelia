@@ -27,15 +27,10 @@ type CommandService struct {
 	v1connect.UnimplementedCommandServiceHandler
 	store      *store.Store
 	dispatcher *dispatcher.Dispatcher
-	acpEnabled bool
 }
 
 func NewCommandService(s *store.Store, d *dispatcher.Dispatcher) *CommandService {
-	return &CommandService{store: s, dispatcher: d, acpEnabled: true}
-}
-
-func (s *CommandService) SetACPEnabled(enabled bool) {
-	s.acpEnabled = enabled
+	return &CommandService{store: s, dispatcher: d}
 }
 
 // SendCommand has been removed in Phase 3. Use SendMessage instead.
@@ -401,46 +396,6 @@ func formatPrincipalID(id int) string {
 	return fmt.Sprintf("%d", id)
 }
 
-func (s *CommandService) validateACPCapability(ctx context.Context, agent *store.AgentMessage, _ string, allowDiff bool, timeoutSeconds int32, user *store.UserMessage) error {
-	capability := agent.Info.GetCapability()
-	if capability == nil || !capability.SupportsAcp {
-		return connect.NewError(connect.CodeInvalidArgument,
-			errors.Errorf("agent %s does not support ACP tasks", agent.ResourceID))
-	}
-
-	if timeoutSeconds > 0 && capability.MaxTimeoutSeconds > 0 && timeoutSeconds > capability.MaxTimeoutSeconds {
-		return connect.NewError(connect.CodeInvalidArgument,
-			errors.Errorf("timeout %ds exceeds agent max %ds", timeoutSeconds, capability.MaxTimeoutSeconds))
-	}
-
-	if allowDiff && !capability.SupportsDiff {
-		return connect.NewError(connect.CodeInvalidArgument,
-			errors.Errorf("agent %s does not support diff events", agent.ResourceID))
-	}
-
-	if user == nil {
-		return nil
-	}
-
-	if !s.acpEnabled || allowDiff {
-		isAdmin, checkErr := isUserWorkspaceAdmin(ctx, s.store, user)
-		if checkErr != nil {
-			slog.Warn("failed to check workspace admin for ACP task", "error", checkErr, "user", user.Email)
-			return connect.NewError(connect.CodeInternal, errors.New("failed to verify permissions"))
-		}
-		if !isAdmin {
-			if allowDiff {
-				return connect.NewError(connect.CodePermissionDenied,
-					errors.New("only workspace admins can send ACP tasks with diff support"))
-			}
-			return connect.NewError(connect.CodePermissionDenied,
-				errors.New("ACP tasks are currently restricted to workspace admins"))
-		}
-	}
-
-	return nil
-}
-
 func (s *CommandService) validateRawEventAccess(ctx context.Context, user *store.UserMessage) error {
 	if user == nil {
 		return nil
@@ -692,7 +647,11 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(createErr, "failed to create assistant message"))
 		}
 
-		s.dispatcher.NotifyNewMessages(ctx, agent.ID, convUUID.String(), newVersion)
+		// Agent-first: wake every OTHER agent member of this conversation so
+		// they can pull this agent's reply. The posting agent is excluded (it
+		// just acked past its own post and must not re-wake itself). This is
+		// the single change that enables agent→agent conversation.
+		s.notifyConversationAgents(ctx, convUUID, newVersion, &agent.ID)
 
 		return connect.NewResponse(&v1pb.PostMessageResponse{
 			Committed:      true,
@@ -768,4 +727,73 @@ func buildLightChatContext(msgs []*store.ChatMessage) string {
 		count++
 	}
 	return b.String()
+}
+
+// ListChannelUpdates is the agent's "what's worth my context" discovery (AX
+// Agent Inbox). It returns every conversation the authenticated agent is a
+// member of whose room_version is beyond the agent's durable per-channel
+// cursor, with the current version, the agent's processed version, and the
+// count of new messages. The autonomous drain loop calls this first every
+// session; an empty list means the agent is idle.
+func (s *CommandService) ListChannelUpdates(ctx context.Context, _ *connect.Request[v1pb.ListChannelUpdatesRequest]) (*connect.Response[v1pb.ListChannelUpdatesResponse], error) {
+	agent, ok := GetAgentFromContext(ctx)
+	if !ok || agent == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent authentication required"))
+	}
+
+	updates, err := s.store.ListChannelsWithUpdates(ctx, agent.ID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list channel updates"))
+	}
+
+	var v1Updates []*v1pb.ChannelUpdate
+	for _, u := range updates {
+		v1Updates = append(v1Updates, &v1pb.ChannelUpdate{
+			Conversation:     fmt.Sprintf("conversations/%s", u.ConversationID.String()),
+			CurrentVersion:   u.CurrentVersion,
+			ProcessedVersion: u.ProcessedVersion,
+			NewMessageCount:  u.NewMessageCount,
+		})
+	}
+
+	return connect.NewResponse(&v1pb.ListChannelUpdatesResponse{Updates: v1Updates}), nil
+}
+
+// AckProcessedVersion advances the agent's durable per-channel cursor to
+// processed_version (monotonic — a stale ack cannot rewind progress). When
+// command_id is supplied, it links the current session's command to this
+// conversation so the frontend can associate execution events with the
+// channel. The agent MUST call this after finishing a channel (reply or
+// deliberate silence) so the next ListChannelUpdates no longer reports it.
+func (s *CommandService) AckProcessedVersion(ctx context.Context, req *connect.Request[v1pb.AckProcessedVersionRequest]) (*connect.Response[v1pb.AckProcessedVersionResponse], error) {
+	agent, ok := GetAgentFromContext(ctx)
+	if !ok || agent == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent authentication required"))
+	}
+
+	convUUID, err := parseConversationID(req.Msg.Conversation)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation id"))
+	}
+	if req.Msg.ProcessedVersion <= 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("processed_version must be positive"))
+	}
+
+	result, err := s.store.UpsertCursor(ctx, agent.ID, convUUID, req.Msg.ProcessedVersion)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to ack processed version"))
+	}
+
+	// Link the session's command to this conversation. One session processes
+	// one channel, so this is unambiguous. A missing/empty command_id (e.g. an
+	// ack outside a session) is ignored.
+	if req.Msg.CommandId != "" {
+		if cid, parseErr := uuid.Parse(req.Msg.CommandId); parseErr == nil {
+			if linkErr := s.store.SetCommandConversationID(ctx, cid, convUUID); linkErr != nil {
+				slog.Warn("failed to link command to conversation", "commandID", req.Msg.CommandId, "conversationID", convUUID, "error", linkErr)
+			}
+		}
+	}
+
+	return connect.NewResponse(&v1pb.AckProcessedVersionResponse{ProcessedVersion: result}), nil
 }
