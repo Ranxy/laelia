@@ -1059,6 +1059,10 @@ paths:
                   in: query
                   schema:
                     type: string
+                - name: beforeVersion
+                  in: query
+                  schema:
+                    type: string
             responses:
                 "200":
                     description: OK

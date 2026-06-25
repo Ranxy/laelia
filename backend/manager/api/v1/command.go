@@ -553,6 +553,9 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation id"))
 	}
+	if req.Msg.AfterVersion > 0 && req.Msg.BeforeVersion > 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("after_version and before_version are mutually exclusive"))
+	}
 
 	offset, err := parseLimitAndOffset(&pageSize{
 		token:   req.Msg.PageToken,
@@ -562,15 +565,27 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 	if err != nil {
 		return nil, err
 	}
-	limitPlusOne := offset.limit + 1
 
-	msgs, currentVersion, err := s.store.ListConversationMessages(ctx, convID, req.Msg.AfterVersion, limitPlusOne, offset.offset)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list conversation messages"))
+	// before_version: one-shot history lookup of the `limit` messages immediately
+	// before the pivot (no backward page token). The store returns them in
+	// chronological order.
+	var msgs []*store.ChatMessage
+	var currentVersion int64
+	if req.Msg.BeforeVersion > 0 {
+		msgs, currentVersion, err = s.store.ListConversationMessages(ctx, convID, 0, req.Msg.BeforeVersion, offset.limit, 0)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list conversation messages"))
+		}
+	} else {
+		limitPlusOne := offset.limit + 1
+		msgs, currentVersion, err = s.store.ListConversationMessages(ctx, convID, req.Msg.AfterVersion, 0, limitPlusOne, offset.offset)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list conversation messages"))
+		}
 	}
 
 	nextPageToken := ""
-	if len(msgs) == limitPlusOne {
+	if req.Msg.BeforeVersion == 0 && len(msgs) == offset.limit+1 {
 		msgs = msgs[:offset.limit]
 		nextPageToken, _ = offset.getNextPageToken()
 	}
@@ -678,7 +693,7 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 		}), nil
 	}
 
-	newMsgs, _, listErr := s.store.ListConversationMessages(ctx, convUUID, req.Msg.BaseVersion, 50, 0)
+	newMsgs, _, listErr := s.store.ListConversationMessages(ctx, convUUID, req.Msg.BaseVersion, 0, 50, 0)
 	if listErr != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(listErr, "failed to list new messages"))
 	}

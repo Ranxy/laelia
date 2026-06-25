@@ -166,22 +166,34 @@ func (s *Store) CreateChatMessageBumpVersion(ctx context.Context, msg *ChatMessa
 	}, newVersion, nil
 }
 
-func (s *Store) ListConversationMessages(ctx context.Context, conversationID uuid.UUID, afterVersion int64, limit, offset int) ([]*ChatMessage, int64, error) {
+func (s *Store) ListConversationMessages(ctx context.Context, conversationID uuid.UUID, afterVersion, beforeVersion int64, limit, offset int) ([]*ChatMessage, int64, error) {
+	if afterVersion > 0 && beforeVersion > 0 {
+		return nil, 0, errors.New("after_version and before_version are mutually exclusive")
+	}
+
 	var whereClause string
 	args := []any{conversationID}
 	argIdx := 2
+	orderClause := ` ORDER BY cm.created_at ASC`
 	if afterVersion > 0 {
 		whereClause = ` AND cm.room_version > $` + itoa(argIdx)
 		args = append(args, afterVersion)
 		argIdx++
+	} else if beforeVersion > 0 {
+		// Fetch the most recent messages before the pivot in DESC order (uses
+		// idx_chat_message_room_version via a reverse range scan), then reverse
+		// below so callers always receive chronological order.
+		whereClause = ` AND cm.room_version < $` + itoa(argIdx)
+		args = append(args, beforeVersion)
+		argIdx++
+		orderClause = ` ORDER BY cm.room_version DESC`
 	}
 
 	query := `SELECT ` + chatMessageColumns + `
 		FROM chat_message cm
 		JOIN principal p ON p.id = cm.principal_id
 		LEFT JOIN agent a ON a.id = cm.sender_agent_id
-		WHERE cm.conversation_id = $1` + whereClause + `
-		ORDER BY cm.created_at ASC
+		WHERE cm.conversation_id = $1` + whereClause + orderClause + `
 		LIMIT $` + itoa(argIdx) + ` OFFSET $` + itoa(argIdx+1)
 	args = append(args, limit, offset)
 
@@ -201,6 +213,13 @@ func (s *Store) ListConversationMessages(ctx context.Context, conversationID uui
 	}
 	if err := rows.Err(); err != nil {
 		return nil, 0, errors.Wrapf(err, "failed to iterate chat messages")
+	}
+
+	// Restore chronological (oldest -> newest) order for the before path.
+	if beforeVersion > 0 {
+		for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
+			msgs[i], msgs[j] = msgs[j], msgs[i]
+		}
 	}
 
 	var currentVersion int64

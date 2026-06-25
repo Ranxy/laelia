@@ -2077,6 +2077,7 @@ type ListConversationMessagesRequest struct {
 	PageSize      int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	PageToken     string                 `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	AfterVersion  int64                  `protobuf:"varint,4,opt,name=after_version,json=afterVersion,proto3" json:"after_version,omitempty"`
+	BeforeVersion int64                  `protobuf:"varint,5,opt,name=before_version,json=beforeVersion,proto3" json:"before_version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2135,6 +2136,13 @@ func (x *ListConversationMessagesRequest) GetPageToken() string {
 func (x *ListConversationMessagesRequest) GetAfterVersion() int64 {
 	if x != nil {
 		return x.AfterVersion
+	}
+	return 0
+}
+
+func (x *ListConversationMessagesRequest) GetBeforeVersion() int64 {
+	if x != nil {
+		return x.BeforeVersion
 	}
 	return 0
 }
@@ -5066,13 +5074,14 @@ const file_v1_command_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\x12\x1f\n" +
 	"\vmember_role\x18\x04 \x01(\x05R\n" +
 	"memberRole\x127\n" +
-	"\tjoined_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bjoinedAt\"\xab\x01\n" +
+	"\tjoined_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bjoinedAt\"\xd2\x01\n" +
 	"\x1fListConversationMessagesRequest\x12'\n" +
 	"\fconversation\x18\x01 \x01(\tB\x03\xe0A\x02R\fconversation\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tR\tpageToken\x12#\n" +
-	"\rafter_version\x18\x04 \x01(\x03R\fafterVersion\"\xa7\x01\n" +
+	"\rafter_version\x18\x04 \x01(\x03R\fafterVersion\x12%\n" +
+	"\x0ebefore_version\x18\x05 \x01(\x03R\rbeforeVersion\"\xa7\x01\n" +
 	" ListConversationMessagesResponse\x122\n" +
 	"\bmessages\x18\x01 \x03(\v2\x16.laelia.v1.ChatMessageR\bmessages\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12'\n" +

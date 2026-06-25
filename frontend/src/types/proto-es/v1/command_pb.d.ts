@@ -892,6 +892,11 @@ export declare type ListConversationMessagesRequest = Message<"laelia.v1.ListCon
    * @generated from field: int64 after_version = 4;
    */
   afterVersion: bigint;
+
+  /**
+   * @generated from field: int64 before_version = 5;
+   */
+  beforeVersion: bigint;
 };
 
 /**

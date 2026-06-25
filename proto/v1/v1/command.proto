@@ -275,6 +275,7 @@ message ListConversationMessagesRequest {
   int32 page_size = 2;
   string page_token = 3;
   int64 after_version = 4;
+  int64 before_version = 5;
 }
 
 message ListConversationMessagesResponse {

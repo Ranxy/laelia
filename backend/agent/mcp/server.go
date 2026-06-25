@@ -67,7 +67,7 @@ func New(managerURL, agentName string, getToken func() string, httpClient *http.
 	mcp.AddTool(srv,
 		&mcp.Tool{
 			Name:        "get_conversation_messages",
-			Description: "Get messages from a conversation, with the current room version. Pass conversation (e.g. \"conversations/<id>\") and after_version to fetch only messages newer than a known version (use the processed_version returned by list_channel_updates). You MUST call this before post_message to obtain the latest base_version.",
+			Description: "Get messages from a conversation, with the current room version. Pass conversation (e.g. \"conversations/<id>\") and version with direction to page relative to a known room version: direction=\"after\" (default) returns messages newer than version, direction=\"before\" returns up to limit prior messages (oldest->newest) when you need more context. Use the processed_version returned by list_channel_updates as the version for the after direction. You MUST call this before post_message to obtain the latest base_version (the returned current_version).",
 		},
 		ms.handleGetConversationMessages,
 	)
@@ -357,7 +357,8 @@ func (s *Server) handleGetCommandContext(ctx context.Context, _ *mcp.CallToolReq
 
 type getConversationMessagesInput struct {
 	Conversation string `json:"conversation"`
-	AfterVersion int64  `json:"after_version,omitempty"`
+	Version      int64  `json:"version,omitempty"`
+	Direction    string `json:"direction,omitempty"`
 	Limit        int    `json:"limit,omitempty"`
 }
 
@@ -368,6 +369,7 @@ type messageEntry struct {
 	IsOwn      bool   `json:"is_own"`
 	Content    string `json:"content"`
 	Timestamp  string `json:"timestamp"`
+	Version    int64  `json:"version,omitempty"`
 }
 
 type getConversationMessagesOutput struct {
@@ -381,18 +383,32 @@ func (s *Server) handleGetConversationMessages(ctx context.Context, _ *mcp.CallT
 		return nil, getConversationMessagesOutput{}, errors.New("conversation is required (pass the conversation name from list_channel_updates)")
 	}
 
+	direction := input.Direction
+	if direction == "" {
+		direction = "after"
+	}
+	if direction != "before" && direction != "after" {
+		return nil, getConversationMessagesOutput{}, errors.Errorf("direction must be \"before\" or \"after\", got %q", direction)
+	}
+
 	limit := input.Limit
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
 
-	req := connect.NewRequest(&v1pb.ListConversationMessagesRequest{
+	reqMsg := &v1pb.ListConversationMessagesRequest{
 		Conversation: conversationName,
 		PageSize:     int32(limit),
-		AfterVersion: input.AfterVersion,
-	})
+	}
+	if input.Version > 0 {
+		if direction == "before" {
+			reqMsg.BeforeVersion = input.Version
+		} else {
+			reqMsg.AfterVersion = input.Version
+		}
+	}
 
-	resp, err := s.client().ListConversationMessages(ctx, req)
+	resp, err := s.client().ListConversationMessages(ctx, connect.NewRequest(reqMsg))
 	if err != nil {
 		return nil, getConversationMessagesOutput{}, errors.Wrap(err, "failed to list conversation messages")
 	}
@@ -406,6 +422,7 @@ func (s *Server) handleGetConversationMessages(ctx context.Context, _ *mcp.CallT
 			IsOwn:      m.IsOwn,
 			Content:    m.Content,
 			Timestamp:  m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
+			Version:    m.RoomVersion,
 		})
 	}
 	if messages == nil {
@@ -414,10 +431,14 @@ func (s *Server) handleGetConversationMessages(ctx context.Context, _ *mcp.CallT
 
 	text := fmt.Sprintf("Conversation messages (current_version: %d):\n", resp.Msg.CurrentVersion)
 	if len(messages) == 0 {
-		text += "(no new messages)\n"
+		text += "(no messages)\n"
 	} else {
 		for _, m := range messages {
 			text += formatMessageLine(m.Timestamp, m.SenderName, m.SenderType, m.IsOwn, m.Content)
+		}
+		if direction == "before" && len(messages) == limit {
+			oldest := messages[0].Version
+			text += fmt.Sprintf("(older messages may exist — call again with version=%d, direction=\"before\" to page further back)\n", oldest)
 		}
 	}
 
@@ -488,6 +509,7 @@ func (s *Server) handlePostMessage(ctx context.Context, _ *mcp.CallToolRequest, 
 			SenderType: senderTypeString(m.SenderType),
 			Content:    m.Content,
 			Timestamp:  timestamp,
+			Version:    m.RoomVersion,
 		})
 	}
 
@@ -503,7 +525,7 @@ func (s *Server) handlePostMessage(ctx context.Context, _ *mcp.CallToolRequest, 
 			text += fmt.Sprintf("[%s] %s: %s\n", ts, m.SenderName, m.Content)
 		}
 	}
-	text += fmt.Sprintf("\nTo resolve: call get_conversation_messages(after_version=%d) to get full context, then call post_message again with the updated base_version=%d.", input.BaseVersion, resp.Msg.CurrentVersion)
+	text += fmt.Sprintf("\nTo resolve: call get_conversation_messages(version=%d, direction=\"after\") to get full context, then call post_message again with the updated base_version=%d.", input.BaseVersion, resp.Msg.CurrentVersion)
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: text}},
@@ -552,7 +574,7 @@ func (s *Server) handleListChannelUpdates(ctx context.Context, _ *mcp.CallToolRe
 			text += fmt.Sprintf("- %s: %d new (current_version=%d, your processed_version=%d)\n",
 				u.Conversation, u.NewMessageCount, u.CurrentVersion, u.ProcessedVersion)
 		}
-		text += "\nPick ONE channel. Call get_conversation_messages(conversation=<name>, after_version=<processed_version>) to read the new messages.\n"
+		text += "\nPick ONE channel. Call get_conversation_messages(conversation=<name>, version=<processed_version>, direction=\"after\") to read the new messages.\n"
 	}
 
 	return &mcp.CallToolResult{
