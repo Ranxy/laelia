@@ -33,11 +33,10 @@ var ErrCLIFailed = errors.New("cli subcommand failed (already reported on stderr
 
 // identity holds the per-session identity + connection info read from env.
 type identity struct {
-	socket    string
-	token     string
-	agent     string
-	principal string
-	command   string
+	socket  string
+	token   string
+	agent   string
+	command string
 }
 
 // loadIdentity reads the daemon-injected env vars. A missing socket or token is
@@ -45,11 +44,10 @@ type identity struct {
 // is false — there is no daemon to talk to.
 func loadIdentity() (*identity, bool) {
 	id := &identity{
-		socket:    os.Getenv(daemonsrv.EnvDaemonSocket),
-		token:     os.Getenv(daemonsrv.EnvSessionToken),
-		agent:     os.Getenv(daemonsrv.EnvAgent),
-		principal: os.Getenv(daemonsrv.EnvPrincipal),
-		command:   os.Getenv(daemonsrv.EnvCommand),
+		socket:  os.Getenv(daemonsrv.EnvDaemonSocket),
+		token:   os.Getenv(daemonsrv.EnvSessionToken),
+		agent:   os.Getenv(daemonsrv.EnvAgent),
+		command: os.Getenv(daemonsrv.EnvCommand),
 	}
 	switch {
 	case id.socket == "":
@@ -83,7 +81,7 @@ func call(endpoint string, req daemonsrv.Request) bool {
 	if !ok {
 		return false
 	}
-	req.Agent, req.Principal, req.Command = id.agent, id.principal, id.command
+	req.Agent, req.Command = id.agent, id.command
 
 	body, err := json.Marshal(req)
 	if err != nil {

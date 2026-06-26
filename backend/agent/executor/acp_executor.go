@@ -870,9 +870,6 @@ func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []st
 	if req.AgentResourceID != "" {
 		values["LAELIA_AGENT"] = req.AgentResourceID
 	}
-	if req.PrincipalID != "" {
-		values["LAELIA_PRINCIPAL"] = req.PrincipalID
-	}
 	if req.CommandID != "" {
 		values["LAELIA_COMMAND"] = req.CommandID
 	}

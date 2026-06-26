@@ -25,13 +25,11 @@ import (
 // access token, plus the identity that the manager scopes the call to. Agent is
 // the "agents/<id>" resource name (used to resolve command context). Command is
 // the drain session's command_id, linked to post_message/ack so the frontend
-// can attribute the conversation activity. Principal is the agent resource id
-// routed by --agent-name.
+// can attribute the conversation activity.
 type Deps struct {
-	Client    v1connect.CommandServiceClient
-	Agent     string
-	Principal string
-	Command   string
+	Client  v1connect.CommandServiceClient
+	Agent   string
+	Command string
 }
 
 // Error is the canonical failure envelope. Code is a stable machine-oriented

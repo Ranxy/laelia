@@ -29,9 +29,8 @@ func TestAuthorize(t *testing.T) {
 
 func TestDepsFallsBackToAgentResourceID(t *testing.T) {
 	s := &Server{agentResourceID: "default-agent"}
-	d := s.deps(Request{Agent: "", Principal: "p", Command: "c"})
+	d := s.deps(Request{Agent: "", Command: "c"})
 	assert.Equal(t, "default-agent", d.Agent)
-	assert.Equal(t, "p", d.Principal)
 	assert.Equal(t, "c", d.Command)
 
 	d = s.deps(Request{Agent: "explicit"})

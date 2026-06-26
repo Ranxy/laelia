@@ -87,7 +87,7 @@ type commandStream struct {
 	agentResourceID string
 	// resourceID is the agent's stable server-assigned UUID (parsed from the
 	// bootstrap token). It keys the per-agent working dir and local state file,
-	// distinct from agentResourceID (the --agent-name flag / PrincipalId).
+	// distinct from agentResourceID (the --agent-name flag).
 	resourceID  string
 	isExecuting atomic.Bool
 
@@ -367,7 +367,6 @@ func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStre
 	req := &v1pb.CommandRequest{
 		CommandId:        commandID,
 		Instruction:      executor.AgentFirstPromptBody,
-		PrincipalId:      c.agentResourceID,
 		AgentDisplayName: agentDisplayName,
 		TimeoutSeconds:   0,
 	}
@@ -571,7 +570,6 @@ func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime
 		ConversationID:   req.ConversationId,
 		AgentResourceID:  c.agentResourceID,
 		AgentDisplayName: req.AgentDisplayName,
-		PrincipalID:      req.PrincipalId,
 		DaemonSocket:     c.socketPath,
 		SessionToken:     c.sessionToken,
 		BinaryDir:        c.binaryDir,

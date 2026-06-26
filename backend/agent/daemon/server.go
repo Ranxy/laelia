@@ -35,7 +35,6 @@ const (
 	EnvDaemonSocket = "LAELIA_DAEMON_SOCKET"
 	EnvSessionToken = "LAELIA_SESSION_TOKEN"
 	EnvAgent        = "LAELIA_AGENT"
-	EnvPrincipal    = "LAELIA_PRINCIPAL"
 	EnvCommand      = "LAELIA_COMMAND"
 )
 
@@ -164,14 +163,13 @@ func (s *Server) Stop() {
 	_ = os.Remove(s.socketPath)
 }
 
-// Request is the shared envelope. Identity (agent/principal/command) comes from
-// the CLI's env vars; operation params are filled per endpoint. Fields not
+// Request is the shared envelope. Identity (agent/command) comes from the
+// CLI's env vars; operation params are filled per endpoint. Fields not
 // relevant to a given endpoint are simply ignored. The CLI reuses this type so
 // the wire shape stays in sync with the daemon handlers.
 type Request struct {
-	Agent     string `json:"agent"`
-	Principal string `json:"principal"`
-	Command   string `json:"command"`
+	Agent   string `json:"agent"`
+	Command string `json:"command"`
 
 	Conversation     string `json:"conversation,omitempty"`
 	Version          int64  `json:"version,omitempty"`
@@ -208,10 +206,9 @@ func (s *Server) deps(r Request) chattools.Deps {
 		agent = s.agentResourceID
 	}
 	return chattools.Deps{
-		Client:    s.commandClient(),
-		Agent:     agent,
-		Principal: r.Principal,
-		Command:   r.Command,
+		Client:  s.commandClient(),
+		Agent:   agent,
+		Command: r.Command,
 	}
 }
 

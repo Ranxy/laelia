@@ -26,7 +26,7 @@ type File struct {
 // "files/<file_id>/<original_name>", but the id is generated here so callers
 // build the key from the returned ID after the fact, or pass a pre-generated
 // uuid).
-func (s *Store) CreateFile(ctx context.Context, tx *sql.Tx, f *File) (*File, error) {
+func (*Store) CreateFile(ctx context.Context, tx *sql.Tx, f *File) (*File, error) {
 	if f.ID == uuid.Nil {
 		f.ID = uuid.New()
 	}

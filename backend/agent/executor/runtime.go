@@ -21,7 +21,6 @@ type Request struct {
 	ConversationID   string
 	AgentResourceID  string
 	AgentDisplayName string
-	PrincipalID      string
 	// DaemonSocket / SessionToken / BinaryDir configure the CLI the LLM shells
 	// out to. The executor injects them into the ACP subprocess env so the
 	// `laelia-agent message ...` / `laelia-agent command context` subcommands can
