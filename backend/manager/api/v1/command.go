@@ -577,6 +577,22 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 	// is_own=false for every message.
 	callerAgent, _ := GetAgentFromContext(ctx)
 
+	// An agent reading a channel is committing to work on it. Link the session's
+	// running command to this conversation now (not at ack time, which runs after
+	// the work is done) so FetchConversationActivity can surface the agent's live
+	// status while it works — without this the channel status bar stays "idle"
+	// throughout execution. User/frontend callers have no session command and are
+	// skipped. SetCommandConversationID is an idempotent UPDATE.
+	if callerAgent != nil {
+		if cmdID := s.dispatcher.CurrentCommandID(callerAgent.ID); cmdID != "" {
+			if cid, parseErr := uuid.Parse(cmdID); parseErr == nil {
+				if linkErr := s.store.SetCommandConversationID(ctx, cid, convID); linkErr != nil {
+					slog.Warn("failed to link command to conversation on read", "commandID", cmdID, "conversationID", convID, "error", linkErr)
+				}
+			}
+		}
+	}
+
 	var v1msgs []*v1pb.ChatMessage
 	for _, msg := range msgs {
 		v1m := storeToV1ChatMessage(msg)

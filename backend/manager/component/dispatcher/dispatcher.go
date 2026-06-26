@@ -136,6 +136,25 @@ func (d *Dispatcher) IsAgentConnected(agentID int) bool {
 	return ok
 }
 
+// CurrentCommandID returns the command id the agent is currently running in its
+// drain session, or "" if the agent has no in-flight session command. It is used
+// to link a session's running command to the conversation the agent is working
+// on, so the channel activity feed reflects in-progress work. The session
+// command is created at BeginSession before the agent has chosen a channel, so
+// the link is filled in when the agent reads a channel (commits to working on
+// it) — see CommandService.ListConversationMessages.
+func (d *Dispatcher) CurrentCommandID(agentID int) string {
+	d.mu.RLock()
+	sess, ok := d.sessions[agentID]
+	d.mu.RUnlock()
+	if !ok {
+		return ""
+	}
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+	return sess.currentCmdID
+}
+
 // HandleBeginSession serves an agent's request to start a new autonomous
 // processing session. The manager checks the agent's durable per-channel
 // cursors: if no conversation has room_version beyond the cursor, it replies
