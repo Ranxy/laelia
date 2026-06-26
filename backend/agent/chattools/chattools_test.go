@@ -7,6 +7,8 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
+
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
 func TestNormalizeConversationName(t *testing.T) {
@@ -93,4 +95,27 @@ func TestGetCommandContextFallsBackToDepsCommand(t *testing.T) {
 	e, ok := err.(*Error)
 	assert.True(t, ok)
 	assert.Equal(t, "MISSING_COMMAND", e.Code)
+}
+
+// TestFormatMessageLineAttachments locks the rendering that lets the agent tie
+// a message like "test file" to the file it must `file download <id>`. The
+// attachment id/name/size/mime must appear inline so the LLM can act on it
+// without a second round-trip.
+func TestFormatMessageLineAttachments(t *testing.T) {
+	// No attachments: the line is unchanged.
+	assert.Equal(t, "[2026-06-26T07:31:16Z] admin (USER): test file\n",
+		formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", false, "test file", nil))
+
+	// Own message keeps the (YOU) tag.
+	assert.Equal(t, "[2026-06-26T07:31:16Z] admin (USER, YOU): hi\n",
+		formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", true, "hi", nil))
+
+	// With attachments: the id appears so `file download <id>` is callable, in
+	// the same id/name/size/mime shape `file list` uses.
+	got := formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", false, "test file",
+		[]*v1pb.Attachment{{Id: "f-1", Name: "report.pdf", MimeType: "application/pdf", SizeBytes: 123456}})
+	want := "[2026-06-26T07:31:16Z] admin (USER): test file\n" +
+		"  attachments:\n" +
+		"    - id=f-1  name=report.pdf  size=123456  mime=application/pdf\n"
+	assert.Equal(t, want, got)
 }

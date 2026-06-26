@@ -97,14 +97,31 @@ func senderTypeString(t v1pb.SenderType) string {
 	}
 }
 
+// formatAttachments renders a message's attachments as indented lines that
+// mirror the `file list` format (id/name/size/mime), or "" when there are none.
+// Surfacing them here is what lets the agent tie a message like "test file" to
+// the file it must `file download <id>` to actually read — without this the
+// attachment metadata the manager returns never reaches the LLM.
+func formatAttachments(attachments []*v1pb.Attachment) string {
+	if len(attachments) == 0 {
+		return ""
+	}
+	out := "  attachments:\n"
+	for _, a := range attachments {
+		out += fmt.Sprintf("    - id=%s  name=%s  size=%d  mime=%s\n", a.Id, a.Name, a.SizeBytes, a.MimeType)
+	}
+	return out
+}
+
 // formatMessageLine renders one message for the text output. Own messages are
 // tagged "(YOU)" so the agent can recognize its own past messages at a glance
-// and avoid replying to itself.
-func formatMessageLine(timestamp, senderName, senderType string, isOwn bool, content string) string {
+// and avoid replying to itself. Any attachments follow on indented lines.
+func formatMessageLine(timestamp, senderName, senderType string, isOwn bool, content string, attachments []*v1pb.Attachment) string {
+	senderTag := senderType
 	if isOwn {
-		return fmt.Sprintf("[%s] %s (%s, YOU): %s\n", timestamp, senderName, senderType, content)
+		senderTag += ", YOU"
 	}
-	return fmt.Sprintf("[%s] %s (%s): %s\n", timestamp, senderName, senderType, content)
+	return fmt.Sprintf("[%s] %s (%s): %s\n", timestamp, senderName, senderTag, content) + formatAttachments(attachments)
 }
 
 // --- Inputs ---------------------------------------------------------------
@@ -185,7 +202,7 @@ func SearchChatHistory(ctx context.Context, d Deps, in SearchChatHistoryInput) (
 	for _, e := range resp.Msg.Entries {
 		text += formatMessageLine(
 			e.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
-			e.SenderName, senderTypeString(e.SenderType), e.IsOwn, e.Content,
+			e.SenderName, senderTypeString(e.SenderType), e.IsOwn, e.Content, e.Attachments,
 		)
 	}
 	return text, nil
@@ -268,7 +285,7 @@ func GetConversationMessages(ctx context.Context, d Deps, in GetConversationMess
 		for _, m := range resp.Msg.Messages {
 			text += formatMessageLine(
 				m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
-				m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Content,
+				m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Content, m.Attachments,
 			)
 		}
 		if direction == "before" && len(resp.Msg.Messages) == limit {
@@ -313,7 +330,7 @@ func PostMessage(ctx context.Context, d Deps, in PostMessageInput) (string, erro
 			if m.CreatedAt != nil {
 				ts = m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z")
 			}
-			text += fmt.Sprintf("[%s] %s: %s\n", ts, m.SenderName, m.Content)
+			text += formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Content, m.Attachments)
 		}
 	}
 	text += fmt.Sprintf("\nTo resolve: call `laelia-agent message read %s --version %d --after` to get full context, then call `laelia-agent message send` again with --base-version %d.",
