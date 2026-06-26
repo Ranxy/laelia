@@ -9,6 +9,7 @@ var flags struct {
 	token      string
 	insecure   bool
 	allowHTTP  bool
+	debug      bool
 	agentName  string
 }
 
@@ -27,6 +28,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&flags.insecure, "insecure", false, "skip TLS certificate verification")
 	rootCmd.PersistentFlags().BoolVar(&flags.allowHTTP, "allow-http", false, "allow plain HTTP connections (insecure, dev only)")
 	rootCmd.PersistentFlags().StringVar(&flags.agentName, "agent-name", "", "agent resource name used for API routing")
+	rootCmd.PersistentFlags().BoolVar(&flags.debug, "debug", false, "start in debug mode")
 
 	// --token is validated only for the daemon command (in runDaemon); the
 	// LLM-facing `message` / `command` subcommands authenticate via env vars the

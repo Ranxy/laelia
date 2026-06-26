@@ -77,13 +77,16 @@ func New(managerURL, agentResourceID, resourceID string, getToken func() string,
 		return nil, errors.Wrap(err, "generate session token")
 	}
 
+	sessionToken := hex.EncodeToString(token)
+	slog.Debug("LAELIA_SESSION_TOKEN", slog.String("token", sessionToken))
+
 	return &Server{
 		managerURL:      managerURL,
 		agentResourceID: agentResourceID,
 		getToken:        getToken,
 		httpClient:      httpClient,
 		socketPath:      socketPath,
-		sessionToken:    hex.EncodeToString(token),
+		sessionToken:    sessionToken,
 		tempDir:         tempDir,
 	}, nil
 }

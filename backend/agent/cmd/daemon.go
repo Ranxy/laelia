@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Ranxy/laelia/backend/agent/client"
+	"github.com/Ranxy/laelia/backend/common/log"
 )
 
 func init() {
@@ -29,6 +30,11 @@ func runDaemon() error {
 	if flags.token == "" {
 		return errors.New("--token is required (the bootstrap token issued by the manager)")
 	}
+	if flags.debug {
+		log.LogLevel.Set(slog.LevelDebug)
+	}
+	log.SetSlog()
+
 	slog.Info("laelia-agent starting", "manager", flags.managerURL)
 
 	apiClient, err := client.New(flags.managerURL, flags.token, flags.insecure, flags.allowHTTP, flags.agentName)

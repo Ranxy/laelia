@@ -4,6 +4,7 @@ package log
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 
 	"github.com/Ranxy/laelia/backend/common/stacktrace"
@@ -35,6 +36,12 @@ var Replace = func(_ []string, a slog.Attr) slog.Attr {
 // Initializes the slog configuration.
 func init() {
 	LogLevel.Set(slog.LevelInfo)
+}
+
+func SetSlog() {
+	handlerOptions := &slog.HandlerOptions{AddSource: true, Level: LogLevel, ReplaceAttr: Replace}
+	handle := slog.NewTextHandler(os.Stdout, handlerOptions)
+	slog.SetDefault(slog.New(handle))
 }
 
 func WithError(err error) slog.Attr {

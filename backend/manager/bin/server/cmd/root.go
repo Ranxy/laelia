@@ -87,6 +87,8 @@ func start() {
 		log.LogLevel.Set(slog.LevelDebug)
 	}
 
+	log.SetSlog()
+
 	profile := activeProfile(flags.dataDir)
 
 	if profile.PgURL == "" {
