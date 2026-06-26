@@ -296,7 +296,9 @@ func setUnexportedField(t *testing.T, target any, fieldName string, value any) {
 
 // TestDrainLoopIdleResponseEndsPass verifies that when BeginSession replies
 // idle=true, the drain loop sends a BeginSession message, builds no runtime,
-// and ends the drain pass without running a session.
+// and ends the drain pass without running a session. The drain loop goroutine
+// itself stays alive to wait for the next wake (it only exits on ctx/doneCh),
+// so the test cancels ctx to stop it rather than expecting it to return on idle.
 func TestDrainLoopIdleResponseEndsPass(t *testing.T) {
 	stream, recorder, cleanup := newTestCommandChannel(t)
 	defer cleanup()
@@ -322,10 +324,18 @@ func TestDrainLoopIdleResponseEndsPass(t *testing.T) {
 	cs.wake()
 	cs.beginRespCh <- &v1pb.BeginSessionResponse{Idle: true}
 
+	// The drain pass ends on idle: exactly one BeginSession is sent and no
+	// runtime is built (the newSessionRuntime closure would t.Fatal otherwise).
+	require.Eventually(t, func() bool {
+		return len(recorder.Messages()) >= 1
+	}, time.Second, 10*time.Millisecond, "drain loop did not send BeginSession on idle response")
+
+	// The loop keeps waiting for the next wake; cancel ctx to let it exit.
+	cancel()
 	select {
 	case <-doneCh:
-	case <-time.After(5 * time.Second):
-		t.Fatal("drain loop did not end on idle response")
+	case <-time.After(time.Second):
+		t.Fatal("drain loop did not exit on ctx cancel")
 	}
 
 	require.NoError(t, stream.CloseRequest())
