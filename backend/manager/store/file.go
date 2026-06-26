@@ -26,14 +26,14 @@ type File struct {
 // "files/<file_id>/<original_name>", but the id is generated here so callers
 // build the key from the returned ID after the fact, or pass a pre-generated
 // uuid).
-func (s *Store) CreateFile(ctx context.Context, f *File) (*File, error) {
+func (s *Store) CreateFile(ctx context.Context, tx *sql.Tx, f *File) (*File, error) {
 	if f.ID == uuid.Nil {
 		f.ID = uuid.New()
 	}
 	if f.S3Key == "" {
 		f.S3Key = "files/" + f.ID.String() + "/" + f.OriginalName
 	}
-	err := s.GetDB().QueryRowContext(ctx, `
+	err := tx.QueryRowContext(ctx, `
 		INSERT INTO file (id, conversation_id, uploader_principal_id, original_name, mime_type, size_bytes, s3_key)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING created_at

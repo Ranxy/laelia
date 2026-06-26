@@ -3,8 +3,10 @@ package v1
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 
 	"connectrpc.com/connect"
@@ -135,9 +137,18 @@ func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1
 		fileRow.ConversationID = toNullUUID(convID)
 	}
 
-	//TODO Transaction processing is required; otherwise, a situation may occur where the database contains values ​​but S3 fails.
+	tx, err := s.store.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to begin pending scheduler transaction"))
+	}
 
-	fileRow, err = s.store.CreateFile(ctx, fileRow)
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			slog.Error("Failed to rollback pending upload file to s3", slog.String("err", rollbackErr.Error()))
+		}
+	}()
+
+	fileRow, err = s.store.CreateFile(ctx, tx, fileRow)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -150,6 +161,10 @@ func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1
 		ContentLength: aws.Int64(fileRow.SizeBytes),
 	}); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "s3 put failed"))
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to commit pending scheduler transaction"))
 	}
 
 	return connect.NewResponse(fileToV1(fileRow)), nil
