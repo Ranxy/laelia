@@ -284,3 +284,44 @@ func toNullUUID(id uuid.UUID) uuid.NullUUID {
 	}
 	return uuid.NullUUID{UUID: id, Valid: true}
 }
+
+// resolveAttachments validates the attachment ids on a message being posted to
+// convID and returns full Attachment metadata (name/mime/size) read from the
+// file rows. Callers (the agent CLI) only carry the file id from `file upload`
+// output; the file row is the source of truth for the rest. Each attachment must
+// reference a file tied to convID — this is what binds an uploaded file to the
+// message that carries it and prevents referencing files from another
+// conversation. An empty/invalid id, a missing file, or a file tied elsewhere
+// is rejected.
+func (s *CommandService) resolveAttachments(ctx context.Context, convID uuid.UUID, attachments []*v1pb.Attachment) ([]*v1pb.Attachment, error) {
+	if len(attachments) == 0 {
+		return attachments, nil
+	}
+	resolved := make([]*v1pb.Attachment, 0, len(attachments))
+	for _, a := range attachments {
+		if a == nil || a.Id == "" {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("attachment id is required"))
+		}
+		fid, err := uuid.Parse(a.Id)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid attachment id %q", a.Id))
+		}
+		f, err := s.store.GetFile(ctx, fid)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+		if f == nil {
+			return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("attachment file %s not found", a.Id))
+		}
+		if !f.ConversationID.Valid || f.ConversationID.UUID != convID {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("file %s is not attached to this conversation; upload it with --conversation first", a.Id))
+		}
+		resolved = append(resolved, &v1pb.Attachment{
+			Id:        f.ID.String(),
+			Name:      f.OriginalName,
+			MimeType:  f.MimeType,
+			SizeBytes: f.SizeBytes,
+		})
+	}
+	return resolved, nil
+}

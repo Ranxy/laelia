@@ -621,6 +621,11 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 			}
 		}
 
+		attachments, err := s.resolveAttachments(ctx, convUUID, req.Msg.Attachments)
+		if err != nil {
+			return nil, err
+		}
+
 		msg, newVersion, createErr := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
 			ConversationID: convUUID,
 			PrincipalID:    principalID,
@@ -629,7 +634,7 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 			Content:        req.Msg.Content,
 			CommandID:      commandID,
 			SenderType:     store.SenderTypeAgent,
-			Attachments:    req.Msg.Attachments,
+			Attachments:    attachments,
 		})
 		if createErr != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(createErr, "failed to create assistant message"))

@@ -146,9 +146,10 @@ type GetConversationMessagesInput struct {
 }
 
 type PostMessageInput struct {
-	Conversation string `json:"conversation"`
-	Content      string `json:"content"`
-	BaseVersion  int64  `json:"base_version"`
+	Conversation  string   `json:"conversation"`
+	Content       string   `json:"content"`
+	BaseVersion   int64    `json:"base_version"`
+	AttachmentIDs []string `json:"attachment_ids,omitempty"`
 }
 
 type AckProcessedVersionInput struct {
@@ -306,11 +307,23 @@ func PostMessage(ctx context.Context, d Deps, in PostMessageInput) (string, erro
 		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the conversation name from `laelia-agent message check`)", "")
 	}
 
+	// Build id-only attachment references; the manager resolves each id to full
+	// metadata (name/mime/size) from the file row and checks it belongs to this
+	// conversation. The agent only ever has the id (from `file upload` output).
+	var attachments []*v1pb.Attachment
+	for _, id := range in.AttachmentIDs {
+		if id == "" {
+			continue
+		}
+		attachments = append(attachments, &v1pb.Attachment{Id: id})
+	}
+
 	req := connect.NewRequest(&v1pb.PostMessageRequest{
 		Conversation: name,
 		Content:      in.Content,
 		BaseVersion:  in.BaseVersion,
 		CommandId:    d.Command,
+		Attachments:  attachments,
 	})
 	resp, err := d.Client.PostMessage(ctx, req)
 	if err != nil {

@@ -107,10 +107,11 @@ var messageAckCmd = &cobra.Command{
 	},
 }
 
-// message send <conversation> --content <text|- > --base-version V
+// message send <conversation> --content <text|- > --base-version V [--attach <file-id>...]
 var (
 	messageSendContent     string
 	messageSendBaseVersion int64
+	messageSendAttachments []string
 )
 
 var messageSendCmd = &cobra.Command{
@@ -125,9 +126,10 @@ var messageSendCmd = &cobra.Command{
 			return ErrCLIFailed
 		}
 		if !call("/message/send", daemonsrv.Request{
-			Conversation: args[0],
-			Content:      content,
-			BaseVersion:  messageSendBaseVersion,
+			Conversation:  args[0],
+			Content:       content,
+			BaseVersion:   messageSendBaseVersion,
+			AttachmentIDs: messageSendAttachments,
 		}) {
 			return ErrCLIFailed
 		}
@@ -149,4 +151,5 @@ func init() {
 
 	messageSendCmd.Flags().StringVar(&messageSendContent, "content", "", "message text; \"-\" reads from stdin")
 	messageSendCmd.Flags().Int64Var(&messageSendBaseVersion, "base-version", 0, "room version the reply is based on (from `message read` current_version)")
+	messageSendCmd.Flags().StringArrayVar(&messageSendAttachments, "attach", nil, "file id to attach to this message (repeatable); the file must already be uploaded to this conversation via `file upload --conversation`")
 }

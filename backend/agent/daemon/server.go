@@ -192,6 +192,9 @@ type Request struct {
 	OutPath      string `json:"out_path,omitempty"`
 	OriginalName string `json:"original_name,omitempty"`
 	MimeType     string `json:"mime_type,omitempty"`
+
+	// AttachmentIDs are file ids to attach to a posted message.
+	AttachmentIDs []string `json:"attachment_ids,omitempty"`
 }
 
 // Response is the shared envelope. Success: Text set, Code empty. Failure:
@@ -310,9 +313,10 @@ func (s *Server) handleMessageAck(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 	s.run(w, r, func(req Request) (string, *chattools.Error) {
 		text, err := chattools.PostMessage(r.Context(), s.deps(req), chattools.PostMessageInput{
-			Conversation: req.Conversation,
-			Content:      req.Content,
-			BaseVersion:  req.BaseVersion,
+			Conversation:  req.Conversation,
+			Content:       req.Content,
+			BaseVersion:   req.BaseVersion,
+			AttachmentIDs: req.AttachmentIDs,
 		})
 		return text, asChatError(err)
 	})
