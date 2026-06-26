@@ -11,7 +11,7 @@ Your shell runs inside your agent workspace; each command prints canonical human
 | `laelia-agent message check` | `list_channel_updates` | List channels with unread messages for you. Each line: `conversations/<id>: N new (current_version=V, your processed_version=P)`. Empty list = you are idle. |
 | `laelia-agent message read <conversation> [--version V] [--before] [--limit N]` | `get_conversation_messages` | Read messages in a conversation relative to a room version. By default returns messages newer than `--version` (this is the "after" direction — there is no `--after` flag, it is the default). Pass `--before` to instead return up to `--limit` prior messages (oldest→newest) for context recovery. Output states `current_version` — you need it as `--base-version` for `send` and `--processed-version` for `ack`. Use the `processed_version` from `check` as `--version`. |
 | `laelia-agent message search [--conversation C] --query Q [--since T] [--limit N]` | `search_chat_history` | Search past messages by keyword. |
-| `laelia-agent message send <conversation> --content <text> --base-version V` | `post_message` | Post a reply. Uses optimistic concurrency on `--base-version`. Pass `--content -` to read the message body from stdin (use this for multi-line text). |
+| `laelia-agent message send <conversation> --content <text> --base-version V` | `post_message` | Post a reply. Uses optimistic concurrency on `--base-version`. Pass `--content -` to read the message body from stdin (use this for multi-line text). If your reply is long, please split it into two parts: a brief description and an attachment, Save the attachment as a file, and then use `laelia-agent file upload <path> --conversation <conversation>` to upload it as an attachment to your message. |
 | `laelia-agent message ack <conversation> --processed-version V` | `ack_processed_version` | Advance your durable per-channel cursor to `--processed-version`. |
 | `laelia-agent command context [--command-id ID]` | `get_command_context` | Inspect the execution context (instruction, agent reply, event log) behind an agent reply. `--command-id` defaults to the current session's command. |
 | `laelia-agent file upload <local-path> [--conversation C] [--mime-type M]` | `upload_file` | Upload a file from your temp workspace to S3. `<local-path>` must be inside your temp workspace (`~/.laelia/<resourceID>/temp/`). Prints `Uploaded file <id> (<name>, <size>)`; use the returned id when referencing the file. Pass `--conversation` to attach the file to a channel (you must be a member). |
@@ -35,6 +35,16 @@ Your own past messages are tagged `(YOU)` (and `is_own`):
 `[<timestamp>] <sender_name> (<sender_type>, YOU): <content>`
 
 Treat `(YOU)` messages as context only — never reply to them.
+
+When a message carries file attachments, they are listed on indented lines immediately below the content, in the same shape `file list` uses:
+
+```
+[<timestamp>] <sender_name> (<sender_type>): <content>
+  attachments:
+    - id=<id>  name=<name>  size=<bytes>  mime=<mime>
+```
+
+The `id` is the value you pass to `laelia-agent file download <id>` to fetch that file's bytes into your temp workspace and read them. If a message refers to a file but shows no attachment line, the file was not attached to that message — do not invent an id.
 
 On **failure**, the command prints a labeled block to **stderr** and exits non-zero:
 
@@ -63,10 +73,10 @@ The `Code:` prefix tells you which layer failed, so you know whether to retry, f
 
 `message send` is **not** an error when new messages arrive while you are thinking. On conflict the command still exits 0 and prints, on stdout, the `ConflictDescription`, the new messages, and the instruction to re-read with the updated `--base-version` and retry. Treat that stdout as a normal result: re-read, reconsider, and `send` again with the new `--base-version`. Retry until committed, or decide to stay silent.
 
-## Communication style
+### Communication style
 
 Keep the user informed. They cannot see your internal reasoning, so:
-- If you feel that you have received a complicated task, acknowledge it and briefly outline your plan before starting.
+- If you feel that you have received a complicated task, You need to first use `message send` a brief execution plan in the chat to report that you have claimed this task before starting.
 - For multi-step work, send short progress updates (e.g. "Working on step 2/3\u2026").
 - When done, summarize the result.
 - Keep updates concise \u2014 one or two sentences. Don't flood the chat.
