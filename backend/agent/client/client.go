@@ -22,8 +22,8 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/Ranxy/laelia/backend/agent/credential"
+	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	"github.com/Ranxy/laelia/backend/agent/executor"
-	mcpsrv "github.com/Ranxy/laelia/backend/agent/mcp"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
@@ -59,7 +59,7 @@ type Client struct {
 	backoff     *ExponentialBackoff
 	cmdStream   *commandStream
 	acpConfig   *executor.ACPConfig
-	mcpServer   *mcpsrv.Server
+	daemon      *daemonsrv.Server
 	agentName   string
 	// resourceID is the agent's stable server-assigned UUID, parsed from the
 	// bootstrap token. It keys the per-agent working dir and local state file.
@@ -295,21 +295,26 @@ func (c *Client) Run(ctx context.Context) error {
 	info := collectAgentInfo(c.acpConfig)
 	slog.Info("connecting to manager", "url", c.managerURL)
 
-	mcpSrv, err := mcpsrv.New(c.managerURL, c.agentName, func() string {
+	daemonSrv, err := daemonsrv.New(c.managerURL, c.agentName, c.resourceID, func() string {
 		c.mu.RLock()
 		defer c.mu.RUnlock()
 		return c.accessToken
 	}, c.httpClient)
 	if err != nil {
-		return errors.Wrap(err, "failed to create MCP server")
+		return errors.Wrap(err, "failed to create local daemon server")
 	}
-	if err := mcpSrv.Start(); err != nil {
-		return errors.Wrap(err, "failed to start MCP server")
+	if err := daemonSrv.Start(); err != nil {
+		return errors.Wrap(err, "failed to start local daemon server")
 	}
-	c.mcpServer = mcpSrv
-	defer mcpSrv.Stop()
+	c.daemon = daemonSrv
+	defer daemonSrv.Stop()
 
-	c.cmdStream = newCommandStream(c.streamClient, c.managerURL, mcpSrv.Port(), c.agentName, c.resourceID)
+	binaryDir := ""
+	if exe, err := os.Executable(); err == nil {
+		binaryDir = filepath.Dir(exe)
+	}
+
+	c.cmdStream = newCommandStream(c.streamClient, c.managerURL, daemonSrv.SocketPath(), daemonSrv.SessionToken(), binaryDir, c.agentName, c.resourceID)
 	c.cmdStream.getToken = func() string {
 		c.mu.RLock()
 		defer c.mu.RUnlock()

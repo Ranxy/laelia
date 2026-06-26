@@ -219,7 +219,7 @@ func NewACP(req Request, cfg *ACPConfig) (Runtime, error) {
 
 	cmd := exec.CommandContext(ctx, cfg.Executable, cfg.Args...)
 	cmd.Dir = workingDir
-	cmd.Env = buildACPEnv(cfg, req.Env)
+	cmd.Env = buildACPEnv(cfg, req.Env, req)
 
 	exec := &ACPExecutor{
 		ctx:              ctx,
@@ -330,10 +330,15 @@ func (e *ACPExecutor) run() {
 		e.initializedAgent = initResp.AgentInfo.Name
 	}
 
+	// mcpServers is sent as an empty array (not omitted): some ACP servers
+	// (e.g. @agentclientprotocol/claude-agent-acp) validate the field with a
+	// strict array schema and reject a missing/null value with -32602 Invalid
+	// params. We expose no MCP servers — the LLM drives the chat loop via the
+	// `laelia-agent` CLI instead.
 	sessionResp, err := e.conn.NewSession(e.ctx, acp.NewSessionRequest{
 		Cwd:                   e.workingDir,
 		AdditionalDirectories: additionalRoots(e.allowedRoots, e.workingDir),
-		McpServers:            e.buildMCPServers(),
+		McpServers:            []acp.McpServer{},
 	})
 	if err != nil {
 		e.finishACPProcess(err)
@@ -827,7 +832,7 @@ func resolveACPWorkingDir(_ Request, cfg *ACPConfig) (string, []string, error) {
 	return filepath.Clean(absWorkingDir), uniqueStrings(roots), nil
 }
 
-func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string) []string {
+func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []string {
 	values := map[string]string{}
 	for _, item := range os.Environ() {
 		key, value, ok := strings.Cut(item, "=")
@@ -850,6 +855,38 @@ func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string) []string {
 	for key, value := range cfg.Env {
 		values[key] = value
 	}
+
+	// Inject the CLI bootstrap env so the LLM can call `laelia-agent` from its
+	// shell with no flags. These overlay the (filtered) inherited env, so they
+	// pass through regardless of the agent's AllowEnv whitelist. The session
+	// token + socket path are stable for the whole daemon lifetime; the live
+	// (rotating) access token stays here in the daemon, never in the subprocess.
+	if req.DaemonSocket != "" {
+		values["LAELIA_DAEMON_SOCKET"] = req.DaemonSocket
+	}
+	if req.SessionToken != "" {
+		values["LAELIA_SESSION_TOKEN"] = req.SessionToken
+	}
+	if req.AgentResourceID != "" {
+		values["LAELIA_AGENT"] = req.AgentResourceID
+	}
+	if req.PrincipalID != "" {
+		values["LAELIA_PRINCIPAL"] = req.PrincipalID
+	}
+	if req.CommandID != "" {
+		values["LAELIA_COMMAND"] = req.CommandID
+	}
+	// Prepend the agent binary's directory to PATH so `laelia-agent` resolves
+	// regardless of the host's PATH configuration.
+	if req.BinaryDir != "" {
+		existing := values["PATH"]
+		if existing == "" {
+			values["PATH"] = req.BinaryDir
+		} else {
+			values["PATH"] = req.BinaryDir + string(os.PathListSeparator) + existing
+		}
+	}
+
 	env := make([]string, 0, len(values))
 	for key, value := range values {
 		env = append(env, key+"="+value)
@@ -996,27 +1033,4 @@ func maxInt(left int, right int) int {
 		return left
 	}
 	return right
-}
-
-func (e *ACPExecutor) buildMCPServers() []acp.McpServer {
-	if e.request.MCPPort <= 0 {
-		return []acp.McpServer{}
-	}
-
-	// The MCP URL carries agent/principal/command identity only. conversation is
-	// NOT pinned here: the agent-first drain session discovers which channel to
-	// process at runtime, so each chat tool takes an explicit conversation
-	// argument instead of reading it from the URL.
-	url := fmt.Sprintf("http://127.0.0.1:%d/mcp?agent=%s&principal=%s&command=%s",
-		e.request.MCPPort, e.request.AgentResourceID, e.request.PrincipalID, e.request.CommandID)
-
-	return []acp.McpServer{{
-		Http: &acp.McpServerHttpInline{
-			Type:    "http",
-			Name:    "laelia-chat",
-			Url:     url,
-			Headers: []acp.HttpHeader{},
-			Meta:    map[string]any{},
-		},
-	}}
 }

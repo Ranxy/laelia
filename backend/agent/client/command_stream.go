@@ -81,7 +81,9 @@ type commandStream struct {
 	getToken        func() string
 	getSessID       func() string
 	getAcpConfig    func() *executor.ACPConfig
-	mcpPort         int
+	socketPath      string
+	sessionToken    string
+	binaryDir       string
 	agentResourceID string
 	// resourceID is the agent's stable server-assigned UUID (parsed from the
 	// bootstrap token). It keys the per-agent working dir and local state file,
@@ -103,12 +105,14 @@ type commandStream struct {
 	newSessionRuntime func(req *v1pb.CommandRequest) (executor.Runtime, error)
 }
 
-func newCommandStream(httpClient *http.Client, managerURL string, mcpPort int, agentResourceID, resourceID string) *commandStream {
+func newCommandStream(httpClient *http.Client, managerURL, socketPath, sessionToken, binaryDir, agentResourceID, resourceID string) *commandStream {
 	c := &commandStream{
 		client:          v1connect.NewAgentStreamServiceClient(httpClient, managerURL),
 		managerURL:      managerURL,
 		backoff:         NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
-		mcpPort:         mcpPort,
+		socketPath:      socketPath,
+		sessionToken:    sessionToken,
+		binaryDir:       binaryDir,
 		agentResourceID: agentResourceID,
 		resourceID:      resourceID,
 		wakeCh:          make(chan struct{}, 1),
@@ -356,8 +360,9 @@ func (c *commandStream) beginSession(ctx context.Context, stream *connect.BidiSt
 
 // runSession executes one drain session: it builds the agent-first runtime
 // (fixed prompt) and pumps progress/events/result over the bidi stream via
-// runCommand. The agent itself decides which channel to process and how,
-// entirely through MCP tools. Blocking: returns when the session finishes.
+// runCommand. The agent itself decides which channel to process and how, by
+// shelling out to the `laelia-agent` CLI over the local daemon. Blocking:
+// returns when the session finishes.
 func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, agentDisplayName string) {
 	req := &v1pb.CommandRequest{
 		CommandId:        commandID,
@@ -567,7 +572,9 @@ func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime
 		AgentResourceID:  c.agentResourceID,
 		AgentDisplayName: req.AgentDisplayName,
 		PrincipalID:      req.PrincipalId,
-		MCPPort:          c.mcpPort,
+		DaemonSocket:     c.socketPath,
+		SessionToken:     c.sessionToken,
+		BinaryDir:        c.binaryDir,
 	}, c.getAcpConfig())
 }
 

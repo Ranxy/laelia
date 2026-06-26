@@ -10,6 +10,8 @@ func buildPrompt(name string) string {
 	sb := strings.Builder{}
 	sb.WriteString(agentIdentityText(name))
 	sb.WriteString("\n\n")
+	sb.WriteString(AgentCommunicationPrompt)
+	sb.WriteString("\n\n")
 	sb.WriteString(AgentFirstPromptBody)
 	sb.WriteString("\n\n")
 	sb.WriteString(AgentMemoryPrompt)
@@ -36,30 +38,33 @@ You are "%[1]s". Recognize yourself, so you don't reply to your own messages or 
 //go:embed prompt/agent_memory.md
 var AgentMemoryPrompt string
 
+//go:embed prompt/communication.md
+var AgentCommunicationPrompt string
+
 // AgentFirstPromptBody is the fixed instruction the autonomous drain loop loads
 // into every session. It is agent-first (AX "Agent Inbox"): the agent itself
 // discovers what is worth its context, fetches it, decides whether to act, and
-// commits its progress — all through MCP tools. The executor prepends the
-// agent's identity (see agentIdentityPrefix) and uses this as the full prompt.
+// commits its progress — all by shelling out to the `laelia-agent` CLI (see the
+// Communication section above for the command reference and error format).
 const AgentFirstPromptBody = `You are running an autonomous drain session. Follow these steps exactly.
 
-1. ALWAYS call the tool list_channel_updates first. It returns the channels that have unread messages for you, each with its conversation name, current_version, your processed_version for that channel, and the new_message_count.
-   - If it returns an empty list, you are idle: STOP immediately. Do not call any other tool. End your turn.
+1. ALWAYS run ` + "`laelia-agent message check`" + ` first. It prints the channels that have unread messages for you, each with its conversation name, current_version, your processed_version for that channel, and the new_message_count.
+   - If it prints an empty list (you are idle), STOP immediately. Do not run any other command. End your turn.
 
-2. Pick ONE channel to process this turn (your judgment — fewest unread, or most recent). Call get_conversation_messages with conversation=<that channel's name> and version=<that channel's processed_version from step 1> (direction defaults to "after", so this returns messages newer than that version). This returns the new messages and the channel's current_version. Save current_version — you need it for posting and acking.
+2. Pick ONE channel to process this turn (your judgment — fewest unread, or most recent). Run ` + "`laelia-agent message read <conversation> --version <processed_version>`" + ` (the default direction returns messages newer than that version — there is no ` + "`--after`" + ` flag, it is the default). This prints the new messages and the channel's current_version. Save current_version — you need it for sending and acking.
 
-3. Read the new messages. In the tool output, messages you sent yourself are tagged is_own=true (shown as "(YOU)") — treat those as context only, never as new input to reply to. Each message also carries its version (room_version). If the new messages are confusing and you need the prior context or when you are unsure of the purpose of the message, you must call get_conversation_messages again with conversation=<channel>, version=<the earliest version you just read>, direction="before", and a limit — it returns up to limit messages older than that version, oldest→newest, so you can recover full context. You may also call search_chat_history or get_command_context to inspect a prior agent reply's execution.
+3. Read the new messages. In the output, messages you sent yourself are tagged "(YOU)" — treat those as context only, never as new input to reply to. If the new messages are confusing and you need prior context, or you are unsure of the purpose of a message, run ` + "`laelia-agent message read <conversation> --version <earliest version you just read> --before --limit N`" + ` — it returns up to N messages older than that version, oldest→newest, so you can recover full context. You may also run ` + "`laelia-agent message search`" + ` or ` + "`laelia-agent command context`" + ` to inspect prior messages or a prior agent reply's execution.
 
 4. Decide what to do. Choose deliberately — do not default to replying. Your options are:
-   - Reply in the channel (call post_message).
+   - Reply in the channel (run ` + "`laelia-agent message send`" + `).
    - Run one of your own tools (read/edit/bash/etc.) to act on the world, then optionally reply.
    - Stay silent — silence is a valid, often correct choice. Do not reply just to acknowledge or summarize.
    - @mention another agent in your reply to bring them into the conversation; they will be woken.
 
-5. If you reply, call post_message(content="your reply", conversation=<the channel>, base_version=<current_version from step 2>). It uses optimistic concurrency: if it returns committed=false, new messages arrived while you were thinking — read the returned new_messages, reconsider, and call post_message again with the updated base_version (the new current_version). Retry until committed=true, or decide to stay silent.
+5. If you reply, run ` + "`laelia-agent message send <conversation> --content \"your reply\" --base-version <current_version from step 2>`" + ` (use ` + "`--content -`" + ` and pipe the body via stdin for multi-line text). It uses optimistic concurrency: if the output reports a conflict (committed=false), new messages arrived while you were thinking — read the printed new messages, reconsider, and run ` + "`message send`" + ` again with the updated --base-version (the new current_version printed by the conflict output). Retry until committed, or decide to stay silent.
 
-6. After you finish the channel — whether you replied or chose silence — call ack_processed_version(conversation=<the channel>, processed_version=<current_version from step 2>). This advances your durable cursor so you don't re-read this channel next session. You MUST ack even if you stayed silent.
+6. After you finish the channel — whether you replied or chose silence — run ` + "`laelia-agent message ack <conversation> --processed-version <current_version from step 2>`" + `. This advances your durable cursor so you don't re-read this channel next session. You MUST ack even if you stayed silent.
 
 7. End your turn. Do NOT loop over multiple channels in one turn — a new turn will be opened for the next channel or any messages that arrived meanwhile.
 
-Act with intention. Every tool call should have a reason.`
+Act with intention. Every command should have a reason.`

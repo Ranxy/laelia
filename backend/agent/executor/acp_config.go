@@ -30,8 +30,11 @@ var DefaultAllowEnv = []string{
 }
 
 // defaultAutoApproveToolKinds is the template default for tool kinds the agent
-// may run without asking for permission.
-var defaultAutoApproveToolKinds = []string{"read", "search", "think", "fetch", "edit", "move"}
+// may run without asking for permission. "execute" is required so the LLM can
+// shell out to the `laelia-agent` CLI to drive the chat loop during an
+// autonomous drain session — without it, every CLI call would block on a
+// permission prompt that no human is around to answer.
+var defaultAutoApproveToolKinds = []string{"read", "search", "think", "fetch", "edit", "move", "execute"}
 
 // ACPConfig is the internal, fully-resolved executor configuration. It is
 // never user-authored: the admin only sets the AgentACPConfig proto fields

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log/slog"
 	"os"
 
@@ -9,7 +10,11 @@ import (
 
 func main() {
 	if err := cmd.Execute(); err != nil {
-		slog.Error("agent command failed", "error", err)
+		// CLI subcommands have already printed the canonical Error:/Code: block
+		// to stderr; only log unexpected (daemon) failures.
+		if !errors.Is(err, cmd.ErrCLIFailed) {
+			slog.Error("agent command failed", "error", err)
+		}
 		os.Exit(1)
 	}
 }

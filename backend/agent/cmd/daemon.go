@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -13,18 +14,21 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(daemonCmd)
 }
 
-var runCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Connect to the manager and start the agent",
+var daemonCmd = &cobra.Command{
+	Use:   "daemon",
+	Short: "Connect to the manager and run the agent drain loop",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		return run()
+		return runDaemon()
 	},
 }
 
-func run() error {
+func runDaemon() error {
+	if flags.token == "" {
+		return errors.New("--token is required (the bootstrap token issued by the manager)")
+	}
 	slog.Info("laelia-agent starting", "manager", flags.managerURL)
 
 	apiClient, err := client.New(flags.managerURL, flags.token, flags.insecure, flags.allowHTTP, flags.agentName)
