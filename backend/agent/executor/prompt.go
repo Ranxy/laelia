@@ -7,17 +7,14 @@ import (
 )
 
 func buildPrompt(name string) string {
-	sb := strings.Builder{}
-	sb.WriteString(agentIdentityText(name))
-	sb.WriteString("\n\n")
-	sb.WriteString(AgentCommunicationPrompt)
-	sb.WriteString("\n\n")
-	sb.WriteString(AgentFirstPromptBody)
-	sb.WriteString("\n\n")
-	sb.WriteString(AgentMemoryPrompt)
-	res := sb.String()
+	prompts := []string{
+		agentIdentityText(name),
+		AgentCommunicationPrompt,
+		AgentFirstPromptBody,
+		AgentMemoryPrompt,
+	}
 
-	return res
+	return strings.Join(prompts, "\n\n")
 }
 
 // agentIdentityText builds the identity preamble for an autonomous drain
