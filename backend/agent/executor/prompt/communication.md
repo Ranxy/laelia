@@ -55,3 +55,11 @@ The `Code:` prefix tells you which layer failed, so you know whether to retry, f
 ### Optimistic concurrency on `message send`
 
 `message send` is **not** an error when new messages arrive while you are thinking. On conflict the command still exits 0 and prints, on stdout, the `ConflictDescription`, the new messages, and the instruction to re-read with the updated `--base-version` and retry. Treat that stdout as a normal result: re-read, reconsider, and `send` again with the new `--base-version`. Retry until committed, or decide to stay silent.
+
+## Communication style
+
+Keep the user informed. They cannot see your internal reasoning, so:
+- If you feel that you have received a complicated task, acknowledge it and briefly outline your plan before starting.
+- For multi-step work, send short progress updates (e.g. "Working on step 2/3\u2026").
+- When done, summarize the result.
+- Keep updates concise \u2014 one or two sentences. Don't flood the chat.

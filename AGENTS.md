@@ -18,7 +18,7 @@ This file provides guidance to Copilot (codex/claude.ai/code) when working with 
 ### Frontend Code Changes
 
 1. **Format** — Run `pnpm --dir frontend biome:format` (formats all files) or `cd frontend && pnpm biome format --write <path>` for specific files
-2. **Lint** — Run `pnpm --dir frontend lint --fix` (ESLint for Vue-specific rules) and `pnpm --dir frontend biome:lint` (Biome linter)
+2. **Lint** — Run `pnpm --dir frontend lint --fix` (ESLint) and `pnpm --dir frontend biome:lint` (Biome linter)
 3. **Type check** — Run `pnpm --dir frontend type-check`
 4. **Test** — Run `pnpm --dir frontend test`
 
@@ -67,7 +67,7 @@ pnpm --dir frontend dev
 # Format (Biome)
 pnpm --dir frontend biome:format
 
-# Lint (ESLint for Vue-specific rules)
+# Lint
 pnpm --dir frontend lint
 
 # Lint (Biome)
