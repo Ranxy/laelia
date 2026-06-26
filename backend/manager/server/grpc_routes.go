@@ -25,6 +25,7 @@ import (
 	apiv1 "github.com/Ranxy/laelia/backend/manager/api/v1"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/ratelimit"
+	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -37,6 +38,7 @@ func configureGrpcRouters(
 	secret string,
 	profile *config.Profile,
 	stateCfg *state.State,
+	s3clientmanager *s3client.Client,
 ) error {
 	gatewayMarshaler := &grpcruntime.HTTPBodyMarshaler{
 		Marshaler: newSuggestingMarshaler(&grpcruntime.JSONPb{
@@ -78,8 +80,9 @@ func configureGrpcRouters(
 	userService := apiv1.NewUserService(stores, profile, stateCfg)
 	authService := apiv1.NewAuthService(stores, secret, profile, stateCfg)
 	agentService := apiv1.NewAgentService(stores, secret, profile, stateCfg, cmdDispatcher)
-	commandService := apiv1.NewCommandService(stores, cmdDispatcher)
+	commandService := apiv1.NewCommandService(stores, cmdDispatcher, s3clientmanager)
 	agentCommandService := apiv1.NewAgentCommandService(stores, cmdDispatcher)
+	settingService := apiv1.NewSettingService(stores, s3clientmanager)
 
 	rateLimiter, err := ratelimit.New(ratelimit.DefaultConfig())
 	if err != nil {
@@ -102,6 +105,9 @@ func configureGrpcRouters(
 			auth.New(stores, secret, stateCfg, profile),
 			apiv1.NewAuditInterceptor(stores),
 		),
+		// Cap unary request bodies so the bytes-based file upload RPC can't be
+		// used to exhaust memory; matches apiv1.MaxUploadBytes.
+		connect.WithReadMaxBytes(apiv1.MaxUploadBytes),
 		connect.WithRecover(onPanic),
 	)
 
@@ -117,6 +123,8 @@ func configureGrpcRouters(
 	connectHandlers[commandPath] = commandHandler
 	agentCmdPath, agentCmdHandler := v1connect.NewAgentStreamServiceHandler(agentCommandService, handlerOpts)
 	connectHandlers[agentCmdPath] = agentCmdHandler
+	settingPath, settingHandler := v1connect.NewSettingServiceHandler(settingService, handlerOpts)
+	connectHandlers[settingPath] = settingHandler
 
 	reflector := grpcreflect.NewStaticReflector(
 		v1connect.UserServiceName,
@@ -124,6 +132,7 @@ func configureGrpcRouters(
 		v1connect.AgentServiceName,
 		v1connect.CommandServiceName,
 		v1connect.AgentStreamServiceName,
+		v1connect.SettingServiceName,
 	)
 	reflectPath, reflectHandler := grpcreflect.NewHandlerV1(reflector)
 	connectHandlers[reflectPath] = reflectHandler
@@ -153,6 +162,9 @@ func configureGrpcRouters(
 		return err
 	}
 	if err := v1pb.RegisterCommandServiceHandler(ctx, mux, grpcConn); err != nil {
+		return err
+	}
+	if err := v1pb.RegisterSettingServiceHandler(ctx, mux, grpcConn); err != nil {
 		return err
 	}
 

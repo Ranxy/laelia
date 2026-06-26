@@ -702,6 +702,193 @@ export declare type Mention = Message<"laelia.v1.Mention"> & {
 export declare const MentionSchema: GenMessage<Mention>;
 
 /**
+ * Attachment references a file stored in S3 that is attached to a chat message.
+ * The id is the file row uuid and doubles as the download key (/v1/files/{id}).
+ *
+ * @generated from message laelia.v1.Attachment
+ */
+export declare type Attachment = Message<"laelia.v1.Attachment"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string mime_type = 3;
+   */
+  mimeType: string;
+
+  /**
+   * @generated from field: int64 size_bytes = 4;
+   */
+  sizeBytes: bigint;
+};
+
+/**
+ * Describes the message laelia.v1.Attachment.
+ * Use `create(AttachmentSchema)` to create a new message.
+ */
+export declare const AttachmentSchema: GenMessage<Attachment>;
+
+/**
+ * File is the persisted metadata for an S3-backed object.
+ *
+ * @generated from message laelia.v1.File
+ */
+export declare type File = Message<"laelia.v1.File"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string conversation = 2;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: string uploader_principal_id = 3;
+   */
+  uploaderPrincipalId: string;
+
+  /**
+   * @generated from field: string original_name = 4;
+   */
+  originalName: string;
+
+  /**
+   * @generated from field: string mime_type = 5;
+   */
+  mimeType: string;
+
+  /**
+   * @generated from field: int64 size_bytes = 6;
+   */
+  sizeBytes: bigint;
+
+  /**
+   * @generated from field: string s3_key = 7;
+   */
+  s3Key: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 8;
+   */
+  createdAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.File.
+ * Use `create(FileSchema)` to create a new message.
+ */
+export declare const FileSchema: GenMessage<File>;
+
+/**
+ * @generated from message laelia.v1.UploadFileRequest
+ */
+export declare type UploadFileRequest = Message<"laelia.v1.UploadFileRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: string original_name = 2;
+   */
+  originalName: string;
+
+  /**
+   * @generated from field: string mime_type = 3;
+   */
+  mimeType: string;
+
+  /**
+   * @generated from field: bytes data = 4;
+   */
+  data: Uint8Array;
+};
+
+/**
+ * Describes the message laelia.v1.UploadFileRequest.
+ * Use `create(UploadFileRequestSchema)` to create a new message.
+ */
+export declare const UploadFileRequestSchema: GenMessage<UploadFileRequest>;
+
+/**
+ * @generated from message laelia.v1.DownloadFileRequest
+ */
+export declare type DownloadFileRequest = Message<"laelia.v1.DownloadFileRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message laelia.v1.DownloadFileRequest.
+ * Use `create(DownloadFileRequestSchema)` to create a new message.
+ */
+export declare const DownloadFileRequestSchema: GenMessage<DownloadFileRequest>;
+
+/**
+ * @generated from message laelia.v1.DownloadFileResponse
+ */
+export declare type DownloadFileResponse = Message<"laelia.v1.DownloadFileResponse"> & {
+  /**
+   * @generated from field: laelia.v1.File file = 1;
+   */
+  file?: File | undefined;
+
+  /**
+   * @generated from field: bytes data = 2;
+   */
+  data: Uint8Array;
+};
+
+/**
+ * Describes the message laelia.v1.DownloadFileResponse.
+ * Use `create(DownloadFileResponseSchema)` to create a new message.
+ */
+export declare const DownloadFileResponseSchema: GenMessage<DownloadFileResponse>;
+
+/**
+ * @generated from message laelia.v1.ListFilesRequest
+ */
+export declare type ListFilesRequest = Message<"laelia.v1.ListFilesRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListFilesRequest.
+ * Use `create(ListFilesRequestSchema)` to create a new message.
+ */
+export declare const ListFilesRequestSchema: GenMessage<ListFilesRequest>;
+
+/**
+ * @generated from message laelia.v1.ListFilesResponse
+ */
+export declare type ListFilesResponse = Message<"laelia.v1.ListFilesResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.File files = 1;
+   */
+  files: File[];
+};
+
+/**
+ * Describes the message laelia.v1.ListFilesResponse.
+ * Use `create(ListFilesResponseSchema)` to create a new message.
+ */
+export declare const ListFilesResponseSchema: GenMessage<ListFilesResponse>;
+
+/**
  * @generated from message laelia.v1.ChatMessage
  */
 export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
@@ -774,6 +961,11 @@ export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
    * @generated from field: bool is_own = 12;
    */
   isOwn: boolean;
+
+  /**
+   * @generated from field: repeated laelia.v1.Attachment attachments = 13;
+   */
+  attachments: Attachment[];
 };
 
 /**
@@ -1176,6 +1368,11 @@ export declare type SendMessageRequest = Message<"laelia.v1.SendMessageRequest">
    * @generated from field: repeated laelia.v1.Mention mentions = 3;
    */
   mentions: Mention[];
+
+  /**
+   * @generated from field: repeated laelia.v1.Attachment attachments = 4;
+   */
+  attachments: Attachment[];
 };
 
 /**
@@ -1249,6 +1446,11 @@ export declare type PostMessageRequest = Message<"laelia.v1.PostMessageRequest">
    * @generated from field: string command_id = 4;
    */
   commandId: string;
+
+  /**
+   * @generated from field: repeated laelia.v1.Attachment attachments = 5;
+   */
+  attachments: Attachment[];
 };
 
 /**
@@ -2397,6 +2599,43 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof FetchConversationActivityRequestSchema;
     output: typeof FetchConversationActivityResponseSchema;
+  },
+  /**
+   * UploadFile stores data in S3 and persists a file row. Intended for the
+   * agent daemon (browser uploads go through the Echo multipart route). No
+   * google.api.http annotation: the agent reaches it via Connect-JSON over the
+   * CommandServiceClient, and avoiding a /v1/files/{id} gateway entry keeps it
+   * from colliding with the browser download route.
+   *
+   * @generated from rpc laelia.v1.CommandService.UploadFile
+   */
+  uploadFile: {
+    methodKind: "unary";
+    input: typeof UploadFileRequestSchema;
+    output: typeof FileSchema;
+  },
+  /**
+   * DownloadFile fetches a file's bytes from S3. The caller must be a member of
+   * the file's conversation. Used by the agent daemon; browser downloads go
+   * through the Echo route.
+   *
+   * @generated from rpc laelia.v1.CommandService.DownloadFile
+   */
+  downloadFile: {
+    methodKind: "unary";
+    input: typeof DownloadFileRequestSchema;
+    output: typeof DownloadFileResponseSchema;
+  },
+  /**
+   * ListFiles returns the files attached to a conversation. The caller must be
+   * a member.
+   *
+   * @generated from rpc laelia.v1.CommandService.ListFiles
+   */
+  listFiles: {
+    methodKind: "unary";
+    input: typeof ListFilesRequestSchema;
+    output: typeof ListFilesResponseSchema;
   },
 }>;
 

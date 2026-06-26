@@ -71,7 +71,7 @@ const file_store_role_proto_rawDesc = "" +
 	"\n" +
 	"\x10store/role.proto\x12\flaelia.store\"3\n" +
 	"\x0fRolePermissions\x12 \n" +
-	"\vpermissions\x18\x01 \x03(\tR\vpermissionsB\x14Z\x12generated-go/storeb\x06proto3"
+	"\vpermissions\x18\x01 \x03(\tR\vpermissionsB4Z2github.com/Ranxy/laelia/backend/generated-go/storeb\x06proto3"
 
 var (
 	file_store_role_proto_rawDescOnce sync.Once

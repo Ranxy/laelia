@@ -153,7 +153,7 @@ const file_store_user_proto_rawDesc = "" +
 	"\bEND_USER\x10\x01\x12\x13\n" +
 	"\x0fSERVICE_ACCOUNT\x10\x02\x12\x0e\n" +
 	"\n" +
-	"SYSTEM_BOT\x10\x03B\x14Z\x12generated-go/storeb\x06proto3"
+	"SYSTEM_BOT\x10\x03B4Z2github.com/Ranxy/laelia/backend/generated-go/storeb\x06proto3"
 
 var (
 	file_store_user_proto_rawDescOnce sync.Once

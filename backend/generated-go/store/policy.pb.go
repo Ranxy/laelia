@@ -453,7 +453,7 @@ const file_store_policy_proto_rawDesc = "" +
 	"\x0fEnvironmentTier\x12 \n" +
 	"\x1cENVIRONMENT_TIER_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tPROTECTED\x10\x01\x12\x0f\n" +
-	"\vUNPROTECTED\x10\x02B\x14Z\x12generated-go/storeb\x06proto3"
+	"\vUNPROTECTED\x10\x02B4Z2github.com/Ranxy/laelia/backend/generated-go/storeb\x06proto3"
 
 var (
 	file_store_policy_proto_rawDescOnce sync.Once

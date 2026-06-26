@@ -13,6 +13,7 @@ import MarkdownRender, {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
+import { FileCard } from "@/components/chat/FileCard";
 import { ChatDiff } from "@/react/components/chat-events/diff-view";
 import { ChatPermissionRequest } from "@/react/components/chat-events/permission-request";
 import { ChatToolCall } from "@/react/components/chat-events/tool-call";
@@ -530,6 +531,13 @@ function MessageRow({
               </span>
             </div>
           ) : null}
+          {msg.attachments && msg.attachments.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {msg.attachments.map((att) => (
+                <FileCard key={att.id} attachment={att} />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* View details link */}

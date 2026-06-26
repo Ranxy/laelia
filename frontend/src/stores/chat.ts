@@ -99,6 +99,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
         senderName: msg.senderName || undefined,
         senderType: msg.senderType || undefined,
         mentions: msg.mentions,
+        attachments: msg.attachments,
       }));
 
       set((state) => ({
@@ -294,6 +295,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
           content: msg.content,
           timestamp: msg.createdAt ? timestampDate(msg.createdAt) : new Date(),
           commandId: msg.commandId || undefined,
+          attachments: msg.attachments,
         }));
 
         // Check if the assistant message for this command exists yet
@@ -379,13 +381,14 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
     return res;
   },
 
-  async sendChannelMessage(conversationId, content, mentions) {
+  async sendChannelMessage(conversationId, content, mentions, attachments) {
     const conversationName = `conversations/${conversationId}`;
     const res = await commandServiceClient.sendMessage(
       create(SendMessageRequestSchema, {
         conversation: conversationName,
         content,
         mentions,
+        attachments,
       })
     );
     const chatMsg: ChatMessageUI = {
@@ -396,6 +399,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       senderName: res.senderName || undefined,
       senderType: res.senderType || undefined,
       mentions: res.mentions,
+      attachments: res.attachments,
     };
     set((state) => ({
       chatMessages: {
@@ -445,6 +449,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
           commandId: msg.commandId || undefined,
           senderName: msg.senderName || undefined,
           senderType: msg.senderType || undefined,
+          attachments: msg.attachments,
         }));
 
         if (uiMsgs.length > currentCount) {
@@ -509,6 +514,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
           commandId: msg.commandId || undefined,
           senderName: msg.senderName || undefined,
           senderType: msg.senderType || undefined,
+          attachments: msg.attachments,
         }));
         // Reuse cached references for unchanged messages and skip the store
         // update entirely when nothing changed, so polling does not churn the

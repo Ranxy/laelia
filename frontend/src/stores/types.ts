@@ -6,6 +6,7 @@ import type {
 } from "@/types/proto-es/v1/agent_pb";
 import type {
   AgentActivity,
+  Attachment,
   ChannelMember,
   ChatMessage,
   Command,
@@ -29,6 +30,7 @@ export interface ChatMessageUI {
   senderName?: string;
   senderType?: number;
   mentions?: Mention[];
+  attachments?: Attachment[];
 }
 
 export interface AuthSlice {
@@ -122,7 +124,8 @@ export interface ChatSlice {
   sendChannelMessage: (
     conversationId: string,
     content: string,
-    mentions?: Mention[]
+    mentions?: Mention[],
+    attachments?: Attachment[]
   ) => Promise<ChatMessage>;
   pollChannelMessages: (conversationName: string) => Promise<void>;
   fetchConversationActivity: (conversationId: string) => Promise<void>;

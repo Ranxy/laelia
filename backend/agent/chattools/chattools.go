@@ -141,6 +141,21 @@ type AckProcessedVersionInput struct {
 	ProcessedVersion int64  `json:"processed_version"`
 }
 
+type UploadFileInput struct {
+	Conversation string `json:"conversation,omitempty"`
+	OriginalName string `json:"original_name"`
+	MimeType     string `json:"mime_type,omitempty"`
+	Data         []byte `json:"data"`
+}
+
+type DownloadFileInput struct {
+	FileID string `json:"file_id"`
+}
+
+type ListFilesInput struct {
+	Conversation string `json:"conversation"`
+}
+
 // --- Operations ------------------------------------------------------------
 
 // SearchChatHistory searches past chat messages by keyword and optional time
@@ -352,4 +367,77 @@ func AckProcessedVersion(ctx context.Context, d Deps, in AckProcessedVersionInpu
 		return "", wrapManagerError(err)
 	}
 	return fmt.Sprintf("Cursor advanced to processed_version=%d for %s.", resp.Msg.ProcessedVersion, name), nil
+}
+
+// UploadFile uploads a blob to S3 via the manager. Returns the canonical text
+// (including the new file id) on success, or a *Error on failure.
+func UploadFile(ctx context.Context, d Deps, in UploadFileInput) (string, error) {
+	if in.OriginalName == "" {
+		return "", localError("INVALID_ARGUMENT_FAILED", "original_name is required", "")
+	}
+	if len(in.Data) == 0 {
+		return "", localError("INVALID_ARGUMENT_FAILED", "data is empty", "")
+	}
+
+	reqMsg := &v1pb.UploadFileRequest{
+		OriginalName: in.OriginalName,
+		MimeType:     in.MimeType,
+		Data:         in.Data,
+	}
+	if name := normalizeConversationName(in.Conversation); name != "" {
+		reqMsg.Conversation = name
+	}
+	resp, err := d.Client.UploadFile(ctx, connect.NewRequest(reqMsg))
+	if err != nil {
+		return "", wrapManagerError(err)
+	}
+	return fmt.Sprintf("Uploaded file %s (%s, %d bytes)", resp.Msg.Id, resp.Msg.OriginalName, resp.Msg.SizeBytes), nil
+}
+
+// DownloadFileResult holds the downloaded bytes and a canonical summary text.
+type DownloadFileResult struct {
+	Text string
+	Data []byte
+	Name string
+}
+
+// DownloadFile fetches a file's bytes from S3 via the manager. The returned
+// Data is meant to be written to the agent's temp workspace by the daemon; the
+// caller does not print it.
+func DownloadFile(ctx context.Context, d Deps, in DownloadFileInput) (*DownloadFileResult, error) {
+	if in.FileID == "" {
+		return nil, localError("INVALID_ARGUMENT_FAILED", "file_id is required", "")
+	}
+	resp, err := d.Client.DownloadFile(ctx, connect.NewRequest(&v1pb.DownloadFileRequest{Id: in.FileID}))
+	if err != nil {
+		return nil, wrapManagerError(err)
+	}
+	return &DownloadFileResult{
+		Text: fmt.Sprintf("Downloaded file %s (%s, %d bytes)", resp.Msg.File.Id, resp.Msg.File.OriginalName, resp.Msg.File.SizeBytes),
+		Data: resp.Msg.Data,
+		Name: resp.Msg.File.OriginalName,
+	}, nil
+}
+
+// ListFiles lists the files attached to a conversation. The agent must be a
+// member.
+func ListFiles(ctx context.Context, d Deps, in ListFilesInput) (string, error) {
+	name := normalizeConversationName(in.Conversation)
+	if name == "" {
+		return "", localError("MISSING_CONVERSATION", "conversation is required", "")
+	}
+	resp, err := d.Client.ListFiles(ctx, connect.NewRequest(&v1pb.ListFilesRequest{Conversation: name}))
+	if err != nil {
+		return "", wrapManagerError(err)
+	}
+	text := fmt.Sprintf("Files in %s (%d):\n", name, len(resp.Msg.Files))
+	if len(resp.Msg.Files) == 0 {
+		text += "(none)\n"
+		return text, nil
+	}
+	for _, f := range resp.Msg.Files {
+		text += fmt.Sprintf("- id=%s  name=%s  size=%d  mime=%s\n", f.Id, f.OriginalName, f.SizeBytes, f.MimeType)
+	}
+	text += "\nPass an id to `laelia-agent file download <id>` to fetch a file into your temp workspace.\n"
+	return text, nil
 }

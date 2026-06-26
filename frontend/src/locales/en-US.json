@@ -18,7 +18,8 @@
     "no-data": "No agents yet.",
     "confirm-delete": "Delete agent {name}?",
     "send": "Send",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "save": "Save"
   },
   "auth": {
     "sign-in": {
@@ -45,7 +46,26 @@
   "sidebar": {
     "home": "Home",
     "agents": "Agents",
-    "channels": "Channels"
+    "channels": "Channels",
+    "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "s3": {
+      "description": "Configure the S3-compatible object storage used to store uploaded files. Upload and download are disabled until this is configured.",
+      "endpoint": "Endpoint",
+      "region": "Region",
+      "bucket": "Bucket",
+      "access-key": "Access key",
+      "secret-key": "Secret key",
+      "secret-placeholder": "Enter a new key to change",
+      "secret-masked": "Leave blank to keep the current secret",
+      "force-path-style": "Use path-style addressing (required for MinIO)",
+      "use-ssl": "Use SSL/TLS",
+      "saved": "S3 configuration saved",
+      "load-failed": "Failed to load S3 configuration",
+      "save-failed": "Failed to save S3 configuration"
+    }
   },
   "landing": {
     "welcome": "Welcome",
@@ -193,6 +213,7 @@
     "add-member": "Add member",
     "member-type-user": "User",
     "member-type-agent": "Agent",
-    "member-id-placeholder": "User ID or Agent ID"
+    "member-id-placeholder": "User ID or Agent ID",
+    "attach-file": "Attach file"
   }
 }

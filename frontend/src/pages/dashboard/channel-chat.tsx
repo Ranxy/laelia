@@ -1,8 +1,10 @@
+import { create } from "@bufbuild/protobuf";
 import {
   ArrowDown,
   ArrowLeft,
   Hash,
   Loader2,
+  Paperclip,
   Plus,
   Send,
   Trash2,
@@ -17,6 +19,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
+import { FileCard } from "@/components/chat/FileCard";
 import { MentionDetailSheet } from "@/components/chat/MentionDetailSheet";
 import { MentionPopup } from "@/components/chat/MentionPopup";
 import { detectMention } from "@/composables/useMentionDetect";
@@ -25,6 +28,7 @@ import {
   targetToMention,
   useMentionTargets,
 } from "@/composables/useMentionTargets";
+import { commandServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
 import {
   Select,
@@ -43,6 +47,8 @@ import {
 import { cn } from "@/react/lib/utils";
 import { useAppStore } from "@/react/stores";
 import type { ChatMessageUI } from "@/react/stores/types";
+import type { Attachment } from "@/types/proto-es/v1/command_pb";
+import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
 
 setCustomComponents({
   // biome-ignore lint/suspicious/noExplicitAny: markstream custom component API is loosely typed
@@ -96,6 +102,11 @@ export function ChannelChatPage() {
 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>(
+    []
+  );
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastChannelRef = useRef<string | null>(null);
   const stickToBottomRef = useRef(true);
@@ -217,21 +228,78 @@ export function ChannelChatPage() {
     autoResize();
   }, [input, autoResize]);
 
+  // uploadFile uploads a file via the CommandService.UploadFile RPC (the same
+  // one agents use) and returns an Attachment describing it. The backend sniffs
+  // the mime type and stores the blob in S3.
+  const uploadFile = useCallback(
+    async (file: File): Promise<Attachment | null> => {
+      if (!channelId) return null;
+      try {
+        const res = await commandServiceClient.uploadFile({
+          conversation: `conversations/${channelId}`,
+          originalName: file.name,
+          mimeType: file.type || "",
+          data: new Uint8Array(await file.arrayBuffer()),
+        });
+        return create(AttachmentSchema, {
+          id: res.id,
+          name: res.originalName,
+          mimeType: res.mimeType,
+          sizeBytes: res.sizeBytes,
+        });
+      } catch (err) {
+        console.error("file upload failed", err);
+        return null;
+      }
+    },
+    [channelId]
+  );
+
+  const handleFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const list = Array.from(files);
+      if (list.length === 0) return;
+      setUploading(true);
+      try {
+        for (const file of list) {
+          const att = await uploadFile(file);
+          if (att) {
+            setPendingAttachments((prev) => [...prev, att]);
+          }
+        }
+      } finally {
+        setUploading(false);
+      }
+    },
+    [uploadFile]
+  );
+
   const handleSend = useCallback(async () => {
     const text = input.trim();
-    if (!text || sending || !channelId) return;
+    if ((!text && pendingAttachments.length === 0) || sending || !channelId)
+      return;
+    const attachments = pendingAttachments;
     setInput("");
     setMentionState(null);
+    setPendingAttachments([]);
     setSending(true);
     const mentions = mentionMap.map(targetToMention);
     try {
-      await sendChannelMessage(channelId, text, mentions);
+      await sendChannelMessage(channelId, text, mentions, attachments);
     } catch {
-      // send failed
+      // send failed — restore the attachments so the user can retry.
+      setPendingAttachments(attachments);
     } finally {
       setSending(false);
     }
-  }, [input, sending, channelId, mentionMap, sendChannelMessage]);
+  }, [
+    input,
+    sending,
+    channelId,
+    mentionMap,
+    sendChannelMessage,
+    pendingAttachments,
+  ]);
 
   const handleMentionClick = useCallback(
     (type: string, id: string, name: string) => {
@@ -402,7 +470,41 @@ export function ChannelChatPage() {
       {/* Input area */}
       <div className="shrink-0 bg-background">
         <div className="mx-auto max-w-3xl px-6 pb-5 pt-2">
-          <div className="rounded-2xl border border-control-border bg-control-bg/40 focus-within:border-accent focus-within:bg-background transition-colors">
+          <div
+            className="rounded-2xl border border-control-border bg-control-bg/40 focus-within:border-accent focus-within:bg-background transition-colors"
+            onDragOver={(e) => {
+              e.preventDefault();
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (e.dataTransfer.files.length > 0)
+                handleFiles(e.dataTransfer.files);
+            }}
+          >
+            {pendingAttachments.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 px-3 pt-2">
+                {pendingAttachments.map((att) => (
+                  <span
+                    key={att.id}
+                    className="group flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
+                  >
+                    <span className="max-w-[160px] truncate">{att.name}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPendingAttachments((prev) =>
+                          prev.filter((p) => p.id !== att.id)
+                        )
+                      }
+                      className="text-control-placeholder hover:text-error transition-colors"
+                      aria-label={t("common.delete")}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
             <textarea
               ref={textareaRef}
               className={cn(
@@ -483,16 +585,43 @@ export function ChannelChatPage() {
               disabled={sending}
             />
             <div className="flex items-center justify-between px-3 pb-2">
-              <span className="text-xs text-control-placeholder">
-                Enter {t("common.send")} · Shift+Enter
-              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files) handleFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading || sending}
+                  className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors disabled:opacity-50"
+                  aria-label={t("channel.attach-file")}
+                >
+                  {uploading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Paperclip className="size-4" />
+                  )}
+                </button>
+                <span className="text-xs text-control-placeholder">
+                  Enter {t("common.send")} · Shift+Enter
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={handleSend}
-                disabled={!input.trim() || sending}
+                disabled={
+                  (!input.trim() && pendingAttachments.length === 0) || sending
+                }
                 className={cn(
                   "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                  input.trim() && !sending
+                  (input.trim() || pendingAttachments.length > 0) && !sending
                     ? "bg-accent text-accent-foreground hover:bg-accent-hover"
                     : "bg-control-bg text-control-placeholder cursor-not-allowed"
                 )}
@@ -878,6 +1007,13 @@ const ChannelMessageRow = memo(function ChannelMessageRow({
                 </span>
               );
             })}
+          {msg.attachments && msg.attachments.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {msg.attachments.map((att) => (
+                <FileCard key={att.id} attachment={att} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -514,6 +514,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.Attachment"><span class="badge">M</span>Attachment</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.BeginSession"><span class="badge">M</span>BeginSession</a>
                 </li>
               
@@ -594,11 +598,23 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.DownloadFileRequest"><span class="badge">M</span>DownloadFileRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DownloadFileResponse"><span class="badge">M</span>DownloadFileResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.FetchConversationActivityRequest"><span class="badge">M</span>FetchConversationActivityRequest</a>
                 </li>
               
                 <li>
                   <a href="#laelia.v1.FetchConversationActivityResponse"><span class="badge">M</span>FetchConversationActivityResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.File"><span class="badge">M</span>File</a>
                 </li>
               
                 <li>
@@ -671,6 +687,14 @@
               
                 <li>
                   <a href="#laelia.v1.ListConversationMessagesResponse"><span class="badge">M</span>ListConversationMessagesResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListFilesRequest"><span class="badge">M</span>ListFilesRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListFilesResponse"><span class="badge">M</span>ListFilesResponse</a>
                 </li>
               
                 <li>
@@ -762,6 +786,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.UploadFileRequest"><span class="badge">M</span>UploadFileRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.WarningPayload"><span class="badge">M</span>WarningPayload</a>
                 </li>
               
@@ -798,6 +826,37 @@
               
                 <li>
                   <a href="#laelia.v1.CommandService"><span class="badge">S</span>CommandService</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#v1%2fsetting.proto">v1/setting.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.v1.GetS3ConfigRequest"><span class="badge">M</span>GetS3ConfigRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetS3ConfigResponse"><span class="badge">M</span>GetS3ConfigResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateS3ConfigRequest"><span class="badge">M</span>UpdateS3ConfigRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateS3ConfigResponse"><span class="badge">M</span>UpdateS3ConfigResponse</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#laelia.v1.SettingService"><span class="badge">S</span>SettingService</a>
                 </li>
               
             </ul>
@@ -3850,6 +3909,51 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.Attachment">Attachment</h3>
+        <p>Attachment references a file stored in S3 that is attached to a chat message.</p><p>The id is the file row uuid and doubles as the download key (/v1/files/{id}).</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mime_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>size_bytes</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.BeginSession">BeginSession</h3>
         <p>BeginSession is sent by an agent to ask the Manager to start a new</p><p>autonomous processing session. The Manager checks the agent's per-channel</p><p>cursors: if no conversation has room_version greater than the agent's cursor,</p><p>it replies BeginSessionResponse{idle=true} and the agent stays idle;</p><p>otherwise it creates a RUNNING command and replies with its command_id, which</p><p>the agent uses to anchor its execution events and link any posted replies.</p>
 
@@ -4200,6 +4304,13 @@ the conversation. </p></td>
 caller-relative (computed by the manager from the authenticated agent vs the
 message&#39;s sender_agent_id) so an agent can recognize its own past messages as
 context-only and avoid replying to itself. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>attachments</td>
+                  <td><a href="#laelia.v1.Attachment">Attachment</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -4973,6 +5084,61 @@ context-only and avoid replying to itself. </p></td>
 
         
       
+        <h3 id="laelia.v1.DownloadFileRequest">DownloadFileRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DownloadFileResponse">DownloadFileResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>file</td>
+                  <td><a href="#laelia.v1.File">File</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.FetchConversationActivityRequest">FetchConversationActivityRequest</h3>
         <p>FetchConversationActivity returns the execution status of each agent member</p><p>in a conversation. It is polled by the frontend to show real-time agent</p><p>status in the channel header.</p>
 
@@ -5011,6 +5177,79 @@ context-only and avoid replying to itself. </p></td>
                   <td>activities</td>
                   <td><a href="#laelia.v1.AgentActivity">AgentActivity</a></td>
                   <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.File">File</h3>
+        <p>File is the persisted metadata for an S3-backed object.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>uploader_principal_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>original_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mime_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>size_bytes</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>s3_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
                   <td><p> </p></td>
                 </tr>
               
@@ -5548,6 +5787,54 @@ context-only and avoid replying to itself. </p></td>
 
         
       
+        <h3 id="laelia.v1.ListFilesRequest">ListFilesRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListFilesResponse">ListFilesResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>files</td>
+                  <td><a href="#laelia.v1.File">File</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ManagerStreamMessage">ManagerStreamMessage</h3>
         <p></p>
 
@@ -5966,6 +6253,13 @@ context-only and avoid replying to itself. </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>attachments</td>
+                  <td><a href="#laelia.v1.Attachment">Attachment</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -6246,6 +6540,13 @@ context-only and avoid replying to itself. </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>attachments</td>
+                  <td><a href="#laelia.v1.Attachment">Attachment</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -6366,6 +6667,51 @@ context-only and avoid replying to itself. </p></td>
                 <tr>
                   <td>update_mask</td>
                   <td><a href="#google.protobuf.FieldMask">google.protobuf.FieldMask</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UploadFileRequest">UploadFileRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>original_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mime_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -6863,6 +7209,34 @@ context-only and avoid replying to itself. </p></td>
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>UploadFile</td>
+                <td><a href="#laelia.v1.UploadFileRequest">UploadFileRequest</a></td>
+                <td><a href="#laelia.v1.File">File</a></td>
+                <td><p>UploadFile stores data in S3 and persists a file row. Intended for the
+agent daemon (browser uploads go through the Echo multipart route). No
+google.api.http annotation: the agent reaches it via Connect-JSON over the
+CommandServiceClient, and avoiding a /v1/files/{id} gateway entry keeps it
+from colliding with the browser download route.</p></td>
+              </tr>
+            
+              <tr>
+                <td>DownloadFile</td>
+                <td><a href="#laelia.v1.DownloadFileRequest">DownloadFileRequest</a></td>
+                <td><a href="#laelia.v1.DownloadFileResponse">DownloadFileResponse</a></td>
+                <td><p>DownloadFile fetches a file&#39;s bytes from S3. The caller must be a member of
+the file&#39;s conversation. Used by the agent daemon; browser downloads go
+through the Echo route.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ListFiles</td>
+                <td><a href="#laelia.v1.ListFilesRequest">ListFilesRequest</a></td>
+                <td><a href="#laelia.v1.ListFilesResponse">ListFilesResponse</a></td>
+                <td><p>ListFiles returns the files attached to a conversation. The caller must be
+a member.</p></td>
+              </tr>
+            
           </tbody>
         </table>
 
@@ -7108,6 +7482,163 @@ context-only and avoid replying to itself. </p></td>
                 <td>GET</td>
                 <td>/v1/{conversation=conversations/*}/activity</td>
                 <td></td>
+              </tr>
+              
+            
+            </tbody>
+          </table>
+          
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="v1/setting.proto">v1/setting.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.v1.GetS3ConfigRequest">GetS3ConfigRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.GetS3ConfigResponse">GetS3ConfigResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>config</td>
+                  <td><a href="#laelia.store.S3ConfigSetting">laelia.store.S3ConfigSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateS3ConfigRequest">UpdateS3ConfigRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>config</td>
+                  <td><a href="#laelia.store.S3ConfigSetting">laelia.store.S3ConfigSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateS3ConfigResponse">UpdateS3ConfigResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>config</td>
+                  <td><a href="#laelia.store.S3ConfigSetting">laelia.store.S3ConfigSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="laelia.v1.SettingService">SettingService</h3>
+        <p>SettingService exposes workspace-level configuration. It is admin-only; the</p><p>handlers enforce workspace admin membership and return</p><p>connect.CodePermissionDenied otherwise. The S3 secret_key is masked on read;</p><p>an update carrying a masked secret preserves the stored value.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GetS3Config</td>
+                <td><a href="#laelia.v1.GetS3ConfigRequest">GetS3ConfigRequest</a></td>
+                <td><a href="#laelia.v1.GetS3ConfigResponse">GetS3ConfigResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateS3Config</td>
+                <td><a href="#laelia.v1.UpdateS3ConfigRequest">UpdateS3ConfigRequest</a></td>
+                <td><a href="#laelia.v1.UpdateS3ConfigResponse">UpdateS3ConfigResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+          
+          
+          <h4>Methods with HTTP bindings</h4>
+          <table>
+            <thead>
+              <tr>
+                <td>Method Name</td>
+                <td>Method</td>
+                <td>Pattern</td>
+                <td>Body</td>
+              </tr>
+            </thead>
+            <tbody>
+            
+              
+              
+              <tr>
+                <td>GetS3Config</td>
+                <td>GET</td>
+                <td>/v1/s3Config</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateS3Config</td>
+                <td>PATCH</td>
+                <td>/v1/s3Config</td>
+                <td>config</td>
               </tr>
               
             

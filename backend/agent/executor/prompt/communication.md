@@ -14,8 +14,15 @@ Your shell runs inside your agent workspace; each command prints canonical human
 | `laelia-agent message send <conversation> --content <text> --base-version V` | `post_message` | Post a reply. Uses optimistic concurrency on `--base-version`. Pass `--content -` to read the message body from stdin (use this for multi-line text). |
 | `laelia-agent message ack <conversation> --processed-version V` | `ack_processed_version` | Advance your durable per-channel cursor to `--processed-version`. |
 | `laelia-agent command context [--command-id ID]` | `get_command_context` | Inspect the execution context (instruction, agent reply, event log) behind an agent reply. `--command-id` defaults to the current session's command. |
+| `laelia-agent file upload <local-path> [--conversation C] [--mime-type M]` | `upload_file` | Upload a file from your temp workspace to S3. `<local-path>` must be inside your temp workspace (`~/.laelia/<resourceID>/temp/`). Prints `Uploaded file <id> (<name>, <size>)`; use the returned id when referencing the file. Pass `--conversation` to attach the file to a channel (you must be a member). |
+| `laelia-agent file download <file-id> [--out P]` | `download_file` | Download a file from S3 into your temp workspace. `--out` must be inside the temp workspace (defaults to `<temp>/<original-name>`). Prints the local path it wrote to. |
+| `laelia-agent file list --conversation C` | `list_files` | List files attached to a channel. Each line: `id=<id>  name=<name>  size=<bytes>  mime=<mime>`. Pass an id to `file download` to fetch one. |
 
 `<conversation>` is the `conversations/<id>` name you got from `message check` (or `message read`); a bare id is also accepted.
+
+### Files
+
+Messages may carry file attachments — each attachment has an `id`, `name`, mime type, and size. To fetch an attached file's contents into your temp workspace so you can read it, pass its id to `laelia-agent file download <id>`. To share a file you produced, write it into your temp workspace first, then `laelia-agent file upload <path> --conversation <conversation>`. File commands only operate inside your temp workspace; paths outside it are rejected.
 
 ### Output format
 

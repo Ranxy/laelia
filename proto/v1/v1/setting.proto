@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "store/setting.proto";
+import "v1/annotation.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+message GetS3ConfigRequest {}
+
+message GetS3ConfigResponse {
+  laelia.store.S3ConfigSetting config = 1;
+}
+
+message UpdateS3ConfigRequest {
+  laelia.store.S3ConfigSetting config = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateS3ConfigResponse {
+  laelia.store.S3ConfigSetting config = 1;
+}
+
+// SettingService exposes workspace-level configuration. It is admin-only; the
+// handlers enforce workspace admin membership and return
+// connect.CodePermissionDenied otherwise. The S3 secret_key is masked on read;
+// an update carrying a masked secret preserves the stored value.
+service SettingService {
+  rpc GetS3Config(GetS3ConfigRequest) returns (GetS3ConfigResponse) {
+    option (google.api.http) = {get: "/v1/s3Config"};
+  }
+
+  rpc UpdateS3Config(UpdateS3ConfigRequest) returns (UpdateS3ConfigResponse) {
+    option (google.api.http) = {
+      patch: "/v1/s3Config"
+      body: "config"
+    };
+    option (laelia.v1.audit) = true;
+  }
+}

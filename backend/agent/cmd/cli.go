@@ -145,6 +145,8 @@ func readContentFlag(content string) (string, bool) {
 }
 
 // requireArgs fails with a canonical error if the arg count is wrong.
+//
+//nolint:unparam // n is intentionally parameterized for future commands needing other counts
 func requireArgs(cmd *cobra.Command, n int, args []string) bool {
 	if len(args) != n {
 		printError("INVALID_ARGUMENT_FAILED",

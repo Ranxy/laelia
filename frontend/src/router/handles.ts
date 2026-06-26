@@ -7,3 +7,4 @@ export const COMMAND_ROUTE_DETAIL = "command.detail";
 export const CHAT_ROUTE = "chat";
 export const CHANNEL_ROUTE_LIST = "channel.list";
 export const CHANNEL_ROUTE_DETAIL = "channel.detail";
+export const SETTINGS_ROUTE = "settings";

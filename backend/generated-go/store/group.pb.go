@@ -193,7 +193,7 @@ const file_store_group_proto_rawDesc = "" +
 	"\x06MEMBER\x10\x02\"[\n" +
 	"\fGroupPayload\x123\n" +
 	"\amembers\x18\x01 \x03(\v2\x19.laelia.store.GroupMemberR\amembers\x12\x16\n" +
-	"\x06source\x18\x02 \x01(\tR\x06sourceB\x14Z\x12generated-go/storeb\x06proto3"
+	"\x06source\x18\x02 \x01(\tR\x06sourceB4Z2github.com/Ranxy/laelia/backend/generated-go/storeb\x06proto3"
 
 var (
 	file_store_group_proto_rawDescOnce sync.Once

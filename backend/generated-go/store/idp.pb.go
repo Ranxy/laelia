@@ -828,7 +828,7 @@ const file_store_idp_proto_rawDesc = "" +
 	"\x0fOAuth2AuthStyle\x12!\n" +
 	"\x1dOAUTH2_AUTH_STYLE_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tIN_PARAMS\x10\x01\x12\r\n" +
-	"\tIN_HEADER\x10\x02B\x14Z\x12generated-go/storeb\x06proto3"
+	"\tIN_HEADER\x10\x02B4Z2github.com/Ranxy/laelia/backend/generated-go/storeb\x06proto3"
 
 var (
 	file_store_idp_proto_rawDescOnce sync.Once

@@ -587,7 +587,7 @@ const file_store_agent_proto_rawDesc = "" +
 	"\n" +
 	"\x06ACTIVE\x10\x01\x12\f\n" +
 	"\bCONSUMED\x10\x02\x12\v\n" +
-	"\aREVOKED\x10\x03B\x14Z\x12generated-go/storeb\x06proto3"
+	"\aREVOKED\x10\x03B4Z2github.com/Ranxy/laelia/backend/generated-go/storeb\x06proto3"
 
 var (
 	file_store_agent_proto_rawDescOnce sync.Once

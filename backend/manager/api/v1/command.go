@@ -20,20 +20,20 @@ import (
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
+	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
 type CommandService struct {
 	v1connect.UnimplementedCommandServiceHandler
-	store      *store.Store
-	dispatcher *dispatcher.Dispatcher
+	store           *store.Store
+	dispatcher      *dispatcher.Dispatcher
+	s3clientManager *s3client.Client
 }
 
-func NewCommandService(s *store.Store, d *dispatcher.Dispatcher) *CommandService {
-	return &CommandService{store: s, dispatcher: d}
+func NewCommandService(s *store.Store, d *dispatcher.Dispatcher, s3clientManager *s3client.Client) *CommandService {
+	return &CommandService{store: s, dispatcher: d, s3clientManager: s3clientManager}
 }
-
-// SendCommand has been removed in Phase 3. Use SendMessage instead.
 
 func (s *CommandService) ListCommands(ctx context.Context, req *connect.Request[v1pb.ListCommandsRequest]) (*connect.Response[v1pb.ListCommandsResponse], error) {
 	agentResourceID := parseAgentResourceID(req.Msg.Agent)
@@ -454,26 +454,8 @@ func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Req
 	var v1Entries []*v1pb.ChatMessage
 	callerAgent, _ := GetAgentFromContext(ctx)
 	for _, msg := range msgs {
-		senderName := msg.PrincipalName
-		senderType := v1pb.SenderType(msg.SenderType)
-		if msg.SenderType == store.SenderTypeAgent && msg.SenderAgentID.Valid {
-			senderName = msg.AgentName
-		}
-		v1m := &v1pb.ChatMessage{
-			Name:          msg.ID.String(),
-			Conversation:  msg.ConversationID.String(),
-			PrincipalName: msg.PrincipalName,
-			Role:          msg.Role,
-			Content:       msg.Content,
-			CreatedAt:     timestamppb.New(msg.CreatedAt),
-			SenderName:    senderName,
-			SenderType:    senderType,
-			RoomVersion:   msg.RoomVersion,
-			IsOwn:         callerAgent != nil && msg.SenderAgentID.Valid && int(msg.SenderAgentID.Int32) == callerAgent.ID,
-		}
-		if msg.CommandID.Valid {
-			v1m.CommandId = msg.CommandID.UUID.String()
-		}
+		v1m := storeToV1ChatMessage(msg)
+		v1m.IsOwn = callerAgent != nil && msg.SenderAgentID.Valid && int(msg.SenderAgentID.Int32) == callerAgent.ID
 		v1Entries = append(v1Entries, v1m)
 	}
 
@@ -597,26 +579,8 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 
 	var v1msgs []*v1pb.ChatMessage
 	for _, msg := range msgs {
-		senderName := msg.PrincipalName
-		senderType := v1pb.SenderType(msg.SenderType)
-		if msg.SenderType == store.SenderTypeAgent && msg.SenderAgentID.Valid {
-			senderName = msg.AgentName
-		}
-		v1m := &v1pb.ChatMessage{
-			Name:          msg.ID.String(),
-			Conversation:  msg.ConversationID.String(),
-			PrincipalName: msg.PrincipalName,
-			Role:          msg.Role,
-			Content:       msg.Content,
-			CreatedAt:     timestamppb.New(msg.CreatedAt),
-			SenderName:    senderName,
-			SenderType:    senderType,
-			RoomVersion:   msg.RoomVersion,
-			IsOwn:         callerAgent != nil && msg.SenderAgentID.Valid && int(msg.SenderAgentID.Int32) == callerAgent.ID,
-		}
-		if msg.CommandID.Valid {
-			v1m.CommandId = msg.CommandID.UUID.String()
-		}
+		v1m := storeToV1ChatMessage(msg)
+		v1m.IsOwn = callerAgent != nil && msg.SenderAgentID.Valid && int(msg.SenderAgentID.Int32) == callerAgent.ID
 		v1msgs = append(v1msgs, v1m)
 	}
 
@@ -665,6 +629,7 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 			Content:        req.Msg.Content,
 			CommandID:      commandID,
 			SenderType:     store.SenderTypeAgent,
+			Attachments:    req.Msg.Attachments,
 		})
 		if createErr != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(createErr, "failed to create assistant message"))
@@ -729,6 +694,8 @@ func storeToV1ChatMessage(msg *store.ChatMessage) *v1pb.ChatMessage {
 		SenderName:    senderName,
 		SenderType:    senderType,
 		RoomVersion:   msg.RoomVersion,
+		Mentions:      msg.Mentions,
+		Attachments:   msg.Attachments,
 	}
 	if msg.CommandID.Valid {
 		v1m.CommandId = msg.CommandID.UUID.String()

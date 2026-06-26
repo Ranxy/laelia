@@ -58,6 +58,7 @@
     - [EnvironmentSetting.Environment](#laelia-store-EnvironmentSetting-Environment)
     - [EnvironmentSetting.Environment.TagsEntry](#laelia-store-EnvironmentSetting-Environment-TagsEntry)
     - [PasswordRestrictionSetting](#laelia-store-PasswordRestrictionSetting)
+    - [S3ConfigSetting](#laelia-store-S3ConfigSetting)
     - [WorkspaceProfileSetting](#laelia-store-WorkspaceProfileSetting)
   
     - [IPValidationPolicy](#laelia-store-IPValidationPolicy)
@@ -811,6 +812,30 @@ EnvironmentTierPolicy is the tier of an environment.
 
 
 
+<a name="laelia-store-S3ConfigSetting"></a>
+
+### S3ConfigSetting
+S3ConfigSetting holds the connection details for the object storage used to
+back file upload/download. When endpoint and bucket are both empty, S3 is
+considered unconfigured and upload/download endpoints reject with
+&#34;s3 not configured&#34;.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| endpoint | [string](#string) |  | S3-compatible endpoint URL, e.g. &#34;https://s3.amazonaws.com&#34; or a MinIO endpoint. Empty for AWS defaults. |
+| region | [string](#string) |  | AWS region, e.g. &#34;us-east-1&#34;. |
+| bucket | [string](#string) |  | Bucket name. |
+| access_key | [string](#string) |  | Static access key id. |
+| secret_key | [string](#string) |  | Static secret access key. Stored as plaintext in the setting row (same mechanism as AUTH_SECRET); masked on read. |
+| force_path_style | [bool](#bool) |  | Use path-style addressing (required for MinIO and many S3-compatible stores; false for AWS virtual-host style). |
+| use_ssl | [bool](#bool) |  | Whether the endpoint uses TLS. Only meaningful when endpoint is set. |
+
+
+
+
+
+
 <a name="laelia-store-WorkspaceProfileSetting"></a>
 
 ### WorkspaceProfileSetting
@@ -867,6 +892,7 @@ IP validation policy for agent connections.
 | PASSWORD_RESTRICTION | 7 |  |
 | ENVIRONMENT | 8 |  |
 | AGENT_SECURITY | 9 |  |
+| S3_CONFIG | 10 |  |
 
 
  

@@ -281,6 +281,7 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		Content:        req.Msg.Content,
 		SenderType:     store.SenderTypeUser,
 		Mentions:       req.Msg.Mentions,
+		Attachments:    req.Msg.Attachments,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create message"))
@@ -304,6 +305,7 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		SenderType:    v1pb.SenderType(msg.SenderType),
 		RoomVersion:   msg.RoomVersion,
 		Mentions:      msg.Mentions,
+		Attachments:   msg.Attachments,
 	}), nil
 }
 

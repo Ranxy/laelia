@@ -105,6 +105,15 @@ const (
 	// CommandServiceFetchConversationActivityProcedure is the fully-qualified name of the
 	// CommandService's FetchConversationActivity RPC.
 	CommandServiceFetchConversationActivityProcedure = "/laelia.v1.CommandService/FetchConversationActivity"
+	// CommandServiceUploadFileProcedure is the fully-qualified name of the CommandService's UploadFile
+	// RPC.
+	CommandServiceUploadFileProcedure = "/laelia.v1.CommandService/UploadFile"
+	// CommandServiceDownloadFileProcedure is the fully-qualified name of the CommandService's
+	// DownloadFile RPC.
+	CommandServiceDownloadFileProcedure = "/laelia.v1.CommandService/DownloadFile"
+	// CommandServiceListFilesProcedure is the fully-qualified name of the CommandService's ListFiles
+	// RPC.
+	CommandServiceListFilesProcedure = "/laelia.v1.CommandService/ListFiles"
 	// AgentStreamServiceAgentChannelProcedure is the fully-qualified name of the AgentStreamService's
 	// AgentChannel RPC.
 	AgentStreamServiceAgentChannelProcedure = "/laelia.v1.AgentStreamService/AgentChannel"
@@ -135,6 +144,19 @@ type CommandServiceClient interface {
 	ListChannelUpdates(context.Context, *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error)
 	AckProcessedVersion(context.Context, *connect.Request[v1.AckProcessedVersionRequest]) (*connect.Response[v1.AckProcessedVersionResponse], error)
 	FetchConversationActivity(context.Context, *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error)
+	// UploadFile stores data in S3 and persists a file row. Intended for the
+	// agent daemon (browser uploads go through the Echo multipart route). No
+	// google.api.http annotation: the agent reaches it via Connect-JSON over the
+	// CommandServiceClient, and avoiding a /v1/files/{id} gateway entry keeps it
+	// from colliding with the browser download route.
+	UploadFile(context.Context, *connect.Request[v1.UploadFileRequest]) (*connect.Response[v1.File], error)
+	// DownloadFile fetches a file's bytes from S3. The caller must be a member of
+	// the file's conversation. Used by the agent daemon; browser downloads go
+	// through the Echo route.
+	DownloadFile(context.Context, *connect.Request[v1.DownloadFileRequest]) (*connect.Response[v1.DownloadFileResponse], error)
+	// ListFiles returns the files attached to a conversation. The caller must be
+	// a member.
+	ListFiles(context.Context, *connect.Request[v1.ListFilesRequest]) (*connect.Response[v1.ListFilesResponse], error)
 }
 
 // NewCommandServiceClient constructs a client for the laelia.v1.CommandService service. By default,
@@ -286,6 +308,24 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("FetchConversationActivity")),
 			connect.WithClientOptions(opts...),
 		),
+		uploadFile: connect.NewClient[v1.UploadFileRequest, v1.File](
+			httpClient,
+			baseURL+CommandServiceUploadFileProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("UploadFile")),
+			connect.WithClientOptions(opts...),
+		),
+		downloadFile: connect.NewClient[v1.DownloadFileRequest, v1.DownloadFileResponse](
+			httpClient,
+			baseURL+CommandServiceDownloadFileProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("DownloadFile")),
+			connect.WithClientOptions(opts...),
+		),
+		listFiles: connect.NewClient[v1.ListFilesRequest, v1.ListFilesResponse](
+			httpClient,
+			baseURL+CommandServiceListFilesProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ListFiles")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -314,6 +354,9 @@ type commandServiceClient struct {
 	listChannelUpdates        *connect.Client[v1.ListChannelUpdatesRequest, v1.ListChannelUpdatesResponse]
 	ackProcessedVersion       *connect.Client[v1.AckProcessedVersionRequest, v1.AckProcessedVersionResponse]
 	fetchConversationActivity *connect.Client[v1.FetchConversationActivityRequest, v1.FetchConversationActivityResponse]
+	uploadFile                *connect.Client[v1.UploadFileRequest, v1.File]
+	downloadFile              *connect.Client[v1.DownloadFileRequest, v1.DownloadFileResponse]
+	listFiles                 *connect.Client[v1.ListFilesRequest, v1.ListFilesResponse]
 }
 
 // ListCommands calls laelia.v1.CommandService.ListCommands.
@@ -431,6 +474,21 @@ func (c *commandServiceClient) FetchConversationActivity(ctx context.Context, re
 	return c.fetchConversationActivity.CallUnary(ctx, req)
 }
 
+// UploadFile calls laelia.v1.CommandService.UploadFile.
+func (c *commandServiceClient) UploadFile(ctx context.Context, req *connect.Request[v1.UploadFileRequest]) (*connect.Response[v1.File], error) {
+	return c.uploadFile.CallUnary(ctx, req)
+}
+
+// DownloadFile calls laelia.v1.CommandService.DownloadFile.
+func (c *commandServiceClient) DownloadFile(ctx context.Context, req *connect.Request[v1.DownloadFileRequest]) (*connect.Response[v1.DownloadFileResponse], error) {
+	return c.downloadFile.CallUnary(ctx, req)
+}
+
+// ListFiles calls laelia.v1.CommandService.ListFiles.
+func (c *commandServiceClient) ListFiles(ctx context.Context, req *connect.Request[v1.ListFilesRequest]) (*connect.Response[v1.ListFilesResponse], error) {
+	return c.listFiles.CallUnary(ctx, req)
+}
+
 // CommandServiceHandler is an implementation of the laelia.v1.CommandService service.
 type CommandServiceHandler interface {
 	ListCommands(context.Context, *connect.Request[v1.ListCommandsRequest]) (*connect.Response[v1.ListCommandsResponse], error)
@@ -456,6 +514,19 @@ type CommandServiceHandler interface {
 	ListChannelUpdates(context.Context, *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error)
 	AckProcessedVersion(context.Context, *connect.Request[v1.AckProcessedVersionRequest]) (*connect.Response[v1.AckProcessedVersionResponse], error)
 	FetchConversationActivity(context.Context, *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error)
+	// UploadFile stores data in S3 and persists a file row. Intended for the
+	// agent daemon (browser uploads go through the Echo multipart route). No
+	// google.api.http annotation: the agent reaches it via Connect-JSON over the
+	// CommandServiceClient, and avoiding a /v1/files/{id} gateway entry keeps it
+	// from colliding with the browser download route.
+	UploadFile(context.Context, *connect.Request[v1.UploadFileRequest]) (*connect.Response[v1.File], error)
+	// DownloadFile fetches a file's bytes from S3. The caller must be a member of
+	// the file's conversation. Used by the agent daemon; browser downloads go
+	// through the Echo route.
+	DownloadFile(context.Context, *connect.Request[v1.DownloadFileRequest]) (*connect.Response[v1.DownloadFileResponse], error)
+	// ListFiles returns the files attached to a conversation. The caller must be
+	// a member.
+	ListFiles(context.Context, *connect.Request[v1.ListFilesRequest]) (*connect.Response[v1.ListFilesResponse], error)
 }
 
 // NewCommandServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -603,6 +674,24 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("FetchConversationActivity")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceUploadFileHandler := connect.NewUnaryHandler(
+		CommandServiceUploadFileProcedure,
+		svc.UploadFile,
+		connect.WithSchema(commandServiceMethods.ByName("UploadFile")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceDownloadFileHandler := connect.NewUnaryHandler(
+		CommandServiceDownloadFileProcedure,
+		svc.DownloadFile,
+		connect.WithSchema(commandServiceMethods.ByName("DownloadFile")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceListFilesHandler := connect.NewUnaryHandler(
+		CommandServiceListFilesProcedure,
+		svc.ListFiles,
+		connect.WithSchema(commandServiceMethods.ByName("ListFiles")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/laelia.v1.CommandService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case CommandServiceListCommandsProcedure:
@@ -651,6 +740,12 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceAckProcessedVersionHandler.ServeHTTP(w, r)
 		case CommandServiceFetchConversationActivityProcedure:
 			commandServiceFetchConversationActivityHandler.ServeHTTP(w, r)
+		case CommandServiceUploadFileProcedure:
+			commandServiceUploadFileHandler.ServeHTTP(w, r)
+		case CommandServiceDownloadFileProcedure:
+			commandServiceDownloadFileHandler.ServeHTTP(w, r)
+		case CommandServiceListFilesProcedure:
+			commandServiceListFilesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -750,6 +845,18 @@ func (UnimplementedCommandServiceHandler) AckProcessedVersion(context.Context, *
 
 func (UnimplementedCommandServiceHandler) FetchConversationActivity(context.Context, *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.FetchConversationActivity is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) UploadFile(context.Context, *connect.Request[v1.UploadFileRequest]) (*connect.Response[v1.File], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.UploadFile is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) DownloadFile(context.Context, *connect.Request[v1.DownloadFileRequest]) (*connect.Response[v1.DownloadFileResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.DownloadFile is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ListFiles(context.Context, *connect.Request[v1.ListFilesRequest]) (*connect.Response[v1.ListFilesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListFiles is not implemented"))
 }
 
 // AgentStreamServiceClient is a client for the laelia.v1.AgentStreamService service.

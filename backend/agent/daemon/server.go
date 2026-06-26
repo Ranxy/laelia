@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"connectrpc.com/connect"
@@ -48,6 +49,10 @@ type Server struct {
 
 	socketPath   string
 	sessionToken string
+	// tempDir is the agent's temp workspace for file upload/download. It is a
+	// "temp" subdir of the per-agent working dir, isolated from the agent's
+	// other working files. File commands confine all local paths to it.
+	tempDir string
 
 	listener   net.Listener
 	httpServer *http.Server
@@ -66,6 +71,7 @@ func New(managerURL, agentResourceID, resourceID string, getToken func() string,
 		return nil, errors.Wrap(err, "resolve home dir")
 	}
 	socketPath := filepath.Join(home, ".laelia", resourceID, "daemon.sock")
+	tempDir := filepath.Join(home, ".laelia", resourceID, "temp")
 
 	token := make([]byte, 32)
 	if _, err := rand.Read(token); err != nil {
@@ -79,11 +85,13 @@ func New(managerURL, agentResourceID, resourceID string, getToken func() string,
 		httpClient:      httpClient,
 		socketPath:      socketPath,
 		sessionToken:    hex.EncodeToString(token),
+		tempDir:         tempDir,
 	}, nil
 }
 
 func (s *Server) SocketPath() string   { return s.socketPath }
 func (s *Server) SessionToken() string { return s.sessionToken }
+func (s *Server) TempDir() string      { return s.tempDir }
 
 // client builds (once) a CommandServiceClient that carries the live access
 // token on every call via an interceptor.
@@ -114,6 +122,9 @@ func (s *Server) Start() error {
 	if err := os.MkdirAll(filepath.Dir(s.socketPath), 0o700); err != nil {
 		return errors.Wrap(err, "create daemon socket dir")
 	}
+	if err := os.MkdirAll(s.tempDir, 0o700); err != nil {
+		return errors.Wrap(err, "create agent temp workspace")
+	}
 	_ = os.Remove(s.socketPath) // clear stale socket from a previous run
 
 	listener, err := net.Listen("unix", s.socketPath)
@@ -132,6 +143,9 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/message/ack", s.handleMessageAck)
 	mux.HandleFunc("/message/send", s.handleMessageSend)
 	mux.HandleFunc("/command/context", s.handleCommandContext)
+	mux.HandleFunc("/file/upload", s.handleFileUpload)
+	mux.HandleFunc("/file/download", s.handleFileDownload)
+	mux.HandleFunc("/file/list", s.handleFileList)
 
 	s.httpServer = &http.Server{Handler: mux}
 	go func() {
@@ -170,6 +184,13 @@ type Request struct {
 	BaseVersion      int64  `json:"base_version,omitempty"`
 	ProcessedVersion int64  `json:"processed_version,omitempty"`
 	CommandID        string `json:"command_id,omitempty"`
+
+	// File command fields.
+	LocalPath    string `json:"local_path,omitempty"`
+	FileID       string `json:"file_id,omitempty"`
+	OutPath      string `json:"out_path,omitempty"`
+	OriginalName string `json:"original_name,omitempty"`
+	MimeType     string `json:"mime_type,omitempty"`
 }
 
 // Response is the shared envelope. Success: Text set, Code empty. Failure:
@@ -316,4 +337,97 @@ func asChatError(err error) *chattools.Error {
 		return e
 	}
 	return &chattools.Error{Code: "SERVER_5XX", Message: err.Error()}
+}
+
+// validateWorkspacePath resolves path against the agent temp workspace and
+// ensures the cleaned, symlink-resolved result stays inside tempDir. This
+// prevents file commands from reading/writing outside the workspace.
+func (s *Server) validateWorkspacePath(path string) (string, error) {
+	if path == "" {
+		return "", errors.New("path is required")
+	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(s.tempDir, path)
+	}
+	cleaned := filepath.Clean(path)
+	resolved, err := filepath.EvalSymlinks(cleaned)
+	if err != nil {
+		// EvalSymlinks fails if the file doesn't exist yet (download target).
+		// Fall back to the cleaned path and verify its parent resolves inside.
+		resolved = cleaned
+	}
+	rel, err := filepath.Rel(s.tempDir, resolved)
+	if err != nil || strings.HasPrefix(rel, "..") || rel == ".." {
+		return "", errors.Errorf("path %q escapes the agent temp workspace", path)
+	}
+	return resolved, nil
+}
+
+func (s *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		localPath, err := s.validateWorkspacePath(req.LocalPath)
+		if err != nil {
+			return "", &chattools.Error{Code: "INVALID_ARGUMENT_FAILED", Message: err.Error()}
+		}
+		data, err := os.ReadFile(localPath)
+		if err != nil {
+			return "", &chattools.Error{Code: "INVALID_ARGUMENT_FAILED", Message: "failed to read local file: " + err.Error()}
+		}
+		originalName := req.OriginalName
+		if originalName == "" {
+			originalName = filepath.Base(localPath)
+		}
+		text, err := chattools.UploadFile(r.Context(), s.deps(req), chattools.UploadFileInput{
+			Conversation: req.Conversation,
+			OriginalName: originalName,
+			MimeType:     req.MimeType,
+			Data:         data,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleFileDownload(w http.ResponseWriter, r *http.Request) {
+	if e := s.authorize(r); e != nil {
+		writeError(w, e)
+		return
+	}
+	var req Request
+	if !s.decode(w, r, &req) {
+		return
+	}
+	result, err := chattools.DownloadFile(r.Context(), s.deps(req), chattools.DownloadFileInput{
+		FileID: req.FileID,
+	})
+	if err != nil {
+		writeError(w, asChatError(err))
+		return
+	}
+	outPath := req.OutPath
+	if outPath == "" {
+		outPath = filepath.Join(s.tempDir, result.Name)
+	}
+	resolved, verr := s.validateWorkspacePath(outPath)
+	if verr != nil {
+		writeError(w, &chattools.Error{Code: "INVALID_ARGUMENT_FAILED", Message: verr.Error()})
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(resolved), 0o700); err != nil {
+		writeError(w, &chattools.Error{Code: "SERVER_5XX", Message: "failed to create target dir: " + err.Error()})
+		return
+	}
+	if err := os.WriteFile(resolved, result.Data, 0o600); err != nil {
+		writeError(w, &chattools.Error{Code: "SERVER_5XX", Message: "failed to write file: " + err.Error()})
+		return
+	}
+	writeOK(w, result.Text+"\nWrote to "+resolved)
+}
+
+func (s *Server) handleFileList(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.ListFiles(r.Context(), s.deps(req), chattools.ListFilesInput{
+			Conversation: req.Conversation,
+		})
+		return text, asChatError(err)
+	})
 }

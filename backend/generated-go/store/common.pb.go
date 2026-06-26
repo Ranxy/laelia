@@ -195,7 +195,7 @@ const file_store_common_proto_rawDesc = "" +
 	"\x06column\x18\x02 \x01(\x05R\x06column\"/\n" +
 	"\x05Range\x12\x14\n" +
 	"\x05start\x18\x01 \x01(\x05R\x05start\x12\x10\n" +
-	"\x03end\x18\x02 \x01(\x05R\x03endB\x14Z\x12generated-go/storeb\x06proto3"
+	"\x03end\x18\x02 \x01(\x05R\x03endB4Z2github.com/Ranxy/laelia/backend/generated-go/storeb\x06proto3"
 
 var (
 	file_store_common_proto_rawDescOnce sync.Once

@@ -4,7 +4,7 @@ package laelia.store;
 
 import "google/protobuf/duration.proto";
 
-option go_package = "generated-go/store";
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/store";
 
 enum SettingName {
   SETTING_NAME_UNSPECIFIED = 0;
@@ -17,6 +17,7 @@ enum SettingName {
   PASSWORD_RESTRICTION = 7;
   ENVIRONMENT = 8;
   AGENT_SECURITY = 9;
+  S3_CONFIG = 10;
 }
 
 message WorkspaceProfileSetting {
@@ -103,4 +104,28 @@ message AgentSecuritySetting {
   int32 heartbeat_rate_limit_per_minute = 8;
   // Connect rate limit per minute per IP.
   int32 connect_rate_limit_per_minute = 9;
+}
+
+// S3ConfigSetting holds the connection details for the object storage used to
+// back file upload/download. When endpoint and bucket are both empty, S3 is
+// considered unconfigured and upload/download endpoints reject with
+// "s3 not configured".
+message S3ConfigSetting {
+  // S3-compatible endpoint URL, e.g. "https://s3.amazonaws.com" or a MinIO
+  // endpoint. Empty for AWS defaults.
+  string endpoint = 1;
+  // AWS region, e.g. "us-east-1".
+  string region = 2;
+  // Bucket name.
+  string bucket = 3;
+  // Static access key id.
+  string access_key = 4;
+  // Static secret access key. Stored as plaintext in the setting row (same
+  // mechanism as AUTH_SECRET); masked on read.
+  string secret_key = 5;
+  // Use path-style addressing (required for MinIO and many S3-compatible
+  // stores; false for AWS virtual-host style).
+  bool force_path_style = 6;
+  // Whether the endpoint uses TLS. Only meaningful when endpoint is set.
+  bool use_ssl = 7;
 }

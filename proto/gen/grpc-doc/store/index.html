@@ -397,6 +397,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.store.S3ConfigSetting"><span class="badge">M</span>S3ConfigSetting</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.store.WorkspaceProfileSetting"><span class="badge">M</span>WorkspaceProfileSetting</a>
                 </li>
               
@@ -2089,6 +2093,75 @@ for example, the environment resource can have the sql review config tag, like &
 
         
       
+        <h3 id="laelia.store.S3ConfigSetting">S3ConfigSetting</h3>
+        <p>S3ConfigSetting holds the connection details for the object storage used to</p><p>back file upload/download. When endpoint and bucket are both empty, S3 is</p><p>considered unconfigured and upload/download endpoints reject with</p><p>"s3 not configured".</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>endpoint</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>S3-compatible endpoint URL, e.g. &#34;https://s3.amazonaws.com&#34; or a MinIO
+endpoint. Empty for AWS defaults. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>region</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>AWS region, e.g. &#34;us-east-1&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>bucket</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Bucket name. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>access_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Static access key id. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>secret_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Static secret access key. Stored as plaintext in the setting row (same
+mechanism as AUTH_SECRET); masked on read. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>force_path_style</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Use path-style addressing (required for MinIO and many S3-compatible
+stores; false for AWS virtual-host style). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>use_ssl</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Whether the endpoint uses TLS. Only meaningful when endpoint is set. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.store.WorkspaceProfileSetting">WorkspaceProfileSetting</h3>
         <p></p>
 
@@ -2271,6 +2344,12 @@ for example, the environment resource can have the sql review config tag, like &
               <tr>
                 <td>AGENT_SECURITY</td>
                 <td>9</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>S3_CONFIG</td>
+                <td>10</td>
                 <td><p></p></td>
               </tr>
             

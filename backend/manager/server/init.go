@@ -108,5 +108,19 @@ func (s *Server) initializeSetting(ctx context.Context) error {
 		}
 	}
 
+	// Seed a default (empty) S3 config so GetS3ConfigSetting never returns a
+	// missing row; upload/download report "s3 not configured" until an admin
+	// fills in endpoint+bucket.
+	s3ConfigValue, err := json.Marshal(&models.S3ConfigSetting{UseSsl: true})
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal initial s3 config setting")
+	}
+	if _, _, err := s.store.CreateSettingIfNotExistV2(ctx, &store.SettingMessage{
+		Name:  models.SettingName_S3_CONFIG,
+		Value: string(s3ConfigValue),
+	}); err != nil {
+		return err
+	}
+
 	return nil
 }

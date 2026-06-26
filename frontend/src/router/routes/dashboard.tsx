@@ -9,6 +9,7 @@ import {
   CHAT_ROUTE,
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
+  SETTINGS_ROUTE,
   WORKSPACE_ROUTE_LANDING,
 } from "../handles";
 
@@ -77,6 +78,14 @@ export const dashboardRoutes: RouteObject[] = [
         lazy: () =>
           import("@/react/pages/dashboard/channel-chat").then((m) => ({
             Component: m.ChannelChatPage,
+          })),
+      },
+      {
+        path: "settings",
+        handle: { name: SETTINGS_ROUTE },
+        lazy: () =>
+          import("@/react/pages/dashboard/settings").then((m) => ({
+            Component: m.SettingsPage,
           })),
       },
     ],

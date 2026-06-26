@@ -387,3 +387,30 @@ CREATE INDEX IF NOT EXISTS idx_agent_channel_cursor_conv ON agent_channel_cursor
 -- create it.
 DROP TABLE IF EXISTS held_action CASCADE;
 
+-- === S3-backed file attachments ===
+-- chat_message.attachments mirrors the mentions JSONB column: a denormalized
+-- list of {id,name,mime_type,size_bytes} refs to rows in the file table. Storing
+-- the refs inline (rather than a join table) keeps message rendering cheap and
+-- matches the existing mentions pattern.
+ALTER TABLE chat_message ADD COLUMN IF NOT EXISTS attachments JSONB NOT NULL DEFAULT '[]';
+
+-- file is the persisted metadata for an S3-backed object. Each upload gets a
+-- unique uuid even for duplicate original_name values in the same conversation.
+-- s3_key is prefixed with the file id so duplicate names never collide in S3.
+-- conversation_id is nullable: a file may be uploaded without a conversation
+-- (then only the uploader may download it); the channel composer always sets
+-- one so membership access control applies.
+CREATE TABLE IF NOT EXISTS file (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID REFERENCES conversation(id) ON DELETE SET NULL,
+    uploader_principal_id INTEGER NOT NULL REFERENCES principal(id),
+    original_name TEXT NOT NULL,
+    mime_type TEXT NOT NULL DEFAULT '',
+    size_bytes BIGINT NOT NULL DEFAULT 0,
+    s3_key TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_file_conversation ON file(conversation_id) WHERE conversation_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_file_uploader ON file(uploader_principal_id);
+

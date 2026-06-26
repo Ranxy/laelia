@@ -4,7 +4,7 @@ package laelia.store;
 
 import "google/type/expr.proto";
 
-option go_package = "generated-go/store";
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/store";
 
 message Policy {
   enum Type {

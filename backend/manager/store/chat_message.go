@@ -39,24 +39,27 @@ type ChatMessage struct {
 	// reference.
 	RoomVersion int64
 	// SenderType: 1=USER, 2=AGENT, 3=SYSTEM.
-	SenderType int32
-	Mentions   []*v1pb.Mention
+	SenderType  int32
+	Mentions    []*v1pb.Mention
+	Attachments []*v1pb.Attachment
 }
 
 // chatMessageScanner scans a chat_message row from the common column order
 // produced by scanChatMessageRow: id, conversation_id, principal_id,
 // principal_name, sender_agent_id, agent_resource_id, agent_name, role,
-// content, command_id, created_at, room_version, sender_type, mentions.
+// content, command_id, created_at, room_version, sender_type, mentions,
+// attachments.
 func scanChatMessageRow(row interface {
 	Scan(dest ...any) error
 }) (*ChatMessage, error) {
 	var msg ChatMessage
 	var mentionsBytes []byte
+	var attachmentsBytes []byte
 	if err := row.Scan(
 		&msg.ID, &msg.ConversationID, &msg.PrincipalID, &msg.PrincipalName,
 		&msg.SenderAgentID, &msg.AgentResourceID, &msg.AgentName,
 		&msg.Role, &msg.Content, &msg.CommandID, &msg.CreatedAt, &msg.RoomVersion, &msg.SenderType,
-		&mentionsBytes,
+		&mentionsBytes, &attachmentsBytes,
 	); err != nil {
 		return nil, errors.Wrapf(err, "failed to scan chat message")
 	}
@@ -67,12 +70,19 @@ func scanChatMessageRow(row interface {
 		}
 		msg.Mentions = mentions
 	}
+	if len(attachmentsBytes) > 0 {
+		var attachments []*v1pb.Attachment
+		if err := json.Unmarshal(attachmentsBytes, &attachments); err != nil {
+			return nil, errors.Wrapf(err, "failed to unmarshal attachments")
+		}
+		msg.Attachments = attachments
+	}
 	return &msg, nil
 }
 
 const chatMessageColumns = `cm.id, cm.conversation_id, cm.principal_id, COALESCE(p.name, ''),
        cm.sender_agent_id, COALESCE(a.resource_id, ''), COALESCE(a.name, ''),
-       cm.role, cm.content, cm.command_id, cm.created_at, cm.room_version, cm.sender_type, cm.mentions`
+       cm.role, cm.content, cm.command_id, cm.created_at, cm.room_version, cm.sender_type, cm.mentions, cm.attachments`
 
 func (s *Store) CreateChatMessage(ctx context.Context, msg *ChatMessage) (*ChatMessage, error) {
 	var id uuid.UUID
@@ -83,11 +93,15 @@ func (s *Store) CreateChatMessage(ctx context.Context, msg *ChatMessage) (*ChatM
 	if err != nil {
 		return nil, err
 	}
+	attachmentsBytes, err := marshalAttachments(msg.Attachments)
+	if err != nil {
+		return nil, err
+	}
 	err = s.GetDB().QueryRowContext(ctx, `
-		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions, attachments)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id, created_at, room_version
-	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, msg.RoomVersion, msg.SenderType, mentionsBytes).Scan(&id, &createdAt, &roomVersion)
+	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, msg.RoomVersion, msg.SenderType, mentionsBytes, attachmentsBytes).Scan(&id, &createdAt, &roomVersion)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create chat message")
 	}
@@ -106,6 +120,7 @@ func (s *Store) CreateChatMessage(ctx context.Context, msg *ChatMessage) (*ChatM
 		RoomVersion:     roomVersion,
 		SenderType:      msg.SenderType,
 		Mentions:        msg.Mentions,
+		Attachments:     msg.Attachments,
 	}, nil
 }
 
@@ -134,14 +149,18 @@ func (s *Store) CreateChatMessageBumpVersion(ctx context.Context, msg *ChatMessa
 	if err != nil {
 		return nil, 0, err
 	}
+	attachmentsBytes, err := marshalAttachments(msg.Attachments)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	var id uuid.UUID
 	var createdAt time.Time
 	if err := tx.QueryRowContext(ctx, `
-		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions, attachments)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id, created_at
-	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, newVersion, msg.SenderType, mentionsBytes).Scan(&id, &createdAt); err != nil {
+	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, newVersion, msg.SenderType, mentionsBytes, attachmentsBytes).Scan(&id, &createdAt); err != nil {
 		return nil, 0, errors.Wrapf(err, "failed to create chat message")
 	}
 
@@ -163,6 +182,7 @@ func (s *Store) CreateChatMessageBumpVersion(ctx context.Context, msg *ChatMessa
 		RoomVersion:     newVersion,
 		SenderType:      msg.SenderType,
 		Mentions:        msg.Mentions,
+		Attachments:     msg.Attachments,
 	}, newVersion, nil
 }
 
@@ -287,6 +307,17 @@ func marshalMentions(mentions []*v1pb.Mention) ([]byte, error) {
 	b, err := json.Marshal(mentions)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to marshal mentions")
+	}
+	return b, nil
+}
+
+func marshalAttachments(attachments []*v1pb.Attachment) ([]byte, error) {
+	if attachments == nil {
+		attachments = []*v1pb.Attachment{}
+	}
+	b, err := json.Marshal(attachments)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal attachments")
 	}
 	return b, nil
 }

@@ -6,6 +6,7 @@ import {
   type LucideIcon,
   Menu,
   MessageCircle,
+  Settings,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -20,6 +21,7 @@ import {
   CHAT_ROUTE,
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
+  SETTINGS_ROUTE,
   WORKSPACE_ROUTE_LANDING,
 } from "@/react/router/handles";
 import { useCurrentRoute } from "@/react/router/use-current-route";
@@ -90,6 +92,12 @@ function useSidebarItems(): SidebarItem[] {
         title: t("sidebar.channels"),
         icon: MessageCircle,
         name: CHANNEL_ROUTE_LIST,
+        type: "route",
+      },
+      {
+        title: t("sidebar.settings"),
+        icon: Settings,
+        name: SETTINGS_ROUTE,
         type: "route",
       },
     ],

@@ -35,21 +35,23 @@ const (
 	SettingName_PASSWORD_RESTRICTION        SettingName = 7
 	SettingName_ENVIRONMENT                 SettingName = 8
 	SettingName_AGENT_SECURITY              SettingName = 9
+	SettingName_S3_CONFIG                   SettingName = 10
 )
 
 // Enum value maps for SettingName.
 var (
 	SettingName_name = map[int32]string{
-		0: "SETTING_NAME_UNSPECIFIED",
-		1: "AUTH_SECRET",
-		2: "BRANDING_LOGO",
-		3: "WORKSPACE_ID",
-		4: "WORKSPACE_PROFILE",
-		5: "WORKSPACE_APPROVAL",
-		6: "WORKSPACE_EXTERNAL_APPROVAL",
-		7: "PASSWORD_RESTRICTION",
-		8: "ENVIRONMENT",
-		9: "AGENT_SECURITY",
+		0:  "SETTING_NAME_UNSPECIFIED",
+		1:  "AUTH_SECRET",
+		2:  "BRANDING_LOGO",
+		3:  "WORKSPACE_ID",
+		4:  "WORKSPACE_PROFILE",
+		5:  "WORKSPACE_APPROVAL",
+		6:  "WORKSPACE_EXTERNAL_APPROVAL",
+		7:  "PASSWORD_RESTRICTION",
+		8:  "ENVIRONMENT",
+		9:  "AGENT_SECURITY",
+		10: "S3_CONFIG",
 	}
 	SettingName_value = map[string]int32{
 		"SETTING_NAME_UNSPECIFIED":    0,
@@ -62,6 +64,7 @@ var (
 		"PASSWORD_RESTRICTION":        7,
 		"ENVIRONMENT":                 8,
 		"AGENT_SECURITY":              9,
+		"S3_CONFIG":                   10,
 	}
 )
 
@@ -522,6 +525,112 @@ func (x *AgentSecuritySetting) GetConnectRateLimitPerMinute() int32 {
 	return 0
 }
 
+// S3ConfigSetting holds the connection details for the object storage used to
+// back file upload/download. When endpoint and bucket are both empty, S3 is
+// considered unconfigured and upload/download endpoints reject with
+// "s3 not configured".
+type S3ConfigSetting struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// S3-compatible endpoint URL, e.g. "https://s3.amazonaws.com" or a MinIO
+	// endpoint. Empty for AWS defaults.
+	Endpoint string `protobuf:"bytes,1,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	// AWS region, e.g. "us-east-1".
+	Region string `protobuf:"bytes,2,opt,name=region,proto3" json:"region,omitempty"`
+	// Bucket name.
+	Bucket string `protobuf:"bytes,3,opt,name=bucket,proto3" json:"bucket,omitempty"`
+	// Static access key id.
+	AccessKey string `protobuf:"bytes,4,opt,name=access_key,json=accessKey,proto3" json:"access_key,omitempty"`
+	// Static secret access key. Stored as plaintext in the setting row (same
+	// mechanism as AUTH_SECRET); masked on read.
+	SecretKey string `protobuf:"bytes,5,opt,name=secret_key,json=secretKey,proto3" json:"secret_key,omitempty"`
+	// Use path-style addressing (required for MinIO and many S3-compatible
+	// stores; false for AWS virtual-host style).
+	ForcePathStyle bool `protobuf:"varint,6,opt,name=force_path_style,json=forcePathStyle,proto3" json:"force_path_style,omitempty"`
+	// Whether the endpoint uses TLS. Only meaningful when endpoint is set.
+	UseSsl        bool `protobuf:"varint,7,opt,name=use_ssl,json=useSsl,proto3" json:"use_ssl,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *S3ConfigSetting) Reset() {
+	*x = S3ConfigSetting{}
+	mi := &file_store_setting_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *S3ConfigSetting) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*S3ConfigSetting) ProtoMessage() {}
+
+func (x *S3ConfigSetting) ProtoReflect() protoreflect.Message {
+	mi := &file_store_setting_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use S3ConfigSetting.ProtoReflect.Descriptor instead.
+func (*S3ConfigSetting) Descriptor() ([]byte, []int) {
+	return file_store_setting_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *S3ConfigSetting) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *S3ConfigSetting) GetRegion() string {
+	if x != nil {
+		return x.Region
+	}
+	return ""
+}
+
+func (x *S3ConfigSetting) GetBucket() string {
+	if x != nil {
+		return x.Bucket
+	}
+	return ""
+}
+
+func (x *S3ConfigSetting) GetAccessKey() string {
+	if x != nil {
+		return x.AccessKey
+	}
+	return ""
+}
+
+func (x *S3ConfigSetting) GetSecretKey() string {
+	if x != nil {
+		return x.SecretKey
+	}
+	return ""
+}
+
+func (x *S3ConfigSetting) GetForcePathStyle() bool {
+	if x != nil {
+		return x.ForcePathStyle
+	}
+	return false
+}
+
+func (x *S3ConfigSetting) GetUseSsl() bool {
+	if x != nil {
+		return x.UseSsl
+	}
+	return false
+}
+
 type EnvironmentSetting_Environment struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -534,7 +643,7 @@ type EnvironmentSetting_Environment struct {
 
 func (x *EnvironmentSetting_Environment) Reset() {
 	*x = EnvironmentSetting_Environment{}
-	mi := &file_store_setting_proto_msgTypes[4]
+	mi := &file_store_setting_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -546,7 +655,7 @@ func (x *EnvironmentSetting_Environment) String() string {
 func (*EnvironmentSetting_Environment) ProtoMessage() {}
 
 func (x *EnvironmentSetting_Environment) ProtoReflect() protoreflect.Message {
-	mi := &file_store_setting_proto_msgTypes[4]
+	mi := &file_store_setting_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -634,7 +743,17 @@ const file_store_setting_proto_rawDesc = "" +
 	"\x17max_concurrent_sessions\x18\x06 \x01(\x05R\x15maxConcurrentSessions\x12R\n" +
 	"\x14ip_validation_policy\x18\a \x01(\x0e2 .laelia.store.IPValidationPolicyR\x12ipValidationPolicy\x12D\n" +
 	"\x1fheartbeat_rate_limit_per_minute\x18\b \x01(\x05R\x1bheartbeatRateLimitPerMinute\x12@\n" +
-	"\x1dconnect_rate_limit_per_minute\x18\t \x01(\x05R\x19connectRateLimitPerMinute*\xf0\x01\n" +
+	"\x1dconnect_rate_limit_per_minute\x18\t \x01(\x05R\x19connectRateLimitPerMinute\"\xde\x01\n" +
+	"\x0fS3ConfigSetting\x12\x1a\n" +
+	"\bendpoint\x18\x01 \x01(\tR\bendpoint\x12\x16\n" +
+	"\x06region\x18\x02 \x01(\tR\x06region\x12\x16\n" +
+	"\x06bucket\x18\x03 \x01(\tR\x06bucket\x12\x1d\n" +
+	"\n" +
+	"access_key\x18\x04 \x01(\tR\taccessKey\x12\x1d\n" +
+	"\n" +
+	"secret_key\x18\x05 \x01(\tR\tsecretKey\x12(\n" +
+	"\x10force_path_style\x18\x06 \x01(\bR\x0eforcePathStyle\x12\x17\n" +
+	"\ause_ssl\x18\a \x01(\bR\x06useSsl*\xff\x01\n" +
 	"\vSettingName\x12\x1c\n" +
 	"\x18SETTING_NAME_UNSPECIFIED\x10\x00\x12\x0f\n" +
 	"\vAUTH_SECRET\x10\x01\x12\x11\n" +
@@ -645,12 +764,14 @@ const file_store_setting_proto_rawDesc = "" +
 	"\x1bWORKSPACE_EXTERNAL_APPROVAL\x10\x06\x12\x18\n" +
 	"\x14PASSWORD_RESTRICTION\x10\a\x12\x0f\n" +
 	"\vENVIRONMENT\x10\b\x12\x12\n" +
-	"\x0eAGENT_SECURITY\x10\t*\x83\x01\n" +
+	"\x0eAGENT_SECURITY\x10\t\x12\r\n" +
+	"\tS3_CONFIG\x10\n" +
+	"*\x83\x01\n" +
 	"\x12IPValidationPolicy\x12$\n" +
 	" IP_VALIDATION_POLICY_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11IP_VALIDATION_OFF\x10\x01\x12\x16\n" +
 	"\x12IP_VALIDATION_WARN\x10\x02\x12\x18\n" +
-	"\x14IP_VALIDATION_STRICT\x10\x03B\x14Z\x12generated-go/storeb\x06proto3"
+	"\x14IP_VALIDATION_STRICT\x10\x03B4Z2github.com/Ranxy/laelia/backend/generated-go/storeb\x06proto3"
 
 var (
 	file_store_setting_proto_rawDescOnce sync.Once
@@ -665,7 +786,7 @@ func file_store_setting_proto_rawDescGZIP() []byte {
 }
 
 var file_store_setting_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_store_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_store_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_store_setting_proto_goTypes = []any{
 	(SettingName)(0),                       // 0: laelia.store.SettingName
 	(IPValidationPolicy)(0),                // 1: laelia.store.IPValidationPolicy
@@ -673,20 +794,21 @@ var file_store_setting_proto_goTypes = []any{
 	(*PasswordRestrictionSetting)(nil),     // 3: laelia.store.PasswordRestrictionSetting
 	(*EnvironmentSetting)(nil),             // 4: laelia.store.EnvironmentSetting
 	(*AgentSecuritySetting)(nil),           // 5: laelia.store.AgentSecuritySetting
-	(*EnvironmentSetting_Environment)(nil), // 6: laelia.store.EnvironmentSetting.Environment
-	nil,                                    // 7: laelia.store.EnvironmentSetting.Environment.TagsEntry
-	(*durationpb.Duration)(nil),            // 8: google.protobuf.Duration
+	(*S3ConfigSetting)(nil),                // 6: laelia.store.S3ConfigSetting
+	(*EnvironmentSetting_Environment)(nil), // 7: laelia.store.EnvironmentSetting.Environment
+	nil,                                    // 8: laelia.store.EnvironmentSetting.Environment.TagsEntry
+	(*durationpb.Duration)(nil),            // 9: google.protobuf.Duration
 }
 var file_store_setting_proto_depIdxs = []int32{
-	8, // 0: laelia.store.WorkspaceProfileSetting.token_duration:type_name -> google.protobuf.Duration
-	8, // 1: laelia.store.WorkspaceProfileSetting.maximum_role_expiration:type_name -> google.protobuf.Duration
-	8, // 2: laelia.store.PasswordRestrictionSetting.password_rotation:type_name -> google.protobuf.Duration
-	6, // 3: laelia.store.EnvironmentSetting.environments:type_name -> laelia.store.EnvironmentSetting.Environment
-	8, // 4: laelia.store.AgentSecuritySetting.bootstrap_token_duration:type_name -> google.protobuf.Duration
-	8, // 5: laelia.store.AgentSecuritySetting.access_token_duration:type_name -> google.protobuf.Duration
-	8, // 6: laelia.store.AgentSecuritySetting.refresh_token_duration:type_name -> google.protobuf.Duration
+	9, // 0: laelia.store.WorkspaceProfileSetting.token_duration:type_name -> google.protobuf.Duration
+	9, // 1: laelia.store.WorkspaceProfileSetting.maximum_role_expiration:type_name -> google.protobuf.Duration
+	9, // 2: laelia.store.PasswordRestrictionSetting.password_rotation:type_name -> google.protobuf.Duration
+	7, // 3: laelia.store.EnvironmentSetting.environments:type_name -> laelia.store.EnvironmentSetting.Environment
+	9, // 4: laelia.store.AgentSecuritySetting.bootstrap_token_duration:type_name -> google.protobuf.Duration
+	9, // 5: laelia.store.AgentSecuritySetting.access_token_duration:type_name -> google.protobuf.Duration
+	9, // 6: laelia.store.AgentSecuritySetting.refresh_token_duration:type_name -> google.protobuf.Duration
 	1, // 7: laelia.store.AgentSecuritySetting.ip_validation_policy:type_name -> laelia.store.IPValidationPolicy
-	7, // 8: laelia.store.EnvironmentSetting.Environment.tags:type_name -> laelia.store.EnvironmentSetting.Environment.TagsEntry
+	8, // 8: laelia.store.EnvironmentSetting.Environment.tags:type_name -> laelia.store.EnvironmentSetting.Environment.TagsEntry
 	9, // [9:9] is the sub-list for method output_type
 	9, // [9:9] is the sub-list for method input_type
 	9, // [9:9] is the sub-list for extension type_name
@@ -705,7 +827,7 @@ func file_store_setting_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_store_setting_proto_rawDesc), len(file_store_setting_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

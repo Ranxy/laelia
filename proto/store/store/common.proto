@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package laelia.store;
 
-option go_package = "generated-go/store";
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/store";
 
 // Used internally for obfuscating the page token.
 message PageToken {

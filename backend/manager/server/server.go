@@ -14,6 +14,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/common/log"
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
+	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -38,6 +39,10 @@ type Server struct {
 
 	// stateCfg is the shared in-momory state within the server.
 	stateCfg *state.State
+
+	// s3clientManager is the shared S3 client used by the CommandService file RPCs and
+	// the SettingService.
+	s3clientManager *s3client.Client
 
 	// boot specifies that whether the server boot correctly
 	cancel context.CancelFunc
@@ -75,6 +80,8 @@ func NewServer(ctx context.Context, profile *config.Profile) (*Server, error) {
 	}
 	s.stateCfg = stateCfg
 
+	s.s3clientManager = s3client.New(stores)
+
 	if err := s.initializeSetting(ctx); err != nil {
 		return nil, errors.Wrap(err, "failed to init config")
 	}
@@ -86,7 +93,7 @@ func NewServer(ctx context.Context, profile *config.Profile) (*Server, error) {
 		return nil, errors.Wrapf(err, "failed to get secret")
 	}
 
-	if err := configureGrpcRouters(ctx, s.echoServer, s.store, secret, s.profile, s.stateCfg); err != nil {
+	if err := configureGrpcRouters(ctx, s.echoServer, s.store, secret, s.profile, s.stateCfg, s.s3clientManager); err != nil {
 		return nil, errors.Wrapf(err, "failed to configure gRPC routers")
 	}
 

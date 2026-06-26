@@ -91,6 +91,7 @@
     - [AgentActivity](#laelia-v1-AgentActivity)
     - [AgentReady](#laelia-v1-AgentReady)
     - [AgentStreamMessage](#laelia-v1-AgentStreamMessage)
+    - [Attachment](#laelia-v1-Attachment)
     - [BeginSession](#laelia-v1-BeginSession)
     - [BeginSessionResponse](#laelia-v1-BeginSessionResponse)
     - [CancelCommandRequest](#laelia-v1-CancelCommandRequest)
@@ -111,8 +112,11 @@
     - [CreateChannelRequest](#laelia-v1-CreateChannelRequest)
     - [DeleteChannelRequest](#laelia-v1-DeleteChannelRequest)
     - [DiffEmittedPayload](#laelia-v1-DiffEmittedPayload)
+    - [DownloadFileRequest](#laelia-v1-DownloadFileRequest)
+    - [DownloadFileResponse](#laelia-v1-DownloadFileResponse)
     - [FetchConversationActivityRequest](#laelia-v1-FetchConversationActivityRequest)
     - [FetchConversationActivityResponse](#laelia-v1-FetchConversationActivityResponse)
+    - [File](#laelia-v1-File)
     - [FinalSummaryPayload](#laelia-v1-FinalSummaryPayload)
     - [GetChannelRequest](#laelia-v1-GetChannelRequest)
     - [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest)
@@ -131,6 +135,8 @@
     - [ListCommandsResponse](#laelia-v1-ListCommandsResponse)
     - [ListConversationMessagesRequest](#laelia-v1-ListConversationMessagesRequest)
     - [ListConversationMessagesResponse](#laelia-v1-ListConversationMessagesResponse)
+    - [ListFilesRequest](#laelia-v1-ListFilesRequest)
+    - [ListFilesResponse](#laelia-v1-ListFilesResponse)
     - [ManagerStreamMessage](#laelia-v1-ManagerStreamMessage)
     - [Mention](#laelia-v1-Mention)
     - [NewMessagesAvailable](#laelia-v1-NewMessagesAvailable)
@@ -153,6 +159,7 @@
     - [ToolCallFinishedPayload](#laelia-v1-ToolCallFinishedPayload)
     - [ToolCallStartedPayload](#laelia-v1-ToolCallStartedPayload)
     - [UpdateChannelRequest](#laelia-v1-UpdateChannelRequest)
+    - [UploadFileRequest](#laelia-v1-UploadFileRequest)
     - [WarningPayload](#laelia-v1-WarningPayload)
     - [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest)
     - [WatchCommandRequest](#laelia-v1-WatchCommandRequest)
@@ -164,6 +171,14 @@
   
     - [AgentStreamService](#laelia-v1-AgentStreamService)
     - [CommandService](#laelia-v1-CommandService)
+  
+- [v1/setting.proto](#v1_setting-proto)
+    - [GetS3ConfigRequest](#laelia-v1-GetS3ConfigRequest)
+    - [GetS3ConfigResponse](#laelia-v1-GetS3ConfigResponse)
+    - [UpdateS3ConfigRequest](#laelia-v1-UpdateS3ConfigRequest)
+    - [UpdateS3ConfigResponse](#laelia-v1-UpdateS3ConfigResponse)
+  
+    - [SettingService](#laelia-v1-SettingService)
   
 - [Scalar Value Types](#scalar-value-types)
 
@@ -1380,6 +1395,25 @@ frontend can associate execution events with the channel.
 
 
 
+<a name="laelia-v1-Attachment"></a>
+
+### Attachment
+Attachment references a file stored in S3 that is attached to a chat message.
+The id is the file row uuid and doubles as the download key (/v1/files/{id}).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| id | [string](#string) |  |  |
+| name | [string](#string) |  |  |
+| mime_type | [string](#string) |  |  |
+| size_bytes | [int64](#int64) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-BeginSession"></a>
 
 ### BeginSession
@@ -1521,6 +1555,7 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | room_version | [int64](#int64) |  | room_version is the conversation.version at the time this message was created. Agents use it together with their per-channel cursor (managed via the ListChannelUpdates / AckProcessedVersion RPCs) to track progress into the conversation. |
 | mentions | [Mention](#laelia-v1-Mention) | repeated |  |
 | is_own | [bool](#bool) |  | is_own is true when this message was sent by the calling agent itself. It is caller-relative (computed by the manager from the authenticated agent vs the message&#39;s sender_agent_id) so an agent can recognize its own past messages as context-only and avoid replying to itself. |
+| attachments | [Attachment](#laelia-v1-Attachment) | repeated |  |
 
 
 
@@ -1775,6 +1810,37 @@ room_version greater than the agent&#39;s processed_version for that channel.
 
 
 
+<a name="laelia-v1-DownloadFileRequest"></a>
+
+### DownloadFileRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-DownloadFileResponse"></a>
+
+### DownloadFileResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| file | [File](#laelia-v1-File) |  |  |
+| data | [bytes](#bytes) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-FetchConversationActivityRequest"></a>
 
 ### FetchConversationActivityRequest
@@ -1801,6 +1867,28 @@ status in the channel header.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | activities | [AgentActivity](#laelia-v1-AgentActivity) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-File"></a>
+
+### File
+File is the persisted metadata for an S3-backed object.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| id | [string](#string) |  |  |
+| conversation | [string](#string) |  |  |
+| uploader_principal_id | [string](#string) |  |  |
+| original_name | [string](#string) |  |  |
+| mime_type | [string](#string) |  |  |
+| size_bytes | [int64](#int64) |  |  |
+| s3_key | [string](#string) |  |  |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 
 
 
@@ -2092,6 +2180,36 @@ drain loop. The agent identity is resolved from the auth context.
 
 
 
+<a name="laelia-v1-ListFilesRequest"></a>
+
+### ListFilesRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListFilesResponse"></a>
+
+### ListFilesResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| files | [File](#laelia-v1-File) | repeated |  |
+
+
+
+
+
+
 <a name="laelia-v1-ManagerStreamMessage"></a>
 
 ### ManagerStreamMessage
@@ -2279,6 +2397,7 @@ calling ListChannelUpdates, which compares conversation.version to the cursor.
 | content | [string](#string) |  |  |
 | base_version | [int64](#int64) |  |  |
 | command_id | [string](#string) |  |  |
+| attachments | [Attachment](#laelia-v1-Attachment) | repeated |  |
 
 
 
@@ -2400,6 +2519,7 @@ calling ListChannelUpdates, which compares conversation.version to the cursor.
 | conversation | [string](#string) |  |  |
 | content | [string](#string) |  |  |
 | mentions | [Mention](#laelia-v1-Mention) | repeated |  |
+| attachments | [Attachment](#laelia-v1-Attachment) | repeated |  |
 
 
 
@@ -2464,6 +2584,24 @@ calling ListChannelUpdates, which compares conversation.version to the cursor.
 | ----- | ---- | ----- | ----------- |
 | conversation | [Conversation](#laelia-v1-Conversation) |  |  |
 | update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UploadFileRequest"></a>
+
+### UploadFileRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| original_name | [string](#string) |  |  |
+| mime_type | [string](#string) |  |  |
+| data | [bytes](#bytes) |  |  |
 
 
 
@@ -2635,6 +2773,94 @@ names).
 | ListChannelUpdates | [ListChannelUpdatesRequest](#laelia-v1-ListChannelUpdatesRequest) | [ListChannelUpdatesResponse](#laelia-v1-ListChannelUpdatesResponse) |  |
 | AckProcessedVersion | [AckProcessedVersionRequest](#laelia-v1-AckProcessedVersionRequest) | [AckProcessedVersionResponse](#laelia-v1-AckProcessedVersionResponse) |  |
 | FetchConversationActivity | [FetchConversationActivityRequest](#laelia-v1-FetchConversationActivityRequest) | [FetchConversationActivityResponse](#laelia-v1-FetchConversationActivityResponse) |  |
+| UploadFile | [UploadFileRequest](#laelia-v1-UploadFileRequest) | [File](#laelia-v1-File) | UploadFile stores data in S3 and persists a file row. Intended for the agent daemon (browser uploads go through the Echo multipart route). No google.api.http annotation: the agent reaches it via Connect-JSON over the CommandServiceClient, and avoiding a /v1/files/{id} gateway entry keeps it from colliding with the browser download route. |
+| DownloadFile | [DownloadFileRequest](#laelia-v1-DownloadFileRequest) | [DownloadFileResponse](#laelia-v1-DownloadFileResponse) | DownloadFile fetches a file&#39;s bytes from S3. The caller must be a member of the file&#39;s conversation. Used by the agent daemon; browser downloads go through the Echo route. |
+| ListFiles | [ListFilesRequest](#laelia-v1-ListFilesRequest) | [ListFilesResponse](#laelia-v1-ListFilesResponse) | ListFiles returns the files attached to a conversation. The caller must be a member. |
+
+ 
+
+
+
+<a name="v1_setting-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/setting.proto
+
+
+
+<a name="laelia-v1-GetS3ConfigRequest"></a>
+
+### GetS3ConfigRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-GetS3ConfigResponse"></a>
+
+### GetS3ConfigResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| config | [laelia.store.S3ConfigSetting](#laelia-store-S3ConfigSetting) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateS3ConfigRequest"></a>
+
+### UpdateS3ConfigRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| config | [laelia.store.S3ConfigSetting](#laelia-store-S3ConfigSetting) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateS3ConfigResponse"></a>
+
+### UpdateS3ConfigResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| config | [laelia.store.S3ConfigSetting](#laelia-store-S3ConfigSetting) |  |  |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="laelia-v1-SettingService"></a>
+
+### SettingService
+SettingService exposes workspace-level configuration. It is admin-only; the
+handlers enforce workspace admin membership and return
+connect.CodePermissionDenied otherwise. The S3 secret_key is masked on read;
+an update carrying a masked secret preserves the stored value.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetS3Config | [GetS3ConfigRequest](#laelia-v1-GetS3ConfigRequest) | [GetS3ConfigResponse](#laelia-v1-GetS3ConfigResponse) |  |
+| UpdateS3Config | [UpdateS3ConfigRequest](#laelia-v1-UpdateS3ConfigRequest) | [UpdateS3ConfigResponse](#laelia-v1-UpdateS3ConfigResponse) |  |
 
  
 
