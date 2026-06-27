@@ -30,6 +30,8 @@ message UpdateS3ConfigResponse {
 service SettingService {
   rpc GetS3Config(GetS3ConfigRequest) returns (GetS3ConfigResponse) {
     option (google.api.http) = {get: "/v1/s3Config"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.settings.get";
   }
 
   rpc UpdateS3Config(UpdateS3ConfigRequest) returns (UpdateS3ConfigResponse) {
@@ -37,6 +39,8 @@ service SettingService {
       patch: "/v1/s3Config"
       body: "config"
     };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.settings.update";
     option (laelia.v1.audit) = true;
   }
 }

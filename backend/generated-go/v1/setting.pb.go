@@ -202,10 +202,10 @@ const file_v1_setting_proto_rawDesc = "" +
 	"\x15UpdateS3ConfigRequest\x12:\n" +
 	"\x06config\x18\x01 \x01(\v2\x1d.laelia.store.S3ConfigSettingB\x03\xe0A\x02R\x06config\"O\n" +
 	"\x16UpdateS3ConfigResponse\x125\n" +
-	"\x06config\x18\x01 \x01(\v2\x1d.laelia.store.S3ConfigSettingR\x06config2\xed\x01\n" +
-	"\x0eSettingService\x12b\n" +
-	"\vGetS3Config\x12\x1d.laelia.v1.GetS3ConfigRequest\x1a\x1e.laelia.v1.GetS3ConfigResponse\"\x14\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/s3Config\x12w\n" +
-	"\x0eUpdateS3Config\x12 .laelia.v1.UpdateS3ConfigRequest\x1a!.laelia.v1.UpdateS3ConfigResponse\" \x98\xea0\x01\x82\xd3\xe4\x93\x02\x16:\x06config2\f/v1/s3ConfigB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"\x06config\x18\x01 \x01(\v2\x1d.laelia.store.S3ConfigSettingR\x06config2\xa7\x02\n" +
+	"\x0eSettingService\x12}\n" +
+	"\vGetS3Config\x12\x1d.laelia.v1.GetS3ConfigRequest\x1a\x1e.laelia.v1.GetS3ConfigResponse\"/\x8a\xea0\x13laelia.settings.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/s3Config\x12\x95\x01\n" +
+	"\x0eUpdateS3Config\x12 .laelia.v1.UpdateS3ConfigRequest\x1a!.laelia.v1.UpdateS3ConfigResponse\">\x8a\xea0\x16laelia.settings.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x16:\x06config2\f/v1/s3ConfigB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_setting_proto_rawDescOnce sync.Once

@@ -5806,37 +5806,37 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x14PERMISSION_REQUESTED\x10\t\x12\x18\n" +
 	"\x14PERMISSION_TIMED_OUT\x10\n" +
 	"\x12\x16\n" +
-	"\x12PERMISSION_DECIDED\x10\v2\xb6\x1a\n" +
-	"\x0eCommandService\x12v\n" +
-	"\fListCommands\x12\x1e.laelia.v1.ListCommandsRequest\x1a\x1f.laelia.v1.ListCommandsResponse\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/v1/{agent=agents/*}/commands\x12f\n" +
+	"\x12PERMISSION_DECIDED\x10\v2\xa2 \n" +
+	"\x0eCommandService\x12\x91\x01\n" +
+	"\fListCommands\x12\x1e.laelia.v1.ListCommandsRequest\x1a\x1f.laelia.v1.ListCommandsResponse\"@\x8a\xea0\x13laelia.commands.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1f\x12\x1d/v1/{agent=agents/*}/commands\x12\x81\x01\n" +
 	"\n" +
-	"GetCommand\x12\x1c.laelia.v1.GetCommandRequest\x1a\x12.laelia.v1.Command\"&\x82\xd3\xe4\x93\x02 \x12\x1e/v1/{name=agents/*/commands/*}\x12z\n" +
-	"\rCancelCommand\x12\x1f.laelia.v1.CancelCommandRequest\x1a\x12.laelia.v1.Command\"4\x98\xea0\x01\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=agents/*/commands/*}:cancel\x12x\n" +
-	"\fWatchCommand\x12\x1e.laelia.v1.WatchCommandRequest\x1a\x18.laelia.v1.CommandOutput\",\x82\xd3\xe4\x93\x02&\x12$/v1/{name=agents/*/commands/*}:watch0\x01\x12\x89\x01\n" +
-	"\x12WatchCommandEvents\x12$.laelia.v1.WatchCommandEventsRequest\x1a\x17.laelia.v1.CommandEvent\"2\x82\xd3\xe4\x93\x02,\x12*/v1/{name=agents/*/commands/*}:watchEvents0\x01\x12\x91\x01\n" +
-	"\x11RespondPermission\x12#.laelia.v1.RespondPermissionRequest\x1a\x16.google.protobuf.Empty\"?\x98\xea0\x01\x82\xd3\xe4\x93\x025:\x01*\"0/v1/{name=agents/*/commands/*}:respondPermission\x12\x89\x01\n" +
-	"\x11SearchChatHistory\x12#.laelia.v1.SearchChatHistoryRequest\x1a$.laelia.v1.SearchChatHistoryResponse\")\x82\xd3\xe4\x93\x02#\x12!/v1/{agent=agents/*}/chat-history\x12\x8e\x01\n" +
-	"\x11GetCommandContext\x12#.laelia.v1.GetCommandContextRequest\x1a$.laelia.v1.GetCommandContextResponse\".\x82\xd3\xe4\x93\x02(\x12&/v1/{name=agents/*/commands/*}/context\x12\x9c\x01\n" +
-	"\x17GetOrCreateConversation\x12).laelia.v1.GetOrCreateConversationRequest\x1a*.laelia.v1.GetOrCreateConversationResponse\"*\x82\xd3\xe4\x93\x02$\"\"/v1/{agent=agents/*}/conversations\x12\xa8\x01\n" +
-	"\x18ListConversationMessages\x12*.laelia.v1.ListConversationMessagesRequest\x1a+.laelia.v1.ListConversationMessagesResponse\"3\x82\xd3\xe4\x93\x02-\x12+/v1/{conversation=conversations/*}/messages\x12f\n" +
-	"\rCreateChannel\x12\x1f.laelia.v1.CreateChannelRequest\x1a\x17.laelia.v1.Conversation\"\x1b\x98\xea0\x01\x82\xd3\xe4\x93\x02\x11:\x01*\"\f/v1/channels\x12e\n" +
-	"\fListChannels\x12\x1e.laelia.v1.ListChannelsRequest\x1a\x1f.laelia.v1.ListChannelsResponse\"\x14\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/channels\x12g\n" +
+	"GetCommand\x12\x1c.laelia.v1.GetCommandRequest\x1a\x12.laelia.v1.Command\"A\x8a\xea0\x13laelia.commands.get\x90\xea0\x01\x82\xd3\xe4\x93\x02 \x12\x1e/v1/{name=agents/*/commands/*}\x12\x98\x01\n" +
+	"\rCancelCommand\x12\x1f.laelia.v1.CancelCommandRequest\x1a\x12.laelia.v1.Command\"R\x8a\xea0\x16laelia.commands.cancel\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=agents/*/commands/*}:cancel\x12\x95\x01\n" +
+	"\fWatchCommand\x12\x1e.laelia.v1.WatchCommandRequest\x1a\x18.laelia.v1.CommandOutput\"I\x8a\xea0\x15laelia.commands.watch\x90\xea0\x01\x82\xd3\xe4\x93\x02&\x12$/v1/{name=agents/*/commands/*}:watch0\x01\x12\xa6\x01\n" +
+	"\x12WatchCommandEvents\x12$.laelia.v1.WatchCommandEventsRequest\x1a\x17.laelia.v1.CommandEvent\"O\x8a\xea0\x15laelia.commands.watch\x90\xea0\x01\x82\xd3\xe4\x93\x02,\x12*/v1/{name=agents/*/commands/*}:watchEvents0\x01\x12\xae\x01\n" +
+	"\x11RespondPermission\x12#.laelia.v1.RespondPermissionRequest\x1a\x16.google.protobuf.Empty\"\\\x8a\xea0\x15laelia.commands.watch\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x025:\x01*\"0/v1/{name=agents/*/commands/*}:respondPermission\x12\xaa\x01\n" +
+	"\x11SearchChatHistory\x12#.laelia.v1.SearchChatHistoryRequest\x1a$.laelia.v1.SearchChatHistoryResponse\"J\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02#\x12!/v1/{agent=agents/*}/chat-history\x12\xab\x01\n" +
+	"\x11GetCommandContext\x12#.laelia.v1.GetCommandContextRequest\x1a$.laelia.v1.GetCommandContextResponse\"K\x8a\xea0\x15laelia.commands.watch\x90\xea0\x01\x82\xd3\xe4\x93\x02(\x12&/v1/{name=agents/*/commands/*}/context\x12\xbf\x01\n" +
+	"\x17GetOrCreateConversation\x12).laelia.v1.GetOrCreateConversationRequest\x1a*.laelia.v1.GetOrCreateConversationResponse\"M\x8a\xea0\x1blaelia.conversations.create\x90\xea0\x01\x82\xd3\xe4\x93\x02$\"\"/v1/{agent=agents/*}/conversations\x12\xc9\x01\n" +
+	"\x18ListConversationMessages\x12*.laelia.v1.ListConversationMessagesRequest\x1a+.laelia.v1.ListConversationMessagesResponse\"T\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02-\x12+/v1/{conversation=conversations/*}/messages\x12\x89\x01\n" +
+	"\rCreateChannel\x12\x1f.laelia.v1.CreateChannelRequest\x1a\x17.laelia.v1.Conversation\">\x8a\xea0\x1blaelia.conversations.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x11:\x01*\"\f/v1/channels\x12\x86\x01\n" +
+	"\fListChannels\x12\x1e.laelia.v1.ListChannelsRequest\x1a\x1f.laelia.v1.ListChannelsResponse\"5\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/channels\x12\x88\x01\n" +
 	"\n" +
-	"GetChannel\x12\x1c.laelia.v1.GetChannelRequest\x1a\x17.laelia.v1.Conversation\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/v1/{name=conversations/*}\x12\x8c\x01\n" +
-	"\rUpdateChannel\x12\x1f.laelia.v1.UpdateChannelRequest\x1a\x17.laelia.v1.Conversation\"A\x98\xea0\x01\x82\xd3\xe4\x93\x027:\fconversation2'/v1/{conversation.name=conversations/*}\x12p\n" +
-	"\rDeleteChannel\x12\x1f.laelia.v1.DeleteChannelRequest\x1a\x16.google.protobuf.Empty\"&\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1c*\x1a/v1/{name=conversations/*}\x12\x8b\x01\n" +
-	"\x10AddChannelMember\x12\".laelia.v1.AddChannelMemberRequest\x1a\x18.laelia.v1.ChannelMember\"9\x98\xea0\x01\x82\xd3\xe4\x93\x02/:\x01*\"*/v1/{conversation=conversations/*}/members\x12\x98\x01\n" +
-	"\x13RemoveChannelMember\x12%.laelia.v1.RemoveChannelMemberRequest\x1a\x16.google.protobuf.Empty\"B\x98\xea0\x01\x82\xd3\xe4\x93\x028*6/v1/{conversation=conversations/*}/members/{member_id}\x12\x95\x01\n" +
-	"\x12ListChannelMembers\x12$.laelia.v1.ListChannelMembersRequest\x1a%.laelia.v1.ListChannelMembersResponse\"2\x82\xd3\xe4\x93\x02,\x12*/v1/{conversation=conversations/*}/members\x12\x85\x01\n" +
-	"\vSendMessage\x12\x1d.laelia.v1.SendMessageRequest\x1a\x16.laelia.v1.ChatMessage\"?\x98\xea0\x01\x82\xd3\xe4\x93\x025:\x01*\"0/v1/{conversation=conversations/*}/messages:send\x12\x87\x01\n" +
+	"GetChannel\x12\x1c.laelia.v1.GetChannelRequest\x1a\x17.laelia.v1.Conversation\"C\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1c\x12\x1a/v1/{name=conversations/*}\x12\xaf\x01\n" +
+	"\rUpdateChannel\x12\x1f.laelia.v1.UpdateChannelRequest\x1a\x17.laelia.v1.Conversation\"d\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x027:\fconversation2'/v1/{conversation.name=conversations/*}\x12\x93\x01\n" +
+	"\rDeleteChannel\x12\x1f.laelia.v1.DeleteChannelRequest\x1a\x16.google.protobuf.Empty\"I\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1c*\x1a/v1/{name=conversations/*}\x12\xae\x01\n" +
+	"\x10AddChannelMember\x12\".laelia.v1.AddChannelMemberRequest\x1a\x18.laelia.v1.ChannelMember\"\\\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02/:\x01*\"*/v1/{conversation=conversations/*}/members\x12\xbb\x01\n" +
+	"\x13RemoveChannelMember\x12%.laelia.v1.RemoveChannelMemberRequest\x1a\x16.google.protobuf.Empty\"e\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x028*6/v1/{conversation=conversations/*}/members/{member_id}\x12\xb6\x01\n" +
+	"\x12ListChannelMembers\x12$.laelia.v1.ListChannelMembersRequest\x1a%.laelia.v1.ListChannelMembersResponse\"S\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02,\x12*/v1/{conversation=conversations/*}/members\x12\xa6\x01\n" +
+	"\vSendMessage\x12\x1d.laelia.v1.SendMessageRequest\x1a\x16.laelia.v1.ChatMessage\"`\x8a\xea0\x19laelia.conversations.send\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x025:\x01*\"0/v1/{conversation=conversations/*}/messages:send\x12\x87\x01\n" +
 	"\vPostMessage\x12\x1d.laelia.v1.PostMessageRequest\x1a\x1e.laelia.v1.PostMessageResponse\"9\x82\xd3\xe4\x93\x023:\x01*\"./v1/{conversation=conversations/*}:postMessage\x12\x86\x01\n" +
 	"\x12ListChannelUpdates\x12$.laelia.v1.ListChannelUpdatesRequest\x1a%.laelia.v1.ListChannelUpdatesResponse\"#\x82\xd3\xe4\x93\x02\x1d\x12\x1b/v1/agents/-/channelUpdates\x12\xa7\x01\n" +
-	"\x13AckProcessedVersion\x12%.laelia.v1.AckProcessedVersionRequest\x1a&.laelia.v1.AckProcessedVersionResponse\"A\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/{conversation=conversations/*}:ackProcessedVersion\x12\xab\x01\n" +
-	"\x19FetchConversationActivity\x12+.laelia.v1.FetchConversationActivityRequest\x1a,.laelia.v1.FetchConversationActivityResponse\"3\x82\xd3\xe4\x93\x02-\x12+/v1/{conversation=conversations/*}/activity\x12=\n" +
+	"\x13AckProcessedVersion\x12%.laelia.v1.AckProcessedVersionRequest\x1a&.laelia.v1.AckProcessedVersionResponse\"A\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/{conversation=conversations/*}:ackProcessedVersion\x12\xcc\x01\n" +
+	"\x19FetchConversationActivity\x12+.laelia.v1.FetchConversationActivityRequest\x1a,.laelia.v1.FetchConversationActivityResponse\"T\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02-\x12+/v1/{conversation=conversations/*}/activity\x12^\n" +
 	"\n" +
-	"UploadFile\x12\x1c.laelia.v1.UploadFileRequest\x1a\x0f.laelia.v1.File\"\x00\x12Q\n" +
-	"\fDownloadFile\x12\x1e.laelia.v1.DownloadFileRequest\x1a\x1f.laelia.v1.DownloadFileResponse\"\x00\x12H\n" +
-	"\tListFiles\x12\x1b.laelia.v1.ListFilesRequest\x1a\x1c.laelia.v1.ListFilesResponse\"\x002h\n" +
+	"UploadFile\x12\x1c.laelia.v1.UploadFileRequest\x1a\x0f.laelia.v1.File\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x12r\n" +
+	"\fDownloadFile\x12\x1e.laelia.v1.DownloadFileRequest\x1a\x1f.laelia.v1.DownloadFileResponse\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x12i\n" +
+	"\tListFiles\x12\x1b.laelia.v1.ListFilesRequest\x1a\x1c.laelia.v1.ListFilesResponse\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x012h\n" +
 	"\x12AgentStreamService\x12R\n" +
 	"\fAgentChannel\x12\x1d.laelia.v1.AgentStreamMessage\x1a\x1f.laelia.v1.ManagerStreamMessage(\x010\x01B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 

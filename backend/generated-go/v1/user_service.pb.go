@@ -824,19 +824,19 @@ const file_v1_user_service_proto_rawDesc = "" +
 	"\x04USER\x10\x01\x12\x13\n" +
 	"\x0fSERVICE_ACCOUNT\x10\x02\x12\x0e\n" +
 	"\n" +
-	"SYSTEM_BOT\x10\x032\xd0\x06\n" +
+	"SYSTEM_BOT\x10\x032\xa4\a\n" +
 	"\vUserService\x12X\n" +
 	"\aGetUser\x12\x19.laelia.v1.GetUserRequest\x1a\x0f.laelia.v1.User\"!\xdaA\x04name\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/{name=users/*}\x12n\n" +
 	"\rBatchGetUsers\x12\x1f.laelia.v1.BatchGetUsersRequest\x1a .laelia.v1.BatchGetUsersResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/users:batchGet\x12W\n" +
 	"\x0eGetCurrentUser\x12\x16.google.protobuf.Empty\x1a\x0f.laelia.v1.User\"\x1c\x80\xea0\x01\x90\xea0\x02\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/users/me\x12b\n" +
 	"\tListUsers\x12\x1b.laelia.v1.ListUsersRequest\x1a\x1c.laelia.v1.ListUsersResponse\"\x1a\xdaA\x06parent\x82\xd3\xe4\x93\x02\v\x12\t/v1/users\x12g\n" +
 	"\n" +
-	"CreateUser\x12\x1c.laelia.v1.CreateUserRequest\x1a\x0f.laelia.v1.User\"*\xdaA\x04user\x80\xea0\x01\x90\xea0\x02\x98\xea0\x01\x82\xd3\xe4\x93\x02\x11:\x04user\"\t/v1/users\x12y\n" +
+	"CreateUser\x12\x1c.laelia.v1.CreateUserRequest\x1a\x0f.laelia.v1.User\"*\xdaA\x04user\x80\xea0\x01\x90\xea0\x02\x98\xea0\x01\x82\xd3\xe4\x93\x02\x11:\x04user\"\t/v1/users\x12\x94\x01\n" +
 	"\n" +
-	"UpdateUser\x12\x1c.laelia.v1.UpdateUserRequest\x1a\x0f.laelia.v1.User\"<\xdaA\x10user,update_mask\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1f:\x04user2\x17/v1/{user.name=users/*}\x12i\n" +
+	"UpdateUser\x12\x1c.laelia.v1.UpdateUserRequest\x1a\x0f.laelia.v1.User\"W\xdaA\x10user,update_mask\x8a\xea0\x13laelia.users.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1f:\x04user2\x17/v1/{user.name=users/*}\x12\x84\x01\n" +
 	"\n" +
-	"DeleteUser\x12\x1c.laelia.v1.DeleteUserRequest\x1a\x16.google.protobuf.Empty\"%\xdaA\x04name\x98\xea0\x01\x82\xd3\xe4\x93\x02\x14*\x12/v1/{name=users/*}\x12k\n" +
-	"\fUndeleteUser\x12\x1e.laelia.v1.UndeleteUserRequest\x1a\x0f.laelia.v1.User\"*\x98\xea0\x01\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/v1/{name=users/*}:undeleteB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"DeleteUser\x12\x1c.laelia.v1.DeleteUserRequest\x1a\x16.google.protobuf.Empty\"@\xdaA\x04name\x8a\xea0\x13laelia.users.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x14*\x12/v1/{name=users/*}\x12\x86\x01\n" +
+	"\fUndeleteUser\x12\x1e.laelia.v1.UndeleteUserRequest\x1a\x0f.laelia.v1.User\"E\x8a\xea0\x13laelia.users.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/v1/{name=users/*}:undeleteB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_user_service_proto_rawDescOnce sync.Once

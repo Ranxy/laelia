@@ -78,9 +78,9 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 }
 
 func (s *CommandService) GetChannel(ctx context.Context, req *connect.Request[v1pb.GetChannelRequest]) (*connect.Response[v1pb.Conversation], error) {
-	convID, err := parseConversationID(req.Msg.Name)
+	convID, err := requireConversationMember(ctx, s.store, req.Msg.Name)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid channel name"))
+		return nil, err
 	}
 
 	conv, err := s.store.GetConversation(ctx, convID)
@@ -99,6 +99,14 @@ func (s *CommandService) UpdateChannel(ctx context.Context, req *connect.Request
 	convID, err := parseConversationID(conv.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid channel name"))
+	}
+
+	existing, err := s.store.GetConversation(ctx, convID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	if err := requireChannelOwner(ctx, s.store, existing); err != nil {
+		return nil, err
 	}
 
 	if conv.Title == "" {
@@ -122,13 +130,12 @@ func (s *CommandService) DeleteChannel(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid channel name"))
 	}
 
-	user, _ := GetUserFromContext(ctx)
 	conv, err := s.store.GetConversation(ctx, convID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	if user != nil && conv.OwnerID != user.ID {
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only channel owner can delete the channel"))
+	if err := requireChannelOwner(ctx, s.store, conv); err != nil {
+		return nil, err
 	}
 
 	if err := s.store.DeleteChannel(ctx, convID); err != nil {
@@ -144,13 +151,12 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 
-	user, _ := GetUserFromContext(ctx)
 	conv, err := s.store.GetConversation(ctx, convID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	if user != nil && conv.OwnerID != user.ID {
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only channel owner can add members"))
+	if err := requireChannelOwner(ctx, s.store, conv); err != nil {
+		return nil, err
 	}
 
 	memberType := req.Msg.MemberType
@@ -199,13 +205,12 @@ func (s *CommandService) RemoveChannelMember(ctx context.Context, req *connect.R
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 
-	user, _ := GetUserFromContext(ctx)
 	conv, err := s.store.GetConversation(ctx, convID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	if user != nil && conv.OwnerID != user.ID {
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only channel owner can remove members"))
+	if err := requireChannelOwner(ctx, s.store, conv); err != nil {
+		return nil, err
 	}
 
 	memberID := req.Msg.MemberId
@@ -224,9 +229,9 @@ func (s *CommandService) RemoveChannelMember(ctx context.Context, req *connect.R
 }
 
 func (s *CommandService) ListChannelMembers(ctx context.Context, req *connect.Request[v1pb.ListChannelMembersRequest]) (*connect.Response[v1pb.ListChannelMembersResponse], error) {
-	convID, err := parseConversationID(req.Msg.Conversation)
+	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
+		return nil, err
 	}
 
 	members, err := s.store.ListConversationMembers(ctx, convID)
@@ -258,25 +263,23 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 
-	conv, err := s.store.GetConversation(ctx, convID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Wrapf(err, "failed to get conversation"))
+	user, ok := GetUserFromContext(ctx)
+	if !ok || user == nil {
+		// Agents reply via PostMessage; SendMessage is the user-facing path and
+		// must never fall back to the system principal (the previous behavior
+		// let an agent token post as principalID=1 "system").
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("SendMessage is for authenticated users; agents must use PostMessage"))
 	}
-
-	user, _ := GetUserFromContext(ctx)
-	principalID := 1
-	principalName := "system"
-	if user != nil {
-		principalID = user.ID
-		principalName = user.Name
+	if _, err := requireConversationMember(ctx, s.store, req.Msg.Conversation); err != nil {
+		return nil, err
 	}
 
 	// Atomically bump conversation.version and write the user message with that
 	// room_version. This is the single source of truth for the room cursor.
 	msg, _, err := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
 		ConversationID: convID,
-		PrincipalID:    principalID,
-		PrincipalName:  principalName,
+		PrincipalID:    user.ID,
+		PrincipalName:  user.Name,
 		Role:           1, // USER
 		Content:        req.Msg.Content,
 		SenderType:     store.SenderTypeUser,
@@ -292,7 +295,7 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 	// available; each agent's autonomous drain loop then decides whether and
 	// how to respond. (Agents are conversation_member rows of their direct
 	// conversations too, so this covers 1:1 chats.)
-	s.notifyConversationAgents(ctx, conv.ID, msg.RoomVersion, nil)
+	s.notifyConversationAgents(ctx, convID, msg.RoomVersion, nil)
 
 	return connect.NewResponse(&v1pb.ChatMessage{
 		Name:          msg.ID.String(),
@@ -366,9 +369,9 @@ func resolveUserName(ctx context.Context, s *store.Store, principalID int) strin
 // conversation. The frontend polls this to show real-time agent status in the
 // channel header.
 func (s *CommandService) FetchConversationActivity(ctx context.Context, req *connect.Request[v1pb.FetchConversationActivityRequest]) (*connect.Response[v1pb.FetchConversationActivityResponse], error) {
-	convID, err := parseConversationID(req.Msg.Conversation)
+	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation"))
+		return nil, err
 	}
 	activities, err := s.dispatcher.FetchConversationActivity(ctx, convID.String())
 	if err != nil {

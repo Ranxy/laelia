@@ -94,6 +94,9 @@ func (s *CommandService) GetCommand(ctx context.Context, req *connect.Request[v1
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
+	if err := requireCommandAccess(ctx, s.store, cmd); err != nil {
+		return nil, err
+	}
 
 	return connect.NewResponse(convertToV1Command(cmd)), nil
 }
@@ -102,6 +105,9 @@ func (s *CommandService) CancelCommand(ctx context.Context, req *connect.Request
 	cmd, err := s.store.GetCommandByName(ctx, req.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	if err := requireCommandAccess(ctx, s.store, cmd); err != nil {
+		return nil, err
 	}
 
 	if cmd.Status != 1 && cmd.Status != 2 {
@@ -126,6 +132,9 @@ func (s *CommandService) WatchCommand(ctx context.Context, req *connect.Request[
 	cmd, err := s.store.GetCommandByName(ctx, req.Msg.Name)
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
+	}
+	if err := requireCommandAccess(ctx, s.store, cmd); err != nil {
+		return err
 	}
 
 	afterSeq := req.Msg.AfterSeqNo
@@ -177,6 +186,9 @@ func (s *CommandService) WatchCommandEvents(ctx context.Context, req *connect.Re
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
+	if err := requireCommandAccess(ctx, s.store, cmd); err != nil {
+		return err
+	}
 
 	user, _ := GetUserFromContext(ctx)
 	if err := s.validateRawEventAccess(ctx, user); err != nil {
@@ -226,6 +238,9 @@ func (s *CommandService) RespondPermission(ctx context.Context, req *connect.Req
 	}
 	if cmd == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("command %s not found", req.Msg.Name))
+	}
+	if err := requireCommandAccess(ctx, s.store, cmd); err != nil {
+		return nil, err
 	}
 
 	if cmd.Status != 2 {
@@ -415,9 +430,9 @@ func (s *CommandService) validateRawEventAccess(ctx context.Context, user *store
 }
 
 func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Request[v1pb.SearchChatHistoryRequest]) (*connect.Response[v1pb.SearchChatHistoryResponse], error) {
-	convID, err := parseConversationID(req.Msg.Conversation)
+	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation"))
+		return nil, err
 	}
 
 	var since, until *time.Time
@@ -470,6 +485,9 @@ func (s *CommandService) GetCommandContext(ctx context.Context, req *connect.Req
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
+	if err := requireCommandAccess(ctx, s.store, cmd); err != nil {
+		return nil, err
+	}
 
 	outputs, err := s.store.GetCommandOutput(ctx, cmd.ID, 0)
 	if err != nil {
@@ -514,13 +532,15 @@ func (s *CommandService) GetOrCreateConversation(ctx context.Context, req *conne
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", agentResourceID))
 	}
 
-	user, _ := GetUserFromContext(ctx)
-	principalID := 1
-	if user != nil {
-		principalID = user.ID
+	// GetOrCreateConversation starts a direct conversation between the caller
+	// and an agent. It is a user-facing action; an agent token must not create a
+	// direct conversation owned by the system principal.
+	user, ok := GetUserFromContext(ctx)
+	if !ok || user == nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("GetOrCreateConversation is for authenticated users"))
 	}
 
-	conv, err := s.store.GetOrCreateDirectConversation(ctx, agent.ID, principalID)
+	conv, err := s.store.GetOrCreateDirectConversation(ctx, agent.ID, user.ID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get or create conversation"))
 	}
@@ -531,9 +551,9 @@ func (s *CommandService) GetOrCreateConversation(ctx context.Context, req *conne
 }
 
 func (s *CommandService) ListConversationMessages(ctx context.Context, req *connect.Request[v1pb.ListConversationMessagesRequest]) (*connect.Response[v1pb.ListConversationMessagesResponse], error) {
-	convID, err := parseConversationID(req.Msg.Conversation)
+	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation id"))
+		return nil, err
 	}
 	if req.Msg.AfterVersion > 0 && req.Msg.BeforeVersion > 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("after_version and before_version are mutually exclusive"))
@@ -621,6 +641,15 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 	conv, err := s.store.GetConversation(ctx, convUUID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+
+	// An agent may only post to a conversation it is a member of.
+	isMember, err := s.store.IsConversationMember(ctx, convUUID, store.MemberTypeAgent, agent.ResourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check conversation membership"))
+	}
+	if !isMember {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("not a conversation member"))
 	}
 
 	currentVersion := conv.Version

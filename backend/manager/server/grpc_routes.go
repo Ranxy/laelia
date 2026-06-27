@@ -103,6 +103,7 @@ func configureGrpcRouters(
 			rateLimiter,
 			ipValidator,
 			auth.New(stores, secret, stateCfg, profile),
+			apiv1.NewIAMInterceptor(stores),
 			apiv1.NewAuditInterceptor(stores),
 		),
 		// Cap unary request bodies so the bytes-based file upload RPC can't be

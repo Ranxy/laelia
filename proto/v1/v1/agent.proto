@@ -21,20 +21,28 @@ service AgentService {
       post: "/v1/agents"
       body: "agent"
     };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agents.create";
     option (laelia.v1.audit) = true;
   }
 
   rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse) {
     option (google.api.http) = {get: "/v1/agents"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agents.get";
   }
 
   rpc GetAgent(GetAgentRequest) returns (Agent) {
     option (google.api.http) = {get: "/v1/{name=agents/*}"};
     option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agents.get";
   }
 
   rpc DeleteAgent(DeleteAgentRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/v1/{name=agents/*}"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agents.delete";
     option (laelia.v1.audit) = true;
   }
 
@@ -44,6 +52,8 @@ service AgentService {
       post: "/v1/{name=agents/*}:rotateToken"
       body: "*"
     };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agents.rotateToken";
     option (laelia.v1.audit) = true;
   }
 
@@ -53,6 +63,8 @@ service AgentService {
       post: "/v1/{name=agents/*}:revokeToken"
       body: "*"
     };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agents.revokeToken";
     option (laelia.v1.audit) = true;
   }
 
@@ -62,12 +74,16 @@ service AgentService {
       post: "/v1/{name=agents/*}:forceDisconnect"
       body: "*"
     };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agents.forceDisconnect";
     option (laelia.v1.audit) = true;
   }
 
   // List agent sessions
   rpc ListAgentSessions(ListAgentSessionsRequest) returns (ListAgentSessionsResponse) {
     option (google.api.http) = {get: "/v1/{name=agents/*}/sessions"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agents.listSessions";
   }
 
   // Update agent ACP config YAML (admin only)
@@ -76,6 +92,8 @@ service AgentService {
       patch: "/v1/{name=agents/*}:updateAcpConfig"
       body: "*"
     };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agents.updateConfig";
     option (laelia.v1.audit) = true;
   }
 

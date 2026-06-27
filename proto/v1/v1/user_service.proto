@@ -62,6 +62,8 @@ service UserService {
       body: "user"
     };
     option (google.api.method_signature) = "user,update_mask";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.users.update";
     option (laelia.v1.audit) = true;
   }
 
@@ -70,6 +72,8 @@ service UserService {
   rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/v1/{name=users/*}"};
     option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.users.delete";
     option (laelia.v1.audit) = true;
   }
 
@@ -79,6 +83,8 @@ service UserService {
       post: "/v1/{name=users/*}:undelete"
       body: "*"
     };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.users.delete";
     option (laelia.v1.audit) = true;
   }
 }
