@@ -370,6 +370,53 @@ type agentClaimsMessage struct {
 	jwt.RegisteredClaims
 }
 
+// AgentClaims is the verified, exported view of an agent token's claims. It is
+// returned by ParseAgentToken so callers outside the auth package (e.g. the
+// refresh-token handler) can bind token_version / token_type to the operation
+// without re-implementing signature verification.
+type AgentClaims struct {
+	Name         string
+	Subject      string
+	TokenVersion int
+	TokenType    string
+	SessionID    string
+	TokenFamily  string
+}
+
+// ParseAgentToken parses an agent JWT and verifies its HS256 signature against
+// secret. It does NOT enforce token_type or token_version — callers bind those
+// to the operation (refresh expects REFRESH; the version must equal the
+// agent's current TokenVersion). Verifying the signature here means a token
+// minted with a tampered claim set or a rotated/different secret is rejected
+// before the store is consulted, so a refresh token whose version was forged
+// cannot silently "upgrade" to the current token_version via a hash lookup.
+func ParseAgentToken(tokenStr string, secret string) (*AgentClaims, error) {
+	claims := &agentClaimsMessage{}
+	parsed, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
+		if t.Method.Alg() != jwt.SigningMethodHS256.Name {
+			return nil, errs.Errorf("unexpected signing method %v", t.Header["alg"])
+		}
+		if kid, ok := t.Header["kid"].(string); ok && kid == keyID {
+			return []byte(secret), nil
+		}
+		return nil, errs.Errorf("unexpected kid %v", t.Header["kid"])
+	})
+	if err != nil {
+		return nil, errs.Wrap(err, "invalid agent token")
+	}
+	if !parsed.Valid {
+		return nil, errs.New("agent token is invalid")
+	}
+	return &AgentClaims{
+		Name:         claims.Name,
+		Subject:      claims.Subject,
+		TokenVersion: claims.TokenVersion,
+		TokenType:    claims.TokenType,
+		SessionID:    claims.SessionID,
+		TokenFamily:  claims.TokenFamily,
+	}, nil
+}
+
 // GenerateAPIToken generates an API token.
 func GenerateAPIToken(userName string, userID int, mode common.ReleaseMode, secret string) (string, error) {
 	expirationTime := time.Now().Add(apiTokenDuration)

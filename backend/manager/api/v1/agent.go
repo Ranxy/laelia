@@ -208,7 +208,14 @@ func (s *AgentService) RotateAgentToken(ctx context.Context, req *connect.Reques
 	}
 
 	if err := s.store.RevokeAllAgentTokens(ctx, agent.ID); err != nil {
-		slog.Warn("failed to revoke old tokens after rotation", "agent", resourceID, "error", err)
+		// Abort the rotation: leaving old tokens live while minting a new
+		// bootstrap token means a previously-issued (possibly leaked) refresh
+		// token would keep working under the old token_version until it
+		// expired. Failing closed forces the admin to retry and keeps the
+		// "rotation revokes everything" invariant intact. The version bump
+		// above is contained: old refresh tokens embed the prior version and
+		// RefreshAgentToken rejects version mismatches.
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to revoke old tokens during rotation, error: %v", err))
 	}
 
 	tokenHash := hashToken(bootstrapToken)
@@ -336,6 +343,7 @@ func (s *AgentService) ListAgentSessions(ctx context.Context, req *connect.Reque
 func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1pb.ConnectAgentRequest]) (*connect.Response[v1pb.ConnectAgentResponse], error) {
 	agent, ok := GetAgentFromContext(ctx)
 	tokenFamily := ""
+	bootstrapTokenID := 0
 	if !ok || agent == nil {
 		if req.Msg.BootstrapToken == "" {
 			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent not authenticated and no bootstrap token provided"))
@@ -346,6 +354,7 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 		}
 		agent = authResult.agent
 		tokenFamily = authResult.tokenFamily
+		bootstrapTokenID = authResult.tokenID
 	}
 	if tokenFamily == "" {
 		tokenFamily = agent.ResourceID
@@ -437,6 +446,17 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 		ExpiresAt:   time.Now().Add(refreshTokenDuration),
 	}); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store refresh token, error: %v", err))
+	}
+
+	// The bootstrap token is single-use: once the connection has fully
+	// succeeded (agent updated, old sessions terminated, new session + tokens
+	// persisted), mark it CONSUMED so a leaked bootstrap token cannot be
+	// replayed within its validity window to kick the legitimate agent off.
+	if bootstrapTokenID != 0 {
+		consumedAt := time.Now()
+		if err := s.store.UpdateAgentTokenState(ctx, bootstrapTokenID, storepb.AgentTokenState_CONSUMED, &consumedAt); err != nil {
+			slog.Warn("failed to consume bootstrap token after connect", "agent", agent.ResourceID, "error", err)
+		}
 	}
 
 	return connect.NewResponse(&v1pb.ConnectAgentResponse{
@@ -580,6 +600,18 @@ func (s *AgentService) RefreshAgentToken(ctx context.Context, req *connect.Reque
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("refresh token is required"))
 	}
 
+	// Verify the JWT signature before trusting any claim. Without this the
+	// handler relied solely on a hash lookup: a refresh token whose
+	// token_version was forged (or minted under a since-rotated secret) could
+	// pass the hash check and be "upgraded" to the current token_version.
+	claims, err := auth.ParseAgentToken(refreshTokenStr, s.secret)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.Wrap(err, "invalid refresh token"))
+	}
+	if claims.TokenType != auth.TokenTypeRefresh {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.Errorf("expected refresh token, got %s", claims.TokenType))
+	}
+
 	tokenHash := hashToken(refreshTokenStr)
 	storedToken, err := s.store.GetAgentTokenByHash(ctx, tokenHash)
 	if err != nil {
@@ -589,17 +621,20 @@ func (s *AgentService) RefreshAgentToken(ctx context.Context, req *connect.Reque
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid refresh token"))
 	}
 
-	switch storedToken.State {
-	case storepb.AgentTokenState_ACTIVE:
-	case storepb.AgentTokenState_CONSUMED:
-		if err := s.store.UpdateAgentTokenState(ctx, storedToken.ID, storepb.AgentTokenState_REVOKED, nil); err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to revoke consumed token, error: %v", err))
-		}
-	case storepb.AgentTokenState_REVOKED:
+	switch action := refreshReuseAction(storedToken.State); action {
+	case refreshActionProceed:
+		// Fresh token: proceed to rotate it below.
+	case refreshActionRevokeFamily:
+		// Reuse detected: a refresh token that was already exchanged (CONSUMED)
+		// or revoked is being presented again. Revoke the entire family so
+		// every token derived from the same bootstrap/rotation is invalidated,
+		// then reject. Reusing a CONSUMED token previously only revoked the
+		// single row and still issued a new token — i.e. it silently
+		// succeeded, defeating reuse detection.
 		if err := s.store.RevokeTokenFamily(ctx, storedToken.TokenFamily); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to revoke token family, error: %v", err))
 		}
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("refresh token has been revoked, possible security breach detected"))
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("refresh token reuse detected, token family revoked"))
 	default:
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid refresh token state"))
 	}
@@ -618,6 +653,18 @@ func (s *AgentService) RefreshAgentToken(ctx context.Context, req *connect.Reque
 	}
 	if agent == nil || agent.Deleted {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent not found or deactivated"))
+	}
+
+	// Bind the token's version to the agent's current version. After a
+	// RotateAgentToken/RevokeAgentToken the version increments and the old
+	// family is revoked; if a refresh token from the old family survived the
+	// revoke (e.g. a partial failure), its embedded version no longer matches
+	// and we reject rather than minting a new token under the current version.
+	if claims.TokenVersion != agent.TokenVersion {
+		if err := s.store.RevokeTokenFamily(ctx, storedToken.TokenFamily); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to revoke stale token family, error: %v", err))
+		}
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("refresh token version mismatch"))
 	}
 
 	if storedToken.State == storepb.AgentTokenState_ACTIVE {
@@ -672,6 +719,35 @@ func (s *AgentService) scheduleTokenRevoke(tokenID int, _ string) {
 	s.consumedMu.Unlock()
 }
 
+// refreshReuseAction is the pure decision for how RefreshAgentToken should
+// treat a stored refresh token given its current state. Extracted so the
+// reuse-detection matrix is unit-testable without a DB.
+//
+//   - ACTIVE        → proceed (rotate the token)
+//   - CONSUMED/REVOKED → reuse: revoke the whole family and reject
+//   - anything else → reject as invalid
+//
+// CONSUMED is treated as reuse (not as a valid second use) because a refresh
+// token is single-use: once exchanged it must never be accepted again.
+type refreshAction int
+
+const (
+	refreshActionProceed refreshAction = iota
+	refreshActionRevokeFamily
+	refreshActionInvalid
+)
+
+func refreshReuseAction(state storepb.AgentTokenState) refreshAction {
+	switch state {
+	case storepb.AgentTokenState_ACTIVE:
+		return refreshActionProceed
+	case storepb.AgentTokenState_CONSUMED, storepb.AgentTokenState_REVOKED:
+		return refreshActionRevokeFamily
+	default:
+		return refreshActionInvalid
+	}
+}
+
 func (*AgentService) Hello(_ context.Context, _ *connect.Request[v1pb.HelloRequest]) (*connect.Response[v1pb.HelloResponse], error) {
 	return connect.NewResponse(&v1pb.HelloResponse{
 		CurrentTime:   time.Now().Unix(),
@@ -690,6 +766,10 @@ type bootstrapClaims struct {
 type bootstrapAuthResult struct {
 	agent       *store.AgentMessage
 	tokenFamily string
+	// tokenID is the DB row id of the bootstrap token, so ConnectAgent can mark
+	// it CONSUMED once the connection succeeds (making the bootstrap token
+	// single-use). Zero when the agent authenticated via an access token.
+	tokenID int
 }
 
 func (s *AgentService) authenticateBootstrapToken(tokenStr string) (*bootstrapAuthResult, error) {
@@ -744,7 +824,7 @@ func (s *AgentService) authenticateBootstrapToken(tokenStr string) (*bootstrapAu
 		tokenFamily = claims.Subject
 	}
 
-	return &bootstrapAuthResult{agent: agent, tokenFamily: tokenFamily}, nil
+	return &bootstrapAuthResult{agent: agent, tokenFamily: tokenFamily, tokenID: storedToken.ID}, nil
 }
 
 func convertToAgent(agent *store.AgentMessage) *v1pb.Agent {
