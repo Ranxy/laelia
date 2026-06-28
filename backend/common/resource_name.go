@@ -92,6 +92,13 @@ func TrimSuffix(name, suffix string) (string, error) {
 	return strings.TrimSuffix(name, suffix), nil
 }
 
+// invalidTokenChars are characters that never appear in a legitimate resource
+// name token (numeric IDs, emails, UUIDs, slugs) but are dangerous when a token
+// value is interpolated into SQL or a path. Rejecting them here is defense in
+// depth on top of query parameterization: callers that still interpolate a
+// token into a SQL string literal cannot be broken out of it by these payloads.
+var invalidTokenChars = "'\";\\()\x00"
+
 // GetNameParentTokens returns the tokens from a resource name.
 func GetNameParentTokens(name string, tokenPrefixes ...string) ([]string, error) {
 	parts := strings.Split(name, "/")
@@ -104,7 +111,11 @@ func GetNameParentTokens(name string, tokenPrefixes ...string) ([]string, error)
 		if fmt.Sprintf("%s/", parts[2*i]) != tokenPrefix {
 			return nil, errors.Errorf("invalid prefix %q in request %q", tokenPrefix, name)
 		}
-		tokens = append(tokens, parts[2*i+1])
+		token := parts[2*i+1]
+		if strings.ContainsAny(token, invalidTokenChars) {
+			return nil, errors.Errorf("invalid token %q in request %q", token, name)
+		}
+		tokens = append(tokens, token)
 	}
 	return tokens, nil
 }

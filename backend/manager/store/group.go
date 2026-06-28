@@ -103,17 +103,24 @@ func (*Store) listGroupImpl(ctx context.Context, txn *sql.Tx, find *FindGroupMes
 
 	var with, join string
 	if v := find.ProjectID; v != nil {
-		with = `WITH all_members AS (
+		// *v is user-controlled (CEL `project == "projects/{x}"`) and must never be
+		// interpolated into the SQL text. PostgreSQL positional placeholders ($N)
+		// map to args by index, not by textual position, so a placeholder in the
+		// WITH clause can safely reference an arg appended after the WHERE-clause
+		// args. The resource_type/type literals are enum constants, not user input.
+		placeholder := len(args) + 1
+		args = append(args, "projects/"+*v)
+		with = fmt.Sprintf(`WITH all_members AS (
 			SELECT
 				jsonb_array_elements_text(jsonb_array_elements(policy.payload->'bindings')->'members') AS member,
 				jsonb_array_elements(policy.payload->'bindings')->>'role' AS role
 			FROM policy
-			WHERE ((resource_type = '` + models.Policy_PROJECT.String() + `' AND resource = 'projects/` + *v + `') OR resource_type = '` + models.Policy_WORKSPACE.String() + `') AND type = '` + models.Policy_IAM.String() + `'
+			WHERE ((resource_type = '%s' AND resource = $%d) OR resource_type = '%s') AND type = '%s'
 		),
 		project_members AS (
-			SELECT ARRAY_AGG(member) AS members FROM all_members WHERE role NOT LIKE 'roles/workspace%'
-		)`
-		join = `INNER JOIN project_members ON (CONCAT('groups/', user_group.email) = ANY(project_members.members) OR '` + common.AllUsers + `' = ANY(project_members.members))`
+			SELECT ARRAY_AGG(member) AS members FROM all_members WHERE role NOT LIKE 'roles/workspace%%'
+		)`, models.Policy_PROJECT.String(), placeholder, models.Policy_WORKSPACE.String(), models.Policy_IAM.String())
+		join = fmt.Sprintf(`INNER JOIN project_members ON (CONCAT('groups/', user_group.email) = ANY(project_members.members) OR '%s' = ANY(project_members.members))`, common.AllUsers)
 	}
 
 	query := with + `

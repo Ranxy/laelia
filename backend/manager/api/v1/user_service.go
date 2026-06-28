@@ -253,7 +253,8 @@ func parseListUserFilter(find *store.FindUserMessage, filter string) error {
 				if !ok {
 					return "", connect.NewError(connect.CodeInvalidArgument, errors.Errorf("expect string, got %T, hint: filter literals should be string", value))
 				}
-				return "LOWER(principal." + variable + ") LIKE '%" + strings.ToLower(strValue) + "%'", nil
+				positionalArgs = append(positionalArgs, "%"+strings.ToLower(strValue)+"%")
+				return fmt.Sprintf("LOWER(principal.%s) LIKE $%d", variable, len(positionalArgs)), nil
 			case celoperators.In:
 				return parseToUserTypeSQL(expr, "IN")
 			case celoperators.LogicalNot:
