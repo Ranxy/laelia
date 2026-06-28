@@ -1,114 +1,36 @@
 import { create } from "@bufbuild/protobuf";
-import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { commandServiceClient } from "@/connect";
-import type { ChatMessage } from "@/types/proto-es/v1/command_pb";
 import {
-  AddChannelMemberRequestSchema,
   CommandEventType,
   CommandStatus,
-  CreateChannelRequestSchema,
-  FetchConversationActivityRequestSchema,
   GetOrCreateConversationRequestSchema,
-  ListChannelMembersRequestSchema,
-  ListChannelsRequestSchema,
   ListConversationMessagesRequestSchema,
-  RemoveChannelMemberRequestSchema,
   SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
+import {
+  abortableSleep,
+  finalizeAssistant,
+  lastEventSeqNo,
+  omitKey,
+  toUiMessage,
+} from "./chat-helpers";
 import type { AppSliceCreator, ChatMessageUI, ChatSlice } from "./types";
 
-// Module-level map of active channel poll intervals, keyed by conversation name.
-const channelWatchers: Record<string, ReturnType<typeof setInterval>> = {};
+// Re-export so existing `./chat` imports of these helpers keep working.
+export { mergeMessages, toUiMessage } from "./chat-helpers";
 
-// toUiMessage is the single mapper from a backend ChatMessage to the UI shape.
-// It always populates mentions/attachments (previously omitted by three of the
-// four call sites, which silently dropped mentions during channel polling). Any
-// extra fields that the streaming path grafts on (commandName/events/status)
-// are layered by the caller via spread.
-export function toUiMessage(msg: ChatMessage): ChatMessageUI {
-  return {
-    id: msg.name,
-    role: msg.role === 1 ? "user" : "assistant",
-    content: msg.content,
-    timestamp: msg.createdAt ? timestampDate(msg.createdAt) : new Date(),
-    commandId: msg.commandId || undefined,
-    senderName: msg.senderName || undefined,
-    senderType: msg.senderType || undefined,
-    mentions: msg.mentions,
-    attachments: msg.attachments,
-  };
-}
-
-// sameArray compares two arrays by value (length + serialized elements).
-// proto-es repeated fields are always arrays, but UI messages created locally
-// (e.g. optimistic user messages) may leave the field undefined; treat missing
-// as empty so a backend round-trip that adds nothing is still "unchanged".
-function sameArray(
-  a: unknown[] | undefined,
-  b: unknown[] | undefined
-): boolean {
-  const aa = a ?? [];
-  const bb = b ?? [];
-  if (aa.length !== bb.length) return false;
-  return aa.every((v, i) => JSON.stringify(v) === JSON.stringify(bb[i]));
-}
-
-// messagesEqual is a value comparison across every field the UI renders. It is
-// deliberately field-by-field so that a backend round-trip that only adds
-// attachments or mentions (leaving content/role untouched) is detected as a
-// change and the new object is propagated to subscribers.
-function messagesEqual(a: ChatMessageUI, b: ChatMessageUI): boolean {
-  return (
-    a.content === b.content &&
-    a.role === b.role &&
-    a.senderName === b.senderName &&
-    a.senderType === b.senderType &&
-    (a.commandId ?? "") === (b.commandId ?? "") &&
-    a.timestamp.getTime() === b.timestamp.getTime() &&
-    sameArray(a.mentions, b.mentions) &&
-    sameArray(a.attachments, b.attachments)
-  );
-}
-
-// mergeMessages reconciles a freshly polled message list with the cached one.
-// Unchanged messages keep their previous object reference so React.memo can skip
-// re-rendering them, and an unchanged list returns the exact same reference so
-// the store setter (and its subscribers) can bail out entirely.
-export function mergeMessages(
-  prev: ChatMessageUI[],
-  next: ChatMessageUI[]
-): ChatMessageUI[] {
-  if (prev.length === 0 || next.length === 0) return next;
-  if (prev[0].id !== next[0].id) return next;
-
-  const prevById = new Map(prev.map((m) => [m.id, m]));
-  let changed = false;
-  const out: ChatMessageUI[] = [];
-  for (const n of next) {
-    const p = prevById.get(n.id);
-    if (p && messagesEqual(p, n)) {
-      out.push(p);
-    } else {
-      out.push(n);
-      changed = true;
-    }
-  }
-  return changed || out.length !== prev.length ? out : prev;
-}
+// Bound reconnect attempts after a transient stream error so a permanently
+// dead command does not retry forever.
+const STREAM_MAX_RETRIES = 5;
+const STREAM_BACKOFF_MS = [500, 1000, 2000, 4000, 8000];
 
 export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
   conversations: {},
-  channels: [],
-  channelsLoading: false,
-  channelMembersByConv: {},
-  channelMembersLoading: {},
   chatMessages: {},
   chatLoading: {},
   streamingContent: {},
   streamingEvents: {},
   streamingStatus: {},
-  agentActivities: {},
-
   async getOrCreateConversation(agent) {
     const existing = get().conversations[agent];
     if (existing) return existing;
@@ -206,112 +128,109 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
         streamingStatus: { ...state.streamingStatus, [commandName]: 1 },
       }));
     }
-
-    // Return shape compatible with callers that read .name for commandName
     return res;
   },
 
   async streamChatCommand(commandName, conversation, signal) {
-    const state = get();
-    const existing = state.streamingEvents[commandName];
-    const afterSeqNo =
-      existing && existing.length > 0
-        ? existing[existing.length - 1].seqNo
-        : -1;
+    // Reconnect loop: on a transient stream error, replay from the last
+    // received event seq with bounded backoff. afterSeqNo is re-read each
+    // attempt so the server replays only what we don't yet have.
+    for (let attempt = 0; ; attempt++) {
+      const afterSeqNo = lastEventSeqNo(get().streamingEvents[commandName]);
+      const stream = commandServiceClient.watchCommandEvents(
+        { name: commandName, afterSeqNo },
+        { signal }
+      );
 
-    const stream = commandServiceClient.watchCommandEvents(
-      { name: commandName, afterSeqNo },
-      { signal }
-    );
+      let cleanClose = false;
+      try {
+        for await (const event of stream) {
+          if (signal?.aborted) break;
+          const s = get();
+          const prevEvents = s.streamingEvents[commandName] ?? [];
+          const nextEvents = [...prevEvents, event];
 
-    try {
-      for await (const event of stream) {
-        if (signal?.aborted) break;
-
-        const s = get();
-        const prevEvents = s.streamingEvents[commandName] ?? [];
-        const nextEvents = [...prevEvents, event];
-
-        if (
-          event.type === CommandEventType.TEXT_DELTA &&
-          event.payload.case === "textDelta"
-        ) {
-          const prevContent = s.streamingContent[commandName] ?? "";
-          const nextContent = prevContent + event.payload.value.content;
-          set({
-            streamingContent: {
-              ...s.streamingContent,
-              [commandName]: nextContent,
-            },
-            streamingEvents: {
-              ...s.streamingEvents,
-              [commandName]: nextEvents,
-            },
-          });
-        } else if (event.type === CommandEventType.FINAL_SUMMARY) {
-          set({
-            streamingEvents: {
-              ...s.streamingEvents,
-              [commandName]: nextEvents,
-            },
-            streamingStatus: {
-              ...s.streamingStatus,
-              [commandName]: CommandStatus.COMPLETED,
-            },
-          });
-        } else {
-          set({
-            streamingEvents: {
-              ...s.streamingEvents,
-              [commandName]: nextEvents,
-            },
-          });
+          if (
+            event.type === CommandEventType.TEXT_DELTA &&
+            event.payload.case === "textDelta"
+          ) {
+            const prevContent = s.streamingContent[commandName] ?? "";
+            const nextContent = prevContent + event.payload.value.content;
+            set({
+              streamingContent: {
+                ...s.streamingContent,
+                [commandName]: nextContent,
+              },
+              streamingEvents: {
+                ...s.streamingEvents,
+                [commandName]: nextEvents,
+              },
+            });
+          } else if (event.type === CommandEventType.FINAL_SUMMARY) {
+            set({
+              streamingEvents: {
+                ...s.streamingEvents,
+                [commandName]: nextEvents,
+              },
+              streamingStatus: {
+                ...s.streamingStatus,
+                [commandName]: CommandStatus.COMPLETED,
+              },
+            });
+          } else {
+            set({
+              streamingEvents: {
+                ...s.streamingEvents,
+                [commandName]: nextEvents,
+              },
+            });
+          }
         }
+        cleanClose = true;
+      } catch {
+        // Transient network error or abort — replay below if not aborted.
       }
-    } catch {
-      // Stream cancelled or network error
+
+      if (signal?.aborted || cleanClose || attempt >= STREAM_MAX_RETRIES) break;
+      await abortableSleep(STREAM_BACKOFF_MS[attempt], signal);
+      if (signal?.aborted) break;
     }
 
-    // Collect final streaming state before cleaning up
-    const s = get();
-    const finalEvents = s.streamingEvents[commandName] ?? [];
+    // Collect the final streaming state before cleaning up.
+    const finalEvents = get().streamingEvents[commandName] ?? [];
     const finalStatus =
-      s.streamingStatus[commandName] ?? CommandStatus.COMPLETED;
-    const streamedContent = s.streamingContent[commandName] ?? "";
-
-    // Clean up streaming state
-    const { [commandName]: _c, ...restContent } = s.streamingContent;
-    const { [commandName]: _e, ...restEvents } = s.streamingEvents;
-    const { [commandName]: _s, ...restStatus } = s.streamingStatus;
-
-    // Mark the assistant message as not streaming, preserving events
-    const messages = s.chatMessages[conversation] ?? [];
-    const updated = messages.map((m) =>
-      m.commandName === commandName
-        ? {
-            ...m,
-            streaming: false,
-            content: streamedContent,
-            events: finalEvents,
-            status: finalStatus,
-          }
-        : m
-    );
-    set({
-      chatMessages: { ...s.chatMessages, [conversation]: updated },
-      streamingContent: restContent,
-      streamingEvents: restEvents,
-      streamingStatus: restStatus,
+      get().streamingStatus[commandName] ?? CommandStatus.COMPLETED;
+    const streamedContent = get().streamingContent[commandName] ?? "";
+    // Cleanup: finalize the assistant message + drop this command's streaming
+    // keys via a functional set so the patch merges into the LATEST
+    // chatMessages[conversation] (a concurrent watcher poll or new send may
+    // have written it since the stream closed; the old stale snapshot would
+    // clobber it). On abort we still finalize the partial output but skip the
+    // backend reload below.
+    set((state) => {
+      const msgs = state.chatMessages[conversation] ?? [];
+      const finalized = finalizeAssistant(msgs, commandName, {
+        streaming: false,
+        content: streamedContent,
+        events: finalEvents,
+        status: finalStatus,
+      });
+      return {
+        chatMessages:
+          finalized === msgs
+            ? state.chatMessages
+            : { ...state.chatMessages, [conversation]: finalized },
+        streamingContent: omitKey(state.streamingContent, commandName),
+        streamingEvents: omitKey(state.streamingEvents, commandName),
+        streamingStatus: omitKey(state.streamingStatus, commandName),
+      };
     });
-
-    // If aborted (user clicked Stop), skip backend reload
     if (signal?.aborted) return;
 
-    // Reload from backend to get the actual final assistant text.
-    // The assistant's response text is stored server-side via FinalSummary
-    // which may not arrive via TEXT_DELTA events during streaming.
-    // Retry a few times because the backend may not have persisted the
-    // assistant message yet when the event stream closes.
+    // Reload the final assistant text (FinalSummary may not arrive via
+    // TEXT_DELTA); retry while the backend may not have persisted it yet. Each
+    // set merges into the latest cached list so a concurrent watcher write is
+    // preserved.
     const cmdId = commandName.split("/").pop();
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -323,300 +242,58 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
           })
         );
 
-        const s2 = get();
-        const uiMsgs: ChatMessageUI[] = (res.messages ?? []).map(toUiMessage);
-
-        // Check if the assistant message for this command exists yet
-        const assistantMsg = uiMsgs.find((m) => m.commandId === cmdId);
+        const fetched = (res.messages ?? []).map(toUiMessage);
+        const assistantMsg = fetched.find((m) => m.commandId === cmdId);
         if (assistantMsg && assistantMsg.content) {
-          // Merge streaming events back into the reloaded assistant message
-          const merged = uiMsgs.map((m) => {
-            if (m.commandId === cmdId) {
-              return {
-                ...m,
-                commandName,
-                events: finalEvents,
-                status: finalStatus,
-                content: m.content || streamedContent,
-              };
-            }
-            return m;
+          set((state) => {
+            const cur = state.chatMessages[conversation] ?? [];
+            const out = cur.map((m) =>
+              m.commandId === cmdId
+                ? {
+                    ...m,
+                    ...assistantMsg,
+                    commandName,
+                    events: finalEvents,
+                    status: finalStatus,
+                    content: assistantMsg.content || streamedContent,
+                  }
+                : m
+            );
+            return {
+              chatMessages: { ...state.chatMessages, [conversation]: out },
+            };
           });
-          set({ chatMessages: { ...s2.chatMessages, [conversation]: merged } });
           return;
         }
 
-        // Backend hasn't persisted the assistant message yet, wait and retry
-        if (attempt < 2) {
-          await new Promise((r) => setTimeout(r, 500));
-        }
+        if (attempt < 2) await abortableSleep(500, signal);
+        if (signal?.aborted) return;
       } catch {
-        // If reload fails, keep streamed content + events
         return;
       }
     }
   },
 
   resetStreaming(commandName) {
-    const s = get();
-    const finalEvents = s.streamingEvents[commandName] ?? [];
-    const finalContent = s.streamingContent[commandName] ?? "";
+    const finalEvents = get().streamingEvents[commandName] ?? [];
+    const finalContent = get().streamingContent[commandName] ?? "";
 
-    const { [commandName]: _c, ...restContent } = s.streamingContent;
-    const { [commandName]: _e, ...restEvents } = s.streamingEvents;
-    const { [commandName]: _s, ...restStatus } = s.streamingStatus;
-
-    const chatMessages = { ...s.chatMessages };
-    for (const [conv, msgs] of Object.entries(chatMessages)) {
-      chatMessages[conv] = msgs.map((m) =>
-        m.commandName === commandName
-          ? {
-              ...m,
-              streaming: false,
-              content: finalContent,
-              events: finalEvents,
-            }
-          : m
-      );
-    }
-
-    set({
-      chatMessages,
-      streamingContent: restContent,
-      streamingEvents: restEvents,
-      streamingStatus: restStatus,
+    set((state) => {
+      const chatMessages = { ...state.chatMessages };
+      for (const [conv, msgs] of Object.entries(chatMessages)) {
+        const finalized = finalizeAssistant(msgs, commandName, {
+          streaming: false,
+          content: finalContent,
+          events: finalEvents,
+        });
+        if (finalized !== msgs) chatMessages[conv] = finalized;
+      }
+      return {
+        chatMessages,
+        streamingContent: omitKey(state.streamingContent, commandName),
+        streamingEvents: omitKey(state.streamingEvents, commandName),
+        streamingStatus: omitKey(state.streamingStatus, commandName),
+      };
     });
-  },
-
-  async fetchChannels() {
-    set({ channelsLoading: true });
-    try {
-      const res = await commandServiceClient.listChannels(
-        create(ListChannelsRequestSchema, { pageSize: 100, pageToken: "" })
-      );
-      set({ channels: res.channels ?? [], channelsLoading: false });
-    } catch {
-      set({ channelsLoading: false });
-    }
-  },
-
-  async createChannel(title) {
-    const res = await commandServiceClient.createChannel(
-      create(CreateChannelRequestSchema, { title })
-    );
-    const channels = [...get().channels, res];
-    set({ channels });
-    return res;
-  },
-
-  async sendChannelMessage(conversationId, content, mentions, attachments) {
-    const conversationName = `conversations/${conversationId}`;
-    const res = await commandServiceClient.sendMessage(
-      create(SendMessageRequestSchema, {
-        conversation: conversationName,
-        content,
-        mentions,
-        attachments,
-      })
-    );
-    const chatMsg: ChatMessageUI = toUiMessage(res);
-    set((state) => ({
-      chatMessages: {
-        ...state.chatMessages,
-        [conversationName]: [
-          ...(state.chatMessages[conversationName] ?? []),
-          chatMsg,
-        ],
-      },
-    }));
-
-    // Phase 2: poll for agent responses in channel conversations.
-    // Agents receive NewMessagesAvailable on their bidi stream and respond
-    // asynchronously; the frontend has no push mechanism, so we poll.
-    get().pollChannelMessages(conversationName);
-
-    return res;
-  },
-
-  // pollChannelMessages periodically reloads messages for a conversation
-  // until new messages appear (count increases) or the timeout expires.
-  async pollChannelMessages(conversationName) {
-    const POLL_INTERVAL_MS = 2000;
-    const POLL_TIMEOUT_MS = 30000;
-    const start = Date.now();
-
-    const currentCount = get().chatMessages[conversationName]?.length ?? 0;
-
-    while (Date.now() - start < POLL_TIMEOUT_MS) {
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-
-      try {
-        // Poll for new messages.
-        const res = await commandServiceClient.listConversationMessages(
-          create(ListConversationMessagesRequestSchema, {
-            conversation: conversationName,
-            pageSize: 200,
-            pageToken: "",
-          })
-        );
-
-        const uiMsgs: ChatMessageUI[] = (res.messages ?? []).map(toUiMessage);
-
-        if (uiMsgs.length > currentCount) {
-          set((state) => ({
-            chatMessages: {
-              ...state.chatMessages,
-              [conversationName]: uiMsgs,
-            },
-          }));
-          return;
-        }
-      } catch {
-        // network error — keep polling
-      }
-
-      // Poll for agent execution status in parallel.
-      get().fetchConversationActivity(conversationName);
-    }
-  },
-
-  async fetchConversationActivity(conversationId) {
-    const conversationName = conversationId.startsWith("conversations/")
-      ? conversationId
-      : `conversations/${conversationId}`;
-    try {
-      const res = await commandServiceClient.fetchConversationActivity(
-        create(FetchConversationActivityRequestSchema, {
-          conversation: conversationName,
-        })
-      );
-      set({
-        agentActivities: {
-          ...get().agentActivities,
-          [conversationName]: res.activities ?? [],
-        },
-      });
-    } catch {
-      // network error — will retry on next poll
-    }
-  },
-
-  startWatchingChannel(conversationName) {
-    // Already watching — avoid duplicate intervals.
-    if (channelWatchers[conversationName]) return;
-
-    const POLL_INTERVAL_MS = 2000;
-
-    const poll = async () => {
-      try {
-        const res = await commandServiceClient.listConversationMessages(
-          create(ListConversationMessagesRequestSchema, {
-            conversation: conversationName,
-            pageSize: 200,
-            pageToken: "",
-          })
-        );
-        const uiMsgs: ChatMessageUI[] = (res.messages ?? []).map(toUiMessage);
-        // Reuse cached references for unchanged messages and skip the store
-        // update entirely when nothing changed, so polling does not churn the
-        // array identity (which would force a scroll snap and re-render).
-        const prev = get().chatMessages[conversationName] ?? [];
-        const merged = mergeMessages(prev, uiMsgs);
-        if (merged !== prev) {
-          set({
-            chatMessages: {
-              ...get().chatMessages,
-              [conversationName]: merged,
-            },
-          });
-        }
-      } catch {
-        // network error — will retry on next tick
-      }
-
-      // Also poll agent activity.
-      get().fetchConversationActivity(conversationName);
-    };
-
-    // Run immediately, then on interval.
-    poll();
-    channelWatchers[conversationName] = setInterval(poll, POLL_INTERVAL_MS);
-  },
-
-  stopWatchingChannel(conversationName) {
-    const id = channelWatchers[conversationName];
-    if (id) {
-      clearInterval(id);
-      delete channelWatchers[conversationName];
-    }
-  },
-
-  async listChannelMembers(conversationId) {
-    const convName = `conversations/${conversationId}`;
-    set((s) => ({
-      channelMembersLoading: { ...s.channelMembersLoading, [convName]: true },
-    }));
-    try {
-      const res = await commandServiceClient.listChannelMembers(
-        create(ListChannelMembersRequestSchema, { conversation: convName })
-      );
-      const members = res.members ?? [];
-      set((s) => ({
-        channelMembersByConv: {
-          ...s.channelMembersByConv,
-          [convName]: members,
-        },
-        channelMembersLoading: {
-          ...s.channelMembersLoading,
-          [convName]: false,
-        },
-      }));
-      return members;
-    } catch {
-      set((s) => ({
-        channelMembersLoading: {
-          ...s.channelMembersLoading,
-          [convName]: false,
-        },
-      }));
-      return [];
-    }
-  },
-
-  async addChannelMember(conversationId, memberType, memberId) {
-    const convName = `conversations/${conversationId}`;
-    const newMember = await commandServiceClient.addChannelMember(
-      create(AddChannelMemberRequestSchema, {
-        conversation: convName,
-        memberType,
-        memberId,
-      })
-    );
-    set((s) => ({
-      channelMembersByConv: {
-        ...s.channelMembersByConv,
-        [convName]: [...(s.channelMembersByConv[convName] ?? []), newMember],
-      },
-    }));
-    return newMember;
-  },
-
-  async removeChannelMember(conversationId, memberType, memberId) {
-    const convName = `conversations/${conversationId}`;
-    await commandServiceClient.removeChannelMember(
-      create(RemoveChannelMemberRequestSchema, {
-        conversation: convName,
-        memberType,
-        memberId,
-      })
-    );
-    set((s) => ({
-      channelMembersByConv: {
-        ...s.channelMembersByConv,
-        [convName]: (s.channelMembersByConv[convName] ?? []).filter(
-          (m) => !(m.memberType === memberType && m.memberId === memberId)
-        ),
-      },
-    }));
   },
 });

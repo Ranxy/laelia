@@ -97,14 +97,11 @@ export interface CommandSlice {
 
 export interface ChatSlice {
   conversations: Record<string, string>;
-  channels: Conversation[];
-  channelsLoading: boolean;
   chatMessages: Record<string, ChatMessageUI[]>;
   chatLoading: Record<string, boolean>;
   streamingContent: Record<string, string>;
   streamingEvents: Record<string, CommandEvent[]>;
   streamingStatus: Record<string, number>;
-  agentActivities: Record<string, AgentActivity[]>;
 
   getOrCreateConversation: (agent: string) => Promise<string>;
   loadMessages: (conversation: string) => Promise<void>;
@@ -119,6 +116,23 @@ export interface ChatSlice {
     signal: AbortSignal
   ) => Promise<void>;
   resetStreaming: (commandName: string) => void;
+}
+
+// ChannelSlice owns channel conversations: the channel roster, per-conversation
+// member rosters, agent activity polling, and the persistent per-conversation
+// message watchers. It shares chatMessages/chatLoading with ChatSlice (both DM
+// and channel messages live in those maps, keyed by conversation name).
+export interface ChannelSlice {
+  channels: Conversation[];
+  channelsLoading: boolean;
+  channelMembersByConv: Record<string, ChannelMember[]>;
+  channelMembersLoading: Record<string, boolean>;
+  agentActivities: Record<string, AgentActivity[]>;
+  // Active per-conversation message-poll intervals, keyed by conversation
+  // name. Held in store state (not a module-level registry) so it is testable
+  // and survives HMR without leaking timers.
+  channelWatchers: Record<string, ReturnType<typeof setInterval>>;
+
   fetchChannels: () => Promise<void>;
   createChannel: (title: string) => Promise<Conversation>;
   sendChannelMessage: (
@@ -127,7 +141,6 @@ export interface ChatSlice {
     mentions?: Mention[],
     attachments?: Attachment[]
   ) => Promise<ChatMessage>;
-  pollChannelMessages: (conversationName: string) => Promise<void>;
   fetchConversationActivity: (conversationId: string) => Promise<void>;
   startWatchingChannel: (conversationName: string) => void;
   stopWatchingChannel: (conversationName: string) => void;
@@ -142,10 +155,12 @@ export interface ChatSlice {
     memberType: number,
     memberId: string
   ) => Promise<void>;
-  channelMembersByConv: Record<string, ChannelMember[]>;
-  channelMembersLoading: Record<string, boolean>;
 }
 
-export type AppStoreState = AuthSlice & AgentSlice & CommandSlice & ChatSlice;
+export type AppStoreState = AuthSlice &
+  AgentSlice &
+  CommandSlice &
+  ChatSlice &
+  ChannelSlice;
 
 export type AppSliceCreator<Slice> = StateCreator<AppStoreState, [], [], Slice>;
