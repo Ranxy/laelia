@@ -27,11 +27,10 @@ const maxRawEventBatchSize = 256
 const permissionTimeout = 120 * time.Second
 
 type outputBuffer struct {
-	mu        sync.Mutex
-	stdout    strings.Builder
-	system    strings.Builder
-	order     []v1pb.CommandOutput_StreamType
-	lastFlush time.Time
+	mu     sync.Mutex
+	stdout strings.Builder
+	system strings.Builder
+	order  []v1pb.CommandOutput_StreamType
 }
 
 func (b *outputBuffer) append(streamType v1pb.CommandOutput_StreamType, text string) {
@@ -66,7 +65,6 @@ func (b *outputBuffer) flush(e *ACPExecutor) {
 	b.system.Reset()
 	order := b.order
 	b.order = b.order[:0]
-	b.lastFlush = time.Now()
 	b.mu.Unlock()
 
 	for _, st := range order {
@@ -176,7 +174,6 @@ type ACPExecutor struct {
 	toolCallCount    atomic.Int32
 	outputLimited    atomic.Bool
 	eventLimitHit    atomic.Bool
-	lastUsage        atomic.Value
 	summaryText      string
 	warnMu           sync.Mutex
 	sessionID        string
@@ -184,6 +181,9 @@ type ACPExecutor struct {
 	buffer           outputBuffer
 	rawEvents        rawEventBatch
 	permissionCh     chan acp.PermissionOptionId
+	// permMu guards perCommandAllow/perCommandReject. The ACP client methods
+	// may be invoked concurrently; without a lock these maps would race.
+	permMu           sync.Mutex
 	perCommandAllow  map[string]bool
 	perCommandReject map[string]bool
 }
@@ -573,7 +573,12 @@ func (c *acpRuntimeClient) RequestPermission(_ context.Context, params acp.Reque
 		}, nil
 	}
 
-	if c.executor.perCommandAllow[kind] {
+	c.executor.permMu.Lock()
+	allowed := c.executor.perCommandAllow[kind]
+	rejected := c.executor.perCommandReject[kind]
+	c.executor.permMu.Unlock()
+
+	if allowed {
 		return acp.RequestPermissionResponse{
 			Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{
 				Outcome:  "selected",
@@ -582,7 +587,7 @@ func (c *acpRuntimeClient) RequestPermission(_ context.Context, params acp.Reque
 		}, nil
 	}
 
-	if c.executor.perCommandReject[kind] {
+	if rejected {
 		return acp.RequestPermissionResponse{
 			Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{
 				Outcome:  "selected",
@@ -619,9 +624,13 @@ func (c *acpRuntimeClient) RequestPermission(_ context.Context, params acp.Reque
 		permissionKind := findPermissionOptionKind(params.Options, optionID)
 		switch permissionKind {
 		case acp.PermissionOptionKindAllowAlways:
+			c.executor.permMu.Lock()
 			c.executor.perCommandAllow[kind] = true
+			c.executor.permMu.Unlock()
 		case acp.PermissionOptionKindRejectAlways:
+			c.executor.permMu.Lock()
 			c.executor.perCommandReject[kind] = true
+			c.executor.permMu.Unlock()
 		default:
 		}
 
@@ -738,7 +747,6 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 	case u.UsageUpdate != nil:
 		c.executor.buffer.flush(c.executor)
 		c.executor.rawEvents.flush(c.executor)
-		c.executor.lastUsage.Store(toJSONMap(u.UsageUpdate))
 		c.executor.rawEvents.append(c.executor, "usage", toJSONMap(u.UsageUpdate))
 		c.executor.rawEvents.flush(c.executor)
 	default:

@@ -132,6 +132,19 @@ func (c *commandStream) wake() {
 	}
 }
 
+// resetCrossConnectionState clears stale in-flight session bookkeeping left
+// over from a previous connection so a BeginSessionResponse that arrived but
+// was never consumed (the drain loop's ctx cancelled mid-begin) cannot persist
+// into the next connection and be consumed by its first beginSession. The
+// caller guarantees the prior connection's receive pump and drain loop have
+// exited, so replacing the channel fields is safe.
+func (c *commandStream) resetCrossConnectionState() {
+	c.setCurrentExecutor(nil)
+	c.isExecuting.Store(false)
+	c.beginRespCh = make(chan *v1pb.BeginSessionResponse, 1)
+	c.wakeCh = make(chan struct{}, 1)
+}
+
 func (c *commandStream) Start(ctx context.Context) error {
 	for {
 		select {
@@ -181,8 +194,10 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 	}
 
 	// Reset any stale in-flight session bookkeeping from a previous connection.
-	c.setCurrentExecutor(nil)
-	c.isExecuting.Store(false)
+	// The previous connection's receive pump and drain loop have exited
+	// (doneCh close / drainCancel) before this point, so replacing the fields
+	// is safe.
+	c.resetCrossConnectionState()
 
 	pingTicker := time.NewTicker(cmdPingInterval)
 	defer pingTicker.Stop()

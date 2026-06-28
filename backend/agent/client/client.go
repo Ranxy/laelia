@@ -292,7 +292,6 @@ func (c *Client) State() ConnState {
 }
 
 func (c *Client) Run(ctx context.Context) error {
-	info := collectAgentInfo(c.acpConfig)
 	slog.Info("connecting to manager", "url", c.managerURL)
 
 	daemonSrv, err := daemonsrv.New(c.managerURL, c.agentName, c.resourceID, func() string {
@@ -341,6 +340,12 @@ func (c *Client) Run(ctx context.Context) error {
 			return nil
 		default:
 		}
+
+		// Recompute AgentInfo each iteration so Capability reflects the latest
+		// AcpConfig (the manager may update it on a reconnect via
+		// handleServerACPConfig). Computing it once before the loop left
+		// Capability stale for the agent's whole lifetime.
+		info := collectAgentInfo(c.acpConfigSnapshot())
 
 		if err := c.Connect(ctx, info); err != nil {
 			slog.Error("connect failed", "error", err)
@@ -434,6 +439,14 @@ func computeFingerprint(info *v1pb.AgentInfo) string {
 	return hex.EncodeToString(h[:])[:16]
 }
 
+// acpConfigSnapshot returns the current ACP config under the read lock so
+// AgentInfo can be recomputed from a consistent snapshot.
+func (c *Client) acpConfigSnapshot() *executor.ACPConfig {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.acpConfig
+}
+
 func collectAgentInfo(acpConfig *executor.ACPConfig) *v1pb.AgentInfo {
 	hostname, _ := os.Hostname()
 	return &v1pb.AgentInfo{
@@ -447,7 +460,9 @@ func collectAgentInfo(acpConfig *executor.ACPConfig) *v1pb.AgentInfo {
 }
 
 func getOutboundIP() string {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
+	// Best-effort: bound the dial so a missing default route cannot stall
+	// startup. The UDP "dial" only selects a source address; no packets flow.
+	conn, err := net.DialTimeout("udp", "8.8.8.8:80", 5*time.Second)
 	if err != nil {
 		return ""
 	}

@@ -12,6 +12,7 @@ package daemon
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"log/slog"
@@ -21,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/pkg/errors"
@@ -78,7 +80,10 @@ func New(managerURL, agentResourceID, resourceID string, getToken func() string,
 	}
 
 	sessionToken := hex.EncodeToString(token)
-	slog.Debug("LAELIA_SESSION_TOKEN", slog.String("token", sessionToken))
+	// Never log the session token in full: it authenticates every CLI call to
+	// this socket. Log only a short prefix + sha256 so logs are traceable but
+	// not usable as a credential.
+	slog.Debug("LAELIA_SESSION_TOKEN", slog.String("prefix", sessionToken[:8]), slog.String("sha256", sha256Prefix(sessionToken)))
 
 	return &Server{
 		managerURL:      managerURL,
@@ -127,7 +132,12 @@ func (s *Server) Start() error {
 	if err := os.MkdirAll(s.tempDir, 0o700); err != nil {
 		return errors.Wrap(err, "create agent temp workspace")
 	}
-	_ = os.Remove(s.socketPath) // clear stale socket from a previous run
+	// If a leftover socket file exists, probe it before clobbering: a live
+	// socket means another daemon is already running on this resource ID, and
+	// blindly removing it would steal the socket out from under that process.
+	if err := s.ensureStaleSocket(); err != nil {
+		return err
+	}
 
 	listener, err := net.Listen("unix", s.socketPath)
 	if err != nil {
@@ -485,4 +495,26 @@ func (s *Server) handleFileList(w http.ResponseWriter, r *http.Request) {
 		})
 		return text, asChatError(err)
 	})
+}
+
+// ensureStaleSocket clears a leftover socket file only if nothing is listening
+// on it. If a process answers the dial, another daemon for this resource ID is
+// already running and we must not steal its socket.
+func (s *Server) ensureStaleSocket() error {
+	conn, err := net.DialTimeout("unix", s.socketPath, 500*time.Millisecond)
+	if err == nil {
+		_ = conn.Close()
+		return errors.Errorf("daemon socket %q is live; another laelia-agent daemon is already running for this agent", s.socketPath)
+	}
+	// No listener: remove the stale file (or no-op if it is already gone) so
+	// the subsequent net.Listen succeeds.
+	_ = os.Remove(s.socketPath)
+	return nil
+}
+
+// sha256Prefix returns the first 12 hex chars of sha256(token), enough to
+// correlate log lines without leaking the credential.
+func sha256Prefix(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])[:12]
 }
