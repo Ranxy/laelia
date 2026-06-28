@@ -40,3 +40,29 @@ func TestSearchChatHistoryTrgmIndexPresent(t *testing.T) {
 		t.Fatal("trgm index must be created with IF NOT EXISTS so re-applying the schema is safe")
 	}
 }
+
+// TestUniqueConstraintsPresent locks in the three unique indexes that close
+// the T10 race/correctness gaps: at most one direct conversation per
+// (agent, user), unique active principal.email, and unique agent_token.token_hash.
+// All are declared idempotently.
+func TestUniqueConstraintsPresent(t *testing.T) {
+	sql := latestSQL(t)
+
+	for _, want := range []string{
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_dm_unique",
+		"ON conversation(agent_id, created_by) WHERE type = 1",
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_principal_unique_email",
+		"ON principal(email) WHERE deleted = FALSE",
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_token_hash ON agent_token(token_hash)",
+	} {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration missing unique-constraint declaration: %q", want)
+		}
+	}
+	// The DM index must be partial (type = 1) so channels (type=2, agent_id NULL)
+	// are not constrained; the email index must be partial (deleted = FALSE) so a
+	// soft-deleted address can be reused.
+	if !strings.Contains(sql, "DROP INDEX IF EXISTS idx_agent_token_hash") {
+		t.Fatal("non-unique idx_agent_token_hash must be dropped before recreating as unique")
+	}
+}

@@ -22,6 +22,20 @@ type ConversationMessage struct {
 	Version   int64
 }
 
+// insertDirectConversationSQL creates a direct conversation, returning the row.
+// ON CONFLICT DO NOTHING is backed by idx_conversation_dm_unique
+// (unique on (agent_id, created_by) WHERE type = 1): when two callers race to
+// open the same DM, only one INSERT returns a row; the other gets sql.ErrNoRows
+// and re-reads the winning row instead of inserting a duplicate. Extracted as a
+// named constant so TestGetOrCreateDirectConversationSQL can lock the
+// race-free INSERT in place without a live database.
+const insertDirectConversationSQL = `
+	INSERT INTO conversation (agent_id, title, type, created_by, owner_id)
+	VALUES ($1, '', 1, $2, $2)
+	ON CONFLICT (agent_id, created_by) WHERE type = 1 DO NOTHING
+	RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+`
+
 func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, principalID int) (*ConversationMessage, error) {
 	agent, err := s.GetAgentResourceIDByID(ctx, agentID)
 	if err != nil {
@@ -46,14 +60,16 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 	defer tx.Rollback()
 
 	var newConv ConversationMessage
-	err = tx.QueryRowContext(ctx, `
-		INSERT INTO conversation (agent_id, title, type, created_by, owner_id)
-		VALUES ($1, '', 1, $2, $2)
-		RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
-	`, agentID, principalID).Scan(
+	err = tx.QueryRowContext(ctx, insertDirectConversationSQL, agentID, principalID).Scan(
 		&newConv.ID, &newConv.AgentID, &newConv.Title, &newConv.Type, &newConv.CreatedBy, &newConv.OwnerID, &newConv.CreatedAt, &newConv.UpdatedAt, &newConv.Version,
 	)
 	if err != nil {
+		// ON CONFLICT DO NOTHING returns no row when another caller won the
+		// race to create this DM. Roll back our (empty) tx and return the
+		// winning row, which is now committed with its members.
+		if errors.Is(err, sql.ErrNoRows) {
+			return s.findDirectConversation(ctx, principalID, agent)
+		}
 		return nil, errors.Wrapf(err, "failed to insert conversation")
 	}
 

@@ -380,6 +380,9 @@ func (s *Store) CreateUser(ctx context.Context, create *UserMessage) (*UserMessa
 		`, strings.Join(set, ","), strings.Join(placeholder, ",")),
 		args...,
 	).Scan(&userID, &create.CreatedAt); err != nil {
+		if isUniqueViolation(err) {
+			return nil, errors.Errorf("user with email %q already exists", create.Email)
+		}
 		return nil, err
 	}
 
@@ -454,6 +457,12 @@ func (s *Store) UpdateUser(ctx context.Context, currentUser *UserMessage, patch 
 	`, len(principalArgs)),
 		principalArgs...,
 	); err != nil {
+		if isUniqueViolation(err) {
+			if patch.Email != nil {
+				return nil, errors.Errorf("user with email %q already exists", strings.ToLower(*patch.Email))
+			}
+			return nil, errors.Errorf("user already exists")
+		}
 		return nil, err
 	}
 

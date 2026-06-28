@@ -425,3 +425,23 @@ CREATE INDEX IF NOT EXISTS idx_file_uploader ON file(uploader_principal_id);
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX IF NOT EXISTS idx_chat_message_content_trgm
     ON chat_message USING GIN (content gin_trgm_ops);
+
+-- === Unique constraints (DM conversation / principal.email / token_hash) ===
+-- Three race/correctness gaps closed by unique indexes:
+--  1. GetOrCreateDirectConversation did SELECT-then-INSERT; two concurrent
+--     callers both observed "no DM" and both inserted. A partial unique index on
+--     (agent_id, created_by) for direct conversations (type=1) — channels are
+--     type=2 with agent_id NULL and intentionally unconstrained — backs an
+--     INSERT ... ON CONFLICT DO NOTHING so only one row wins.
+--  2. principal.email had no uniqueness; CreateUser/UpdateUser relied on app-layer
+--     lowercasing with no constraint, so duplicate emails could be inserted and
+--     GetUserByEmail returned a random one. Unique among non-deleted users so a
+--     soft-deleted address can be reused.
+--  3. agent_token.token_hash was a non-unique index; GetAgentTokenByHash assumes
+--     1:1 hash→row, so a collision silently cross-linked agents. Made unique.
+DROP INDEX IF EXISTS idx_agent_token_hash;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_token_hash ON agent_token(token_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_dm_unique
+    ON conversation(agent_id, created_by) WHERE type = 1;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_principal_unique_email
+    ON principal(email) WHERE deleted = FALSE;
