@@ -414,3 +414,14 @@ CREATE TABLE IF NOT EXISTS file (
 CREATE INDEX IF NOT EXISTS idx_file_conversation ON file(conversation_id) WHERE conversation_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_file_uploader ON file(uploader_principal_id);
 
+
+-- === Search: pg_trgm GIN index for leading-wildcard ILIKE ===
+-- SearchChatHistory filters chat_message.content with `content ILIKE '%q%'`,
+-- a leading-wildcard pattern no btree can serve, forcing a full scan per
+-- search. pg_trgm's GIN(gin_trgm_ops) index supports ILIKE and turns that into
+-- an index scan. The extension is created idempotently; the index is partial on
+-- non-empty content (every chat_message.content is NOT NULL) but guarded with
+-- IF NOT EXISTS so re-applying the migration is safe.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_chat_message_content_trgm
+    ON chat_message USING GIN (content gin_trgm_ops);
