@@ -84,31 +84,88 @@ func (s *Store) GetSystemBotUser(ctx context.Context) *UserMessage {
 	return user
 }
 
-// GetUserByID gets the user by ID.
+// cacheActiveUser stores a user in both the ID and email caches only when it is
+// not soft-deleted. The LRU must never serve a deleted user: a soft-deleted
+// email frees up for reuse (the idx_principal_unique_email index is partial on
+// deleted=FALSE), and callers must see MemberDeleted=true for deleted users,
+// which requires a fresh DB read rather than a stale cached active copy.
+func (s *Store) cacheActiveUser(user *UserMessage) {
+	if user == nil || user.MemberDeleted {
+		return
+	}
+	s.userIDCache.Add(user.ID, user)
+	s.userEmailCache.Add(user.Email, user)
+}
+
+// invalidateUserCache evicts a user from both caches by its previous id/email,
+// used on delete/restore/email-change so the next lookup re-reads from the DB.
+func (s *Store) invalidateUserCache(id int, email string) {
+	s.userIDCache.Remove(id)
+	s.userEmailCache.Remove(email)
+}
+
+// findUser runs a single-user lookup via listUserImpl in a read transaction and
+// returns the match (or nil when absent). It is the point-query path used on a
+// cache miss so that resolving one user does not trigger a full-table load.
+// ShowDeleted is forwarded so deleted users are still resolvable, with
+// MemberDeleted set, without being cached.
+func (s *Store) findUser(ctx context.Context, find *FindUserMessage) (*UserMessage, error) {
+	tx, err := s.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	users, err := listUserImpl(ctx, tx, find)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	if len(users) == 0 {
+		return nil, nil
+	}
+	return users[0], nil
+}
+
+// GetUserByID gets the user by ID. A cache hit returns the active cached copy;
+// a miss falls back to a point query (not a full-table load), which resolves
+// soft-deleted users with MemberDeleted=true but does not cache them.
 func (s *Store) GetUserByID(ctx context.Context, id int) (*UserMessage, error) {
 	if v, ok := s.userIDCache.Get(id); ok && s.enableCache {
 		return v, nil
 	}
 
-	if err := s.listAndCacheAllUsers(ctx); err != nil {
+	user, err := s.findUser(ctx, &FindUserMessage{ID: &id, ShowDeleted: true})
+	if err != nil {
 		return nil, err
 	}
-
-	user, _ := s.userIDCache.Get(id)
+	if user == nil {
+		return nil, nil
+	}
+	s.cacheActiveUser(user)
 	return user, nil
 }
 
-// GetUserByEmail gets the user by email.
+// GetUserByEmail gets the user by email. A cache hit returns the active cached
+// copy; a miss falls back to a point query (not a full-table load), which
+// resolves soft-deleted users with MemberDeleted=true but does not cache them.
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (*UserMessage, error) {
 	if v, ok := s.userEmailCache.Get(email); ok && s.enableCache {
 		return v, nil
 	}
 
-	if err := s.listAndCacheAllUsers(ctx); err != nil {
+	user, err := s.findUser(ctx, &FindUserMessage{Email: &email, ShowDeleted: true})
+	if err != nil {
 		return nil, err
 	}
-
-	user, _ := s.userEmailCache.Get(email)
+	if user == nil {
+		return nil, nil
+	}
+	s.cacheActiveUser(user)
 	return user, nil
 }
 
@@ -169,34 +226,9 @@ func (s *Store) ListUsers(ctx context.Context, find *FindUserMessage) ([]*UserMe
 	}
 
 	for _, user := range users {
-		s.userIDCache.Add(user.ID, user)
-		s.userEmailCache.Add(user.Email, user)
+		s.cacheActiveUser(user)
 	}
 	return users, nil
-}
-
-// listAndCacheAllUsers is used for caching all users.
-func (s *Store) listAndCacheAllUsers(ctx context.Context) error {
-	tx, err := s.GetDB().BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	users, err := listUserImpl(ctx, tx, &FindUserMessage{ShowDeleted: true})
-	if err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-
-	for _, user := range users {
-		s.userIDCache.Add(user.ID, user)
-		s.userEmailCache.Add(user.Email, user)
-	}
-	return nil
 }
 
 // buildListUsersQuery assembles the ListUsers SQL statement and its positional
@@ -400,8 +432,7 @@ func (s *Store) CreateUser(ctx context.Context, create *UserMessage) (*UserMessa
 		CreatedAt:    create.CreatedAt,
 		Profile:      create.Profile,
 	}
-	s.userIDCache.Add(user.ID, user)
-	s.userEmailCache.Add(user.Email, user)
+	s.cacheActiveUser(user)
 	return user, nil
 }
 
@@ -470,14 +501,12 @@ func (s *Store) UpdateUser(ctx context.Context, currentUser *UserMessage, patch 
 		return nil, err
 	}
 
-	s.userEmailCache.Remove(currentUser.Email)
-	s.userIDCache.Remove(currentUser.ID)
+	s.invalidateUserCache(currentUser.ID, currentUser.Email)
 	user, err := s.GetUserByID(ctx, currentUser.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	s.userIDCache.Add(currentUser.ID, user)
-	s.userEmailCache.Add(user.Email, user)
+	s.cacheActiveUser(user)
 	return user, nil
 }
