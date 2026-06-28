@@ -528,13 +528,12 @@ func (d *Dispatcher) broadcastEvent(commandID string, event *v1pb.CommandEvent) 
 }
 
 func (d *Dispatcher) HandleProgress(ctx context.Context, _ int, progress *v1pb.CommandProgress) error {
-
-	commanId, err := uuid.Parse(progress.GetCommandId())
+	commanID, err := uuid.Parse(progress.GetCommandId())
 	if err != nil {
 		return errors.Wrap(err, "progress commandId parse failed")
 	}
 
-	if err := d.store.AppendCommandOutput(ctx, commanId, progress.SeqNo, int32(progress.Type), progress.Content); err != nil {
+	if err := d.store.AppendCommandOutput(ctx, commanID, progress.SeqNo, int32(progress.Type), progress.Content); err != nil {
 		return errors.Wrapf(err, "failed to store command output")
 	}
 
