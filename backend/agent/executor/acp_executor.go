@@ -848,6 +848,8 @@ func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []st
 			}
 		}
 		values = filtered
+	} else {
+		values = map[string]string{}
 	}
 	for key, value := range requestEnv {
 		values[key] = value
