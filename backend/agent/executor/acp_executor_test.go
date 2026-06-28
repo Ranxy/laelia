@@ -458,6 +458,48 @@ func TestACPValidatePath_AllowsFreshPathInsideRoot(t *testing.T) {
 	assert.Equal(t, filepath.Join(sub, "new.txt"), got)
 }
 
+// TestSendOutput_NonBlockingAfterCancel guards the T15 cancel-safe channel fix:
+// once the session ctx is cancelled, sendOutput/sendEvent must not block on a
+// full channel (the consumer has stopped draining). Before the fix a producer
+// blocked forever on the cap-1024 channel, run()'s deferred close never ran,
+// and the goroutine leaked.
+func TestSendOutput_NonBlockingAfterCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	e := &ACPExecutor{
+		ctx:      ctx,
+		cancel:   cancel,
+		config:   &ACPConfig{MaxOutputBytes: 0}, // no output limit
+		outputCh: make(chan OutputChunk, 2),
+		eventCh:  make(chan Event, 2),
+	}
+	// Fill both channels so a blocking send would wedge.
+	e.outputCh <- OutputChunk{StreamType: v1pb.CommandOutput_STDOUT, Content: "fill-out-1"}
+	e.outputCh <- OutputChunk{StreamType: v1pb.CommandOutput_STDOUT, Content: "fill-out-2"}
+	e.eventCh <- Event{Type: v1pb.CommandEventType_WARNING, Summary: "fill-evt-1"}
+	e.eventCh <- Event{Type: v1pb.CommandEventType_WARNING, Summary: "fill-evt-2"}
+
+	var wg sync.WaitGroup
+	const producers = 8
+	wg.Add(producers)
+	for range producers {
+		go func() {
+			defer wg.Done()
+			e.sendOutput(v1pb.CommandOutput_STDOUT, "flood chunk that would block a full channel")
+			e.sendEvent(Event{Type: v1pb.CommandEventType_WARNING, Summary: "flood event"})
+		}()
+	}
+
+	cancel() // cancelled ctx: every blocked producer selects ctx.Done and returns.
+
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("sendOutput/sendEvent leaked goroutines after cancel (blocked on full channel)")
+	}
+}
+
 // TestRequestPermission_ConcurrentCallsNoRace exercises concurrent reads of
 // perCommandAllow (the "already allowed" fast path) overlapping with writes
 // (an AllowAlways decision recording perCommandAllow[kind]=true). Under -race

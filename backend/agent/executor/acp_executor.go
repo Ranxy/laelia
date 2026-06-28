@@ -448,7 +448,16 @@ func (e *ACPExecutor) sendOutput(streamType v1pb.CommandOutput_StreamType, conte
 	if !ok {
 		return
 	}
-	e.outputCh <- OutputChunk{StreamType: streamType, Content: allowed, SeqNo: e.nextSeq()}
+	chunk := OutputChunk{StreamType: streamType, Content: allowed, SeqNo: e.nextSeq()}
+	// Never block a producer once the session is cancelled: the consumer
+	// (runCommand) stops draining on its own ctx.Done, and run()'s deferred
+	// close(e.outputCh) must not race a blocked/racing send. Selecting on
+	// e.ctx.Done lets a Cancel unblock every producer so close can proceed and
+	// the goroutines exit instead of leaking on a full (cap 1024) channel.
+	select {
+	case e.outputCh <- chunk:
+	case <-e.ctx.Done():
+	}
 }
 
 func (e *ACPExecutor) startFlushTimer() {
@@ -480,7 +489,12 @@ func (e *ACPExecutor) sendEvent(event Event) {
 	if event.Timestamp.IsZero() {
 		event.Timestamp = time.Now()
 	}
-	e.eventCh <- event
+	// See sendOutput: never block a producer after Cancel, so run()'s deferred
+	// close(e.eventCh) cannot race a blocked send and goroutines exit cleanly.
+	select {
+	case e.eventCh <- event:
+	case <-e.ctx.Done():
+	}
 }
 
 func (e *ACPExecutor) allowEvent() bool {

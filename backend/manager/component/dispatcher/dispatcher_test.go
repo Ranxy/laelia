@@ -384,7 +384,7 @@ func noopSend(_ *v1pb.ManagerStreamMessage) error { return nil }
 // previous `send` field was written under sess.mu and read under sendMu (a
 // race on the same field); the atomic.Pointer + single deliver path makes it
 // race-free.
-func TestDispatcher_Send_NoDataRace(t *testing.T) {
+func TestDispatcher_Send_NoDataRace(_ *testing.T) {
 	d := New(nil)
 	defer d.Stop()
 
@@ -394,26 +394,22 @@ func TestDispatcher_Send_NoDataRace(t *testing.T) {
 	for i := 0; i < agents; i++ {
 		agentID := i + 1
 		resourceID := fmt.Sprintf("agents/a%d", agentID)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for j := 0; j < iters; j++ {
 				sess := d.RegisterAgent(context.Background(), agentID, resourceID, noopSend)
 
 				var swg sync.WaitGroup
 				for k := 0; k < 4; k++ {
-					swg.Add(1)
-					go func() {
-						defer swg.Done()
+					swg.Go(func() {
 						_ = sess.Send(&v1pb.ManagerStreamMessage{})
 						d.NotifyWake(context.Background(), agentID)
 						d.NotifyNewMessages(context.Background(), agentID, uuid.NewString(), 1)
-					}()
+					})
 				}
 				swg.Wait()
 				d.UnregisterAgent(agentID)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }

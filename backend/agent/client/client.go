@@ -33,6 +33,11 @@ const (
 	defaultConnectTimeout    = 30 * time.Second
 	defaultRetryMaxWait      = 1 * time.Minute
 	defaultRetryBaseWait     = 2 * time.Second
+	// heartbeatTimeout bounds a single Heartbeat RPC. The agent's liveness
+	// must not stall on a manager that accepts the connection but never
+	// replies; a per-call timeout makes heartbeat failure (not the peer's
+	// tcp keepalive) the detection signal.
+	heartbeatTimeout = 10 * time.Second
 )
 
 type ConnState int
@@ -239,7 +244,11 @@ func (c *Client) Heartbeat(ctx context.Context) error {
 	})
 	req.Header().Set("Authorization", "Bearer "+token)
 
-	resp, err := c.client.AgentHeartbeat(ctx, req)
+	// Per-call timeout: a hung manager must not stall the heartbeat ticker
+	// (and thus liveness detection) until the long-lived ctx is cancelled.
+	hbCtx, cancel := context.WithTimeout(ctx, heartbeatTimeout)
+	defer cancel()
+	resp, err := c.client.AgentHeartbeat(hbCtx, req)
 	if err != nil {
 		return err
 	}
@@ -356,9 +365,18 @@ func (c *Client) Run(ctx context.Context) error {
 		}
 
 		cmdCtx, cmdCancel := context.WithCancel(ctx)
+		// Death fuse: the command stream is the authority on whether the agent
+		// can actually receive work. The bidi stream and the heartbeat are
+		// separate HTTP/2 streams, so a permanently dead command stream can
+		// coexist with a healthy heartbeat — leaving the agent "Connected" but
+		// deaf (never receiving BeginSession/Cancel/Permission). Start returns
+		// its terminal error here (it no longer retries internally), and the
+		// heartbeat loop watches streamErr to tear down and reconnect the whole
+		// agent connection instead of going deaf.
+		streamErr := make(chan error, 1)
 		go func() {
 			if err := c.cmdStream.Start(cmdCtx); err != nil {
-				slog.Error("command stream stopped", "error", err)
+				streamErr <- err
 			}
 		}()
 
@@ -368,12 +386,27 @@ func (c *Client) Run(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
+				slog.Info("agent stopping")
 				ticker.Stop()
 				cmdCancel()
 				disconnectCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				_ = c.Disconnect(disconnectCtx)
 				cancel()
 				return nil
+			case err := <-streamErr:
+				slog.Warn("command stream died while heartbeat healthy, reconnecting", "error", err)
+				c.mu.Lock()
+				c.connState = StateDisconnected
+				c.mu.Unlock()
+				ticker.Stop()
+				cmdCancel()
+				disconnectCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				_ = c.Disconnect(disconnectCtx)
+				cancel()
+				if err := c.backoff.Wait(ctx); err != nil {
+					return err
+				}
+				break heartbeatLoop
 			case <-ticker.C:
 				if err := c.Heartbeat(ctx); err != nil {
 					slog.Error("heartbeat failed", "error", err)

@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"reflect"
@@ -139,10 +140,18 @@ func TestDrainOutputSendsProgressAndSynthesizedEvent(t *testing.T) {
 		SeqNo:      9,
 	}
 	close(runtime.outputCh)
+	close(runtime.eventCh)
 
-	lastSeqNo, lastEventSeqNo := drainOutput(runtime, stream, "cmd-2", 4, 6, &mergedText{})
-	assert.Equal(t, int32(9), lastSeqNo)
-	assert.Equal(t, int32(6), lastEventSeqNo)
+	state := &executor.LocalState{LastSeqSent: 4, LastEventSeqSent: 6}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	drainOutput(ctx, runtime, stream, "cmd-2", state, &mergedText{})
+
+	assert.Equal(t, int32(9), state.LastSeqSent, "LastSeqSent must advance to the drained chunk")
+	// The synthesized TEXT_DELTA flush increments the event seq from 6 -> 7
+	// and state must reflect it (the pre-fix code wrote against a throwaway
+	// LocalState, leaving LastEventSeqSent stale at 6).
+	assert.Equal(t, int32(7), state.LastEventSeqSent, "LastEventSeqSent must advance past the flushed TEXT_DELTA")
 
 	require.NoError(t, stream.CloseRequest())
 
@@ -160,6 +169,7 @@ func TestDrainOutputSendsProgressAndSynthesizedEvent(t *testing.T) {
 	require.NotNil(t, textDelta)
 	assert.Equal(t, v1pb.CommandEventType_TEXT_DELTA, textDelta.Type)
 	assert.Equal(t, "remaining output", textDelta.Summary)
+	assert.Equal(t, int32(7), textDelta.SeqNo, "TEXT_DELTA seq must come from the live state counter")
 	assert.Equal(t, "STDERR", textDelta.GetTextDelta().GetStreamType())
 	assert.Equal(t, "remaining output", textDelta.GetTextDelta().GetContent())
 	assert.True(t, recorder.closed.Load())
@@ -397,4 +407,96 @@ func TestRunSessionExecutesRuntime(t *testing.T) {
 
 	assert.Equal(t, int32(1), runtime.startInvoked.Load())
 	assert.False(t, cs.isExecuting.Load(), "isExecuting must be cleared after the session")
+}
+
+// TestDrainOutput_SequenceMonotonic guards the T15 drainOutput rewrite: with
+// both buffered output and buffered events pending after Done(), the drain
+// must forward all of them and leave state.LastEventSeqSent monotonically
+// ahead of its input (previously events were dropped and the seq counter was
+// written against a throwaway LocalState, rolling it back).
+func TestDrainOutput_SequenceMonotonic(t *testing.T) {
+	stream, recorder, cleanup := newTestCommandChannel(t)
+	defer cleanup()
+
+	runtime := &scriptedRuntime{
+		outputCh: make(chan executor.OutputChunk, 4),
+		eventCh:  make(chan executor.Event, 4),
+		resultCh: make(chan executor.Result, 1),
+		doneCh:   make(chan struct{}),
+	}
+	runtime.outputCh <- executor.OutputChunk{StreamType: v1pb.CommandOutput_STDOUT, Content: "aaa", SeqNo: 10}
+	runtime.outputCh <- executor.OutputChunk{StreamType: v1pb.CommandOutput_STDOUT, Content: "bbb", SeqNo: 11}
+	runtime.eventCh <- executor.Event{Type: v1pb.CommandEventType_WARNING, Summary: "w1"}
+	runtime.eventCh <- executor.Event{Type: v1pb.CommandEventType_WARNING, Summary: "w2"}
+	close(runtime.outputCh)
+	close(runtime.eventCh)
+
+	state := &executor.LocalState{LastSeqSent: 4, LastEventSeqSent: 6}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	drainOutput(ctx, runtime, stream, "cmd-m", state, &mergedText{})
+
+	assert.Equal(t, int32(11), state.LastSeqSent, "LastSeqSent must be the max drained chunk seq")
+	// 2 forwarded events (7, 8) + 1 synthesized TEXT_DELTA flush (9) = 9, which
+	// is strictly greater than the input 6 (monotonic, no rollback).
+	assert.Equal(t, int32(9), state.LastEventSeqSent)
+
+	require.NoError(t, stream.CloseRequest())
+	// 2 progress + 2 warning events + 1 TEXT_DELTA = 5 messages.
+	assert.Len(t, recorder.Messages(), 5)
+}
+
+// failingConn is a connect streaming conn whose Send always errors, simulating a
+// dead bidi stream.
+type failingConn struct{}
+
+func (failingConn) Spec() connect.Spec           { return connect.Spec{} }
+func (failingConn) Peer() connect.Peer           { return connect.Peer{} }
+func (failingConn) Send(any) error               { return errors.New("stream dead") }
+func (failingConn) RequestHeader() http.Header   { return http.Header{} }
+func (failingConn) CloseRequest() error          { return nil }
+func (failingConn) Receive(any) error            { return io.EOF }
+func (failingConn) ResponseHeader() http.Header  { return http.Header{} }
+func (failingConn) ResponseTrailer() http.Header { return http.Header{} }
+func (failingConn) CloseResponse() error         { return nil }
+
+type fakeStreamClient struct {
+	stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage]
+}
+
+func (f *fakeStreamClient) AgentChannel(_ context.Context) *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage] {
+	return f.stream
+}
+
+// TestCommandStreamStart_SurfacesTerminalError guards the T15 death fuse: Start
+// must return the stream's terminal error directly instead of swallowing it in
+// an internal retry loop. Run's heartbeat loop watches this to tear down and
+// reconnect the whole agent connection when the bidi stream dies. The old code
+// logged + backed off + looped forever, so the agent went deaf while heartbeat
+// stayed healthy. This test fails if Start retries (it would return a ctx
+// deadline error after the backoff, not the "stream dead" error, and only
+// after the full backoff wait).
+func TestCommandStreamStart_SurfacesTerminalError(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	stream := &connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage]{}
+	setUnexportedField(t, stream, "conn", &failingConn{})
+
+	cs := &commandStream{
+		client:    &fakeStreamClient{stream: stream},
+		getToken:  func() string { return "tok" },
+		getSessID: func() string { return "sess" },
+		backoff:   NewExponentialBackoff(2*time.Second, 1*time.Minute),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	err := cs.Start(ctx)
+	elapsed := time.Since(start)
+
+	require.Error(t, err, "Start must surface the stream's terminal error")
+	assert.Contains(t, err.Error(), "stream dead", "Start must return the stream error, not a backoff/ctx error")
+	assert.Less(t, elapsed, 1*time.Second, "Start must return promptly, not retry-then-backoff")
 }

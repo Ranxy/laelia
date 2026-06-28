@@ -20,7 +20,6 @@ import (
 
 const (
 	cmdPingInterval = 15 * time.Second
-	cmdPingTimeout  = 5 * time.Second
 
 	mergedTextDeltaFlushBytes = 4096
 
@@ -145,24 +144,19 @@ func (c *commandStream) resetCrossConnectionState() {
 	c.wakeCh = make(chan struct{}, 1)
 }
 
+// Start runs one command-stream lifecycle (mainLoop) and returns its terminal
+// error. It deliberately does NOT retry internally: a dead bidi stream must
+// surface to the caller (Client.Run's heartbeat loop, the "death fuse") so the
+// whole agent connection is torn down and reconnected rather than the agent
+// going deaf while its heartbeat stays healthy. The caller owns reconnect
+// backoff.
 func (c *commandStream) Start(ctx context.Context) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-		}
-
-		if err := c.mainLoop(ctx); err != nil {
-			slog.Error("command stream error, reconnecting", "error", err)
-			if err := c.backoff.Wait(ctx); err != nil {
-				return err
-			}
-			continue
-		}
-
-		c.backoff.Reset()
+	select {
+	case <-ctx.Done():
+		return nil
+	default:
 	}
+	return c.mainLoop(ctx)
 }
 
 func (c *commandStream) mainLoop(ctx context.Context) error {
@@ -439,11 +433,6 @@ func (c *commandStream) runCommand(
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 	}
 
-	var mergedTextBuf mergedText
-	defer func() {
-		_ = mergedTextBuf.flush(stream, commandID, state)
-	}()
-
 	resultSent := false
 	defer func() {
 		if resultSent {
@@ -487,9 +476,10 @@ func (c *commandStream) runCommand(
 		case <-runtime.Done():
 			_ = merged.flush(stream, commandID, state)
 
-			lastSeqNo, lastEventSeqNo := drainOutput(runtime, stream, commandID, state.LastSeqSent, state.LastEventSeqSent, &merged)
-			state.LastSeqSent = lastSeqNo
-			state.LastEventSeqSent = lastEventSeqNo
+			// DrainOutput flushes any output/events the runtime produced while
+			// the consumer was busy sending the result, mutating state so
+			// LastSeqSent/LastEventSeqSent reflect exactly what was forwarded.
+			drainOutput(ctx, runtime, stream, commandID, state, &merged)
 
 			_ = merged.flush(stream, commandID, state)
 
@@ -549,28 +539,57 @@ func (c *commandStream) runCommand(
 	}
 }
 
-func drainOutput(runtime executor.Runtime, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, lastSeqNo int32, lastEventSeqNo int32, merged *mergedText) (int32, int32) {
-	for {
+// drainOutput forwards any output chunks and events the runtime still has
+// buffered after Done() fired, mutating state so LastSeqSent/LastEventSeqSent
+// reflect exactly what was sent. It drains until both channels close (the
+// runtime closes them in its deferred teardown), with ctx as a backstop so a
+// runtime that never closes cannot wedge the consumer. Previously it only
+// drained OutputChannel via a non-blocking `default` (dropping queued events
+// and any output produced after the peek) and wrote event seq numbers against
+// a throwaway LocalState, leaving state.LastEventSeqSent stale/rolled back.
+func drainOutput(
+	ctx context.Context,
+	runtime executor.Runtime,
+	stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage],
+	commandID string,
+	state *executor.LocalState,
+	merged *mergedText,
+) {
+	outputClosed, eventClosed := false, false
+	for !outputClosed || !eventClosed {
 		select {
+		case <-ctx.Done():
+			_ = merged.flush(stream, commandID, state)
+			return
 		case chunk, ok := <-runtime.OutputChannel():
 			if !ok {
-				_ = merged.flush(stream, commandID, &executor.LocalState{LastEventSeqSent: lastEventSeqNo})
-				return lastSeqNo, lastEventSeqNo
+				outputClosed = true
+				continue
 			}
 			if err := sendCommandProgress(stream, commandID, chunk); err != nil {
 				slog.Error("failed to send command progress", "commandID", commandID, "error", err)
-				return lastSeqNo, lastEventSeqNo
+				_ = merged.flush(stream, commandID, state)
+				return
 			}
-			lastSeqNo = maxSeq(lastSeqNo, chunk.SeqNo)
-
+			state.LastSeqSent = maxSeq(state.LastSeqSent, chunk.SeqNo)
 			if merged.append(chunk.StreamType, chunk.Content) {
-				_ = merged.flush(stream, commandID, &executor.LocalState{})
+				_ = merged.flush(stream, commandID, state)
 				_ = merged.append(chunk.StreamType, chunk.Content)
 			}
-		default:
-			return lastSeqNo, lastEventSeqNo
+		case event, ok := <-runtime.EventChannel():
+			if !ok {
+				eventClosed = true
+				continue
+			}
+			event.SeqNo = nextEventSeq(state)
+			if err := sendCommandEvent(stream, commandID, &event); err != nil {
+				slog.Error("failed to send command event", "commandID", commandID, "error", err)
+				_ = merged.flush(stream, commandID, state)
+				return
+			}
 		}
 	}
+	_ = merged.flush(stream, commandID, state)
 }
 
 func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime, error) {
