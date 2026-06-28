@@ -18,3 +18,15 @@ func TestListConversationMessagesMutualExclusion(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "mutually exclusive")
 }
+
+// TestCreateChatMessageBumpVersionSQL locks in that sending a message advances
+// conversation.updated_at, not just version. ListChannelsWithUpdates and
+// ListUserConversations order by updated_at DESC, so omitting it froze channel
+// ordering at the last rename. A DB-backed assertion (updated_at actually
+// advances) is T27's domain; this guard ensures the bump statement carries the
+// updated_at clause. Run without a live database.
+func TestCreateChatMessageBumpVersionSQL(t *testing.T) {
+	assert.Contains(t, conversationVersionBumpSQL, "updated_at = now()",
+		"bump statement must advance updated_at so activity-ordered listings reflect new messages")
+	assert.Contains(t, conversationVersionBumpSQL, "version = version + 1")
+}

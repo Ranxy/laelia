@@ -124,6 +124,17 @@ func (s *Store) CreateChatMessage(ctx context.Context, msg *ChatMessage) (*ChatM
 	}, nil
 }
 
+// conversationVersionBumpSQL is the room-version bump statement. It also
+// advances conversation.updated_at so that activity-ordered listings
+// (ListChannelsWithUpdates / ListUserConversations, both ORDER BY
+// updated_at DESC) reflect new messages, not just metadata edits. Extracted as
+// a named constant so the regression guard TestCreateChatMessageBumpVersionSQL
+// can lock the updated_at clause in place without a live database.
+const conversationVersionBumpSQL = `
+	UPDATE conversation SET version = version + 1, updated_at = now() WHERE id = $1
+	RETURNING version
+`
+
 // CreateChatMessageBumpVersion atomically increments the conversation's room
 // version and inserts a chat_message carrying that new version. It is the
 // single entry point for both user (SendMessage) and assistant (HandleResult)
@@ -138,10 +149,7 @@ func (s *Store) CreateChatMessageBumpVersion(ctx context.Context, msg *ChatMessa
 	defer tx.Rollback()
 
 	var newVersion int64
-	if err := tx.QueryRowContext(ctx, `
-		UPDATE conversation SET version = version + 1 WHERE id = $1
-		RETURNING version
-	`, msg.ConversationID).Scan(&newVersion); err != nil {
+	if err := tx.QueryRowContext(ctx, conversationVersionBumpSQL, msg.ConversationID).Scan(&newVersion); err != nil {
 		return nil, 0, errors.Wrapf(err, "failed to bump conversation version")
 	}
 
