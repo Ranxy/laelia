@@ -344,8 +344,23 @@ func asChatError(err error) *chattools.Error {
 }
 
 // validateWorkspacePath resolves path against the agent temp workspace and
-// ensures the cleaned, symlink-resolved result stays inside tempDir. This
-// prevents file commands from reading/writing outside the workspace.
+// ensures the symlink-resolved result stays inside tempDir. This prevents file
+// commands from reading/writing outside the workspace.
+//
+// The previous version, when EvalSymlinks failed (a not-yet-existing download
+// target), fell back to the lexical cleaned path. A dangling symlink inside
+// tempDir pointing outside the jail (tempDir/evil → /etc/laelia-shell) then
+// passed the ".." check (rel == "evil") and a subsequent os.WriteFile followed
+// the symlink out of the jail.
+//
+// Hardening:
+//   - If the final component exists and is a symlink, refuse outright (a write
+//     would follow it).
+//   - If the final component exists and is a regular file/dir, resolve all
+//     symlinks in the full path and confirm the result is inside the jail.
+//   - If the final component does not exist (fresh target), resolve the parent
+//     directory's symlinks and confirm the parent is inside the jail; the leaf
+//     cannot itself be a symlink because it does not exist.
 func (s *Server) validateWorkspacePath(path string) (string, error) {
 	if path == "" {
 		return "", errors.New("path is required")
@@ -354,17 +369,53 @@ func (s *Server) validateWorkspacePath(path string) (string, error) {
 		path = filepath.Join(s.tempDir, path)
 	}
 	cleaned := filepath.Clean(path)
-	resolved, err := filepath.EvalSymlinks(cleaned)
+
+	fi, err := os.Lstat(cleaned)
+	switch {
+	case err == nil:
+		if fi.Mode()&os.ModeSymlink != 0 {
+			// A symlink at the leaf — dangling or not — would be followed by a
+			// write, so refuse rather than risk escaping the jail.
+			return "", errors.Errorf("path %q is a symlink; refusing to follow it outside the workspace", path)
+		}
+		// Existing regular file/dir: resolve the whole path and confirm it
+		// stays inside the jail.
+		resolved, lerr := filepath.EvalSymlinks(cleaned)
+		if lerr != nil {
+			return "", errors.Errorf("failed to resolve path %q: %v", path, lerr)
+		}
+		if !insideWorkspace(s.tempDir, resolved) {
+			return "", errors.Errorf("path %q escapes the agent temp workspace", path)
+		}
+		return resolved, nil
+	case errors.Is(err, os.ErrNotExist):
+		// Fresh target (e.g. a download destination). The leaf cannot be a
+		// symlink, but an ancestor might be — resolve the parent and confirm
+		// it is inside the jail, then rejoin the leaf onto the resolved parent.
+		parent := filepath.Dir(cleaned)
+		parentResolved, perr := filepath.EvalSymlinks(parent)
+		if perr != nil {
+			return "", errors.Errorf("failed to resolve parent directory %q: %v", parent, perr)
+		}
+		if !insideWorkspace(s.tempDir, parentResolved) {
+			return "", errors.Errorf("path %q escapes the agent temp workspace", path)
+		}
+		return filepath.Join(parentResolved, filepath.Base(cleaned)), nil
+	default:
+		return "", errors.Errorf("failed to stat path %q: %v", path, err)
+	}
+}
+
+// insideWorkspace reports whether target is at or below jail once both are
+// cleaned. It does not itself resolve symlinks; callers resolve first.
+func insideWorkspace(jail, target string) bool {
+	rel, err := filepath.Rel(jail, target)
 	if err != nil {
-		// EvalSymlinks fails if the file doesn't exist yet (download target).
-		// Fall back to the cleaned path and verify its parent resolves inside.
-		resolved = cleaned
+		return false
 	}
-	rel, err := filepath.Rel(s.tempDir, resolved)
-	if err != nil || strings.HasPrefix(rel, "..") || rel == ".." {
-		return "", errors.Errorf("path %q escapes the agent temp workspace", path)
-	}
-	return resolved, nil
+	// ".." escapes; "../anything" escapes. A leaf literally named "..foo" does
+	// not (it has no separator after the leading dots).
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func (s *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {

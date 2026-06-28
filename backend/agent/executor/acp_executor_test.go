@@ -429,3 +429,30 @@ func newTestBufferedExecutor() *ACPExecutor {
 	e.client = &acpRuntimeClient{executor: e}
 	return e
 }
+
+// TestACPValidatePath_RejectsDanglingSymlinkEscape guards the T20 hardening of
+// ACPExecutor.validatePath: a symlink inside a root pointing outside it must be
+// rejected rather than followed. The pre-fix lexical fallback let it escape.
+func TestACPValidatePath_RejectsDanglingSymlinkEscape(t *testing.T) {
+	workspace := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "outside-target")
+	require.NoError(t, os.Symlink(outside, filepath.Join(workspace, "evil")))
+
+	exec := &ACPExecutor{allowedRoots: []string{workspace}}
+	_, err := exec.validatePath(filepath.Join(workspace, "evil"), true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "symlink")
+}
+
+// TestACPValidatePath_AllowsFreshPathInsideRoot: a not-yet-existing file under a
+// real directory inside the root resolves and is allowed.
+func TestACPValidatePath_AllowsFreshPathInsideRoot(t *testing.T) {
+	workspace := t.TempDir()
+	sub := filepath.Join(workspace, "sub")
+	require.NoError(t, os.MkdirAll(sub, 0o700))
+
+	exec := &ACPExecutor{allowedRoots: []string{workspace}}
+	got, err := exec.validatePath(filepath.Join(sub, "new.txt"), true)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(sub, "new.txt"), got)
+}

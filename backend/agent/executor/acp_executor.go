@@ -798,19 +798,49 @@ func (e *ACPExecutor) validatePath(path string, enabled bool) (string, error) {
 	if !filepath.IsAbs(cleaned) {
 		return "", pkgerrors.Errorf("path must be absolute: %s", path)
 	}
-	resolved, err := filepath.EvalSymlinks(cleaned)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return "", err
-	}
-	if resolved == "" {
-		resolved = cleaned
-	}
-	for _, root := range e.allowedRoots {
-		if resolved == root || strings.HasPrefix(resolved, root+string(os.PathSeparator)) {
+	// Same symlink-escape hardening as daemon.validateWorkspacePath: the
+	// previous version fell back to the lexical cleaned path when EvalSymlinks
+	// failed on a not-yet-existing target, so a dangling symlink inside a root
+	// pointing outside it (root/evil -> /etc/...) passed the prefix check and a
+	// subsequent write followed the symlink out of the roots.
+	fi, err := os.Lstat(cleaned)
+	switch {
+	case err == nil:
+		if fi.Mode()&os.ModeSymlink != 0 {
+			return "", pkgerrors.Errorf("path %s is a symlink; refusing to follow it outside the ACP roots", path)
+		}
+		resolved, lerr := filepath.EvalSymlinks(cleaned)
+		if lerr != nil {
+			return "", lerr
+		}
+		if e.pathInsideRoots(resolved) {
 			return resolved, nil
 		}
+		return "", pkgerrors.Errorf("path %s is outside ACP workspace roots", path)
+	case errors.Is(err, os.ErrNotExist):
+		parent := filepath.Dir(cleaned)
+		parentResolved, perr := filepath.EvalSymlinks(parent)
+		if perr != nil {
+			return "", perr
+		}
+		if e.pathInsideRoots(parentResolved) {
+			return filepath.Join(parentResolved, filepath.Base(cleaned)), nil
+		}
+		return "", pkgerrors.Errorf("path %s is outside ACP workspace roots", path)
+	default:
+		return "", err
 	}
-	return "", pkgerrors.Errorf("path %s is outside ACP workspace roots", path)
+}
+
+// pathInsideRoots reports whether target is at or below one of the allowed
+// ACP workspace roots.
+func (e *ACPExecutor) pathInsideRoots(target string) bool {
+	for _, root := range e.allowedRoots {
+		if target == root || strings.HasPrefix(target, root+string(os.PathSeparator)) {
+			return true
+		}
+	}
+	return false
 }
 
 func resolveACPWorkingDir(_ Request, cfg *ACPConfig) (string, []string, error) {
