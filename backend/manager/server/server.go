@@ -31,6 +31,7 @@ type Server struct {
 	profile      *config.Profile
 	echoServer   *echo.Echo
 	httpServer   *http.Server
+	pprofServer  *http.Server
 	store        *store.Store
 	startedTS    int64
 
@@ -154,6 +155,20 @@ func (s *Server) Run(ctx context.Context, port int) error {
 		go s.stateCfg.HeartbeatBuffer.Start(s.runnerCtx)
 	}
 
+	// pprof is served on a separate, dedicated listener — never the public
+	// port — and only when runtime debug is enabled and an address is set.
+	// Heap/goroutine/profile dumps are sensitive; binding to localhost keeps
+	// them off the network. The lifecycle mirrors the http server.
+	if s.profile.RuntimeDebug.Load() && s.profile.PprofAddr != "" {
+		s.pprofServer = newPprofServer(s.profile.PprofAddr)
+		go func() {
+			slog.Info("starting pprof server", "addr", s.profile.PprofAddr)
+			if err := s.pprofServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				slog.Error("pprof server error", log.WithError(err))
+			}
+		}()
+	}
+
 	return nil
 }
 
@@ -180,6 +195,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// Shutdown echo
 	if s.httpServer != nil {
 		_ = s.httpServer.Shutdown(ctx)
+	}
+
+	// Shutdown the standalone pprof server (best-effort; it may be nil).
+	if s.pprofServer != nil {
+		_ = s.pprofServer.Shutdown(ctx)
 	}
 
 	s.runnerWG.Wait()

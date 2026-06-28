@@ -52,8 +52,6 @@ func configureEchoRouters(
 	// TODO we need to Embed frontend at future. for now, we just use frontend not embed for skip this
 	embedFrontend(e)
 
-	registerPprof(e, &profile.RuntimeDebug)
-
 	// Prometheus metrics - use custom registry to avoid duplicate registration in tests
 	registry := prometheus.NewRegistry()
 	e.Use(echoprometheus.NewMiddlewareWithConfig(echoprometheus.MiddlewareConfig{

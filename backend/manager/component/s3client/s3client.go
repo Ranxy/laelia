@@ -5,10 +5,12 @@ package s3client
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
@@ -58,7 +60,7 @@ func (c *Client) Get(ctx context.Context) (*s3.Client, *models.S3ConfigSetting, 
 		return c.client, c.cfg, nil
 	}
 
-	cli, err := build(cfg)
+	cli, err := build(ctx, cfg)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -78,14 +80,15 @@ func (c *Client) Invalidate() {
 	c.fingerprint = ""
 }
 
-func build(cfg *models.S3ConfigSetting) (*s3.Client, error) {
+func build(ctx context.Context, cfg *models.S3ConfigSetting) (*s3.Client, error) {
 	region := cfg.Region
 	if region == "" {
 		region = "us-east-1"
 	}
-	awsCfg, err := awscfg.LoadDefaultConfig(context.Background(),
+	awsCfg, err := awscfg.LoadDefaultConfig(ctx,
 		awscfg.WithRegion(region),
 		awscfg.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cfg.AccessKey, cfg.SecretKey, "")),
+		awscfg.WithHTTPClient(s3HTTPClient()),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load aws config")
@@ -122,10 +125,29 @@ func build(cfg *models.S3ConfigSetting) (*s3.Client, error) {
 		})
 	}
 
-	// The default aws http client is fine; ensure no retries surprise callers
-	// by leaving the SDK defaults.
-	_ = http.DefaultClient
+	// The aws SDK inherits the per-request context from each call; the custom
+	// http client below bounds connection and header-read time so a stuck S3
+	// endpoint cannot pin a goroutine indefinitely.
 	return s3.NewFromConfig(awsCfg, s3Opts...), nil
+}
+
+// s3HTTPClient returns an *http.Client with bounded dial and header-read
+// timeouts. Without it the SDK uses its default transport, which has no
+// response-header deadline: a server that accepts the connection but never
+// sends headers blocks the upload/download RPC until the request context
+// (often the whole gRPC stream) is cancelled.
+func s3HTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 0, // overall timeout is governed by the per-call context.
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   10 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			ResponseHeaderTimeout: 30 * time.Second,
+			IdleConnTimeout:       90 * time.Second,
+		},
+	}
 }
 
 func fingerprint(cfg *models.S3ConfigSetting) string {

@@ -264,7 +264,7 @@ func (s *AuthService) getOrCreateUserWithIDP(ctx context.Context, request *v1pb.
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to exchange token"))
 		}
-		userInfo, _, err = oauth2IdentityProvider.UserInfo(token)
+		userInfo, _, err = oauth2IdentityProvider.UserInfo(ctx, token)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get user info"))
 		}

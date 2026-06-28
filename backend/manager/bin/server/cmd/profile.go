@@ -17,6 +17,7 @@ func getBaseProfile(_ string) *config.Profile {
 		TLSDomain:  flags.tlsDomain,
 		DisableACP: flags.disableACP,
 		TrustProxy: flags.trustProxy,
+		PprofAddr:  flags.pprofAddr,
 	}
 
 	if flags.tlsHost != "" {

@@ -3,32 +3,21 @@ package server
 import (
 	"net/http"
 	"net/http/pprof"
-	"sync/atomic"
-
-	"github.com/labstack/echo/v5"
 )
 
-func registerPprof(e *echo.Echo, runtimeDebug *atomic.Bool) {
-	router := e.Group("/debug/pprof")
-	handler := func(h http.HandlerFunc) echo.HandlerFunc {
-		return func(c *echo.Context) error {
-			if !runtimeDebug.Load() {
-				return echo.NewHTTPError(echo.ErrNotFound.StatusCode(), "")
-			}
-			h.ServeHTTP(c.Response(), c.Request())
-			return nil
-		}
-	}
-	router.GET("/", handler(pprof.Index))
-	router.GET("/allocs", handler(pprof.Handler("allocs").ServeHTTP))
-	router.GET("/block", handler(pprof.Handler("block").ServeHTTP))
-	router.GET("/cmdline", handler(pprof.Cmdline))
-	router.GET("/goroutine", handler(pprof.Handler("goroutine").ServeHTTP))
-	router.GET("/heap", handler(pprof.Handler("heap").ServeHTTP))
-	router.GET("/mutex", handler(pprof.Handler("mutex").ServeHTTP))
-	router.GET("/profile", handler(pprof.Profile))
-	router.POST("/symbol", handler(pprof.Symbol))
-	router.GET("/symbol", handler(pprof.Symbol))
-	router.GET("/threadcreate", handler(pprof.Handler("threadcreate").ServeHTTP))
-	router.GET("/trace", handler(pprof.Trace))
+// newPprofServer builds a standalone HTTP server that exposes /debug/pprof/* on
+// the given address. It is intentionally separate from the public echo listener
+// so heap/goroutine/profile dumps are not reachable from the network: bind it
+// to a localhost or admin-only address and only start it when runtime debug is
+// enabled. The caller owns its lifecycle (Serve + Shutdown). Registering pprof
+// on the public listener (even gated by a runtime flag) exposed dumps to anyone
+// who could reach the port with no authentication.
+func newPprofServer(addr string) *http.Server {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	return &http.Server{Addr: addr, Handler: mux}
 }
