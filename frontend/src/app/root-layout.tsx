@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { isAuthPath, resolveAuthRedirect } from "@/react/router/auth-redirect";
 import { useAppStore } from "@/react/stores";
 
 export function RootLayout() {
@@ -15,14 +16,21 @@ export function RootLayout() {
     loadSession();
   }, [loadSession]);
 
-  // Once session is loaded and user is logged in, redirect away from auth pages
+  // Reactive auth guard. The root loader only runs on navigation, so it cannot
+  // react to the auth store flipping sessionLoaded/isLoggedIn after the initial
+  // load. Re-evaluate on every state change so a logged-out user landing
+  // directly on a protected route is redirected without the protected content
+  // flashing first. Also covers a logged-in user hitting an /auth/* page.
   useEffect(() => {
-    if (!sessionLoaded || !isLoggedIn) return;
-    if (!location.pathname.startsWith("/auth/")) return;
-
-    const params = new URLSearchParams(location.search);
-    const redirectTo = params.get("redirect") ?? "/";
-    navigate(redirectTo, { replace: true });
+    const target = resolveAuthRedirect({
+      sessionLoaded,
+      isLoggedIn,
+      pathname: location.pathname,
+      search: location.search,
+    });
+    if (target !== null) {
+      navigate(target, { replace: true });
+    }
   }, [sessionLoaded, isLoggedIn, location, navigate]);
 
   // Show spinner until session state is known
@@ -32,6 +40,12 @@ export function RootLayout() {
         <div className="size-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
       </div>
     );
+  }
+
+  // While a redirect is pending for a logged-out user on a protected route,
+  // render nothing instead of <Outlet/> so the protected page never flashes.
+  if (!isLoggedIn && !isAuthPath(location.pathname)) {
+    return null;
   }
 
   return <Outlet />;
