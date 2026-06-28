@@ -84,7 +84,9 @@ func configureGrpcRouters(
 	agentCommandService := apiv1.NewAgentCommandService(stores, cmdDispatcher)
 	settingService := apiv1.NewSettingService(stores, s3clientmanager)
 
-	rateLimiter, err := ratelimit.New(ratelimit.DefaultConfig())
+	rateLimiterCfg := ratelimit.DefaultConfig()
+	rateLimiterCfg.TrustProxy = profile.TrustProxy
+	rateLimiter, err := ratelimit.New(rateLimiterCfg)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create rate limiter")
 	}
@@ -95,7 +97,7 @@ func configureGrpcRouters(
 		return connect.NewError(connect.CodeInternal, errors.Errorf("error: %v\n%s", p, stack))
 	}
 
-	ipValidator := auth.NewIPValidator(auth.IPValidationWarn, false)
+	ipValidator := auth.NewIPValidator(auth.IPValidationWarn, profile.TrustProxy)
 
 	handlerOpts := connect.WithHandlerOptions(
 		connect.WithInterceptors(

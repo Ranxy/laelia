@@ -33,7 +33,7 @@ func NewIPValidator(policy IPValidationPolicy, trustProxy bool) *IPValidator {
 func (v *IPValidator) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		if v.policy != IPValidationOff {
-			sourceIP := extractSourceIP(req.Header(), v.trustProxy)
+			sourceIP := extractSourceIP(req.Header(), peerRemoteAddr(req.Peer()), v.trustProxy)
 			if sourceIP != "" {
 				ctx = context.WithValue(ctx, common.SourceIPContextKey, sourceIP)
 			}
@@ -51,7 +51,7 @@ func (*IPValidator) WrapStreamingClient(next connect.StreamingClientFunc) connec
 func (v *IPValidator) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 		if v.policy != IPValidationOff {
-			sourceIP := extractSourceIP(conn.RequestHeader(), v.trustProxy)
+			sourceIP := extractSourceIP(conn.RequestHeader(), peerRemoteAddr(conn.Peer()), v.trustProxy)
 			if sourceIP != "" {
 				ctx = context.WithValue(ctx, common.SourceIPContextKey, sourceIP)
 			}
@@ -61,7 +61,23 @@ func (v *IPValidator) WrapStreamingHandler(next connect.StreamingHandlerFunc) co
 }
 
 func ValidateAgentIP(reportedIP string, sourceIP string, policy IPValidationPolicy) error {
-	if policy == IPValidationOff || reportedIP == "" || sourceIP == "" {
+	if policy == IPValidationOff {
+		return nil
+	}
+	// IP validation is configured (Warn or Strict). An empty source IP means the
+	// caller's real address could not be established (no trusted forwarding
+	// header and no peer address). Under Strict — allowlist enforcement — this
+	// must fail closed: an attacker who suppresses the source IP must not bypass
+	// the allowlist. Under Warn we log and proceed (advisory only).
+	if sourceIP == "" {
+		if policy == IPValidationStrict {
+			return connect.NewError(connect.CodePermissionDenied,
+				errs.Errorf("agent source IP unavailable; cannot enforce IP allowlist"))
+		}
+		slog.Warn("agent source IP unavailable; skipping IP validation")
+		return nil
+	}
+	if reportedIP == "" {
 		return nil
 	}
 	if reportedIP != sourceIP {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -80,7 +81,7 @@ type authResult struct {
 // WrapUnary implements the ConnectRPC interceptor interface for unary RPCs.
 func (in *APIAuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		sourceIP := extractSourceIP(req.Header(), false)
+		sourceIP := extractSourceIP(req.Header(), peerRemoteAddr(req.Peer()), in.profile.TrustProxy)
 		ctx = context.WithValue(ctx, common.SourceIPContextKey, sourceIP)
 
 		accessTokenStr, err := GetTokenFromHeaders(req.Header())
@@ -125,7 +126,7 @@ func (*APIAuthInterceptor) WrapStreamingClient(next connect.StreamingClientFunc)
 // WrapStreamingHandler implements the ConnectRPC interceptor interface for streaming handlers.
 func (in *APIAuthInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-		sourceIP := extractSourceIP(conn.RequestHeader(), false)
+		sourceIP := extractSourceIP(conn.RequestHeader(), peerRemoteAddr(conn.Peer()), in.profile.TrustProxy)
 		ctx = context.WithValue(ctx, common.SourceIPContextKey, sourceIP)
 
 		accessTokenStr, err := GetTokenFromHeaders(conn.RequestHeader())
@@ -315,7 +316,15 @@ func audienceContains(audience jwt.ClaimStrings, token string) bool {
 	return false
 }
 
-func extractSourceIP(headers http.Header, trustProxy bool) string {
+// extractSourceIP resolves the client source IP for a request.
+//
+// When trustProxy is true, the leftmost X-Forwarded-For entry (or X-Real-IP) is
+// trusted — but only when the server sits behind a trusted reverse proxy that
+// overwrites client-supplied values. Otherwise the raw TCP peer address
+// (remoteAddr) is used, so the source IP is always populated for downstream IP
+// allowlists and rate limiters. Client-supplied forwarding headers are ignored
+// entirely when trustProxy is false, preventing spoofing.
+func extractSourceIP(headers http.Header, remoteAddr string, trustProxy bool) string {
 	if trustProxy {
 		if xff := headers.Get("X-Forwarded-For"); xff != "" {
 			ips := strings.SplitN(xff, ",", 2)
@@ -325,7 +334,26 @@ func extractSourceIP(headers http.Header, trustProxy bool) string {
 			return strings.TrimSpace(xri)
 		}
 	}
-	return ""
+	return stripPort(remoteAddr)
+}
+
+// peerRemoteAddr returns the connect peer's remote address (the raw TCP
+// "host:port" of the client), or "" when unavailable (e.g. an in-process call).
+func peerRemoteAddr(peer connect.Peer) string {
+	return peer.Addr
+}
+
+// stripPort removes the port from a "host:port" / "[host]:port" address,
+// returning the host as-is when it is not an authority form.
+func stripPort(addr string) string {
+	if addr == "" {
+		return ""
+	}
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
+	}
+	return host
 }
 
 type claimsMessage struct {

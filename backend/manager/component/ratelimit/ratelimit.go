@@ -2,6 +2,7 @@ package ratelimit
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -83,7 +84,7 @@ func (rl *RateLimiter) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		}
 
 		procedure := req.Spec().Procedure
-		sourceIP := getSourceIP(req.Header(), rl.cfg.TrustProxy)
+		sourceIP := getSourceIP(req.Header(), req.Peer().Addr, rl.cfg.TrustProxy)
 
 		switch {
 		case isConnectProcedure(procedure):
@@ -108,6 +109,15 @@ func (rl *RateLimiter) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 			userID := extractIdentifier(ctx, common.UserContextKey)
 			if userID != "" {
 				limiter := rl.getUserLimiter(userID)
+				if !limiter.Allow() {
+					return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("API rate limit exceeded"))
+				}
+			} else {
+				// Anonymous callers (unauthenticated) have no user identity to pin a
+				// per-user limiter to. Fall back to per-IP so a single source cannot
+				// fan out anonymous requests — e.g. CreateUser brute-force — while
+				// relying solely on the shared global budget.
+				limiter := rl.getIPLimiter(sourceIP)
 				if !limiter.Allow() {
 					return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("API rate limit exceeded"))
 				}
@@ -166,15 +176,26 @@ func (rl *RateLimiter) getUserLimiter(userID string) *rate.Limiter {
 	return limiter
 }
 
-func getSourceIP(headers http.Header, trustProxy bool) string {
+// getSourceIP resolves the client source IP for rate-limit keying. Forwarding
+// headers are only honored when trustProxy is true (server behind a trusted
+// reverse proxy that overwrites them); otherwise the raw TCP peer address is
+// used. Client-supplied X-Real-IP is never trusted when trustProxy is false,
+// preventing IP spoofing to dodge or pin rate limits.
+func getSourceIP(headers http.Header, remoteAddr string, trustProxy bool) string {
 	if trustProxy {
 		if xff := headers.Get("X-Forwarded-For"); xff != "" {
 			ips := strings.SplitN(xff, ",", 2)
 			return strings.TrimSpace(ips[0])
 		}
+		if xri := headers.Get("X-Real-IP"); xri != "" {
+			return strings.TrimSpace(xri)
+		}
 	}
-	if xri := headers.Get("X-Real-IP"); xri != "" {
-		return strings.TrimSpace(xri)
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil && host != "" {
+		return host
+	}
+	if remoteAddr != "" {
+		return remoteAddr
 	}
 	return "unknown"
 }
