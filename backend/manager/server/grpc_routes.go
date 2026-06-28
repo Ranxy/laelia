@@ -39,6 +39,7 @@ func configureGrpcRouters(
 	profile *config.Profile,
 	stateCfg *state.State,
 	s3clientmanager *s3client.Client,
+	cmdDispatcher *dispatcher.Dispatcher,
 ) error {
 	gatewayMarshaler := &grpcruntime.HTTPBodyMarshaler{
 		Marshaler: newSuggestingMarshaler(&grpcruntime.JSONPb{
@@ -74,7 +75,6 @@ func configureGrpcRouters(
 		}),
 	)
 
-	cmdDispatcher := dispatcher.New(stores)
 	cmdDispatcher.StartPingMonitor()
 
 	userService := apiv1.NewUserService(stores, profile, stateCfg)

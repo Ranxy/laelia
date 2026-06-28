@@ -14,6 +14,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/common/log"
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
+	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/config"
@@ -44,6 +45,10 @@ type Server struct {
 	// s3clientManager is the shared S3 client used by the CommandService file RPCs and
 	// the SettingService.
 	s3clientManager *s3client.Client
+
+	// dispatcher is the command dispatcher; Stop joins its ping monitor and
+	// grace goroutines on shutdown.
+	dispatcher *dispatcher.Dispatcher
 
 	// boot specifies that whether the server boot correctly
 	cancel context.CancelFunc
@@ -94,7 +99,9 @@ func NewServer(ctx context.Context, profile *config.Profile) (*Server, error) {
 		return nil, errors.Wrapf(err, "failed to get secret")
 	}
 
-	if err := configureGrpcRouters(ctx, s.echoServer, s.store, secret, s.profile, s.stateCfg, s.s3clientManager); err != nil {
+	s.dispatcher = dispatcher.New(stores)
+
+	if err := configureGrpcRouters(ctx, s.echoServer, s.store, secret, s.profile, s.stateCfg, s.s3clientManager, s.dispatcher); err != nil {
 		return nil, errors.Wrapf(err, "failed to configure gRPC routers")
 	}
 
@@ -152,7 +159,8 @@ func (s *Server) Run(ctx context.Context, port int) error {
 	}()
 
 	if s.stateCfg.HeartbeatBuffer != nil {
-		go s.stateCfg.HeartbeatBuffer.Start(s.runnerCtx)
+		// Start spawns its own goroutine and is idempotent.
+		s.stateCfg.HeartbeatBuffer.Start(s.runnerCtx)
 	}
 
 	// pprof is served on a separate, dedicated listener — never the public
@@ -200,6 +208,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// Shutdown the standalone pprof server (best-effort; it may be nil).
 	if s.pprofServer != nil {
 		_ = s.pprofServer.Shutdown(ctx)
+	}
+
+	// Join the dispatcher's ping monitor and any in-flight grace goroutines
+	// before closing the store, so they do not use a closed *sql.DB.
+	if s.dispatcher != nil {
+		s.dispatcher.Stop()
 	}
 
 	s.runnerWG.Wait()

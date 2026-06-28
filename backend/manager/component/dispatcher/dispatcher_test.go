@@ -1,11 +1,15 @@
 package dispatcher
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -368,5 +372,120 @@ func TestCurrentCommandID(t *testing.T) {
 	d.sessions[7].currentCmdID = cmd
 	if got := d.CurrentCommandID(7); got != cmd {
 		t.Errorf("expected %q, got %q", cmd, got)
+	}
+}
+
+// ---- T11: concurrency, lifecycle, grace period ----
+
+func noopSend(_ *v1pb.ManagerStreamMessage) error { return nil }
+
+// TestDispatcher_Send_NoDataRace hammers concurrent Register/Unregister/Send/
+// NotifyNewMessages/NotifyWake on a shared dispatcher. Run with -race: the
+// previous `send` field was written under sess.mu and read under sendMu (a
+// race on the same field); the atomic.Pointer + single deliver path makes it
+// race-free.
+func TestDispatcher_Send_NoDataRace(t *testing.T) {
+	d := New(nil)
+	defer d.Stop()
+
+	const agents = 8
+	const iters = 100
+	var wg sync.WaitGroup
+	for i := 0; i < agents; i++ {
+		agentID := i + 1
+		resourceID := fmt.Sprintf("agents/a%d", agentID)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < iters; j++ {
+				sess := d.RegisterAgent(context.Background(), agentID, resourceID, noopSend)
+
+				var swg sync.WaitGroup
+				for k := 0; k < 4; k++ {
+					swg.Add(1)
+					go func() {
+						defer swg.Done()
+						_ = sess.Send(&v1pb.ManagerStreamMessage{})
+						d.NotifyWake(context.Background(), agentID)
+						d.NotifyNewMessages(context.Background(), agentID, uuid.NewString(), 1)
+					}()
+				}
+				swg.Wait()
+				d.UnregisterAgent(agentID)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// TestDispatcher_GracePeriodCanceledOnReconnect verifies a reconnect cancels a
+// pending grace-period timer for the agent's in-flight command. The grace
+// goroutine (60s timer) must exit promptly via ctx cancellation rather than
+// sleeping the full period; d.wg.Wait() returning quickly proves it. If the
+// cancel did not propagate, wg.Wait would block for 60s and the test times out.
+func TestDispatcher_GracePeriodCanceledOnReconnect(t *testing.T) {
+	d := New(nil)
+	defer d.Stop()
+
+	sess := d.RegisterAgent(context.Background(), 1, "agents/a1", noopSend)
+	cmd := uuid.NewString()
+	sess.mu.Lock()
+	sess.currentCmdID = cmd
+	sess.mu.Unlock()
+
+	d.UnregisterAgent(1) // arms the grace timer for cmd
+
+	d.graceMu.Lock()
+	hasGrace := len(d.grace[1]) > 0
+	d.graceMu.Unlock()
+	require.True(t, hasGrace, "grace timer should be armed after unregister")
+
+	// Reconnect: RegisterAgent cancels the pending grace for this agent.
+	d.RegisterAgent(context.Background(), 1, "agents/a1", noopSend)
+
+	waited := make(chan struct{})
+	go func() {
+		d.wg.Wait() // joins the cancelled grace goroutine
+		close(waited)
+	}()
+	select {
+	case <-waited:
+	case <-time.After(3 * time.Second):
+		t.Fatal("grace goroutine was not cancelled by reconnect (wg.Wait blocked)")
+	}
+
+	d.graceMu.Lock()
+	empty := len(d.grace[1]) == 0
+	d.graceMu.Unlock()
+	require.True(t, empty, "grace entry should be cleared after reconnect cancelled it")
+}
+
+// TestDispatcher_ShutdownJoinsGoroutines starts the ping monitor and arms
+// several grace timers, then asserts Stop returns within a timeout — i.e. the
+// lifecycle context cancels the ping ticker and every grace goroutine and the
+// WaitGroup joins them. Previously the ping goroutine had no context/join.
+func TestDispatcher_ShutdownJoinsGoroutines(t *testing.T) {
+	d := New(nil)
+	d.StartPingMonitor()
+
+	for i := 0; i < 4; i++ {
+		agentID := i + 1
+		resourceID := fmt.Sprintf("agents/a%d", agentID)
+		sess := d.RegisterAgent(context.Background(), agentID, resourceID, noopSend)
+		sess.mu.Lock()
+		sess.currentCmdID = uuid.NewString()
+		sess.mu.Unlock()
+		d.UnregisterAgent(agentID) // arms grace
+	}
+
+	done := make(chan struct{})
+	go func() {
+		d.Stop()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Stop did not join ping monitor + grace goroutines within 3s")
 	}
 }

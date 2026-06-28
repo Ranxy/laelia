@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ import (
 
 const (
 	gracePeriod    = 60 * time.Second
+	graceDBTimeout = 10 * time.Second
 	watcherBufSize = 256
 )
 
@@ -26,22 +28,36 @@ type AgentSession struct {
 	agentID         int
 	agentResourceID string
 	currentCmdID    string
-	send            SendFunc
-	sendMu          sync.Mutex
-	lastPingAt      time.Time
-	connectedAt     time.Time
-	mu              sync.Mutex
+	// send is the raw bidi-stream send function. It is nil once the session is
+	// invalidated (agent disconnected or replaced). Stored in an atomic pointer
+	// so RegisterAgent/UnregisterAgent (writers) and deliver (reader) never race
+	// on the field — previously `send` was written under sess.mu and read under
+	// sendMu, a data race on the same field.
+	send        atomic.Pointer[SendFunc]
+	sendMu      sync.Mutex // serializes concurrent sends on the same bidi stream
+	lastPingAt  time.Time
+	connectedAt time.Time
+	mu          sync.Mutex // guards currentCmdID, lastPingAt, connectedAt
+}
+
+// deliver sends msg to the agent, serializing concurrent sends on the stream
+// and returning an error if the session has been invalidated. All outbound
+// messages route through this single path so the underlying stream send is
+// never called concurrently (gRPC bidi sends are not safe for concurrent use).
+func (s *AgentSession) deliver(msg *v1pb.ManagerStreamMessage) error {
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
+	fn := s.send.Load()
+	if fn == nil {
+		return errors.New("agent session invalidated")
+	}
+	return (*fn)(msg)
 }
 
 // Send sends a message to the agent over its bidi stream. It is safe for
 // concurrent use (e.g. from the Phase 2 held-action re-prompt path).
 func (s *AgentSession) Send(msg *v1pb.ManagerStreamMessage) error {
-	s.sendMu.Lock()
-	defer s.sendMu.Unlock()
-	if s.send == nil {
-		return errors.New("agent session invalidated")
-	}
-	return s.send(msg)
+	return s.deliver(msg)
 }
 
 // ClearCurrentCommand clears the session's current command id when it matches
@@ -62,16 +78,36 @@ type Dispatcher struct {
 	eventWatchers map[string]map[chan *v1pb.CommandEvent]struct{}
 	pingInterval  time.Duration
 	pingTimeout   time.Duration
+
+	// lifecycleCtx is the parent context for the ping monitor and the
+	// grace-period goroutines. Stop cancels it and waits on wg, so shutdown
+	// joins every dispatcher-spawned goroutine instead of leaving the ping
+	// ticker running for the process lifetime.
+	lifecycleCtx    context.Context
+	lifecycleCancel context.CancelFunc
+	wg              sync.WaitGroup
+
+	// grace tracks in-flight grace-period timers keyed by agent then command,
+	// so a reconnect can cancel a pending "mark FAILED" timer for that agent
+	// (the reconnect path reaps stale commands itself). Without this, a
+	// reconnect racing the 60s timer could mark a command FAILED out from
+	// under the new session.
+	graceMu sync.Mutex
+	grace   map[int]map[string]context.CancelFunc
 }
 
 func New(s *store.Store) *Dispatcher {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Dispatcher{
-		store:         s,
-		sessions:      make(map[int]*AgentSession),
-		watchers:      make(map[string]map[chan *v1pb.CommandOutput]struct{}),
-		eventWatchers: make(map[string]map[chan *v1pb.CommandEvent]struct{}),
-		pingInterval:  15 * time.Second,
-		pingTimeout:   45 * time.Second,
+		store:           s,
+		sessions:        make(map[int]*AgentSession),
+		watchers:        make(map[string]map[chan *v1pb.CommandOutput]struct{}),
+		eventWatchers:   make(map[string]map[chan *v1pb.CommandEvent]struct{}),
+		pingInterval:    15 * time.Second,
+		pingTimeout:     45 * time.Second,
+		grace:           make(map[int]map[string]context.CancelFunc),
+		lifecycleCtx:    ctx,
+		lifecycleCancel: cancel,
 	}
 }
 
@@ -81,10 +117,17 @@ func (d *Dispatcher) RegisterAgent(_ context.Context, agentID int, agentResource
 
 	if old, ok := d.sessions[agentID]; ok {
 		slog.Info("replacing existing agent session", "agentID", agentID)
-		old.mu.Lock()
-		old.send = nil
-		old.mu.Unlock()
+		// Invalidate the previous session's send so in-flight deliver calls
+		// error out instead of writing to the torn-down stream. The atomic
+		// store is race-free against concurrent deliver readers.
+		old.send.Store(nil)
 	}
+
+	// The agent reconnected: cancel any pending grace-period "mark FAILED"
+	// timers for its in-flight commands. The reconnect path (handleAgentReady)
+	// reaps stale RUNNING commands itself, so a dangling 60s timer is redundant
+	// and racy (it could mark a command FAILED out from under the new session).
+	d.cancelGraceForAgent(agentID)
 
 	sess := &AgentSession{
 		agentID:         agentID,
@@ -92,11 +135,8 @@ func (d *Dispatcher) RegisterAgent(_ context.Context, agentID int, agentResource
 		connectedAt:     time.Now(),
 		lastPingAt:      time.Now(),
 	}
-	sess.send = func(msg *v1pb.ManagerStreamMessage) error {
-		sess.sendMu.Lock()
-		defer sess.sendMu.Unlock()
-		return send(msg)
-	}
+	fn := send
+	sess.send.Store(&fn)
 
 	d.sessions[agentID] = sess
 	slog.Info("agent registered for command dispatch", "agentID", agentID)
@@ -109,23 +149,25 @@ func (d *Dispatcher) RegisterAgent(_ context.Context, agentID int, agentResource
 
 func (d *Dispatcher) UnregisterAgent(agentID int) {
 	d.mu.Lock()
-	defer d.mu.Unlock()
-
 	sess, ok := d.sessions[agentID]
 	if !ok {
+		d.mu.Unlock()
 		return
 	}
+	delete(d.sessions, agentID)
+	d.mu.Unlock()
 
 	sess.mu.Lock()
 	cmdID := sess.currentCmdID
-	sess.send = nil
 	sess.mu.Unlock()
+	// Invalidate send so any concurrent deliver returns "agent session
+	// invalidated" rather than writing to the closed stream.
+	sess.send.Store(nil)
 
-	delete(d.sessions, agentID)
 	slog.Info("agent unregistered from command dispatch", "agentID", agentID)
 
 	if cmdID != "" {
-		go d.handleCommandGracePeriod(agentID, cmdID)
+		d.startGracePeriod(agentID, cmdID)
 	}
 }
 
@@ -225,14 +267,6 @@ func (d *Dispatcher) NotifyNewMessages(_ context.Context, agentID int, conversat
 		return
 	}
 
-	sess.mu.Lock()
-	send := sess.send
-	sess.mu.Unlock()
-
-	if send == nil {
-		return
-	}
-
 	msg := &v1pb.ManagerStreamMessage{
 		Message: &v1pb.ManagerStreamMessage_NewMessages{
 			NewMessages: &v1pb.NewMessagesAvailable{
@@ -242,7 +276,7 @@ func (d *Dispatcher) NotifyNewMessages(_ context.Context, agentID int, conversat
 		},
 	}
 
-	if err := send(msg); err != nil {
+	if err := sess.deliver(msg); err != nil {
 		slog.Warn("failed to send NewMessagesAvailable", "agentID", agentID, "error", err)
 	}
 }
@@ -260,19 +294,12 @@ func (d *Dispatcher) NotifyWake(_ context.Context, agentID int) {
 		return
 	}
 
-	sess.mu.Lock()
-	send := sess.send
-	sess.mu.Unlock()
-	if send == nil {
-		return
-	}
-
 	msg := &v1pb.ManagerStreamMessage{
 		Message: &v1pb.ManagerStreamMessage_NewMessages{
 			NewMessages: &v1pb.NewMessagesAvailable{},
 		},
 	}
-	if err := send(msg); err != nil {
+	if err := sess.deliver(msg); err != nil {
 		slog.Warn("failed to send wake to agent", "agentID", agentID, "error", err)
 	}
 }
@@ -391,14 +418,6 @@ func (d *Dispatcher) CancelCommand(_ context.Context, agentID int, commandID str
 		return errors.New("agent not connected")
 	}
 
-	sess.mu.Lock()
-	send := sess.send
-	sess.mu.Unlock()
-
-	if send == nil {
-		return errors.New("agent session invalidated")
-	}
-
 	msg := &v1pb.ManagerStreamMessage{
 		Message: &v1pb.ManagerStreamMessage_Cancel{
 			Cancel: &v1pb.CancelMessage{
@@ -407,7 +426,7 @@ func (d *Dispatcher) CancelCommand(_ context.Context, agentID int, commandID str
 		},
 	}
 
-	if err := send(msg); err != nil {
+	if err := sess.deliver(msg); err != nil {
 		slog.Error("failed to send cancel to agent", "error", err)
 		return errors.Wrapf(err, "failed to send cancel to agent")
 	}
@@ -425,14 +444,6 @@ func (d *Dispatcher) RespondPermission(_ context.Context, agentID int, commandID
 		return errors.New("agent not connected")
 	}
 
-	sess.mu.Lock()
-	send := sess.send
-	sess.mu.Unlock()
-
-	if send == nil {
-		return errors.New("agent session invalidated")
-	}
-
 	msg := &v1pb.ManagerStreamMessage{
 		Message: &v1pb.ManagerStreamMessage_PermissionDecision{
 			PermissionDecision: &v1pb.PermissionDecision{
@@ -442,7 +453,7 @@ func (d *Dispatcher) RespondPermission(_ context.Context, agentID int, commandID
 		},
 	}
 
-	if err := send(msg); err != nil {
+	if err := sess.deliver(msg); err != nil {
 		slog.Error("failed to send permission decision to agent", "error", err)
 		return errors.Wrapf(err, "failed to send permission decision to agent")
 	}
@@ -665,15 +676,33 @@ func (d *Dispatcher) HandlePing(agentID int, _ *v1pb.Ping) {
 	}
 }
 
+// StartPingMonitor launches the liveness ticker. It runs until Stop cancels
+// the dispatcher's lifecycle context, and is tracked on the dispatcher's
+// WaitGroup so shutdown joins it. Previously the goroutine had no context and
+// no join, so it ran for the whole process lifetime with no way to stop it.
 func (d *Dispatcher) StartPingMonitor() {
+	d.wg.Add(1)
 	go func() {
+		defer d.wg.Done()
 		ticker := time.NewTicker(d.pingInterval)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			d.checkSessionLiveness()
+		for {
+			select {
+			case <-d.lifecycleCtx.Done():
+				return
+			case <-ticker.C:
+				d.checkSessionLiveness()
+			}
 		}
 	}()
+}
+
+// Stop cancels the dispatcher's lifecycle context (ping monitor + any
+// in-flight grace goroutines) and waits for them to exit. Idempotent.
+func (d *Dispatcher) Stop() {
+	d.lifecycleCancel()
+	d.wg.Wait()
 }
 
 func (d *Dispatcher) checkSessionLiveness() {
@@ -689,10 +718,11 @@ func (d *Dispatcher) checkSessionLiveness() {
 		sess.mu.Lock()
 		idle := now.Sub(sess.lastPingAt)
 		agentID := sess.agentID
-		send := sess.send
 		sess.mu.Unlock()
 
-		if send == nil {
+		// Skip invalidated sessions (send is an atomic pointer now, not
+		// guarded by mu).
+		if sess.send.Load() == nil {
 			continue
 		}
 
@@ -706,25 +736,85 @@ func (d *Dispatcher) checkSessionLiveness() {
 	}
 }
 
-func (d *Dispatcher) handleCommandGracePeriod(agentID int, commandID string) {
+// startGracePeriod arms a cancellable 60s timer that, if it fires, marks the
+// given command FAILED. The timer is tracked in d.grace so a reconnect can
+// cancel it (the reconnect path reaps stale commands itself). The goroutine
+// is tracked on the dispatcher's WaitGroup so Stop joins it.
+func (d *Dispatcher) startGracePeriod(agentID int, commandID string) {
+	ctx, cancel := context.WithCancel(d.lifecycleCtx)
+
+	d.graceMu.Lock()
+	cmds := d.grace[agentID]
+	if cmds == nil {
+		cmds = make(map[string]context.CancelFunc)
+		d.grace[agentID] = cmds
+	}
+	cmds[commandID] = cancel
+	d.graceMu.Unlock()
+
+	d.wg.Add(1)
+	go d.handleCommandGracePeriod(ctx, agentID, commandID)
+}
+
+// cancelGraceForAgent cancels every pending grace timer for an agent. Called
+// on reconnect so a dangling 60s "mark FAILED" does not race the new session.
+func (d *Dispatcher) cancelGraceForAgent(agentID int) {
+	d.graceMu.Lock()
+	cmds := d.grace[agentID]
+	delete(d.grace, agentID)
+	d.graceMu.Unlock()
+	for _, cancel := range cmds {
+		cancel()
+	}
+}
+
+// finishGrace removes a grace timer's entry once its goroutine exits.
+func (d *Dispatcher) finishGrace(agentID int, commandID string) {
+	d.graceMu.Lock()
+	defer d.graceMu.Unlock()
+	if cmds := d.grace[agentID]; cmds != nil {
+		delete(cmds, commandID)
+		if len(cmds) == 0 {
+			delete(d.grace, agentID)
+		}
+	}
+}
+
+func (d *Dispatcher) handleCommandGracePeriod(ctx context.Context, agentID int, commandID string) {
+	defer d.wg.Done()
+	defer d.finishGrace(agentID, commandID)
+
 	cmdUUID, err := uuid.Parse(commandID)
 	if err != nil {
 		return
 	}
 
-	time.Sleep(gracePeriod)
+	// A cancellable timer instead of a bare time.Sleep: a reconnect cancels
+	// this context via cancelGraceForAgent, so the timer does not mark a
+	// command FAILED out from under the new session.
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(gracePeriod):
+	}
 
+	// Belt-and-suspenders: if the agent reconnected between the timer firing
+	// and here, the reconnect path reaps the stale command — leave it alone.
 	d.mu.RLock()
 	_, reconnected := d.sessions[agentID]
 	d.mu.RUnlock()
-
 	if reconnected {
 		return
 	}
 
+	// Bound the DB call so a hung Postgres does not accumulate blocked grace
+	// goroutines. Previously this used a bare context.Background() with no
+	// deadline.
+	dbCtx, cancel := context.WithTimeout(d.lifecycleCtx, graceDBTimeout)
+	defer cancel()
 	status := int32(v1pb.CommandStatus_FAILED)
 	now := time.Now()
-	if err := d.store.UpdateCommandStatus(context.Background(), cmdUUID, status, nil, &now, nil, nil, "agent disconnected during execution"); err != nil {
+	if err := d.store.UpdateCommandStatus(dbCtx, cmdUUID, status, nil, &now, nil, nil, "agent disconnected during execution"); err != nil {
 		slog.Error("failed to mark command as failed after grace period", "commandID", commandID, "error", err)
 	}
 
