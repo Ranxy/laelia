@@ -10,7 +10,7 @@ import MarkdownRender, {
   MarkdownCodeBlockNode,
   setCustomComponents,
 } from "markstream-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { FileCard } from "@/components/chat/FileCard";
@@ -25,6 +25,12 @@ import { useAppStore } from "@/react/stores";
 import type { ChatMessageUI } from "@/react/stores/types";
 import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
 import { CommandEventType } from "@/types/proto-es/v1/command_pb";
+
+// Stable empty fallbacks so selectors returning `undefined` for an unloaded
+// conversation don't create a new array literal each run (which would defeat
+// zustand's Object.is equality and re-render on every store change).
+const EMPTY_MESSAGES: ChatMessageUI[] = [];
+const EMPTY_EVENTS: CommandEvent[] = [];
 
 setCustomComponents({
   // biome-ignore lint/suspicious/noExplicitAny: markstream custom component API is loosely typed
@@ -42,6 +48,26 @@ function formatTime(date: Date): string {
   const hours = date.getHours().toString().padStart(2, "0");
   const minutes = date.getMinutes().toString().padStart(2, "0");
   return `${hours}:${minutes}`;
+}
+
+// Computes the streaming props for a single row. Only the row that is
+// actively streaming (`msg.streaming` with a bound commandName) receives the
+// live streamingContent/streamingEvents slices; every other row gets stable
+// empty / own-event values so React.memo skips it when the parent re-renders
+// on each streamed token. Extracted as a pure helper so the per-row dispatch
+// is unit-testable without rendering the whole page.
+export function rowStreamingProps(
+  msg: ChatMessageUI,
+  isStreamingRow: boolean,
+  streamingContent: string,
+  streamingEvents: CommandEvent[]
+): { streamingContent: string; streamingEvents: CommandEvent[] } {
+  return {
+    streamingContent: isStreamingRow ? streamingContent : "",
+    streamingEvents: isStreamingRow
+      ? streamingEvents
+      : (msg.events ?? EMPTY_EVENTS),
+  };
 }
 
 function pairToolCallEvents(events: CommandEvent[]) {
@@ -63,14 +89,20 @@ export function ChatPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const agent = agentResourceName(agentId);
 
-  const agentCache = useAppStore((s) => s.agentCache);
-  const agentTitle = agentCache[agent]?.title ?? agentId ?? "";
-
-  const conversations = useAppStore((s) => s.conversations);
-  const chatMessages = useAppStore((s) => s.chatMessages);
-  const chatLoading = useAppStore((s) => s.chatLoading);
-  const streamingContent = useAppStore((s) => s.streamingContent);
-  const streamingEvents = useAppStore((s) => s.streamingEvents);
+  // Fine-grained selectors: subscribe to per-key slices instead of whole
+  // record maps. zustand's default Object.is equality means a component only
+  // re-renders when its specific slice's reference changes, so streaming a
+  // token in one conversation no longer re-renders components subscribed to
+  // another. The action functions below are stable refs defined once in the
+  // store slice, so selecting them never causes a re-render.
+  const agentTitle =
+    useAppStore((s) => s.agentCache[agent]?.title) ?? agentId ?? "";
+  const conversation = useAppStore((s) => s.conversations[agent]);
+  const messages =
+    useAppStore((s) => s.chatMessages[conversation]) ?? EMPTY_MESSAGES;
+  const loading = useAppStore((s) =>
+    conversation ? s.chatLoading[conversation] : false
+  );
   const getOrCreateConversation = useAppStore((s) => s.getOrCreateConversation);
   const loadMessages = useAppStore((s) => s.loadMessages);
   const sendChatMessage = useAppStore((s) => s.sendChatMessage);
@@ -84,14 +116,25 @@ export function ChatPage() {
   const [showScrollDown, setShowScrollDown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const conversation = conversations[agent];
-  const messages = conversation ? (chatMessages[conversation] ?? []) : [];
-  const loading = conversation ? (chatLoading[conversation] ?? false) : false;
-
   const streamingCommandName = useMemo(() => {
     const streamingMsg = messages.find((m) => m.streaming && m.commandName);
     return streamingMsg?.commandName;
   }, [messages]);
+
+  // Subscribe only to the streaming command's slice, not the whole
+  // streamingContent/streamingEvents maps. streamingCommandName is undefined
+  // when nothing is streaming, so guard the lookup (undefined is not a valid
+  // record key).
+  const streamingContent =
+    useAppStore((s) =>
+      streamingCommandName
+        ? s.streamingContent[streamingCommandName]
+        : undefined
+    ) ?? "";
+  const streamingEvents =
+    useAppStore((s) =>
+      streamingCommandName ? s.streamingEvents[streamingCommandName] : undefined
+    ) ?? EMPTY_EVENTS;
 
   const init = useCallback(async () => {
     if (lastAgentRef.current === agent) return;
@@ -184,6 +227,16 @@ export function ChatPage() {
 
   const isStreaming = sending || !!streamingCommandName;
 
+  // Stable per-page callback (depends only on agentId + navigate, both stable
+  // across token re-renders) so memoized MessageRows don't re-render when the
+  // parent re-renders. Each row passes its own commandId.
+  const viewCommand = useCallback(
+    (commandId: string) => {
+      navigate(`/agents/${agentId}/commands/${commandId}`);
+    },
+    [agentId, navigate]
+  );
+
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
       {/* Messages scroll area */}
@@ -210,27 +263,25 @@ export function ChatPage() {
           {messages.map((msg, idx) => {
             const prevMsg = idx > 0 ? messages[idx - 1] : null;
             const showAvatar = !prevMsg || prevMsg.role !== msg.role;
+            const isStreamingRow = !!(msg.streaming && msg.commandName);
+            const rowProps = rowStreamingProps(
+              msg,
+              isStreamingRow,
+              streamingContent,
+              streamingEvents
+            );
             return (
               <MessageRow
                 key={msg.id}
                 msg={msg}
                 showAvatar={showAvatar}
                 agentTitle={agentTitle}
-                streamingContent={
-                  msg.streaming && msg.commandName
-                    ? (streamingContent[msg.commandName] ?? "")
-                    : ""
-                }
-                streamingEvents={
-                  msg.streaming && msg.commandName
-                    ? (streamingEvents[msg.commandName] ?? [])
-                    : (msg.events ?? [])
-                }
-                onViewDetails={() => {
-                  if (msg.commandId) {
-                    navigate(`/agents/${agentId}/commands/${msg.commandId}`);
-                  }
-                }}
+                // Only the streaming row receives live streaming props; every
+                // other row gets stable empty/own-events so memo skips it when
+                // the parent re-renders on each token.
+                streamingContent={rowProps.streamingContent}
+                streamingEvents={rowProps.streamingEvents}
+                onViewDetails={viewCommand}
               />
             );
           })}
@@ -337,7 +388,7 @@ function Avatar({ label }: { label: string }) {
   );
 }
 
-function MessageRow({
+export const MessageRow = memo(function MessageRow({
   msg,
   showAvatar,
   agentTitle,
@@ -350,7 +401,7 @@ function MessageRow({
   agentTitle: string;
   streamingContent: string;
   streamingEvents: CommandEvent[];
-  onViewDetails: () => void;
+  onViewDetails: (commandId: string) => void;
 }) {
   const { t } = useTranslation();
   const isUser = msg.role === "user";
@@ -545,7 +596,9 @@ function MessageRow({
           <button
             type="button"
             className="text-xs text-control-placeholder hover:text-accent px-0.5 cursor-pointer transition-colors"
-            onClick={onViewDetails}
+            onClick={() => {
+              if (msg.commandId) onViewDetails(msg.commandId);
+            }}
           >
             {t("chat.view-details")} &rarr;
           </button>
@@ -553,4 +606,4 @@ function MessageRow({
       </div>
     </div>
   );
-}
+});

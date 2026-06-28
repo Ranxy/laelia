@@ -47,8 +47,19 @@ import {
 import { cn } from "@/react/lib/utils";
 import { useAppStore } from "@/react/stores";
 import type { ChatMessageUI } from "@/react/stores/types";
-import type { Attachment } from "@/types/proto-es/v1/command_pb";
+import type {
+  AgentActivity,
+  Attachment,
+  ChannelMember,
+} from "@/types/proto-es/v1/command_pb";
 import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
+
+// Stable empty fallbacks so per-key selectors returning undefined for an
+// unloaded channel don't mint a new array each run (which would defeat
+// zustand's Object.is equality and re-render on every store change).
+const EMPTY_MESSAGES: ChatMessageUI[] = [];
+const EMPTY_MEMBERS: ChannelMember[] = [];
+const EMPTY_ACTIVITIES: AgentActivity[] = [];
 
 setCustomComponents({
   // biome-ignore lint/suspicious/noExplicitAny: markstream custom component API is loosely typed
@@ -83,13 +94,8 @@ export function ChannelChatPage() {
   const { channelId } = useParams<{ channelId: string }>();
 
   const channels = useAppStore((s) => s.channels);
-  const chatMessages = useAppStore((s) => s.chatMessages);
-  const chatLoading = useAppStore((s) => s.chatLoading);
   const loadMessages = useAppStore((s) => s.loadMessages);
   const sendChannelMessage = useAppStore((s) => s.sendChannelMessage);
-  const channelMembersByConv = useAppStore((s) => s.channelMembersByConv);
-  const channelMembersLoading = useAppStore((s) => s.channelMembersLoading);
-  const agentActivities = useAppStore((s) => s.agentActivities);
   const listChannelMembers = useAppStore((s) => s.listChannelMembers);
   const startWatchingChannel = useAppStore((s) => s.startWatchingChannel);
   const stopWatchingChannel = useAppStore((s) => s.stopWatchingChannel);
@@ -99,6 +105,24 @@ export function ChannelChatPage() {
   const agents = useAppStore((s) => s.agents);
   const fetchAgents = useAppStore((s) => s.fetchAgents);
   const fetchChannels = useAppStore((s) => s.fetchChannels);
+
+  const conversationName = channelId ? `conversations/${channelId}` : "";
+  // Per-key slices: subscribe only to this channel's records, not the whole
+  // map, so activity in other channels no longer re-renders this page. The
+  // action functions above are stable store refs and never cause re-renders.
+  const messages =
+    useAppStore((s) => s.chatMessages[conversationName]) ?? EMPTY_MESSAGES;
+  const loading = useAppStore((s) =>
+    conversationName ? s.chatLoading[conversationName] : false
+  );
+  const members =
+    useAppStore((s) => s.channelMembersByConv[conversationName]) ??
+    EMPTY_MEMBERS;
+  const membersLoading = useAppStore((s) =>
+    conversationName ? s.channelMembersLoading[conversationName] : false
+  );
+  const activities =
+    useAppStore((s) => s.agentActivities[conversationName]) ?? EMPTY_ACTIVITIES;
 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -134,13 +158,7 @@ export function ChannelChatPage() {
     name: string;
   } | null>(null);
 
-  const conversationName = channelId ? `conversations/${channelId}` : "";
-  const messages = chatMessages[conversationName] ?? [];
-  const loading = chatLoading[conversationName] ?? false;
-
   const channel = channels.find((c) => c.name === conversationName);
-  const members = channelMembersByConv[conversationName] ?? [];
-  const membersLoading = channelMembersLoading[conversationName] ?? false;
   const isOwner =
     channel && currentUser
       ? channel.ownerId === currentUser.name.split("/").pop()
@@ -394,9 +412,7 @@ export function ChannelChatPage() {
           <h2 className="text-sm font-semibold text-main truncate">
             {channel?.title ?? channelId ?? ""}
           </h2>
-          <AgentStatusBar
-            activities={agentActivities[conversationName] ?? []}
-          />
+          <AgentStatusBar activities={activities} />
         </div>
         <button
           type="button"
