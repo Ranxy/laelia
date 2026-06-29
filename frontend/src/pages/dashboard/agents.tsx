@@ -58,17 +58,11 @@ function agentLifecycle(agent: Agent): Lifecycle {
   return "waiting-connection";
 }
 
-function lifecycleLabel(state: Lifecycle): string {
-  switch (state) {
-    case "ready":
-      return "Ready";
-    case "pending-config":
-      return "Connected — pending configuration";
-    case "configured-offline":
-      return "Configured (offline)";
-    case "waiting-connection":
-      return "Waiting for connection";
-  }
+function lifecycleLabel(
+  t: (key: string, options?: Record<string, unknown>) => string,
+  state: Lifecycle
+): string {
+  return t(`agent.lifecycle.${state}`);
 }
 
 export function AgentsPage() {
@@ -96,6 +90,12 @@ export function AgentsPage() {
   const [rotating, setRotating] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    name: string;
+    title: string;
+  } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(() => {
     fetchAgents({ pageSize: 100 });
@@ -153,6 +153,18 @@ export function AgentsPage() {
       load();
     } catch {
       // handled by api client
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await handleDelete(deleteTarget.name);
+      setDeleteOpen(false);
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -234,7 +246,7 @@ export function AgentsPage() {
       }
     } catch (err) {
       const msg =
-        err instanceof Error ? err.message : "Failed to save ACP config";
+        err instanceof Error ? err.message : t("agent.acp-config-save-failed");
       setSaveError(msg);
     } finally {
       setSaving(false);
@@ -259,7 +271,7 @@ export function AgentsPage() {
             <Input
               placeholder={t("agent.create-name-placeholder")}
               value={name}
-              onChange={(e) => setName((e.target as HTMLInputElement).value)}
+              onChange={(e) => setName(e.target.value)}
             />
             <Button disabled={creating || !name.trim()} onClick={handleCreate}>
               {creating ? t("common.creating") : t("common.create")}
@@ -329,9 +341,9 @@ export function AgentsPage() {
                 </span>
 
                 <span className="text-control-light whitespace-nowrap">
-                  Configuration
+                  {t("agent.detail-configuration")}
                 </span>
-                <span>{lifecycleLabel(agentLifecycle(selectedAgent))}</span>
+                <span>{lifecycleLabel(t, agentLifecycle(selectedAgent))}</span>
 
                 {selectedAgent.info && (
                   <>
@@ -417,14 +429,14 @@ export function AgentsPage() {
               {agentLifecycle(selectedAgent) === "waiting-connection" && (
                 <Alert
                   variant="info"
-                  description="Run the bootstrap command on the host to connect this agent, then configure its executable."
+                  description={t("agent.waiting-connection-hint")}
                   className="mt-1"
                 />
               )}
               {agentLifecycle(selectedAgent) === "pending-config" && (
                 <Alert
                   variant="info"
-                  description="Agent is connected. Set its executable to make it usable."
+                  description={t("agent.pending-config-hint")}
                   className="mt-1"
                 />
               )}
@@ -434,7 +446,7 @@ export function AgentsPage() {
                   size="sm"
                   onClick={() => handleEditACPConfig(selectedAgent)}
                 >
-                  ACP Config
+                  {t("agent.acp-config")}
                 </Button>
                 <div className="flex gap-2">
                   <Button
@@ -477,10 +489,13 @@ export function AgentsPage() {
       >
         <SheetContent width="standard">
           <SheetHeader>
-            <SheetTitle>ACP Config — {selectedAgent?.title ?? ""}</SheetTitle>
+            <SheetTitle>
+              {t("agent.acp-config-title", {
+                title: selectedAgent?.title ?? "",
+              })}
+            </SheetTitle>
             <SheetDescription>
-              Configure the LLM agent to run. Everything else uses built-in
-              defaults.
+              {t("agent.acp-config-description")}
             </SheetDescription>
           </SheetHeader>
           <SheetBody>
@@ -489,20 +504,22 @@ export function AgentsPage() {
             )}
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">Executable</label>
+                <label className="text-sm font-medium">
+                  {t("agent.acp-config-executable")}
+                </label>
                 <Input
-                  placeholder="npx"
+                  placeholder={t("agent.acp-config-executable-placeholder")}
                   value={executable}
                   onChange={(e) => {
-                    setExecutable((e.target as HTMLInputElement).value);
+                    setExecutable(e.target.value);
                     setSaveError("");
                   }}
                 />
               </div>
 
               <StringListEditor
-                label="Args"
-                placeholder="@agentclientprotocol/claude-agent-acp@latest"
+                label={t("agent.acp-config-args")}
+                placeholder={t("agent.acp-config-args-placeholder")}
                 values={args}
                 onChange={(next) => {
                   setArgs(next);
@@ -511,8 +528,8 @@ export function AgentsPage() {
               />
 
               <StringListEditor
-                label="Allow env"
-                placeholder="MY_CUSTOM_VAR"
+                label={t("agent.acp-config-allow-env")}
+                placeholder={t("agent.acp-config-allow-env-placeholder")}
                 values={allowEnv}
                 onChange={(next) => {
                   setAllowEnv(next);
@@ -527,13 +544,13 @@ export function AgentsPage() {
               onClick={() => setAcpConfigOpen(false)}
               disabled={saving}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               disabled={saving || !executable.trim()}
               onClick={handleSaveACPConfig}
             >
-              {saving ? "Saving..." : "Save"}
+              {saving ? t("common.saving") : t("common.save")}
             </Button>
           </SheetFooter>
         </SheetContent>
@@ -593,6 +610,37 @@ export function AgentsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={deleteOpen}
+        onOpenChange={(next) => {
+          setDeleteOpen(next);
+          if (!next) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogTitle>{t("agent.delete-confirm-title")}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("agent.delete-confirm-description", {
+              title: deleteTarget?.title ?? "",
+            })}
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogClose>
+              <Button variant="outline" disabled={deleting}>
+                {t("common.cancel")}
+              </Button>
+            </AlertDialogClose>
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={handleConfirmDelete}
+            >
+              {deleting ? t("common.saving") : t("common.delete")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {loading ? (
         <p className="text-control-light">{t("common.loading")}</p>
       ) : (
@@ -622,7 +670,17 @@ export function AgentsPage() {
                 <TableRow
                   key={agent.name}
                   className="cursor-pointer"
+                  tabIndex={0}
+                  aria-label={t("agent.row-open-detail", {
+                    title: agent.title,
+                  })}
                   onClick={() => handleRowClick(agent)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleRowClick(agent);
+                    }
+                  }}
                 >
                   <TableCell>{agent.title}</TableCell>
                   <TableCell>
@@ -649,7 +707,7 @@ export function AgentsPage() {
                           navigate(`/agents/${resourceId}/chat`);
                         }}
                       >
-                        Chat
+                        {t("agent.action-chat")}
                       </Button>
                       <Button
                         variant="outline"
@@ -663,22 +721,18 @@ export function AgentsPage() {
                           navigate(`/agents/${resourceId}/commands`);
                         }}
                       >
-                        Commands
+                        {t("agent.action-commands")}
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (
-                            window.confirm(
-                              t("common.confirm-delete", {
-                                name: agent.title,
-                              })
-                            )
-                          ) {
-                            handleDelete(agent.name);
-                          }
+                          setDeleteTarget({
+                            name: agent.name,
+                            title: agent.title,
+                          });
+                          setDeleteOpen(true);
                         }}
                       >
                         {t("common.delete")}
@@ -706,6 +760,7 @@ function StringListEditor({
   values: string[];
   onChange: (next: string[]) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between">
@@ -715,7 +770,7 @@ function StringListEditor({
           size="sm"
           onClick={() => onChange([...values, ""])}
         >
-          Add
+          {t("common.add")}
         </Button>
       </div>
       <div className="flex flex-col gap-2">
@@ -726,7 +781,7 @@ function StringListEditor({
               value={value}
               onChange={(e) => {
                 const next = [...values];
-                next[index] = (e.target as HTMLInputElement).value;
+                next[index] = e.target.value;
                 onChange(next);
               }}
             />
@@ -735,7 +790,7 @@ function StringListEditor({
               size="sm"
               onClick={() => onChange(values.filter((_, i) => i !== index))}
             >
-              Remove
+              {t("common.remove")}
             </Button>
           </div>
         ))}

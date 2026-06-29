@@ -65,7 +65,7 @@ export function SignInPage() {
               id="signin-email"
               type="email"
               autoComplete="email"
-              placeholder="you@example.com"
+              placeholder={t("auth.sign-in.email-placeholder")}
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -94,7 +94,7 @@ export function SignInPage() {
               type="button"
               className="absolute right-3 hover:cursor-pointer"
               onClick={() => setShowPassword((v) => !v)}
-              aria-label="Toggle password visibility"
+              aria-label={t("common.toggle-password-visibility")}
             >
               {showPassword ? (
                 <Eye className="size-4" />

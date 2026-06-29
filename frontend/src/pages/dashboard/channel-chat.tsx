@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
 import { FileCard } from "@/components/chat/file-card";
+import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
 import { MentionPopup } from "@/components/chat/mention-popup";
 import {
@@ -60,6 +61,10 @@ import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
 const EMPTY_MESSAGES: ChatMessageUI[] = [];
 const EMPTY_MEMBERS: ChannelMember[] = [];
 const EMPTY_ACTIVITIES: AgentActivity[] = [];
+
+// DOM id of the mention popup listbox, used to wire the textarea's
+// aria-controls / aria-activedescendant to the active option.
+const MENTION_POPUP_ID = "mention-popup";
 
 setCustomComponents({
   // biome-ignore lint/suspicious/noExplicitAny: markstream custom component API is loosely typed
@@ -531,6 +536,14 @@ export function ChannelChatPage() {
               )}
               rows={1}
               placeholder={t("channel.placeholder")}
+              aria-controls={
+                mentionState?.active ? MENTION_POPUP_ID : undefined
+              }
+              aria-activedescendant={
+                mentionState?.active && mentionState.matched.length > 0
+                  ? `${MENTION_POPUP_ID}-opt-${mentionSelectedIndex}`
+                  : undefined
+              }
               value={input}
               onChange={(e) => {
                 const value = e.target.value;
@@ -626,7 +639,7 @@ export function ChannelChatPage() {
                   )}
                 </button>
                 <span className="text-xs text-control-placeholder">
-                  Enter {t("common.send")} · Shift+Enter
+                  {t("chat.send-hint")}
                 </span>
               </div>
               <button
@@ -649,6 +662,7 @@ export function ChannelChatPage() {
           </div>
           {mentionState?.active && textareaRef.current && (
             <MentionPopup
+              id={MENTION_POPUP_ID}
               targets={mentionState.matched}
               query={mentionState.query}
               position={getCaretCoordinates(textareaRef.current, cursorPos)}
@@ -909,26 +923,6 @@ function splitByMentions(
   return segments;
 }
 
-function MentionBadge({
-  name,
-  onClick,
-}: {
-  name: string;
-  onClick: () => void;
-}) {
-  return (
-    <span
-      className="inline-flex items-center px-1 py-0.5 rounded bg-accent/15 text-accent font-medium cursor-pointer hover:bg-accent/25"
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") onClick();
-      }}
-    >
-      @{name}
-    </span>
-  );
-}
-
 const ChannelMessageRow = memo(function ChannelMessageRow({
   msg,
   showAvatar,
@@ -989,17 +983,14 @@ const ChannelMessageRow = memo(function ChannelMessageRow({
         >
           {segments.length > 0 &&
             segments.map((seg, i) => {
-              if (seg.mention) {
+              const mention = seg.mention;
+              if (mention) {
                 return (
                   <MentionBadge
-                    key={`${i}-${seg.mention.name}`}
-                    name={seg.mention.name}
+                    key={`${i}-${mention.name}`}
+                    name={mention.name}
                     onClick={() =>
-                      handleClick(
-                        seg.mention!.type,
-                        seg.mention!.id,
-                        seg.mention!.name
-                      )
+                      handleClick(mention.type, mention.id, mention.name)
                     }
                   />
                 );

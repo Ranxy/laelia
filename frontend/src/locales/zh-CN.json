@@ -19,7 +19,12 @@
     "confirm-delete": "确认删除 Agent {name}？",
     "send": "发送",
     "cancel": "取消",
-    "save": "保存"
+    "save": "保存",
+    "saving": "保存中...",
+    "add": "添加",
+    "remove": "移除",
+    "toggle-password-visibility": "切换密码可见性",
+    "dismiss": "关闭"
   },
   "auth": {
     "sign-in": {
@@ -27,7 +32,8 @@
       "new-user": "还没有账户？",
       "forget-password": "忘记密码？",
       "failed": "登录失败",
-      "failed-description": "请检查您的登录凭据。"
+      "failed-description": "请检查您的登录凭据。",
+      "email-placeholder": "you@example.com"
     },
     "sign-up": {
       "title": "创建您的账户",
@@ -40,7 +46,9 @@
       "password-confirm": "确认密码",
       "password-min-length": "至少 8 个字符",
       "password-require-letter": "至少包含 1 个字母",
-      "password-require-number": "至少包含 1 个数字"
+      "password-require-number": "至少包含 1 个数字",
+      "email-placeholder": "you@example.com",
+      "name-placeholder": "张三"
     }
   },
   "sidebar": {
@@ -64,7 +72,9 @@
       "use-ssl": "使用 SSL/TLS",
       "saved": "S3 配置已保存",
       "load-failed": "加载 S3 配置失败",
-      "save-failed": "保存 S3 配置失败"
+      "save-failed": "保存 S3 配置失败",
+      "endpoint-placeholder": "https://s3.amazonaws.com",
+      "region-placeholder": "us-east-1"
     }
   },
   "landing": {
@@ -75,6 +85,11 @@
     "back-to-agents": "返回 Agent 列表",
     "tab-chat": "对话",
     "tab-tasks": "任务"
+  },
+  "router": {
+    "error-title": "出错了",
+    "error-unknown": "发生了意外错误。",
+    "error-retry": "重新加载"
   },
   "agent": {
     "title": "Agent 管理",
@@ -116,7 +131,31 @@
     "header-hostname": "主机名",
     "header-os": "操作系统",
     "header-ip": "IP 地址",
-    "header-actions": "操作"
+    "header-actions": "操作",
+    "detail-configuration": "配置",
+    "lifecycle": {
+      "ready": "就绪",
+      "pending-config": "已连接 — 待配置",
+      "configured-offline": "已配置（离线）",
+      "waiting-connection": "等待连接"
+    },
+    "waiting-connection-hint": "在主机上运行 bootstrap 命令以连接该 Agent,然后配置其可执行程序。",
+    "pending-config-hint": "Agent 已连接。设置其可执行程序以启用。",
+    "acp-config": "ACP 配置",
+    "acp-config-title": "ACP 配置 — {{title}}",
+    "acp-config-description": "配置要运行的 LLM Agent。其余配置使用内置默认值。",
+    "acp-config-executable": "可执行程序",
+    "acp-config-executable-placeholder": "npx",
+    "acp-config-args": "参数",
+    "acp-config-args-placeholder": "@agentclientprotocol/claude-agent-acp@latest",
+    "acp-config-allow-env": "允许的环境变量",
+    "acp-config-allow-env-placeholder": "MY_CUSTOM_VAR",
+    "acp-config-save-failed": "保存 ACP 配置失败",
+    "action-chat": "对话",
+    "action-commands": "命令",
+    "row-open-detail": "打开 Agent {{title}} 详情",
+    "delete-confirm-title": "删除 Agent",
+    "delete-confirm-description": "确定要删除 Agent {{title}} 吗?此操作无法撤销。"
   },
   "command": {
     "status-unknown": "未知",
@@ -154,7 +193,8 @@
     "cancelling": "取消中...",
     "back": "返回",
     "details": "详情",
-    "collapse": "收起"
+    "collapse": "收起",
+    "row-open-detail": "打开命令详情"
   },
   "chat": {
     "with-agent": "与 {name} 对话",
@@ -174,7 +214,14 @@
     "warning": "警告",
     "allow-once": "允许一次",
     "allow-always": "始终允许",
-    "deny": "拒绝"
+    "deny": "拒绝",
+    "send-hint": "Enter 发送 · Shift+Enter 换行",
+    "tool-input": "输入",
+    "tool-output": "输出",
+    "mention-list-aria-label": "@提及建议",
+    "mention-no-matches": "没有找到 '@{{query}}' 的匹配",
+    "mention-group-users": "用户",
+    "mention-group-agents": "Agent"
   },
   "tasks": {
     "title": "任务",

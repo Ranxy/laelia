@@ -242,7 +242,7 @@ export function CommandDetailPage() {
                 <h1 className="text-lg font-mono font-semibold text-main truncate max-w-xl">
                   {cmd.instruction || cmd.command}
                 </h1>
-                <Badge variant="secondary">ACP</Badge>
+                <Badge variant="secondary">{t("command.executor-acp")}</Badge>
                 <CommandStatusBadge status={cmd.status} />
               </div>
               {isRunning && (

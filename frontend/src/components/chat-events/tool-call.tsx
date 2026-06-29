@@ -77,7 +77,7 @@ export function ChatToolCall({
           {rawInput !== undefined && (
             <div>
               <div className="text-[10px] font-medium text-control-light mb-1">
-                Input
+                {t("chat.tool-input")}
               </div>
               <pre className="text-[11px] font-mono text-control bg-background/50 rounded p-2 overflow-auto max-h-40 whitespace-pre-wrap">
                 {JSON.stringify(rawInput, null, 2)}
@@ -87,7 +87,7 @@ export function ChatToolCall({
           {rawOutput !== undefined && (
             <div>
               <div className="text-[10px] font-medium text-control-light mb-1">
-                Output
+                {t("chat.tool-output")}
               </div>
               <pre
                 className={cn(

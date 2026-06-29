@@ -19,7 +19,12 @@
     "confirm-delete": "Delete agent {name}?",
     "send": "Send",
     "cancel": "Cancel",
-    "save": "Save"
+    "save": "Save",
+    "saving": "Saving...",
+    "add": "Add",
+    "remove": "Remove",
+    "toggle-password-visibility": "Toggle password visibility",
+    "dismiss": "Dismiss"
   },
   "auth": {
     "sign-in": {
@@ -27,7 +32,8 @@
       "new-user": "Don't have an account?",
       "forget-password": "Forgot your password?",
       "failed": "Sign in failed",
-      "failed-description": "Please check your credentials."
+      "failed-description": "Please check your credentials.",
+      "email-placeholder": "you@example.com"
     },
     "sign-up": {
       "title": "Create your account",
@@ -40,7 +46,9 @@
       "password-confirm": "Confirm password",
       "password-min-length": "At least 8 characters",
       "password-require-letter": "At least 1 letter",
-      "password-require-number": "At least 1 number"
+      "password-require-number": "At least 1 number",
+      "email-placeholder": "you@example.com",
+      "name-placeholder": "foo bar"
     }
   },
   "sidebar": {
@@ -64,7 +72,9 @@
       "use-ssl": "Use SSL/TLS",
       "saved": "S3 configuration saved",
       "load-failed": "Failed to load S3 configuration",
-      "save-failed": "Failed to save S3 configuration"
+      "save-failed": "Failed to save S3 configuration",
+      "endpoint-placeholder": "https://s3.amazonaws.com",
+      "region-placeholder": "us-east-1"
     }
   },
   "landing": {
@@ -75,6 +85,11 @@
     "back-to-agents": "Back to Agents",
     "tab-chat": "Chat",
     "tab-tasks": "Tasks"
+  },
+  "router": {
+    "error-title": "Something went wrong",
+    "error-unknown": "An unexpected error occurred.",
+    "error-retry": "Reload"
   },
   "agent": {
     "title": "Agents",
@@ -116,7 +131,31 @@
     "header-hostname": "Hostname",
     "header-os": "OS",
     "header-ip": "IP",
-    "header-actions": "Actions"
+    "header-actions": "Actions",
+    "detail-configuration": "Configuration",
+    "lifecycle": {
+      "ready": "Ready",
+      "pending-config": "Connected — pending configuration",
+      "configured-offline": "Configured (offline)",
+      "waiting-connection": "Waiting for connection"
+    },
+    "waiting-connection-hint": "Run the bootstrap command on the host to connect this agent, then configure its executable.",
+    "pending-config-hint": "Agent is connected. Set its executable to make it usable.",
+    "acp-config": "ACP Config",
+    "acp-config-title": "ACP Config — {{title}}",
+    "acp-config-description": "Configure the LLM agent to run. Everything else uses built-in defaults.",
+    "acp-config-executable": "Executable",
+    "acp-config-executable-placeholder": "npx",
+    "acp-config-args": "Args",
+    "acp-config-args-placeholder": "@agentclientprotocol/claude-agent-acp@latest",
+    "acp-config-allow-env": "Allow env",
+    "acp-config-allow-env-placeholder": "MY_CUSTOM_VAR",
+    "acp-config-save-failed": "Failed to save ACP config",
+    "action-chat": "Chat",
+    "action-commands": "Commands",
+    "row-open-detail": "Open agent {{title}} details",
+    "delete-confirm-title": "Delete agent",
+    "delete-confirm-description": "Are you sure you want to delete agent {{title}}? This cannot be undone."
   },
   "command": {
     "status-unknown": "Unknown",
@@ -154,7 +193,8 @@
     "cancelling": "Cancelling...",
     "back": "Back",
     "details": "Details",
-    "collapse": "Collapse"
+    "collapse": "Collapse",
+    "row-open-detail": "Open command details"
   },
   "chat": {
     "with-agent": "Chat with {name}",
@@ -174,7 +214,14 @@
     "warning": "Warning",
     "allow-once": "Allow Once",
     "allow-always": "Allow Always",
-    "deny": "Deny"
+    "deny": "Deny",
+    "send-hint": "Enter to send · Shift+Enter for newline",
+    "tool-input": "Input",
+    "tool-output": "Output",
+    "mention-list-aria-label": "Mention suggestions",
+    "mention-no-matches": "No matches for '@{{query}}'",
+    "mention-group-users": "Users",
+    "mention-group-agents": "Agents"
   },
   "tasks": {
     "title": "Tasks",

@@ -7,6 +7,7 @@ import {
   X,
 } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
 const alertVariants = cva(
@@ -62,6 +63,7 @@ function Alert({
   children,
   ...props
 }: AlertProps) {
+  const { t } = useTranslation();
   const Icon = iconMap[variant ?? "info"];
   const hasStructuredContent = title !== undefined || description !== undefined;
 
@@ -97,7 +99,7 @@ function Alert({
       {onDismiss && (
         <button
           type="button"
-          aria-label="Dismiss"
+          aria-label={t("common.dismiss")}
           className="shrink-0 rounded-xs p-0.5 text-control-light hover:bg-black/5 hover:text-control"
           onClick={onDismiss}
         >

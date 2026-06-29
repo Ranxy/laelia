@@ -134,7 +134,7 @@ export function SettingsPage() {
             <Field label={t("settings.s3.endpoint")}>
               <Input
                 value={form.endpoint}
-                placeholder="https://s3.amazonaws.com"
+                placeholder={t("settings.s3.endpoint-placeholder")}
                 onChange={(e) => set("endpoint", e.target.value)}
               />
             </Field>
@@ -142,7 +142,7 @@ export function SettingsPage() {
               <Field label={t("settings.s3.region")}>
                 <Input
                   value={form.region}
-                  placeholder="us-east-1"
+                  placeholder={t("settings.s3.region-placeholder")}
                   onChange={(e) => set("region", e.target.value)}
                 />
               </Field>

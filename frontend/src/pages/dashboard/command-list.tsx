@@ -107,8 +107,6 @@ export function CommandListPage() {
     return cmd.instruction || cmd.command || "";
   }
 
-  const executorLabel = (_cmd: Command) => "ACP";
-
   return (
     <div className="flex h-full flex-col">
       <div className="shrink-0 border-b border-control-border px-4 py-3">
@@ -199,11 +197,19 @@ export function CommandListPage() {
                 <TableRow
                   key={cmd.name}
                   className="cursor-pointer"
+                  tabIndex={0}
+                  aria-label={t("command.row-open-detail")}
                   onClick={() => handleRowClick(cmd)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleRowClick(cmd);
+                    }
+                  }}
                 >
                   <TableCell>
                     <span className="text-xs text-control-light">
-                      {executorLabel(cmd)}
+                      {t("command.executor-acp")}
                     </span>
                   </TableCell>
                   <TableCell>

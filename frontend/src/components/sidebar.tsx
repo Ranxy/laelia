@@ -201,6 +201,7 @@ function SidebarNav({ collapsed }: { collapsed: boolean }) {
         <div key={item.name}>
           <button
             type="button"
+            aria-expanded={isExpanded}
             onClick={() => {
               if (item.name) toggleGroup(item.name);
             }}

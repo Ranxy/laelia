@@ -1,6 +1,7 @@
+import { create } from "@bufbuild/protobuf";
 import { useMemo } from "react";
 import { useAppStore } from "@/stores";
-import type { Mention } from "@/types/proto-es/v1/command_pb";
+import { type Mention, MentionSchema } from "@/types/proto-es/v1/command_pb";
 
 export interface MentionTarget {
   type: "user" | "agent";
@@ -27,10 +28,9 @@ export function useMentionTargets(channelId?: string): MentionTarget[] {
 }
 
 export function targetToMention(target: MentionTarget): Mention {
-  return {
-    $typeName: "laelia.v1.Mention",
+  return create(MentionSchema, {
     type: target.type,
     id: target.id,
     name: target.name,
-  } as Mention;
+  });
 }

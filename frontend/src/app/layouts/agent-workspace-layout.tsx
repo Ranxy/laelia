@@ -6,6 +6,12 @@ import { ConnectionBadge } from "@/components/connection-badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { agentResourceName } from "@/lib/command-status";
+import {
+  CHAT_ROUTE,
+  COMMAND_ROUTE_DETAIL,
+  COMMAND_ROUTE_LIST,
+} from "@/router/handles";
+import { resolvePath } from "@/router/route-index";
 import { useCurrentRoute } from "@/router/use-current-route";
 import { useAppStore } from "@/stores";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
@@ -31,8 +37,8 @@ export function AgentWorkspaceLayout() {
   const displayAgent = agent ?? cached;
 
   const activeTab =
-    currentRoute.name === "command.list" ||
-    currentRoute.name === "command.detail"
+    currentRoute.name === COMMAND_ROUTE_LIST ||
+    currentRoute.name === COMMAND_ROUTE_DETAIL
       ? "tasks"
       : "chat";
 
@@ -56,14 +62,16 @@ export function AgentWorkspaceLayout() {
           <TabsList className="border-b-0">
             <TabsTrigger
               value="chat"
-              onClick={() => navigate(`/agents/${agentId}/chat`)}
+              onClick={() => navigate(resolvePath(CHAT_ROUTE, { agentId }))}
             >
               <MessageSquare className="size-3.5 mr-1.5" />
               {t("workspace.tab-chat")}
             </TabsTrigger>
             <TabsTrigger
               value="tasks"
-              onClick={() => navigate(`/agents/${agentId}/commands`)}
+              onClick={() =>
+                navigate(resolvePath(COMMAND_ROUTE_LIST, { agentId }))
+              }
             >
               <ListChecks className="size-3.5 mr-1.5" />
               {t("workspace.tab-tasks")}
