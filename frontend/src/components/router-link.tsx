@@ -1,6 +1,6 @@
 import type { AnchorHTMLAttributes, MouseEvent, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { resolvePath } from "@/react/router/route-index";
+import { resolvePath } from "@/router/route-index";
 
 export type RouterLinkProps = Omit<
   AnchorHTMLAttributes<HTMLAnchorElement>,

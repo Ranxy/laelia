@@ -18,7 +18,7 @@ import ts from "typescript";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
-const REACT_DIR = resolve(ROOT, "src/react");
+const REACT_DIR = resolve(ROOT, "src");
 const REPORT_ONLY = process.argv.includes("--report-only");
 
 const APPROVED_PREFIXES = [

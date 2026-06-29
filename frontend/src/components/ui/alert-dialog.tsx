@@ -1,6 +1,6 @@
 import { AlertDialog as BaseAlertDialog } from "@base-ui/react/alert-dialog";
 import type { ComponentProps } from "react";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 import {
   getLayerRoot,
   LAYER_BACKDROP_CLASS,

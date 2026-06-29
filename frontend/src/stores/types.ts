@@ -35,7 +35,10 @@ export interface ChatMessageUI {
 
 export interface AuthSlice {
   currentUser: User | null;
-  token: string | null;
+  // `isLoggedIn` is an explicit flag consumed by the router guard and the
+  // unauthenticated-redirect path (see `router/guard.ts`, `router/auth-redirect.ts`).
+  // It is kept as stored state rather than derived from `currentUser !== null`
+  // because the routing tests and redirect hook assert against it directly.
   isLoggedIn: boolean;
   sessionLoaded: boolean;
 
@@ -115,7 +118,6 @@ export interface ChatSlice {
     conversation: string,
     signal: AbortSignal
   ) => Promise<void>;
-  resetStreaming: (commandName: string) => void;
 }
 
 // ChannelSlice owns channel conversations: the channel roster, per-conversation

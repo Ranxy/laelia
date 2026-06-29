@@ -1,21 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { CommandStatusBadge } from "@/react/components/command-status-badge";
-import {
-  CommandTerminal,
-  FinalSummary,
-} from "@/react/components/command-terminal";
-import { Badge } from "@/react/components/ui/badge";
-import { Button } from "@/react/components/ui/button";
+import { CommandStatusBadge } from "@/components/command-status-badge";
+import { CommandTerminal, FinalSummary } from "@/components/command-terminal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   commandEventTypeToI18nKey,
   formatDuration,
   formatTimeOfDay,
   formatTimestamp,
-} from "@/react/lib/command-status";
-import { cn } from "@/react/lib/utils";
-import { useAppStore } from "@/react/stores";
+} from "@/lib/command-status";
+import { cn } from "@/lib/utils";
+import { useAppStore } from "@/stores";
 import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
 import {
   CommandEventType,

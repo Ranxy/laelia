@@ -1,5 +1,5 @@
 import type { RouteObject } from "react-router-dom";
-import { SplashLayout } from "@/react/app/layouts/splash-layout";
+import { SplashLayout } from "@/app/layouts/splash-layout";
 
 export const authRoutes: RouteObject[] = [
   {
@@ -10,7 +10,7 @@ export const authRoutes: RouteObject[] = [
         path: "signin",
         handle: { name: "auth.signin" },
         lazy: () =>
-          import("@/react/pages/auth/signin").then((m) => ({
+          import("@/pages/auth/signin").then((m) => ({
             Component: m.SignInPage,
           })),
       },
@@ -18,7 +18,7 @@ export const authRoutes: RouteObject[] = [
         path: "signup",
         handle: { name: "auth.signup" },
         lazy: () =>
-          import("@/react/pages/auth/signup").then((m) => ({
+          import("@/pages/auth/signup").then((m) => ({
             Component: m.SignUpPage,
           })),
       },

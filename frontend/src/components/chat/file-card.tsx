@@ -1,7 +1,7 @@
 import { Download, FileIcon, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { commandServiceClient } from "@/connect";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
 
 // formatBytes renders a human-readable byte count.

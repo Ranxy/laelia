@@ -8,10 +8,10 @@ import {
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/react/components/ui/button";
-import { Input } from "@/react/components/ui/input";
-import { toastManager } from "@/react/lib/toast";
-import { useAppStore } from "@/react/stores";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toastManager } from "@/lib/toast";
+import { useAppStore } from "@/stores";
 
 type PasswordCheck = {
   key: string;

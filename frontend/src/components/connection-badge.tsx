@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Badge } from "@/react/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { AgentStatus_ConnectionState } from "@/types/proto-es/v1/agent_pb";
 
 interface ConnectionBadgeProps {

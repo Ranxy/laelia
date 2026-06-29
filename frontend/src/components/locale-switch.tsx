@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { setLocale } from "@/react/lib/i18n";
+import { setLocale } from "@/lib/i18n";
 
 type LocaleOption = {
   value: string;

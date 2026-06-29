@@ -1,6 +1,6 @@
 import { Menu as BaseMenu } from "@base-ui/react/menu";
 import type { ComponentProps } from "react";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 import { getLayerRoot, LAYER_SURFACE_CLASS } from "./layer";
 
 // ---- Root ----

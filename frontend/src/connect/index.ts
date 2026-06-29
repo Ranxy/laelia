@@ -28,7 +28,6 @@ async function onUnauthenticated() {
     // and re-enter this handler). Keep sessionLoaded true so the guard does not
     // re-show the initial spinner.
     useAppStore.setState({
-      token: null,
       currentUser: null,
       isLoggedIn: false,
       sessionLoaded: true,

@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 import {
   getLayerRoot,
   LAYER_BACKDROP_CLASS,

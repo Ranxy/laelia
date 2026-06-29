@@ -1,10 +1,10 @@
 import { useTranslation } from "react-i18next";
-import { Badge } from "@/react/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import {
   commandStatusToI18nKey,
   commandStatusToVariant,
-} from "@/react/lib/command-status";
-import { cn } from "@/react/lib/utils";
+} from "@/lib/command-status";
+import { cn } from "@/lib/utils";
 import { CommandStatus } from "@/types/proto-es/v1/command_pb";
 
 interface CommandStatusBadgeProps {

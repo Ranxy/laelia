@@ -1,5 +1,5 @@
 import { Switch as BaseSwitch } from "@base-ui/react/switch";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 
 type SwitchSize = "xs" | "sm" | "md" | "lg";
 

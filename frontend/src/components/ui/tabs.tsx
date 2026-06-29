@@ -1,6 +1,6 @@
 import { Tabs as BaseTabs } from "@base-ui/react/tabs";
 import type { ComponentProps } from "react";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 
 function Tabs({ className, ...props }: ComponentProps<typeof BaseTabs.Root>) {
   return <BaseTabs.Root className={cn("w-full", className)} {...props} />;

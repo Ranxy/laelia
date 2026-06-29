@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 
 // The grab target is a 12px-wide invisible strip straddling the column border
 // (right-[-6px] + w-3 centers it on the edge) so the affordance is easy to hit;

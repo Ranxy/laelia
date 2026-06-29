@@ -1,8 +1,8 @@
 import { ChevronDown, ChevronRight, Wrench } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Badge } from "@/react/components/ui/badge";
-import { cn } from "@/react/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
 
 interface ChatToolCallProps {

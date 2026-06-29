@@ -273,27 +273,4 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       }
     }
   },
-
-  resetStreaming(commandName) {
-    const finalEvents = get().streamingEvents[commandName] ?? [];
-    const finalContent = get().streamingContent[commandName] ?? "";
-
-    set((state) => {
-      const chatMessages = { ...state.chatMessages };
-      for (const [conv, msgs] of Object.entries(chatMessages)) {
-        const finalized = finalizeAssistant(msgs, commandName, {
-          streaming: false,
-          content: finalContent,
-          events: finalEvents,
-        });
-        if (finalized !== msgs) chatMessages[conv] = finalized;
-      }
-      return {
-        chatMessages,
-        streamingContent: omitKey(state.streamingContent, commandName),
-        streamingEvents: omitKey(state.streamingEvents, commandName),
-        streamingStatus: omitKey(state.streamingStatus, commandName),
-      };
-    });
-  },
 });

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { isAuthPath, resolveAuthRedirect } from "@/react/router/auth-redirect";
-import { useAppStore } from "@/react/stores";
+import { isAuthPath, resolveAuthRedirect } from "@/router/auth-redirect";
+import { useAppStore } from "@/stores";
 
 export function RootLayout() {
   const location = useLocation();

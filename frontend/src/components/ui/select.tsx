@@ -2,7 +2,7 @@ import { Select as BaseSelect } from "@base-ui/react/select";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Check, ChevronDown } from "lucide-react";
 import type { ComponentProps } from "react";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 import { getLayerRoot, LAYER_SURFACE_CLASS } from "./layer";
 
 // ---- Root ----

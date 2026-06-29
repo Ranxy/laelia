@@ -1,8 +1,8 @@
 import { Menu } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { DesktopSidebar, MobileSidebar } from "@/react/components/sidebar";
-import { UserMenu } from "@/react/components/user-menu";
+import { DesktopSidebar, MobileSidebar } from "@/components/sidebar";
+import { UserMenu } from "@/components/user-menu";
 
 const COLLAPSED_KEY = "laelia-sidebar-collapsed";
 

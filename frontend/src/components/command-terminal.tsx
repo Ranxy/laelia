@@ -1,6 +1,6 @@
 import MarkdownRender from "markstream-react";
 import { useEffect, useRef } from "react";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 import type { CommandOutput } from "@/types/proto-es/v1/command_pb";
 import { CommandOutput_StreamType } from "@/types/proto-es/v1/command_pb";
 

@@ -2,7 +2,7 @@ import { Toast as BaseToast } from "@base-ui/react/toast";
 import { cva } from "class-variance-authority";
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 
 // Map BBNotificationStyle ("SUCCESS" | "INFO" | "WARN" | "CRITICAL") onto
 // the visual variant of the toast container.

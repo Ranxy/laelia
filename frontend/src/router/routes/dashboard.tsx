@@ -1,7 +1,7 @@
 import type { RouteObject } from "react-router-dom";
 import { Navigate } from "react-router-dom";
-import { AgentWorkspaceLayout } from "@/react/app/layouts/agent-workspace-layout";
-import { DashboardLayout } from "@/react/app/layouts/dashboard-layout";
+import { AgentWorkspaceLayout } from "@/app/layouts/agent-workspace-layout";
+import { DashboardLayout } from "@/app/layouts/dashboard-layout";
 import {
   AGENT_ROUTE_LIST,
   CHANNEL_ROUTE_DETAIL,
@@ -21,7 +21,7 @@ export const dashboardRoutes: RouteObject[] = [
         index: true,
         handle: { name: WORKSPACE_ROUTE_LANDING },
         lazy: () =>
-          import("@/react/pages/dashboard/landing").then((m) => ({
+          import("@/pages/dashboard/landing").then((m) => ({
             Component: m.LandingPage,
           })),
       },
@@ -29,7 +29,7 @@ export const dashboardRoutes: RouteObject[] = [
         path: "agents",
         handle: { name: AGENT_ROUTE_LIST },
         lazy: () =>
-          import("@/react/pages/dashboard/agents").then((m) => ({
+          import("@/pages/dashboard/agents").then((m) => ({
             Component: m.AgentsPage,
           })),
       },
@@ -42,7 +42,7 @@ export const dashboardRoutes: RouteObject[] = [
             path: "chat",
             handle: { name: CHAT_ROUTE },
             lazy: () =>
-              import("@/react/pages/dashboard/chat").then((m) => ({
+              import("@/pages/dashboard/chat").then((m) => ({
                 Component: m.ChatPage,
               })),
           },
@@ -50,7 +50,7 @@ export const dashboardRoutes: RouteObject[] = [
             path: "commands",
             handle: { name: COMMAND_ROUTE_LIST },
             lazy: () =>
-              import("@/react/pages/dashboard/command-list").then((m) => ({
+              import("@/pages/dashboard/command-list").then((m) => ({
                 Component: m.CommandListPage,
               })),
           },
@@ -58,7 +58,7 @@ export const dashboardRoutes: RouteObject[] = [
             path: "commands/:commandId",
             handle: { name: COMMAND_ROUTE_DETAIL },
             lazy: () =>
-              import("@/react/pages/dashboard/command-detail").then((m) => ({
+              import("@/pages/dashboard/command-detail").then((m) => ({
                 Component: m.CommandDetailPage,
               })),
           },
@@ -68,7 +68,7 @@ export const dashboardRoutes: RouteObject[] = [
         path: "channels",
         handle: { name: CHANNEL_ROUTE_LIST },
         lazy: () =>
-          import("@/react/pages/dashboard/channel-list").then((m) => ({
+          import("@/pages/dashboard/channel-list").then((m) => ({
             Component: m.ChannelListPage,
           })),
       },
@@ -76,7 +76,7 @@ export const dashboardRoutes: RouteObject[] = [
         path: "channels/:channelId",
         handle: { name: CHANNEL_ROUTE_DETAIL },
         lazy: () =>
-          import("@/react/pages/dashboard/channel-chat").then((m) => ({
+          import("@/pages/dashboard/channel-chat").then((m) => ({
             Component: m.ChannelChatPage,
           })),
       },
@@ -84,7 +84,7 @@ export const dashboardRoutes: RouteObject[] = [
         path: "settings",
         handle: { name: SETTINGS_ROUTE },
         lazy: () =>
-          import("@/react/pages/dashboard/settings").then((m) => ({
+          import("@/pages/dashboard/settings").then((m) => ({
             Component: m.SettingsPage,
           })),
       },

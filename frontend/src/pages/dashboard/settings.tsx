@@ -1,11 +1,11 @@
 import { Loader2, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { settingServiceClient } from "@/connect";
-import { Button } from "@/react/components/ui/button";
-import { Checkbox } from "@/react/components/ui/checkbox";
-import { Input } from "@/react/components/ui/input";
-import { toastManager } from "@/react/lib/toast";
+import { toastManager } from "@/lib/toast";
 
 interface S3Form {
   endpoint: string;

@@ -3,7 +3,7 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useAppStore } from "@/react/stores";
+import { useAppStore } from "@/stores";
 import { RootLayout } from "./root-layout";
 
 // Mock the connect clients so the real auth store's loadSession never hits the
@@ -58,7 +58,6 @@ describe("RootLayout auth guard", () => {
   beforeEach(() => {
     useAppStore.setState({
       currentUser: null,
-      token: null,
       isLoggedIn: false,
       sessionLoaded: false,
     });

@@ -3,7 +3,7 @@ import {
   type RouteObject,
   redirect,
 } from "react-router-dom";
-import { RootLayout } from "@/react/app/root-layout";
+import { RootLayout } from "@/app/root-layout";
 import { rootGuard } from "./guard";
 import { buildRouteNameIndex, setRouteNameIndex } from "./route-index";
 import { authRoutes } from "./routes/auth";

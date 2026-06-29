@@ -1,6 +1,6 @@
 import { Popover as BasePopover } from "@base-ui/react/popover";
 import type { ComponentProps } from "react";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 import { getLayerRoot, LAYER_SURFACE_CLASS } from "./layer";
 
 // ---- Root ----

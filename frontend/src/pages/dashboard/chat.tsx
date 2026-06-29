@@ -13,16 +13,16 @@ import MarkdownRender, {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { FileCard } from "@/components/chat/FileCard";
-import { ChatDiff } from "@/react/components/chat-events/diff-view";
-import { ChatPermissionRequest } from "@/react/components/chat-events/permission-request";
-import { ChatToolCall } from "@/react/components/chat-events/tool-call";
-import { ChatWarning } from "@/react/components/chat-events/warning";
-import { CommandStatusBadge } from "@/react/components/command-status-badge";
-import { agentResourceName } from "@/react/lib/command-status";
-import { cn } from "@/react/lib/utils";
-import { useAppStore } from "@/react/stores";
-import type { ChatMessageUI } from "@/react/stores/types";
+import { FileCard } from "@/components/chat/file-card";
+import { ChatDiff } from "@/components/chat-events/diff-view";
+import { ChatPermissionRequest } from "@/components/chat-events/permission-request";
+import { ChatToolCall } from "@/components/chat-events/tool-call";
+import { ChatWarning } from "@/components/chat-events/warning";
+import { CommandStatusBadge } from "@/components/command-status-badge";
+import { agentResourceName } from "@/lib/command-status";
+import { cn } from "@/lib/utils";
+import { useAppStore } from "@/stores";
+import type { ChatMessageUI } from "@/stores/types";
 import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
 import { CommandEventType } from "@/types/proto-es/v1/command_pb";
 

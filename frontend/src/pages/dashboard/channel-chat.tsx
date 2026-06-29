@@ -19,9 +19,23 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
-import { FileCard } from "@/components/chat/FileCard";
-import { MentionDetailSheet } from "@/components/chat/MentionDetailSheet";
-import { MentionPopup } from "@/components/chat/MentionPopup";
+import { FileCard } from "@/components/chat/file-card";
+import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
+import { MentionPopup } from "@/components/chat/mention-popup";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { detectMention } from "@/composables/useMentionDetect";
 import {
   MentionTarget,
@@ -30,23 +44,9 @@ import {
 } from "@/composables/useMentionTargets";
 import { commandServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/react/components/ui/select";
-import {
-  Sheet,
-  SheetBody,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/react/components/ui/sheet";
-import { cn } from "@/react/lib/utils";
-import { useAppStore } from "@/react/stores";
-import type { ChatMessageUI } from "@/react/stores/types";
+import { cn } from "@/lib/utils";
+import { useAppStore } from "@/stores";
+import type { ChatMessageUI } from "@/stores/types";
 import type {
   AgentActivity,
   Attachment,

@@ -13,7 +13,6 @@ import type { AppSliceCreator, AuthSlice } from "./types";
 
 export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
   currentUser: null,
-  token: null,
   isLoggedIn: false,
   sessionLoaded: false,
 
@@ -23,7 +22,6 @@ export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
     );
 
     set({
-      token: res.token,
       currentUser: res.user ?? null,
       isLoggedIn: true,
     });
@@ -33,7 +31,7 @@ export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
     try {
       await authServiceClient.logout(create(LogoutRequestSchema));
     } finally {
-      set({ token: null, currentUser: null, isLoggedIn: false });
+      set({ currentUser: null, isLoggedIn: false });
     }
   },
 

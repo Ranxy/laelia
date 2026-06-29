@@ -2,9 +2,9 @@ import { Plus, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { CommandStatusBadge } from "@/react/components/command-status-badge";
-import { Button } from "@/react/components/ui/button";
-import { Input } from "@/react/components/ui/input";
+import { CommandStatusBadge } from "@/components/command-status-badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetBody,
@@ -13,7 +13,7 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from "@/react/components/ui/sheet";
+} from "@/components/ui/sheet";
 import {
   Table,
   TableBody,
@@ -21,14 +21,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/react/components/ui/table";
-import { Textarea } from "@/react/components/ui/textarea";
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import {
   agentResourceName,
   formatDuration,
   formatTimestamp,
-} from "@/react/lib/command-status";
-import { useAppStore } from "@/react/stores";
+} from "@/lib/command-status";
+import { useAppStore } from "@/stores";
 import type { Command } from "@/types/proto-es/v1/command_pb";
 import { CommandStatus } from "@/types/proto-es/v1/command_pb";
 

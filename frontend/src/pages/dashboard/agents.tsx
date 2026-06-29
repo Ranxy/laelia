@@ -2,8 +2,8 @@ import { Timestamp } from "@bufbuild/protobuf/wkt";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { ConnectionBadge } from "@/react/components/connection-badge";
-import { Alert } from "@/react/components/ui/alert";
+import { ConnectionBadge } from "@/components/connection-badge";
+import { Alert } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -11,15 +11,15 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogTitle,
-} from "@/react/components/ui/alert-dialog";
-import { Button } from "@/react/components/ui/button";
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "@/react/components/ui/dialog";
-import { Input } from "@/react/components/ui/input";
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetBody,
@@ -28,7 +28,7 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from "@/react/components/ui/sheet";
+} from "@/components/ui/sheet";
 import {
   Table,
   TableBody,
@@ -36,8 +36,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/react/components/ui/table";
-import { useAppStore } from "@/react/stores";
+} from "@/components/ui/table";
+import { useAppStore } from "@/stores";
 import {
   type Agent,
   AgentStatus_ConnectionState,

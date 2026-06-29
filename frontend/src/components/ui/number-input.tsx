@@ -1,7 +1,7 @@
 import { NumberField } from "@base-ui/react/number-field";
 import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 
 // Mirrors the sizing/appearance of ./input.tsx so NumberInput visually matches
 // the regular Input at every size.

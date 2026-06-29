@@ -2,7 +2,7 @@ import { Search } from "lucide-react";
 import type { ComponentProps } from "react";
 import { forwardRef } from "react";
 import { useTranslation } from "react-i18next";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 import { Input } from "./input";
 
 type SearchInputProps = Omit<ComponentProps<typeof Input>, "className"> & {

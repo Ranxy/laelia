@@ -27,22 +27,8 @@ export const toastManager = {
   close(_id?: string) {
     // Base UI handles toast lifecycle internally.
   },
-  update(_id: string, _updates: Record<string, unknown>) {
-    // Not implemented yet.
-  },
-  promise<Value>(
-    promiseValue: Promise<Value>,
-    _options: Record<string, unknown>
-  ) {
-    return promiseValue;
-  },
 } as {
   " subscribe"(fn: Listener): () => void;
   add(options: Record<string, unknown>): string;
   close(id?: string): void;
-  update(id: string, updates: Record<string, unknown>): void;
-  promise<Value>(
-    promiseValue: Promise<Value>,
-    options: Record<string, unknown>
-  ): Promise<Value>;
 };

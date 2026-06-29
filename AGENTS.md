@@ -38,8 +38,8 @@ This file provides guidance to Copilot (codex/claude.ai/code) when working with 
 # Build
 go build -ldflags "-w -s" -p=16 -o ./build/laelia ./backend/manager/bin/server/main.go
 
-# Start manager backend
-go run ./backend/manager/bin/server/main.go --port 8111 --debug
+# Start manager backend (default port 8181 matches the frontend vite proxy)
+go run ./backend/manager/bin/server/main.go --port 8181 --debug
 
 # Run single test
 go test -v -count=1 github.com/Ranxy/laelia/backend/manager/path/to/tests -run ^TestFunctionName$

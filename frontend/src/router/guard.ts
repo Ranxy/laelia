@@ -1,5 +1,5 @@
 import { redirect } from "react-router-dom";
-import { useAppStore } from "@/react/stores";
+import { useAppStore } from "@/stores";
 import { resolveAuthRedirect } from "./auth-redirect";
 
 export function rootGuard({ url }: { url: URL }): Response | null {

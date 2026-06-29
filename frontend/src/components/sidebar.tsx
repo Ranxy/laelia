@@ -11,9 +11,9 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { RouterLink } from "@/react/components/router-link";
-import { getLayerRoot, LAYER_SURFACE_CLASS } from "@/react/components/ui/layer";
-import { cn } from "@/react/lib/utils";
+import { RouterLink } from "@/components/router-link";
+import { getLayerRoot, LAYER_SURFACE_CLASS } from "@/components/ui/layer";
+import { cn } from "@/lib/utils";
 import {
   AGENT_ROUTE_LIST,
   CHANNEL_ROUTE_DETAIL,
@@ -23,8 +23,8 @@ import {
   COMMAND_ROUTE_LIST,
   SETTINGS_ROUTE,
   WORKSPACE_ROUTE_LANDING,
-} from "@/react/router/handles";
-import { useCurrentRoute } from "@/react/router/use-current-route";
+} from "@/router/handles";
+import { useCurrentRoute } from "@/router/use-current-route";
 
 // ---------------------------------------------------------------------------
 // Types

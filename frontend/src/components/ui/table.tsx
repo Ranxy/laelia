@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import type { ComponentPropsWithoutRef } from "react";
-import { ColumnResizeHandle } from "@/react/components/ui/column-resize-handle";
-import { cn } from "@/react/lib/utils";
+import { ColumnResizeHandle } from "@/components/ui/column-resize-handle";
+import { cn } from "@/lib/utils";
 
 function Table({ className, ...props }: ComponentPropsWithoutRef<"table">) {
   return (

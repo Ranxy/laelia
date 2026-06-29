@@ -2,12 +2,12 @@ import { ArrowLeft, ListChecks, MessageSquare } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useNavigate, useParams } from "react-router-dom";
-import { ConnectionBadge } from "@/react/components/connection-badge";
-import { Button } from "@/react/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/react/components/ui/tabs";
-import { agentResourceName } from "@/react/lib/command-status";
-import { useCurrentRoute } from "@/react/router/use-current-route";
-import { useAppStore } from "@/react/stores";
+import { ConnectionBadge } from "@/components/connection-badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { agentResourceName } from "@/lib/command-status";
+import { useCurrentRoute } from "@/router/use-current-route";
+import { useAppStore } from "@/stores";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
 
 export function AgentWorkspaceLayout() {

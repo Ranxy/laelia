@@ -1,6 +1,6 @@
 import { Toast as BaseToast } from "@base-ui/react/toast";
 import { useTranslation } from "react-i18next";
-import { toastManager } from "@/react/lib/toast";
+import { toastManager } from "@/lib/toast";
 import { getLayerRoot, LAYER_Z_INDEX } from "./layer";
 import {
   ToastAction,

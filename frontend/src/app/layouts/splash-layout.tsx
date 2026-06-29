@@ -1,5 +1,5 @@
 import { Outlet } from "react-router-dom";
-import { LocaleSwitch } from "@/react/components/locale-switch";
+import { LocaleSwitch } from "@/components/locale-switch";
 
 export function SplashLayout() {
   return (

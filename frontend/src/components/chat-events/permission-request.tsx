@@ -1,9 +1,9 @@
 import { ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Badge } from "@/react/components/ui/badge";
-import { Button } from "@/react/components/ui/button";
-import { useAppStore } from "@/react/stores";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useAppStore } from "@/stores";
 import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
 
 interface ChatPermissionRequestProps {

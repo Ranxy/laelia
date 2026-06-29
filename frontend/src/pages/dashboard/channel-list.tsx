@@ -7,9 +7,9 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "@/react/components/ui/dialog";
-import { cn } from "@/react/lib/utils";
-import { useAppStore } from "@/react/stores";
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import { useAppStore } from "@/stores";
 
 export function ChannelListPage() {
   const { t } = useTranslation();

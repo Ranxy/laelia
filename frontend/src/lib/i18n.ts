@@ -1,7 +1,7 @@
 import i18next from "i18next";
 import { initReactI18next } from "react-i18next";
-import enUS from "@/react/locales/en-US.json";
-import zhCN from "@/react/locales/zh-CN.json";
+import enUS from "@/locales/en-US.json";
+import zhCN from "@/locales/zh-CN.json";
 
 const STORAGE_KEY = "laelia.language";
 

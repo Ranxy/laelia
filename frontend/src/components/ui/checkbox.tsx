@@ -1,7 +1,7 @@
 import { Checkbox as BaseCheckbox } from "@base-ui/react/checkbox";
 import { Check, Minus } from "lucide-react";
 import type * as React from "react";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 
 type CheckboxSize = "sm" | "md";
 

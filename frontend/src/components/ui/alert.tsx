@@ -7,7 +7,7 @@ import {
   X,
 } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
-import { cn } from "@/react/lib/utils";
+import { cn } from "@/lib/utils";
 
 const alertVariants = cva(
   "relative flex w-full items-start gap-x-3 rounded-xs border px-4 py-3 text-sm leading-5 text-control shadow-xs",

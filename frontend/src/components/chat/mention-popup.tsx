@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { getLayerRoot, LAYER_SURFACE_CLASS } from "@/components/ui/layer";
 import type { MentionTarget } from "@/composables/useMentionTargets";
 
 interface MentionPopupProps {
@@ -41,10 +43,10 @@ export function MentionPopup({
   const users = targets.filter((t) => t.type === "user");
   const agents = targets.filter((t) => t.type === "agent");
 
-  return (
+  return createPortal(
     <div
       ref={listRef}
-      className="fixed z-[2600] w-56 max-h-48 overflow-y-auto rounded-lg border border-control-border bg-background shadow-lg"
+      className={`fixed ${LAYER_SURFACE_CLASS} w-56 max-h-48 overflow-y-auto rounded-lg border border-control-border bg-background shadow-lg`}
       style={{
         bottom: window.innerHeight - position.top + 4,
         left: position.left,
@@ -87,7 +89,8 @@ export function MentionPopup({
           ))}
         </>
       )}
-    </div>
+    </div>,
+    getLayerRoot("overlay")
   );
 }
 

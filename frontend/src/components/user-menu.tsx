@@ -11,9 +11,9 @@ import {
   DropdownMenuSubmenuContent,
   DropdownMenuSubmenuTrigger,
   DropdownMenuTrigger,
-} from "@/react/components/ui/dropdown-menu";
-import { setLocale } from "@/react/lib/i18n";
-import { useAppStore } from "@/react/stores";
+} from "@/components/ui/dropdown-menu";
+import { setLocale } from "@/lib/i18n";
+import { useAppStore } from "@/stores";
 
 type LocaleOption = {
   value: string;

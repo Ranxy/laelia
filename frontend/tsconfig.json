@@ -18,11 +18,9 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "paths": {
-      "@/react/*": ["./src/*"],
       "@/*": ["./src/*"]
     },
     "baseUrl": "."
   },
-  "include": ["src"],
-  "exclude": ["src/components/ui/segmented-control.tsx"]
+  "include": ["src"]
 }
