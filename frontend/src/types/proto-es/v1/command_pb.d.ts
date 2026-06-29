@@ -1017,6 +1017,15 @@ export declare type Conversation = Message<"laelia.v1.Conversation"> & {
    * @generated from field: google.protobuf.Timestamp updated_at = 8;
    */
   updatedAt?: Timestamp | undefined;
+
+  /**
+   * unread_count is the number of chat_message rows with room_version beyond
+   * the requesting user's read cursor for this conversation. Populated by
+   * ListChannels; 0 (or unset) when the user is caught up.
+   *
+   * @generated from field: int32 unread_count = 9;
+   */
+  unreadCount: number;
 };
 
 /**
@@ -1611,6 +1620,44 @@ export declare type AckProcessedVersionResponse = Message<"laelia.v1.AckProcesse
  * Use `create(AckProcessedVersionResponseSchema)` to create a new message.
  */
 export declare const AckProcessedVersionResponseSchema: GenMessage<AckProcessedVersionResponse>;
+
+/**
+ * MarkConversationRead advances the requesting user's per-conversation read
+ * cursor to the conversation's current room_version, clearing the user-facing
+ * unread badge for that conversation. read_version in the response is the
+ * resulting cursor value, so the frontend can set its local state to the exact
+ * server value.
+ *
+ * @generated from message laelia.v1.MarkConversationReadRequest
+ */
+export declare type MarkConversationReadRequest = Message<"laelia.v1.MarkConversationReadRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+};
+
+/**
+ * Describes the message laelia.v1.MarkConversationReadRequest.
+ * Use `create(MarkConversationReadRequestSchema)` to create a new message.
+ */
+export declare const MarkConversationReadRequestSchema: GenMessage<MarkConversationReadRequest>;
+
+/**
+ * @generated from message laelia.v1.MarkConversationReadResponse
+ */
+export declare type MarkConversationReadResponse = Message<"laelia.v1.MarkConversationReadResponse"> & {
+  /**
+   * @generated from field: int64 read_version = 1;
+   */
+  readVersion: bigint;
+};
+
+/**
+ * Describes the message laelia.v1.MarkConversationReadResponse.
+ * Use `create(MarkConversationReadResponseSchema)` to create a new message.
+ */
+export declare const MarkConversationReadResponseSchema: GenMessage<MarkConversationReadResponse>;
 
 /**
  * @generated from message laelia.v1.AgentStreamMessage
@@ -2599,6 +2646,14 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof FetchConversationActivityRequestSchema;
     output: typeof FetchConversationActivityResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.MarkConversationRead
+   */
+  markConversationRead: {
+    methodKind: "unary";
+    input: typeof MarkConversationReadRequestSchema;
+    output: typeof MarkConversationReadResponseSchema;
   },
   /**
    * UploadFile stores data in S3 and persists a file row. Intended for the

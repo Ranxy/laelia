@@ -380,6 +380,24 @@ CREATE TABLE IF NOT EXISTS agent_channel_cursor (
 CREATE INDEX IF NOT EXISTS idx_agent_channel_cursor_agent ON agent_channel_cursor(agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_channel_cursor_conv ON agent_channel_cursor(conversation_id);
 
+-- === User-first: durable per-channel read cursor ===
+-- user_channel_cursor records how far a user has read each conversation they
+-- are a member of. The frontend compares conversation.version against
+-- read_version to render unread badges. A missing row is treated as
+-- "caught up to current version" on first read (COALESCE to conversation.version),
+-- mirroring agent_channel_cursor semantics, so a newly joined user does not see
+-- existing history as unread.
+CREATE TABLE IF NOT EXISTS user_channel_cursor (
+    principal_id INTEGER NOT NULL REFERENCES principal(id) ON DELETE CASCADE,
+    conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+    read_version BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (principal_id, conversation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_channel_cursor_user ON user_channel_cursor(principal_id);
+CREATE INDEX IF NOT EXISTS idx_user_channel_cursor_conv ON user_channel_cursor(conversation_id);
+
 -- The previous Phase 2 held_action table is obsolete in the agent-first model:
 -- the agent runs tools and posts replies directly within its own session, and
 -- the send-time Held Draft is handled inline by post_message's base_version

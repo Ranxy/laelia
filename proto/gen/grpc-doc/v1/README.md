@@ -138,6 +138,8 @@
     - [ListFilesRequest](#laelia-v1-ListFilesRequest)
     - [ListFilesResponse](#laelia-v1-ListFilesResponse)
     - [ManagerStreamMessage](#laelia-v1-ManagerStreamMessage)
+    - [MarkConversationReadRequest](#laelia-v1-MarkConversationReadRequest)
+    - [MarkConversationReadResponse](#laelia-v1-MarkConversationReadResponse)
     - [Mention](#laelia-v1-Mention)
     - [NewMessagesAvailable](#laelia-v1-NewMessagesAvailable)
     - [PermissionDecidedPayload](#laelia-v1-PermissionDecidedPayload)
@@ -1758,6 +1760,7 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | owner_name | [string](#string) |  |  |
 | created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | updated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| unread_count | [int32](#int32) |  | unread_count is the number of chat_message rows with room_version beyond the requesting user&#39;s read cursor for this conversation. Populated by ListChannels; 0 (or unset) when the user is caught up. |
 
 
 
@@ -2224,6 +2227,40 @@ drain loop. The agent identity is resolved from the auth context.
 | cancel | [CancelMessage](#laelia-v1-CancelMessage) |  |  |
 | pong | [Pong](#laelia-v1-Pong) |  |  |
 | permission_decision | [PermissionDecision](#laelia-v1-PermissionDecision) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-MarkConversationReadRequest"></a>
+
+### MarkConversationReadRequest
+MarkConversationRead advances the requesting user&#39;s per-conversation read
+cursor to the conversation&#39;s current room_version, clearing the user-facing
+unread badge for that conversation. read_version in the response is the
+resulting cursor value, so the frontend can set its local state to the exact
+server value.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-MarkConversationReadResponse"></a>
+
+### MarkConversationReadResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| read_version | [int64](#int64) |  |  |
 
 
 
@@ -2774,6 +2811,7 @@ names).
 | ListChannelUpdates | [ListChannelUpdatesRequest](#laelia-v1-ListChannelUpdatesRequest) | [ListChannelUpdatesResponse](#laelia-v1-ListChannelUpdatesResponse) |  |
 | AckProcessedVersion | [AckProcessedVersionRequest](#laelia-v1-AckProcessedVersionRequest) | [AckProcessedVersionResponse](#laelia-v1-AckProcessedVersionResponse) |  |
 | FetchConversationActivity | [FetchConversationActivityRequest](#laelia-v1-FetchConversationActivityRequest) | [FetchConversationActivityResponse](#laelia-v1-FetchConversationActivityResponse) |  |
+| MarkConversationRead | [MarkConversationReadRequest](#laelia-v1-MarkConversationReadRequest) | [MarkConversationReadResponse](#laelia-v1-MarkConversationReadResponse) |  |
 | UploadFile | [UploadFileRequest](#laelia-v1-UploadFileRequest) | [File](#laelia-v1-File) | UploadFile stores data in S3 and persists a file row. Intended for the agent daemon (browser uploads go through the Echo multipart route). No google.api.http annotation: the agent reaches it via Connect-JSON over the CommandServiceClient, and avoiding a /v1/files/{id} gateway entry keeps it from colliding with the browser download route. |
 | DownloadFile | [DownloadFileRequest](#laelia-v1-DownloadFileRequest) | [DownloadFileResponse](#laelia-v1-DownloadFileResponse) | DownloadFile fetches a file&#39;s bytes from S3. The caller must be a member of the file&#39;s conversation. Used by the agent daemon; browser downloads go through the Echo route. |
 | ListFiles | [ListFilesRequest](#laelia-v1-ListFilesRequest) | [ListFilesResponse](#laelia-v1-ListFilesResponse) | ListFiles returns the files attached to a conversation. The caller must be a member. |

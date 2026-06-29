@@ -165,6 +165,10 @@ export interface ChannelSlice {
   channelMembersByConv: Record<string, ChannelMember[]>;
   channelMembersLoading: Record<string, boolean>;
   agentActivities: Record<string, AgentActivity[]>;
+  // Unread message counts per conversation, keyed by conversation name
+  // (`conversations/{id}`). Populated by fetchChannels from the backend and
+  // cleared locally by markConversationRead; drives the left-rail badges.
+  unreadByConv: Record<string, number>;
   // Active per-conversation message-poll intervals, keyed by conversation
   // name. Held in store state (not a module-level registry) so it is testable
   // and survives HMR without leaking timers.
@@ -172,6 +176,7 @@ export interface ChannelSlice {
 
   fetchChannels: () => Promise<void>;
   createChannel: (title: string) => Promise<Conversation>;
+  markConversationRead: (conversationId: string) => Promise<void>;
   sendChannelMessage: (
     conversationId: string,
     content: string,

@@ -54,6 +54,7 @@
   "sidebar": {
     "home": "首页",
     "agents": "Agent 管理",
+    "chat": "聊天",
     "channels": "频道",
     "settings": "设置",
     "settings-storage": "存储配置",
@@ -251,6 +252,9 @@
   },
   "chat": {
     "with-agent": "与 {{name}} 对话",
+    "title": "聊天",
+    "select-conversation": "选择一个会话开始聊天",
+    "search-placeholder": "搜索会话…",
     "placeholder": "输入消息...",
     "placeholder-processing": "Agent 处理中...",
     "stop": "停止",

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { pairToolCallEvents } from "@/components/chat/message-row";
 import {
   type CommandEvent,
   CommandEventType,
 } from "@/types/proto-es/v1/command_pb";
-import { pairToolCallEvents } from "./chat";
 
 // Minimal event stubs: pairing only reads `.type`, so we build typed shells
 // instead of fully-populated proto messages.

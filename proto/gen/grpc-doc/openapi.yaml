@@ -1138,6 +1138,37 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}:markRead:
+        post:
+            tags:
+                - CommandService
+            operationId: CommandService_MarkConversationRead
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MarkConversationReadRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MarkConversationReadResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/conversations/{conversation}:postMessage:
         post:
             tags:
@@ -2032,6 +2063,13 @@ components:
                 updatedAt:
                     type: string
                     format: date-time
+                unreadCount:
+                    type: integer
+                    description: |-
+                        unread_count is the number of chat_message rows with room_version beyond
+                         the requesting user's read cursor for this conversation. Populated by
+                         ListChannels; 0 (or unset) when the user is caught up.
+                    format: int32
         CreateAgentResponse:
             type: object
             properties:
@@ -2238,6 +2276,24 @@ components:
         LogoutRequest:
             type: object
             properties: {}
+        MarkConversationReadRequest:
+            required:
+                - conversation
+            type: object
+            properties:
+                conversation:
+                    type: string
+            description: |-
+                MarkConversationRead advances the requesting user's per-conversation read
+                 cursor to the conversation's current room_version, clearing the user-facing
+                 unread badge for that conversation. read_version in the response is the
+                 resulting cursor value, so the frontend can set its local state to the exact
+                 server value.
+        MarkConversationReadResponse:
+            type: object
+            properties:
+                readVersion:
+                    type: string
         Mention:
             type: object
             properties:

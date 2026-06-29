@@ -16,8 +16,6 @@ import { getLayerRoot, LAYER_SURFACE_CLASS } from "@/components/ui/layer";
 import { cn } from "@/lib/utils";
 import {
   AGENT_ROUTE_LIST,
-  CHANNEL_ROUTE_DETAIL,
-  CHANNEL_ROUTE_LIST,
   CHAT_ROUTE,
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
@@ -52,17 +50,11 @@ function getItemClass(item: SidebarItem, currentRouteName: string): string {
   if (isActive) {
     return cn("router-link-active", "bg-link-hover");
   }
+  // Opening an agent's tasks/commands view highlights the Agents nav item.
   if (
     item.name === AGENT_ROUTE_LIST &&
     (currentRouteName === COMMAND_ROUTE_LIST ||
-      currentRouteName === COMMAND_ROUTE_DETAIL ||
-      currentRouteName === CHAT_ROUTE)
-  ) {
-    return cn("router-link-active", "bg-link-hover");
-  }
-  if (
-    item.name === CHANNEL_ROUTE_LIST &&
-    currentRouteName === CHANNEL_ROUTE_DETAIL
+      currentRouteName === COMMAND_ROUTE_DETAIL)
   ) {
     return cn("router-link-active", "bg-link-hover");
   }
@@ -91,9 +83,9 @@ function useSidebarItems(): SidebarItem[] {
         type: "route",
       },
       {
-        title: t("sidebar.channels"),
+        title: t("sidebar.chat"),
         icon: MessageCircle,
-        name: CHANNEL_ROUTE_LIST,
+        name: CHAT_ROUTE,
         type: "route",
       },
       {

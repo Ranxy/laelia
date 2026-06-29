@@ -309,6 +309,10 @@ message Conversation {
   string owner_name = 6;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
+  // unread_count is the number of chat_message rows with room_version beyond
+  // the requesting user's read cursor for this conversation. Populated by
+  // ListChannels; 0 (or unset) when the user is caught up.
+  int32 unread_count = 9;
 }
 
 message ChannelMember {
@@ -484,6 +488,22 @@ message AckProcessedVersionResponse {
   int64 processed_version = 1;
 }
 
+// MarkConversationRead advances the requesting user's per-conversation read
+// cursor to the conversation's current room_version, clearing the user-facing
+// unread badge for that conversation. read_version in the response is the
+// resulting cursor value, so the frontend can set its local state to the exact
+// server value.
+message MarkConversationReadRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+}
+
+message MarkConversationReadResponse {
+  int64 read_version = 1;
+}
+
 service CommandService {
   rpc ListCommands(ListCommandsRequest) returns (ListCommandsResponse) {
     option (google.api.http) = {get: "/v1/{agent=agents/*}/commands"};
@@ -645,6 +665,15 @@ service CommandService {
 
   rpc FetchConversationActivity(FetchConversationActivityRequest) returns (FetchConversationActivityResponse) {
     option (google.api.http) = {get: "/v1/{conversation=conversations/*}/activity"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.read";
+  }
+
+  rpc MarkConversationRead(MarkConversationReadRequest) returns (MarkConversationReadResponse) {
+    option (google.api.http) = {
+      post: "/v1/{conversation=conversations/*}:markRead"
+      body: "*"
+    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }

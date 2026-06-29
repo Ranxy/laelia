@@ -4,9 +4,8 @@ import { AgentWorkspaceLayout } from "@/app/layouts/agent-workspace-layout";
 import { DashboardLayout } from "@/app/layouts/dashboard-layout";
 import {
   AGENT_ROUTE_LIST,
-  CHANNEL_ROUTE_DETAIL,
-  CHANNEL_ROUTE_LIST,
   CHAT_ROUTE,
+  CHAT_ROUTE_DETAIL,
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
   SETTINGS_ROUTE_STORAGE,
@@ -38,15 +37,9 @@ export const dashboardRoutes: RouteObject[] = [
         path: "agents/:agentId",
         element: <AgentWorkspaceLayout />,
         children: [
-          { index: true, element: <Navigate to="chat" replace /> },
-          {
-            path: "chat",
-            handle: { name: CHAT_ROUTE },
-            lazy: () =>
-              import("@/pages/dashboard/chat").then((m) => ({
-                Component: m.ChatPage,
-              })),
-          },
+          // Chat lives in the unified /chat page now; the agent workspace hosts
+          // only the tasks/commands views.
+          { index: true, element: <Navigate to="commands" replace /> },
           {
             path: "commands",
             handle: { name: COMMAND_ROUTE_LIST },
@@ -66,20 +59,29 @@ export const dashboardRoutes: RouteObject[] = [
         ],
       },
       {
-        path: "channels",
-        handle: { name: CHANNEL_ROUTE_LIST },
+        path: "chat",
         lazy: () =>
-          import("@/pages/dashboard/channel-list").then((m) => ({
-            Component: m.ChannelListPage,
+          import("@/pages/dashboard/chat-layout").then((m) => ({
+            Component: m.ChatLayout,
           })),
-      },
-      {
-        path: "channels/:channelId",
-        handle: { name: CHANNEL_ROUTE_DETAIL },
-        lazy: () =>
-          import("@/pages/dashboard/channel-chat").then((m) => ({
-            Component: m.ChannelChatPage,
-          })),
+        children: [
+          {
+            index: true,
+            handle: { name: CHAT_ROUTE },
+            lazy: () =>
+              import("@/pages/dashboard/chat-conversation").then((m) => ({
+                Component: m.ChatEmptyState,
+              })),
+          },
+          {
+            path: ":conversationId",
+            handle: { name: CHAT_ROUTE_DETAIL },
+            lazy: () =>
+              import("@/pages/dashboard/chat-conversation").then((m) => ({
+                Component: m.ChatConversationPage,
+              })),
+          },
+        ],
       },
       {
         path: "settings",

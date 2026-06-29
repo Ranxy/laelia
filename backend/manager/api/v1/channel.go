@@ -31,7 +31,7 @@ func (s *CommandService) CreateChannel(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create channel"))
 	}
 
-	return connect.NewResponse(convertToV1Conversation(conv, user.Name, 1)), nil
+	return connect.NewResponse(convertToV1Conversation(conv, user.Name, 1, 0, conv.Title)), nil
 }
 
 func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[v1pb.ListChannelsRequest]) (*connect.Response[v1pb.ListChannelsResponse], error) {
@@ -50,7 +50,7 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 	}
 	limitPlusOne := offset.limit + 1
 
-	convs, err := s.store.ListUserConversations(ctx, user.ID, limitPlusOne, offset.offset)
+	convs, err := s.store.ListUserConversationsWithUnread(ctx, user.ID, limitPlusOne, offset.offset)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list channels"))
 	}
@@ -62,13 +62,23 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 	}
 
 	var v1Convs []*v1pb.Conversation
-	for _, conv := range convs {
+	for _, uc := range convs {
+		conv := uc.Conversation
 		memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
 		ownerName := user.Name
 		if conv.OwnerID != user.ID {
 			ownerName = resolveUserName(ctx, s.store, conv.OwnerID)
 		}
-		v1Convs = append(v1Convs, convertToV1Conversation(conv, ownerName, memberCount))
+		// For direct conversations (type=1) the title is empty in the DB; surface
+		// the agent's display name instead so the left rail can render the DM row
+		// without an extra member fetch.
+		title := conv.Title
+		if conv.Type == 1 && conv.AgentID.Valid {
+			if agent, agentErr := s.store.GetAgent(ctx, int(conv.AgentID.Int32)); agentErr == nil && agent != nil && agent.Name != "" {
+				title = agent.Name
+			}
+		}
+		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, memberCount, uc.UnreadCount, title))
 	}
 
 	return connect.NewResponse(&v1pb.ListChannelsResponse{
@@ -91,7 +101,7 @@ func (s *CommandService) GetChannel(ctx context.Context, req *connect.Request[v1
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
 	ownerName := resolveUserName(ctx, s.store, conv.OwnerID)
 
-	return connect.NewResponse(convertToV1Conversation(conv, ownerName, memberCount)), nil
+	return connect.NewResponse(convertToV1Conversation(conv, ownerName, memberCount, 0, conv.Title)), nil
 }
 
 func (s *CommandService) UpdateChannel(ctx context.Context, req *connect.Request[v1pb.UpdateChannelRequest]) (*connect.Response[v1pb.Conversation], error) {
@@ -121,7 +131,7 @@ func (s *CommandService) UpdateChannel(ctx context.Context, req *connect.Request
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, updated.ID)
 	ownerName := resolveUserName(ctx, s.store, updated.OwnerID)
 
-	return connect.NewResponse(convertToV1Conversation(updated, ownerName, memberCount)), nil
+	return connect.NewResponse(convertToV1Conversation(updated, ownerName, memberCount, 0, updated.Title)), nil
 }
 
 func (s *CommandService) DeleteChannel(ctx context.Context, req *connect.Request[v1pb.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error) {
@@ -340,16 +350,17 @@ func (s *CommandService) notifyConversationAgents(ctx context.Context, convID uu
 	}
 }
 
-func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, memberCount int) *v1pb.Conversation {
+func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, memberCount int, unreadCount int32, title string) *v1pb.Conversation {
 	return &v1pb.Conversation{
 		Name:        fmt.Sprintf("conversations/%s", conv.ID.String()),
-		Title:       conv.Title,
+		Title:       title,
 		Type:        conv.Type,
 		MemberCount: int32(memberCount),
 		OwnerId:     fmt.Sprintf("%d", conv.OwnerID),
 		OwnerName:   ownerName,
 		CreatedAt:   timestamppb.New(conv.CreatedAt),
 		UpdatedAt:   timestamppb.New(conv.UpdatedAt),
+		UnreadCount: unreadCount,
 	}
 }
 
@@ -378,6 +389,29 @@ func (s *CommandService) FetchConversationActivity(ctx context.Context, req *con
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to fetch conversation activity"))
 	}
 	return connect.NewResponse(&v1pb.FetchConversationActivityResponse{Activities: activities}), nil
+}
+
+// MarkConversationRead advances the requesting user's read cursor for a
+// conversation to its current room_version, clearing the user-facing unread
+// badge. The caller must be a member of the conversation.
+func (s *CommandService) MarkConversationRead(ctx context.Context, req *connect.Request[v1pb.MarkConversationReadRequest]) (*connect.Response[v1pb.MarkConversationReadResponse], error) {
+	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
+	if err != nil {
+		return nil, err
+	}
+	user, ok := GetUserFromContext(ctx)
+	if !ok || user == nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("MarkConversationRead is for authenticated users"))
+	}
+	conv, err := s.store.GetConversation(ctx, convID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to read conversation version"))
+	}
+	readVersion, err := s.store.UpsertUserReadCursor(ctx, user.ID, convID, conv.Version)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to mark conversation read"))
+	}
+	return connect.NewResponse(&v1pb.MarkConversationReadResponse{ReadVersion: readVersion}), nil
 }
 
 func resolveMemberDisplayName(ctx context.Context, s *store.Store, memberType int32, memberID string) string {

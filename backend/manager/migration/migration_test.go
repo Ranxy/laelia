@@ -66,3 +66,25 @@ func TestUniqueConstraintsPresent(t *testing.T) {
 		t.Fatal("non-unique idx_agent_token_hash must be dropped before recreating as unique")
 	}
 }
+
+// TestUserChannelCursorPresent locks in the user_channel_cursor table that backs
+// the user-facing unread badge. It mirrors agent_channel_cursor: monotonic
+// read_version, cascade deletes, and a missing row treated as caught-up. All
+// declarations are idempotent so re-applying the schema is safe.
+func TestUserChannelCursorPresent(t *testing.T) {
+	sql := latestSQL(t)
+
+	for _, want := range []string{
+		"CREATE TABLE IF NOT EXISTS user_channel_cursor",
+		"principal_id INTEGER NOT NULL REFERENCES principal(id) ON DELETE CASCADE",
+		"conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE",
+		"read_version BIGINT NOT NULL DEFAULT 0",
+		"PRIMARY KEY (principal_id, conversation_id)",
+		"CREATE INDEX IF NOT EXISTS idx_user_channel_cursor_user",
+		"CREATE INDEX IF NOT EXISTS idx_user_channel_cursor_conv",
+	} {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration missing user_channel_cursor declaration: %q", want)
+		}
+	}
+}

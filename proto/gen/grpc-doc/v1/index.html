@@ -702,6 +702,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.MarkConversationReadRequest"><span class="badge">M</span>MarkConversationReadRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.MarkConversationReadResponse"><span class="badge">M</span>MarkConversationReadResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.Mention"><span class="badge">M</span>Mention</a>
                 </li>
               
@@ -4999,6 +5007,15 @@ context-only and avoid replying to itself. </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>unread_count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>unread_count is the number of chat_message rows with room_version beyond
+the requesting user&#39;s read cursor for this conversation. Populated by
+ListChannels; 0 (or unset) when the user is caught up. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -5884,6 +5901,54 @@ context-only and avoid replying to itself. </p></td>
                 <tr>
                   <td>permission_decision</td>
                   <td><a href="#laelia.v1.PermissionDecision">PermissionDecision</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.MarkConversationReadRequest">MarkConversationReadRequest</h3>
+        <p>MarkConversationRead advances the requesting user's per-conversation read</p><p>cursor to the conversation's current room_version, clearing the user-facing</p><p>unread badge for that conversation. read_version in the response is the</p><p>resulting cursor value, so the frontend can set its local state to the exact</p><p>server value.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.MarkConversationReadResponse">MarkConversationReadResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>read_version</td>
+                  <td><a href="#int64">int64</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -7218,6 +7283,13 @@ context-only and avoid replying to itself. </p></td>
               </tr>
             
               <tr>
+                <td>MarkConversationRead</td>
+                <td><a href="#laelia.v1.MarkConversationReadRequest">MarkConversationReadRequest</a></td>
+                <td><a href="#laelia.v1.MarkConversationReadResponse">MarkConversationReadResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
                 <td>UploadFile</td>
                 <td><a href="#laelia.v1.UploadFileRequest">UploadFileRequest</a></td>
                 <td><a href="#laelia.v1.File">File</a></td>
@@ -7490,6 +7562,16 @@ a member.</p></td>
                 <td>GET</td>
                 <td>/v1/{conversation=conversations/*}/activity</td>
                 <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>MarkConversationRead</td>
+                <td>POST</td>
+                <td>/v1/{conversation=conversations/*}:markRead</td>
+                <td>*</td>
               </tr>
               
             

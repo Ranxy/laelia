@@ -92,6 +92,13 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 		return nil, errors.Wrapf(seedErr, "failed to seed agent cursor for new direct conversation")
 	}
 
+	// Seed the user's read cursor too, so creating a DM does not mark its
+	// (empty) history unread. Re-opening an existing DM takes the early-return
+	// path above and is deliberately not re-seeded, preserving unread state.
+	if seedErr := s.SeedUserReadCursorOnJoin(ctx, principalID, newConv.ID); seedErr != nil {
+		return nil, errors.Wrapf(seedErr, "failed to seed user read cursor for new direct conversation")
+	}
+
 	return &newConv, nil
 }
 
@@ -133,6 +140,13 @@ func (s *Store) CreateChannel(ctx context.Context, title string, ownerID int) (*
 	}
 
 	if err := addConversationMemberTx(ctx, tx, conv.ID, MemberTypeUser, fmt.Sprintf("%d", ownerID), MemberRoleOwner); err != nil {
+		return nil, err
+	}
+
+	// Seed the owner's read cursor to the new conversation's version so it
+	// starts caught up and only future messages count as unread. Inside the tx
+	// so a failure rolls back the seed with the conversation.
+	if err := upsertUserReadCursorTx(ctx, tx, ownerID, conv.ID, conv.Version); err != nil {
 		return nil, err
 	}
 
@@ -193,6 +207,59 @@ func (s *Store) ListUserConversations(ctx context.Context, principalID int, limi
 	}
 	if err := rows.Err(); err != nil {
 		return nil, errors.Wrapf(err, "failed to iterate conversations")
+	}
+
+	return convs, nil
+}
+
+// UserConversation pairs a conversation with its per-user unread count, used to
+// render the left-rail channel list with unread badges.
+type UserConversation struct {
+	Conversation ConversationMessage
+	UnreadCount  int32
+}
+
+// ListUserConversationsWithUnread returns every conversation the user is a
+// member of, ordered by updated_at DESC, together with the number of
+// chat_message rows whose room_version is beyond the user's read cursor. A
+// missing cursor row is treated as caught-up (COALESCE to conversation.version),
+// mirroring agent_channel_cursor semantics, so a newly joined user does not see
+// existing history as unread.
+func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID int, limit, offset int) ([]*UserConversation, error) {
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version,
+		       COALESCE((
+		         SELECT count(*)::int
+		         FROM chat_message m
+		         WHERE m.conversation_id = c.id
+		           AND m.room_version > COALESCE(ucc.read_version, c.version)
+		       ), 0)
+		FROM conversation c
+		JOIN conversation_member cm ON cm.conversation_id = c.id
+		LEFT JOIN user_channel_cursor ucc ON ucc.principal_id = $3 AND ucc.conversation_id = c.id
+		WHERE cm.member_type = $1 AND cm.member_id = $2
+		ORDER BY c.updated_at DESC
+		LIMIT $4 OFFSET $5
+	`, MemberTypeUser, fmt.Sprintf("%d", principalID), principalID, limit, offset)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list user conversations with unread")
+	}
+	defer rows.Close()
+
+	var convs []*UserConversation
+	for rows.Next() {
+		var uc UserConversation
+		conv := &uc.Conversation
+		if err := rows.Scan(
+			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+			&uc.UnreadCount,
+		); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan user conversation")
+		}
+		convs = append(convs, &uc)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate user conversations")
 	}
 
 	return convs, nil

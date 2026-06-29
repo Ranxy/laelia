@@ -43,6 +43,7 @@ const (
 	CommandService_ListChannelUpdates_FullMethodName        = "/laelia.v1.CommandService/ListChannelUpdates"
 	CommandService_AckProcessedVersion_FullMethodName       = "/laelia.v1.CommandService/AckProcessedVersion"
 	CommandService_FetchConversationActivity_FullMethodName = "/laelia.v1.CommandService/FetchConversationActivity"
+	CommandService_MarkConversationRead_FullMethodName      = "/laelia.v1.CommandService/MarkConversationRead"
 	CommandService_UploadFile_FullMethodName                = "/laelia.v1.CommandService/UploadFile"
 	CommandService_DownloadFile_FullMethodName              = "/laelia.v1.CommandService/DownloadFile"
 	CommandService_ListFiles_FullMethodName                 = "/laelia.v1.CommandService/ListFiles"
@@ -75,6 +76,7 @@ type CommandServiceClient interface {
 	ListChannelUpdates(ctx context.Context, in *ListChannelUpdatesRequest, opts ...grpc.CallOption) (*ListChannelUpdatesResponse, error)
 	AckProcessedVersion(ctx context.Context, in *AckProcessedVersionRequest, opts ...grpc.CallOption) (*AckProcessedVersionResponse, error)
 	FetchConversationActivity(ctx context.Context, in *FetchConversationActivityRequest, opts ...grpc.CallOption) (*FetchConversationActivityResponse, error)
+	MarkConversationRead(ctx context.Context, in *MarkConversationReadRequest, opts ...grpc.CallOption) (*MarkConversationReadResponse, error)
 	// UploadFile stores data in S3 and persists a file row. Intended for the
 	// agent daemon (browser uploads go through the Echo multipart route). No
 	// google.api.http annotation: the agent reaches it via Connect-JSON over the
@@ -346,6 +348,16 @@ func (c *commandServiceClient) FetchConversationActivity(ctx context.Context, in
 	return out, nil
 }
 
+func (c *commandServiceClient) MarkConversationRead(ctx context.Context, in *MarkConversationReadRequest, opts ...grpc.CallOption) (*MarkConversationReadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkConversationReadResponse)
+	err := c.cc.Invoke(ctx, CommandService_MarkConversationRead_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *commandServiceClient) UploadFile(ctx context.Context, in *UploadFileRequest, opts ...grpc.CallOption) (*File, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(File)
@@ -403,6 +415,7 @@ type CommandServiceServer interface {
 	ListChannelUpdates(context.Context, *ListChannelUpdatesRequest) (*ListChannelUpdatesResponse, error)
 	AckProcessedVersion(context.Context, *AckProcessedVersionRequest) (*AckProcessedVersionResponse, error)
 	FetchConversationActivity(context.Context, *FetchConversationActivityRequest) (*FetchConversationActivityResponse, error)
+	MarkConversationRead(context.Context, *MarkConversationReadRequest) (*MarkConversationReadResponse, error)
 	// UploadFile stores data in S3 and persists a file row. Intended for the
 	// agent daemon (browser uploads go through the Echo multipart route). No
 	// google.api.http annotation: the agent reaches it via Connect-JSON over the
@@ -494,6 +507,9 @@ func (UnimplementedCommandServiceServer) AckProcessedVersion(context.Context, *A
 }
 func (UnimplementedCommandServiceServer) FetchConversationActivity(context.Context, *FetchConversationActivityRequest) (*FetchConversationActivityResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method FetchConversationActivity not implemented")
+}
+func (UnimplementedCommandServiceServer) MarkConversationRead(context.Context, *MarkConversationReadRequest) (*MarkConversationReadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MarkConversationRead not implemented")
 }
 func (UnimplementedCommandServiceServer) UploadFile(context.Context, *UploadFileRequest) (*File, error) {
 	return nil, status.Error(codes.Unimplemented, "method UploadFile not implemented")
@@ -925,6 +941,24 @@ func _CommandService_FetchConversationActivity_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommandService_MarkConversationRead_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkConversationReadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).MarkConversationRead(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_MarkConversationRead_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).MarkConversationRead(ctx, req.(*MarkConversationReadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CommandService_UploadFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UploadFileRequest)
 	if err := dec(in); err != nil {
@@ -1069,6 +1103,10 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "FetchConversationActivity",
 			Handler:    _CommandService_FetchConversationActivity_Handler,
+		},
+		{
+			MethodName: "MarkConversationRead",
+			Handler:    _CommandService_MarkConversationRead_Handler,
 		},
 		{
 			MethodName: "UploadFile",

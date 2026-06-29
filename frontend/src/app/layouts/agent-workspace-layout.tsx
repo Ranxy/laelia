@@ -6,13 +6,8 @@ import { ConnectionBadge } from "@/components/connection-badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { agentResourceName } from "@/lib/command-status";
-import {
-  CHAT_ROUTE,
-  COMMAND_ROUTE_DETAIL,
-  COMMAND_ROUTE_LIST,
-} from "@/router/handles";
+import { COMMAND_ROUTE_LIST } from "@/router/handles";
 import { resolvePath } from "@/router/route-index";
-import { useCurrentRoute } from "@/router/use-current-route";
 import { useAppStore } from "@/stores";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
 
@@ -20,7 +15,6 @@ export function AgentWorkspaceLayout() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { agentId } = useParams<{ agentId: string }>();
-  const currentRoute = useCurrentRoute();
   const getAgent = useAppStore((s) => s.getAgent);
   const agentCache = useAppStore((s) => s.agentCache);
 
@@ -36,13 +30,25 @@ export function AgentWorkspaceLayout() {
   const cached = agentCache[agentName];
   const displayAgent = agent ?? cached;
 
-  const activeTab =
-    currentRoute.name === COMMAND_ROUTE_LIST ||
-    currentRoute.name === COMMAND_ROUTE_DETAIL
-      ? "tasks"
-      : "chat";
+  // The agent workspace now hosts only the tasks/commands views; chat lives in
+  // the unified /chat page. The Chat tab opens (creating if needed) the 1:1
+  // conversation with this agent and navigates there. The workspace only ever
+  // shows the tasks tab now, so it is always active.
+  const activeTab = "tasks";
 
   const title = displayAgent?.title ?? agentId ?? "";
+
+  const openDirectChat = async () => {
+    try {
+      const convName = await useAppStore
+        .getState()
+        .getOrCreateConversation(agentName);
+      const convId = convName.split("/").pop();
+      if (convId) navigate(`/chat/${convId}`);
+    } catch {
+      // open failed — stay on the workspace
+    }
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -60,10 +66,7 @@ export function AgentWorkspaceLayout() {
       <Tabs value={activeTab} className="flex h-full flex-col overflow-hidden">
         <div className="px-4 border-b border-control-border shrink-0">
           <TabsList className="border-b-0">
-            <TabsTrigger
-              value="chat"
-              onClick={() => navigate(resolvePath(CHAT_ROUTE, { agentId }))}
-            >
+            <TabsTrigger value="chat" onClick={() => openDirectChat()}>
               <MessageSquare className="size-3.5 mr-1.5" />
               {t("workspace.tab-chat")}
             </TabsTrigger>

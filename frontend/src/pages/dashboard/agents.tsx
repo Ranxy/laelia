@@ -698,13 +698,24 @@ export function AgentsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation();
                           const resourceId = agent.name.replace(
                             /^agents\//,
                             ""
                           );
-                          navigate(`/agents/${resourceId}/chat`);
+                          // Lazily create (or fetch) the 1:1 conversation with
+                          // this agent, then open it in the unified chat page.
+                          try {
+                            const convName = await useAppStore
+                              .getState()
+                              .getOrCreateConversation(`agents/${resourceId}`);
+                            const convId = convName.split("/").pop();
+                            if (convId) navigate(`/chat/${convId}`);
+                          } catch {
+                            // open failed — fall back to the agent workspace
+                            navigate(`/agents/${resourceId}/commands`);
+                          }
                         }}
                       >
                         {t("agent.action-chat")}

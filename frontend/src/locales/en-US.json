@@ -54,6 +54,7 @@
   "sidebar": {
     "home": "Home",
     "agents": "Agents",
+    "chat": "Chat",
     "channels": "Channels",
     "settings": "Settings",
     "settings-storage": "Storage",
@@ -251,6 +252,9 @@
   },
   "chat": {
     "with-agent": "Chat with {{name}}",
+    "title": "Chat",
+    "select-conversation": "Select a conversation to start chatting",
+    "search-placeholder": "Search conversations…",
     "placeholder": "Type a message...",
     "placeholder-processing": "Agent is processing...",
     "stop": "Stop",

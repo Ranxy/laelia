@@ -7,6 +7,7 @@ import {
   ListChannelMembersRequestSchema,
   ListChannelsRequestSchema,
   ListConversationMessagesRequestSchema,
+  MarkConversationReadRequestSchema,
   RemoveChannelMemberRequestSchema,
   SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
@@ -24,6 +25,7 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
   channelMembersByConv: {},
   channelMembersLoading: {},
   agentActivities: {},
+  unreadByConv: {},
   channelWatchers: {},
 
   async fetchChannels() {
@@ -32,7 +34,10 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
       const res = await commandServiceClient.listChannels(
         create(ListChannelsRequestSchema, { pageSize: 100, pageToken: "" })
       );
-      set({ channels: res.channels ?? [], channelsLoading: false });
+      const list = res.channels ?? [];
+      const unreadByConv: Record<string, number> = {};
+      for (const c of list) unreadByConv[c.name] = c.unreadCount ?? 0;
+      set({ channels: list, unreadByConv, channelsLoading: false });
     } catch {
       set({ channelsLoading: false });
     }
@@ -42,8 +47,25 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
     const res = await commandServiceClient.createChannel(
       create(CreateChannelRequestSchema, { title })
     );
-    set({ channels: [...get().channels, res] });
+    set((state) => ({
+      channels: [...state.channels, res],
+      unreadByConv: { ...state.unreadByConv, [res.name]: res.unreadCount ?? 0 },
+    }));
     return res;
+  },
+
+  async markConversationRead(conversationId) {
+    const conversation = `conversations/${conversationId}`;
+    try {
+      await commandServiceClient.markConversationRead(
+        create(MarkConversationReadRequestSchema, { conversation })
+      );
+      set((s) => ({
+        unreadByConv: { ...s.unreadByConv, [conversation]: 0 },
+      }));
+    } catch {
+      // network error — the next fetchChannels tick will reconcile
+    }
   },
 
   async sendChannelMessage(conversationId, content, mentions, attachments) {

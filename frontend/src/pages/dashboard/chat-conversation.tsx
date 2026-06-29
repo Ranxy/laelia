@@ -2,6 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import {
   ArrowDown,
   ArrowLeft,
+  Bot,
   Hash,
   Loader2,
   Paperclip,
@@ -57,7 +58,7 @@ import type {
 import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
 
 // Stable empty fallbacks so per-key selectors returning undefined for an
-// unloaded channel don't mint a new array each run (which would defeat
+// unloaded conversation don't mint a new array each run (which would defeat
 // zustand's Object.is equality and re-render on every store change).
 const EMPTY_MESSAGES: ChatMessageUI[] = [];
 const EMPTY_MEMBERS: ChannelMember[] = [];
@@ -66,6 +67,9 @@ const EMPTY_ACTIVITIES: AgentActivity[] = [];
 // DOM id of the mention popup listbox, used to wire the textarea's
 // aria-controls / aria-activedescendant to the active option.
 const MENTION_POPUP_ID = "mention-popup";
+
+// Conversation type values mirror Conversation.type: 1 = direct/DM, 2 = channel.
+const CONVERSATION_TYPE_DM = 1;
 
 function memberTypeLabel(
   t: (key: string) => string,
@@ -76,10 +80,10 @@ function memberTypeLabel(
     : t("channel.member-type-user");
 }
 
-export function ChannelChatPage() {
+export function ChatConversationPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { channelId } = useParams<{ channelId: string }>();
+  const { conversationId: channelId } = useParams<{ conversationId: string }>();
 
   const channels = useAppStore((s) => s.channels);
   const loadMessages = useAppStore((s) => s.loadMessages);
@@ -89,6 +93,7 @@ export function ChannelChatPage() {
   const stopWatchingChannel = useAppStore((s) => s.stopWatchingChannel);
   const addChannelMember = useAppStore((s) => s.addChannelMember);
   const removeChannelMember = useAppStore((s) => s.removeChannelMember);
+  const markConversationRead = useAppStore((s) => s.markConversationRead);
   const currentUser = useAppStore((s) => s.currentUser);
   const fetchAgents = useAppStore((s) => s.fetchAgents);
   const fetchChannels = useAppStore((s) => s.fetchChannels);
@@ -123,6 +128,15 @@ export function ChannelChatPage() {
   const stickToBottomRef = useRef(true);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Per-conversation input draft cache so switching channels does not leak the
+  // half-typed message, pending attachments, or @mention map across channels.
+  // Keyed by channelId; lives for the lifetime of this page instance.
+  const draftRef = useRef<
+    Record<
+      string,
+      { input: string; attachments: Attachment[]; mentions: MentionTarget[] }
+    >
+  >({});
 
   const [membersOpen, setMembersOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
@@ -146,6 +160,7 @@ export function ChannelChatPage() {
   } | null>(null);
 
   const channel = channels.find((c) => c.name === conversationName);
+  const isDm = channel?.type === CONVERSATION_TYPE_DM;
   const isOwner =
     channel && currentUser
       ? channel.ownerId === currentUser.name.split("/").pop()
@@ -184,6 +199,11 @@ export function ChannelChatPage() {
     fetchAgents({ pageSize: 100 });
     fetchChannels();
 
+    // Clear the unread badge for this conversation now that the user has it
+    // open. Done after loadMessages so the cursor advance reflects the latest
+    // fetched version.
+    markConversationRead(channelId);
+
     // Start background polling for new messages and agent activity.
     startWatchingChannel(conversationName);
   }, [
@@ -193,6 +213,7 @@ export function ChannelChatPage() {
     listChannelMembers,
     fetchAgents,
     fetchChannels,
+    markConversationRead,
     startWatchingChannel,
     stopWatchingChannel,
   ]);
@@ -206,6 +227,51 @@ export function ChannelChatPage() {
       }
     };
   }, [init, stopWatchingChannel]);
+
+  // Restore the entering conversation's draft. Declared before the persist
+  // effect so it reads the saved draft before any stale write lands.
+  useEffect(() => {
+    if (!channelId) return;
+    const d = draftRef.current[channelId];
+    setInput(d?.input ?? "");
+    setPendingAttachments(d?.attachments ?? []);
+    setMentionMap(d?.mentions ?? []);
+    setMentionState(null);
+    setMentionSelectedIndex(0);
+    setCursorPos(0);
+  }, [channelId]);
+
+  // Persist the current input/attachments/mentions to the draft cache on every
+  // change. On a switch the restore effect above seeds the new conversation's
+  // state, which re-triggers this effect and writes the restored values back —
+  // so each conversation keeps its own draft without cross-talk.
+  useEffect(() => {
+    if (channelId) {
+      draftRef.current[channelId] = {
+        input,
+        attachments: pendingAttachments,
+        mentions: mentionMap,
+      };
+    }
+  }, [channelId, input, pendingAttachments, mentionMap]);
+
+  // Auto-mark-read as new messages arrive via polling while the conversation
+  // is open. On conversation switch we just reset the baseline; the initial
+  // markRead is handled by init() above.
+  const prevMsgCountRef = useRef(0);
+  const lastMarkConvRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!channelId) return;
+    if (lastMarkConvRef.current !== channelId) {
+      lastMarkConvRef.current = channelId;
+      prevMsgCountRef.current = messages.length;
+      return;
+    }
+    if (messages.length > prevMsgCountRef.current) {
+      markConversationRead(channelId);
+    }
+    prevMsgCountRef.current = messages.length;
+  }, [messages, channelId, markConversationRead]);
 
   const scrollToBottom = useCallback(() => {
     stickToBottomRef.current = true;
@@ -404,14 +470,19 @@ export function ChannelChatPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate("/channels")}
+          onClick={() => navigate("/chat")}
           aria-label={t("channel.back")}
-          className="size-8 p-0"
+          className="size-8 p-0 lg:hidden"
         >
           <ArrowLeft className="size-4" />
         </Button>
-        <div className="flex size-8 items-center justify-center rounded-lg bg-control-bg text-control">
-          <Hash className="size-4" />
+        <div
+          className={cn(
+            "flex size-8 items-center justify-center rounded-lg",
+            isDm ? "bg-accent/10 text-accent" : "bg-control-bg text-control"
+          )}
+        >
+          {isDm ? <Bot className="size-4" /> : <Hash className="size-4" />}
         </div>
         <div className="min-w-0 flex-1 flex items-center gap-3">
           <h2 className="text-sm font-semibold text-main truncate">
@@ -702,7 +773,9 @@ export function ChannelChatPage() {
                         )}
                       </p>
                     </div>
-                    {isOwner && m.memberRole !== 1 && (
+                    {/* DMs have fixed membership (user + agent); only channel
+                        owners can remove members. */}
+                    {!isDm && isOwner && m.memberRole !== 1 && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -720,8 +793,8 @@ export function ChannelChatPage() {
               </div>
             )}
 
-            {/* Add member section */}
-            {isOwner && (
+            {/* Add member section — channels only (DMs are 1:1 with an agent). */}
+            {!isDm && isOwner && (
               <div className="mt-auto border-t border-control-border pt-4 px-1">
                 {addMemberOpen ? (
                   <div className="space-y-3">
@@ -797,6 +870,20 @@ export function ChannelChatPage() {
         name={detailMention?.name ?? ""}
         onClose={() => setDetailMention(null)}
       />
+    </div>
+  );
+}
+
+export function ChatEmptyState() {
+  const { t } = useTranslation();
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+      <div className="flex size-14 items-center justify-center rounded-full bg-control-bg text-control-light">
+        <Hash className="size-6" />
+      </div>
+      <p className="text-control-light text-sm max-w-xs">
+        {t("chat.select-conversation")}
+      </p>
     </div>
   );
 }
