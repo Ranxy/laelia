@@ -323,6 +323,14 @@ export declare type User = Message<"laelia.v1.User"> & {
    * @generated from field: repeated string groups = 14;
    */
   groups: string[];
+
+  /**
+   * workspace_admin is true when the user holds the roles/workspaceAdmin role.
+   * Only populated for the current caller (GetCurrentUser).
+   *
+   * @generated from field: bool workspace_admin = 15;
+   */
+  workspaceAdmin: boolean;
 };
 
 /**

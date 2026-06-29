@@ -49,6 +49,36 @@ export interface AuthSlice {
   loadSession: () => Promise<void>;
 }
 
+// UserSlice owns the workspace user roster (active + recycled) and the
+// user-management mutations. It wraps userServiceClient; permission gating for
+// mutating RPCs is enforced server-side (laelia.users.update/delete) and the UI
+// hides the controls for non-admin callers based on `currentUser.workspaceAdmin`.
+export interface UserSlice {
+  users: User[];
+  usersLoading: boolean;
+  deletedUsers: User[];
+  deletedUsersLoading: boolean;
+
+  fetchUsers: (
+    params?: { pageSize?: number; pageToken?: string; showDeleted?: boolean },
+    opts?: { silent?: boolean }
+  ) => Promise<{ nextPageToken: string } | undefined>;
+  createUser: (input: {
+    email: string;
+    title: string;
+    password: string;
+    phone?: string;
+  }) => Promise<User>;
+  updateUser: (
+    name: string,
+    fields: { title?: string; email?: string; phone?: string },
+    maskPaths: string[]
+  ) => Promise<User>;
+  resetPassword: (name: string, newPassword: string) => Promise<User>;
+  deleteUser: (name: string) => Promise<void>;
+  undeleteUser: (name: string) => Promise<User>;
+}
+
 export interface AgentSlice {
   agents: Agent[];
   agentsLoading: boolean;
@@ -163,6 +193,7 @@ export type AppStoreState = AuthSlice &
   AgentSlice &
   CommandSlice &
   ChatSlice &
-  ChannelSlice;
+  ChannelSlice &
+  UserSlice;
 
 export type AppSliceCreator<Slice> = StateCreator<AppStoreState, [], [], Slice>;

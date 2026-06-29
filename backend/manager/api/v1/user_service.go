@@ -3,6 +3,7 @@ package v1
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/mail"
 	"regexp"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/Ranxy/laelia/backend/common"
+	"github.com/Ranxy/laelia/backend/common/log"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
@@ -85,12 +87,21 @@ func (s *UserService) BatchGetUsers(ctx context.Context, request *connect.Reques
 }
 
 // GetCurrentUser gets the current authenticated user.
-func (*UserService) GetCurrentUser(ctx context.Context, _ *connect.Request[emptypb.Empty]) (*connect.Response[v1pb.User], error) {
+func (s *UserService) GetCurrentUser(ctx context.Context, _ *connect.Request[emptypb.Empty]) (*connect.Response[v1pb.User], error) {
 	user, ok := GetUserFromContext(ctx)
 	if !ok || user == nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.Errorf("authenticated user not found"))
 	}
-	return connect.NewResponse(convertToUser(user)), nil
+	out := convertToUser(user)
+	// Expose whether the caller holds the workspace-admin role so the frontend
+	// can gate user-management actions. A lookup failure is logged but does not
+	// fail the request; the field defaults to false.
+	isAdmin, err := isUserWorkspaceAdmin(ctx, s.store, user)
+	if err != nil {
+		slog.Error("failed to resolve workspace admin", log.WithError(err), slog.String("user", user.Email))
+	}
+	out.WorkspaceAdmin = isAdmin
+	return connect.NewResponse(out), nil
 }
 
 // ListUsers lists all users.
@@ -455,6 +466,9 @@ func (s *UserService) UpdateUser(ctx context.Context, request *connect.Request[v
 	if user.MemberDeleted {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %d has been deleted", userID))
 	}
+	if isReservedUserID(userID) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("built-in user %d cannot be modified", userID))
+	}
 
 	// if callerUser.ID != userID {
 	// 	// TODO check permission
@@ -534,7 +548,7 @@ func (s *UserService) UpdateUser(ctx context.Context, request *connect.Request[v
 
 // DeleteUser deletes a user.
 func (s *UserService) DeleteUser(ctx context.Context, request *connect.Request[v1pb.DeleteUserRequest]) (*connect.Response[emptypb.Empty], error) {
-	_, ok := GetUserFromContext(ctx)
+	caller, ok := GetUserFromContext(ctx)
 	if !ok {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("failed to get caller user"))
 	}
@@ -554,6 +568,12 @@ func (s *UserService) DeleteUser(ctx context.Context, request *connect.Request[v
 	}
 	if user.MemberDeleted {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %d has been deleted", userID))
+	}
+	if caller != nil && caller.ID == userID {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("cannot delete your own account"))
+	}
+	if isReservedUserID(userID) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("built-in user %d cannot be deleted", userID))
 	}
 
 	// Check if there is still workspace admin if the current user is deleted.
@@ -645,6 +665,9 @@ func (s *UserService) UndeleteUser(ctx context.Context, request *connect.Request
 	}
 	if !user.MemberDeleted {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("user %d is already active", userID))
+	}
+	if isReservedUserID(userID) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("built-in user %d cannot be modified", userID))
 	}
 
 	user, err = s.store.UpdateUser(ctx, user, &store.UpdateUserMessage{Delete: &undeletePatch})
@@ -777,4 +800,13 @@ func isUserWorkspaceAdmin(ctx context.Context, stores *store.Store, user *store.
 	}
 	roles := utils.GetUserFormattedRolesMap(ctx, stores, user, workspacePolicy.Policy)
 	return roles[common.FormatRole(common.WorkspaceAdmin)], nil
+}
+
+// isReservedUserID reports whether the id belongs to a built-in account in the
+// reserved range (id < PrincipalIDForFirstUser, e.g. the seeded system bot at
+// id=1). Reserved accounts cannot be modified, deleted, or restored. Real users
+// are always assigned ids >= PrincipalIDForFirstUser (see migration/latest.sql,
+// `ALTER SEQUENCE principal_id_seq RESTART WITH 101`).
+func isReservedUserID(userID int) bool {
+	return userID < common.PrincipalIDForFirstUser
 }

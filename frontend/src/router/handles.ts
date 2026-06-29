@@ -8,3 +8,5 @@ export const CHAT_ROUTE = "chat";
 export const CHANNEL_ROUTE_LIST = "channel.list";
 export const CHANNEL_ROUTE_DETAIL = "channel.detail";
 export const SETTINGS_ROUTE = "settings";
+export const SETTINGS_ROUTE_STORAGE = "settings.storage";
+export const SETTINGS_ROUTE_USERS = "settings.users";

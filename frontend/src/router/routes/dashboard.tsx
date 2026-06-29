@@ -9,7 +9,8 @@ import {
   CHAT_ROUTE,
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
-  SETTINGS_ROUTE,
+  SETTINGS_ROUTE_STORAGE,
+  SETTINGS_ROUTE_USERS,
   WORKSPACE_ROUTE_LANDING,
 } from "../handles";
 
@@ -82,11 +83,25 @@ export const dashboardRoutes: RouteObject[] = [
       },
       {
         path: "settings",
-        handle: { name: SETTINGS_ROUTE },
-        lazy: () =>
-          import("@/pages/dashboard/settings").then((m) => ({
-            Component: m.SettingsPage,
-          })),
+        children: [
+          { index: true, element: <Navigate to="storage" replace /> },
+          {
+            path: "storage",
+            handle: { name: SETTINGS_ROUTE_STORAGE },
+            lazy: () =>
+              import("@/pages/dashboard/settings-storage").then((m) => ({
+                Component: m.SettingsStoragePage,
+              })),
+          },
+          {
+            path: "users",
+            handle: { name: SETTINGS_ROUTE_USERS },
+            lazy: () =>
+              import("@/pages/dashboard/user-list").then((m) => ({
+                Component: m.UserListPage,
+              })),
+          },
+        ],
       },
     ],
   },

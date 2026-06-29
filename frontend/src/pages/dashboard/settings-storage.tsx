@@ -33,7 +33,7 @@ function isMasked(secret: string): boolean {
   return secret === "" || secret.startsWith("****");
 }
 
-export function SettingsPage() {
+export function SettingsStoragePage() {
   const { t } = useTranslation();
   const [form, setForm] = useState<S3Form>(EMPTY);
   const [loading, setLoading] = useState(true);
@@ -118,7 +118,7 @@ export function SettingsPage() {
     <div className="flex h-full overflow-y-auto flex-col">
       <div className="mx-auto w-full max-w-2xl px-6 py-8">
         <h1 className="text-lg font-semibold text-main">
-          {t("settings.title")}
+          {t("settings.s3.title")}
         </h1>
         <p className="mt-1 text-sm text-control-light">
           {t("settings.s3.description")}

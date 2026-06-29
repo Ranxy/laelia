@@ -2579,6 +2579,12 @@ components:
                     description: |-
                         The groups for the user.
                          Format: groups/{email}
+                workspaceAdmin:
+                    readOnly: true
+                    type: boolean
+                    description: |-
+                        workspace_admin is true when the user holds the roles/workspaceAdmin role.
+                         Only populated for the current caller (GetCurrentUser).
         UserProfile:
             type: object
             properties:

@@ -22,6 +22,8 @@ import {
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
   SETTINGS_ROUTE,
+  SETTINGS_ROUTE_STORAGE,
+  SETTINGS_ROUTE_USERS,
   WORKSPACE_ROUTE_LANDING,
 } from "@/router/handles";
 import { useCurrentRoute } from "@/router/use-current-route";
@@ -98,7 +100,19 @@ function useSidebarItems(): SidebarItem[] {
         title: t("sidebar.settings"),
         icon: Settings,
         name: SETTINGS_ROUTE,
-        type: "route",
+        type: "group",
+        children: [
+          {
+            title: t("sidebar.settings-storage"),
+            name: SETTINGS_ROUTE_STORAGE,
+            type: "route",
+          },
+          {
+            title: t("sidebar.settings-users"),
+            name: SETTINGS_ROUTE_USERS,
+            type: "route",
+          },
+        ],
       },
     ],
     [t]

@@ -236,6 +236,10 @@ message User {
   // The groups for the user.
   // Format: groups/{email}
   repeated string groups = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // workspace_admin is true when the user holds the roles/workspaceAdmin role.
+  // Only populated for the current caller (GetCurrentUser).
+  bool workspace_admin = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 enum UserType {
