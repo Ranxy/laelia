@@ -11,10 +11,14 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
+import {
+  MemberPicker,
+  type MemberPickerType,
+} from "@/components/chat/member-picker";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
 import { MentionPopup } from "@/components/chat/mention-popup";
@@ -25,14 +29,6 @@ import {
 } from "@/components/chat/message-row";
 import { EmptyState, LoadingState } from "@/components/chat/states";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Sheet,
   SheetBody,
@@ -94,7 +90,6 @@ export function ChannelChatPage() {
   const addChannelMember = useAppStore((s) => s.addChannelMember);
   const removeChannelMember = useAppStore((s) => s.removeChannelMember);
   const currentUser = useAppStore((s) => s.currentUser);
-  const agents = useAppStore((s) => s.agents);
   const fetchAgents = useAppStore((s) => s.fetchAgents);
   const fetchChannels = useAppStore((s) => s.fetchChannels);
 
@@ -131,7 +126,7 @@ export function ChannelChatPage() {
 
   const [membersOpen, setMembersOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
-  const [addMemberType, setAddMemberType] = useState(2); // default AGENT
+  const [addMemberType, setAddMemberType] = useState<MemberPickerType>(2); // default AGENT
   const [addMemberId, setAddMemberId] = useState("");
   const [addingMember, setAddingMember] = useState(false);
 
@@ -155,6 +150,18 @@ export function ChannelChatPage() {
     channel && currentUser
       ? channel.ownerId === currentUser.name.split("/").pop()
       : false;
+
+  // memberIds already in the channel for the currently-selected add-member
+  // type, used to disable + badge them in the picker so they can't be re-added.
+  const existingMemberIds = useMemo(
+    () =>
+      new Set(
+        members
+          .filter((m) => m.memberType === addMemberType)
+          .map((m) => m.memberId)
+      ),
+    [members, addMemberType]
+  );
 
   const mentionTargets = useMentionTargets(channelId);
 
@@ -737,43 +744,14 @@ export function ChannelChatPage() {
                       </Button>
                     </div>
                     <div className="flex gap-2">
-                      {addMemberType === 2 ? (
-                        <Select
-                          value={addMemberId}
-                          onValueChange={(v) => v && setAddMemberId(v)}
-                        >
-                          <SelectTrigger className="flex-1 h-auto rounded-md border border-control-border bg-background px-2.5 py-1.5 text-xs text-main">
-                            <SelectValue
-                              placeholder={t("channel.member-id-placeholder")}
-                            />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {agents.map((agent) => {
-                              const resourceId =
-                                agent.name.split("/").pop() || agent.name;
-                              return (
-                                <SelectItem key={resourceId} value={resourceId}>
-                                  {agent.title || resourceId}
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input
-                          type="text"
-                          className={cn(
-                            "flex-1 rounded-md px-2.5 py-1.5 text-xs"
-                          )}
-                          placeholder={t("channel.member-id-placeholder")}
-                          value={addMemberId}
-                          onChange={(e) => setAddMemberId(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") handleAddMember();
-                          }}
-                          autoFocus
-                        />
-                      )}
+                      <MemberPicker
+                        key={addMemberType}
+                        memberType={addMemberType}
+                        existingMemberIds={existingMemberIds}
+                        value={addMemberId}
+                        onPick={setAddMemberId}
+                        placeholder={t("channel.member-id-placeholder")}
+                      />
                       <Button
                         variant="ghost"
                         size="sm"

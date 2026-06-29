@@ -60,7 +60,12 @@ export interface UserSlice {
   deletedUsersLoading: boolean;
 
   fetchUsers: (
-    params?: { pageSize?: number; pageToken?: string; showDeleted?: boolean },
+    params?: {
+      pageSize?: number;
+      pageToken?: string;
+      showDeleted?: boolean;
+      filter?: string;
+    },
     opts?: { silent?: boolean }
   ) => Promise<{ nextPageToken: string } | undefined>;
   createUser: (input: {

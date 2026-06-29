@@ -16,7 +16,7 @@
     "loading": "Loading...",
     "actions": "Actions",
     "no-data": "No agents yet.",
-    "confirm-delete": "Delete agent {name}?",
+    "confirm-delete": "Delete agent {{name}}?",
     "send": "Send",
     "cancel": "Cancel",
     "save": "Save",
@@ -250,7 +250,7 @@
     "row-open-detail": "Open command details"
   },
   "chat": {
-    "with-agent": "Chat with {name}",
+    "with-agent": "Chat with {{name}}",
     "placeholder": "Type a message...",
     "placeholder-processing": "Agent is processing...",
     "stop": "Stop",
@@ -279,7 +279,7 @@
   "tasks": {
     "title": "Tasks",
     "new": "New Task",
-    "new-description": "Send an ACP task to agent {name}",
+    "new-description": "Send an ACP task to agent {{name}}",
     "instruction-label": "Instruction (natural language)",
     "instruction-placeholder": "e.g. Read config.yaml and list all the port numbers in use",
     "profile-label": "Profile (optional — leave empty for agent default)",
@@ -307,13 +307,17 @@
     "name-placeholder": "Channel name",
     "empty": "No channels yet. Create one to start collaborating.",
     "placeholder": "Type a message...",
-    "members": "{count} members",
+    "members": "{{count}} members",
     "you": "You",
     "back": "Back to channels",
     "add-member": "Add member",
     "member-type-user": "User",
     "member-type-agent": "Agent",
     "member-id-placeholder": "User ID or Agent ID",
+    "member-joined": "Already a member",
+    "add-member-search": "Search users…",
+    "add-member-search-agent": "Search agents…",
+    "no-results": "No results",
     "attach-file": "Attach file"
   }
 }

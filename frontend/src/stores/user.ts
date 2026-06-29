@@ -31,6 +31,7 @@ export const createUserSlice: AppSliceCreator<UserSlice> = (set) => ({
           pageSize: params?.pageSize ?? 100,
           pageToken: params?.pageToken ?? "",
           showDeleted,
+          filter: params?.filter ?? "",
         })
       );
       if (showDeleted) {
