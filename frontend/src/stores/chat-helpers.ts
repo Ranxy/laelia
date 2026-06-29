@@ -1,5 +1,5 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
-import type { ChatMessage, CommandEvent } from "@/types/proto-es/v1/command_pb";
+import type { ChatMessage } from "@/types/proto-es/v1/command_pb";
 import type { ChatMessageUI } from "./types";
 
 // toUiMessage is the single mapper from a backend ChatMessage to the UI shape.
@@ -76,65 +76,4 @@ export function mergeMessages(
     }
   }
   return changed || out.length !== prev.length ? out : prev;
-}
-
-// lastEventSeqNo is the high-water mark of events already received for a
-// command; watchCommandEvents replays from after this seq so a reconnected
-// stream does not duplicate events the store already has.
-export function lastEventSeqNo(events: CommandEvent[] | undefined): number {
-  return events && events.length > 0 ? events[events.length - 1].seqNo : -1;
-}
-
-// omitKey returns a copy of rec without key, without mutating rec.
-export function omitKey<T>(
-  rec: Record<string, T>,
-  key: string
-): Record<string, T> {
-  const rest: Record<string, T> = {};
-  for (const k of Object.keys(rec)) {
-    if (k !== key) rest[k] = rec[k];
-  }
-  return rest;
-}
-
-// finalizeAssistant merges a patch into the assistant message identified by
-// commandName within the cached list, returning the same array reference when
-// no message matched (so subscribers bail out). Used by streamChatCommand's
-// cleanup to mark streaming done while preserving every other message —
-// including ones a concurrent watcher poll or a new send may have appended
-// between the stream closing and the cleanup set.
-export function finalizeAssistant(
-  msgs: ChatMessageUI[],
-  commandName: string,
-  patch: Partial<ChatMessageUI>
-): ChatMessageUI[] {
-  let changed = false;
-  const out = msgs.map((m) => {
-    if (m.commandName === commandName) {
-      changed = true;
-      return { ...m, ...patch };
-    }
-    return m;
-  });
-  return changed ? out : msgs;
-}
-
-// abortableSleep resolves after ms, or immediately if signal aborts. Used so
-// the reconnect backoff unblocks on abort instead of waiting the full delay.
-export function abortableSleep(
-  ms: number,
-  signal: AbortSignal | undefined
-): Promise<void> {
-  if (signal?.aborted) return Promise.resolve();
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true }
-    );
-  });
 }

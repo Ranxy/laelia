@@ -137,9 +137,6 @@ export interface ChatSlice {
   conversations: Record<string, string>;
   chatMessages: Record<string, ChatMessageUI[]>;
   chatLoading: Record<string, boolean>;
-  streamingContent: Record<string, string>;
-  streamingEvents: Record<string, CommandEvent[]>;
-  streamingStatus: Record<string, number>;
 
   getOrCreateConversation: (agent: string) => Promise<string>;
   loadMessages: (conversation: string) => Promise<void>;
@@ -148,11 +145,6 @@ export interface ChatSlice {
     instruction: string,
     conversationId?: string
   ) => Promise<ChatMessage>;
-  streamChatCommand: (
-    commandName: string,
-    conversation: string,
-    signal: AbortSignal
-  ) => Promise<void>;
 }
 
 // ChannelSlice owns channel conversations: the channel roster, per-conversation
