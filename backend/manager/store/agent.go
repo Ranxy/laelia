@@ -28,6 +28,12 @@ type AgentMessage struct {
 	LastTokenRotatedAt time.Time
 }
 
+// GetResourceID returns the agent's resource name, used to key context-derived
+// identifiers such as per-agent rate-limit buckets (heartbeat and agent API).
+func (m *AgentMessage) GetResourceID() string {
+	return m.ResourceID
+}
+
 type FindAgentMessage struct {
 	ID          *int
 	ResourceID  *string

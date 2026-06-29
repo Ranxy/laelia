@@ -106,17 +106,22 @@ func (rl *RateLimiter) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 				return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("login rate limit exceeded"))
 			}
 		default:
-			userID := extractIdentifier(ctx, common.UserContextKey)
-			if userID != "" {
-				limiter := rl.getUserLimiter(userID)
-				if !limiter.Allow() {
+			// Authenticated callers are keyed on the principal the auth
+			// interceptor (which runs before us) injected into the context:
+			// human users by their user resource id, agents by their agent
+			// resource id. Anonymous callers — no principal in context, e.g.
+			// CreateUser brute-force — fall back to per-IP so a single source
+			// cannot fan out anonymous requests while relying solely on the
+			// shared global budget.
+			if id := extractIdentifier(ctx, common.UserContextKey); id != "" {
+				if !rl.getUserLimiter(id).Allow() {
+					return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("API rate limit exceeded"))
+				}
+			} else if id := extractIdentifier(ctx, common.AgentContextKey); id != "" {
+				if !rl.getAgentLimiter(id).Allow() {
 					return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("API rate limit exceeded"))
 				}
 			} else {
-				// Anonymous callers (unauthenticated) have no user identity to pin a
-				// per-user limiter to. Fall back to per-IP so a single source cannot
-				// fan out anonymous requests — e.g. CreateUser brute-force — while
-				// relying solely on the shared global budget.
 				limiter := rl.getIPLimiter(sourceIP)
 				if !limiter.Allow() {
 					return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("API rate limit exceeded"))

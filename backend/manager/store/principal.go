@@ -65,6 +65,12 @@ type UserMessage struct {
 	Groups []string
 }
 
+// GetResourceID returns the stable per-user resource name used to key
+// context-derived identifiers such as per-user rate-limit buckets.
+func (m *UserMessage) GetResourceID() string {
+	return common.FormatUserUID(m.ID)
+}
+
 type UserStat struct {
 	Type    models.PrincipalType
 	Deleted bool

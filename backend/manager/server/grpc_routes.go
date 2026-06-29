@@ -100,11 +100,18 @@ func configureGrpcRouters(
 	ipValidator := auth.NewIPValidator(auth.IPValidationWarn, profile.TrustProxy)
 
 	handlerOpts := connect.WithHandlerOptions(
+		// Interceptors execute in the listed order. The rate limiter MUST run
+		// after auth: it keys per-user/per-agent buckets on the principal that auth
+		// injects into the context, so running it before auth leaves every
+		// authenticated call misclassified as anonymous and throttled by the
+		// tiny per-IP "connect" bucket (burst 5) — i.e. a few clicks -> 429.
+		// Connection/login brute-force guards are unaffected: they are matched
+		// by procedure name, not by context, so they still apply pre-handler.
 		connect.WithInterceptors(
 			apiv1.NewDebugInterceptor(),
-			rateLimiter,
 			ipValidator,
 			auth.New(stores, secret, stateCfg, profile),
+			rateLimiter,
 			apiv1.NewIAMInterceptor(stores),
 			apiv1.NewAuditInterceptor(stores),
 		),
