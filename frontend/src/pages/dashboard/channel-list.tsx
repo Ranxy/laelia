@@ -2,13 +2,14 @@ import { Hash, Loader2, Plus, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 import { useAppStore } from "@/stores";
 
 export function ChannelListPage() {
@@ -51,14 +52,10 @@ export function ChannelListPage() {
         <h1 className="text-lg font-semibold text-main">
           {t("channel.title")}
         </h1>
-        <button
-          type="button"
-          onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:bg-accent-hover transition-colors"
-        >
+        <Button onClick={() => setCreateOpen(true)} size="sm">
           <Plus className="size-4" />
           {t("channel.create")}
-        </button>
+        </Button>
       </div>
 
       {/* Content */}
@@ -78,14 +75,10 @@ export function ChannelListPage() {
             <p className="text-control-light text-sm max-w-xs">
               {t("channel.empty")}
             </p>
-            <button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover transition-colors"
-            >
+            <Button onClick={() => setCreateOpen(true)} size="sm">
               <Plus className="size-4" />
               {t("channel.create")}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -130,12 +123,7 @@ export function ChannelListPage() {
             {t("channel.create-description")}
           </DialogDescription>
           <div className="mt-2 space-y-4">
-            <input
-              type="text"
-              className={cn(
-                "w-full rounded-lg border border-control-border bg-background px-3 py-2 text-sm text-main",
-                "placeholder:text-control-placeholder focus:outline-none focus:border-accent"
-              )}
+            <Input
               placeholder={t("channel.name-placeholder")}
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
@@ -145,26 +133,15 @@ export function ChannelListPage() {
               autoFocus
             />
             <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setCreateOpen(false)}
-                className="rounded-lg border border-control-border px-3 py-1.5 text-sm text-control hover:bg-control-bg transition-colors"
-              >
+              <Button variant="outline" onClick={() => setCreateOpen(false)}>
                 {t("common.cancel")}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
                 onClick={handleCreate}
                 disabled={!newTitle.trim() || creating}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                  newTitle.trim() && !creating
-                    ? "bg-accent text-accent-foreground hover:bg-accent-hover"
-                    : "bg-control-bg text-control-placeholder cursor-not-allowed"
-                )}
               >
                 {creating ? t("common.creating") : t("common.create")}
-              </button>
+              </Button>
             </div>
           </div>
         </DialogContent>

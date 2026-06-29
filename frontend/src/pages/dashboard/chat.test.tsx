@@ -70,6 +70,7 @@ describe("MessageRow memo", () => {
       streamingContent: "",
       streamingEvents: [] as never[],
       onViewDetails,
+      markdownCustomId: "chat",
     };
 
     act(() => {

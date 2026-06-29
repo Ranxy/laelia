@@ -11,18 +11,21 @@ import {
   Users,
   X,
 } from "lucide-react";
-import MarkdownRender, {
-  MarkdownCodeBlockNode,
-  setCustomComponents,
-} from "markstream-react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
-import { FileCard } from "@/components/chat/file-card";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
 import { MentionPopup } from "@/components/chat/mention-popup";
+import {
+  EMPTY_EVENTS,
+  MessageRow,
+  rowStreamingProps,
+} from "@/components/chat/message-row";
+import { EmptyState, LoadingState } from "@/components/chat/states";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -37,14 +40,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
 import { detectMention } from "@/composables/useMentionDetect";
 import {
-  MentionTarget,
+  type MentionTarget,
   targetToMention,
   useMentionTargets,
 } from "@/composables/useMentionTargets";
 import { commandServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
+import "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { ChatMessageUI } from "@/stores/types";
@@ -65,24 +70,6 @@ const EMPTY_ACTIVITIES: AgentActivity[] = [];
 // DOM id of the mention popup listbox, used to wire the textarea's
 // aria-controls / aria-activedescendant to the active option.
 const MENTION_POPUP_ID = "mention-popup";
-
-setCustomComponents({
-  // biome-ignore lint/suspicious/noExplicitAny: markstream custom component API is loosely typed
-  code_block: ({ node, isDark, ctx }: any) => (
-    <MarkdownCodeBlockNode
-      node={node}
-      isDark={isDark}
-      stream={ctx?.codeBlockStream}
-      {...(ctx?.codeBlockProps ?? {})}
-    />
-  ),
-});
-
-function formatTime(date: Date): string {
-  const hours = date.getHours().toString().padStart(2, "0");
-  const minutes = date.getMinutes().toString().padStart(2, "0");
-  return `${hours}:${minutes}`;
-}
 
 function memberTypeLabel(
   t: (key: string) => string,
@@ -398,18 +385,24 @@ export function ChannelChatPage() {
     [channelId, removeChannelMember, listChannelMembers]
   );
 
+  // Channel rows are never in DM-style streaming mode (channel messages are
+  // polled, not streamed token-by-token), so every row receives stable empty
+  // streaming slices. The shared MessageRow still accepts them.
+  const noopViewDetails = useCallback((_: string) => {}, []);
+
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
       {/* Header */}
       <div className="flex shrink-0 items-center gap-3 border-b border-control-border px-4 py-3">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => navigate("/channels")}
-          className="flex size-8 items-center justify-center rounded-md text-control hover:text-main hover:bg-control-bg transition-colors"
           aria-label={t("channel.back")}
+          className="size-8 p-0"
         >
           <ArrowLeft className="size-4" />
-        </button>
+        </Button>
         <div className="flex size-8 items-center justify-center rounded-lg bg-control-bg text-control">
           <Hash className="size-4" />
         </div>
@@ -419,17 +412,18 @@ export function ChannelChatPage() {
           </h2>
           <AgentStatusBar activities={activities} />
         </div>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => {
             setMembersOpen(true);
             if (channelId) listChannelMembers(channelId);
           }}
-          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-control hover:text-main hover:bg-control-bg transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1.5"
         >
           <Users className="size-4" />
           <span className="hidden sm:inline">{members.length}</span>
-        </button>
+        </Button>
       </div>
 
       {/* Messages scroll area */}
@@ -439,19 +433,9 @@ export function ChannelChatPage() {
         className="flex-1 overflow-y-auto"
       >
         <div className="mx-auto flex max-w-3xl flex-col gap-4 px-6 pt-6 pb-4">
-          {loading && (
-            <div className="flex items-center justify-center gap-2 py-12 text-control-light text-sm">
-              <Loader2 className="size-4 animate-spin" />
-              {t("common.loading")}
-            </div>
-          )}
+          {loading && <LoadingState />}
           {!loading && messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
-              <div className="flex size-14 items-center justify-center rounded-full bg-control-bg text-control-light">
-                <Send className="size-6" />
-              </div>
-              <p className="text-control-light text-sm">{t("chat.empty")}</p>
-            </div>
+            <EmptyState icon={Send} message={t("chat.empty")} />
           )}
           {messages.map((msg, idx) => {
             const prevMsg = idx > 0 ? messages[idx - 1] : null;
@@ -459,12 +443,19 @@ export function ChannelChatPage() {
               !prevMsg ||
               prevMsg.role !== msg.role ||
               prevMsg.senderName !== msg.senderName;
+            const rowProps = rowStreamingProps(msg, false, "", EMPTY_EVENTS);
             return (
-              <ChannelMessageRow
+              <MessageRow
                 key={msg.id}
                 msg={msg}
                 showAvatar={showAvatar}
+                agentTitle={msg.senderName ?? ""}
+                streamingContent={rowProps.streamingContent}
+                streamingEvents={rowProps.streamingEvents}
+                onViewDetails={noopViewDetails}
                 onMentionClick={handleMentionClick}
+                MentionBadge={MentionBadge}
+                markdownCustomId="channel-chat"
               />
             );
           })}
@@ -526,12 +517,11 @@ export function ChannelChatPage() {
                 ))}
               </div>
             )}
-            <textarea
+            <Textarea
               ref={textareaRef}
               className={cn(
-                "block w-full resize-none bg-transparent px-4 py-3 text-sm text-main",
-                "placeholder:text-control-placeholder",
-                "focus:outline-none",
+                "block w-full resize-none border-0 bg-transparent px-4 py-3 text-sm text-main",
+                "placeholder:text-control-placeholder focus:ring-0 focus:border-transparent",
                 "max-h-[200px] min-h-[24px]"
               )}
               rows={1}
@@ -642,22 +632,17 @@ export function ChannelChatPage() {
                   {t("chat.send-hint")}
                 </span>
               </div>
-              <button
+              <Button
                 type="button"
+                size="xs"
                 onClick={handleSend}
                 disabled={
                   (!input.trim() && pendingAttachments.length === 0) || sending
                 }
-                className={cn(
-                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                  (input.trim() || pendingAttachments.length > 0) && !sending
-                    ? "bg-accent text-accent-foreground hover:bg-accent-hover"
-                    : "bg-control-bg text-control-placeholder cursor-not-allowed"
-                )}
               >
                 <Send className="size-3" />
                 {t("common.send")}
-              </button>
+              </Button>
             </div>
           </div>
           {mentionState?.active && textareaRef.current && (
@@ -686,12 +671,7 @@ export function ChannelChatPage() {
             </SheetTitle>
           </SheetHeader>
           <SheetBody className="flex flex-col gap-0">
-            {membersLoading && (
-              <div className="flex items-center justify-center gap-2 py-12 text-control-light text-sm">
-                <Loader2 className="size-4 animate-spin" />
-                {t("common.loading")}
-              </div>
-            )}
+            {membersLoading && <LoadingState />}
             {!membersLoading && (
               <div className="divide-y divide-control-border">
                 {members.map((m) => (
@@ -716,16 +696,17 @@ export function ChannelChatPage() {
                       </p>
                     </div>
                     {isOwner && m.memberRole !== 1 && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() =>
                           handleRemoveMember(m.memberType, m.memberId)
                         }
-                        className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-error hover:bg-error/10 transition-colors"
                         aria-label={t("common.delete")}
+                        className="size-7 p-0 text-control-placeholder hover:text-error hover:bg-error/10"
                       >
                         <Trash2 className="size-3.5" />
-                      </button>
+                      </Button>
                     )}
                   </div>
                 ))}
@@ -738,30 +719,22 @@ export function ChannelChatPage() {
                 {addMemberOpen ? (
                   <div className="space-y-3">
                     <div className="flex gap-2">
-                      <button
-                        type="button"
+                      <Button
+                        variant={addMemberType === 1 ? "default" : "outline"}
+                        size="sm"
                         onClick={() => setAddMemberType(1)}
-                        className={cn(
-                          "flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                          addMemberType === 1
-                            ? "bg-accent text-accent-foreground"
-                            : "bg-control-bg text-control hover:bg-control-bg/80"
-                        )}
+                        className="flex-1"
                       >
                         {t("channel.member-type-user")}
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant={addMemberType === 2 ? "default" : "outline"}
+                        size="sm"
                         onClick={() => setAddMemberType(2)}
-                        className={cn(
-                          "flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                          addMemberType === 2
-                            ? "bg-accent text-accent-foreground"
-                            : "bg-control-bg text-control hover:bg-control-bg/80"
-                        )}
+                        className="flex-1"
                       >
                         {t("channel.member-type-agent")}
-                      </button>
+                      </Button>
                     </div>
                     <div className="flex gap-2">
                       {addMemberType === 2 ? (
@@ -787,11 +760,10 @@ export function ChannelChatPage() {
                           </SelectContent>
                         </Select>
                       ) : (
-                        <input
+                        <Input
                           type="text"
                           className={cn(
-                            "flex-1 rounded-md border border-control-border bg-background px-2.5 py-1.5 text-xs text-main",
-                            "placeholder:text-control-placeholder focus:outline-none focus:border-accent"
+                            "flex-1 rounded-md px-2.5 py-1.5 text-xs"
                           )}
                           placeholder={t("channel.member-id-placeholder")}
                           value={addMemberId}
@@ -802,42 +774,37 @@ export function ChannelChatPage() {
                           autoFocus
                         />
                       )}
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
                           setAddMemberOpen(false);
                           setAddMemberId("");
                         }}
-                        className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors"
+                        className="size-7 p-0"
                       >
                         <X className="size-3.5" />
-                      </button>
+                      </Button>
                     </div>
-                    <button
-                      type="button"
+                    <Button
                       onClick={handleAddMember}
                       disabled={!addMemberId.trim() || addingMember}
-                      className={cn(
-                        "w-full rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                        addMemberId.trim() && !addingMember
-                          ? "bg-accent text-accent-foreground hover:bg-accent-hover"
-                          : "bg-control-bg text-control-placeholder cursor-not-allowed"
-                      )}
+                      className="w-full"
                     >
                       {addingMember
                         ? t("common.creating")
                         : t("channel.add-member")}
-                    </button>
+                    </Button>
                   </div>
                 ) : (
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
                     onClick={() => setAddMemberOpen(true)}
-                    className="flex w-full items-center gap-1.5 rounded-md px-2.5 py-2 text-sm text-control hover:text-main hover:bg-control-bg transition-colors"
+                    className="flex w-full items-center gap-1.5 rounded-md px-2.5 py-2 text-sm"
                   >
                     <Plus className="size-4" />
                     {t("channel.add-member")}
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
@@ -855,174 +822,3 @@ export function ChannelChatPage() {
     </div>
   );
 }
-
-function Avatar({ label }: { label: string }) {
-  return (
-    <div
-      className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-        label === "U"
-          ? "bg-accent text-accent-foreground"
-          : "bg-control-bg text-control"
-      )}
-    >
-      {label.charAt(0).toUpperCase()}
-    </div>
-  );
-}
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function splitByMentions(
-  content: string,
-  mentions: { type: string; id: string; name: string }[]
-): {
-  text: string;
-  mention: { type: string; id: string; name: string } | null;
-}[] {
-  if (mentions.length === 0) return [{ text: content, mention: null }];
-
-  const segments: {
-    text: string;
-    mention: { type: string; id: string; name: string } | null;
-  }[] = [];
-  const sorted = [...mentions].sort((a, b) => {
-    const ai = content.indexOf(`@${a.name}`);
-    const bi = content.indexOf(`@${b.name}`);
-    return ai - bi;
-  });
-
-  let lastIndex = 0;
-  const used = new Set<string>();
-
-  for (const m of sorted) {
-    const pattern = `@${escapeRegex(m.name)}`;
-    const re = new RegExp(pattern, "g");
-    re.lastIndex = lastIndex;
-    const match = re.exec(content);
-    if (!match) continue;
-
-    const idx = match.index;
-    const key = `${idx}-${m.name}`;
-    if (used.has(key)) continue;
-    used.add(key);
-
-    if (idx > lastIndex) {
-      segments.push({ text: content.slice(lastIndex, idx), mention: null });
-    }
-    segments.push({ text: "", mention: m });
-    lastIndex = idx + match[0].length;
-  }
-
-  if (lastIndex < content.length) {
-    segments.push({ text: content.slice(lastIndex), mention: null });
-  }
-
-  return segments;
-}
-
-const ChannelMessageRow = memo(function ChannelMessageRow({
-  msg,
-  showAvatar,
-  onMentionClick,
-}: {
-  msg: ChatMessageUI;
-  showAvatar: boolean;
-  onMentionClick?: (type: string, id: string, name: string) => void;
-}) {
-  const { t } = useTranslation();
-  const isUser = msg.role === "user";
-  const senderName =
-    msg.senderName || (isUser ? t("channel.you") : t("chat.agent"));
-  const content = msg.content;
-  const mentions = msg.mentions ?? [];
-
-  const handleClick = (type: string, id: string, name: string) => {
-    onMentionClick?.(type, id, name);
-  };
-
-  const segments = splitByMentions(content, mentions);
-
-  return (
-    <div className={cn("flex gap-3", isUser ? "flex-row-reverse" : "flex-row")}>
-      <div className="flex shrink-0 flex-col items-center pt-0.5">
-        {showAvatar ? (
-          <Avatar label={isUser ? "U" : senderName || "A"} />
-        ) : (
-          <div className="size-8 shrink-0" />
-        )}
-      </div>
-      <div
-        className={cn(
-          "flex min-w-0 flex-1 flex-col gap-1.5",
-          isUser ? "items-end" : "items-start"
-        )}
-      >
-        {showAvatar && (
-          <div className="flex items-center gap-2 px-0.5">
-            <span className="text-xs font-medium text-control">
-              {senderName}
-            </span>
-            <span className="text-xs text-control-placeholder">
-              {formatTime(msg.timestamp)}
-            </span>
-          </div>
-        )}
-
-        <div
-          className={cn(
-            "rounded-2xl text-sm leading-relaxed",
-            isUser
-              ? "bg-accent text-accent-foreground rounded-tr-sm px-4 py-2.5 max-w-[80%]"
-              : content
-                ? "bg-control-bg/60 text-main rounded-tl-sm px-4 py-3 max-w-[80%]"
-                : "hidden"
-          )}
-        >
-          {segments.length > 0 &&
-            segments.map((seg, i) => {
-              const mention = seg.mention;
-              if (mention) {
-                return (
-                  <MentionBadge
-                    key={`${i}-${mention.name}`}
-                    name={mention.name}
-                    onClick={() =>
-                      handleClick(mention.type, mention.id, mention.name)
-                    }
-                  />
-                );
-              }
-              if (!seg.text) return null;
-              if (isUser) {
-                return (
-                  <span key={i} className="whitespace-pre-wrap break-words">
-                    {seg.text}
-                  </span>
-                );
-              }
-              return (
-                <span key={i} className="markstream-chat break-words inline">
-                  <MarkdownRender
-                    customId="channel-chat"
-                    content={seg.text}
-                    final
-                    fade
-                  />
-                </span>
-              );
-            })}
-          {msg.attachments && msg.attachments.length > 0 && (
-            <div className="flex flex-col gap-1">
-              {msg.attachments.map((att) => (
-                <FileCard key={att.id} attachment={att} />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-});
