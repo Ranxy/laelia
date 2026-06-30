@@ -51,6 +51,11 @@ export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
           },
         },
       }));
+      // The root (messages[0]) carries the authoritative total reply count;
+      // sync it back into the main channel list so the "N replies" badge on the
+      // root stays fresh without the main watcher having to observe thread
+      // activity (it only polls new main-channel messages).
+      syncRootReplyCount(set, get, conversation, rootMessageId, uiMsgs[0]);
     } catch {
       set((state) => ({
         threadByRoot: {
@@ -109,6 +114,10 @@ export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
         },
       },
     }));
+    // Optimistically bump the root's reply count in the main channel list so the
+    // "N replies" badge updates instantly. The thread watcher's next poll
+    // replaces it with the authoritative count from the backend.
+    bumpRootReplyCount(set, get, conversationName, rootMessageId, +1);
     return res;
   },
 });
@@ -154,6 +163,10 @@ function startWatcher(
           },
         }));
       }
+      // The root (delta[0]) carries the authoritative total reply count; keep
+      // the main channel list's root badge in sync as replies arrive (from the
+      // user or anyone else) while the panel is open.
+      syncRootReplyCount(set, get, conversation, root, delta[0]);
     } catch {
       // network error — retry on next tick
     }
@@ -180,4 +193,63 @@ function stopWatcher(
       return { threadWatchers };
     });
   }
+}
+
+// syncRootReplyCount writes the authoritative total reply count from a thread
+// response's root message into the main channel list (`chatMessages[conv]`),
+// so the "N replies" badge on the root stays fresh. The main channel watcher
+// only polls new main-channel messages (thread replies are excluded server-side),
+// so it would never observe a changed reply count on its own. No-op if the root
+// isn't in the main list or the count is already current. `rootMsg` may be null
+// (e.g. an empty delta) — then nothing is synced.
+function syncRootReplyCount(
+  set: Parameters<AppSliceCreator<ThreadSlice>>[0],
+  get: Parameters<AppSliceCreator<ThreadSlice>>[1],
+  conversation: string,
+  rootId: string,
+  rootMsg: ChatMessageUI | undefined
+) {
+  if (!rootMsg) return;
+  const count = rootMsg.threadReplyCount ?? 0;
+  updateRootReplyCount(set, get, conversation, rootId, (prev) =>
+    prev === count ? prev : count
+  );
+}
+
+// bumpRootReplyCount adjusts the root's reply count in the main channel list by
+// a delta (e.g. +1 on optimistic send). Used when we don't yet have the
+// authoritative total from the backend.
+function bumpRootReplyCount(
+  set: Parameters<AppSliceCreator<ThreadSlice>>[0],
+  get: Parameters<AppSliceCreator<ThreadSlice>>[1],
+  conversation: string,
+  rootId: string,
+  delta: number
+) {
+  updateRootReplyCount(set, get, conversation, rootId, (prev) =>
+    Math.max(0, (prev ?? 0) + delta)
+  );
+}
+
+// updateRootReplyCount finds the root message in the main channel list and
+// applies `fn` to its current threadReplyCount, replacing the row only if the
+// value changes (so subscribers bail out on no-ops).
+function updateRootReplyCount(
+  set: Parameters<AppSliceCreator<ThreadSlice>>[0],
+  get: Parameters<AppSliceCreator<ThreadSlice>>[1],
+  conversation: string,
+  rootId: string,
+  fn: (prev: number | undefined) => number
+) {
+  const list = get().chatMessages[conversation];
+  if (!list) return;
+  const idx = list.findIndex((m) => m.id === rootId);
+  if (idx < 0) return;
+  const next = fn(list[idx].threadReplyCount);
+  if (next === list[idx].threadReplyCount) return;
+  const updated = [...list];
+  updated[idx] = { ...updated[idx], threadReplyCount: next };
+  set((state) => ({
+    chatMessages: { ...state.chatMessages, [conversation]: updated },
+  }));
 }

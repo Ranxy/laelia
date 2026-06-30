@@ -225,6 +225,13 @@ type UserConversation struct {
 // missing cursor row is treated as caught-up (COALESCE to conversation.version),
 // mirroring agent_channel_cursor semantics, so a newly joined user does not see
 // existing history as unread.
+//
+// Only main-channel messages (thread_root_message_id IS NULL) count toward the
+// channel unread badge: thread replies are a side conversation whose
+// unread/reply state is surfaced via the root's reply count, not the channel
+// badge (see fillThreadReplyCounts). This mirrors the agent inbox's
+// thread-aware relevance filter, so a thread reply never pings the left-rail
+// badge for a user who has the channel open.
 func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID int, limit, offset int) ([]*UserConversation, error) {
 	rows, err := s.GetDB().QueryContext(ctx, `
 		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version,
@@ -232,6 +239,7 @@ func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID
 		         SELECT count(*)::int
 		         FROM chat_message m
 		         WHERE m.conversation_id = c.id
+		           AND m.thread_root_message_id IS NULL
 		           AND m.room_version > COALESCE(ucc.read_version, c.version)
 		       ), 0)
 		FROM conversation c

@@ -410,6 +410,13 @@ func (s *Store) ListThreadMessages(ctx context.Context, conversationID, rootID u
 		return nil, 0, errors.Wrapf(err, "failed to get conversation version")
 	}
 
+	// Populate the root's total reply count so callers (the thread panel, and
+	// the frontend syncing the root badge back into the main channel list) see
+	// the authoritative count rather than 0. Replies keep count 0.
+	if err := s.fillThreadReplyCounts(ctx, []*ChatMessage{root}); err != nil {
+		return nil, 0, err
+	}
+
 	return append([]*ChatMessage{root}, replies...), currentVersion, nil
 }
 
