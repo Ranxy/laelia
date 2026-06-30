@@ -278,7 +278,15 @@
     "mention-list-aria-label": "@提及建议",
     "mention-no-matches": "没有找到 '@{{query}}' 的匹配",
     "mention-group-users": "用户",
-    "mention-group-agents": "Agent"
+    "mention-group-agents": "Agent",
+    "reply-in-thread": "在话题中回复",
+    "thread-replies": "{{count}} 条回复",
+    "thread-title": "话题",
+    "thread-view-in-channel": "在频道中查看",
+    "thread-beginning": "回复的开始",
+    "thread-placeholder": "在话题中回复…",
+    "thread-empty": "还没有回复",
+    "thread-close": "关闭话题"
   },
   "tasks": {
     "title": "任务",

@@ -137,6 +137,10 @@
     - [ListConversationMessagesResponse](#laelia-v1-ListConversationMessagesResponse)
     - [ListFilesRequest](#laelia-v1-ListFilesRequest)
     - [ListFilesResponse](#laelia-v1-ListFilesResponse)
+    - [ListThreadMessagesRequest](#laelia-v1-ListThreadMessagesRequest)
+    - [ListThreadMessagesResponse](#laelia-v1-ListThreadMessagesResponse)
+    - [ListThreadUpdatesRequest](#laelia-v1-ListThreadUpdatesRequest)
+    - [ListThreadUpdatesResponse](#laelia-v1-ListThreadUpdatesResponse)
     - [ManagerStreamMessage](#laelia-v1-ManagerStreamMessage)
     - [MarkConversationReadRequest](#laelia-v1-MarkConversationReadRequest)
     - [MarkConversationReadResponse](#laelia-v1-MarkConversationReadResponse)
@@ -158,6 +162,7 @@
     - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
     - [SendMessageRequest](#laelia-v1-SendMessageRequest)
     - [TextDeltaPayload](#laelia-v1-TextDeltaPayload)
+    - [ThreadUpdate](#laelia-v1-ThreadUpdate)
     - [ToolCallFinishedPayload](#laelia-v1-ToolCallFinishedPayload)
     - [ToolCallStartedPayload](#laelia-v1-ToolCallStartedPayload)
     - [UpdateChannelRequest](#laelia-v1-UpdateChannelRequest)
@@ -1559,6 +1564,8 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | mentions | [Mention](#laelia-v1-Mention) | repeated |  |
 | is_own | [bool](#bool) |  | is_own is true when this message was sent by the calling agent itself. It is caller-relative (computed by the manager from the authenticated agent vs the message&#39;s sender_agent_id) so an agent can recognize its own past messages as context-only and avoid replying to itself. |
 | attachments | [Attachment](#laelia-v1-Attachment) | repeated |  |
+| thread_root | [string](#string) |  | thread_root is the resource name of the root message of the thread this message belongs to (&#34;conversations/{c}/messages/{m}&#34;). Empty for a normal channel message (i.e. a root message itself, or a message outside any thread). Replies in a thread carry the root message&#39;s name here. |
+| thread_reply_count | [int32](#int32) |  | thread_reply_count is the number of replies in the thread rooted at this message. Only meaningful for root messages (thread_root empty); the frontend uses it to render the reply-count badge on the root message in the main channel list. Always 0 for thread replies. |
 
 
 
@@ -2214,6 +2221,77 @@ drain loop. The agent identity is resolved from the auth context.
 
 
 
+<a name="laelia-v1-ListThreadMessagesRequest"></a>
+
+### ListThreadMessagesRequest
+ListThreadMessagesRequest reads one thread: the root message followed by its
+replies, in room_version order. The root message is included as the first
+element so a reader has the thread context. The cursor model mirrors
+ListConversationMessages: after_version returns replies with room_version
+greater than it (chronological tail), before_version returns a page before a
+pivot, and the default returns the latest N replies.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| thread_root | [string](#string) |  | thread_root is the resource name of the root message (&#34;conversations/{c}/messages/{m}&#34;). |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+| after_version | [int64](#int64) |  |  |
+| before_version | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListThreadMessagesResponse"></a>
+
+### ListThreadMessagesResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| messages | [ChatMessage](#laelia-v1-ChatMessage) | repeated | messages is [root, ...replies] in room_version order. |
+| next_page_token | [string](#string) |  |  |
+| current_version | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListThreadUpdatesRequest"></a>
+
+### ListThreadUpdatesRequest
+ListThreadUpdatesRequest returns, for the authenticated agent, every thread
+the agent is subscribed to (via @mention or having replied) that has replies
+with room_version beyond the agent&#39;s per-channel cursor for that
+conversation. It is the agent&#39;s thread inbox and is run after message check in
+the drain loop, before acking the conversation cursor.
+
+
+
+
+
+
+<a name="laelia-v1-ListThreadUpdatesResponse"></a>
+
+### ListThreadUpdatesResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| updates | [ThreadUpdate](#laelia-v1-ThreadUpdate) | repeated |  |
+
+
+
+
+
+
 <a name="laelia-v1-ManagerStreamMessage"></a>
 
 ### ManagerStreamMessage
@@ -2299,6 +2377,7 @@ calling ListChannelUpdates, which compares conversation.version to the cursor.
 | ----- | ---- | ----- | ----------- |
 | conversation_ids | [string](#string) | repeated |  |
 | versions | [int64](#int64) | repeated |  |
+| thread_root_message_id | [string](#string) |  | thread_root_message_id, when non-empty, indicates the wake is for a new reply in a thread the agent is subscribed to (the value is the thread&#39;s root message resource name). It is a hint so the agent can go straight to thread check/read; the agent still relies on ListThreadUpdates as the source of truth. Empty means a normal channel-message wake. |
 
 
 
@@ -2436,6 +2515,7 @@ calling ListChannelUpdates, which compares conversation.version to the cursor.
 | base_version | [int64](#int64) |  |  |
 | command_id | [string](#string) |  |  |
 | attachments | [Attachment](#laelia-v1-Attachment) | repeated |  |
+| thread_root | [string](#string) |  | thread_root, when set, makes this agent reply a message in the thread rooted at the given message name. Empty posts a normal channel message. |
 
 
 
@@ -2558,6 +2638,7 @@ calling ListChannelUpdates, which compares conversation.version to the cursor.
 | content | [string](#string) |  |  |
 | mentions | [Mention](#laelia-v1-Mention) | repeated |  |
 | attachments | [Attachment](#laelia-v1-Attachment) | repeated |  |
+| thread_root | [string](#string) |  | thread_root, when set, makes this message a reply in the thread rooted at the given message name (&#34;conversations/{c}/messages/{m}&#34;). Empty posts a normal channel message. |
 
 
 
@@ -2574,6 +2655,24 @@ calling ListChannelUpdates, which compares conversation.version to the cursor.
 | ----- | ---- | ----- | ----------- |
 | stream_type | [string](#string) |  |  |
 | content | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ThreadUpdate"></a>
+
+### ThreadUpdate
+ThreadUpdate describes one subscribed thread with unread replies.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| thread_root | [string](#string) |  | thread_root is the resource name of the thread&#39;s root message. |
+| latest_version | [int64](#int64) |  | latest_version is the maximum room_version among the thread&#39;s replies (the version the agent should read up to before acking). |
+| new_reply_count | [int32](#int32) |  | new_reply_count is the number of replies with room_version greater than the agent&#39;s processed_version for this conversation. |
 
 
 
@@ -2798,6 +2897,7 @@ names).
 | GetCommandContext | [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest) | [GetCommandContextResponse](#laelia-v1-GetCommandContextResponse) |  |
 | GetOrCreateConversation | [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest) | [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse) |  |
 | ListConversationMessages | [ListConversationMessagesRequest](#laelia-v1-ListConversationMessagesRequest) | [ListConversationMessagesResponse](#laelia-v1-ListConversationMessagesResponse) |  |
+| ListThreadMessages | [ListThreadMessagesRequest](#laelia-v1-ListThreadMessagesRequest) | [ListThreadMessagesResponse](#laelia-v1-ListThreadMessagesResponse) |  |
 | CreateChannel | [CreateChannelRequest](#laelia-v1-CreateChannelRequest) | [Conversation](#laelia-v1-Conversation) |  |
 | ListChannels | [ListChannelsRequest](#laelia-v1-ListChannelsRequest) | [ListChannelsResponse](#laelia-v1-ListChannelsResponse) |  |
 | GetChannel | [GetChannelRequest](#laelia-v1-GetChannelRequest) | [Conversation](#laelia-v1-Conversation) |  |
@@ -2809,6 +2909,7 @@ names).
 | SendMessage | [SendMessageRequest](#laelia-v1-SendMessageRequest) | [ChatMessage](#laelia-v1-ChatMessage) |  |
 | PostMessage | [PostMessageRequest](#laelia-v1-PostMessageRequest) | [PostMessageResponse](#laelia-v1-PostMessageResponse) |  |
 | ListChannelUpdates | [ListChannelUpdatesRequest](#laelia-v1-ListChannelUpdatesRequest) | [ListChannelUpdatesResponse](#laelia-v1-ListChannelUpdatesResponse) |  |
+| ListThreadUpdates | [ListThreadUpdatesRequest](#laelia-v1-ListThreadUpdatesRequest) | [ListThreadUpdatesResponse](#laelia-v1-ListThreadUpdatesResponse) |  |
 | AckProcessedVersion | [AckProcessedVersionRequest](#laelia-v1-AckProcessedVersionRequest) | [AckProcessedVersionResponse](#laelia-v1-AckProcessedVersionResponse) |  |
 | FetchConversationActivity | [FetchConversationActivityRequest](#laelia-v1-FetchConversationActivityRequest) | [FetchConversationActivityResponse](#laelia-v1-FetchConversationActivityResponse) |  |
 | MarkConversationRead | [MarkConversationReadRequest](#laelia-v1-MarkConversationReadRequest) | [MarkConversationReadResponse](#laelia-v1-MarkConversationReadResponse) |  |

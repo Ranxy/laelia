@@ -154,6 +154,9 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/message/search", s.handleMessageSearch)
 	mux.HandleFunc("/message/ack", s.handleMessageAck)
 	mux.HandleFunc("/message/send", s.handleMessageSend)
+	mux.HandleFunc("/message/thread/check", s.handleThreadCheck)
+	mux.HandleFunc("/message/thread/read", s.handleThreadRead)
+	mux.HandleFunc("/message/thread/send", s.handleThreadSend)
 	mux.HandleFunc("/command/context", s.handleCommandContext)
 	mux.HandleFunc("/file/upload", s.handleFileUpload)
 	mux.HandleFunc("/file/download", s.handleFileDownload)
@@ -195,6 +198,8 @@ type Request struct {
 	BaseVersion      int64  `json:"base_version,omitempty"`
 	ProcessedVersion int64  `json:"processed_version,omitempty"`
 	CommandID        string `json:"command_id,omitempty"`
+	// Root is the thread root message id, for thread read/send.
+	Root string `json:"root,omitempty"`
 
 	// File command fields.
 	LocalPath    string `json:"local_path,omitempty"`
@@ -324,6 +329,39 @@ func (s *Server) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 	s.run(w, r, func(req Request) (string, *chattools.Error) {
 		text, err := chattools.PostMessage(r.Context(), s.deps(req), chattools.PostMessageInput{
 			Conversation:  req.Conversation,
+			Content:       req.Content,
+			BaseVersion:   req.BaseVersion,
+			AttachmentIDs: req.AttachmentIDs,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleThreadCheck(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.ListThreadUpdates(r.Context(), s.deps(req), chattools.ListThreadUpdatesInput{})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleThreadRead(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.GetThreadMessages(r.Context(), s.deps(req), chattools.GetThreadMessagesInput{
+			Conversation: req.Conversation,
+			Root:         req.Root,
+			Version:      req.Version,
+			Direction:    req.Direction,
+			Limit:        req.Limit,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleThreadSend(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.PostThreadMessage(r.Context(), s.deps(req), chattools.PostThreadMessageInput{
+			Conversation:  req.Conversation,
+			Root:          req.Root,
 			Content:       req.Content,
 			BaseVersion:   req.BaseVersion,
 			AttachmentIDs: req.AttachmentIDs,

@@ -966,6 +966,26 @@ export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
    * @generated from field: repeated laelia.v1.Attachment attachments = 13;
    */
   attachments: Attachment[];
+
+  /**
+   * thread_root is the resource name of the root message of the thread this
+   * message belongs to ("conversations/{c}/messages/{m}"). Empty for a normal
+   * channel message (i.e. a root message itself, or a message outside any
+   * thread). Replies in a thread carry the root message's name here.
+   *
+   * @generated from field: string thread_root = 14;
+   */
+  threadRoot: string;
+
+  /**
+   * thread_reply_count is the number of replies in the thread rooted at this
+   * message. Only meaningful for root messages (thread_root empty); the frontend
+   * uses it to render the reply-count badge on the root message in the main
+   * channel list. Always 0 for thread replies.
+   *
+   * @generated from field: int32 thread_reply_count = 15;
+   */
+  threadReplyCount: number;
 };
 
 /**
@@ -1131,6 +1151,160 @@ export declare type ListConversationMessagesResponse = Message<"laelia.v1.ListCo
  * Use `create(ListConversationMessagesResponseSchema)` to create a new message.
  */
 export declare const ListConversationMessagesResponseSchema: GenMessage<ListConversationMessagesResponse>;
+
+/**
+ * ListThreadMessagesRequest reads one thread: the root message followed by its
+ * replies, in room_version order. The root message is included as the first
+ * element so a reader has the thread context. The cursor model mirrors
+ * ListConversationMessages: after_version returns replies with room_version
+ * greater than it (chronological tail), before_version returns a page before a
+ * pivot, and the default returns the latest N replies.
+ *
+ * @generated from message laelia.v1.ListThreadMessagesRequest
+ */
+export declare type ListThreadMessagesRequest = Message<"laelia.v1.ListThreadMessagesRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * thread_root is the resource name of the root message
+   * ("conversations/{c}/messages/{m}").
+   *
+   * @generated from field: string thread_root = 2;
+   */
+  threadRoot: string;
+
+  /**
+   * @generated from field: int32 page_size = 3;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 4;
+   */
+  pageToken: string;
+
+  /**
+   * @generated from field: int64 after_version = 5;
+   */
+  afterVersion: bigint;
+
+  /**
+   * @generated from field: int64 before_version = 6;
+   */
+  beforeVersion: bigint;
+};
+
+/**
+ * Describes the message laelia.v1.ListThreadMessagesRequest.
+ * Use `create(ListThreadMessagesRequestSchema)` to create a new message.
+ */
+export declare const ListThreadMessagesRequestSchema: GenMessage<ListThreadMessagesRequest>;
+
+/**
+ * @generated from message laelia.v1.ListThreadMessagesResponse
+ */
+export declare type ListThreadMessagesResponse = Message<"laelia.v1.ListThreadMessagesResponse"> & {
+  /**
+   * messages is [root, ...replies] in room_version order.
+   *
+   * @generated from field: repeated laelia.v1.ChatMessage messages = 1;
+   */
+  messages: ChatMessage[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+
+  /**
+   * @generated from field: int64 current_version = 3;
+   */
+  currentVersion: bigint;
+};
+
+/**
+ * Describes the message laelia.v1.ListThreadMessagesResponse.
+ * Use `create(ListThreadMessagesResponseSchema)` to create a new message.
+ */
+export declare const ListThreadMessagesResponseSchema: GenMessage<ListThreadMessagesResponse>;
+
+/**
+ * ListThreadUpdatesRequest returns, for the authenticated agent, every thread
+ * the agent is subscribed to (via @mention or having replied) that has replies
+ * with room_version beyond the agent's per-channel cursor for that
+ * conversation. It is the agent's thread inbox and is run after message check in
+ * the drain loop, before acking the conversation cursor.
+ *
+ * @generated from message laelia.v1.ListThreadUpdatesRequest
+ */
+export declare type ListThreadUpdatesRequest = Message<"laelia.v1.ListThreadUpdatesRequest"> & {
+};
+
+/**
+ * Describes the message laelia.v1.ListThreadUpdatesRequest.
+ * Use `create(ListThreadUpdatesRequestSchema)` to create a new message.
+ */
+export declare const ListThreadUpdatesRequestSchema: GenMessage<ListThreadUpdatesRequest>;
+
+/**
+ * ThreadUpdate describes one subscribed thread with unread replies.
+ *
+ * @generated from message laelia.v1.ThreadUpdate
+ */
+export declare type ThreadUpdate = Message<"laelia.v1.ThreadUpdate"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * thread_root is the resource name of the thread's root message.
+   *
+   * @generated from field: string thread_root = 2;
+   */
+  threadRoot: string;
+
+  /**
+   * latest_version is the maximum room_version among the thread's replies
+   * (the version the agent should read up to before acking).
+   *
+   * @generated from field: int64 latest_version = 3;
+   */
+  latestVersion: bigint;
+
+  /**
+   * new_reply_count is the number of replies with room_version greater than
+   * the agent's processed_version for this conversation.
+   *
+   * @generated from field: int32 new_reply_count = 4;
+   */
+  newReplyCount: number;
+};
+
+/**
+ * Describes the message laelia.v1.ThreadUpdate.
+ * Use `create(ThreadUpdateSchema)` to create a new message.
+ */
+export declare const ThreadUpdateSchema: GenMessage<ThreadUpdate>;
+
+/**
+ * @generated from message laelia.v1.ListThreadUpdatesResponse
+ */
+export declare type ListThreadUpdatesResponse = Message<"laelia.v1.ListThreadUpdatesResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.ThreadUpdate updates = 1;
+   */
+  updates: ThreadUpdate[];
+};
+
+/**
+ * Describes the message laelia.v1.ListThreadUpdatesResponse.
+ * Use `create(ListThreadUpdatesResponseSchema)` to create a new message.
+ */
+export declare const ListThreadUpdatesResponseSchema: GenMessage<ListThreadUpdatesResponse>;
 
 /**
  * @generated from message laelia.v1.GetOrCreateConversationRequest
@@ -1382,6 +1556,15 @@ export declare type SendMessageRequest = Message<"laelia.v1.SendMessageRequest">
    * @generated from field: repeated laelia.v1.Attachment attachments = 4;
    */
   attachments: Attachment[];
+
+  /**
+   * thread_root, when set, makes this message a reply in the thread rooted at
+   * the given message name ("conversations/{c}/messages/{m}"). Empty posts a
+   * normal channel message.
+   *
+   * @generated from field: string thread_root = 5;
+   */
+  threadRoot: string;
 };
 
 /**
@@ -1460,6 +1643,14 @@ export declare type PostMessageRequest = Message<"laelia.v1.PostMessageRequest">
    * @generated from field: repeated laelia.v1.Attachment attachments = 5;
    */
   attachments: Attachment[];
+
+  /**
+   * thread_root, when set, makes this agent reply a message in the thread
+   * rooted at the given message name. Empty posts a normal channel message.
+   *
+   * @generated from field: string thread_root = 6;
+   */
+  threadRoot: string;
 };
 
 /**
@@ -2182,6 +2373,17 @@ export declare type NewMessagesAvailable = Message<"laelia.v1.NewMessagesAvailab
    * @generated from field: repeated int64 versions = 2;
    */
   versions: bigint[];
+
+  /**
+   * thread_root_message_id, when non-empty, indicates the wake is for a new
+   * reply in a thread the agent is subscribed to (the value is the thread's
+   * root message resource name). It is a hint so the agent can go straight to
+   * thread check/read; the agent still relies on ListThreadUpdates as the
+   * source of truth. Empty means a normal channel-message wake.
+   *
+   * @generated from field: string thread_root_message_id = 3;
+   */
+  threadRootMessageId: string;
 };
 
 /**
@@ -2544,6 +2746,14 @@ export declare const CommandService: GenService<{
     output: typeof ListConversationMessagesResponseSchema;
   },
   /**
+   * @generated from rpc laelia.v1.CommandService.ListThreadMessages
+   */
+  listThreadMessages: {
+    methodKind: "unary";
+    input: typeof ListThreadMessagesRequestSchema;
+    output: typeof ListThreadMessagesResponseSchema;
+  },
+  /**
    * @generated from rpc laelia.v1.CommandService.CreateChannel
    */
   createChannel: {
@@ -2630,6 +2840,14 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof ListChannelUpdatesRequestSchema;
     output: typeof ListChannelUpdatesResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.ListThreadUpdates
+   */
+  listThreadUpdates: {
+    methodKind: "unary";
+    input: typeof ListThreadUpdatesRequestSchema;
+    output: typeof ListThreadUpdatesResponseSchema;
   },
   /**
    * @generated from rpc laelia.v1.CommandService.AckProcessedVersion

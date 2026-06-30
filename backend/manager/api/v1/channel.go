@@ -284,42 +284,58 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		return nil, err
 	}
 
+	// thread_root, when set, makes this message a reply in an existing thread
+	// rooted at the given message id. Validate the root belongs to this
+	// conversation and is itself a root (not a nested thread reply).
+	var threadRoot uuid.NullUUID
+	if req.Msg.ThreadRoot != "" {
+		rootID, parseErr := uuid.Parse(req.Msg.ThreadRoot)
+		if parseErr != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(parseErr, "invalid thread_root"))
+		}
+		isRoot, rootErr := s.store.IsThreadRoot(ctx, convID, rootID)
+		if rootErr != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(rootErr, "failed to validate thread root"))
+		}
+		if !isRoot {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("thread_root is not a root message in this conversation"))
+		}
+		threadRoot = uuid.NullUUID{UUID: rootID, Valid: true}
+	}
+
 	// Atomically bump conversation.version and write the user message with that
 	// room_version. This is the single source of truth for the room cursor.
 	msg, _, err := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
-		ConversationID: convID,
-		PrincipalID:    user.ID,
-		PrincipalName:  user.Name,
-		Role:           1, // USER
-		Content:        req.Msg.Content,
-		SenderType:     store.SenderTypeUser,
-		Mentions:       req.Msg.Mentions,
-		Attachments:    req.Msg.Attachments,
+		ConversationID:      convID,
+		PrincipalID:         user.ID,
+		PrincipalName:       user.Name,
+		Role:                1, // USER
+		Content:             req.Msg.Content,
+		SenderType:          store.SenderTypeUser,
+		Mentions:            req.Msg.Mentions,
+		Attachments:         req.Msg.Attachments,
+		ThreadRootMessageID: threadRoot,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create message"))
 	}
 
-	// Agent-first: the manager never dispatches work on a user message. It only
-	// notifies every agent member of the conversation that new messages are
-	// available; each agent's autonomous drain loop then decides whether and
-	// how to respond. (Agents are conversation_member rows of their direct
-	// conversations too, so this covers 1:1 chats.)
-	s.notifyConversationAgents(ctx, convID, msg.RoomVersion, nil)
+	if threadRoot.Valid {
+		// Thread reply: subscribe any @mentioned agents (idempotent) and wake
+		// every subscriber of this thread — subscription is persistent, so a
+		// subscriber is woken on every reply even without a fresh @mention. The
+		// user sender has no agent id, so all subscribers are woken.
+		s.subscribeAndNotifyThread(ctx, convID, threadRoot.UUID, msg.RoomVersion, req.Msg.Mentions, nil)
+	} else {
+		// Agent-first: the manager never dispatches work on a user message. It
+		// only notifies every agent member of the conversation that new messages
+		// are available; each agent's autonomous drain loop then decides whether
+		// and how to respond. (Agents are conversation_member rows of their
+		// direct conversations too, so this covers 1:1 chats.)
+		s.notifyConversationAgents(ctx, convID, msg.RoomVersion, nil)
+	}
 
-	return connect.NewResponse(&v1pb.ChatMessage{
-		Name:          msg.ID.String(),
-		Conversation:  msg.ConversationID.String(),
-		PrincipalName: msg.PrincipalName,
-		Role:          msg.Role,
-		Content:       msg.Content,
-		CreatedAt:     timestamppb.New(msg.CreatedAt),
-		SenderName:    msg.PrincipalName,
-		SenderType:    v1pb.SenderType(msg.SenderType),
-		RoomVersion:   msg.RoomVersion,
-		Mentions:      msg.Mentions,
-		Attachments:   msg.Attachments,
-	}), nil
+	return connect.NewResponse(storeToV1ChatMessage(msg)), nil
 }
 
 // notifyConversationAgents sends NewMessagesAvailable to every connected
@@ -347,6 +363,63 @@ func (s *CommandService) notifyConversationAgents(ctx context.Context, convID uu
 			continue
 		}
 		s.dispatcher.NotifyNewMessages(ctx, agent.ID, convID.String(), version)
+	}
+}
+
+// subscribeAndNotifyThread handles a thread reply: it subscribes any agent
+// @mentioned in the reply (plus the posting agent, when posterAgentID is
+// non-nil) to the thread, then wakes every current subscriber except
+// posterAgentID that a new reply landed. Subscription is persistent — once an
+// agent is subscribed (via @mention or its own reply) it is woken on every
+// subsequent reply in the thread, even without a fresh @mention. Used by
+// SendMessage (user, posterAgentID=nil) and PostMessage (agent) for thread
+// replies.
+func (s *CommandService) subscribeAndNotifyThread(ctx context.Context, convID, rootID uuid.UUID, version int64, mentions []*v1pb.Mention, posterAgentID *int) {
+	var agentIDs []int
+	seen := make(map[int]bool)
+	addAgent := func(id int) {
+		if id > 0 && !seen[id] {
+			seen[id] = true
+			agentIDs = append(agentIDs, id)
+		}
+	}
+	for _, m := range mentions {
+		if m.Type != "agent" || m.Id == "" {
+			continue
+		}
+		agent, err := s.store.GetAgentByResourceID(ctx, m.Id)
+		if err != nil || agent == nil {
+			slog.Warn("failed to resolve mentioned agent for thread subscription", "resourceID", m.Id, "error", err)
+			continue
+		}
+		addAgent(agent.ID)
+	}
+	if posterAgentID != nil {
+		addAgent(*posterAgentID)
+	}
+	if err := s.store.AddThreadParticipants(ctx, rootID, agentIDs); err != nil {
+		slog.Warn("failed to subscribe thread participants", "rootID", rootID, "error", err)
+		// Still notify existing subscribers below.
+	}
+	s.notifyThreadParticipants(ctx, convID, rootID, version, posterAgentID)
+}
+
+// notifyThreadParticipants wakes every agent subscribed to a thread (except
+// exceptAgentID) that a new reply landed, carrying the thread root id so the
+// agent can go straight to thread check/read. Best-effort: a missed wake is
+// recovered on reconnect via ListThreadUpdates (the durable cursor is the
+// source of truth).
+func (s *CommandService) notifyThreadParticipants(ctx context.Context, convID, rootID uuid.UUID, version int64, exceptAgentID *int) {
+	agentIDs, err := s.store.ListThreadParticipantAgents(ctx, rootID)
+	if err != nil {
+		slog.Warn("failed to list thread participants for notification", "rootID", rootID, "error", err)
+		return
+	}
+	for _, id := range agentIDs {
+		if exceptAgentID != nil && id == *exceptAgentID {
+			continue
+		}
+		s.dispatcher.NotifyThreadMention(ctx, id, convID.String(), version, rootID.String())
 	}
 }
 

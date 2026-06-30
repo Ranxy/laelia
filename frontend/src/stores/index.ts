@@ -5,6 +5,7 @@ import { createAgentSlice } from "./agent";
 import { createCommandSlice } from "./command";
 import { createChatSlice } from "./chat";
 import { createChannelSlice } from "./channel";
+import { createThreadSlice } from "./thread";
 import { createUserSlice } from "./user";
 
 export const useAppStore = create<AppStoreState>()((...args) => ({
@@ -13,5 +14,6 @@ export const useAppStore = create<AppStoreState>()((...args) => ({
   ...createCommandSlice(...args),
   ...createChatSlice(...args),
   ...createChannelSlice(...args),
+  ...createThreadSlice(...args),
   ...createUserSlice(...args),
 }));

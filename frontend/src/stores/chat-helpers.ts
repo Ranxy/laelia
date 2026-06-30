@@ -18,6 +18,8 @@ export function toUiMessage(msg: ChatMessage): ChatMessageUI {
     senderType: msg.senderType || undefined,
     mentions: msg.mentions,
     attachments: msg.attachments,
+    threadRoot: msg.threadRoot || undefined,
+    threadReplyCount: msg.threadReplyCount || undefined,
   };
 }
 

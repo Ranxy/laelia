@@ -1,4 +1,4 @@
-import { ArrowUp, ChevronRight } from "lucide-react";
+import { ArrowUp, ChevronRight, MessageCircleReply } from "lucide-react";
 import MarkdownRender from "markstream-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -81,6 +81,10 @@ export interface MessageRowProps {
   // markdownCustomId distinguishes the markstream renderer instance between
   // DM and channel chat so each can carry independent streaming state.
   markdownCustomId: string;
+  // onOpenThread, when provided (channel chat only), enables the "Reply in
+  // thread" hover action and the reply-count entry. The message's id is the
+  // thread root id the panel opens against.
+  onOpenThread?: (msg: ChatMessageUI) => void;
 }
 
 export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
@@ -94,6 +98,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     onMentionClick,
     MentionBadge,
     markdownCustomId,
+    onOpenThread,
   } = props;
   const { t } = useTranslation();
   const isUser = msg.role === "user";
@@ -164,7 +169,12 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
   const MentionBadgeCmp = MentionBadge;
 
   return (
-    <div className={cn("flex gap-3", isUser ? "flex-row-reverse" : "flex-row")}>
+    <div
+      className={cn(
+        "group flex gap-3",
+        isUser ? "flex-row-reverse" : "flex-row"
+      )}
+    >
       {/* Avatar */}
       <div className="flex shrink-0 flex-col items-center pt-0.5">
         {showAvatar ? (
@@ -197,6 +207,19 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
                 status={msg.status}
                 className="text-[10px] px-1.5 py-0"
               />
+            )}
+            {onOpenThread && !msg.threadRoot && !isStreaming && (
+              <button
+                type="button"
+                onClick={() => onOpenThread(msg)}
+                className="ml-1 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-control-placeholder opacity-0 transition-all hover:bg-control-bg hover:text-main group-hover:opacity-100 focus:opacity-100 cursor-pointer"
+                aria-label={t("chat.reply-in-thread")}
+              >
+                <MessageCircleReply className="size-3" />
+                <span className="hidden sm:inline">
+                  {t("chat.reply-in-thread")}
+                </span>
+              </button>
             )}
           </div>
         )}
@@ -342,6 +365,23 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
             {t("chat.view-details")} &rarr;
           </button>
         )}
+
+        {/* Thread reply count + open-thread entry (root messages only). */}
+        {onOpenThread &&
+          !msg.threadRoot &&
+          (msg.threadReplyCount ?? 0) > 0 &&
+          !isStreaming && (
+            <button
+              type="button"
+              onClick={() => onOpenThread(msg)}
+              className="flex items-center gap-1.5 text-xs text-control-placeholder hover:text-accent px-0.5 cursor-pointer transition-colors"
+            >
+              <MessageCircleReply className="size-3" />
+              <span>
+                {t("chat.thread-replies", { count: msg.threadReplyCount ?? 0 })}
+              </span>
+            </button>
+          )}
       </div>
     </div>
   );

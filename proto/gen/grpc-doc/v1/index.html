@@ -698,6 +698,22 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ListThreadMessagesRequest"><span class="badge">M</span>ListThreadMessagesRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListThreadMessagesResponse"><span class="badge">M</span>ListThreadMessagesResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListThreadUpdatesRequest"><span class="badge">M</span>ListThreadUpdatesRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListThreadUpdatesResponse"><span class="badge">M</span>ListThreadUpdatesResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ManagerStreamMessage"><span class="badge">M</span>ManagerStreamMessage</a>
                 </li>
               
@@ -779,6 +795,10 @@
               
                 <li>
                   <a href="#laelia.v1.TextDeltaPayload"><span class="badge">M</span>TextDeltaPayload</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ThreadUpdate"><span class="badge">M</span>ThreadUpdate</a>
                 </li>
               
                 <li>
@@ -4329,6 +4349,26 @@ context-only and avoid replying to itself. </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>thread_root</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>thread_root is the resource name of the root message of the thread this
+message belongs to (&#34;conversations/{c}/messages/{m}&#34;). Empty for a normal
+channel message (i.e. a root message itself, or a message outside any
+thread). Replies in a thread carry the root message&#39;s name here. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>thread_reply_count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>thread_reply_count is the number of replies in the thread rooted at this
+message. Only meaningful for root messages (thread_root empty); the frontend
+uses it to render the reply-count badge on the root message in the main
+channel list. Always 0 for thread replies. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -5860,6 +5900,135 @@ ListChannels; 0 (or unset) when the user is caught up. </p></td>
 
         
       
+        <h3 id="laelia.v1.ListThreadMessagesRequest">ListThreadMessagesRequest</h3>
+        <p>ListThreadMessagesRequest reads one thread: the root message followed by its</p><p>replies, in room_version order. The root message is included as the first</p><p>element so a reader has the thread context. The cursor model mirrors</p><p>ListConversationMessages: after_version returns replies with room_version</p><p>greater than it (chronological tail), before_version returns a page before a</p><p>pivot, and the default returns the latest N replies.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>thread_root</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>thread_root is the resource name of the root message
+(&#34;conversations/{c}/messages/{m}&#34;). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>after_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>before_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListThreadMessagesResponse">ListThreadMessagesResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>messages</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td>repeated</td>
+                  <td><p>messages is [root, ...replies] in room_version order. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>current_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListThreadUpdatesRequest">ListThreadUpdatesRequest</h3>
+        <p>ListThreadUpdatesRequest returns, for the authenticated agent, every thread</p><p>the agent is subscribed to (via @mention or having replied) that has replies</p><p>with room_version beyond the agent's per-channel cursor for that</p><p>conversation. It is the agent's thread inbox and is run after message check in</p><p>the drain loop, before acking the conversation cursor.</p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.ListThreadUpdatesResponse">ListThreadUpdatesResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>updates</td>
+                  <td><a href="#laelia.v1.ThreadUpdate">ThreadUpdate</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ManagerStreamMessage">ManagerStreamMessage</h3>
         <p></p>
 
@@ -6020,6 +6189,17 @@ ListChannels; 0 (or unset) when the user is caught up. </p></td>
                   <td><a href="#int64">int64</a></td>
                   <td>repeated</td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>thread_root_message_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>thread_root_message_id, when non-empty, indicates the wake is for a new
+reply in a thread the agent is subscribed to (the value is the thread&#39;s
+root message resource name). It is a hint so the agent can go straight to
+thread check/read; the agent still relies on ListThreadUpdates as the
+source of truth. Empty means a normal channel-message wake. </p></td>
                 </tr>
               
             </tbody>
@@ -6333,6 +6513,14 @@ ListChannels; 0 (or unset) when the user is caught up. </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>thread_root</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>thread_root, when set, makes this agent reply a message in the thread
+rooted at the given message name. Empty posts a normal channel message. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -6620,6 +6808,15 @@ ListChannels; 0 (or unset) when the user is caught up. </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>thread_root</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>thread_root, when set, makes this message a reply in the thread rooted at
+the given message name (&#34;conversations/{c}/messages/{m}&#34;). Empty posts a
+normal channel message. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -6649,6 +6846,53 @@ ListChannels; 0 (or unset) when the user is caught up. </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ThreadUpdate">ThreadUpdate</h3>
+        <p>ThreadUpdate describes one subscribed thread with unread replies.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>thread_root</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>thread_root is the resource name of the thread&#39;s root message. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>latest_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p>latest_version is the maximum room_version among the thread&#39;s replies
+(the version the agent should read up to before acking). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>new_reply_count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>new_reply_count is the number of replies with room_version greater than
+the agent&#39;s processed_version for this conversation. </p></td>
                 </tr>
               
             </tbody>
@@ -7192,6 +7436,13 @@ ListChannels; 0 (or unset) when the user is caught up. </p></td>
               </tr>
             
               <tr>
+                <td>ListThreadMessages</td>
+                <td><a href="#laelia.v1.ListThreadMessagesRequest">ListThreadMessagesRequest</a></td>
+                <td><a href="#laelia.v1.ListThreadMessagesResponse">ListThreadMessagesResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
                 <td>CreateChannel</td>
                 <td><a href="#laelia.v1.CreateChannelRequest">CreateChannelRequest</a></td>
                 <td><a href="#laelia.v1.Conversation">Conversation</a></td>
@@ -7265,6 +7516,13 @@ ListChannels; 0 (or unset) when the user is caught up. </p></td>
                 <td>ListChannelUpdates</td>
                 <td><a href="#laelia.v1.ListChannelUpdatesRequest">ListChannelUpdatesRequest</a></td>
                 <td><a href="#laelia.v1.ListChannelUpdatesResponse">ListChannelUpdatesResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ListThreadUpdates</td>
+                <td><a href="#laelia.v1.ListThreadUpdatesRequest">ListThreadUpdatesRequest</a></td>
+                <td><a href="#laelia.v1.ListThreadUpdatesResponse">ListThreadUpdatesResponse</a></td>
                 <td><p></p></td>
               </tr>
             
@@ -7438,6 +7696,16 @@ a member.</p></td>
               
               
               <tr>
+                <td>ListThreadMessages</td>
+                <td>GET</td>
+                <td>/v1/{conversation=conversations/*}/threads</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
                 <td>CreateChannel</td>
                 <td>POST</td>
                 <td>/v1/channels</td>
@@ -7541,6 +7809,16 @@ a member.</p></td>
                 <td>ListChannelUpdates</td>
                 <td>GET</td>
                 <td>/v1/agents/-/channelUpdates</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListThreadUpdates</td>
+                <td>GET</td>
+                <td>/v1/agents/-/threadUpdates</td>
                 <td></td>
               </tr>
               

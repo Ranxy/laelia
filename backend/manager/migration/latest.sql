@@ -463,3 +463,27 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_dm_unique
     ON conversation(agent_id, created_by) WHERE type = 1;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_principal_unique_email
     ON principal(email) WHERE deleted = FALSE;
+
+-- === Threads (sub-conversations rooted at a channel message) ===
+-- A thread is rooted at a normal channel message (the root). Replies in the
+-- thread are chat_message rows whose thread_root_message_id points at the
+-- root; they still belong to the same conversation and share its room_version
+-- space (so the existing version/cursor infra keeps working), but the main
+-- channel list filters them out (thread_root_message_id IS NULL).
+ALTER TABLE chat_message ADD COLUMN IF NOT EXISTS thread_root_message_id UUID REFERENCES chat_message(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_chat_message_thread_root
+    ON chat_message(thread_root_message_id) WHERE thread_root_message_id IS NOT NULL;
+
+-- thread_participant records which agents are subscribed to a thread. An agent
+-- is subscribed once it is @mentioned in a thread reply or it posts a reply
+-- itself; thereafter every new reply in that thread wakes the agent (even
+-- without a fresh @mention). This table is only for agent wake routing;
+-- thread access control still uses conversation_member.
+CREATE TABLE IF NOT EXISTS thread_participant (
+    thread_root_message_id UUID NOT NULL REFERENCES chat_message(id) ON DELETE CASCADE,
+    agent_id INTEGER NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (thread_root_message_id, agent_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_thread_participant_agent ON thread_participant(agent_id);

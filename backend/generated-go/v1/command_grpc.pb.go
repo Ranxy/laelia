@@ -30,6 +30,7 @@ const (
 	CommandService_GetCommandContext_FullMethodName         = "/laelia.v1.CommandService/GetCommandContext"
 	CommandService_GetOrCreateConversation_FullMethodName   = "/laelia.v1.CommandService/GetOrCreateConversation"
 	CommandService_ListConversationMessages_FullMethodName  = "/laelia.v1.CommandService/ListConversationMessages"
+	CommandService_ListThreadMessages_FullMethodName        = "/laelia.v1.CommandService/ListThreadMessages"
 	CommandService_CreateChannel_FullMethodName             = "/laelia.v1.CommandService/CreateChannel"
 	CommandService_ListChannels_FullMethodName              = "/laelia.v1.CommandService/ListChannels"
 	CommandService_GetChannel_FullMethodName                = "/laelia.v1.CommandService/GetChannel"
@@ -41,6 +42,7 @@ const (
 	CommandService_SendMessage_FullMethodName               = "/laelia.v1.CommandService/SendMessage"
 	CommandService_PostMessage_FullMethodName               = "/laelia.v1.CommandService/PostMessage"
 	CommandService_ListChannelUpdates_FullMethodName        = "/laelia.v1.CommandService/ListChannelUpdates"
+	CommandService_ListThreadUpdates_FullMethodName         = "/laelia.v1.CommandService/ListThreadUpdates"
 	CommandService_AckProcessedVersion_FullMethodName       = "/laelia.v1.CommandService/AckProcessedVersion"
 	CommandService_FetchConversationActivity_FullMethodName = "/laelia.v1.CommandService/FetchConversationActivity"
 	CommandService_MarkConversationRead_FullMethodName      = "/laelia.v1.CommandService/MarkConversationRead"
@@ -63,6 +65,7 @@ type CommandServiceClient interface {
 	GetCommandContext(ctx context.Context, in *GetCommandContextRequest, opts ...grpc.CallOption) (*GetCommandContextResponse, error)
 	GetOrCreateConversation(ctx context.Context, in *GetOrCreateConversationRequest, opts ...grpc.CallOption) (*GetOrCreateConversationResponse, error)
 	ListConversationMessages(ctx context.Context, in *ListConversationMessagesRequest, opts ...grpc.CallOption) (*ListConversationMessagesResponse, error)
+	ListThreadMessages(ctx context.Context, in *ListThreadMessagesRequest, opts ...grpc.CallOption) (*ListThreadMessagesResponse, error)
 	CreateChannel(ctx context.Context, in *CreateChannelRequest, opts ...grpc.CallOption) (*Conversation, error)
 	ListChannels(ctx context.Context, in *ListChannelsRequest, opts ...grpc.CallOption) (*ListChannelsResponse, error)
 	GetChannel(ctx context.Context, in *GetChannelRequest, opts ...grpc.CallOption) (*Conversation, error)
@@ -74,6 +77,7 @@ type CommandServiceClient interface {
 	SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*ChatMessage, error)
 	PostMessage(ctx context.Context, in *PostMessageRequest, opts ...grpc.CallOption) (*PostMessageResponse, error)
 	ListChannelUpdates(ctx context.Context, in *ListChannelUpdatesRequest, opts ...grpc.CallOption) (*ListChannelUpdatesResponse, error)
+	ListThreadUpdates(ctx context.Context, in *ListThreadUpdatesRequest, opts ...grpc.CallOption) (*ListThreadUpdatesResponse, error)
 	AckProcessedVersion(ctx context.Context, in *AckProcessedVersionRequest, opts ...grpc.CallOption) (*AckProcessedVersionResponse, error)
 	FetchConversationActivity(ctx context.Context, in *FetchConversationActivityRequest, opts ...grpc.CallOption) (*FetchConversationActivityResponse, error)
 	MarkConversationRead(ctx context.Context, in *MarkConversationReadRequest, opts ...grpc.CallOption) (*MarkConversationReadResponse, error)
@@ -218,6 +222,16 @@ func (c *commandServiceClient) ListConversationMessages(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *commandServiceClient) ListThreadMessages(ctx context.Context, in *ListThreadMessagesRequest, opts ...grpc.CallOption) (*ListThreadMessagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListThreadMessagesResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListThreadMessages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *commandServiceClient) CreateChannel(ctx context.Context, in *CreateChannelRequest, opts ...grpc.CallOption) (*Conversation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Conversation)
@@ -328,6 +342,16 @@ func (c *commandServiceClient) ListChannelUpdates(ctx context.Context, in *ListC
 	return out, nil
 }
 
+func (c *commandServiceClient) ListThreadUpdates(ctx context.Context, in *ListThreadUpdatesRequest, opts ...grpc.CallOption) (*ListThreadUpdatesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListThreadUpdatesResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListThreadUpdates_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *commandServiceClient) AckProcessedVersion(ctx context.Context, in *AckProcessedVersionRequest, opts ...grpc.CallOption) (*AckProcessedVersionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AckProcessedVersionResponse)
@@ -402,6 +426,7 @@ type CommandServiceServer interface {
 	GetCommandContext(context.Context, *GetCommandContextRequest) (*GetCommandContextResponse, error)
 	GetOrCreateConversation(context.Context, *GetOrCreateConversationRequest) (*GetOrCreateConversationResponse, error)
 	ListConversationMessages(context.Context, *ListConversationMessagesRequest) (*ListConversationMessagesResponse, error)
+	ListThreadMessages(context.Context, *ListThreadMessagesRequest) (*ListThreadMessagesResponse, error)
 	CreateChannel(context.Context, *CreateChannelRequest) (*Conversation, error)
 	ListChannels(context.Context, *ListChannelsRequest) (*ListChannelsResponse, error)
 	GetChannel(context.Context, *GetChannelRequest) (*Conversation, error)
@@ -413,6 +438,7 @@ type CommandServiceServer interface {
 	SendMessage(context.Context, *SendMessageRequest) (*ChatMessage, error)
 	PostMessage(context.Context, *PostMessageRequest) (*PostMessageResponse, error)
 	ListChannelUpdates(context.Context, *ListChannelUpdatesRequest) (*ListChannelUpdatesResponse, error)
+	ListThreadUpdates(context.Context, *ListThreadUpdatesRequest) (*ListThreadUpdatesResponse, error)
 	AckProcessedVersion(context.Context, *AckProcessedVersionRequest) (*AckProcessedVersionResponse, error)
 	FetchConversationActivity(context.Context, *FetchConversationActivityRequest) (*FetchConversationActivityResponse, error)
 	MarkConversationRead(context.Context, *MarkConversationReadRequest) (*MarkConversationReadResponse, error)
@@ -469,6 +495,9 @@ func (UnimplementedCommandServiceServer) GetOrCreateConversation(context.Context
 func (UnimplementedCommandServiceServer) ListConversationMessages(context.Context, *ListConversationMessagesRequest) (*ListConversationMessagesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListConversationMessages not implemented")
 }
+func (UnimplementedCommandServiceServer) ListThreadMessages(context.Context, *ListThreadMessagesRequest) (*ListThreadMessagesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListThreadMessages not implemented")
+}
 func (UnimplementedCommandServiceServer) CreateChannel(context.Context, *CreateChannelRequest) (*Conversation, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateChannel not implemented")
 }
@@ -501,6 +530,9 @@ func (UnimplementedCommandServiceServer) PostMessage(context.Context, *PostMessa
 }
 func (UnimplementedCommandServiceServer) ListChannelUpdates(context.Context, *ListChannelUpdatesRequest) (*ListChannelUpdatesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListChannelUpdates not implemented")
+}
+func (UnimplementedCommandServiceServer) ListThreadUpdates(context.Context, *ListThreadUpdatesRequest) (*ListThreadUpdatesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListThreadUpdates not implemented")
 }
 func (UnimplementedCommandServiceServer) AckProcessedVersion(context.Context, *AckProcessedVersionRequest) (*AckProcessedVersionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AckProcessedVersion not implemented")
@@ -707,6 +739,24 @@ func _CommandService_ListConversationMessages_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommandService_ListThreadMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListThreadMessagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListThreadMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListThreadMessages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListThreadMessages(ctx, req.(*ListThreadMessagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CommandService_CreateChannel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateChannelRequest)
 	if err := dec(in); err != nil {
@@ -905,6 +955,24 @@ func _CommandService_ListChannelUpdates_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommandService_ListThreadUpdates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListThreadUpdatesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListThreadUpdates(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListThreadUpdates_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListThreadUpdates(ctx, req.(*ListThreadUpdatesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CommandService_AckProcessedVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AckProcessedVersionRequest)
 	if err := dec(in); err != nil {
@@ -1053,6 +1121,10 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _CommandService_ListConversationMessages_Handler,
 		},
 		{
+			MethodName: "ListThreadMessages",
+			Handler:    _CommandService_ListThreadMessages_Handler,
+		},
+		{
 			MethodName: "CreateChannel",
 			Handler:    _CommandService_CreateChannel_Handler,
 		},
@@ -1095,6 +1167,10 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListChannelUpdates",
 			Handler:    _CommandService_ListChannelUpdates_Handler,
+		},
+		{
+			MethodName: "ListThreadUpdates",
+			Handler:    _CommandService_ListThreadUpdates_Handler,
 		},
 		{
 			MethodName: "AckProcessedVersion",

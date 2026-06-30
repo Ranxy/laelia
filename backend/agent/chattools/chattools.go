@@ -469,3 +469,174 @@ func ListFiles(ctx context.Context, d Deps, in ListFilesInput) (string, error) {
 	text += "\nPass an id to `laelia-agent file download <id>` to fetch a file into your temp workspace.\n"
 	return text, nil
 }
+
+// --- Thread inputs ---------------------------------------------------------
+
+type ListThreadUpdatesInput struct{}
+
+type GetThreadMessagesInput struct {
+	Conversation string `json:"conversation"`
+	Root         string `json:"root"`
+	Version      int64  `json:"version,omitempty"`
+	Direction    string `json:"direction,omitempty"`
+	Limit        int    `json:"limit,omitempty"`
+}
+
+type PostThreadMessageInput struct {
+	Conversation  string   `json:"conversation"`
+	Root          string   `json:"root"`
+	Content       string   `json:"content"`
+	BaseVersion   int64    `json:"base_version"`
+	AttachmentIDs []string `json:"attachment_ids,omitempty"`
+}
+
+// --- Thread operations ----------------------------------------------------
+
+// ListThreadUpdates is the agent's thread inbox: every thread the agent is
+// subscribed to (via @mention or having replied) that has replies beyond the
+// agent's per-channel cursor for that conversation. Run this after
+// `message check` for each channel with updates, BEFORE acking — acking
+// advances the conversation cursor past unread thread replies, so the agent
+// must read every subscribed thread first.
+func ListThreadUpdates(ctx context.Context, d Deps, _ ListThreadUpdatesInput) (string, error) {
+	resp, err := d.Client.ListThreadUpdates(ctx, connect.NewRequest(&v1pb.ListThreadUpdatesRequest{}))
+	if err != nil {
+		return "", wrapManagerError(err)
+	}
+
+	text := fmt.Sprintf("Threads with unread replies (%d):\n", len(resp.Msg.Updates))
+	if len(resp.Msg.Updates) == 0 {
+		text += "(none — no subscribed thread has new replies)\n"
+		return text, nil
+	}
+	for _, u := range resp.Msg.Updates {
+		text += fmt.Sprintf("- %s thread %s: %d new replies (latest_version=%d)\n",
+			u.Conversation, u.ThreadRoot, u.NewReplyCount, u.LatestVersion)
+	}
+	text += "\nFor each thread, call `laelia-agent thread read <conversation> --root <thread_root> --version <your processed_version for that conversation>` (default direction returns replies newer than that version) to read the new replies, then reply with `laelia-agent thread send` if you should respond.\n"
+	return text, nil
+}
+
+// GetThreadMessages reads one thread — the root message (as context) followed
+// by its replies — relative to a known room version. The root is always
+// included first so the agent has the thread context even on a delta read.
+// direction="after" (default) returns replies newer than version; "before"
+// returns up to limit prior replies (oldest→newest). The returned text states
+// current_version, which the caller needs as base_version for thread send and
+// (with the rest of the channel) processed_version for message ack.
+func GetThreadMessages(ctx context.Context, d Deps, in GetThreadMessagesInput) (string, error) {
+	name := normalizeConversationName(in.Conversation)
+	if name == "" {
+		return "", localError("MISSING_CONVERSATION", "conversation is required", "")
+	}
+	if in.Root == "" {
+		return "", localError("INVALID_ARGUMENT_FAILED", "root is required (the thread root message id from `thread check`)", "Pass --root <thread_root>.")
+	}
+
+	direction := in.Direction
+	if direction == "" {
+		direction = "after"
+	}
+	if direction != "before" && direction != "after" {
+		return "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("direction must be \"before\" or \"after\", got %q", direction), "Use --after or --before.")
+	}
+
+	limit := in.Limit
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+
+	reqMsg := &v1pb.ListThreadMessagesRequest{
+		Conversation: name,
+		ThreadRoot:   in.Root,
+		PageSize:     int32(limit),
+	}
+	if in.Version > 0 {
+		if direction == "before" {
+			reqMsg.BeforeVersion = in.Version
+		} else {
+			reqMsg.AfterVersion = in.Version
+		}
+	}
+	resp, err := d.Client.ListThreadMessages(ctx, connect.NewRequest(reqMsg))
+	if err != nil {
+		return "", wrapManagerError(err)
+	}
+
+	text := fmt.Sprintf("Thread messages (current_version: %d):\n", resp.Msg.CurrentVersion)
+	if len(resp.Msg.Messages) == 0 {
+		text += "(no messages)\n"
+		return text, nil
+	}
+	// The first message is the thread root (context); label it so the agent
+	// distinguishes the root from the replies it must respond to.
+	for i, m := range resp.Msg.Messages {
+		ts := m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z")
+		line := formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Content, m.Attachments)
+		if i == 0 {
+			text += "[ROOT] " + line
+		} else {
+			text += line
+		}
+	}
+	if direction == "before" && len(resp.Msg.Messages)-1 == limit {
+		oldest := resp.Msg.Messages[1].RoomVersion
+		text += fmt.Sprintf("(older replies may exist — call again with --version %d --before to page further back)\n", oldest)
+	}
+	return text, nil
+}
+
+// PostThreadMessage posts a reply into a thread using optimistic concurrency,
+// mirroring PostMessage. The thread_root anchors the reply to the thread. On a
+// committed=false conflict the returned text lists the new messages and tells
+// the agent to re-read and retry with the updated base_version.
+func PostThreadMessage(ctx context.Context, d Deps, in PostThreadMessageInput) (string, error) {
+	name := normalizeConversationName(in.Conversation)
+	if name == "" {
+		return "", localError("MISSING_CONVERSATION", "conversation is required", "")
+	}
+	if in.Root == "" {
+		return "", localError("INVALID_ARGUMENT_FAILED", "root is required (the thread root message id)", "Pass --root <thread_root>.")
+	}
+
+	var attachments []*v1pb.Attachment
+	for _, id := range in.AttachmentIDs {
+		if id == "" {
+			continue
+		}
+		attachments = append(attachments, &v1pb.Attachment{Id: id})
+	}
+
+	req := connect.NewRequest(&v1pb.PostMessageRequest{
+		Conversation: name,
+		Content:      in.Content,
+		BaseVersion:  in.BaseVersion,
+		CommandId:    d.Command,
+		Attachments:  attachments,
+		ThreadRoot:   in.Root,
+	})
+	resp, err := d.Client.PostMessage(ctx, req)
+	if err != nil {
+		return "", wrapManagerError(err)
+	}
+
+	if resp.Msg.Committed {
+		return fmt.Sprintf("Thread reply posted successfully (version: %d)", resp.Msg.CurrentVersion), nil
+	}
+
+	text := resp.Msg.ConflictDescription + "\nNew messages:\n"
+	if len(resp.Msg.NewMessages) == 0 {
+		text += "(no new messages)\n"
+	} else {
+		for _, m := range resp.Msg.NewMessages {
+			ts := ""
+			if m.CreatedAt != nil {
+				ts = m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z")
+			}
+			text += formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Content, m.Attachments)
+		}
+	}
+	text += fmt.Sprintf("\nTo resolve: call `laelia-agent thread read %s --root %s --version %d` to get full context, then call `laelia-agent thread send` again with --base-version %d.",
+		name, in.Root, resp.Msg.CurrentVersion, resp.Msg.CurrentVersion)
+	return text, nil
+}

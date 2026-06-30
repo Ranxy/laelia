@@ -304,6 +304,33 @@ func (d *Dispatcher) NotifyWake(_ context.Context, agentID int) {
 	}
 }
 
+// NotifyThreadMention pushes a NewMessagesAvailable hint to a connected agent
+// that is subscribed to a thread, carrying the thread root id so the agent can
+// go straight to thread check/read. Best-effort like NotifyNewMessages: the
+// agent's durable cursor (advanced via ListThreadUpdates + AckProcessedVersion)
+// is the source of truth, so a missed wake is recovered on reconnect.
+func (d *Dispatcher) NotifyThreadMention(_ context.Context, agentID int, conversationID string, version int64, threadRootMessageID string) {
+	d.mu.RLock()
+	sess, ok := d.sessions[agentID]
+	d.mu.RUnlock()
+	if !ok {
+		return
+	}
+
+	msg := &v1pb.ManagerStreamMessage{
+		Message: &v1pb.ManagerStreamMessage_NewMessages{
+			NewMessages: &v1pb.NewMessagesAvailable{
+				ConversationIds:     []string{conversationID},
+				Versions:            []int64{version},
+				ThreadRootMessageId: threadRootMessageID,
+			},
+		},
+	}
+	if err := sess.deliver(msg); err != nil {
+		slog.Warn("failed to send thread mention wake", "agentID", agentID, "error", err)
+	}
+}
+
 // FetchConversationActivity returns the execution status of every agent member
 // in a conversation. It combines member list, connection state, and running
 // command events to derive a human-readable status per agent.

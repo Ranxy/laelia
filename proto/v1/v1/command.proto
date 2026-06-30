@@ -291,6 +291,16 @@ message ChatMessage {
   // context-only and avoid replying to itself.
   bool is_own = 12;
   repeated Attachment attachments = 13;
+  // thread_root is the resource name of the root message of the thread this
+  // message belongs to ("conversations/{c}/messages/{m}"). Empty for a normal
+  // channel message (i.e. a root message itself, or a message outside any
+  // thread). Replies in a thread carry the root message's name here.
+  string thread_root = 14;
+  // thread_reply_count is the number of replies in the thread rooted at this
+  // message. Only meaningful for root messages (thread_root empty); the frontend
+  // uses it to render the reply-count badge on the root message in the main
+  // channel list. Always 0 for thread replies.
+  int32 thread_reply_count = 15;
 }
 
 message Conversation {
@@ -335,6 +345,57 @@ message ListConversationMessagesResponse {
   repeated ChatMessage messages = 1;
   string next_page_token = 2;
   int64 current_version = 3;
+}
+
+// ListThreadMessagesRequest reads one thread: the root message followed by its
+// replies, in room_version order. The root message is included as the first
+// element so a reader has the thread context. The cursor model mirrors
+// ListConversationMessages: after_version returns replies with room_version
+// greater than it (chronological tail), before_version returns a page before a
+// pivot, and the default returns the latest N replies.
+message ListThreadMessagesRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
+  // thread_root is the resource name of the root message
+  // ("conversations/{c}/messages/{m}").
+  string thread_root = 2 [(google.api.field_behavior) = REQUIRED];
+  int32 page_size = 3;
+  string page_token = 4;
+  int64 after_version = 5;
+  int64 before_version = 6;
+}
+
+message ListThreadMessagesResponse {
+  // messages is [root, ...replies] in room_version order.
+  repeated ChatMessage messages = 1;
+  string next_page_token = 2;
+  int64 current_version = 3;
+}
+
+// ListThreadUpdatesRequest returns, for the authenticated agent, every thread
+// the agent is subscribed to (via @mention or having replied) that has replies
+// with room_version beyond the agent's per-channel cursor for that
+// conversation. It is the agent's thread inbox and is run after message check in
+// the drain loop, before acking the conversation cursor.
+message ListThreadUpdatesRequest {}
+
+// ThreadUpdate describes one subscribed thread with unread replies.
+message ThreadUpdate {
+  string conversation = 1 [(google.api.resource_reference).type = "laelia/Conversation"];
+  // thread_root is the resource name of the thread's root message.
+  string thread_root = 2;
+  // latest_version is the maximum room_version among the thread's replies
+  // (the version the agent should read up to before acking).
+  int64 latest_version = 3;
+  // new_reply_count is the number of replies with room_version greater than
+  // the agent's processed_version for this conversation.
+  int32 new_reply_count = 4;
+}
+
+message ListThreadUpdatesResponse {
+  repeated ThreadUpdate updates = 1;
 }
 
 message GetOrCreateConversationRequest {
@@ -415,6 +476,10 @@ message SendMessageRequest {
   string content = 2 [(google.api.field_behavior) = REQUIRED];
   repeated Mention mentions = 3;
   repeated Attachment attachments = 4;
+  // thread_root, when set, makes this message a reply in the thread rooted at
+  // the given message name ("conversations/{c}/messages/{m}"). Empty posts a
+  // normal channel message.
+  string thread_root = 5;
 }
 
 message GetCommandContextRequest {
@@ -439,6 +504,9 @@ message PostMessageRequest {
   int64 base_version = 3 [(google.api.field_behavior) = REQUIRED];
   string command_id = 4;
   repeated Attachment attachments = 5;
+  // thread_root, when set, makes this agent reply a message in the thread
+  // rooted at the given message name. Empty posts a normal channel message.
+  string thread_root = 6;
 }
 
 message PostMessageResponse {
@@ -573,6 +641,12 @@ service CommandService {
     option (laelia.v1.permission) = "laelia.conversations.read";
   }
 
+  rpc ListThreadMessages(ListThreadMessagesRequest) returns (ListThreadMessagesResponse) {
+    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/threads"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.read";
+  }
+
   rpc CreateChannel(CreateChannelRequest) returns (Conversation) {
     option (google.api.http) = {
       post: "/v1/channels"
@@ -654,6 +728,10 @@ service CommandService {
 
   rpc ListChannelUpdates(ListChannelUpdatesRequest) returns (ListChannelUpdatesResponse) {
     option (google.api.http) = {get: "/v1/agents/-/channelUpdates"};
+  }
+
+  rpc ListThreadUpdates(ListThreadUpdatesRequest) returns (ListThreadUpdatesResponse) {
+    option (google.api.http) = {get: "/v1/agents/-/threadUpdates"};
   }
 
   rpc AckProcessedVersion(AckProcessedVersionRequest) returns (AckProcessedVersionResponse) {
@@ -849,6 +927,12 @@ message RespondPermissionRequest {
 message NewMessagesAvailable {
   repeated string conversation_ids = 1;
   repeated int64 versions = 2;
+  // thread_root_message_id, when non-empty, indicates the wake is for a new
+  // reply in a thread the agent is subscribed to (the value is the thread's
+  // root message resource name). It is a hint so the agent can go straight to
+  // thread check/read; the agent still relies on ListThreadUpdates as the
+  // source of truth. Empty means a normal channel-message wake.
+  string thread_root_message_id = 3;
 }
 
 // BeginSession is sent by an agent to ask the Manager to start a new

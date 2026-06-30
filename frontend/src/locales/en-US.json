@@ -278,7 +278,15 @@
     "mention-list-aria-label": "Mention suggestions",
     "mention-no-matches": "No matches for '@{{query}}'",
     "mention-group-users": "Users",
-    "mention-group-agents": "Agents"
+    "mention-group-agents": "Agents",
+    "reply-in-thread": "Reply in thread",
+    "thread-replies": "{{count}} replies",
+    "thread-title": "Thread",
+    "thread-view-in-channel": "View in channel",
+    "thread-beginning": "Beginning of replies",
+    "thread-placeholder": "Reply in thread…",
+    "thread-empty": "No replies yet",
+    "thread-close": "Close thread"
   },
   "tasks": {
     "title": "Tasks",

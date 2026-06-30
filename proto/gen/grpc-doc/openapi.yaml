@@ -104,6 +104,24 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/-/threadUpdates:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_ListThreadUpdates
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListThreadUpdatesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}:
         get:
             tags:
@@ -1107,6 +1125,55 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/threads:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_ListThreadMessages
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+                - name: threadRoot
+                  in: query
+                  description: |-
+                    thread_root is the resource name of the root message
+                     ("conversations/{c}/messages/{m}").
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+                - name: afterVersion
+                  in: query
+                  schema:
+                    type: string
+                - name: beforeVersion
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListThreadMessagesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/conversations/{conversation}:ackProcessedVersion:
         post:
             tags:
@@ -1883,6 +1950,21 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/Attachment'
+                threadRoot:
+                    type: string
+                    description: |-
+                        thread_root is the resource name of the root message of the thread this
+                         message belongs to ("conversations/{c}/messages/{m}"). Empty for a normal
+                         channel message (i.e. a root message itself, or a message outside any
+                         thread). Replies in a thread carry the root message's name here.
+                threadReplyCount:
+                    type: integer
+                    description: |-
+                        thread_reply_count is the number of replies in the thread rooted at this
+                         message. Only meaningful for root messages (thread_root empty); the frontend
+                         uses it to render the reply-count badge on the root message in the main
+                         channel list. Always 0 for thread replies.
+                    format: int32
         Command:
             type: object
             properties:
@@ -2230,6 +2312,25 @@ components:
                     type: string
                 currentVersion:
                     type: string
+        ListThreadMessagesResponse:
+            type: object
+            properties:
+                messages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ChatMessage'
+                    description: messages is [root, ...replies] in room_version order.
+                nextPageToken:
+                    type: string
+                currentVersion:
+                    type: string
+        ListThreadUpdatesResponse:
+            type: object
+            properties:
+                updates:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ThreadUpdate'
         ListUsersResponse:
             type: object
             properties:
@@ -2385,6 +2486,11 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/Attachment'
+                threadRoot:
+                    type: string
+                    description: |-
+                        thread_root, when set, makes this agent reply a message in the thread
+                         rooted at the given message name. Empty posts a normal channel message.
         PostMessageResponse:
             type: object
             properties:
@@ -2519,6 +2625,12 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/Attachment'
+                threadRoot:
+                    type: string
+                    description: |-
+                        thread_root, when set, makes this message a reply in the thread rooted at
+                         the given message name ("conversations/{c}/messages/{m}"). Empty posts a
+                         normal channel message.
         Status:
             type: object
             properties:
@@ -2542,6 +2654,26 @@ components:
                     type: string
                 content:
                     type: string
+        ThreadUpdate:
+            type: object
+            properties:
+                conversation:
+                    type: string
+                threadRoot:
+                    type: string
+                    description: thread_root is the resource name of the thread's root message.
+                latestVersion:
+                    type: string
+                    description: |-
+                        latest_version is the maximum room_version among the thread's replies
+                         (the version the agent should read up to before acking).
+                newReplyCount:
+                    type: integer
+                    description: |-
+                        new_reply_count is the number of replies with room_version greater than
+                         the agent's processed_version for this conversation.
+                    format: int32
+            description: ThreadUpdate describes one subscribed thread with unread replies.
         ToolCallFinishedPayload:
             type: object
             properties:

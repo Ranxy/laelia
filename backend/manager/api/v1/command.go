@@ -641,6 +641,83 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 	}), nil
 }
 
+// ListThreadMessages returns the root message of a thread followed by its
+// replies in room_version order, with the same cursor model as
+// ListConversationMessages. The caller must be a member of the conversation.
+func (s *CommandService) ListThreadMessages(ctx context.Context, req *connect.Request[v1pb.ListThreadMessagesRequest]) (*connect.Response[v1pb.ListThreadMessagesResponse], error) {
+	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
+	if err != nil {
+		return nil, err
+	}
+	if req.Msg.ThreadRoot == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("thread_root must not be empty"))
+	}
+	rootID, err := uuid.Parse(req.Msg.ThreadRoot)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid thread_root"))
+	}
+	if req.Msg.AfterVersion > 0 && req.Msg.BeforeVersion > 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("after_version and before_version are mutually exclusive"))
+	}
+
+	offset, err := parseLimitAndOffset(&pageSize{
+		token:   req.Msg.PageToken,
+		limit:   int(req.Msg.PageSize),
+		maximum: 100,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var msgs []*store.ChatMessage
+	var currentVersion int64
+	switch {
+	case req.Msg.BeforeVersion > 0:
+		msgs, currentVersion, err = s.store.ListThreadMessages(ctx, convID, rootID, 0, req.Msg.BeforeVersion, offset.limit, 0)
+	case req.Msg.AfterVersion > 0:
+		limitPlusOne := offset.limit + 1
+		msgs, currentVersion, err = s.store.ListThreadMessages(ctx, convID, rootID, req.Msg.AfterVersion, 0, limitPlusOne, offset.offset)
+	default:
+		msgs, currentVersion, err = s.store.ListThreadMessages(ctx, convID, rootID, 0, 0, offset.limit, 0)
+	}
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list thread messages"))
+	}
+
+	nextPageToken := ""
+	if req.Msg.BeforeVersion == 0 && req.Msg.AfterVersion > 0 && len(msgs) == offset.limit+1 {
+		msgs = msgs[:offset.limit]
+		nextPageToken, _ = offset.getNextPageToken()
+	}
+
+	callerAgent, _ := GetAgentFromContext(ctx)
+	// Link the session's command to this conversation on read, same as
+	// ListConversationMessages, so FetchConversationActivity surfaces the
+	// agent's live status while it works on the thread.
+	if callerAgent != nil {
+		if cmdID := s.dispatcher.CurrentCommandID(callerAgent.ID); cmdID != "" {
+			if cid, parseErr := uuid.Parse(cmdID); parseErr == nil {
+				if linkErr := s.store.SetCommandConversationID(ctx, cid, convID); linkErr != nil {
+					slog.Warn("failed to link command to conversation on thread read", "commandID", cmdID, "conversationID", convID, "error", linkErr)
+				}
+			}
+		}
+	}
+
+	var v1msgs []*v1pb.ChatMessage
+	for _, msg := range msgs {
+		v1m := storeToV1ChatMessage(msg)
+		v1m.IsOwn = callerAgent != nil && msg.SenderAgentID.Valid && int(msg.SenderAgentID.Int32) == callerAgent.ID
+		v1msgs = append(v1msgs, v1m)
+	}
+
+	return connect.NewResponse(&v1pb.ListThreadMessagesResponse{
+		Messages:       v1msgs,
+		NextPageToken:  nextPageToken,
+		CurrentVersion: currentVersion,
+	}), nil
+}
+
 func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v1pb.PostMessageRequest]) (*connect.Response[v1pb.PostMessageResponse], error) {
 	agent, ok := GetAgentFromContext(ctx)
 	if !ok || agent == nil {
@@ -685,25 +762,52 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 			return nil, err
 		}
 
+		// thread_root, when set, makes this agent reply a message in an
+		// existing thread rooted at the given message id. Validate the root
+		// belongs to this conversation and is itself a root.
+		var threadRoot uuid.NullUUID
+		if req.Msg.ThreadRoot != "" {
+			rootID, parseErr := uuid.Parse(req.Msg.ThreadRoot)
+			if parseErr != nil {
+				return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(parseErr, "invalid thread_root"))
+			}
+			isRoot, rootErr := s.store.IsThreadRoot(ctx, convUUID, rootID)
+			if rootErr != nil {
+				return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(rootErr, "failed to validate thread root"))
+			}
+			if !isRoot {
+				return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("thread_root is not a root message in this conversation"))
+			}
+			threadRoot = uuid.NullUUID{UUID: rootID, Valid: true}
+		}
+
 		msg, newVersion, createErr := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
-			ConversationID: convUUID,
-			PrincipalID:    principalID,
-			SenderAgentID:  toNullInt32(int32(agent.ID)),
-			Role:           2,
-			Content:        req.Msg.Content,
-			CommandID:      commandID,
-			SenderType:     store.SenderTypeAgent,
-			Attachments:    attachments,
+			ConversationID:      convUUID,
+			PrincipalID:         principalID,
+			SenderAgentID:       toNullInt32(int32(agent.ID)),
+			Role:                2,
+			Content:             req.Msg.Content,
+			CommandID:           commandID,
+			SenderType:          store.SenderTypeAgent,
+			Attachments:         attachments,
+			ThreadRootMessageID: threadRoot,
 		})
 		if createErr != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(createErr, "failed to create assistant message"))
 		}
 
-		// Agent-first: wake every OTHER agent member of this conversation so
-		// they can pull this agent's reply. The posting agent is excluded (it
-		// just acked past its own post and must not re-wake itself). This is
-		// the single change that enables agent→agent conversation.
-		s.notifyConversationAgents(ctx, convUUID, newVersion, &agent.ID)
+		if threadRoot.Valid {
+			// Thread reply: subscribe the posting agent and any @mentioned
+			// agents, then wake every subscriber except the poster. The poster
+			// is excluded so its own reply does not re-wake itself.
+			s.subscribeAndNotifyThread(ctx, convUUID, threadRoot.UUID, newVersion, nil, &agent.ID)
+		} else {
+			// Agent-first: wake every OTHER agent member of this conversation so
+			// they can pull this agent's reply. The posting agent is excluded (it
+			// just acked past its own post and must not re-wake itself). This is
+			// the single change that enables agent→agent conversation.
+			s.notifyConversationAgents(ctx, convUUID, newVersion, &agent.ID)
+		}
 
 		// The posting agent has produced this message, so it has processed up to
 		// and including newVersion. Advance its durable cursor now so its own
@@ -749,20 +853,24 @@ func storeToV1ChatMessage(msg *store.ChatMessage) *v1pb.ChatMessage {
 		senderName = msg.AgentName
 	}
 	v1m := &v1pb.ChatMessage{
-		Name:          msg.ID.String(),
-		Conversation:  msg.ConversationID.String(),
-		PrincipalName: msg.PrincipalName,
-		Role:          msg.Role,
-		Content:       msg.Content,
-		CreatedAt:     timestamppb.New(msg.CreatedAt),
-		SenderName:    senderName,
-		SenderType:    senderType,
-		RoomVersion:   msg.RoomVersion,
-		Mentions:      msg.Mentions,
-		Attachments:   msg.Attachments,
+		Name:             msg.ID.String(),
+		Conversation:     msg.ConversationID.String(),
+		PrincipalName:    msg.PrincipalName,
+		Role:             msg.Role,
+		Content:          msg.Content,
+		CreatedAt:        timestamppb.New(msg.CreatedAt),
+		SenderName:       senderName,
+		SenderType:       senderType,
+		RoomVersion:      msg.RoomVersion,
+		Mentions:         msg.Mentions,
+		Attachments:      msg.Attachments,
+		ThreadReplyCount: msg.ThreadReplyCount,
 	}
 	if msg.CommandID.Valid {
 		v1m.CommandId = msg.CommandID.UUID.String()
+	}
+	if msg.ThreadRootMessageID.Valid {
+		v1m.ThreadRoot = msg.ThreadRootMessageID.UUID.String()
 	}
 	return v1m
 }
@@ -823,6 +931,35 @@ func (s *CommandService) ListChannelUpdates(ctx context.Context, _ *connect.Requ
 	}
 
 	return connect.NewResponse(&v1pb.ListChannelUpdatesResponse{Updates: v1Updates}), nil
+}
+
+// ListThreadUpdates is the agent's thread inbox. It returns every thread the
+// authenticated agent is subscribed to (via @mention or having replied) that
+// has replies beyond the agent's per-channel cursor for that conversation. The
+// drain loop runs this after ListChannelUpdates and before acking, so a
+// subscribed agent catches up on every thread it cares about.
+func (s *CommandService) ListThreadUpdates(ctx context.Context, _ *connect.Request[v1pb.ListThreadUpdatesRequest]) (*connect.Response[v1pb.ListThreadUpdatesResponse], error) {
+	agent, ok := GetAgentFromContext(ctx)
+	if !ok || agent == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("agent authentication required"))
+	}
+
+	updates, err := s.store.ListSubscribedThreadUpdates(ctx, agent.ID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list thread updates"))
+	}
+
+	var v1Updates []*v1pb.ThreadUpdate
+	for _, u := range updates {
+		v1Updates = append(v1Updates, &v1pb.ThreadUpdate{
+			Conversation:  fmt.Sprintf("conversations/%s", u.ConversationID.String()),
+			ThreadRoot:    u.RootMessageID.String(),
+			LatestVersion: u.LatestVersion,
+			NewReplyCount: u.NewReplyCount,
+		})
+	}
+
+	return connect.NewResponse(&v1pb.ListThreadUpdatesResponse{Updates: v1Updates}), nil
 }
 
 // AckProcessedVersion advances the agent's durable per-channel cursor to

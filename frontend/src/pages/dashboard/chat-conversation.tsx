@@ -29,6 +29,7 @@ import {
   rowStreamingProps,
 } from "@/components/chat/message-row";
 import { EmptyState, LoadingState } from "@/components/chat/states";
+import { ThreadPanel } from "@/components/chat/thread-panel";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -97,6 +98,12 @@ export function ChatConversationPage() {
   const currentUser = useAppStore((s) => s.currentUser);
   const fetchAgents = useAppStore((s) => s.fetchAgents);
   const fetchChannels = useAppStore((s) => s.fetchChannels);
+  const openThread = useAppStore((s) => s.openThread);
+  const closeThread = useAppStore((s) => s.closeThread);
+  const activeThreadRoot = useAppStore((s) => s.activeThreadRoot);
+  const activeThreadConversation = useAppStore(
+    (s) => s.activeThreadConversation
+  );
 
   const conversationName = channelId ? `conversations/${channelId}` : "";
   // Per-key slices: subscribe only to this channel's records, not the whole
@@ -166,6 +173,11 @@ export function ChatConversationPage() {
       ? channel.ownerId === currentUser.name.split("/").pop()
       : false;
 
+  // The thread panel is open only when it belongs to the currently-viewed
+  // channel; switching channels closes it (see init()).
+  const threadRootOpen =
+    activeThreadConversation === conversationName ? activeThreadRoot : null;
+
   // memberIds already in the channel for the currently-selected add-member
   // type, used to disable + badge them in the picker so they can't be re-added.
   const existingMemberIds = useMemo(
@@ -188,6 +200,8 @@ export function ChatConversationPage() {
       const prevName = `conversations/${lastChannelRef.current}`;
       stopWatchingChannel(prevName);
     }
+    // Close any open thread panel — it belongs to the previous channel.
+    closeThread();
     lastChannelRef.current = channelId;
     stickToBottomRef.current = true;
     try {
@@ -216,6 +230,7 @@ export function ChatConversationPage() {
     markConversationRead,
     startWatchingChannel,
     stopWatchingChannel,
+    closeThread,
   ]);
 
   useEffect(() => {
@@ -225,8 +240,9 @@ export function ChatConversationPage() {
         stopWatchingChannel(`conversations/${lastChannelRef.current}`);
         lastChannelRef.current = null;
       }
+      closeThread();
     };
-  }, [init, stopWatchingChannel]);
+  }, [init, stopWatchingChannel, closeThread]);
 
   // Restore the entering conversation's draft. Declared before the persist
   // effect so it reads the saved draft before any stale write lands.
@@ -463,6 +479,27 @@ export function ChatConversationPage() {
   // streaming slices. The shared MessageRow still accepts them.
   const noopViewDetails = useCallback((_: string) => {}, []);
 
+  const handleOpenThread = useCallback(
+    (msg: ChatMessageUI) => {
+      if (!channelId || msg.threadRoot) return;
+      openThread(conversationName, msg.id);
+    },
+    [channelId, conversationName, openThread]
+  );
+
+  const handleViewInChannel = useCallback(() => {
+    const rootId = threadRootOpen;
+    closeThread();
+    if (rootId && scrollRef.current) {
+      // Defer until the panel unmounts so the main list reclaims width.
+      requestAnimationFrame(() => {
+        scrollRef.current
+          ?.querySelector(`[data-msg-id="${rootId}"]`)
+          ?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+    }
+  }, [threadRootOpen, closeThread]);
+
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
       {/* Header */}
@@ -504,237 +541,266 @@ export function ChatConversationPage() {
         </Button>
       </div>
 
-      {/* Messages scroll area */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto"
-      >
-        <div className="mx-auto flex max-w-3xl flex-col gap-4 px-6 pt-6 pb-4">
-          {loading && <LoadingState />}
-          {!loading && messages.length === 0 && (
-            <EmptyState icon={Send} message={t("chat.empty")} />
-          )}
-          {messages.map((msg, idx) => {
-            const prevMsg = idx > 0 ? messages[idx - 1] : null;
-            const showAvatar =
-              !prevMsg ||
-              prevMsg.role !== msg.role ||
-              prevMsg.senderName !== msg.senderName;
-            const rowProps = rowStreamingProps(msg, false, "", EMPTY_EVENTS);
-            return (
-              <MessageRow
-                key={msg.id}
-                msg={msg}
-                showAvatar={showAvatar}
-                agentTitle={msg.senderName ?? ""}
-                streamingContent={rowProps.streamingContent}
-                streamingEvents={rowProps.streamingEvents}
-                onViewDetails={noopViewDetails}
-                onMentionClick={handleMentionClick}
-                MentionBadge={MentionBadge}
-                markdownCustomId="channel-chat"
-              />
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Scroll to bottom button */}
-      {showScrollDown && (
-        <button
-          type="button"
-          onClick={scrollToBottom}
-          className={cn(
-            "absolute bottom-28 left-1/2 -translate-x-1/2 z-10",
-            "flex size-9 items-center justify-center",
-            "rounded-full border border-control-border bg-background shadow-lg",
-            "text-control hover:text-main hover:bg-control-bg transition-all"
-          )}
-          aria-label={t("chat.scroll-to-bottom")}
-        >
-          <ArrowDown className="size-4" />
-        </button>
-      )}
-
-      {/* Input area */}
-      <div className="shrink-0 bg-background">
-        <div className="mx-auto max-w-3xl px-6 pb-5 pt-2">
+      <div className="flex flex-1 min-h-0">
+        <div className="relative flex flex-1 flex-col min-w-0">
+          {/* Messages scroll area */}
           <div
-            className="rounded-2xl border border-control-border bg-control-bg/40 focus-within:border-accent focus-within:bg-background transition-colors"
-            onDragOver={(e) => {
-              e.preventDefault();
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (e.dataTransfer.files.length > 0)
-                handleFiles(e.dataTransfer.files);
-            }}
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto"
           >
-            {pendingAttachments.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 px-3 pt-2">
-                {pendingAttachments.map((att) => (
-                  <span
-                    key={att.id}
-                    className="group flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
-                  >
-                    <span className="max-w-[160px] truncate">{att.name}</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPendingAttachments((prev) =>
-                          prev.filter((p) => p.id !== att.id)
-                        )
-                      }
-                      className="text-control-placeholder hover:text-error transition-colors"
-                      aria-label={t("common.delete")}
-                    >
-                      <X className="size-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            <Textarea
-              ref={textareaRef}
-              className={cn(
-                "block w-full resize-none border-0 bg-transparent px-4 py-3 text-sm text-main",
-                "placeholder:text-control-placeholder focus:ring-0 focus:border-transparent",
-                "max-h-[200px] min-h-[24px]"
+            <div className="mx-auto flex max-w-3xl flex-col gap-4 px-6 pt-6 pb-4">
+              {loading && <LoadingState />}
+              {!loading && messages.length === 0 && (
+                <EmptyState icon={Send} message={t("chat.empty")} />
               )}
-              rows={1}
-              placeholder={t("channel.placeholder")}
-              aria-controls={
-                mentionState?.active ? MENTION_POPUP_ID : undefined
-              }
-              aria-activedescendant={
-                mentionState?.active && mentionState.matched.length > 0
-                  ? `${MENTION_POPUP_ID}-opt-${mentionSelectedIndex}`
-                  : undefined
-              }
-              value={input}
-              onChange={(e) => {
-                const value = e.target.value;
-                setInput(value);
-                const pos = e.target.selectionStart ?? 0;
-                setCursorPos(pos);
-                const state = detectMention(value, pos, mentionTargets);
-                setMentionState(state);
-                setMentionSelectedIndex(0);
-                if (state?.active) {
-                  const newMap: MentionTarget[] = [];
-                  const re = /(?:^|\s)@(\S+)/g;
-                  let m: RegExpExecArray | null;
-                  while ((m = re.exec(value)) !== null) {
-                    const name = m[1];
-                    const found = mentionTargets.find((t) => t.name === name);
-                    if (found) newMap.push(found);
-                  }
-                  setMentionMap(newMap);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (mentionState?.active) {
-                  const total = mentionState.matched.length;
-                  if (e.key === "ArrowDown") {
-                    e.preventDefault();
-                    setMentionSelectedIndex((idx) =>
-                      idx + 1 < total ? idx + 1 : 0
-                    );
-                    return;
-                  }
-                  if (e.key === "ArrowUp") {
-                    e.preventDefault();
-                    setMentionSelectedIndex((idx) =>
-                      idx - 1 >= 0 ? idx - 1 : total - 1
-                    );
-                    return;
-                  }
-                  if (e.key === "Enter" || e.key === "Tab") {
-                    if (total === 0) return;
-                    e.preventDefault();
-                    if (mentionState.matched[mentionSelectedIndex]) {
-                      handleMentionSelect(
-                        mentionState.matched[mentionSelectedIndex]
-                      );
-                    }
-                    return;
-                  }
-                  if (e.key === "Escape") {
-                    e.preventDefault();
-                    setMentionState(null);
-                    return;
-                  }
-                }
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              onSelect={(e) => {
-                const target = e.target as HTMLTextAreaElement;
-                const pos = target.selectionStart ?? 0;
-                setCursorPos(pos);
-                const state = detectMention(target.value, pos, mentionTargets);
-                setMentionState(state);
-                setMentionSelectedIndex(0);
-              }}
-              disabled={sending}
-            />
-            <div className="flex items-center justify-between px-3 pb-2">
-              <div className="flex items-center gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files) handleFiles(e.target.files);
-                    e.target.value = "";
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading || sending}
-                  className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors disabled:opacity-50"
-                  aria-label={t("channel.attach-file")}
-                >
-                  {uploading ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Paperclip className="size-4" />
-                  )}
-                </button>
-                <span className="text-xs text-control-placeholder">
-                  {t("chat.send-hint")}
-                </span>
-              </div>
-              <Button
-                type="button"
-                size="xs"
-                onClick={handleSend}
-                disabled={
-                  (!input.trim() && pendingAttachments.length === 0) || sending
-                }
-              >
-                <Send className="size-3" />
-                {t("common.send")}
-              </Button>
+              {messages.map((msg, idx) => {
+                const prevMsg = idx > 0 ? messages[idx - 1] : null;
+                const showAvatar =
+                  !prevMsg ||
+                  prevMsg.role !== msg.role ||
+                  prevMsg.senderName !== msg.senderName;
+                const rowProps = rowStreamingProps(
+                  msg,
+                  false,
+                  "",
+                  EMPTY_EVENTS
+                );
+                return (
+                  <div key={msg.id} data-msg-id={msg.id}>
+                    <MessageRow
+                      msg={msg}
+                      showAvatar={showAvatar}
+                      agentTitle={msg.senderName ?? ""}
+                      streamingContent={rowProps.streamingContent}
+                      streamingEvents={rowProps.streamingEvents}
+                      onViewDetails={noopViewDetails}
+                      onMentionClick={handleMentionClick}
+                      MentionBadge={MentionBadge}
+                      markdownCustomId="channel-chat"
+                      onOpenThread={handleOpenThread}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
-          {mentionState?.active && textareaRef.current && (
-            <MentionPopup
-              id={MENTION_POPUP_ID}
-              targets={mentionState.matched}
-              query={mentionState.query}
-              position={getCaretCoordinates(textareaRef.current, cursorPos)}
-              selectedIndex={mentionSelectedIndex}
-              onSelect={handleMentionSelect}
-              onClose={() => setMentionState(null)}
-            />
+
+          {/* Scroll to bottom button */}
+          {showScrollDown && (
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              className={cn(
+                "absolute bottom-28 left-1/2 -translate-x-1/2 z-10",
+                "flex size-9 items-center justify-center",
+                "rounded-full border border-control-border bg-background shadow-lg",
+                "text-control hover:text-main hover:bg-control-bg transition-all"
+              )}
+              aria-label={t("chat.scroll-to-bottom")}
+            >
+              <ArrowDown className="size-4" />
+            </button>
           )}
+
+          {/* Input area */}
+          <div className="shrink-0 bg-background">
+            <div className="mx-auto max-w-3xl px-6 pb-5 pt-2">
+              <div
+                className="rounded-2xl border border-control-border bg-control-bg/40 focus-within:border-accent focus-within:bg-background transition-colors"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (e.dataTransfer.files.length > 0)
+                    handleFiles(e.dataTransfer.files);
+                }}
+              >
+                {pendingAttachments.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 px-3 pt-2">
+                    {pendingAttachments.map((att) => (
+                      <span
+                        key={att.id}
+                        className="group flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
+                      >
+                        <span className="max-w-[160px] truncate">
+                          {att.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPendingAttachments((prev) =>
+                              prev.filter((p) => p.id !== att.id)
+                            )
+                          }
+                          className="text-control-placeholder hover:text-error transition-colors"
+                          aria-label={t("common.delete")}
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <Textarea
+                  ref={textareaRef}
+                  className={cn(
+                    "block w-full resize-none border-0 bg-transparent px-4 py-3 text-sm text-main",
+                    "placeholder:text-control-placeholder focus:ring-0 focus:border-transparent",
+                    "max-h-[200px] min-h-[24px]"
+                  )}
+                  rows={1}
+                  placeholder={t("channel.placeholder")}
+                  aria-controls={
+                    mentionState?.active ? MENTION_POPUP_ID : undefined
+                  }
+                  aria-activedescendant={
+                    mentionState?.active && mentionState.matched.length > 0
+                      ? `${MENTION_POPUP_ID}-opt-${mentionSelectedIndex}`
+                      : undefined
+                  }
+                  value={input}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setInput(value);
+                    const pos = e.target.selectionStart ?? 0;
+                    setCursorPos(pos);
+                    const state = detectMention(value, pos, mentionTargets);
+                    setMentionState(state);
+                    setMentionSelectedIndex(0);
+                    if (state?.active) {
+                      const newMap: MentionTarget[] = [];
+                      const re = /(?:^|\s)@(\S+)/g;
+                      let m: RegExpExecArray | null;
+                      while ((m = re.exec(value)) !== null) {
+                        const name = m[1];
+                        const found = mentionTargets.find(
+                          (t) => t.name === name
+                        );
+                        if (found) newMap.push(found);
+                      }
+                      setMentionMap(newMap);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (mentionState?.active) {
+                      const total = mentionState.matched.length;
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setMentionSelectedIndex((idx) =>
+                          idx + 1 < total ? idx + 1 : 0
+                        );
+                        return;
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setMentionSelectedIndex((idx) =>
+                          idx - 1 >= 0 ? idx - 1 : total - 1
+                        );
+                        return;
+                      }
+                      if (e.key === "Enter" || e.key === "Tab") {
+                        if (total === 0) return;
+                        e.preventDefault();
+                        if (mentionState.matched[mentionSelectedIndex]) {
+                          handleMentionSelect(
+                            mentionState.matched[mentionSelectedIndex]
+                          );
+                        }
+                        return;
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setMentionState(null);
+                        return;
+                      }
+                    }
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  onSelect={(e) => {
+                    const target = e.target as HTMLTextAreaElement;
+                    const pos = target.selectionStart ?? 0;
+                    setCursorPos(pos);
+                    const state = detectMention(
+                      target.value,
+                      pos,
+                      mentionTargets
+                    );
+                    setMentionState(state);
+                    setMentionSelectedIndex(0);
+                  }}
+                  disabled={sending}
+                />
+                <div className="flex items-center justify-between px-3 pb-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files) handleFiles(e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading || sending}
+                      className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors disabled:opacity-50"
+                      aria-label={t("channel.attach-file")}
+                    >
+                      {uploading ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Paperclip className="size-4" />
+                      )}
+                    </button>
+                    <span className="text-xs text-control-placeholder">
+                      {t("chat.send-hint")}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    size="xs"
+                    onClick={handleSend}
+                    disabled={
+                      (!input.trim() && pendingAttachments.length === 0) ||
+                      sending
+                    }
+                  >
+                    <Send className="size-3" />
+                    {t("common.send")}
+                  </Button>
+                </div>
+              </div>
+              {mentionState?.active && textareaRef.current && (
+                <MentionPopup
+                  id={MENTION_POPUP_ID}
+                  targets={mentionState.matched}
+                  query={mentionState.query}
+                  position={getCaretCoordinates(textareaRef.current, cursorPos)}
+                  selectedIndex={mentionSelectedIndex}
+                  onSelect={handleMentionSelect}
+                  onClose={() => setMentionState(null)}
+                />
+              )}
+            </div>
+          </div>
         </div>
+        {threadRootOpen && (
+          <ThreadPanel
+            channelId={channelId ?? ""}
+            channelTitle={channel?.title ?? channelId ?? ""}
+            rootMessageId={threadRootOpen}
+            onClose={closeThread}
+            onViewInChannel={handleViewInChannel}
+          />
+        )}
       </div>
 
       {/* Members Sheet */}

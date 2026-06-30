@@ -475,6 +475,59 @@ func local_request_CommandService_ListConversationMessages_0(ctx context.Context
 	return msg, metadata, err
 }
 
+var filter_CommandService_ListThreadMessages_0 = &utilities.DoubleArray{Encoding: map[string]int{"conversation": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
+
+func request_CommandService_ListThreadMessages_0(ctx context.Context, marshaler runtime.Marshaler, client CommandServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListThreadMessagesRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	val, ok := pathParams["conversation"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "conversation")
+	}
+	protoReq.Conversation, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "conversation", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_CommandService_ListThreadMessages_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.ListThreadMessages(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_CommandService_ListThreadMessages_0(ctx context.Context, marshaler runtime.Marshaler, server CommandServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListThreadMessagesRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	val, ok := pathParams["conversation"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "conversation")
+	}
+	protoReq.Conversation, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "conversation", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_CommandService_ListThreadMessages_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.ListThreadMessages(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 func request_CommandService_CreateChannel_0(ctx context.Context, marshaler runtime.Marshaler, client CommandServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq CreateChannelRequest
@@ -960,6 +1013,27 @@ func local_request_CommandService_ListChannelUpdates_0(ctx context.Context, mars
 	return msg, metadata, err
 }
 
+func request_CommandService_ListThreadUpdates_0(ctx context.Context, marshaler runtime.Marshaler, client CommandServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListThreadUpdatesRequest
+		metadata runtime.ServerMetadata
+	)
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	msg, err := client.ListThreadUpdates(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_CommandService_ListThreadUpdates_0(ctx context.Context, marshaler runtime.Marshaler, server CommandServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListThreadUpdatesRequest
+		metadata runtime.ServerMetadata
+	)
+	msg, err := server.ListThreadUpdates(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 func request_CommandService_AckProcessedVersion_0(ctx context.Context, marshaler runtime.Marshaler, client CommandServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq AckProcessedVersionRequest
@@ -1269,6 +1343,26 @@ func RegisterCommandServiceHandlerServer(ctx context.Context, mux *runtime.Serve
 		}
 		forward_CommandService_ListConversationMessages_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_CommandService_ListThreadMessages_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.CommandService/ListThreadMessages", runtime.WithHTTPPathPattern("/v1/{conversation=conversations/*}/threads"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_CommandService_ListThreadMessages_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_CommandService_ListThreadMessages_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodPost, pattern_CommandService_CreateChannel_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -1488,6 +1582,26 @@ func RegisterCommandServiceHandlerServer(ctx context.Context, mux *runtime.Serve
 			return
 		}
 		forward_CommandService_ListChannelUpdates_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_CommandService_ListThreadUpdates_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.CommandService/ListThreadUpdates", runtime.WithHTTPPathPattern("/v1/agents/-/threadUpdates"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_CommandService_ListThreadUpdates_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_CommandService_ListThreadUpdates_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodPost, pattern_CommandService_AckProcessedVersion_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -1759,6 +1873,23 @@ func RegisterCommandServiceHandlerClient(ctx context.Context, mux *runtime.Serve
 		}
 		forward_CommandService_ListConversationMessages_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_CommandService_ListThreadMessages_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.CommandService/ListThreadMessages", runtime.WithHTTPPathPattern("/v1/{conversation=conversations/*}/threads"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_CommandService_ListThreadMessages_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_CommandService_ListThreadMessages_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodPost, pattern_CommandService_CreateChannel_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -1946,6 +2077,23 @@ func RegisterCommandServiceHandlerClient(ctx context.Context, mux *runtime.Serve
 		}
 		forward_CommandService_ListChannelUpdates_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_CommandService_ListThreadUpdates_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.CommandService/ListThreadUpdates", runtime.WithHTTPPathPattern("/v1/agents/-/threadUpdates"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_CommandService_ListThreadUpdates_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_CommandService_ListThreadUpdates_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodPost, pattern_CommandService_AckProcessedVersion_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -2011,6 +2159,7 @@ var (
 	pattern_CommandService_GetCommandContext_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "agents", "commands", "name", "context"}, ""))
 	pattern_CommandService_GetOrCreateConversation_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "agents", "agent", "conversations"}, ""))
 	pattern_CommandService_ListConversationMessages_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "conversations", "conversation", "messages"}, ""))
+	pattern_CommandService_ListThreadMessages_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "conversations", "conversation", "threads"}, ""))
 	pattern_CommandService_CreateChannel_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "channels"}, ""))
 	pattern_CommandService_ListChannels_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "channels"}, ""))
 	pattern_CommandService_GetChannel_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "conversations", "name"}, ""))
@@ -2022,6 +2171,7 @@ var (
 	pattern_CommandService_SendMessage_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "conversations", "conversation", "messages"}, "send"))
 	pattern_CommandService_PostMessage_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "conversations", "conversation"}, "postMessage"))
 	pattern_CommandService_ListChannelUpdates_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"v1", "agents", "-", "channelUpdates"}, ""))
+	pattern_CommandService_ListThreadUpdates_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"v1", "agents", "-", "threadUpdates"}, ""))
 	pattern_CommandService_AckProcessedVersion_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "conversations", "conversation"}, "ackProcessedVersion"))
 	pattern_CommandService_FetchConversationActivity_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "conversations", "conversation", "activity"}, ""))
 	pattern_CommandService_MarkConversationRead_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "conversations", "conversation"}, "markRead"))
@@ -2038,6 +2188,7 @@ var (
 	forward_CommandService_GetCommandContext_0         = runtime.ForwardResponseMessage
 	forward_CommandService_GetOrCreateConversation_0   = runtime.ForwardResponseMessage
 	forward_CommandService_ListConversationMessages_0  = runtime.ForwardResponseMessage
+	forward_CommandService_ListThreadMessages_0        = runtime.ForwardResponseMessage
 	forward_CommandService_CreateChannel_0             = runtime.ForwardResponseMessage
 	forward_CommandService_ListChannels_0              = runtime.ForwardResponseMessage
 	forward_CommandService_GetChannel_0                = runtime.ForwardResponseMessage
@@ -2049,6 +2200,7 @@ var (
 	forward_CommandService_SendMessage_0               = runtime.ForwardResponseMessage
 	forward_CommandService_PostMessage_0               = runtime.ForwardResponseMessage
 	forward_CommandService_ListChannelUpdates_0        = runtime.ForwardResponseMessage
+	forward_CommandService_ListThreadUpdates_0         = runtime.ForwardResponseMessage
 	forward_CommandService_AckProcessedVersion_0       = runtime.ForwardResponseMessage
 	forward_CommandService_FetchConversationActivity_0 = runtime.ForwardResponseMessage
 	forward_CommandService_MarkConversationRead_0      = runtime.ForwardResponseMessage

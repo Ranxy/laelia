@@ -31,6 +31,12 @@ export interface ChatMessageUI {
   senderType?: number;
   mentions?: Mention[];
   attachments?: Attachment[];
+  // threadRoot is the bare UUID of the thread's root message; set on thread
+  // replies, absent on main-channel messages and on roots themselves.
+  threadRoot?: string;
+  // threadReplyCount is the number of replies under this message; set on root
+  // messages, 0/absent otherwise. Drives the "N replies · View thread" entry.
+  threadReplyCount?: number;
 }
 
 export interface AuthSlice {
@@ -197,11 +203,37 @@ export interface ChannelSlice {
   ) => Promise<void>;
 }
 
+// ThreadSlice owns the right-side thread panel state: per-thread cached
+// messages + current_version, the active thread root (which thread panel is
+// open), and the per-thread polling watchers. Thread roots/reply ids are bare
+// UUIDs (the backend uses chat_message.id, not a resource name). The active
+// thread panel is scoped to one conversation at a time (activeThreadConversation).
+export interface ThreadSlice {
+  threadByRoot: Record<
+    string,
+    { messages: ChatMessageUI[]; currentVersion: bigint; loading: boolean }
+  >;
+  activeThreadRoot: string | null;
+  activeThreadConversation: string | null;
+  threadWatchers: Record<string, ReturnType<typeof setInterval>>;
+
+  openThread: (conversation: string, rootMessageId: string) => Promise<void>;
+  closeThread: () => void;
+  sendThreadMessage: (
+    conversationId: string,
+    rootMessageId: string,
+    content: string,
+    mentions?: Mention[],
+    attachments?: Attachment[]
+  ) => Promise<ChatMessage>;
+}
+
 export type AppStoreState = AuthSlice &
   AgentSlice &
   CommandSlice &
   ChatSlice &
   ChannelSlice &
+  ThreadSlice &
   UserSlice;
 
 export type AppSliceCreator<Slice> = StateCreator<AppStoreState, [], [], Slice>;

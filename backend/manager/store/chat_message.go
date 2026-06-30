@@ -42,13 +42,21 @@ type ChatMessage struct {
 	SenderType  int32
 	Mentions    []*v1pb.Mention
 	Attachments []*v1pb.Attachment
+	// ThreadRootMessageID is the root message of the thread this message belongs
+	// to. Valid (non-NULL) only for thread replies; root messages and normal
+	// channel messages have it NULL.
+	ThreadRootMessageID uuid.NullUUID
+	// ThreadReplyCount is the number of replies in the thread rooted at this
+	// message. Populated only for root messages by ListConversationMessages; 0
+	// otherwise.
+	ThreadReplyCount int32
 }
 
 // chatMessageScanner scans a chat_message row from the common column order
 // produced by scanChatMessageRow: id, conversation_id, principal_id,
 // principal_name, sender_agent_id, agent_resource_id, agent_name, role,
 // content, command_id, created_at, room_version, sender_type, mentions,
-// attachments.
+// attachments, thread_root_message_id.
 func scanChatMessageRow(row interface {
 	Scan(dest ...any) error
 }) (*ChatMessage, error) {
@@ -59,7 +67,7 @@ func scanChatMessageRow(row interface {
 		&msg.ID, &msg.ConversationID, &msg.PrincipalID, &msg.PrincipalName,
 		&msg.SenderAgentID, &msg.AgentResourceID, &msg.AgentName,
 		&msg.Role, &msg.Content, &msg.CommandID, &msg.CreatedAt, &msg.RoomVersion, &msg.SenderType,
-		&mentionsBytes, &attachmentsBytes,
+		&mentionsBytes, &attachmentsBytes, &msg.ThreadRootMessageID,
 	); err != nil {
 		return nil, errors.Wrapf(err, "failed to scan chat message")
 	}
@@ -82,7 +90,7 @@ func scanChatMessageRow(row interface {
 
 const chatMessageColumns = `cm.id, cm.conversation_id, cm.principal_id, COALESCE(p.name, ''),
        cm.sender_agent_id, COALESCE(a.resource_id, ''), COALESCE(a.name, ''),
-       cm.role, cm.content, cm.command_id, cm.created_at, cm.room_version, cm.sender_type, cm.mentions, cm.attachments`
+       cm.role, cm.content, cm.command_id, cm.created_at, cm.room_version, cm.sender_type, cm.mentions, cm.attachments, cm.thread_root_message_id`
 
 func (s *Store) CreateChatMessage(ctx context.Context, msg *ChatMessage) (*ChatMessage, error) {
 	var id uuid.UUID
@@ -98,29 +106,30 @@ func (s *Store) CreateChatMessage(ctx context.Context, msg *ChatMessage) (*ChatM
 		return nil, err
 	}
 	err = s.GetDB().QueryRowContext(ctx, `
-		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions, attachments)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions, attachments, thread_root_message_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, created_at, room_version
-	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, msg.RoomVersion, msg.SenderType, mentionsBytes, attachmentsBytes).Scan(&id, &createdAt, &roomVersion)
+	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, msg.RoomVersion, msg.SenderType, mentionsBytes, attachmentsBytes, msg.ThreadRootMessageID).Scan(&id, &createdAt, &roomVersion)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create chat message")
 	}
 
 	return &ChatMessage{
-		ID:              id,
-		ConversationID:  msg.ConversationID,
-		PrincipalID:     msg.PrincipalID,
-		PrincipalName:   msg.PrincipalName,
-		SenderAgentID:   msg.SenderAgentID,
-		AgentResourceID: msg.AgentResourceID,
-		Role:            msg.Role,
-		Content:         msg.Content,
-		CommandID:       msg.CommandID,
-		CreatedAt:       createdAt,
-		RoomVersion:     roomVersion,
-		SenderType:      msg.SenderType,
-		Mentions:        msg.Mentions,
-		Attachments:     msg.Attachments,
+		ID:                  id,
+		ConversationID:      msg.ConversationID,
+		PrincipalID:         msg.PrincipalID,
+		PrincipalName:       msg.PrincipalName,
+		SenderAgentID:       msg.SenderAgentID,
+		AgentResourceID:     msg.AgentResourceID,
+		Role:                msg.Role,
+		Content:             msg.Content,
+		CommandID:           msg.CommandID,
+		CreatedAt:           createdAt,
+		RoomVersion:         roomVersion,
+		SenderType:          msg.SenderType,
+		Mentions:            msg.Mentions,
+		Attachments:         msg.Attachments,
+		ThreadRootMessageID: msg.ThreadRootMessageID,
 	}, nil
 }
 
@@ -165,10 +174,10 @@ func (s *Store) CreateChatMessageBumpVersion(ctx context.Context, msg *ChatMessa
 	var id uuid.UUID
 	var createdAt time.Time
 	if err := tx.QueryRowContext(ctx, `
-		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions, attachments)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions, attachments, thread_root_message_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, created_at
-	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, newVersion, msg.SenderType, mentionsBytes, attachmentsBytes).Scan(&id, &createdAt); err != nil {
+	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, newVersion, msg.SenderType, mentionsBytes, attachmentsBytes, msg.ThreadRootMessageID).Scan(&id, &createdAt); err != nil {
 		return nil, 0, errors.Wrapf(err, "failed to create chat message")
 	}
 
@@ -177,20 +186,21 @@ func (s *Store) CreateChatMessageBumpVersion(ctx context.Context, msg *ChatMessa
 	}
 
 	return &ChatMessage{
-		ID:              id,
-		ConversationID:  msg.ConversationID,
-		PrincipalID:     msg.PrincipalID,
-		PrincipalName:   msg.PrincipalName,
-		SenderAgentID:   msg.SenderAgentID,
-		AgentResourceID: msg.AgentResourceID,
-		Role:            msg.Role,
-		Content:         msg.Content,
-		CommandID:       msg.CommandID,
-		CreatedAt:       createdAt,
-		RoomVersion:     newVersion,
-		SenderType:      msg.SenderType,
-		Mentions:        msg.Mentions,
-		Attachments:     msg.Attachments,
+		ID:                  id,
+		ConversationID:      msg.ConversationID,
+		PrincipalID:         msg.PrincipalID,
+		PrincipalName:       msg.PrincipalName,
+		SenderAgentID:       msg.SenderAgentID,
+		AgentResourceID:     msg.AgentResourceID,
+		Role:                msg.Role,
+		Content:             msg.Content,
+		CommandID:           msg.CommandID,
+		CreatedAt:           createdAt,
+		RoomVersion:         newVersion,
+		SenderType:          msg.SenderType,
+		Mentions:            msg.Mentions,
+		Attachments:         msg.Attachments,
+		ThreadRootMessageID: msg.ThreadRootMessageID,
 	}, newVersion, nil
 }
 
@@ -225,7 +235,7 @@ func (s *Store) ListConversationMessages(ctx context.Context, conversationID uui
 		FROM chat_message cm
 		JOIN principal p ON p.id = cm.principal_id
 		LEFT JOIN agent a ON a.id = cm.sender_agent_id
-		WHERE cm.conversation_id = $1` + whereClause + orderClause + `
+		WHERE cm.conversation_id = $1 AND cm.thread_root_message_id IS NULL` + whereClause + orderClause + `
 		LIMIT $` + itoa(argIdx) + ` OFFSET $` + itoa(argIdx+1)
 	args = append(args, limit, offset)
 
@@ -256,6 +266,12 @@ func (s *Store) ListConversationMessages(ctx context.Context, conversationID uui
 		}
 	}
 
+	// Populate thread_reply_count on each root message so the frontend can
+	// render the reply-count badge. One grouped query for the page's roots.
+	if err := s.fillThreadReplyCounts(ctx, msgs); err != nil {
+		return nil, 0, err
+	}
+
 	var currentVersion int64
 	if err := s.GetDB().QueryRowContext(ctx,
 		`SELECT version FROM conversation WHERE id = $1`, conversationID,
@@ -266,8 +282,157 @@ func (s *Store) ListConversationMessages(ctx context.Context, conversationID uui
 	return msgs, currentVersion, nil
 }
 
+// fillThreadReplyCounts populates ThreadReplyCount on each root message in
+// msgs (messages whose ThreadRootMessageID is NULL) by counting the replies
+// that point at them. Thread replies in msgs keep count 0. One grouped query
+// covers the page; a nil/empty input is a no-op.
+func (s *Store) fillThreadReplyCounts(ctx context.Context, msgs []*ChatMessage) error {
+	var roots []uuid.UUID
+	for _, m := range msgs {
+		if m == nil || m.ThreadRootMessageID.Valid {
+			continue
+		}
+		roots = append(roots, m.ID)
+	}
+	if len(roots) == 0 {
+		return nil
+	}
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT thread_root_message_id, count(*)
+		FROM chat_message
+		WHERE thread_root_message_id = ANY($1)
+		GROUP BY thread_root_message_id
+	`, roots)
+	if err != nil {
+		return errors.Wrapf(err, "failed to count thread replies")
+	}
+	defer rows.Close()
+	counts := make(map[uuid.UUID]int32, len(roots))
+	for rows.Next() {
+		var rootID uuid.UUID
+		var cnt int32
+		if err := rows.Scan(&rootID, &cnt); err != nil {
+			return errors.Wrapf(err, "failed to scan thread reply count")
+		}
+		counts[rootID] = cnt
+	}
+	if err := rows.Err(); err != nil {
+		return errors.Wrapf(err, "failed to iterate thread reply counts")
+	}
+	for _, m := range msgs {
+		if m == nil || m.ThreadRootMessageID.Valid {
+			continue
+		}
+		m.ThreadReplyCount = counts[m.ID]
+	}
+	return nil
+}
+
+// ListThreadMessages returns the root message followed by its replies, in
+// room_version order. The root is always the first element so a reader has
+// the thread context. The cursor model mirrors ListConversationMessages but
+// applies to replies only (the root is always included):
+//   - afterVersion > 0: replies with room_version > afterVersion (chronological tail);
+//   - beforeVersion > 0: a page of replies with room_version < beforeVersion;
+//   - neither: the newest N replies.
+//
+// Returns (root+replies, currentVersion, error). rootID must belong to
+// conversationID; otherwise the root is not found and an error is returned.
+func (s *Store) ListThreadMessages(ctx context.Context, conversationID, rootID uuid.UUID, afterVersion, beforeVersion int64, limit, offset int) ([]*ChatMessage, int64, error) {
+	if afterVersion > 0 && beforeVersion > 0 {
+		return nil, 0, errors.New("after_version and before_version are mutually exclusive")
+	}
+
+	// The root message is always included (first element) regardless of the
+	// cursor, so the reader has the thread context even on a delta read.
+	rootRow := s.GetDB().QueryRowContext(ctx, `SELECT `+chatMessageColumns+`
+		FROM chat_message cm
+		JOIN principal p ON p.id = cm.principal_id
+		LEFT JOIN agent a ON a.id = cm.sender_agent_id
+		WHERE cm.id = $1 AND cm.conversation_id = $2 AND cm.thread_root_message_id IS NULL`,
+		rootID, conversationID)
+	root, err := scanChatMessageRow(rootRow)
+	if err != nil {
+		return nil, 0, errors.Wrapf(err, "failed to get thread root message")
+	}
+
+	var whereClause string
+	args := []any{rootID}
+	argIdx := 2
+	orderClause := ` ORDER BY cm.created_at DESC`
+	if afterVersion > 0 {
+		whereClause = ` AND cm.room_version > $` + itoa(argIdx)
+		args = append(args, afterVersion)
+		argIdx++
+		orderClause = ` ORDER BY cm.room_version ASC`
+	} else if beforeVersion > 0 {
+		whereClause = ` AND cm.room_version < $` + itoa(argIdx)
+		args = append(args, beforeVersion)
+		argIdx++
+		orderClause = ` ORDER BY cm.room_version DESC`
+	}
+
+	replyQuery := `SELECT ` + chatMessageColumns + `
+		FROM chat_message cm
+		JOIN principal p ON p.id = cm.principal_id
+		LEFT JOIN agent a ON a.id = cm.sender_agent_id
+		WHERE cm.thread_root_message_id = $1` + whereClause + orderClause + `
+		LIMIT $` + itoa(argIdx) + ` OFFSET $` + itoa(argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := s.GetDB().QueryContext(ctx, replyQuery, args...)
+	if err != nil {
+		return nil, 0, errors.Wrapf(err, "failed to list thread messages")
+	}
+	defer rows.Close()
+	var replies []*ChatMessage
+	for rows.Next() {
+		msg, scanErr := scanChatMessageRow(rows)
+		if scanErr != nil {
+			return nil, 0, scanErr
+		}
+		replies = append(replies, msg)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, errors.Wrapf(err, "failed to iterate thread messages")
+	}
+	// Chronological order for the DESC paths; afterVersion is already ASC.
+	if afterVersion == 0 {
+		for i, j := 0, len(replies)-1; i < j; i, j = i+1, j-1 {
+			replies[i], replies[j] = replies[j], replies[i]
+		}
+	}
+
+	var currentVersion int64
+	if err := s.GetDB().QueryRowContext(ctx,
+		`SELECT version FROM conversation WHERE id = $1`, conversationID,
+	).Scan(&currentVersion); err != nil {
+		return nil, 0, errors.Wrapf(err, "failed to get conversation version")
+	}
+
+	return append([]*ChatMessage{root}, replies...), currentVersion, nil
+}
+
 func itoa(n int) string {
 	return strconv.Itoa(n)
+}
+
+// IsThreadRoot reports whether rootID is a root message in conversationID —
+// i.e. a chat_message row with that id and conversation, whose
+// thread_root_message_id is NULL (so it can anchor a thread). Used by
+// SendMessage/PostMessage to validate a thread_root before inserting a reply.
+func (s *Store) IsThreadRoot(ctx context.Context, conversationID, rootID uuid.UUID) (bool, error) {
+	var exists bool
+	err := s.GetDB().QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM chat_message
+			WHERE id = $1 AND conversation_id = $2 AND thread_root_message_id IS NULL
+		)
+	`, rootID, conversationID).Scan(&exists)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to check thread root")
+	}
+	return exists, nil
 }
 
 func (s *Store) GetRecentChatMessages(ctx context.Context, conversationID uuid.UUID, limit int) ([]*ChatMessage, error) {
