@@ -253,7 +253,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
           className={cn(
             "rounded-2xl text-sm leading-relaxed",
             isUser
-              ? "bg-accent text-accent-foreground rounded-tr-sm px-4 py-2.5 max-w-[80%]"
+              ? "bg-control-bg/60 text-main rounded-tr-sm px-4 py-2.5 max-w-[80%]"
               : displayContent || isStreaming
                 ? "bg-control-bg/60 text-main rounded-tl-sm px-4 py-3 max-w-[80%]"
                 : "hidden"
