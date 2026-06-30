@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	errs "github.com/pkg/errors"
 
 	"github.com/Ranxy/laelia/backend/common"
@@ -455,6 +456,12 @@ func signAgentToken(agentName string, resourceID string, tokenVersion int, token
 		SessionID:    sessionID,
 		TokenFamily:  tokenFamily,
 		RegisteredClaims: jwt.RegisteredClaims{
+			// jti makes every minted token unique. Without it, two tokens
+			// minted for the same agent in the same second (e.g. a refresh
+			// followed immediately by a connect) are byte-identical, hash to
+			// the same idx_agent_token_hash, and violate the unique
+			// constraint on insert.
+			ID:        uuid.NewString(),
 			Audience:  jwt.ClaimStrings{aud},
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

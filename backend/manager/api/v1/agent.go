@@ -425,49 +425,64 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to create agent session, error: %v", err))
 	}
 
-	accessToken, err := auth.GenerateAgentTokenWithSession(updated.Name, updated.ResourceID, updated.TokenVersion, auth.TokenTypeAccess, sessionID, s.profile.Mode, s.secret, accessTokenDuration)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate access token, error: %v", err))
-	}
-
-	refreshToken, err := auth.GenerateAgentTokenWithSession(updated.Name, updated.ResourceID, updated.TokenVersion, auth.TokenTypeRefresh, "", s.profile.Mode, s.secret, refreshTokenDuration)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate refresh token, error: %v", err))
-	}
-
-	refreshTokenHash := hashToken(refreshToken)
-	if err := s.store.CreateAgentToken(ctx, &store.AgentTokenMessage{
-		AgentID:     agent.ID,
-		TokenHash:   refreshTokenHash,
-		TokenType:   storepb.AgentTokenType_REFRESH,
-		TokenFamily: tokenFamily,
-		State:       storepb.AgentTokenState_ACTIVE,
-		Fingerprint: req.Msg.Fingerprint,
-		ExpiresAt:   time.Now().Add(refreshTokenDuration),
-	}); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store refresh token, error: %v", err))
-	}
-
-	// The bootstrap token is single-use: once the connection has fully
-	// succeeded (agent updated, old sessions terminated, new session + tokens
-	// persisted), mark it CONSUMED so a leaked bootstrap token cannot be
-	// replayed within its validity window to kick the legitimate agent off.
+	// Mint the agent's initial access + refresh tokens only on the bootstrap
+	// (first connect) path. On a reconnect the agent authenticated via an
+	// access token it already holds from RefreshAgentToken, which also minted
+	// and persisted the current refresh token — so minting another refresh
+	// token here is redundant and was the source of both the
+	// idx_agent_token_hash collision (a second identical-token insert in the
+	// same second) and the unbounded growth of the refresh-token table.
+	accessToken := ""
+	refreshToken := ""
+	accessTokenExpiresAt := time.Time{}
 	if bootstrapTokenID != 0 {
+		accessToken, err = auth.GenerateAgentTokenWithSession(updated.Name, updated.ResourceID, updated.TokenVersion, auth.TokenTypeAccess, sessionID, s.profile.Mode, s.secret, accessTokenDuration)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate access token, error: %v", err))
+		}
+
+		refreshToken, err = auth.GenerateAgentTokenWithSession(updated.Name, updated.ResourceID, updated.TokenVersion, auth.TokenTypeRefresh, "", s.profile.Mode, s.secret, refreshTokenDuration)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate refresh token, error: %v", err))
+		}
+
+		refreshTokenHash := hashToken(refreshToken)
+		if err := s.store.CreateAgentToken(ctx, &store.AgentTokenMessage{
+			AgentID:     agent.ID,
+			TokenHash:   refreshTokenHash,
+			TokenType:   storepb.AgentTokenType_REFRESH,
+			TokenFamily: tokenFamily,
+			State:       storepb.AgentTokenState_ACTIVE,
+			Fingerprint: req.Msg.Fingerprint,
+			ExpiresAt:   time.Now().Add(refreshTokenDuration),
+		}); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store refresh token, error: %v", err))
+		}
+
+		accessTokenExpiresAt = time.Now().Add(accessTokenDuration)
+
+		// The bootstrap token is single-use: once the connection has fully
+		// succeeded (agent updated, old sessions terminated, new session + tokens
+		// persisted), mark it CONSUMED so a leaked bootstrap token cannot be
+		// replayed within its validity window to kick the legitimate agent off.
 		consumedAt := time.Now()
 		if err := s.store.UpdateAgentTokenState(ctx, bootstrapTokenID, storepb.AgentTokenState_CONSUMED, &consumedAt); err != nil {
 			slog.Warn("failed to consume bootstrap token after connect", "agent", agent.ResourceID, "error", err)
 		}
 	}
 
-	return connect.NewResponse(&v1pb.ConnectAgentResponse{
-		AccessToken:          accessToken,
-		RefreshToken:         refreshToken,
-		SessionId:            sessionID,
-		NextNonce:            nonce,
-		AccessTokenExpiresAt: timestamppb.New(time.Now().Add(accessTokenDuration)),
-		InitialStatus:        convertToV1AgentStatus(updated.Status, updated.Deleted),
-		AcpConfig:            convertToV1AgentACPConfig(storedAcpConfig),
-	}), nil
+	resp := &v1pb.ConnectAgentResponse{
+		SessionId:     sessionID,
+		NextNonce:     nonce,
+		InitialStatus: convertToV1AgentStatus(updated.Status, updated.Deleted),
+		AcpConfig:     convertToV1AgentACPConfig(storedAcpConfig),
+	}
+	if accessToken != "" {
+		resp.AccessToken = accessToken
+		resp.RefreshToken = refreshToken
+		resp.AccessTokenExpiresAt = timestamppb.New(accessTokenExpiresAt)
+	}
+	return connect.NewResponse(resp), nil
 }
 
 func (s *AgentService) AgentHeartbeat(ctx context.Context, req *connect.Request[v1pb.AgentHeartbeatRequest]) (*connect.Response[v1pb.AgentHeartbeatResponse], error) {
