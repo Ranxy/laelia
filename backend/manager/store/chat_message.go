@@ -202,15 +202,19 @@ func (s *Store) ListConversationMessages(ctx context.Context, conversationID uui
 	var whereClause string
 	args := []any{conversationID}
 	argIdx := 2
-	orderClause := ` ORDER BY cm.created_at ASC`
+	// afterVersion > 0 returns only the delta (room_version > afterVersion) in
+	// chronological (ASC) order — callers append it to their cached tail.
+	// beforeVersion > 0 and the no-version default both return the NEWEST N
+	// messages: DESC in SQL (reverse range scan on the room_version index for
+	// beforeVersion, newest-first by created_at for the default), then reversed
+	// below so callers always receive chronological order.
+	orderClause := ` ORDER BY cm.created_at DESC`
 	if afterVersion > 0 {
 		whereClause = ` AND cm.room_version > $` + itoa(argIdx)
 		args = append(args, afterVersion)
 		argIdx++
+		orderClause = ` ORDER BY cm.created_at ASC`
 	} else if beforeVersion > 0 {
-		// Fetch the most recent messages before the pivot in DESC order (uses
-		// idx_chat_message_room_version via a reverse range scan), then reverse
-		// below so callers always receive chronological order.
 		whereClause = ` AND cm.room_version < $` + itoa(argIdx)
 		args = append(args, beforeVersion)
 		argIdx++
@@ -243,8 +247,10 @@ func (s *Store) ListConversationMessages(ctx context.Context, conversationID uui
 		return nil, 0, errors.Wrapf(err, "failed to iterate chat messages")
 	}
 
-	// Restore chronological (oldest -> newest) order for the before path.
-	if beforeVersion > 0 {
+	// Restore chronological (oldest -> newest) order for the latest-first
+	// paths (before_version and the no-version default both queried DESC). The
+	// afterVersion delta path is already ASC and must not be reversed.
+	if afterVersion == 0 {
 		for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
 			msgs[i], msgs[j] = msgs[j], msgs[i]
 		}

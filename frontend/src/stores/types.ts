@@ -137,6 +137,12 @@ export interface ChatSlice {
   conversations: Record<string, string>;
   chatMessages: Record<string, ChatMessageUI[]>;
   chatLoading: Record<string, boolean>;
+  // Last-seen conversation.current_version per conversation, keyed by
+  // conversation name. Captured by loadMessages and advanced by the channel
+  // watcher; used as the afterVersion cursor so the watcher polls only for
+  // messages newer than what it has already seen instead of re-fetching the
+  // whole list every tick.
+  chatCurrentVersion: Record<string, bigint>;
 
   getOrCreateConversation: (agent: string) => Promise<string>;
   loadMessages: (conversation: string) => Promise<void>;

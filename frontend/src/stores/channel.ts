@@ -11,7 +11,7 @@ import {
   RemoveChannelMemberRequestSchema,
   SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
-import { mergeMessages, toUiMessage } from "./chat";
+import { appendNewMessages, toUiMessage } from "./chat";
 import type { AppSliceCreator, ChannelSlice, ChatMessageUI } from "./types";
 
 const WATCHER_POLL_INTERVAL_MS = 2000;
@@ -125,24 +125,41 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
 
     const poll = async () => {
       try {
+        // Incremental fetch: ask only for messages with room_version strictly
+        // after the last version we saw (captured by loadMessages). This returns
+        // a small delta (usually 0–2 messages) instead of the whole history, so
+        // large conversations no longer re-download and re-merge the entire list
+        // every tick. When no cursor is set yet (e.g. loadMessages failed) this
+        // falls back to afterVersion=0, which the backend serves as latest-N.
+        const afterVersion = get().chatCurrentVersion[conversationName] ?? 0n;
         const res = await commandServiceClient.listConversationMessages(
           create(ListConversationMessagesRequestSchema, {
             conversation: conversationName,
             pageSize: 200,
             pageToken: "",
+            afterVersion,
           })
         );
-        const uiMsgs: ChatMessageUI[] = (res.messages ?? []).map(toUiMessage);
-        // Reuse cached references for unchanged messages and skip the store
-        // update entirely when nothing changed, so polling does not churn the
-        // array identity (which would force a scroll snap and re-render).
+        const delta: ChatMessageUI[] = (res.messages ?? []).map(toUiMessage);
         const prev = get().chatMessages[conversationName] ?? [];
-        const merged = mergeMessages(prev, uiMsgs);
-        if (merged !== prev) {
+        // Append only messages we don't already have. This dedups the optimistic
+        // send already in the list against its server echo, and returns the same
+        // reference when nothing new arrived so subscribers bail out.
+        const merged = appendNewMessages(prev, delta);
+        const nextVersion = res.currentVersion;
+        const prevVersion = get().chatCurrentVersion[conversationName] ?? 0n;
+        if (merged !== prev || nextVersion !== prevVersion) {
           set((state) => ({
-            chatMessages: {
-              ...state.chatMessages,
-              [conversationName]: merged,
+            chatMessages:
+              merged !== prev
+                ? {
+                    ...state.chatMessages,
+                    [conversationName]: merged,
+                  }
+                : state.chatMessages,
+            chatCurrentVersion: {
+              ...state.chatCurrentVersion,
+              [conversationName]: nextVersion,
             },
           }));
         }

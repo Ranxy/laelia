@@ -9,12 +9,13 @@ import { toUiMessage } from "./chat-helpers";
 import type { AppSliceCreator, ChatMessageUI, ChatSlice } from "./types";
 
 // Re-export so existing `./chat` imports of these helpers keep working.
-export { mergeMessages, toUiMessage } from "./chat-helpers";
+export { appendNewMessages, toUiMessage } from "./chat-helpers";
 
 export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
   conversations: {},
   chatMessages: {},
   chatLoading: {},
+  chatCurrentVersion: {},
   async getOrCreateConversation(agent) {
     const existing = get().conversations[agent];
     if (existing) return existing;
@@ -33,6 +34,10 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       chatLoading: { ...state.chatLoading, [conversation]: true },
     }));
     try {
+      // No version filter: the backend returns the latest N messages in
+      // chronological order (newest at the bottom), plus the conversation's
+      // current_version. We cache that version so the channel watcher can poll
+      // incrementally (after_version) instead of re-fetching the whole list.
       const res = await commandServiceClient.listConversationMessages(
         create(ListConversationMessagesRequestSchema, {
           conversation,
@@ -45,6 +50,10 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
 
       set((state) => ({
         chatMessages: { ...state.chatMessages, [conversation]: uiMsgs },
+        chatCurrentVersion: {
+          ...state.chatCurrentVersion,
+          [conversation]: res.currentVersion,
+        },
         chatLoading: { ...state.chatLoading, [conversation]: false },
       }));
     } catch {

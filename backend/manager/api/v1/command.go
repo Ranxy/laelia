@@ -568,26 +568,40 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 		return nil, err
 	}
 
-	// before_version: one-shot history lookup of the `limit` messages immediately
-	// before the pivot (no backward page token). The store returns them in
-	// chronological order.
+	// Three read modes, all returned in chronological (oldest -> newest) order:
+	//   - before_version: one-shot history lookup of the `limit` messages
+	//     immediately before the pivot (no backward page token).
+	//   - after_version: incremental delta (room_version > after_version),
+	//     paginated with a forward page token.
+	//   - neither (default): one-shot latest-N — the newest `limit` messages,
+	//     so opening a conversation shows recent history, not the oldest page.
 	var msgs []*store.ChatMessage
 	var currentVersion int64
-	if req.Msg.BeforeVersion > 0 {
+	switch {
+	case req.Msg.BeforeVersion > 0:
 		msgs, currentVersion, err = s.store.ListConversationMessages(ctx, convID, 0, req.Msg.BeforeVersion, offset.limit, 0)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list conversation messages"))
 		}
-	} else {
+	case req.Msg.AfterVersion > 0:
 		limitPlusOne := offset.limit + 1
 		msgs, currentVersion, err = s.store.ListConversationMessages(ctx, convID, req.Msg.AfterVersion, 0, limitPlusOne, offset.offset)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list conversation messages"))
 		}
+	default:
+		msgs, currentVersion, err = s.store.ListConversationMessages(ctx, convID, 0, 0, offset.limit, 0)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list conversation messages"))
+		}
 	}
 
+	// Forward pagination only applies to the after_version delta path: the store
+	// returned one extra (limit+1) as a "has more" indicator, which we trim. The
+	// before_version and default latest-N paths are one-shot (no +1), so len(msgs)
+	// never reaches offset.limit+1 and this is a no-op for them.
 	nextPageToken := ""
-	if req.Msg.BeforeVersion == 0 && len(msgs) == offset.limit+1 {
+	if req.Msg.BeforeVersion == 0 && req.Msg.AfterVersion > 0 && len(msgs) == offset.limit+1 {
 		msgs = msgs[:offset.limit]
 		nextPageToken, _ = offset.getNextPageToken()
 	}

@@ -21,59 +21,20 @@ export function toUiMessage(msg: ChatMessage): ChatMessageUI {
   };
 }
 
-// sameArray compares two arrays by value (length + serialized elements).
-// proto-es repeated fields are always arrays, but UI messages created locally
-// (e.g. optimistic user messages) may leave the field undefined; treat missing
-// as empty so a backend round-trip that adds nothing is still "unchanged".
-function sameArray(
-  a: unknown[] | undefined,
-  b: unknown[] | undefined
-): boolean {
-  const aa = a ?? [];
-  const bb = b ?? [];
-  if (aa.length !== bb.length) return false;
-  return aa.every((v, i) => JSON.stringify(v) === JSON.stringify(bb[i]));
-}
-
-// messagesEqual is a value comparison across every field the UI renders. It is
-// deliberately field-by-field so that a backend round-trip that only adds
-// attachments or mentions (leaving content/role untouched) is detected as a
-// change and the new object is propagated to subscribers.
-function messagesEqual(a: ChatMessageUI, b: ChatMessageUI): boolean {
-  return (
-    a.content === b.content &&
-    a.role === b.role &&
-    a.senderName === b.senderName &&
-    a.senderType === b.senderType &&
-    (a.commandId ?? "") === (b.commandId ?? "") &&
-    a.timestamp.getTime() === b.timestamp.getTime() &&
-    sameArray(a.mentions, b.mentions) &&
-    sameArray(a.attachments, b.attachments)
-  );
-}
-
-// mergeMessages reconciles a freshly polled message list with the cached one.
-// Unchanged messages keep their previous object reference so React.memo can skip
-// re-rendering them, and an unchanged list returns the exact same reference so
-// the store setter (and its subscribers) can bail out entirely.
-export function mergeMessages(
+// appendNewMessages appends the messages from `delta` whose id is not already
+// present in `prev`, preserving delta order. It is the incremental companion to
+// the cursor-based watcher: each poll fetches only messages newer than the last
+// seen room_version (a small delta), so reconciliation is a dedup-and-append
+// rather than a full-list re-merge. Returns the exact same reference as `prev`
+// when nothing was added, so the store setter (and its subscribers) can bail out
+// entirely and polling does not churn the array identity.
+export function appendNewMessages(
   prev: ChatMessageUI[],
-  next: ChatMessageUI[]
+  delta: ChatMessageUI[]
 ): ChatMessageUI[] {
-  if (prev.length === 0 || next.length === 0) return next;
-  if (prev[0].id !== next[0].id) return next;
-
-  const prevById = new Map(prev.map((m) => [m.id, m]));
-  let changed = false;
-  const out: ChatMessageUI[] = [];
-  for (const n of next) {
-    const p = prevById.get(n.id);
-    if (p && messagesEqual(p, n)) {
-      out.push(p);
-    } else {
-      out.push(n);
-      changed = true;
-    }
-  }
-  return changed || out.length !== prev.length ? out : prev;
+  if (delta.length === 0) return prev;
+  const seen = new Set(prev.map((m) => m.id));
+  const fresh = delta.filter((m) => !seen.has(m.id));
+  if (fresh.length === 0) return prev;
+  return [...prev, ...fresh];
 }

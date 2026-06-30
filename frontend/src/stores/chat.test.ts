@@ -6,7 +6,7 @@ import {
   ChatMessageSchema,
   MentionSchema,
 } from "@/types/proto-es/v1/command_pb";
-import { mergeMessages, toUiMessage } from "./chat";
+import { appendNewMessages, toUiMessage } from "./chat";
 
 // A fixed timestamp shared across fixtures so unchanged round-trips produce
 // equal Date values (timestampDate(ts) is deterministic for a given input).
@@ -42,69 +42,49 @@ function buildMessage(
   });
 }
 
-describe("mergeMessages", () => {
-  it("detects an attachment added to an existing message", () => {
-    const prev = [toUiMessage(buildMessage())];
-    const next = [
-      toUiMessage(
-        buildMessage({
-          attachments: [
-            create(AttachmentSchema, {
-              id: "att-1",
-              name: "file.txt",
-              mimeType: "text/plain",
-              sizeBytes: 4n,
-            }),
-          ],
-        })
-      ),
+describe("appendNewMessages", () => {
+  it("appends delta messages whose id is not already present, in order", () => {
+    const prev = [toUiMessage(buildMessage({ name: "m1" }))];
+    const delta = [
+      toUiMessage(buildMessage({ name: "m2", content: "second" })),
+      toUiMessage(buildMessage({ name: "m3", content: "third" })),
     ];
 
-    const merged = mergeMessages(prev, next);
+    const merged = appendNewMessages(prev, delta);
 
-    // A change was detected: the array reference changed and the new object
-    // (carrying the attachment) replaced the stale one.
     expect(merged).not.toBe(prev);
-    expect(merged[0]).toBe(next[0]);
-    expect(merged[0].attachments).toHaveLength(1);
-    expect(merged[0].attachments?.[0].id).toBe("att-1");
+    expect(merged.map((m) => m.id)).toEqual(["m1", "m2", "m3"]);
   });
 
-  it("detects a mention added to an existing message", () => {
-    const prev = [toUiMessage(buildMessage())];
-    const next = [
-      toUiMessage(
-        buildMessage({
-          mentions: [
-            create(MentionSchema, {
-              type: "user",
-              id: "users/2",
-              name: "Alice",
-            }),
-          ],
-        })
-      ),
+  it("skips delta messages already in prev (optimistic-send echo dedup)", () => {
+    // The optimistic send already appended the user message with its real
+    // server id; the watcher's after-version delta echoes it back. The dedup
+    // must keep the optimistic copy and drop the echo, then append only the
+    // genuinely new agent reply.
+    const optimistic = toUiMessage(buildMessage({ name: "m1", content: "hi" }));
+    const prev = [optimistic];
+    const delta = [
+      toUiMessage(buildMessage({ name: "m1", content: "hi" })),
+      toUiMessage(buildMessage({ name: "m2", role: 2, content: "reply" })),
     ];
 
-    const merged = mergeMessages(prev, next);
+    const merged = appendNewMessages(prev, delta);
 
     expect(merged).not.toBe(prev);
-    expect(merged[0]).toBe(next[0]);
-    expect(merged[0].mentions).toHaveLength(1);
-    expect(merged[0].mentions?.[0].id).toBe("users/2");
+    expect(merged).toHaveLength(2);
+    // The existing message keeps its reference (no duplicate, no replacement).
+    expect(merged[0]).toBe(optimistic);
+    expect(merged[1].id).toBe("m2");
   });
 
-  it("preserves object identity for unchanged messages", () => {
-    // Two independent backend round-trips with identical fields.
-    const prev = [toUiMessage(buildMessage())];
-    const next = [toUiMessage(buildMessage())];
-
-    const merged = mergeMessages(prev, next);
-
-    // No field changed: the whole array reference is preserved...
-    expect(merged).toBe(prev);
-    // ...and so is the per-message reference (React.memo skips re-render).
-    expect(merged[0]).toBe(prev[0]);
+  it("returns the same reference when nothing was added", () => {
+    const prev = [toUiMessage(buildMessage({ name: "m1" }))];
+    // Empty delta — a poll that found no new messages.
+    expect(appendNewMessages(prev, [])).toBe(prev);
+    // Delta whose ids are all already present.
+    expect(
+      appendNewMessages(prev, [toUiMessage(buildMessage({ name: "m1" }))])
+    ).toBe(prev);
   });
 });
 
