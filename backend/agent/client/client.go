@@ -276,8 +276,17 @@ func (c *Client) Disconnect(ctx context.Context) error {
 	req.Header().Set("Authorization", "Bearer "+token)
 
 	_, err := c.client.AgentDisconnect(ctx, req)
-	c.credential.DeleteRefreshToken()
 
+	// Keep the persisted refresh token. The bootstrap token is single-use
+	// (CONSUMED on the first successful connect), so the refresh token is the
+	// only credential that can reconnect after a clean restart or a transient
+	// stream/heartbeat failure. Wiping it here left the agent with nothing but
+	// the already-consumed bootstrap token, so every reconnect failed with
+	// "bootstrap token is not active". The on-disk token is always the latest
+	// active one (SaveRefreshToken overwrites it on each rotation); permanent
+	// decommission is handled server-side via RotateAgentToken/RevokeAgentToken,
+	// which revoke the whole family and bump the token version, making any
+	// lingering on-disk token useless.
 	c.mu.Lock()
 	c.connState = StateDisconnected
 	c.mu.Unlock()

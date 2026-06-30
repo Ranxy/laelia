@@ -12,7 +12,10 @@ type Manager struct {
 	bootstrapToken string
 
 	// mu guards refreshToken, which is read by Connect (via the Run loop) and
-	// written/cleared by Disconnect's DeleteRefreshToken, possibly concurrently.
+	// written by SaveRefreshToken on each successful rotation, possibly
+	// concurrently with Connect. The token is intentionally NOT cleared on
+	// Disconnect: it is the agent's persistent reconnection credential after
+	// the single-use bootstrap token has been consumed.
 	mu           sync.Mutex
 	refreshToken string
 }
