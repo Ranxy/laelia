@@ -69,6 +69,9 @@ const (
 	// CommandServiceListThreadMessagesProcedure is the fully-qualified name of the CommandService's
 	// ListThreadMessages RPC.
 	CommandServiceListThreadMessagesProcedure = "/laelia.v1.CommandService/ListThreadMessages"
+	// CommandServiceListChannelThreadsProcedure is the fully-qualified name of the CommandService's
+	// ListChannelThreads RPC.
+	CommandServiceListChannelThreadsProcedure = "/laelia.v1.CommandService/ListChannelThreads"
 	// CommandServiceCreateChannelProcedure is the fully-qualified name of the CommandService's
 	// CreateChannel RPC.
 	CommandServiceCreateChannelProcedure = "/laelia.v1.CommandService/CreateChannel"
@@ -141,6 +144,7 @@ type CommandServiceClient interface {
 	GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error)
 	ListConversationMessages(context.Context, *connect.Request[v1.ListConversationMessagesRequest]) (*connect.Response[v1.ListConversationMessagesResponse], error)
 	ListThreadMessages(context.Context, *connect.Request[v1.ListThreadMessagesRequest]) (*connect.Response[v1.ListThreadMessagesResponse], error)
+	ListChannelThreads(context.Context, *connect.Request[v1.ListChannelThreadsRequest]) (*connect.Response[v1.ListChannelThreadsResponse], error)
 	CreateChannel(context.Context, *connect.Request[v1.CreateChannelRequest]) (*connect.Response[v1.Conversation], error)
 	ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error)
 	GetChannel(context.Context, *connect.Request[v1.GetChannelRequest]) (*connect.Response[v1.Conversation], error)
@@ -246,6 +250,12 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			httpClient,
 			baseURL+CommandServiceListThreadMessagesProcedure,
 			connect.WithSchema(commandServiceMethods.ByName("ListThreadMessages")),
+			connect.WithClientOptions(opts...),
+		),
+		listChannelThreads: connect.NewClient[v1.ListChannelThreadsRequest, v1.ListChannelThreadsResponse](
+			httpClient,
+			baseURL+CommandServiceListChannelThreadsProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ListChannelThreads")),
 			connect.WithClientOptions(opts...),
 		),
 		createChannel: connect.NewClient[v1.CreateChannelRequest, v1.Conversation](
@@ -372,6 +382,7 @@ type commandServiceClient struct {
 	getOrCreateConversation   *connect.Client[v1.GetOrCreateConversationRequest, v1.GetOrCreateConversationResponse]
 	listConversationMessages  *connect.Client[v1.ListConversationMessagesRequest, v1.ListConversationMessagesResponse]
 	listThreadMessages        *connect.Client[v1.ListThreadMessagesRequest, v1.ListThreadMessagesResponse]
+	listChannelThreads        *connect.Client[v1.ListChannelThreadsRequest, v1.ListChannelThreadsResponse]
 	createChannel             *connect.Client[v1.CreateChannelRequest, v1.Conversation]
 	listChannels              *connect.Client[v1.ListChannelsRequest, v1.ListChannelsResponse]
 	getChannel                *connect.Client[v1.GetChannelRequest, v1.Conversation]
@@ -445,6 +456,11 @@ func (c *commandServiceClient) ListConversationMessages(ctx context.Context, req
 // ListThreadMessages calls laelia.v1.CommandService.ListThreadMessages.
 func (c *commandServiceClient) ListThreadMessages(ctx context.Context, req *connect.Request[v1.ListThreadMessagesRequest]) (*connect.Response[v1.ListThreadMessagesResponse], error) {
 	return c.listThreadMessages.CallUnary(ctx, req)
+}
+
+// ListChannelThreads calls laelia.v1.CommandService.ListChannelThreads.
+func (c *commandServiceClient) ListChannelThreads(ctx context.Context, req *connect.Request[v1.ListChannelThreadsRequest]) (*connect.Response[v1.ListChannelThreadsResponse], error) {
+	return c.listChannelThreads.CallUnary(ctx, req)
 }
 
 // CreateChannel calls laelia.v1.CommandService.CreateChannel.
@@ -550,6 +566,7 @@ type CommandServiceHandler interface {
 	GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error)
 	ListConversationMessages(context.Context, *connect.Request[v1.ListConversationMessagesRequest]) (*connect.Response[v1.ListConversationMessagesResponse], error)
 	ListThreadMessages(context.Context, *connect.Request[v1.ListThreadMessagesRequest]) (*connect.Response[v1.ListThreadMessagesResponse], error)
+	ListChannelThreads(context.Context, *connect.Request[v1.ListChannelThreadsRequest]) (*connect.Response[v1.ListChannelThreadsResponse], error)
 	CreateChannel(context.Context, *connect.Request[v1.CreateChannelRequest]) (*connect.Response[v1.Conversation], error)
 	ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error)
 	GetChannel(context.Context, *connect.Request[v1.GetChannelRequest]) (*connect.Response[v1.Conversation], error)
@@ -651,6 +668,12 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		CommandServiceListThreadMessagesProcedure,
 		svc.ListThreadMessages,
 		connect.WithSchema(commandServiceMethods.ByName("ListThreadMessages")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceListChannelThreadsHandler := connect.NewUnaryHandler(
+		CommandServiceListChannelThreadsProcedure,
+		svc.ListChannelThreads,
+		connect.WithSchema(commandServiceMethods.ByName("ListChannelThreads")),
 		connect.WithHandlerOptions(opts...),
 	)
 	commandServiceCreateChannelHandler := connect.NewUnaryHandler(
@@ -785,6 +808,8 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceListConversationMessagesHandler.ServeHTTP(w, r)
 		case CommandServiceListThreadMessagesProcedure:
 			commandServiceListThreadMessagesHandler.ServeHTTP(w, r)
+		case CommandServiceListChannelThreadsProcedure:
+			commandServiceListChannelThreadsHandler.ServeHTTP(w, r)
 		case CommandServiceCreateChannelProcedure:
 			commandServiceCreateChannelHandler.ServeHTTP(w, r)
 		case CommandServiceListChannelsProcedure:
@@ -872,6 +897,10 @@ func (UnimplementedCommandServiceHandler) ListConversationMessages(context.Conte
 
 func (UnimplementedCommandServiceHandler) ListThreadMessages(context.Context, *connect.Request[v1.ListThreadMessagesRequest]) (*connect.Response[v1.ListThreadMessagesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListThreadMessages is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ListChannelThreads(context.Context, *connect.Request[v1.ListChannelThreadsRequest]) (*connect.Response[v1.ListChannelThreadsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListChannelThreads is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) CreateChannel(context.Context, *connect.Request[v1.CreateChannelRequest]) (*connect.Response[v1.Conversation], error) {

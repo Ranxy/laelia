@@ -420,6 +420,49 @@ func (s *Store) ListThreadMessages(ctx context.Context, conversationID, rootID u
 	return append([]*ChatMessage{root}, replies...), currentVersion, nil
 }
 
+// ChannelThread summarizes one active thread (a root with ≥1 reply) in a
+// conversation: the root message id, total reply count, and the latest reply's
+// room_version / created_at. It is what ListChannelThreads returns so the
+// channel page can keep root-message reply-count badges fresh without fetching
+// the whole message list.
+type ChannelThread struct {
+	RootMessageID uuid.UUID
+	ReplyCount    int32
+	LatestVersion int64
+	LatestAt      time.Time
+}
+
+// ListChannelThreads returns a summary for every active thread in a
+// conversation, ordered by latest reply DESC. A "thread" here is any root
+// message that has ≥1 reply (the query groups replies by thread_root_message_id,
+// so roots with no replies do not appear). One grouped query covers the page;
+// the result is bounded by the number of threads, not the number of replies.
+func (s *Store) ListChannelThreads(ctx context.Context, conversationID uuid.UUID) ([]*ChannelThread, error) {
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT thread_root_message_id, count(*)::int, max(room_version), max(created_at)
+		FROM chat_message
+		WHERE conversation_id = $1 AND thread_root_message_id IS NOT NULL
+		GROUP BY thread_root_message_id
+		ORDER BY max(room_version) DESC
+	`, conversationID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list channel threads")
+	}
+	defer rows.Close()
+	var threads []*ChannelThread
+	for rows.Next() {
+		var t ChannelThread
+		if err := rows.Scan(&t.RootMessageID, &t.ReplyCount, &t.LatestVersion, &t.LatestAt); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan channel thread")
+		}
+		threads = append(threads, &t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate channel threads")
+	}
+	return threads, nil
+}
+
 func itoa(n int) string {
 	return strconv.Itoa(n)
 }

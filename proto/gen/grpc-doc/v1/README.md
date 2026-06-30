@@ -97,6 +97,7 @@
     - [CancelCommandRequest](#laelia-v1-CancelCommandRequest)
     - [CancelMessage](#laelia-v1-CancelMessage)
     - [ChannelMember](#laelia-v1-ChannelMember)
+    - [ChannelThread](#laelia-v1-ChannelThread)
     - [ChannelUpdate](#laelia-v1-ChannelUpdate)
     - [ChatHistoryEntry](#laelia-v1-ChatHistoryEntry)
     - [ChatMessage](#laelia-v1-ChatMessage)
@@ -127,6 +128,8 @@
     - [LifecyclePayload](#laelia-v1-LifecyclePayload)
     - [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest)
     - [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse)
+    - [ListChannelThreadsRequest](#laelia-v1-ListChannelThreadsRequest)
+    - [ListChannelThreadsResponse](#laelia-v1-ListChannelThreadsResponse)
     - [ListChannelUpdatesRequest](#laelia-v1-ListChannelUpdatesRequest)
     - [ListChannelUpdatesResponse](#laelia-v1-ListChannelUpdatesResponse)
     - [ListChannelsRequest](#laelia-v1-ListChannelsRequest)
@@ -1504,6 +1507,25 @@ the agent uses to anchor its execution events and link any posted replies.
 
 
 
+<a name="laelia-v1-ChannelThread"></a>
+
+### ChannelThread
+ChannelThread is a summary of one active thread (a root with ≥1 reply) in a
+conversation.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| root_message | [string](#string) |  | root_message is the id (bare UUID) of the thread&#39;s root message; matches ChatMessage.name so the client can map it back to a root row. |
+| reply_count | [int32](#int32) |  | reply_count is the total number of replies in the thread (always ≥1). |
+| latest_reply_version | [int64](#int64) |  | latest_reply_version is the maximum room_version among the thread&#39;s replies. |
+| latest_reply_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | latest_reply_at is the created_at of the most recent reply. |
+
+
+
+
+
+
 <a name="laelia-v1-ChannelUpdate"></a>
 
 ### ChannelUpdate
@@ -2054,6 +2076,42 @@ File is the persisted metadata for an S3-backed object.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | members | [ChannelMember](#laelia-v1-ChannelMember) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListChannelThreadsRequest"></a>
+
+### ListChannelThreadsRequest
+ListChannelThreadsRequest summarizes every active thread in a conversation:
+each thread&#39;s root message, total reply count, and the latest reply&#39;s
+room_version / created_at. The channel page polls this to keep the root
+messages&#39; reply-count badges fresh (including replies that arrive while the
+thread panel is closed, e.g. an async agent reply) without fetching the whole
+message list — thread replies are excluded from ListConversationMessages, so
+the message watcher alone cannot observe a changed reply count.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  | The conversation whose active threads to summarize: &#34;conversations/{id}&#34;. |
+
+
+
+
+
+
+<a name="laelia-v1-ListChannelThreadsResponse"></a>
+
+### ListChannelThreadsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| threads | [ChannelThread](#laelia-v1-ChannelThread) | repeated |  |
 
 
 
@@ -2898,6 +2956,7 @@ names).
 | GetOrCreateConversation | [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest) | [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse) |  |
 | ListConversationMessages | [ListConversationMessagesRequest](#laelia-v1-ListConversationMessagesRequest) | [ListConversationMessagesResponse](#laelia-v1-ListConversationMessagesResponse) |  |
 | ListThreadMessages | [ListThreadMessagesRequest](#laelia-v1-ListThreadMessagesRequest) | [ListThreadMessagesResponse](#laelia-v1-ListThreadMessagesResponse) |  |
+| ListChannelThreads | [ListChannelThreadsRequest](#laelia-v1-ListChannelThreadsRequest) | [ListChannelThreadsResponse](#laelia-v1-ListChannelThreadsResponse) |  |
 | CreateChannel | [CreateChannelRequest](#laelia-v1-CreateChannelRequest) | [Conversation](#laelia-v1-Conversation) |  |
 | ListChannels | [ListChannelsRequest](#laelia-v1-ListChannelsRequest) | [ListChannelsResponse](#laelia-v1-ListChannelsResponse) |  |
 | GetChannel | [GetChannelRequest](#laelia-v1-GetChannelRequest) | [Conversation](#laelia-v1-Conversation) |  |

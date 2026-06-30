@@ -6,6 +6,7 @@ import {
   FetchConversationActivityRequestSchema,
   ListChannelMembersRequestSchema,
   ListChannelsRequestSchema,
+  ListChannelThreadsRequestSchema,
   ListConversationMessagesRequestSchema,
   MarkConversationReadRequestSchema,
   RemoveChannelMemberRequestSchema,
@@ -167,6 +168,13 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
         // network error — will retry on next tick
       }
 
+      // Refresh root-message reply-count badges. Thread replies are excluded
+      // from the message delta above (server-side), so the watcher cannot
+      // observe a changed reply count on its own. This separate summary poll
+      // covers replies that arrive while the thread panel is closed — notably
+      // an async agent reply to a thread the user has left.
+      refreshChannelThreadCounts(set, get, conversationName);
+
       // Also poll agent activity.
       get().fetchConversationActivity(conversationName);
     };
@@ -261,3 +269,48 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
     }));
   },
 });
+
+// refreshChannelThreadCounts fetches the channel's active-thread summaries and
+// writes each root's total reply count back into the main message list, so the
+// "N replies" badge on root messages stays fresh. The message watcher's delta
+// (above) excludes thread replies, so without this a reply that lands while the
+// thread panel is closed — e.g. an async agent reply — would never update the
+// badge. No-op when the list is empty or no root's count changed (same-reference
+// bail-out so subscribers don't churn). Failures are swallowed and retried next
+// tick; they must not abort the surrounding poll.
+async function refreshChannelThreadCounts(
+  set: Parameters<AppSliceCreator<ChannelSlice>>[0],
+  get: Parameters<AppSliceCreator<ChannelSlice>>[1],
+  conversationName: string
+) {
+  const prev = get().chatMessages[conversationName];
+  if (!prev || prev.length === 0) return;
+  let threads: { rootMessage: string; replyCount: number }[];
+  try {
+    const res = await commandServiceClient.listChannelThreads(
+      create(ListChannelThreadsRequestSchema, {
+        conversation: conversationName,
+      })
+    );
+    threads = (res.threads ?? []).map((t) => ({
+      rootMessage: t.rootMessage,
+      replyCount: t.replyCount,
+    }));
+  } catch {
+    return; // network error — retry next tick
+  }
+  const countById = new Map(threads.map((t) => [t.rootMessage, t.replyCount]));
+  let changed = false;
+  const next = prev.map((m) => {
+    if (m.threadRoot) return m; // replies never carry the badge
+    const count = countById.get(m.id) ?? 0;
+    if ((m.threadReplyCount ?? 0) === count) return m;
+    changed = true;
+    return { ...m, threadReplyCount: count };
+  });
+  if (changed) {
+    set((state) => ({
+      chatMessages: { ...state.chatMessages, [conversationName]: next },
+    }));
+  }
+}

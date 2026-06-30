@@ -1232,6 +1232,92 @@ export declare type ListThreadMessagesResponse = Message<"laelia.v1.ListThreadMe
 export declare const ListThreadMessagesResponseSchema: GenMessage<ListThreadMessagesResponse>;
 
 /**
+ * ListChannelThreadsRequest summarizes every active thread in a conversation:
+ * each thread's root message, total reply count, and the latest reply's
+ * room_version / created_at. The channel page polls this to keep the root
+ * messages' reply-count badges fresh (including replies that arrive while the
+ * thread panel is closed, e.g. an async agent reply) without fetching the whole
+ * message list — thread replies are excluded from ListConversationMessages, so
+ * the message watcher alone cannot observe a changed reply count.
+ *
+ * @generated from message laelia.v1.ListChannelThreadsRequest
+ */
+export declare type ListChannelThreadsRequest = Message<"laelia.v1.ListChannelThreadsRequest"> & {
+  /**
+   * The conversation whose active threads to summarize: "conversations/{id}".
+   *
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListChannelThreadsRequest.
+ * Use `create(ListChannelThreadsRequestSchema)` to create a new message.
+ */
+export declare const ListChannelThreadsRequestSchema: GenMessage<ListChannelThreadsRequest>;
+
+/**
+ * ChannelThread is a summary of one active thread (a root with ≥1 reply) in a
+ * conversation.
+ *
+ * @generated from message laelia.v1.ChannelThread
+ */
+export declare type ChannelThread = Message<"laelia.v1.ChannelThread"> & {
+  /**
+   * root_message is the id (bare UUID) of the thread's root message; matches
+   * ChatMessage.name so the client can map it back to a root row.
+   *
+   * @generated from field: string root_message = 1;
+   */
+  rootMessage: string;
+
+  /**
+   * reply_count is the total number of replies in the thread (always ≥1).
+   *
+   * @generated from field: int32 reply_count = 2;
+   */
+  replyCount: number;
+
+  /**
+   * latest_reply_version is the maximum room_version among the thread's
+   * replies.
+   *
+   * @generated from field: int64 latest_reply_version = 3;
+   */
+  latestReplyVersion: bigint;
+
+  /**
+   * latest_reply_at is the created_at of the most recent reply.
+   *
+   * @generated from field: google.protobuf.Timestamp latest_reply_at = 4;
+   */
+  latestReplyAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.ChannelThread.
+ * Use `create(ChannelThreadSchema)` to create a new message.
+ */
+export declare const ChannelThreadSchema: GenMessage<ChannelThread>;
+
+/**
+ * @generated from message laelia.v1.ListChannelThreadsResponse
+ */
+export declare type ListChannelThreadsResponse = Message<"laelia.v1.ListChannelThreadsResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.ChannelThread threads = 1;
+   */
+  threads: ChannelThread[];
+};
+
+/**
+ * Describes the message laelia.v1.ListChannelThreadsResponse.
+ * Use `create(ListChannelThreadsResponseSchema)` to create a new message.
+ */
+export declare const ListChannelThreadsResponseSchema: GenMessage<ListChannelThreadsResponse>;
+
+/**
  * ListThreadUpdatesRequest returns, for the authenticated agent, every thread
  * the agent is subscribed to (via @mention or having replied) that has replies
  * with room_version beyond the agent's per-channel cursor for that
@@ -2752,6 +2838,14 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof ListThreadMessagesRequestSchema;
     output: typeof ListThreadMessagesResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.ListChannelThreads
+   */
+  listChannelThreads: {
+    methodKind: "unary";
+    input: typeof ListChannelThreadsRequestSchema;
+    output: typeof ListChannelThreadsResponseSchema;
   },
   /**
    * @generated from rpc laelia.v1.CommandService.CreateChannel

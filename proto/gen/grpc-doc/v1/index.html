@@ -538,6 +538,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ChannelThread"><span class="badge">M</span>ChannelThread</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ChannelUpdate"><span class="badge">M</span>ChannelUpdate</a>
                 </li>
               
@@ -655,6 +659,14 @@
               
                 <li>
                   <a href="#laelia.v1.ListChannelMembersResponse"><span class="badge">M</span>ListChannelMembersResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListChannelThreadsRequest"><span class="badge">M</span>ListChannelThreadsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListChannelThreadsResponse"><span class="badge">M</span>ListChannelThreadsResponse</a>
                 </li>
               
                 <li>
@@ -4145,6 +4157,53 @@ messages and @mentions of itself. </p></td>
 
         
       
+        <h3 id="laelia.v1.ChannelThread">ChannelThread</h3>
+        <p>ChannelThread is a summary of one active thread (a root with ≥1 reply) in a</p><p>conversation.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>root_message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>root_message is the id (bare UUID) of the thread&#39;s root message; matches
+ChatMessage.name so the client can map it back to a root row. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reply_count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>reply_count is the total number of replies in the thread (always ≥1). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>latest_reply_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p>latest_reply_version is the maximum room_version among the thread&#39;s
+replies. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>latest_reply_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p>latest_reply_at is the created_at of the most recent reply. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ChannelUpdate">ChannelUpdate</h3>
         <p>ChannelUpdate describes one conversation that has unread messages for the</p><p>agent. new_message_count is the number of chat_message rows with</p><p>room_version greater than the agent's processed_version for that channel.</p>
 
@@ -5582,6 +5641,54 @@ ListChannels; 0 (or unset) when the user is caught up. </p></td>
                 <tr>
                   <td>members</td>
                   <td><a href="#laelia.v1.ChannelMember">ChannelMember</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListChannelThreadsRequest">ListChannelThreadsRequest</h3>
+        <p>ListChannelThreadsRequest summarizes every active thread in a conversation:</p><p>each thread's root message, total reply count, and the latest reply's</p><p>room_version / created_at. The channel page polls this to keep the root</p><p>messages' reply-count badges fresh (including replies that arrive while the</p><p>thread panel is closed, e.g. an async agent reply) without fetching the whole</p><p>message list — thread replies are excluded from ListConversationMessages, so</p><p>the message watcher alone cannot observe a changed reply count.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The conversation whose active threads to summarize: &#34;conversations/{id}&#34;. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListChannelThreadsResponse">ListChannelThreadsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>threads</td>
+                  <td><a href="#laelia.v1.ChannelThread">ChannelThread</a></td>
                   <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
@@ -7443,6 +7550,13 @@ the agent&#39;s processed_version for this conversation. </p></td>
               </tr>
             
               <tr>
+                <td>ListChannelThreads</td>
+                <td><a href="#laelia.v1.ListChannelThreadsRequest">ListChannelThreadsRequest</a></td>
+                <td><a href="#laelia.v1.ListChannelThreadsResponse">ListChannelThreadsResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
                 <td>CreateChannel</td>
                 <td><a href="#laelia.v1.CreateChannelRequest">CreateChannelRequest</a></td>
                 <td><a href="#laelia.v1.Conversation">Conversation</a></td>
@@ -7699,6 +7813,16 @@ a member.</p></td>
                 <td>ListThreadMessages</td>
                 <td>GET</td>
                 <td>/v1/{conversation=conversations/*}/threads</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListChannelThreads</td>
+                <td>GET</td>
+                <td>/v1/{conversation=conversations/*}/threads:summarize</td>
                 <td></td>
               </tr>
               

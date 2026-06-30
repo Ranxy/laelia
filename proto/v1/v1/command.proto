@@ -374,6 +374,37 @@ message ListThreadMessagesResponse {
   int64 current_version = 3;
 }
 
+// ListChannelThreadsRequest summarizes every active thread in a conversation:
+// each thread's root message, total reply count, and the latest reply's
+// room_version / created_at. The channel page polls this to keep the root
+// messages' reply-count badges fresh (including replies that arrive while the
+// thread panel is closed, e.g. an async agent reply) without fetching the whole
+// message list — thread replies are excluded from ListConversationMessages, so
+// the message watcher alone cannot observe a changed reply count.
+message ListChannelThreadsRequest {
+  // The conversation whose active threads to summarize: "conversations/{id}".
+  string conversation = 1;
+}
+
+// ChannelThread is a summary of one active thread (a root with ≥1 reply) in a
+// conversation.
+message ChannelThread {
+  // root_message is the id (bare UUID) of the thread's root message; matches
+  // ChatMessage.name so the client can map it back to a root row.
+  string root_message = 1;
+  // reply_count is the total number of replies in the thread (always ≥1).
+  int32 reply_count = 2;
+  // latest_reply_version is the maximum room_version among the thread's
+  // replies.
+  int64 latest_reply_version = 3;
+  // latest_reply_at is the created_at of the most recent reply.
+  google.protobuf.Timestamp latest_reply_at = 4;
+}
+
+message ListChannelThreadsResponse {
+  repeated ChannelThread threads = 1;
+}
+
 // ListThreadUpdatesRequest returns, for the authenticated agent, every thread
 // the agent is subscribed to (via @mention or having replied) that has replies
 // with room_version beyond the agent's per-channel cursor for that
@@ -643,6 +674,12 @@ service CommandService {
 
   rpc ListThreadMessages(ListThreadMessagesRequest) returns (ListThreadMessagesResponse) {
     option (google.api.http) = {get: "/v1/{conversation=conversations/*}/threads"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.read";
+  }
+
+  rpc ListChannelThreads(ListChannelThreadsRequest) returns (ListChannelThreadsResponse) {
+    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/threads:summarize"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }

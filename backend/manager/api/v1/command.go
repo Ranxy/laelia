@@ -718,6 +718,36 @@ func (s *CommandService) ListThreadMessages(ctx context.Context, req *connect.Re
 	}), nil
 }
 
+// ListChannelThreads returns a summary (root id, reply count, latest reply
+// version/time) for every active thread in a conversation. The channel page
+// polls this to keep root-message reply-count badges fresh — including replies
+// that arrive while the thread panel is closed (e.g. an async agent reply),
+// which the message watcher cannot observe because ListConversationMessages
+// excludes thread replies.
+func (s *CommandService) ListChannelThreads(ctx context.Context, req *connect.Request[v1pb.ListChannelThreadsRequest]) (*connect.Response[v1pb.ListChannelThreadsResponse], error) {
+	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
+	if err != nil {
+		return nil, err
+	}
+	threads, err := s.store.ListChannelThreads(ctx, convID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list channel threads"))
+	}
+	v1threads := make([]*v1pb.ChannelThread, 0, len(threads))
+	for _, t := range threads {
+		ct := &v1pb.ChannelThread{
+			RootMessage:        t.RootMessageID.String(),
+			ReplyCount:         t.ReplyCount,
+			LatestReplyVersion: t.LatestVersion,
+		}
+		if !t.LatestAt.IsZero() {
+			ct.LatestReplyAt = timestamppb.New(t.LatestAt)
+		}
+		v1threads = append(v1threads, ct)
+	}
+	return connect.NewResponse(&v1pb.ListChannelThreadsResponse{Threads: v1threads}), nil
+}
+
 func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v1pb.PostMessageRequest]) (*connect.Response[v1pb.PostMessageResponse], error) {
 	agent, ok := GetAgentFromContext(ctx)
 	if !ok || agent == nil {

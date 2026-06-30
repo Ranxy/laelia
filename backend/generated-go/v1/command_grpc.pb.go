@@ -31,6 +31,7 @@ const (
 	CommandService_GetOrCreateConversation_FullMethodName   = "/laelia.v1.CommandService/GetOrCreateConversation"
 	CommandService_ListConversationMessages_FullMethodName  = "/laelia.v1.CommandService/ListConversationMessages"
 	CommandService_ListThreadMessages_FullMethodName        = "/laelia.v1.CommandService/ListThreadMessages"
+	CommandService_ListChannelThreads_FullMethodName        = "/laelia.v1.CommandService/ListChannelThreads"
 	CommandService_CreateChannel_FullMethodName             = "/laelia.v1.CommandService/CreateChannel"
 	CommandService_ListChannels_FullMethodName              = "/laelia.v1.CommandService/ListChannels"
 	CommandService_GetChannel_FullMethodName                = "/laelia.v1.CommandService/GetChannel"
@@ -66,6 +67,7 @@ type CommandServiceClient interface {
 	GetOrCreateConversation(ctx context.Context, in *GetOrCreateConversationRequest, opts ...grpc.CallOption) (*GetOrCreateConversationResponse, error)
 	ListConversationMessages(ctx context.Context, in *ListConversationMessagesRequest, opts ...grpc.CallOption) (*ListConversationMessagesResponse, error)
 	ListThreadMessages(ctx context.Context, in *ListThreadMessagesRequest, opts ...grpc.CallOption) (*ListThreadMessagesResponse, error)
+	ListChannelThreads(ctx context.Context, in *ListChannelThreadsRequest, opts ...grpc.CallOption) (*ListChannelThreadsResponse, error)
 	CreateChannel(ctx context.Context, in *CreateChannelRequest, opts ...grpc.CallOption) (*Conversation, error)
 	ListChannels(ctx context.Context, in *ListChannelsRequest, opts ...grpc.CallOption) (*ListChannelsResponse, error)
 	GetChannel(ctx context.Context, in *GetChannelRequest, opts ...grpc.CallOption) (*Conversation, error)
@@ -226,6 +228,16 @@ func (c *commandServiceClient) ListThreadMessages(ctx context.Context, in *ListT
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListThreadMessagesResponse)
 	err := c.cc.Invoke(ctx, CommandService_ListThreadMessages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) ListChannelThreads(ctx context.Context, in *ListChannelThreadsRequest, opts ...grpc.CallOption) (*ListChannelThreadsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListChannelThreadsResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListChannelThreads_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -427,6 +439,7 @@ type CommandServiceServer interface {
 	GetOrCreateConversation(context.Context, *GetOrCreateConversationRequest) (*GetOrCreateConversationResponse, error)
 	ListConversationMessages(context.Context, *ListConversationMessagesRequest) (*ListConversationMessagesResponse, error)
 	ListThreadMessages(context.Context, *ListThreadMessagesRequest) (*ListThreadMessagesResponse, error)
+	ListChannelThreads(context.Context, *ListChannelThreadsRequest) (*ListChannelThreadsResponse, error)
 	CreateChannel(context.Context, *CreateChannelRequest) (*Conversation, error)
 	ListChannels(context.Context, *ListChannelsRequest) (*ListChannelsResponse, error)
 	GetChannel(context.Context, *GetChannelRequest) (*Conversation, error)
@@ -497,6 +510,9 @@ func (UnimplementedCommandServiceServer) ListConversationMessages(context.Contex
 }
 func (UnimplementedCommandServiceServer) ListThreadMessages(context.Context, *ListThreadMessagesRequest) (*ListThreadMessagesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListThreadMessages not implemented")
+}
+func (UnimplementedCommandServiceServer) ListChannelThreads(context.Context, *ListChannelThreadsRequest) (*ListChannelThreadsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListChannelThreads not implemented")
 }
 func (UnimplementedCommandServiceServer) CreateChannel(context.Context, *CreateChannelRequest) (*Conversation, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateChannel not implemented")
@@ -753,6 +769,24 @@ func _CommandService_ListThreadMessages_Handler(srv interface{}, ctx context.Con
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CommandServiceServer).ListThreadMessages(ctx, req.(*ListThreadMessagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_ListChannelThreads_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListChannelThreadsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListChannelThreads(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListChannelThreads_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListChannelThreads(ctx, req.(*ListChannelThreadsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1123,6 +1157,10 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListThreadMessages",
 			Handler:    _CommandService_ListThreadMessages_Handler,
+		},
+		{
+			MethodName: "ListChannelThreads",
+			Handler:    _CommandService_ListChannelThreads_Handler,
 		},
 		{
 			MethodName: "CreateChannel",

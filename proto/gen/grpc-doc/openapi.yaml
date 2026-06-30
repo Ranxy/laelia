@@ -1174,6 +1174,31 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/threads:summarize:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_ListChannelThreads
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListChannelThreadsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/conversations/{conversation}:ackProcessedVersion:
         post:
             tags:
@@ -1883,6 +1908,30 @@ components:
                 joinedAt:
                     type: string
                     format: date-time
+        ChannelThread:
+            type: object
+            properties:
+                rootMessage:
+                    type: string
+                    description: |-
+                        root_message is the id (bare UUID) of the thread's root message; matches
+                         ChatMessage.name so the client can map it back to a root row.
+                replyCount:
+                    type: integer
+                    description: reply_count is the total number of replies in the thread (always ≥1).
+                    format: int32
+                latestReplyVersion:
+                    type: string
+                    description: |-
+                        latest_reply_version is the maximum room_version among the thread's
+                         replies.
+                latestReplyAt:
+                    type: string
+                    description: latest_reply_at is the created_at of the most recent reply.
+                    format: date-time
+            description: |-
+                ChannelThread is a summary of one active thread (a root with ≥1 reply) in a
+                 conversation.
         ChannelUpdate:
             type: object
             properties:
@@ -2276,6 +2325,13 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/ChannelMember'
+        ListChannelThreadsResponse:
+            type: object
+            properties:
+                threads:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ChannelThread'
         ListChannelUpdatesResponse:
             type: object
             properties:

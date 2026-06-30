@@ -163,10 +163,10 @@ function startWatcher(
           },
         }));
       }
-      // The root (delta[0]) carries the authoritative total reply count; keep
-      // the main channel list's root badge in sync as replies arrive (from the
-      // user or anyone else) while the panel is open.
-      syncRootReplyCount(set, get, conversation, root, delta[0]);
+      // Root reply-count freshness on the main channel list is owned by the
+      // channel watcher (refreshChannelThreadCounts), so this watcher does not
+      // also write back to the main list — it only maintains the thread's own
+      // messages.
     } catch {
       // network error — retry on next tick
     }
