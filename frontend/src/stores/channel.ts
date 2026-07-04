@@ -8,6 +8,7 @@ import {
   ListChannelsRequestSchema,
   ListChannelThreadsRequestSchema,
   ListConversationMessagesRequestSchema,
+  ListTasksRequestSchema,
   MarkConversationReadRequestSchema,
   RemoveChannelMemberRequestSchema,
   SendMessageRequestSchema,
@@ -182,6 +183,14 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
       // an async agent reply to a thread the user has left.
       refreshChannelThreadCounts(set, get, conversationName);
 
+      // Refresh inline task badges (status/assignee). Task mutations
+      // (convert/claim/review/done) only change the task row + post a system
+      // notification; they do NOT bump the task message's room_version, so the
+      // delta above never re-fetches the task message. This separate poll
+      // re-reads the task board and patches task metadata onto matching
+      // messages in the main list, mirroring refreshChannelThreadCounts.
+      refreshChannelTaskInfo(set, get, conversationName);
+
       // Also poll agent activity.
       get().fetchConversationActivity(conversationName);
     };
@@ -314,6 +323,65 @@ async function refreshChannelThreadCounts(
     if ((m.threadReplyCount ?? 0) === count) return m;
     changed = true;
     return { ...m, threadReplyCount: count };
+  });
+  if (changed) {
+    set((state) => ({
+      chatMessages: { ...state.chatMessages, [conversationName]: next },
+    }));
+  }
+}
+
+// refreshChannelTaskInfo re-reads the channel's task board and patches each
+// task's metadata (status, assignee) onto the matching root message in the
+// main channel list. Task mutations (convert/claim/review/done) change the
+// task row and post a system notification but do NOT bump the task message's
+// room_version, so the watcher's delta never re-fetches the task message and
+// its inline badge would stay stale. This mirrors refreshChannelThreadCounts.
+// No-op when the list is empty or no message's task metadata changed
+// (same-reference bail-out so subscribers don't churn). Failures are swallowed
+// and retried next tick; they must not abort the surrounding poll.
+async function refreshChannelTaskInfo(
+  set: Parameters<AppSliceCreator<ChannelSlice>>[0],
+  get: Parameters<AppSliceCreator<ChannelSlice>>[1],
+  conversationName: string
+) {
+  const prev = get().chatMessages[conversationName];
+  if (!prev || prev.length === 0) return;
+  let tasks: ChatMessageUI[];
+  try {
+    const res = await commandServiceClient.listTasks(
+      create(ListTasksRequestSchema, {
+        conversation: conversationName,
+        statusFilter: [],
+      })
+    );
+    tasks = (res.tasks ?? []).map(toUiMessage);
+  } catch {
+    return; // network error — retry next tick
+  }
+  const taskById = new Map(tasks.map((t) => [t.id, t.task]));
+  let changed = false;
+  const next = prev.map((m) => {
+    const fresh = taskById.get(m.id);
+    if (!fresh) {
+      // Task was unconverted/deleted — clear a stale badge if present.
+      if (m.task) {
+        changed = true;
+        return { ...m, task: undefined };
+      }
+      return m;
+    }
+    if (
+      m.task &&
+      m.task.taskNumber === fresh.taskNumber &&
+      m.task.status === fresh.status &&
+      m.task.assigneeName === fresh.assigneeName &&
+      m.task.assigneeResourceId === fresh.assigneeResourceId
+    ) {
+      return m; // unchanged
+    }
+    changed = true;
+    return { ...m, task: fresh };
   });
   if (changed) {
     set((state) => ({

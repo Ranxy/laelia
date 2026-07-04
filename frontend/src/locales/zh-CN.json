@@ -327,7 +327,10 @@
     "panel-close": "关闭任务面板",
     "panel-empty": "此频道还没有任务",
     "panel-summary": "{{todo}} 待办 · {{inProgress}} 进行中 · {{inReview}} 待审核 · {{done}} 已完成",
-    "refresh": "刷新"
+    "refresh": "刷新",
+    "open": "打开",
+    "back-to-tasks": "任务",
+    "replies": "{{count}} 条回复"
   },
   "channel": {
     "title": "频道",

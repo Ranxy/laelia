@@ -327,7 +327,10 @@
     "panel-close": "Close tasks panel",
     "panel-empty": "No tasks in this channel yet",
     "panel-summary": "{{todo}} todo · {{inProgress}} in progress · {{inReview}} in review · {{done}} done",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "open": "Open",
+    "back-to-tasks": "Tasks",
+    "replies": "{{count}} replies"
   },
   "channel": {
     "title": "Channels",

@@ -235,7 +235,12 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
               <button
                 type="button"
                 onClick={() => onOpenThread(msg)}
-                className="ml-1 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-control-placeholder opacity-0 transition-all hover:bg-control-bg hover:text-main group-hover:opacity-100 focus:opacity-100 cursor-pointer"
+                // A task's thread is its workspace, so keep the entry visible on
+                // task messages instead of hover-only; non-task roots stay hover-gated.
+                className={cn(
+                  "ml-1 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-control-placeholder transition-all hover:bg-control-bg hover:text-main focus:opacity-100 cursor-pointer",
+                  msg.task ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                )}
                 aria-label={t("chat.reply-in-thread")}
               >
                 <MessageCircleReply className="size-3" />

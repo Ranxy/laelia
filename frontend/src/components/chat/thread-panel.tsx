@@ -1,5 +1,12 @@
 import { create } from "@bufbuild/protobuf";
-import { ExternalLink, Loader2, Paperclip, Send, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ExternalLink,
+  Loader2,
+  Paperclip,
+  Send,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Avatar, formatTime } from "@/components/chat/avatar";
@@ -12,6 +19,7 @@ import {
   rowStreamingProps,
 } from "@/components/chat/message-row";
 import { EmptyState, LoadingState } from "@/components/chat/states";
+import { TaskStatusBadge } from "@/components/chat/task-status-badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { detectMention } from "@/composables/useMentionDetect";
@@ -224,6 +232,8 @@ export function ThreadPanel({
         <ThreadHeader
           title={t("chat.thread-title")}
           channelName={channelTitle}
+          channelId={channelId}
+          rootMsg={null}
           onClose={onClose}
           onViewInChannel={onViewInChannel}
         />
@@ -237,6 +247,8 @@ export function ThreadPanel({
       <ThreadHeader
         title={t("chat.thread-title")}
         channelName={channelTitle}
+        channelId={channelId}
+        rootMsg={rootMsg}
         onClose={onClose}
         onViewInChannel={onViewInChannel}
       />
@@ -466,22 +478,55 @@ export function ThreadPanel({
 function ThreadHeader({
   title,
   channelName,
+  channelId,
+  rootMsg,
   onClose,
   onViewInChannel,
 }: {
   title: string;
   channelName: string;
+  channelId: string;
+  rootMsg: ChatMessageUI | null;
   onClose: () => void;
   onViewInChannel: () => void;
 }) {
   const { t } = useTranslation();
+  const closeThread = useAppStore((s) => s.closeThread);
+  const toggleTasksPanel = useAppStore((s) => s.toggleTasksPanel);
+  const isTask = !!rootMsg?.task;
+  const handleBackToTasks = () => {
+    // Drill back from a task's thread to the channel's task board.
+    closeThread();
+    toggleTasksPanel(channelId);
+  };
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-control-border px-3 py-2.5">
+      {isTask && (
+        <button
+          type="button"
+          onClick={handleBackToTasks}
+          className="flex items-center gap-1 text-xs text-control-placeholder hover:text-main transition-colors"
+          aria-label={t("channelTask.back-to-tasks")}
+        >
+          <ArrowLeft className="size-3.5" />
+          <span className="hidden sm:inline">
+            {t("channelTask.back-to-tasks")}
+          </span>
+        </button>
+      )}
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-main truncate">
           {title} — #{channelName}
         </p>
       </div>
+      {isTask && rootMsg?.task && (
+        <TaskStatusBadge
+          taskNumber={rootMsg.task.taskNumber}
+          status={rootMsg.task.status}
+          assigneeName={rootMsg.task.assigneeName}
+          className="text-[10px] px-1.5 py-0"
+        />
+      )}
       <button
         type="button"
         onClick={onViewInChannel}

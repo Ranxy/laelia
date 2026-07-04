@@ -520,6 +520,17 @@ export function ChatConversationPage() {
     toggleTasksPanel(channelId);
   }, [channelId, tasksPanelOpen, toggleTasksPanel, closeThread]);
 
+  // handleOpenTaskThread drills from the task board into a task's workspace:
+  // close the tasks panel and open the task's thread (reused ThreadPanel).
+  const handleOpenTaskThread = useCallback(
+    (taskMessageId: string) => {
+      if (!channelId) return;
+      closeTasksPanel(channelId);
+      openThread(conversationName, taskMessageId);
+    },
+    [channelId, conversationName, openThread, closeTasksPanel]
+  );
+
   const handleViewInChannel = useCallback(() => {
     const rootId = threadRootOpen;
     closeThread();
@@ -870,6 +881,7 @@ export function ChatConversationPage() {
             channelId={channelId}
             channelTitle={channel?.title ?? channelId ?? ""}
             onClose={() => closeTasksPanel(channelId)}
+            onOpenTask={handleOpenTaskThread}
           />
         )}
       </div>

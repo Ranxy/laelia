@@ -21,6 +21,17 @@ func TestNormalizeConversationName(t *testing.T) {
 	}
 }
 
+func TestNormalizeThreadRoot(t *testing.T) {
+	for in, want := range map[string]string{
+		"":                                   "",
+		"abc-123":                            "abc-123",
+		"conversations/c-1/messages/m-2":     "m-2",
+		"conversations/abc-123/messages/456": "456",
+	} {
+		assert.Equal(t, want, normalizeThreadRoot(in), "input %q", in)
+	}
+}
+
 func TestWrapManagerErrorCodeMapping(t *testing.T) {
 	cases := []struct {
 		name string

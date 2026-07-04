@@ -84,6 +84,21 @@ func normalizeConversationName(s string) string {
 	return fmt.Sprintf("conversations/%s", s)
 }
 
+// normalizeThreadRoot turns a thread-root reference into the bare message id
+// the manager expects for ThreadRoot. Accepts either a bare id or the full
+// "conversations/<c>/messages/<m>" resource name (as printed by `task list` /
+// `task claim`), so an agent can pass a task's full message name straight from
+// `task claim` to `thread send --root` without stripping the prefix by hand.
+func normalizeThreadRoot(s string) string {
+	if s == "" {
+		return ""
+	}
+	if idx := strings.LastIndex(s, "/"); idx >= 0 {
+		return s[idx+1:]
+	}
+	return s
+}
+
 func senderTypeString(t v1pb.SenderType) string {
 	switch t {
 	case v1pb.SenderType_SENDER_TYPE_USER:
@@ -532,6 +547,7 @@ func GetThreadMessages(ctx context.Context, d Deps, in GetThreadMessagesInput) (
 	if in.Root == "" {
 		return "", localError("INVALID_ARGUMENT_FAILED", "root is required (the thread root message id from `thread check`)", "Pass --root <thread_root>.")
 	}
+	root := normalizeThreadRoot(in.Root)
 
 	direction := in.Direction
 	if direction == "" {
@@ -548,7 +564,7 @@ func GetThreadMessages(ctx context.Context, d Deps, in GetThreadMessagesInput) (
 
 	reqMsg := &v1pb.ListThreadMessagesRequest{
 		Conversation: name,
-		ThreadRoot:   in.Root,
+		ThreadRoot:   root,
 		PageSize:     int32(limit),
 	}
 	if in.Version > 0 {
@@ -598,6 +614,7 @@ func PostThreadMessage(ctx context.Context, d Deps, in PostThreadMessageInput) (
 	if in.Root == "" {
 		return "", localError("INVALID_ARGUMENT_FAILED", "root is required (the thread root message id)", "Pass --root <thread_root>.")
 	}
+	root := normalizeThreadRoot(in.Root)
 
 	var attachments []*v1pb.Attachment
 	for _, id := range in.AttachmentIDs {
@@ -613,7 +630,7 @@ func PostThreadMessage(ctx context.Context, d Deps, in PostThreadMessageInput) (
 		BaseVersion:  in.BaseVersion,
 		CommandId:    d.Command,
 		Attachments:  attachments,
-		ThreadRoot:   in.Root,
+		ThreadRoot:   root,
 	})
 	resp, err := d.Client.PostMessage(ctx, req)
 	if err != nil {
