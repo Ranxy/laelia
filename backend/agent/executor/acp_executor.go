@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -345,6 +346,17 @@ func (e *ACPExecutor) run() {
 		return
 	}
 	e.sessionID = string(sessionResp.SessionId)
+
+	// Apply the admin-selected model via the ACP session config option round
+	// trip: find the model config option the agent advertised in NewSession and
+	// set its value before the first prompt. This is the protocol-sanctioned way
+	// to select a model (ACP has no model field on initialize/newSession/prompt).
+	// If the agent did not advertise a model option, or the selected valueId is
+	// not among the advertised options, we log and continue with the agent's
+	// default rather than failing the session.
+	if err := e.applySelectedModel(sessionResp.ConfigOptions); err != nil {
+		slog.Warn("failed to apply selected model", "agent", e.initializedAgent, "model", e.config.Model, "error", err)
+	}
 
 	identityName := e.request.AgentDisplayName
 	if identityName == "" {
@@ -884,6 +896,76 @@ func resolveACPWorkingDir(_ Request, cfg *ACPConfig) (string, []string, error) {
 	return filepath.Clean(absWorkingDir), uniqueStrings(roots), nil
 }
 
+// applySelectedModel drives the ACP session config option round trip to apply
+// the admin-selected model. It scans the NewSession config options for the
+// one whose category is "model" and, when the selected valueId is among the
+// advertised options, calls SetSessionConfigOption. Missing model option or
+// unknown valueId are not errors: the session continues with the agent's
+// default model. Returns an error only when the SetSessionConfigOption RPC
+// itself fails.
+func (e *ACPExecutor) applySelectedModel(opts []acp.SessionConfigOption) error {
+	if e.config.Model == "" {
+		return nil
+	}
+	var modelSelect *acp.SessionConfigOptionSelect
+	for i := range opts {
+		sel := opts[i].Select
+		if sel == nil || sel.Category == nil {
+			continue
+		}
+		if *sel.Category == acp.SessionConfigOptionCategoryModel {
+			modelSelect = sel
+			break
+		}
+	}
+	if modelSelect == nil {
+		slog.Warn("agent did not advertise a model config option; cannot apply selected model", "agent", e.initializedAgent, "model", e.config.Model)
+		return nil
+	}
+	if !modelOptionContains(modelSelect.Options, e.config.Model) {
+		slog.Warn("selected model not among advertised options; using agent default", "agent", e.initializedAgent, "model", e.config.Model, "optionId", modelSelect.Id)
+		return nil
+	}
+	if _, err := e.conn.SetSessionConfigOption(e.ctx, acp.SetSessionConfigOptionRequest{
+		ValueId: &acp.SetSessionConfigOptionValueId{
+			SessionId: acp.SessionId(e.sessionID),
+			ConfigId:  modelSelect.Id,
+			Value:     acp.SessionConfigValueId(e.config.Model),
+		},
+	}); err != nil {
+		return pkgerrors.Wrapf(err, "set session config option %q=%q", modelSelect.Id, e.config.Model)
+	}
+	return nil
+}
+
+// modelOptionContains reports whether the given valueId appears in the model
+// config option's selectable values (ungrouped or grouped).
+func modelOptionContains(opts acp.SessionConfigSelectOptions, want string) bool {
+	for _, o := range flattenSelectOptions(opts) {
+		if string(o.Value) == want {
+			return true
+		}
+	}
+	return false
+}
+
+// flattenSelectOptions returns the selectable values of a session config
+// select, whether advertised as a flat ungrouped list or grouped under
+// headers.
+func flattenSelectOptions(opts acp.SessionConfigSelectOptions) []acp.SessionConfigSelectOption {
+	if opts.Ungrouped != nil {
+		return *opts.Ungrouped
+	}
+	if opts.Grouped != nil {
+		flat := make([]acp.SessionConfigSelectOption, 0)
+		for _, g := range *opts.Grouped {
+			flat = append(flat, g.Options...)
+		}
+		return flat
+	}
+	return nil
+}
+
 func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []string {
 	values := map[string]string{}
 	for _, item := range os.Environ() {
@@ -907,6 +989,12 @@ func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []st
 		values[key] = value
 	}
 	for key, value := range cfg.Env {
+		values[key] = value
+	}
+	// Overlay admin-authored custom env (key-value) on top of the inherited
+	// allow_env set; custom env wins over inherited values but is itself
+	// overridden by the LAELIA_* bootstrap vars injected below.
+	for key, value := range cfg.CustomEnv {
 		values[key] = value
 	}
 

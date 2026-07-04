@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -38,16 +39,23 @@ var defaultAutoApproveToolKinds = []string{"read", "search", "think", "fetch", "
 
 // ACPConfig is the internal, fully-resolved executor configuration. It is
 // never user-authored: the admin only sets the AgentACPConfig proto fields
-// (executable, args, allow_env), and BuildACPConfig fills in the template.
+// (provider, model, custom_env, executable, args, allow_env), and BuildACPConfig
+// fills in the template and derives the launch command from the provider
+// registry when a built-in provider is selected.
 type ACPConfig struct {
 	MaxTimeoutSeconds int32 `yaml:"max_timeout_seconds"`
 	MaxEventCount     int32 `yaml:"max_event_count"`
 	MaxOutputBytes    int64 `yaml:"max_output_bytes"`
 	OutputFlushBytes  int32 `yaml:"output_flush_bytes"`
 
-	Executable            string            `yaml:"executable"`
-	Args                  []string          `yaml:"args"`
+	Provider   string   `yaml:"provider"`
+	Model      string   `yaml:"model"`
+	Executable string   `yaml:"executable"`
+	Args       []string `yaml:"args"`
+	// Env is the template env overlay (currently unused; kept for the built-in
+	// template). CustomEnv below is the admin-authored key-value overlay.
 	Env                   map[string]string `yaml:"env"`
+	CustomEnv             map[string]string `yaml:"custom_env"`
 	AllowEnv              []string          `yaml:"allow_env"`
 	WorkingDir            string            `yaml:"working_dir"`
 	AdditionalDirectories []string          `yaml:"additional_directories"`
@@ -66,13 +74,21 @@ func AgentWorkingDir(agentID string) string {
 	return filepath.Join(home, ".laelia", agentID)
 }
 
-// BuildACPConfig resolves the user-configurable AgentACPConfig (executable,
-// args, allow_env) into a fully-populated ACPConfig by applying the built-in
-// template. It returns nil when the agent has not been configured yet
-// (executable empty), which keeps the "not configured" gating in NewACP and
-// reports supports_acp=false via Capability().
+// BuildACPConfig resolves the user-configurable AgentACPConfig (provider,
+// model, custom_env, executable, args, allow_env) into a fully-populated
+// ACPConfig by applying the built-in template. When provider selects a
+// built-in provider, the executable + args are derived from the provider
+// registry; otherwise (provider empty or "custom") the raw executable/args are
+// used as-is. It returns nil when the agent has not been configured yet
+// (neither a known provider nor an executable), which keeps the "not
+// configured" gating in NewACP and reports supports_acp=false via Capability().
 func BuildACPConfig(user *v1pb.AgentACPConfig, agentID string) *ACPConfig {
-	if user == nil || user.Executable == "" {
+	if user == nil {
+		return nil
+	}
+
+	executable, args := resolvedCommand(user, agentID)
+	if executable == "" {
 		return nil
 	}
 
@@ -82,8 +98,11 @@ func BuildACPConfig(user *v1pb.AgentACPConfig, agentID string) *ACPConfig {
 		MaxOutputBytes:    defaultACPMaxOutputBytes,
 		OutputFlushBytes:  defaultOutputFlushBytes,
 
-		Executable:           user.Executable,
-		Args:                 user.Args,
+		Provider:             user.Provider,
+		Model:                user.Model,
+		Executable:           executable,
+		Args:                 args,
+		CustomEnv:            user.CustomEnv,
 		AllowEnv:             user.AllowEnv,
 		WorkingDir:           AgentWorkingDir(agentID),
 		ReadTextFiles:        true,
@@ -94,6 +113,17 @@ func BuildACPConfig(user *v1pb.AgentACPConfig, agentID string) *ACPConfig {
 		SupportsToolTraces:   true,
 	}
 	return cfg
+}
+
+// resolvedCommand returns the executable + args to spawn. A built-in provider
+// (looked up in the default registry) supplies its own launch command rooted
+// at the agent working directory; anything else (provider "custom", empty, or
+// unknown) falls back to the raw executable/args fields.
+func resolvedCommand(user *v1pb.AgentACPConfig, agentID string) (string, []string) {
+	if p, ok := provider.Default().Lookup(user.Provider); ok {
+		return p.BuildCommand(AgentWorkingDir(agentID))
+	}
+	return user.Executable, user.Args
 }
 
 // BuildCapability derives the agent capability from the user-configurable ACP
