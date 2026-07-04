@@ -153,13 +153,18 @@ func (s *CommandService) CreateTask(ctx context.Context, req *connect.Request[v1
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to create task message"))
 	}
 
-	// Advance the posting agent's cursor past its own message so it never
-	// re-surfaces its own task as new (mirrors PostMessage).
-	if _, err := s.store.UpsertCursor(ctx, agent.ID, convUUID, newVersion); err != nil {
-		slog.Warn("failed to advance posting agent cursor", "agentID", agent.ID, "conversationID", convUUID, "version", newVersion, "error", err)
-	}
-	// Wake the other agent members so they can claim the new task.
-	s.notifyConversationAgents(ctx, convUUID, newVersion, &agent.ID)
+	// A created task is work-to-be-done, not a conversational reply: the
+	// creator must be able to discover and claim its own subtask (e.g. when it
+	// is the only agent, or it broke a big task into steps it will execute).
+	// We therefore do NOT advance the creator's cursor past its own task, and
+	// we wake ALL agent members including the creator. The task message then
+	// sits beyond the creator's cursor so HasUpdates triggers the next drain,
+	// whose `task list` step surfaces the TODO for the creator to claim. After
+	// the creator acks past the task message, HasUpdates goes false again, so
+	// the loop terminates — no infinite self-wake. (Contrast PostMessage,
+	// which advances the cursor and excludes self so an agent never re-reads
+	// or replies to its own conversational reply.)
+	s.notifyConversationAgents(ctx, convUUID, newVersion, nil)
 	s.postTaskSystemNotification(ctx, convUUID, fmt.Sprintf("📋 %s created task #%d %q", agent.Name, msg.TaskInfo.TaskNumber, truncateContent(msg.Content)))
 
 	return connect.NewResponse(&v1pb.CreateTaskResponse{Message: storeToV1ChatMessage(msg)}), nil
