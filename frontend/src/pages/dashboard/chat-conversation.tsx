@@ -524,6 +524,19 @@ export function ChatConversationPage() {
     [channelId, conversationName, openFilePreview]
   );
 
+  // Cross-scenario anchor jump: a comment's anchor chip (rendered in a thread
+  // reply or channel message) opens the file's preview already scrolled to the
+  // section the comment is anchored to. The anchored attachment references the
+  // file (same id/name/mime/size), so openFilePreview downloads and renders it,
+  // then the overlay scrolls to scrollToSectionId once the DOM is ready.
+  const handleJumpToSection = useCallback(
+    (att: Attachment, sectionId: string, rootMessageId: string) => {
+      if (!channelId) return;
+      openFilePreview(conversationName, rootMessageId, att, sectionId);
+    },
+    [channelId, conversationName, openFilePreview]
+  );
+
   const handleToggleTasksPanel = useCallback(() => {
     if (!channelId) return;
     // Opening the tasks panel closes the thread panel — two 420px side panels
@@ -648,6 +661,7 @@ export function ChatConversationPage() {
                       markdownCustomId="channel-chat"
                       onOpenThread={handleOpenThread}
                       onPreviewAttachment={handlePreviewAttachment}
+                      onJumpToSection={handleJumpToSection}
                     />
                   </div>
                 );
@@ -888,6 +902,7 @@ export function ChatConversationPage() {
             onClose={closeThread}
             onViewInChannel={handleViewInChannel}
             onPreviewAttachment={handlePreviewAttachment}
+            onJumpToSection={handleJumpToSection}
           />
         )}
         {tasksPanelOpen && channelId && (

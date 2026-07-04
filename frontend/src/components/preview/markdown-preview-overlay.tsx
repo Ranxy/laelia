@@ -50,17 +50,25 @@ export function MarkdownPreviewOverlay() {
   }, [active, closeFilePreview]);
 
   // Build the outline once the markdown DOM is painted. The content is static
-  // (`final`), so a single rAF after `status === "ready"` suffices.
+  // (`final`), so a single rAF after `status === "ready"` suffices. When the
+  // preview was opened with a scrollToSectionId (cross-scenario anchor jump
+  // from a comment card), scroll to that heading right after ids are assigned.
   useEffect(() => {
     if (!active || active.status !== "ready") {
       setOutline([]);
       return;
     }
     const id = requestAnimationFrame(() => {
-      if (contentRef.current) setOutline(buildOutline(contentRef.current));
+      if (!contentRef.current) return;
+      setOutline(buildOutline(contentRef.current));
+      if (active.scrollToSectionId) {
+        document
+          .getElementById(active.scrollToSectionId)
+          ?.scrollIntoView({ block: "start", behavior: "smooth" });
+      }
     });
     return () => cancelAnimationFrame(id);
-  }, [active?.status, active?.content]);
+  }, [active?.status, active?.content, active?.scrollToSectionId]);
 
   if (!active) return null;
   const { attachment } = active;

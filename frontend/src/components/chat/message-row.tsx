@@ -96,6 +96,16 @@ export interface MessageRowProps {
   // thread root (the message's threadRoot, or its own id when it is a root)
   // so Phase 2 comments can route to the right thread.
   onPreviewAttachment?: (attachment: Attachment, rootMessageId: string) => void;
+  // onJumpToSection, when provided, turns an anchored-comment card's anchor
+  // chip into a cross-scenario jump: it opens the file's preview overlay
+  // already scrolled to the section the comment is anchored to. Receives the
+  // anchored attachment (which references the file), the section id, and the
+  // effective thread root.
+  onJumpToSection?: (
+    attachment: Attachment,
+    sectionId: string,
+    rootMessageId: string
+  ) => void;
 }
 
 export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
@@ -111,6 +121,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     markdownCustomId,
     onOpenThread,
     onPreviewAttachment,
+    onJumpToSection,
   } = props;
   const { t } = useTranslation();
   const isUser = msg.role === "user";
@@ -395,6 +406,16 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
                       key={att.id}
                       attachment={att}
                       variant="inline"
+                      onJumpToSection={
+                        onJumpToSection
+                          ? (sectionId) =>
+                              onJumpToSection(
+                                att,
+                                sectionId,
+                                msg.threadRoot ?? msg.id
+                              )
+                          : undefined
+                      }
                     />
                   );
                 }

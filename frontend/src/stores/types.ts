@@ -262,12 +262,18 @@ export interface PreviewSlice {
     attachment: Attachment;
     content: string;
     status: "loading" | "ready" | "error" | "too-large";
+    // When set, the overlay scrolls to this heading id once the markdown DOM
+    // is ready (cross-scenario anchor jump: a comment's anchor chip clicked
+    // outside the overlay opens the preview already scrolled to its section).
+    // Consumed and cleared by the overlay after the first ready render.
+    scrollToSectionId?: string;
   } | null;
 
   openFilePreview: (
     conversation: string,
     rootMessageId: string,
-    attachment: Attachment
+    attachment: Attachment,
+    scrollToSectionId?: string
   ) => Promise<void>;
   closeFilePreview: () => void;
 }

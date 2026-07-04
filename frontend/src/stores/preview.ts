@@ -11,7 +11,12 @@ import type { AppSliceCreator, PreviewSlice } from "./types";
 export const createPreviewSlice: AppSliceCreator<PreviewSlice> = (set) => ({
   activePreview: null,
 
-  async openFilePreview(conversation, rootMessageId, attachment) {
+  async openFilePreview(
+    conversation,
+    rootMessageId,
+    attachment,
+    scrollToSectionId
+  ) {
     const tooLarge = (attachment.sizeBytes ?? 0n) > MAX_MARKDOWN_PREVIEW_BYTES;
     set({
       activePreview: {
@@ -21,6 +26,7 @@ export const createPreviewSlice: AppSliceCreator<PreviewSlice> = (set) => ({
         attachment,
         content: "",
         status: tooLarge ? "too-large" : "loading",
+        scrollToSectionId,
       },
     });
     if (tooLarge) return;

@@ -49,6 +49,11 @@ export interface ThreadPanelProps {
   onClose: () => void;
   onViewInChannel: () => void;
   onPreviewAttachment?: (attachment: Attachment, rootMessageId: string) => void;
+  onJumpToSection?: (
+    attachment: Attachment,
+    sectionId: string,
+    rootMessageId: string
+  ) => void;
 }
 
 export function ThreadPanel({
@@ -58,6 +63,7 @@ export function ThreadPanel({
   onClose,
   onViewInChannel,
   onPreviewAttachment,
+  onJumpToSection,
 }: ThreadPanelProps) {
   const { t } = useTranslation();
   const conversationName = `conversations/${channelId}`;
@@ -307,6 +313,7 @@ export function ThreadPanel({
                 MentionBadge={MentionBadge}
                 markdownCustomId="thread-chat"
                 onPreviewAttachment={onPreviewAttachment}
+                onJumpToSection={onJumpToSection}
               />
             );
           })}
