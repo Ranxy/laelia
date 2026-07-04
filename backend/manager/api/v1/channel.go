@@ -303,21 +303,47 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		threadRoot = uuid.NullUUID{UUID: rootID, Valid: true}
 	}
 
+	// as_task creates this top-level message as a task: a task row is inserted
+	// in the same transaction with a per-conversation number and status TODO.
+	// Tasks are top-level only, so as_task is incompatible with thread_root.
+	if req.Msg.AsTask && threadRoot.Valid {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("as_task is only valid for top-level messages, not thread replies"))
+	}
+
 	// Atomically bump conversation.version and write the user message with that
-	// room_version. This is the single source of truth for the room cursor.
-	msg, _, err := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
-		ConversationID:      convID,
-		PrincipalID:         user.ID,
-		PrincipalName:       user.Name,
-		Role:                1, // USER
-		Content:             req.Msg.Content,
-		SenderType:          store.SenderTypeUser,
-		Mentions:            req.Msg.Mentions,
-		Attachments:         req.Msg.Attachments,
-		ThreadRootMessageID: threadRoot,
-	})
+	// room_version. This is the single source of truth for the room cursor. When
+	// as_task is set, the same tx also inserts the task row (status TODO).
+	var msg *store.ChatMessage
+	if req.Msg.AsTask {
+		msg, _, err = s.store.CreateTaskMessageBumpVersion(ctx, &store.ChatMessage{
+			ConversationID: convID,
+			PrincipalID:    user.ID,
+			PrincipalName:  user.Name,
+			Role:           1, // USER
+			Content:        req.Msg.Content,
+			SenderType:     store.SenderTypeUser,
+			Mentions:       req.Msg.Mentions,
+			Attachments:    req.Msg.Attachments,
+		})
+	} else {
+		msg, _, err = s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
+			ConversationID:      convID,
+			PrincipalID:         user.ID,
+			PrincipalName:       user.Name,
+			Role:                1, // USER
+			Content:             req.Msg.Content,
+			SenderType:          store.SenderTypeUser,
+			Mentions:            req.Msg.Mentions,
+			Attachments:         req.Msg.Attachments,
+			ThreadRootMessageID: threadRoot,
+		})
+	}
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create message"))
+	}
+
+	if req.Msg.AsTask {
+		s.postTaskSystemNotification(ctx, convID, fmt.Sprintf("📋 %s created task #%d %q", user.Name, msg.TaskInfo.TaskNumber, truncateContent(req.Msg.Content)))
 	}
 
 	if threadRoot.Valid {

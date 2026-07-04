@@ -895,6 +895,7 @@ func storeToV1ChatMessage(msg *store.ChatMessage) *v1pb.ChatMessage {
 		Mentions:         msg.Mentions,
 		Attachments:      msg.Attachments,
 		ThreadReplyCount: msg.ThreadReplyCount,
+		Task:             storeToV1TaskInfo(msg.TaskInfo),
 	}
 	if msg.CommandID.Valid {
 		v1m.CommandId = msg.CommandID.UUID.String()
@@ -903,6 +904,21 @@ func storeToV1ChatMessage(msg *store.ChatMessage) *v1pb.ChatMessage {
 		v1m.ThreadRoot = msg.ThreadRootMessageID.UUID.String()
 	}
 	return v1m
+}
+
+// storeToV1TaskInfo converts the store-layer TaskInfo join into the proto
+// TaskInfo carried on a ChatMessage. Returns nil when the message is not a
+// task, so non-task messages omit the field.
+func storeToV1TaskInfo(ti *store.TaskInfo) *v1pb.TaskInfo {
+	if ti == nil {
+		return nil
+	}
+	return &v1pb.TaskInfo{
+		TaskNumber:         ti.TaskNumber,
+		Status:             v1pb.TaskStatus(ti.Status),
+		AssigneeName:       ti.AssigneeName,
+		AssigneeResourceId: ti.AssigneeResourceID,
+	}
 }
 
 func toNullInt32(v int32) sql.NullInt32 {
