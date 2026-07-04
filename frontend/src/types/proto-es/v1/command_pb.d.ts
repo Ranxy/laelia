@@ -12,6 +12,50 @@ import type { EmptySchema, FieldMask, Timestamp } from "@bufbuild/protobuf/wkt";
 export declare const file_v1_command: GenFile;
 
 /**
+ * TaskInfo is the task metadata attached to a ChatMessage that is a task. It is
+ * a read-only join output populated by ListConversationMessages /
+ * ListThreadMessages for root messages; absent on non-task messages and on
+ * thread replies. The chat_message itself remains the source of truth for
+ * content/sender/room_version.
+ *
+ * @generated from message laelia.v1.TaskInfo
+ */
+export declare type TaskInfo = Message<"laelia.v1.TaskInfo"> & {
+  /**
+   * task_number is the per-conversation sequence number shown as "[task #N]".
+   *
+   * @generated from field: int32 task_number = 1;
+   */
+  taskNumber: number;
+
+  /**
+   * @generated from field: laelia.v1.TaskStatus status = 2;
+   */
+  status: TaskStatus;
+
+  /**
+   * assignee_name is the assigned agent's display name, empty when unassigned.
+   *
+   * @generated from field: string assignee_name = 3;
+   */
+  assigneeName: string;
+
+  /**
+   * assignee_resource_id is the assigned agent's resource id ("agents/<id>"),
+   * empty when unassigned.
+   *
+   * @generated from field: string assignee_resource_id = 4;
+   */
+  assigneeResourceId: string;
+};
+
+/**
+ * Describes the message laelia.v1.TaskInfo.
+ * Use `create(TaskInfoSchema)` to create a new message.
+ */
+export declare const TaskInfoSchema: GenMessage<TaskInfo>;
+
+/**
  * @generated from message laelia.v1.Command
  */
 export declare type Command = Message<"laelia.v1.Command"> & {
@@ -986,6 +1030,15 @@ export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
    * @generated from field: int32 thread_reply_count = 15;
    */
   threadReplyCount: number;
+
+  /**
+   * task is set when this message is a task (a row exists in the task table for
+   * this message id). Populated by ListConversationMessages / ListThreadMessages
+   * for root messages; absent for non-task messages and thread replies.
+   *
+   * @generated from field: laelia.v1.TaskInfo task = 16;
+   */
+  task?: TaskInfo | undefined;
 };
 
 /**
@@ -1651,6 +1704,15 @@ export declare type SendMessageRequest = Message<"laelia.v1.SendMessageRequest">
    * @generated from field: string thread_root = 5;
    */
   threadRoot: string;
+
+  /**
+   * as_task, when true, creates this message as a task: a task row is inserted
+   * in the same transaction with a per-conversation task number and status
+   * TODO. Only valid for top-level messages (thread_root must be empty).
+   *
+   * @generated from field: bool as_task = 6;
+   */
+  asTask: boolean;
 };
 
 /**
@@ -1780,6 +1842,254 @@ export declare type PostMessageResponse = Message<"laelia.v1.PostMessageResponse
  * Use `create(PostMessageResponseSchema)` to create a new message.
  */
 export declare const PostMessageResponseSchema: GenMessage<PostMessageResponse>;
+
+/**
+ * @generated from message laelia.v1.ConvertMessageToTaskRequest
+ */
+export declare type ConvertMessageToTaskRequest = Message<"laelia.v1.ConvertMessageToTaskRequest"> & {
+  /**
+   * message is the resource name of the top-level message to convert
+   * ("conversations/{c}/messages/{m}"). Must be a root message in the
+   * conversation (thread_root empty) and not already a task.
+   *
+   * @generated from field: string message = 1;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message laelia.v1.ConvertMessageToTaskRequest.
+ * Use `create(ConvertMessageToTaskRequestSchema)` to create a new message.
+ */
+export declare const ConvertMessageToTaskRequestSchema: GenMessage<ConvertMessageToTaskRequest>;
+
+/**
+ * @generated from message laelia.v1.ConvertMessageToTaskResponse
+ */
+export declare type ConvertMessageToTaskResponse = Message<"laelia.v1.ConvertMessageToTaskResponse"> & {
+  /**
+   * message is the converted message, with task populated. A separate system
+   * notification row is also inserted into the conversation flow.
+   *
+   * @generated from field: laelia.v1.ChatMessage message = 1;
+   */
+  message?: ChatMessage | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.ConvertMessageToTaskResponse.
+ * Use `create(ConvertMessageToTaskResponseSchema)` to create a new message.
+ */
+export declare const ConvertMessageToTaskResponseSchema: GenMessage<ConvertMessageToTaskResponse>;
+
+/**
+ * @generated from message laelia.v1.ListTasksRequest
+ */
+export declare type ListTasksRequest = Message<"laelia.v1.ListTasksRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * status_filter, when non-empty, restricts the result to the given statuses.
+   * Empty returns tasks in every status.
+   *
+   * @generated from field: repeated laelia.v1.TaskStatus status_filter = 2;
+   */
+  statusFilter: TaskStatus[];
+};
+
+/**
+ * Describes the message laelia.v1.ListTasksRequest.
+ * Use `create(ListTasksRequestSchema)` to create a new message.
+ */
+export declare const ListTasksRequestSchema: GenMessage<ListTasksRequest>;
+
+/**
+ * @generated from message laelia.v1.ListTasksResponse
+ */
+export declare type ListTasksResponse = Message<"laelia.v1.ListTasksResponse"> & {
+  /**
+   * tasks are the channel's task root messages, each with task populated,
+   * ordered by task_number ascending.
+   *
+   * @generated from field: repeated laelia.v1.ChatMessage tasks = 1;
+   */
+  tasks: ChatMessage[];
+};
+
+/**
+ * Describes the message laelia.v1.ListTasksResponse.
+ * Use `create(ListTasksResponseSchema)` to create a new message.
+ */
+export declare const ListTasksResponseSchema: GenMessage<ListTasksResponse>;
+
+/**
+ * @generated from message laelia.v1.ClaimTaskRequest
+ */
+export declare type ClaimTaskRequest = Message<"laelia.v1.ClaimTaskRequest"> & {
+  /**
+   * message is the resource name of the task's root message
+   * ("conversations/{c}/messages/{m}").
+   *
+   * @generated from field: string message = 1;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message laelia.v1.ClaimTaskRequest.
+ * Use `create(ClaimTaskRequestSchema)` to create a new message.
+ */
+export declare const ClaimTaskRequestSchema: GenMessage<ClaimTaskRequest>;
+
+/**
+ * @generated from message laelia.v1.ClaimTaskResponse
+ */
+export declare type ClaimTaskResponse = Message<"laelia.v1.ClaimTaskResponse"> & {
+  /**
+   * message is the task message after the claim, with task populated (status
+   * now IN_PROGRESS, assignee set to the caller). When the claim failed because
+   * another agent already owns the task or it is not in TODO, the RPC returns
+   * FAILED_PRECONDITION instead and this response is not sent.
+   *
+   * @generated from field: laelia.v1.ChatMessage message = 1;
+   */
+  message?: ChatMessage | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.ClaimTaskResponse.
+ * Use `create(ClaimTaskResponseSchema)` to create a new message.
+ */
+export declare const ClaimTaskResponseSchema: GenMessage<ClaimTaskResponse>;
+
+/**
+ * @generated from message laelia.v1.UnclaimTaskRequest
+ */
+export declare type UnclaimTaskRequest = Message<"laelia.v1.UnclaimTaskRequest"> & {
+  /**
+   * @generated from field: string message = 1;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message laelia.v1.UnclaimTaskRequest.
+ * Use `create(UnclaimTaskRequestSchema)` to create a new message.
+ */
+export declare const UnclaimTaskRequestSchema: GenMessage<UnclaimTaskRequest>;
+
+/**
+ * @generated from message laelia.v1.UnclaimTaskResponse
+ */
+export declare type UnclaimTaskResponse = Message<"laelia.v1.UnclaimTaskResponse"> & {
+  /**
+   * @generated from field: laelia.v1.ChatMessage message = 1;
+   */
+  message?: ChatMessage | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.UnclaimTaskResponse.
+ * Use `create(UnclaimTaskResponseSchema)` to create a new message.
+ */
+export declare const UnclaimTaskResponseSchema: GenMessage<UnclaimTaskResponse>;
+
+/**
+ * @generated from message laelia.v1.UpdateTaskStatusRequest
+ */
+export declare type UpdateTaskStatusRequest = Message<"laelia.v1.UpdateTaskStatusRequest"> & {
+  /**
+   * @generated from field: string message = 1;
+   */
+  message: string;
+
+  /**
+   * status is the target status. Allowed transitions (enforced server-side):
+   * IN_PROGRESS -> IN_REVIEW (the assignee marks the task ready for human
+   * review) and IN_REVIEW -> DONE (the assignee marks the task done after
+   * detecting the human's approval in the task's thread). TODO -> IN_PROGRESS
+   * is performed by ClaimTask, not this RPC.
+   *
+   * @generated from field: laelia.v1.TaskStatus status = 2;
+   */
+  status: TaskStatus;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateTaskStatusRequest.
+ * Use `create(UpdateTaskStatusRequestSchema)` to create a new message.
+ */
+export declare const UpdateTaskStatusRequestSchema: GenMessage<UpdateTaskStatusRequest>;
+
+/**
+ * @generated from message laelia.v1.UpdateTaskStatusResponse
+ */
+export declare type UpdateTaskStatusResponse = Message<"laelia.v1.UpdateTaskStatusResponse"> & {
+  /**
+   * @generated from field: laelia.v1.ChatMessage message = 1;
+   */
+  message?: ChatMessage | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateTaskStatusResponse.
+ * Use `create(UpdateTaskStatusResponseSchema)` to create a new message.
+ */
+export declare const UpdateTaskStatusResponseSchema: GenMessage<UpdateTaskStatusResponse>;
+
+/**
+ * @generated from message laelia.v1.CreateTaskRequest
+ */
+export declare type CreateTaskRequest = Message<"laelia.v1.CreateTaskRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: string content = 2;
+   */
+  content: string;
+
+  /**
+   * @generated from field: repeated laelia.v1.Mention mentions = 3;
+   */
+  mentions: Mention[];
+
+  /**
+   * @generated from field: repeated laelia.v1.Attachment attachments = 4;
+   */
+  attachments: Attachment[];
+};
+
+/**
+ * Describes the message laelia.v1.CreateTaskRequest.
+ * Use `create(CreateTaskRequestSchema)` to create a new message.
+ */
+export declare const CreateTaskRequestSchema: GenMessage<CreateTaskRequest>;
+
+/**
+ * @generated from message laelia.v1.CreateTaskResponse
+ */
+export declare type CreateTaskResponse = Message<"laelia.v1.CreateTaskResponse"> & {
+  /**
+   * message is the newly posted task message, with task populated. The task is
+   * created unassigned (status TODO); the posting agent does NOT auto-claim it
+   * — call ClaimTask afterwards to own it.
+   *
+   * @generated from field: laelia.v1.ChatMessage message = 1;
+   */
+  message?: ChatMessage | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.CreateTaskResponse.
+ * Use `create(CreateTaskResponseSchema)` to create a new message.
+ */
+export declare const CreateTaskResponseSchema: GenMessage<CreateTaskResponse>;
 
 /**
  * ListChannelUpdates returns, for the authenticated agent, every conversation
@@ -2678,6 +2988,46 @@ export enum SenderType {
 export declare const SenderTypeSchema: GenEnum<SenderType>;
 
 /**
+ * TaskStatus is the lifecycle state of a task message. A task is a top-level
+ * channel/DM message with task metadata; its thread is the discussion/approval
+ * channel. Values prefixed to satisfy protobuf's C++ scoping rules (sibling
+ * enums cannot share value names), matching SenderType/CommandStatus.
+ *
+ * @generated from enum laelia.v1.TaskStatus
+ */
+export enum TaskStatus {
+  /**
+   * @generated from enum value: TASK_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: TASK_STATUS_TODO = 1;
+   */
+  TODO = 1,
+
+  /**
+   * @generated from enum value: TASK_STATUS_IN_PROGRESS = 2;
+   */
+  IN_PROGRESS = 2,
+
+  /**
+   * @generated from enum value: TASK_STATUS_IN_REVIEW = 3;
+   */
+  IN_REVIEW = 3,
+
+  /**
+   * @generated from enum value: TASK_STATUS_DONE = 4;
+   */
+  DONE = 4,
+}
+
+/**
+ * Describes the enum laelia.v1.TaskStatus.
+ */
+export declare const TaskStatusSchema: GenEnum<TaskStatus>;
+
+/**
  * @generated from enum laelia.v1.CommandEventType
  */
 export enum CommandEventType {
@@ -2926,6 +3276,81 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof PostMessageRequestSchema;
     output: typeof PostMessageResponseSchema;
+  },
+  /**
+   * ConvertMessageToTask turns an existing top-level message into a task by
+   * attaching task metadata (number, status=TODO, no assignee). Any channel
+   * member (user or agent) may convert. Emits a system notification row.
+   *
+   * @generated from rpc laelia.v1.CommandService.ConvertMessageToTask
+   */
+  convertMessageToTask: {
+    methodKind: "unary";
+    input: typeof ConvertMessageToTaskRequestSchema;
+    output: typeof ConvertMessageToTaskResponseSchema;
+  },
+  /**
+   * ListTasks returns the task board for a conversation: every task (root
+   * message with task metadata) in the channel, optionally filtered by status.
+   *
+   * @generated from rpc laelia.v1.CommandService.ListTasks
+   */
+  listTasks: {
+    methodKind: "unary";
+    input: typeof ListTasksRequestSchema;
+    output: typeof ListTasksResponseSchema;
+  },
+  /**
+   * CreateTask posts a new top-level task message in a channel (used by agents
+   * to break work into subtasks for others to claim). The new task is created
+   * unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a
+   * system notification row and wakes other agent members.
+   *
+   * @generated from rpc laelia.v1.CommandService.CreateTask
+   */
+  createTask: {
+    methodKind: "unary";
+    input: typeof CreateTaskRequestSchema;
+    output: typeof CreateTaskResponseSchema;
+  },
+  /**
+   * ClaimTask atomically transitions a TODO task to IN_PROGRESS and assigns it
+   * to the calling agent, subscribing the agent to the task's thread so approval
+   * replies wake it. Returns FAILED_PRECONDITION if the task is already
+   * claimed or not in TODO. Emits a system notification row.
+   *
+   * @generated from rpc laelia.v1.CommandService.ClaimTask
+   */
+  claimTask: {
+    methodKind: "unary";
+    input: typeof ClaimTaskRequestSchema;
+    output: typeof ClaimTaskResponseSchema;
+  },
+  /**
+   * UnclaimTask releases the calling agent's claim on a task it owns, setting
+   * it back to TODO so another agent may claim it. Not allowed on DONE
+   * (terminal). Emits a system notification row.
+   *
+   * @generated from rpc laelia.v1.CommandService.UnclaimTask
+   */
+  unclaimTask: {
+    methodKind: "unary";
+    input: typeof UnclaimTaskRequestSchema;
+    output: typeof UnclaimTaskResponseSchema;
+  },
+  /**
+   * UpdateTaskStatus advances a task's status. IN_PROGRESS -> IN_REVIEW marks
+   * the assignee's work ready for human review; IN_REVIEW -> DONE marks it
+   * complete (the assignee should call this only after detecting the human's
+   * approval in the task's thread). Only the assignee may call this. Emits a
+   * system notification row.
+   *
+   * @generated from rpc laelia.v1.CommandService.UpdateTaskStatus
+   */
+  updateTaskStatus: {
+    methodKind: "unary";
+    input: typeof UpdateTaskStatusRequestSchema;
+    output: typeof UpdateTaskStatusResponseSchema;
   },
   /**
    * @generated from rpc laelia.v1.CommandService.ListChannelUpdates

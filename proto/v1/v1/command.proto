@@ -36,6 +36,34 @@ enum SenderType {
   SENDER_TYPE_SYSTEM = 3;
 }
 
+// TaskStatus is the lifecycle state of a task message. A task is a top-level
+// channel/DM message with task metadata; its thread is the discussion/approval
+// channel. Values prefixed to satisfy protobuf's C++ scoping rules (sibling
+// enums cannot share value names), matching SenderType/CommandStatus.
+enum TaskStatus {
+  TASK_STATUS_UNSPECIFIED = 0;
+  TASK_STATUS_TODO = 1;
+  TASK_STATUS_IN_PROGRESS = 2;
+  TASK_STATUS_IN_REVIEW = 3;
+  TASK_STATUS_DONE = 4;
+}
+
+// TaskInfo is the task metadata attached to a ChatMessage that is a task. It is
+// a read-only join output populated by ListConversationMessages /
+// ListThreadMessages for root messages; absent on non-task messages and on
+// thread replies. The chat_message itself remains the source of truth for
+// content/sender/room_version.
+message TaskInfo {
+  // task_number is the per-conversation sequence number shown as "[task #N]".
+  int32 task_number = 1;
+  TaskStatus status = 2;
+  // assignee_name is the assigned agent's display name, empty when unassigned.
+  string assignee_name = 3;
+  // assignee_resource_id is the assigned agent's resource id ("agents/<id>"),
+  // empty when unassigned.
+  string assignee_resource_id = 4;
+}
+
 enum CommandEventType {
   COMMAND_EVENT_TYPE_UNSPECIFIED = 0;
   LIFECYCLE = 1;
@@ -301,6 +329,10 @@ message ChatMessage {
   // uses it to render the reply-count badge on the root message in the main
   // channel list. Always 0 for thread replies.
   int32 thread_reply_count = 15;
+  // task is set when this message is a task (a row exists in the task table for
+  // this message id). Populated by ListConversationMessages / ListThreadMessages
+  // for root messages; absent for non-task messages and thread replies.
+  TaskInfo task = 16;
 }
 
 message Conversation {
@@ -511,6 +543,10 @@ message SendMessageRequest {
   // the given message name ("conversations/{c}/messages/{m}"). Empty posts a
   // normal channel message.
   string thread_root = 5;
+  // as_task, when true, creates this message as a task: a task row is inserted
+  // in the same transaction with a per-conversation task number and status
+  // TODO. Only valid for top-level messages (thread_root must be empty).
+  bool as_task = 6;
 }
 
 message GetCommandContextRequest {
@@ -546,6 +582,93 @@ message PostMessageResponse {
   int64 current_version = 3;
   repeated ChatMessage new_messages = 4;
   string conflict_description = 5;
+}
+
+// === Tasks ===
+// A task is a top-level channel/DM message with task metadata (a
+// per-conversation number, a status, and an optional assignee). The chat
+// message is the source of truth for content; the task row carries the task
+// state. The thread rooted at the task message is the task's discussion /
+// approval channel. These RPCs cover the four creation/mutation paths:
+// convert an existing message, list a channel's tasks, claim / unclaim, and
+// update status. SendMessage.as_task and agent CreateTask cover send-time and
+// agent-subtask creation respectively; the conversions/claims here are the
+// shared mutation surface.
+
+message ConvertMessageToTaskRequest {
+  // message is the resource name of the top-level message to convert
+  // ("conversations/{c}/messages/{m}"). Must be a root message in the
+  // conversation (thread_root empty) and not already a task.
+  string message = 1 [(google.api.field_behavior) = REQUIRED];
+}
+message ConvertMessageToTaskResponse {
+  // message is the converted message, with task populated. A separate system
+  // notification row is also inserted into the conversation flow.
+  ChatMessage message = 1;
+}
+
+message ListTasksRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
+  // status_filter, when non-empty, restricts the result to the given statuses.
+  // Empty returns tasks in every status.
+  repeated TaskStatus status_filter = 2;
+}
+message ListTasksResponse {
+  // tasks are the channel's task root messages, each with task populated,
+  // ordered by task_number ascending.
+  repeated ChatMessage tasks = 1;
+}
+
+message ClaimTaskRequest {
+  // message is the resource name of the task's root message
+  // ("conversations/{c}/messages/{m}").
+  string message = 1 [(google.api.field_behavior) = REQUIRED];
+}
+message ClaimTaskResponse {
+  // message is the task message after the claim, with task populated (status
+  // now IN_PROGRESS, assignee set to the caller). When the claim failed because
+  // another agent already owns the task or it is not in TODO, the RPC returns
+  // FAILED_PRECONDITION instead and this response is not sent.
+  ChatMessage message = 1;
+}
+
+message UnclaimTaskRequest {
+  string message = 1 [(google.api.field_behavior) = REQUIRED];
+}
+message UnclaimTaskResponse {
+  ChatMessage message = 1;
+}
+
+message UpdateTaskStatusRequest {
+  string message = 1 [(google.api.field_behavior) = REQUIRED];
+  // status is the target status. Allowed transitions (enforced server-side):
+  // IN_PROGRESS -> IN_REVIEW (the assignee marks the task ready for human
+  // review) and IN_REVIEW -> DONE (the assignee marks the task done after
+  // detecting the human's approval in the task's thread). TODO -> IN_PROGRESS
+  // is performed by ClaimTask, not this RPC.
+  TaskStatus status = 2 [(google.api.field_behavior) = REQUIRED];
+}
+message UpdateTaskStatusResponse {
+  ChatMessage message = 1;
+}
+
+message CreateTaskRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
+  string content = 2 [(google.api.field_behavior) = REQUIRED];
+  repeated Mention mentions = 3;
+  repeated Attachment attachments = 4;
+}
+message CreateTaskResponse {
+  // message is the newly posted task message, with task populated. The task is
+  // created unassigned (status TODO); the posting agent does NOT auto-claim it
+  // — call ClaimTask afterwards to own it.
+  ChatMessage message = 1;
 }
 
 // ListChannelUpdates returns, for the authenticated agent, every conversation
@@ -759,6 +882,71 @@ service CommandService {
   rpc PostMessage(PostMessageRequest) returns (PostMessageResponse) {
     option (google.api.http) = {
       post: "/v1/{conversation=conversations/*}:postMessage"
+      body: "*"
+    };
+  }
+
+  // ConvertMessageToTask turns an existing top-level message into a task by
+  // attaching task metadata (number, status=TODO, no assignee). Any channel
+  // member (user or agent) may convert. Emits a system notification row.
+  rpc ConvertMessageToTask(ConvertMessageToTaskRequest) returns (ConvertMessageToTaskResponse) {
+    option (google.api.http) = {
+      post: "/v1/{message=conversations/*/messages/*}:convertToTask"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.send";
+    option (laelia.v1.audit) = true;
+  }
+
+  // ListTasks returns the task board for a conversation: every task (root
+  // message with task metadata) in the channel, optionally filtered by status.
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse) {
+    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/tasks"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.read";
+  }
+
+  // CreateTask posts a new top-level task message in a channel (used by agents
+  // to break work into subtasks for others to claim). The new task is created
+  // unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a
+  // system notification row and wakes other agent members.
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {
+    option (google.api.http) = {
+      post: "/v1/{conversation=conversations/*}:createTask"
+      body: "*"
+    };
+  }
+
+  // ClaimTask atomically transitions a TODO task to IN_PROGRESS and assigns it
+  // to the calling agent, subscribing the agent to the task's thread so approval
+  // replies wake it. Returns FAILED_PRECONDITION if the task is already
+  // claimed or not in TODO. Emits a system notification row.
+  rpc ClaimTask(ClaimTaskRequest) returns (ClaimTaskResponse) {
+    option (google.api.http) = {
+      post: "/v1/{message=conversations/*/messages/*}:claimTask"
+      body: "*"
+    };
+  }
+
+  // UnclaimTask releases the calling agent's claim on a task it owns, setting
+  // it back to TODO so another agent may claim it. Not allowed on DONE
+  // (terminal). Emits a system notification row.
+  rpc UnclaimTask(UnclaimTaskRequest) returns (UnclaimTaskResponse) {
+    option (google.api.http) = {
+      post: "/v1/{message=conversations/*/messages/*}:unclaimTask"
+      body: "*"
+    };
+  }
+
+  // UpdateTaskStatus advances a task's status. IN_PROGRESS -> IN_REVIEW marks
+  // the assignee's work ready for human review; IN_REVIEW -> DONE marks it
+  // complete (the assignee should call this only after detecting the human's
+  // approval in the task's thread). Only the assignee may call this. Emits a
+  // system notification row.
+  rpc UpdateTaskStatus(UpdateTaskStatusRequest) returns (UpdateTaskStatusResponse) {
+    option (google.api.http) = {
+      post: "/v1/{message=conversations/*/messages/*}:updateTaskStatus"
       body: "*"
     };
   }

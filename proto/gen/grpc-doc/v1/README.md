@@ -101,6 +101,8 @@
     - [ChannelUpdate](#laelia-v1-ChannelUpdate)
     - [ChatHistoryEntry](#laelia-v1-ChatHistoryEntry)
     - [ChatMessage](#laelia-v1-ChatMessage)
+    - [ClaimTaskRequest](#laelia-v1-ClaimTaskRequest)
+    - [ClaimTaskResponse](#laelia-v1-ClaimTaskResponse)
     - [Command](#laelia-v1-Command)
     - [Command.EnvEntry](#laelia-v1-Command-EnvEntry)
     - [CommandEvent](#laelia-v1-CommandEvent)
@@ -110,7 +112,11 @@
     - [CommandRequest.EnvEntry](#laelia-v1-CommandRequest-EnvEntry)
     - [CommandResult](#laelia-v1-CommandResult)
     - [Conversation](#laelia-v1-Conversation)
+    - [ConvertMessageToTaskRequest](#laelia-v1-ConvertMessageToTaskRequest)
+    - [ConvertMessageToTaskResponse](#laelia-v1-ConvertMessageToTaskResponse)
     - [CreateChannelRequest](#laelia-v1-CreateChannelRequest)
+    - [CreateTaskRequest](#laelia-v1-CreateTaskRequest)
+    - [CreateTaskResponse](#laelia-v1-CreateTaskResponse)
     - [DeleteChannelRequest](#laelia-v1-DeleteChannelRequest)
     - [DiffEmittedPayload](#laelia-v1-DiffEmittedPayload)
     - [DownloadFileRequest](#laelia-v1-DownloadFileRequest)
@@ -140,6 +146,8 @@
     - [ListConversationMessagesResponse](#laelia-v1-ListConversationMessagesResponse)
     - [ListFilesRequest](#laelia-v1-ListFilesRequest)
     - [ListFilesResponse](#laelia-v1-ListFilesResponse)
+    - [ListTasksRequest](#laelia-v1-ListTasksRequest)
+    - [ListTasksResponse](#laelia-v1-ListTasksResponse)
     - [ListThreadMessagesRequest](#laelia-v1-ListThreadMessagesRequest)
     - [ListThreadMessagesResponse](#laelia-v1-ListThreadMessagesResponse)
     - [ListThreadUpdatesRequest](#laelia-v1-ListThreadUpdatesRequest)
@@ -164,11 +172,16 @@
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
     - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
     - [SendMessageRequest](#laelia-v1-SendMessageRequest)
+    - [TaskInfo](#laelia-v1-TaskInfo)
     - [TextDeltaPayload](#laelia-v1-TextDeltaPayload)
     - [ThreadUpdate](#laelia-v1-ThreadUpdate)
     - [ToolCallFinishedPayload](#laelia-v1-ToolCallFinishedPayload)
     - [ToolCallStartedPayload](#laelia-v1-ToolCallStartedPayload)
+    - [UnclaimTaskRequest](#laelia-v1-UnclaimTaskRequest)
+    - [UnclaimTaskResponse](#laelia-v1-UnclaimTaskResponse)
     - [UpdateChannelRequest](#laelia-v1-UpdateChannelRequest)
+    - [UpdateTaskStatusRequest](#laelia-v1-UpdateTaskStatusRequest)
+    - [UpdateTaskStatusResponse](#laelia-v1-UpdateTaskStatusResponse)
     - [UploadFileRequest](#laelia-v1-UploadFileRequest)
     - [WarningPayload](#laelia-v1-WarningPayload)
     - [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest)
@@ -178,6 +191,7 @@
     - [CommandOutput.StreamType](#laelia-v1-CommandOutput-StreamType)
     - [CommandStatus](#laelia-v1-CommandStatus)
     - [SenderType](#laelia-v1-SenderType)
+    - [TaskStatus](#laelia-v1-TaskStatus)
   
     - [AgentStreamService](#laelia-v1-AgentStreamService)
     - [CommandService](#laelia-v1-CommandService)
@@ -1588,6 +1602,37 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | attachments | [Attachment](#laelia-v1-Attachment) | repeated |  |
 | thread_root | [string](#string) |  | thread_root is the resource name of the root message of the thread this message belongs to (&#34;conversations/{c}/messages/{m}&#34;). Empty for a normal channel message (i.e. a root message itself, or a message outside any thread). Replies in a thread carry the root message&#39;s name here. |
 | thread_reply_count | [int32](#int32) |  | thread_reply_count is the number of replies in the thread rooted at this message. Only meaningful for root messages (thread_root empty); the frontend uses it to render the reply-count badge on the root message in the main channel list. Always 0 for thread replies. |
+| task | [TaskInfo](#laelia-v1-TaskInfo) |  | task is set when this message is a task (a row exists in the task table for this message id). Populated by ListConversationMessages / ListThreadMessages for root messages; absent for non-task messages and thread replies. |
+
+
+
+
+
+
+<a name="laelia-v1-ClaimTaskRequest"></a>
+
+### ClaimTaskRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [string](#string) |  | message is the resource name of the task&#39;s root message (&#34;conversations/{c}/messages/{m}&#34;). |
+
+
+
+
+
+
+<a name="laelia-v1-ClaimTaskResponse"></a>
+
+### ClaimTaskResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [ChatMessage](#laelia-v1-ChatMessage) |  | message is the task message after the claim, with task populated (status now IN_PROGRESS, assignee set to the caller). When the claim failed because another agent already owns the task or it is not in TODO, the RPC returns FAILED_PRECONDITION instead and this response is not sent. |
 
 
 
@@ -1796,6 +1841,36 @@ room_version greater than the agent&#39;s processed_version for that channel.
 
 
 
+<a name="laelia-v1-ConvertMessageToTaskRequest"></a>
+
+### ConvertMessageToTaskRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [string](#string) |  | message is the resource name of the top-level message to convert (&#34;conversations/{c}/messages/{m}&#34;). Must be a root message in the conversation (thread_root empty) and not already a task. |
+
+
+
+
+
+
+<a name="laelia-v1-ConvertMessageToTaskResponse"></a>
+
+### ConvertMessageToTaskResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [ChatMessage](#laelia-v1-ChatMessage) |  | message is the converted message, with task populated. A separate system notification row is also inserted into the conversation flow. |
+
+
+
+
+
+
 <a name="laelia-v1-CreateChannelRequest"></a>
 
 ### CreateChannelRequest
@@ -1805,6 +1880,39 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | title | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-CreateTaskRequest"></a>
+
+### CreateTaskRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| content | [string](#string) |  |  |
+| mentions | [Mention](#laelia-v1-Mention) | repeated |  |
+| attachments | [Attachment](#laelia-v1-Attachment) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-CreateTaskResponse"></a>
+
+### CreateTaskResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [ChatMessage](#laelia-v1-ChatMessage) |  | message is the newly posted task message, with task populated. The task is created unassigned (status TODO); the posting agent does NOT auto-claim it — call ClaimTask afterwards to own it. |
 
 
 
@@ -2279,6 +2387,37 @@ drain loop. The agent identity is resolved from the auth context.
 
 
 
+<a name="laelia-v1-ListTasksRequest"></a>
+
+### ListTasksRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| status_filter | [TaskStatus](#laelia-v1-TaskStatus) | repeated | status_filter, when non-empty, restricts the result to the given statuses. Empty returns tasks in every status. |
+
+
+
+
+
+
+<a name="laelia-v1-ListTasksResponse"></a>
+
+### ListTasksResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| tasks | [ChatMessage](#laelia-v1-ChatMessage) | repeated | tasks are the channel&#39;s task root messages, each with task populated, ordered by task_number ascending. |
+
+
+
+
+
+
 <a name="laelia-v1-ListThreadMessagesRequest"></a>
 
 ### ListThreadMessagesRequest
@@ -2697,6 +2836,29 @@ calling ListChannelUpdates, which compares conversation.version to the cursor.
 | mentions | [Mention](#laelia-v1-Mention) | repeated |  |
 | attachments | [Attachment](#laelia-v1-Attachment) | repeated |  |
 | thread_root | [string](#string) |  | thread_root, when set, makes this message a reply in the thread rooted at the given message name (&#34;conversations/{c}/messages/{m}&#34;). Empty posts a normal channel message. |
+| as_task | [bool](#bool) |  | as_task, when true, creates this message as a task: a task row is inserted in the same transaction with a per-conversation task number and status TODO. Only valid for top-level messages (thread_root must be empty). |
+
+
+
+
+
+
+<a name="laelia-v1-TaskInfo"></a>
+
+### TaskInfo
+TaskInfo is the task metadata attached to a ChatMessage that is a task. It is
+a read-only join output populated by ListConversationMessages /
+ListThreadMessages for root messages; absent on non-task messages and on
+thread replies. The chat_message itself remains the source of truth for
+content/sender/room_version.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| task_number | [int32](#int32) |  | task_number is the per-conversation sequence number shown as &#34;[task #N]&#34;. |
+| status | [TaskStatus](#laelia-v1-TaskStatus) |  |  |
+| assignee_name | [string](#string) |  | assignee_name is the assigned agent&#39;s display name, empty when unassigned. |
+| assignee_resource_id | [string](#string) |  | assignee_resource_id is the assigned agent&#39;s resource id (&#34;agents/&lt;id&gt;&#34;), empty when unassigned. |
 
 
 
@@ -2769,6 +2931,36 @@ ThreadUpdate describes one subscribed thread with unread replies.
 
 
 
+<a name="laelia-v1-UnclaimTaskRequest"></a>
+
+### UnclaimTaskRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UnclaimTaskResponse"></a>
+
+### UnclaimTaskResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [ChatMessage](#laelia-v1-ChatMessage) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-UpdateChannelRequest"></a>
 
 ### UpdateChannelRequest
@@ -2779,6 +2971,37 @@ ThreadUpdate describes one subscribed thread with unread replies.
 | ----- | ---- | ----- | ----------- |
 | conversation | [Conversation](#laelia-v1-Conversation) |  |  |
 | update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateTaskStatusRequest"></a>
+
+### UpdateTaskStatusRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [string](#string) |  |  |
+| status | [TaskStatus](#laelia-v1-TaskStatus) |  | status is the target status. Allowed transitions (enforced server-side): IN_PROGRESS -&gt; IN_REVIEW (the assignee marks the task ready for human review) and IN_REVIEW -&gt; DONE (the assignee marks the task done after detecting the human&#39;s approval in the task&#39;s thread). TODO -&gt; IN_PROGRESS is performed by ClaimTask, not this RPC. |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateTaskStatusResponse"></a>
+
+### UpdateTaskStatusResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [ChatMessage](#laelia-v1-ChatMessage) |  |  |
 
 
 
@@ -2923,6 +3146,24 @@ names).
 | SENDER_TYPE_SYSTEM | 3 |  |
 
 
+
+<a name="laelia-v1-TaskStatus"></a>
+
+### TaskStatus
+TaskStatus is the lifecycle state of a task message. A task is a top-level
+channel/DM message with task metadata; its thread is the discussion/approval
+channel. Values prefixed to satisfy protobuf&#39;s C&#43;&#43; scoping rules (sibling
+enums cannot share value names), matching SenderType/CommandStatus.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TASK_STATUS_UNSPECIFIED | 0 |  |
+| TASK_STATUS_TODO | 1 |  |
+| TASK_STATUS_IN_PROGRESS | 2 |  |
+| TASK_STATUS_IN_REVIEW | 3 |  |
+| TASK_STATUS_DONE | 4 |  |
+
+
  
 
  
@@ -2967,6 +3208,12 @@ names).
 | ListChannelMembers | [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest) | [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse) |  |
 | SendMessage | [SendMessageRequest](#laelia-v1-SendMessageRequest) | [ChatMessage](#laelia-v1-ChatMessage) |  |
 | PostMessage | [PostMessageRequest](#laelia-v1-PostMessageRequest) | [PostMessageResponse](#laelia-v1-PostMessageResponse) |  |
+| ConvertMessageToTask | [ConvertMessageToTaskRequest](#laelia-v1-ConvertMessageToTaskRequest) | [ConvertMessageToTaskResponse](#laelia-v1-ConvertMessageToTaskResponse) | ConvertMessageToTask turns an existing top-level message into a task by attaching task metadata (number, status=TODO, no assignee). Any channel member (user or agent) may convert. Emits a system notification row. |
+| ListTasks | [ListTasksRequest](#laelia-v1-ListTasksRequest) | [ListTasksResponse](#laelia-v1-ListTasksResponse) | ListTasks returns the task board for a conversation: every task (root message with task metadata) in the channel, optionally filtered by status. |
+| CreateTask | [CreateTaskRequest](#laelia-v1-CreateTaskRequest) | [CreateTaskResponse](#laelia-v1-CreateTaskResponse) | CreateTask posts a new top-level task message in a channel (used by agents to break work into subtasks for others to claim). The new task is created unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a system notification row and wakes other agent members. |
+| ClaimTask | [ClaimTaskRequest](#laelia-v1-ClaimTaskRequest) | [ClaimTaskResponse](#laelia-v1-ClaimTaskResponse) | ClaimTask atomically transitions a TODO task to IN_PROGRESS and assigns it to the calling agent, subscribing the agent to the task&#39;s thread so approval replies wake it. Returns FAILED_PRECONDITION if the task is already claimed or not in TODO. Emits a system notification row. |
+| UnclaimTask | [UnclaimTaskRequest](#laelia-v1-UnclaimTaskRequest) | [UnclaimTaskResponse](#laelia-v1-UnclaimTaskResponse) | UnclaimTask releases the calling agent&#39;s claim on a task it owns, setting it back to TODO so another agent may claim it. Not allowed on DONE (terminal). Emits a system notification row. |
+| UpdateTaskStatus | [UpdateTaskStatusRequest](#laelia-v1-UpdateTaskStatusRequest) | [UpdateTaskStatusResponse](#laelia-v1-UpdateTaskStatusResponse) | UpdateTaskStatus advances a task&#39;s status. IN_PROGRESS -&gt; IN_REVIEW marks the assignee&#39;s work ready for human review; IN_REVIEW -&gt; DONE marks it complete (the assignee should call this only after detecting the human&#39;s approval in the task&#39;s thread). Only the assignee may call this. Emits a system notification row. |
 | ListChannelUpdates | [ListChannelUpdatesRequest](#laelia-v1-ListChannelUpdatesRequest) | [ListChannelUpdatesResponse](#laelia-v1-ListChannelUpdatesResponse) |  |
 | ListThreadUpdates | [ListThreadUpdatesRequest](#laelia-v1-ListThreadUpdatesRequest) | [ListThreadUpdatesResponse](#laelia-v1-ListThreadUpdatesResponse) |  |
 | AckProcessedVersion | [AckProcessedVersionRequest](#laelia-v1-AckProcessedVersionRequest) | [AckProcessedVersionResponse](#laelia-v1-AckProcessedVersionResponse) |  |

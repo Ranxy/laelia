@@ -102,6 +102,24 @@ const (
 	// CommandServicePostMessageProcedure is the fully-qualified name of the CommandService's
 	// PostMessage RPC.
 	CommandServicePostMessageProcedure = "/laelia.v1.CommandService/PostMessage"
+	// CommandServiceConvertMessageToTaskProcedure is the fully-qualified name of the CommandService's
+	// ConvertMessageToTask RPC.
+	CommandServiceConvertMessageToTaskProcedure = "/laelia.v1.CommandService/ConvertMessageToTask"
+	// CommandServiceListTasksProcedure is the fully-qualified name of the CommandService's ListTasks
+	// RPC.
+	CommandServiceListTasksProcedure = "/laelia.v1.CommandService/ListTasks"
+	// CommandServiceCreateTaskProcedure is the fully-qualified name of the CommandService's CreateTask
+	// RPC.
+	CommandServiceCreateTaskProcedure = "/laelia.v1.CommandService/CreateTask"
+	// CommandServiceClaimTaskProcedure is the fully-qualified name of the CommandService's ClaimTask
+	// RPC.
+	CommandServiceClaimTaskProcedure = "/laelia.v1.CommandService/ClaimTask"
+	// CommandServiceUnclaimTaskProcedure is the fully-qualified name of the CommandService's
+	// UnclaimTask RPC.
+	CommandServiceUnclaimTaskProcedure = "/laelia.v1.CommandService/UnclaimTask"
+	// CommandServiceUpdateTaskStatusProcedure is the fully-qualified name of the CommandService's
+	// UpdateTaskStatus RPC.
+	CommandServiceUpdateTaskStatusProcedure = "/laelia.v1.CommandService/UpdateTaskStatus"
 	// CommandServiceListChannelUpdatesProcedure is the fully-qualified name of the CommandService's
 	// ListChannelUpdates RPC.
 	CommandServiceListChannelUpdatesProcedure = "/laelia.v1.CommandService/ListChannelUpdates"
@@ -155,6 +173,33 @@ type CommandServiceClient interface {
 	ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error)
 	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.ChatMessage], error)
 	PostMessage(context.Context, *connect.Request[v1.PostMessageRequest]) (*connect.Response[v1.PostMessageResponse], error)
+	// ConvertMessageToTask turns an existing top-level message into a task by
+	// attaching task metadata (number, status=TODO, no assignee). Any channel
+	// member (user or agent) may convert. Emits a system notification row.
+	ConvertMessageToTask(context.Context, *connect.Request[v1.ConvertMessageToTaskRequest]) (*connect.Response[v1.ConvertMessageToTaskResponse], error)
+	// ListTasks returns the task board for a conversation: every task (root
+	// message with task metadata) in the channel, optionally filtered by status.
+	ListTasks(context.Context, *connect.Request[v1.ListTasksRequest]) (*connect.Response[v1.ListTasksResponse], error)
+	// CreateTask posts a new top-level task message in a channel (used by agents
+	// to break work into subtasks for others to claim). The new task is created
+	// unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a
+	// system notification row and wakes other agent members.
+	CreateTask(context.Context, *connect.Request[v1.CreateTaskRequest]) (*connect.Response[v1.CreateTaskResponse], error)
+	// ClaimTask atomically transitions a TODO task to IN_PROGRESS and assigns it
+	// to the calling agent, subscribing the agent to the task's thread so approval
+	// replies wake it. Returns FAILED_PRECONDITION if the task is already
+	// claimed or not in TODO. Emits a system notification row.
+	ClaimTask(context.Context, *connect.Request[v1.ClaimTaskRequest]) (*connect.Response[v1.ClaimTaskResponse], error)
+	// UnclaimTask releases the calling agent's claim on a task it owns, setting
+	// it back to TODO so another agent may claim it. Not allowed on DONE
+	// (terminal). Emits a system notification row.
+	UnclaimTask(context.Context, *connect.Request[v1.UnclaimTaskRequest]) (*connect.Response[v1.UnclaimTaskResponse], error)
+	// UpdateTaskStatus advances a task's status. IN_PROGRESS -> IN_REVIEW marks
+	// the assignee's work ready for human review; IN_REVIEW -> DONE marks it
+	// complete (the assignee should call this only after detecting the human's
+	// approval in the task's thread). Only the assignee may call this. Emits a
+	// system notification row.
+	UpdateTaskStatus(context.Context, *connect.Request[v1.UpdateTaskStatusRequest]) (*connect.Response[v1.UpdateTaskStatusResponse], error)
 	ListChannelUpdates(context.Context, *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error)
 	ListThreadUpdates(context.Context, *connect.Request[v1.ListThreadUpdatesRequest]) (*connect.Response[v1.ListThreadUpdatesResponse], error)
 	AckProcessedVersion(context.Context, *connect.Request[v1.AckProcessedVersionRequest]) (*connect.Response[v1.AckProcessedVersionResponse], error)
@@ -318,6 +363,42 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("PostMessage")),
 			connect.WithClientOptions(opts...),
 		),
+		convertMessageToTask: connect.NewClient[v1.ConvertMessageToTaskRequest, v1.ConvertMessageToTaskResponse](
+			httpClient,
+			baseURL+CommandServiceConvertMessageToTaskProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ConvertMessageToTask")),
+			connect.WithClientOptions(opts...),
+		),
+		listTasks: connect.NewClient[v1.ListTasksRequest, v1.ListTasksResponse](
+			httpClient,
+			baseURL+CommandServiceListTasksProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ListTasks")),
+			connect.WithClientOptions(opts...),
+		),
+		createTask: connect.NewClient[v1.CreateTaskRequest, v1.CreateTaskResponse](
+			httpClient,
+			baseURL+CommandServiceCreateTaskProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("CreateTask")),
+			connect.WithClientOptions(opts...),
+		),
+		claimTask: connect.NewClient[v1.ClaimTaskRequest, v1.ClaimTaskResponse](
+			httpClient,
+			baseURL+CommandServiceClaimTaskProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ClaimTask")),
+			connect.WithClientOptions(opts...),
+		),
+		unclaimTask: connect.NewClient[v1.UnclaimTaskRequest, v1.UnclaimTaskResponse](
+			httpClient,
+			baseURL+CommandServiceUnclaimTaskProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("UnclaimTask")),
+			connect.WithClientOptions(opts...),
+		),
+		updateTaskStatus: connect.NewClient[v1.UpdateTaskStatusRequest, v1.UpdateTaskStatusResponse](
+			httpClient,
+			baseURL+CommandServiceUpdateTaskStatusProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("UpdateTaskStatus")),
+			connect.WithClientOptions(opts...),
+		),
 		listChannelUpdates: connect.NewClient[v1.ListChannelUpdatesRequest, v1.ListChannelUpdatesResponse](
 			httpClient,
 			baseURL+CommandServiceListChannelUpdatesProcedure,
@@ -393,6 +474,12 @@ type commandServiceClient struct {
 	listChannelMembers        *connect.Client[v1.ListChannelMembersRequest, v1.ListChannelMembersResponse]
 	sendMessage               *connect.Client[v1.SendMessageRequest, v1.ChatMessage]
 	postMessage               *connect.Client[v1.PostMessageRequest, v1.PostMessageResponse]
+	convertMessageToTask      *connect.Client[v1.ConvertMessageToTaskRequest, v1.ConvertMessageToTaskResponse]
+	listTasks                 *connect.Client[v1.ListTasksRequest, v1.ListTasksResponse]
+	createTask                *connect.Client[v1.CreateTaskRequest, v1.CreateTaskResponse]
+	claimTask                 *connect.Client[v1.ClaimTaskRequest, v1.ClaimTaskResponse]
+	unclaimTask               *connect.Client[v1.UnclaimTaskRequest, v1.UnclaimTaskResponse]
+	updateTaskStatus          *connect.Client[v1.UpdateTaskStatusRequest, v1.UpdateTaskStatusResponse]
 	listChannelUpdates        *connect.Client[v1.ListChannelUpdatesRequest, v1.ListChannelUpdatesResponse]
 	listThreadUpdates         *connect.Client[v1.ListThreadUpdatesRequest, v1.ListThreadUpdatesResponse]
 	ackProcessedVersion       *connect.Client[v1.AckProcessedVersionRequest, v1.AckProcessedVersionResponse]
@@ -513,6 +600,36 @@ func (c *commandServiceClient) PostMessage(ctx context.Context, req *connect.Req
 	return c.postMessage.CallUnary(ctx, req)
 }
 
+// ConvertMessageToTask calls laelia.v1.CommandService.ConvertMessageToTask.
+func (c *commandServiceClient) ConvertMessageToTask(ctx context.Context, req *connect.Request[v1.ConvertMessageToTaskRequest]) (*connect.Response[v1.ConvertMessageToTaskResponse], error) {
+	return c.convertMessageToTask.CallUnary(ctx, req)
+}
+
+// ListTasks calls laelia.v1.CommandService.ListTasks.
+func (c *commandServiceClient) ListTasks(ctx context.Context, req *connect.Request[v1.ListTasksRequest]) (*connect.Response[v1.ListTasksResponse], error) {
+	return c.listTasks.CallUnary(ctx, req)
+}
+
+// CreateTask calls laelia.v1.CommandService.CreateTask.
+func (c *commandServiceClient) CreateTask(ctx context.Context, req *connect.Request[v1.CreateTaskRequest]) (*connect.Response[v1.CreateTaskResponse], error) {
+	return c.createTask.CallUnary(ctx, req)
+}
+
+// ClaimTask calls laelia.v1.CommandService.ClaimTask.
+func (c *commandServiceClient) ClaimTask(ctx context.Context, req *connect.Request[v1.ClaimTaskRequest]) (*connect.Response[v1.ClaimTaskResponse], error) {
+	return c.claimTask.CallUnary(ctx, req)
+}
+
+// UnclaimTask calls laelia.v1.CommandService.UnclaimTask.
+func (c *commandServiceClient) UnclaimTask(ctx context.Context, req *connect.Request[v1.UnclaimTaskRequest]) (*connect.Response[v1.UnclaimTaskResponse], error) {
+	return c.unclaimTask.CallUnary(ctx, req)
+}
+
+// UpdateTaskStatus calls laelia.v1.CommandService.UpdateTaskStatus.
+func (c *commandServiceClient) UpdateTaskStatus(ctx context.Context, req *connect.Request[v1.UpdateTaskStatusRequest]) (*connect.Response[v1.UpdateTaskStatusResponse], error) {
+	return c.updateTaskStatus.CallUnary(ctx, req)
+}
+
 // ListChannelUpdates calls laelia.v1.CommandService.ListChannelUpdates.
 func (c *commandServiceClient) ListChannelUpdates(ctx context.Context, req *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error) {
 	return c.listChannelUpdates.CallUnary(ctx, req)
@@ -577,6 +694,33 @@ type CommandServiceHandler interface {
 	ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error)
 	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.ChatMessage], error)
 	PostMessage(context.Context, *connect.Request[v1.PostMessageRequest]) (*connect.Response[v1.PostMessageResponse], error)
+	// ConvertMessageToTask turns an existing top-level message into a task by
+	// attaching task metadata (number, status=TODO, no assignee). Any channel
+	// member (user or agent) may convert. Emits a system notification row.
+	ConvertMessageToTask(context.Context, *connect.Request[v1.ConvertMessageToTaskRequest]) (*connect.Response[v1.ConvertMessageToTaskResponse], error)
+	// ListTasks returns the task board for a conversation: every task (root
+	// message with task metadata) in the channel, optionally filtered by status.
+	ListTasks(context.Context, *connect.Request[v1.ListTasksRequest]) (*connect.Response[v1.ListTasksResponse], error)
+	// CreateTask posts a new top-level task message in a channel (used by agents
+	// to break work into subtasks for others to claim). The new task is created
+	// unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a
+	// system notification row and wakes other agent members.
+	CreateTask(context.Context, *connect.Request[v1.CreateTaskRequest]) (*connect.Response[v1.CreateTaskResponse], error)
+	// ClaimTask atomically transitions a TODO task to IN_PROGRESS and assigns it
+	// to the calling agent, subscribing the agent to the task's thread so approval
+	// replies wake it. Returns FAILED_PRECONDITION if the task is already
+	// claimed or not in TODO. Emits a system notification row.
+	ClaimTask(context.Context, *connect.Request[v1.ClaimTaskRequest]) (*connect.Response[v1.ClaimTaskResponse], error)
+	// UnclaimTask releases the calling agent's claim on a task it owns, setting
+	// it back to TODO so another agent may claim it. Not allowed on DONE
+	// (terminal). Emits a system notification row.
+	UnclaimTask(context.Context, *connect.Request[v1.UnclaimTaskRequest]) (*connect.Response[v1.UnclaimTaskResponse], error)
+	// UpdateTaskStatus advances a task's status. IN_PROGRESS -> IN_REVIEW marks
+	// the assignee's work ready for human review; IN_REVIEW -> DONE marks it
+	// complete (the assignee should call this only after detecting the human's
+	// approval in the task's thread). Only the assignee may call this. Emits a
+	// system notification row.
+	UpdateTaskStatus(context.Context, *connect.Request[v1.UpdateTaskStatusRequest]) (*connect.Response[v1.UpdateTaskStatusResponse], error)
 	ListChannelUpdates(context.Context, *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error)
 	ListThreadUpdates(context.Context, *connect.Request[v1.ListThreadUpdatesRequest]) (*connect.Response[v1.ListThreadUpdatesResponse], error)
 	AckProcessedVersion(context.Context, *connect.Request[v1.AckProcessedVersionRequest]) (*connect.Response[v1.AckProcessedVersionResponse], error)
@@ -736,6 +880,42 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("PostMessage")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceConvertMessageToTaskHandler := connect.NewUnaryHandler(
+		CommandServiceConvertMessageToTaskProcedure,
+		svc.ConvertMessageToTask,
+		connect.WithSchema(commandServiceMethods.ByName("ConvertMessageToTask")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceListTasksHandler := connect.NewUnaryHandler(
+		CommandServiceListTasksProcedure,
+		svc.ListTasks,
+		connect.WithSchema(commandServiceMethods.ByName("ListTasks")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceCreateTaskHandler := connect.NewUnaryHandler(
+		CommandServiceCreateTaskProcedure,
+		svc.CreateTask,
+		connect.WithSchema(commandServiceMethods.ByName("CreateTask")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceClaimTaskHandler := connect.NewUnaryHandler(
+		CommandServiceClaimTaskProcedure,
+		svc.ClaimTask,
+		connect.WithSchema(commandServiceMethods.ByName("ClaimTask")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceUnclaimTaskHandler := connect.NewUnaryHandler(
+		CommandServiceUnclaimTaskProcedure,
+		svc.UnclaimTask,
+		connect.WithSchema(commandServiceMethods.ByName("UnclaimTask")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceUpdateTaskStatusHandler := connect.NewUnaryHandler(
+		CommandServiceUpdateTaskStatusProcedure,
+		svc.UpdateTaskStatus,
+		connect.WithSchema(commandServiceMethods.ByName("UpdateTaskStatus")),
+		connect.WithHandlerOptions(opts...),
+	)
 	commandServiceListChannelUpdatesHandler := connect.NewUnaryHandler(
 		CommandServiceListChannelUpdatesProcedure,
 		svc.ListChannelUpdates,
@@ -830,6 +1010,18 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceSendMessageHandler.ServeHTTP(w, r)
 		case CommandServicePostMessageProcedure:
 			commandServicePostMessageHandler.ServeHTTP(w, r)
+		case CommandServiceConvertMessageToTaskProcedure:
+			commandServiceConvertMessageToTaskHandler.ServeHTTP(w, r)
+		case CommandServiceListTasksProcedure:
+			commandServiceListTasksHandler.ServeHTTP(w, r)
+		case CommandServiceCreateTaskProcedure:
+			commandServiceCreateTaskHandler.ServeHTTP(w, r)
+		case CommandServiceClaimTaskProcedure:
+			commandServiceClaimTaskHandler.ServeHTTP(w, r)
+		case CommandServiceUnclaimTaskProcedure:
+			commandServiceUnclaimTaskHandler.ServeHTTP(w, r)
+		case CommandServiceUpdateTaskStatusProcedure:
+			commandServiceUpdateTaskStatusHandler.ServeHTTP(w, r)
 		case CommandServiceListChannelUpdatesProcedure:
 			commandServiceListChannelUpdatesHandler.ServeHTTP(w, r)
 		case CommandServiceListThreadUpdatesProcedure:
@@ -941,6 +1133,30 @@ func (UnimplementedCommandServiceHandler) SendMessage(context.Context, *connect.
 
 func (UnimplementedCommandServiceHandler) PostMessage(context.Context, *connect.Request[v1.PostMessageRequest]) (*connect.Response[v1.PostMessageResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.PostMessage is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ConvertMessageToTask(context.Context, *connect.Request[v1.ConvertMessageToTaskRequest]) (*connect.Response[v1.ConvertMessageToTaskResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ConvertMessageToTask is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ListTasks(context.Context, *connect.Request[v1.ListTasksRequest]) (*connect.Response[v1.ListTasksResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListTasks is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) CreateTask(context.Context, *connect.Request[v1.CreateTaskRequest]) (*connect.Response[v1.CreateTaskResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.CreateTask is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ClaimTask(context.Context, *connect.Request[v1.ClaimTaskRequest]) (*connect.Response[v1.ClaimTaskResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ClaimTask is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) UnclaimTask(context.Context, *connect.Request[v1.UnclaimTaskRequest]) (*connect.Response[v1.UnclaimTaskResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.UnclaimTask is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) UpdateTaskStatus(context.Context, *connect.Request[v1.UpdateTaskStatusRequest]) (*connect.Response[v1.UpdateTaskStatusResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.UpdateTaskStatus is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) ListChannelUpdates(context.Context, *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error) {

@@ -487,3 +487,32 @@ CREATE TABLE IF NOT EXISTS thread_participant (
 );
 
 CREATE INDEX IF NOT EXISTS idx_thread_participant_agent ON thread_participant(agent_id);
+
+-- === Tasks (top-level messages with task metadata) ===
+-- A task is a top-level channel/DM chat_message with attached metadata: a
+-- per-conversation sequence number, a status, and an optional assignee. The
+-- chat_message (root) is the source of truth for content/sender/room_version;
+-- this row carries the task-specific state. The thread rooted at the chat_message
+-- is the task's discussion/approval channel. message_id is both PK and FK, so a
+-- task IS its root message and deleting the message cascades to the task.
+-- conversation_id is denormalized (already on chat_message) for cheap
+-- per-conversation listing without a join.
+ALTER TABLE conversation ADD COLUMN IF NOT EXISTS next_task_number INTEGER NOT NULL DEFAULT 1;
+COMMENT ON COLUMN conversation.next_task_number IS 'Next per-conversation task number; incremented atomically on task creation';
+
+-- status: 1=TODO, 2=IN_PROGRESS, 3=IN_REVIEW, 4=DONE
+CREATE TABLE IF NOT EXISTS task (
+    message_id UUID PRIMARY KEY REFERENCES chat_message(id) ON DELETE CASCADE,
+    conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+    task_number INTEGER NOT NULL,
+    status SMALLINT NOT NULL DEFAULT 1,
+    assignee_agent_id INTEGER REFERENCES agent(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    completed_at TIMESTAMPTZ,
+    CONSTRAINT task_status_check CHECK (status IN (1,2,3,4))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_task_conversation_number ON task(conversation_id, task_number);
+CREATE INDEX IF NOT EXISTS idx_task_conversation_status ON task(conversation_id, status);
+CREATE INDEX IF NOT EXISTS idx_task_assignee ON task(assignee_agent_id) WHERE assignee_agent_id IS NOT NULL;

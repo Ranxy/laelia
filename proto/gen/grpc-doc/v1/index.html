@@ -554,6 +554,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ClaimTaskRequest"><span class="badge">M</span>ClaimTaskRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ClaimTaskResponse"><span class="badge">M</span>ClaimTaskResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.Command"><span class="badge">M</span>Command</a>
                 </li>
               
@@ -590,7 +598,23 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ConvertMessageToTaskRequest"><span class="badge">M</span>ConvertMessageToTaskRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ConvertMessageToTaskResponse"><span class="badge">M</span>ConvertMessageToTaskResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.CreateChannelRequest"><span class="badge">M</span>CreateChannelRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.CreateTaskRequest"><span class="badge">M</span>CreateTaskRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.CreateTaskResponse"><span class="badge">M</span>CreateTaskResponse</a>
                 </li>
               
                 <li>
@@ -710,6 +734,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ListTasksRequest"><span class="badge">M</span>ListTasksRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListTasksResponse"><span class="badge">M</span>ListTasksResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ListThreadMessagesRequest"><span class="badge">M</span>ListThreadMessagesRequest</a>
                 </li>
               
@@ -806,6 +838,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.TaskInfo"><span class="badge">M</span>TaskInfo</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.TextDeltaPayload"><span class="badge">M</span>TextDeltaPayload</a>
                 </li>
               
@@ -822,7 +858,23 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.UnclaimTaskRequest"><span class="badge">M</span>UnclaimTaskRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UnclaimTaskResponse"><span class="badge">M</span>UnclaimTaskResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.UpdateChannelRequest"><span class="badge">M</span>UpdateChannelRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateTaskStatusRequest"><span class="badge">M</span>UpdateTaskStatusRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateTaskStatusResponse"><span class="badge">M</span>UpdateTaskStatusResponse</a>
                 </li>
               
                 <li>
@@ -856,6 +908,10 @@
               
                 <li>
                   <a href="#laelia.v1.SenderType"><span class="badge">E</span>SenderType</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.TaskStatus"><span class="badge">E</span>TaskStatus</a>
                 </li>
               
               
@@ -4428,6 +4484,67 @@ uses it to render the reply-count badge on the root message in the main
 channel list. Always 0 for thread replies. </p></td>
                 </tr>
               
+                <tr>
+                  <td>task</td>
+                  <td><a href="#laelia.v1.TaskInfo">TaskInfo</a></td>
+                  <td></td>
+                  <td><p>task is set when this message is a task (a row exists in the task table for
+this message id). Populated by ListConversationMessages / ListThreadMessages
+for root messages; absent for non-task messages and thread replies. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ClaimTaskRequest">ClaimTaskRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>message is the resource name of the task&#39;s root message
+(&#34;conversations/{c}/messages/{m}&#34;). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ClaimTaskResponse">ClaimTaskResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td></td>
+                  <td><p>message is the task message after the claim, with task populated (status
+now IN_PROGRESS, assignee set to the caller). When the claim failed because
+another agent already owns the task or it is not in TODO, the RPC returns
+FAILED_PRECONDITION instead and this response is not sent. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -5122,6 +5239,57 @@ ListChannels; 0 (or unset) when the user is caught up. </p></td>
 
         
       
+        <h3 id="laelia.v1.ConvertMessageToTaskRequest">ConvertMessageToTaskRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>message is the resource name of the top-level message to convert
+(&#34;conversations/{c}/messages/{m}&#34;). Must be a root message in the
+conversation (thread_root empty) and not already a task. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ConvertMessageToTaskResponse">ConvertMessageToTaskResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td></td>
+                  <td><p>message is the converted message, with task populated. A separate system
+notification row is also inserted into the conversation flow. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.CreateChannelRequest">CreateChannelRequest</h3>
         <p></p>
 
@@ -5137,6 +5305,77 @@ ListChannels; 0 (or unset) when the user is caught up. </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.CreateTaskRequest">CreateTaskRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>content</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mentions</td>
+                  <td><a href="#laelia.v1.Mention">Mention</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>attachments</td>
+                  <td><a href="#laelia.v1.Attachment">Attachment</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.CreateTaskResponse">CreateTaskResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td></td>
+                  <td><p>message is the newly posted task message, with task populated. The task is
+created unassigned (status TODO); the posting agent does NOT auto-claim it
+— call ClaimTask afterwards to own it. </p></td>
                 </tr>
               
             </tbody>
@@ -5998,6 +6237,63 @@ ListChannels; 0 (or unset) when the user is caught up. </p></td>
                   <td><a href="#laelia.v1.File">File</a></td>
                   <td>repeated</td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListTasksRequest">ListTasksRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>status_filter</td>
+                  <td><a href="#laelia.v1.TaskStatus">TaskStatus</a></td>
+                  <td>repeated</td>
+                  <td><p>status_filter, when non-empty, restricts the result to the given statuses.
+Empty returns tasks in every status. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListTasksResponse">ListTasksResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>tasks</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td>repeated</td>
+                  <td><p>tasks are the channel&#39;s task root messages, each with task populated,
+ordered by task_number ascending. </p></td>
                 </tr>
               
             </tbody>
@@ -6924,6 +7220,61 @@ the given message name (&#34;conversations/{c}/messages/{m}&#34;). Empty posts a
 normal channel message. </p></td>
                 </tr>
               
+                <tr>
+                  <td>as_task</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>as_task, when true, creates this message as a task: a task row is inserted
+in the same transaction with a per-conversation task number and status
+TODO. Only valid for top-level messages (thread_root must be empty). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.TaskInfo">TaskInfo</h3>
+        <p>TaskInfo is the task metadata attached to a ChatMessage that is a task. It is</p><p>a read-only join output populated by ListConversationMessages /</p><p>ListThreadMessages for root messages; absent on non-task messages and on</p><p>thread replies. The chat_message itself remains the source of truth for</p><p>content/sender/room_version.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>task_number</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>task_number is the per-conversation sequence number shown as &#34;[task #N]&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>status</td>
+                  <td><a href="#laelia.v1.TaskStatus">TaskStatus</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>assignee_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>assignee_name is the assigned agent&#39;s display name, empty when unassigned. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>assignee_resource_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>assignee_resource_id is the assigned agent&#39;s resource id (&#34;agents/&lt;id&gt;&#34;),
+empty when unassigned. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -7071,6 +7422,54 @@ the agent&#39;s processed_version for this conversation. </p></td>
 
         
       
+        <h3 id="laelia.v1.UnclaimTaskRequest">UnclaimTaskRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UnclaimTaskResponse">UnclaimTaskResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.UpdateChannelRequest">UpdateChannelRequest</h3>
         <p></p>
 
@@ -7091,6 +7490,65 @@ the agent&#39;s processed_version for this conversation. </p></td>
                 <tr>
                   <td>update_mask</td>
                   <td><a href="#google.protobuf.FieldMask">google.protobuf.FieldMask</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateTaskStatusRequest">UpdateTaskStatusRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>status</td>
+                  <td><a href="#laelia.v1.TaskStatus">TaskStatus</a></td>
+                  <td></td>
+                  <td><p>status is the target status. Allowed transitions (enforced server-side):
+IN_PROGRESS -&gt; IN_REVIEW (the assignee marks the task ready for human
+review) and IN_REVIEW -&gt; DONE (the assignee marks the task done after
+detecting the human&#39;s approval in the task&#39;s thread). TODO -&gt; IN_PROGRESS
+is performed by ClaimTask, not this RPC. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateTaskStatusResponse">UpdateTaskStatusResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -7441,6 +7899,47 @@ the agent&#39;s processed_version for this conversation. </p></td>
           </tbody>
         </table>
       
+        <h3 id="laelia.v1.TaskStatus">TaskStatus</h3>
+        <p>TaskStatus is the lifecycle state of a task message. A task is a top-level</p><p>channel/DM message with task metadata; its thread is the discussion/approval</p><p>channel. Values prefixed to satisfy protobuf's C++ scoping rules (sibling</p><p>enums cannot share value names), matching SenderType/CommandStatus.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>TASK_STATUS_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>TASK_STATUS_TODO</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>TASK_STATUS_IN_PROGRESS</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>TASK_STATUS_IN_REVIEW</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>TASK_STATUS_DONE</td>
+                <td>4</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
 
       
 
@@ -7624,6 +8123,63 @@ the agent&#39;s processed_version for this conversation. </p></td>
                 <td><a href="#laelia.v1.PostMessageRequest">PostMessageRequest</a></td>
                 <td><a href="#laelia.v1.PostMessageResponse">PostMessageResponse</a></td>
                 <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ConvertMessageToTask</td>
+                <td><a href="#laelia.v1.ConvertMessageToTaskRequest">ConvertMessageToTaskRequest</a></td>
+                <td><a href="#laelia.v1.ConvertMessageToTaskResponse">ConvertMessageToTaskResponse</a></td>
+                <td><p>ConvertMessageToTask turns an existing top-level message into a task by
+attaching task metadata (number, status=TODO, no assignee). Any channel
+member (user or agent) may convert. Emits a system notification row.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ListTasks</td>
+                <td><a href="#laelia.v1.ListTasksRequest">ListTasksRequest</a></td>
+                <td><a href="#laelia.v1.ListTasksResponse">ListTasksResponse</a></td>
+                <td><p>ListTasks returns the task board for a conversation: every task (root
+message with task metadata) in the channel, optionally filtered by status.</p></td>
+              </tr>
+            
+              <tr>
+                <td>CreateTask</td>
+                <td><a href="#laelia.v1.CreateTaskRequest">CreateTaskRequest</a></td>
+                <td><a href="#laelia.v1.CreateTaskResponse">CreateTaskResponse</a></td>
+                <td><p>CreateTask posts a new top-level task message in a channel (used by agents
+to break work into subtasks for others to claim). The new task is created
+unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a
+system notification row and wakes other agent members.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ClaimTask</td>
+                <td><a href="#laelia.v1.ClaimTaskRequest">ClaimTaskRequest</a></td>
+                <td><a href="#laelia.v1.ClaimTaskResponse">ClaimTaskResponse</a></td>
+                <td><p>ClaimTask atomically transitions a TODO task to IN_PROGRESS and assigns it
+to the calling agent, subscribing the agent to the task&#39;s thread so approval
+replies wake it. Returns FAILED_PRECONDITION if the task is already
+claimed or not in TODO. Emits a system notification row.</p></td>
+              </tr>
+            
+              <tr>
+                <td>UnclaimTask</td>
+                <td><a href="#laelia.v1.UnclaimTaskRequest">UnclaimTaskRequest</a></td>
+                <td><a href="#laelia.v1.UnclaimTaskResponse">UnclaimTaskResponse</a></td>
+                <td><p>UnclaimTask releases the calling agent&#39;s claim on a task it owns, setting
+it back to TODO so another agent may claim it. Not allowed on DONE
+(terminal). Emits a system notification row.</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateTaskStatus</td>
+                <td><a href="#laelia.v1.UpdateTaskStatusRequest">UpdateTaskStatusRequest</a></td>
+                <td><a href="#laelia.v1.UpdateTaskStatusResponse">UpdateTaskStatusResponse</a></td>
+                <td><p>UpdateTaskStatus advances a task&#39;s status. IN_PROGRESS -&gt; IN_REVIEW marks
+the assignee&#39;s work ready for human review; IN_REVIEW -&gt; DONE marks it
+complete (the assignee should call this only after detecting the human&#39;s
+approval in the task&#39;s thread). Only the assignee may call this. Emits a
+system notification row.</p></td>
               </tr>
             
               <tr>
@@ -7923,6 +8479,66 @@ a member.</p></td>
                 <td>PostMessage</td>
                 <td>POST</td>
                 <td>/v1/{conversation=conversations/*}:postMessage</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ConvertMessageToTask</td>
+                <td>POST</td>
+                <td>/v1/{message=conversations/*/messages/*}:convertToTask</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListTasks</td>
+                <td>GET</td>
+                <td>/v1/{conversation=conversations/*}/tasks</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>CreateTask</td>
+                <td>POST</td>
+                <td>/v1/{conversation=conversations/*}:createTask</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ClaimTask</td>
+                <td>POST</td>
+                <td>/v1/{message=conversations/*/messages/*}:claimTask</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UnclaimTask</td>
+                <td>POST</td>
+                <td>/v1/{message=conversations/*/messages/*}:unclaimTask</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateTaskStatus</td>
+                <td>POST</td>
+                <td>/v1/{message=conversations/*/messages/*}:updateTaskStatus</td>
                 <td>*</td>
               </tr>
               

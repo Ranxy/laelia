@@ -1094,6 +1094,173 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/messages/{message}:claimTask:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                ClaimTask atomically transitions a TODO task to IN_PROGRESS and assigns it
+                 to the calling agent, subscribing the agent to the task's thread so approval
+                 replies wake it. Returns FAILED_PRECONDITION if the task is already
+                 claimed or not in TODO. Emits a system notification row.
+            operationId: CommandService_ClaimTask
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+                - name: message
+                  in: path
+                  description: The message id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ClaimTaskRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ClaimTaskResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/messages/{message}:convertToTask:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                ConvertMessageToTask turns an existing top-level message into a task by
+                 attaching task metadata (number, status=TODO, no assignee). Any channel
+                 member (user or agent) may convert. Emits a system notification row.
+            operationId: CommandService_ConvertMessageToTask
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+                - name: message
+                  in: path
+                  description: The message id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ConvertMessageToTaskRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ConvertMessageToTaskResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/messages/{message}:unclaimTask:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                UnclaimTask releases the calling agent's claim on a task it owns, setting
+                 it back to TODO so another agent may claim it. Not allowed on DONE
+                 (terminal). Emits a system notification row.
+            operationId: CommandService_UnclaimTask
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+                - name: message
+                  in: path
+                  description: The message id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UnclaimTaskRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UnclaimTaskResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/messages/{message}:updateTaskStatus:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                UpdateTaskStatus advances a task's status. IN_PROGRESS -> IN_REVIEW marks
+                 the assignee's work ready for human review; IN_REVIEW -> DONE marks it
+                 complete (the assignee should call this only after detecting the human's
+                 approval in the task's thread). Only the assignee may call this. Emits a
+                 system notification row.
+            operationId: CommandService_UpdateTaskStatus
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+                - name: message
+                  in: path
+                  description: The message id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UpdateTaskStatusRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UpdateTaskStatusResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/conversations/{conversation}/messages:send:
         post:
             tags:
@@ -1119,6 +1286,50 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/ChatMessage'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/tasks:
+        get:
+            tags:
+                - CommandService
+            description: |-
+                ListTasks returns the task board for a conversation: every task (root
+                 message with task metadata) in the channel, optionally filtered by status.
+            operationId: CommandService_ListTasks
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+                - name: statusFilter
+                  in: query
+                  description: |-
+                    status_filter, when non-empty, restricts the result to the given statuses.
+                     Empty returns tasks in every status.
+                  schema:
+                    type: array
+                    items:
+                        enum:
+                            - TASK_STATUS_UNSPECIFIED
+                            - TASK_STATUS_TODO
+                            - TASK_STATUS_IN_PROGRESS
+                            - TASK_STATUS_IN_REVIEW
+                            - TASK_STATUS_DONE
+                        type: string
+                        format: enum
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListTasksResponse'
                 default:
                     description: Default error response
                     content:
@@ -1224,6 +1435,42 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/AckProcessedVersionResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}:createTask:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                CreateTask posts a new top-level task message in a channel (used by agents
+                 to break work into subtasks for others to claim). The new task is created
+                 unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a
+                 system notification row and wakes other agent members.
+            operationId: CommandService_CreateTask
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/CreateTaskRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/CreateTaskResponse'
                 default:
                     description: Default error response
                     content:
@@ -2014,6 +2261,34 @@ components:
                          uses it to render the reply-count badge on the root message in the main
                          channel list. Always 0 for thread replies.
                     format: int32
+                task:
+                    allOf:
+                        - $ref: '#/components/schemas/TaskInfo'
+                    description: |-
+                        task is set when this message is a task (a row exists in the task table for
+                         this message id). Populated by ListConversationMessages / ListThreadMessages
+                         for root messages; absent for non-task messages and thread replies.
+        ClaimTaskRequest:
+            required:
+                - message
+            type: object
+            properties:
+                message:
+                    type: string
+                    description: |-
+                        message is the resource name of the task's root message
+                         ("conversations/{c}/messages/{m}").
+        ClaimTaskResponse:
+            type: object
+            properties:
+                message:
+                    allOf:
+                        - $ref: '#/components/schemas/ChatMessage'
+                    description: |-
+                        message is the task message after the claim, with task populated (status
+                         now IN_PROGRESS, assignee set to the caller). When the claim failed because
+                         another agent already owns the task or it is not in TODO, the RPC returns
+                         FAILED_PRECONDITION instead and this response is not sent.
         Command:
             type: object
             properties:
@@ -2201,6 +2476,26 @@ components:
                          the requesting user's read cursor for this conversation. Populated by
                          ListChannels; 0 (or unset) when the user is caught up.
                     format: int32
+        ConvertMessageToTaskRequest:
+            required:
+                - message
+            type: object
+            properties:
+                message:
+                    type: string
+                    description: |-
+                        message is the resource name of the top-level message to convert
+                         ("conversations/{c}/messages/{m}"). Must be a root message in the
+                         conversation (thread_root empty) and not already a task.
+        ConvertMessageToTaskResponse:
+            type: object
+            properties:
+                message:
+                    allOf:
+                        - $ref: '#/components/schemas/ChatMessage'
+                    description: |-
+                        message is the converted message, with task populated. A separate system
+                         notification row is also inserted into the conversation flow.
         CreateAgentResponse:
             type: object
             properties:
@@ -2215,6 +2510,34 @@ components:
             properties:
                 title:
                     type: string
+        CreateTaskRequest:
+            required:
+                - conversation
+                - content
+            type: object
+            properties:
+                conversation:
+                    type: string
+                content:
+                    type: string
+                mentions:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Mention'
+                attachments:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Attachment'
+        CreateTaskResponse:
+            type: object
+            properties:
+                message:
+                    allOf:
+                        - $ref: '#/components/schemas/ChatMessage'
+                    description: |-
+                        message is the newly posted task message, with task populated. The task is
+                         created unassigned (status TODO); the posting agent does NOT auto-claim it
+                         — call ClaimTask afterwards to own it.
         DiffEmittedPayload:
             type: object
             properties:
@@ -2368,6 +2691,16 @@ components:
                     type: string
                 currentVersion:
                     type: string
+        ListTasksResponse:
+            type: object
+            properties:
+                tasks:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ChatMessage'
+                    description: |-
+                        tasks are the channel's task root messages, each with task populated,
+                         ordered by task_number ascending.
         ListThreadMessagesResponse:
             type: object
             properties:
@@ -2687,6 +3020,12 @@ components:
                         thread_root, when set, makes this message a reply in the thread rooted at
                          the given message name ("conversations/{c}/messages/{m}"). Empty posts a
                          normal channel message.
+                asTask:
+                    type: boolean
+                    description: |-
+                        as_task, when true, creates this message as a task: a task row is inserted
+                         in the same transaction with a per-conversation task number and status
+                         TODO. Only valid for top-level messages (thread_root must be empty).
         Status:
             type: object
             properties:
@@ -2703,6 +3042,36 @@ components:
                         $ref: '#/components/schemas/GoogleProtobufAny'
                     description: A list of messages that carry the error details.  There is a common set of message types for APIs to use.
             description: 'The `Status` type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by [gRPC](https://github.com/grpc). Each `Status` message contains three pieces of data: error code, error message, and error details. You can find out more about this error model and how to work with it in the [API Design Guide](https://cloud.google.com/apis/design/errors).'
+        TaskInfo:
+            type: object
+            properties:
+                taskNumber:
+                    type: integer
+                    description: 'task_number is the per-conversation sequence number shown as "[task #N]".'
+                    format: int32
+                status:
+                    enum:
+                        - TASK_STATUS_UNSPECIFIED
+                        - TASK_STATUS_TODO
+                        - TASK_STATUS_IN_PROGRESS
+                        - TASK_STATUS_IN_REVIEW
+                        - TASK_STATUS_DONE
+                    type: string
+                    format: enum
+                assigneeName:
+                    type: string
+                    description: assignee_name is the assigned agent's display name, empty when unassigned.
+                assigneeResourceId:
+                    type: string
+                    description: |-
+                        assignee_resource_id is the assigned agent's resource id ("agents/<id>"),
+                         empty when unassigned.
+            description: |-
+                TaskInfo is the task metadata attached to a ChatMessage that is a task. It is
+                 a read-only join output populated by ListConversationMessages /
+                 ListThreadMessages for root messages; absent on non-task messages and on
+                 thread replies. The chat_message itself remains the source of truth for
+                 content/sender/room_version.
         TextDeltaPayload:
             type: object
             properties:
@@ -2744,6 +3113,18 @@ components:
                     type: string
                 rawInput:
                     type: object
+        UnclaimTaskRequest:
+            required:
+                - message
+            type: object
+            properties:
+                message:
+                    type: string
+        UnclaimTaskResponse:
+            type: object
+            properties:
+                message:
+                    $ref: '#/components/schemas/ChatMessage'
         UndeleteUserRequest:
             required:
                 - name
@@ -2769,6 +3150,34 @@ components:
             properties:
                 config:
                     $ref: '#/components/schemas/S3ConfigSetting'
+        UpdateTaskStatusRequest:
+            required:
+                - message
+                - status
+            type: object
+            properties:
+                message:
+                    type: string
+                status:
+                    enum:
+                        - TASK_STATUS_UNSPECIFIED
+                        - TASK_STATUS_TODO
+                        - TASK_STATUS_IN_PROGRESS
+                        - TASK_STATUS_IN_REVIEW
+                        - TASK_STATUS_DONE
+                    type: string
+                    description: |-
+                        status is the target status. Allowed transitions (enforced server-side):
+                         IN_PROGRESS -> IN_REVIEW (the assignee marks the task ready for human
+                         review) and IN_REVIEW -> DONE (the assignee marks the task done after
+                         detecting the human's approval in the task's thread). TODO -> IN_PROGRESS
+                         is performed by ClaimTask, not this RPC.
+                    format: enum
+        UpdateTaskStatusResponse:
+            type: object
+            properties:
+                message:
+                    $ref: '#/components/schemas/ChatMessage'
         User:
             type: object
             properties:

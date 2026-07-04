@@ -42,6 +42,12 @@ const (
 	CommandService_ListChannelMembers_FullMethodName        = "/laelia.v1.CommandService/ListChannelMembers"
 	CommandService_SendMessage_FullMethodName               = "/laelia.v1.CommandService/SendMessage"
 	CommandService_PostMessage_FullMethodName               = "/laelia.v1.CommandService/PostMessage"
+	CommandService_ConvertMessageToTask_FullMethodName      = "/laelia.v1.CommandService/ConvertMessageToTask"
+	CommandService_ListTasks_FullMethodName                 = "/laelia.v1.CommandService/ListTasks"
+	CommandService_CreateTask_FullMethodName                = "/laelia.v1.CommandService/CreateTask"
+	CommandService_ClaimTask_FullMethodName                 = "/laelia.v1.CommandService/ClaimTask"
+	CommandService_UnclaimTask_FullMethodName               = "/laelia.v1.CommandService/UnclaimTask"
+	CommandService_UpdateTaskStatus_FullMethodName          = "/laelia.v1.CommandService/UpdateTaskStatus"
 	CommandService_ListChannelUpdates_FullMethodName        = "/laelia.v1.CommandService/ListChannelUpdates"
 	CommandService_ListThreadUpdates_FullMethodName         = "/laelia.v1.CommandService/ListThreadUpdates"
 	CommandService_AckProcessedVersion_FullMethodName       = "/laelia.v1.CommandService/AckProcessedVersion"
@@ -78,6 +84,33 @@ type CommandServiceClient interface {
 	ListChannelMembers(ctx context.Context, in *ListChannelMembersRequest, opts ...grpc.CallOption) (*ListChannelMembersResponse, error)
 	SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*ChatMessage, error)
 	PostMessage(ctx context.Context, in *PostMessageRequest, opts ...grpc.CallOption) (*PostMessageResponse, error)
+	// ConvertMessageToTask turns an existing top-level message into a task by
+	// attaching task metadata (number, status=TODO, no assignee). Any channel
+	// member (user or agent) may convert. Emits a system notification row.
+	ConvertMessageToTask(ctx context.Context, in *ConvertMessageToTaskRequest, opts ...grpc.CallOption) (*ConvertMessageToTaskResponse, error)
+	// ListTasks returns the task board for a conversation: every task (root
+	// message with task metadata) in the channel, optionally filtered by status.
+	ListTasks(ctx context.Context, in *ListTasksRequest, opts ...grpc.CallOption) (*ListTasksResponse, error)
+	// CreateTask posts a new top-level task message in a channel (used by agents
+	// to break work into subtasks for others to claim). The new task is created
+	// unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a
+	// system notification row and wakes other agent members.
+	CreateTask(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error)
+	// ClaimTask atomically transitions a TODO task to IN_PROGRESS and assigns it
+	// to the calling agent, subscribing the agent to the task's thread so approval
+	// replies wake it. Returns FAILED_PRECONDITION if the task is already
+	// claimed or not in TODO. Emits a system notification row.
+	ClaimTask(ctx context.Context, in *ClaimTaskRequest, opts ...grpc.CallOption) (*ClaimTaskResponse, error)
+	// UnclaimTask releases the calling agent's claim on a task it owns, setting
+	// it back to TODO so another agent may claim it. Not allowed on DONE
+	// (terminal). Emits a system notification row.
+	UnclaimTask(ctx context.Context, in *UnclaimTaskRequest, opts ...grpc.CallOption) (*UnclaimTaskResponse, error)
+	// UpdateTaskStatus advances a task's status. IN_PROGRESS -> IN_REVIEW marks
+	// the assignee's work ready for human review; IN_REVIEW -> DONE marks it
+	// complete (the assignee should call this only after detecting the human's
+	// approval in the task's thread). Only the assignee may call this. Emits a
+	// system notification row.
+	UpdateTaskStatus(ctx context.Context, in *UpdateTaskStatusRequest, opts ...grpc.CallOption) (*UpdateTaskStatusResponse, error)
 	ListChannelUpdates(ctx context.Context, in *ListChannelUpdatesRequest, opts ...grpc.CallOption) (*ListChannelUpdatesResponse, error)
 	ListThreadUpdates(ctx context.Context, in *ListThreadUpdatesRequest, opts ...grpc.CallOption) (*ListThreadUpdatesResponse, error)
 	AckProcessedVersion(ctx context.Context, in *AckProcessedVersionRequest, opts ...grpc.CallOption) (*AckProcessedVersionResponse, error)
@@ -344,6 +377,66 @@ func (c *commandServiceClient) PostMessage(ctx context.Context, in *PostMessageR
 	return out, nil
 }
 
+func (c *commandServiceClient) ConvertMessageToTask(ctx context.Context, in *ConvertMessageToTaskRequest, opts ...grpc.CallOption) (*ConvertMessageToTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConvertMessageToTaskResponse)
+	err := c.cc.Invoke(ctx, CommandService_ConvertMessageToTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) ListTasks(ctx context.Context, in *ListTasksRequest, opts ...grpc.CallOption) (*ListTasksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTasksResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListTasks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) CreateTask(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateTaskResponse)
+	err := c.cc.Invoke(ctx, CommandService_CreateTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) ClaimTask(ctx context.Context, in *ClaimTaskRequest, opts ...grpc.CallOption) (*ClaimTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ClaimTaskResponse)
+	err := c.cc.Invoke(ctx, CommandService_ClaimTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) UnclaimTask(ctx context.Context, in *UnclaimTaskRequest, opts ...grpc.CallOption) (*UnclaimTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UnclaimTaskResponse)
+	err := c.cc.Invoke(ctx, CommandService_UnclaimTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) UpdateTaskStatus(ctx context.Context, in *UpdateTaskStatusRequest, opts ...grpc.CallOption) (*UpdateTaskStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateTaskStatusResponse)
+	err := c.cc.Invoke(ctx, CommandService_UpdateTaskStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *commandServiceClient) ListChannelUpdates(ctx context.Context, in *ListChannelUpdatesRequest, opts ...grpc.CallOption) (*ListChannelUpdatesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListChannelUpdatesResponse)
@@ -450,6 +543,33 @@ type CommandServiceServer interface {
 	ListChannelMembers(context.Context, *ListChannelMembersRequest) (*ListChannelMembersResponse, error)
 	SendMessage(context.Context, *SendMessageRequest) (*ChatMessage, error)
 	PostMessage(context.Context, *PostMessageRequest) (*PostMessageResponse, error)
+	// ConvertMessageToTask turns an existing top-level message into a task by
+	// attaching task metadata (number, status=TODO, no assignee). Any channel
+	// member (user or agent) may convert. Emits a system notification row.
+	ConvertMessageToTask(context.Context, *ConvertMessageToTaskRequest) (*ConvertMessageToTaskResponse, error)
+	// ListTasks returns the task board for a conversation: every task (root
+	// message with task metadata) in the channel, optionally filtered by status.
+	ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error)
+	// CreateTask posts a new top-level task message in a channel (used by agents
+	// to break work into subtasks for others to claim). The new task is created
+	// unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a
+	// system notification row and wakes other agent members.
+	CreateTask(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error)
+	// ClaimTask atomically transitions a TODO task to IN_PROGRESS and assigns it
+	// to the calling agent, subscribing the agent to the task's thread so approval
+	// replies wake it. Returns FAILED_PRECONDITION if the task is already
+	// claimed or not in TODO. Emits a system notification row.
+	ClaimTask(context.Context, *ClaimTaskRequest) (*ClaimTaskResponse, error)
+	// UnclaimTask releases the calling agent's claim on a task it owns, setting
+	// it back to TODO so another agent may claim it. Not allowed on DONE
+	// (terminal). Emits a system notification row.
+	UnclaimTask(context.Context, *UnclaimTaskRequest) (*UnclaimTaskResponse, error)
+	// UpdateTaskStatus advances a task's status. IN_PROGRESS -> IN_REVIEW marks
+	// the assignee's work ready for human review; IN_REVIEW -> DONE marks it
+	// complete (the assignee should call this only after detecting the human's
+	// approval in the task's thread). Only the assignee may call this. Emits a
+	// system notification row.
+	UpdateTaskStatus(context.Context, *UpdateTaskStatusRequest) (*UpdateTaskStatusResponse, error)
 	ListChannelUpdates(context.Context, *ListChannelUpdatesRequest) (*ListChannelUpdatesResponse, error)
 	ListThreadUpdates(context.Context, *ListThreadUpdatesRequest) (*ListThreadUpdatesResponse, error)
 	AckProcessedVersion(context.Context, *AckProcessedVersionRequest) (*AckProcessedVersionResponse, error)
@@ -543,6 +663,24 @@ func (UnimplementedCommandServiceServer) SendMessage(context.Context, *SendMessa
 }
 func (UnimplementedCommandServiceServer) PostMessage(context.Context, *PostMessageRequest) (*PostMessageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PostMessage not implemented")
+}
+func (UnimplementedCommandServiceServer) ConvertMessageToTask(context.Context, *ConvertMessageToTaskRequest) (*ConvertMessageToTaskResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConvertMessageToTask not implemented")
+}
+func (UnimplementedCommandServiceServer) ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTasks not implemented")
+}
+func (UnimplementedCommandServiceServer) CreateTask(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateTask not implemented")
+}
+func (UnimplementedCommandServiceServer) ClaimTask(context.Context, *ClaimTaskRequest) (*ClaimTaskResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ClaimTask not implemented")
+}
+func (UnimplementedCommandServiceServer) UnclaimTask(context.Context, *UnclaimTaskRequest) (*UnclaimTaskResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UnclaimTask not implemented")
+}
+func (UnimplementedCommandServiceServer) UpdateTaskStatus(context.Context, *UpdateTaskStatusRequest) (*UpdateTaskStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateTaskStatus not implemented")
 }
 func (UnimplementedCommandServiceServer) ListChannelUpdates(context.Context, *ListChannelUpdatesRequest) (*ListChannelUpdatesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListChannelUpdates not implemented")
@@ -971,6 +1109,114 @@ func _CommandService_PostMessage_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommandService_ConvertMessageToTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConvertMessageToTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ConvertMessageToTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ConvertMessageToTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ConvertMessageToTask(ctx, req.(*ConvertMessageToTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_ListTasks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTasksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListTasks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListTasks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListTasks(ctx, req.(*ListTasksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_CreateTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).CreateTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_CreateTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).CreateTask(ctx, req.(*CreateTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_ClaimTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClaimTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ClaimTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ClaimTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ClaimTask(ctx, req.(*ClaimTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_UnclaimTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnclaimTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).UnclaimTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_UnclaimTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).UnclaimTask(ctx, req.(*UnclaimTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_UpdateTaskStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateTaskStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).UpdateTaskStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_UpdateTaskStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).UpdateTaskStatus(ctx, req.(*UpdateTaskStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CommandService_ListChannelUpdates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListChannelUpdatesRequest)
 	if err := dec(in); err != nil {
@@ -1201,6 +1447,30 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PostMessage",
 			Handler:    _CommandService_PostMessage_Handler,
+		},
+		{
+			MethodName: "ConvertMessageToTask",
+			Handler:    _CommandService_ConvertMessageToTask_Handler,
+		},
+		{
+			MethodName: "ListTasks",
+			Handler:    _CommandService_ListTasks_Handler,
+		},
+		{
+			MethodName: "CreateTask",
+			Handler:    _CommandService_CreateTask_Handler,
+		},
+		{
+			MethodName: "ClaimTask",
+			Handler:    _CommandService_ClaimTask_Handler,
+		},
+		{
+			MethodName: "UnclaimTask",
+			Handler:    _CommandService_UnclaimTask_Handler,
+		},
+		{
+			MethodName: "UpdateTaskStatus",
+			Handler:    _CommandService_UpdateTaskStatus_Handler,
 		},
 		{
 			MethodName: "ListChannelUpdates",
