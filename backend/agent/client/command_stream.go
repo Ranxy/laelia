@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
@@ -74,16 +75,21 @@ func (m *mergedText) flush(stream *connect.BidiStreamForClient[v1pb.AgentStreamM
 }
 
 type commandStream struct {
-	client          v1connect.AgentStreamServiceClient
-	managerURL      string
-	backoff         *ExponentialBackoff
-	getToken        func() string
-	getSessID       func() string
-	getAcpConfig    func() *executor.ACPConfig
-	socketPath      string
-	sessionToken    string
-	binaryDir       string
-	agentResourceID string
+	client       v1connect.AgentStreamServiceClient
+	managerURL   string
+	backoff      *ExponentialBackoff
+	getToken     func() string
+	getSessID    func() string
+	getAcpConfig func() *executor.ACPConfig
+	// refreshProviders re-probes the host for installed LLM agent providers
+	// and returns the freshly discovered set. Wired from Client so the
+	// DiscoverProviders control message can trigger an on-demand re-probe and
+	// reply with the result. Nil in tests.
+	refreshProviders func(ctx context.Context) []provider.Discovered
+	socketPath       string
+	sessionToken     string
+	binaryDir        string
+	agentResourceID  string
 	// resourceID is the agent's stable server-assigned UUID (parsed from the
 	// bootstrap token). It keys the per-agent working dir and local state file,
 	// distinct from agentResourceID (the --agent-name flag).
@@ -247,6 +253,32 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 						resolver.ResolvePermission(d.OptionId)
 					}
 				}
+
+			case *v1pb.ManagerStreamMessage_DiscoverProviders:
+				// Manager-triggered on-demand re-probe (RefreshAgentProviders RPC).
+				// Re-probe the host and reply with the freshly discovered providers
+				// so the manager can persist them into agent.info and hand them back
+				// to the caller. Bounded ctx so a stuck probe can't hold the receive
+				// pump forever; the reply is best-effort — a dead stream just drops it.
+				req := m.DiscoverProviders
+				go func(requestID string) {
+					probeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+					defer cancel()
+					var providers []*v1pb.AgentProviderInfo
+					if c.refreshProviders != nil {
+						providers = discoveredToProto(c.refreshProviders(probeCtx), time.Now())
+					}
+					if err := stream.Send(&v1pb.AgentStreamMessage{
+						Message: &v1pb.AgentStreamMessage_ProvidersDiscovered{
+							ProvidersDiscovered: &v1pb.ProvidersDiscovered{
+								RequestId: requestID,
+								Providers: providers,
+							},
+						},
+					}); err != nil {
+						slog.Warn("failed to send providers_discovered reply", "requestID", requestID, "error", err)
+					}
+				}(req.RequestId)
 
 			default:
 				slog.Warn("unknown message type from manager")

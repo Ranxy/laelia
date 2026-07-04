@@ -13,11 +13,14 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/provider"
 	"github.com/Ranxy/laelia/backend/common"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -866,20 +869,38 @@ func convertToAgent(agent *store.AgentMessage) *v1pb.Agent {
 	return result
 }
 
+// cloneStoreAgentInfo returns a deep copy of info safe to mutate before a
+// partial UpdateAgent, or a fresh empty AgentInfo when info is nil. The plain
+// type assertion after proto.Clone is unchecked; centralizing it here keeps
+// revive's unchecked-type-assertion quiet without hiding the panic risk at
+// each call site (the input is always *storepb.AgentInfo here).
+func cloneStoreAgentInfo(info *storepb.AgentInfo) *storepb.AgentInfo {
+	if info == nil {
+		return &storepb.AgentInfo{}
+	}
+	cloned := proto.Clone(info)
+	patchInfo, ok := cloned.(*storepb.AgentInfo)
+	if !ok || patchInfo == nil {
+		return &storepb.AgentInfo{}
+	}
+	return patchInfo
+}
+
 func convertToV1AgentInfo(info *storepb.AgentInfo) *v1pb.AgentInfo {
 	if info == nil {
 		return nil
 	}
 	return &v1pb.AgentInfo{
-		AgentType:  info.AgentType,
-		Hostname:   info.Hostname,
-		Os:         info.Os,
-		Arch:       info.Arch,
-		Ip:         info.Ip,
-		Version:    info.Version,
-		Labels:     info.Labels,
-		Capability: convertToV1AgentCapability(info.Capability),
-		AcpConfig:  convertToV1AgentACPConfig(info.AcpConfig),
+		AgentType:          info.AgentType,
+		Hostname:           info.Hostname,
+		Os:                 info.Os,
+		Arch:               info.Arch,
+		Ip:                 info.Ip,
+		Version:            info.Version,
+		Labels:             info.Labels,
+		Capability:         convertToV1AgentCapability(info.Capability),
+		AvailableProviders: convertToV1Providers(info.AvailableProviders),
+		AcpConfig:          convertToV1AgentACPConfig(info.AcpConfig),
 	}
 }
 
@@ -896,6 +917,8 @@ func convertToStoreAgentInfo(info *v1pb.AgentInfo) *storepb.AgentInfo {
 		Version:    info.Version,
 		Labels:     info.Labels,
 		Capability: convertToStoreAgentCapability(info.Capability),
+		// available_providers is agent-owned: store exactly what the agent reported.
+		AvailableProviders: convertToStoreProviders(info.AvailableProviders),
 		// AcpConfig is server-owned; never overwrite it from agent-reported info.
 		AcpConfig: nil,
 	}
@@ -909,6 +932,9 @@ func convertToV1AgentACPConfig(cfg *storepb.AgentACPConfig) *v1pb.AgentACPConfig
 		Executable: cfg.Executable,
 		Args:       cfg.Args,
 		AllowEnv:   cfg.AllowEnv,
+		Provider:   cfg.Provider,
+		Model:      cfg.Model,
+		CustomEnv:  cfg.CustomEnv,
 	}
 }
 
@@ -920,7 +946,78 @@ func convertToStoreAgentACPConfig(cfg *v1pb.AgentACPConfig) *storepb.AgentACPCon
 		Executable: cfg.Executable,
 		Args:       cfg.Args,
 		AllowEnv:   cfg.AllowEnv,
+		Provider:   cfg.Provider,
+		Model:      cfg.Model,
+		CustomEnv:  cfg.CustomEnv,
 	}
+}
+
+func convertToV1Providers(in []*storepb.AgentProviderInfo) []*v1pb.AgentProviderInfo {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]*v1pb.AgentProviderInfo, 0, len(in))
+	for _, p := range in {
+		out = append(out, &v1pb.AgentProviderInfo{
+			ProviderId:                p.ProviderId,
+			DisplayName:               p.DisplayName,
+			Version:                   p.Version,
+			ExecutablePath:            p.ExecutablePath,
+			Models:                    convertToV1Models(p.Models),
+			SupportsModelConfigOption: p.SupportsModelConfigOption,
+			DetectedAt:                p.DetectedAt,
+		})
+	}
+	return out
+}
+
+func convertToStoreProviders(in []*v1pb.AgentProviderInfo) []*storepb.AgentProviderInfo {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]*storepb.AgentProviderInfo, 0, len(in))
+	for _, p := range in {
+		out = append(out, &storepb.AgentProviderInfo{
+			ProviderId:                p.ProviderId,
+			DisplayName:               p.DisplayName,
+			Version:                   p.Version,
+			ExecutablePath:            p.ExecutablePath,
+			Models:                    convertToStoreModels(p.Models),
+			SupportsModelConfigOption: p.SupportsModelConfigOption,
+			DetectedAt:                p.DetectedAt,
+		})
+	}
+	return out
+}
+
+func convertToV1Models(in []*storepb.AgentModelOption) []*v1pb.AgentModelOption {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]*v1pb.AgentModelOption, 0, len(in))
+	for _, m := range in {
+		out = append(out, &v1pb.AgentModelOption{
+			Value:       m.Value,
+			Name:        m.Name,
+			Description: m.Description,
+		})
+	}
+	return out
+}
+
+func convertToStoreModels(in []*v1pb.AgentModelOption) []*storepb.AgentModelOption {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]*storepb.AgentModelOption, 0, len(in))
+	for _, m := range in {
+		out = append(out, &storepb.AgentModelOption{
+			Value:       m.Value,
+			Name:        m.Name,
+			Description: m.Description,
+		})
+	}
+	return out
 }
 
 func convertToV1AgentCapability(capability *storepb.AgentCapability) *v1pb.AgentCapability {
@@ -1066,30 +1163,105 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
 	}
 
-	patch := &store.UpdateAgentMessage{
-		Info: &storepb.AgentInfo{
-			AcpConfig: convertToStoreAgentACPConfig(req.Msg.AcpConfig),
-		},
-	}
+	// Preserve the rest of AgentInfo (hostname/os/capability/available_providers/
+	// labels); only AcpConfig is admin-owned and replaced here. Previously this
+	// built a fresh Info{AcpConfig:...} and clobbered the agent-reported fields.
+	patchInfo := cloneStoreAgentInfo(agent.Info)
+	patchInfo.AcpConfig = convertToStoreAgentACPConfig(req.Msg.AcpConfig)
+
+	patch := &store.UpdateAgentMessage{Info: patchInfo}
 	if _, err := s.store.UpdateAgent(ctx, agent, patch); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
-// validateAgentACPConfig checks the user-configurable ACP fields. executable
-// is required and every allow_env entry must be a valid env var name.
+// RefreshAgentProviders asks the agent daemon to re-probe its host for
+// installed LLM agent providers + models, then persists the fresh result into
+// agent.info.available_providers and returns it. Requires the agent to be
+// online (the probe runs on the agent's host, reached via the bidi stream).
+func (s *AgentService) RefreshAgentProviders(ctx context.Context, req *connect.Request[v1pb.RefreshAgentProvidersRequest]) (*connect.Response[v1pb.RefreshAgentProvidersResponse], error) {
+	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+	if !s.dispatcher.IsAgentConnected(agent.ID) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent is not connected; cannot probe providers"))
+	}
+
+	requestID := uuid.NewString()
+	replyCh := s.dispatcher.RegisterPendingDiscover(requestID)
+	defer s.dispatcher.CancelPendingDiscover(requestID)
+
+	if err := s.dispatcher.SendDiscoverProviders(agent.ID, requestID); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Wrap(err, "failed to request provider discovery"))
+	}
+
+	select {
+	case msg := <-replyCh:
+		if msg == nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.New("provider discovery returned no result"))
+		}
+		// Persist the fresh provider list into agent.info, preserving every
+		// other AgentInfo field (only available_providers is agent-owned here).
+		patchInfo := cloneStoreAgentInfo(agent.Info)
+		patchInfo.AvailableProviders = convertToStoreProviders(msg.Providers)
+		if _, err := s.store.UpdateAgent(ctx, agent, &store.UpdateAgentMessage{Info: patchInfo}); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to persist discovered providers"))
+		}
+		return connect.NewResponse(&v1pb.RefreshAgentProvidersResponse{
+			Providers: convertToV1Providers(patchInfo.AvailableProviders),
+		}), nil
+	case <-time.After(60 * time.Second):
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, errors.New("timed out waiting for provider discovery"))
+	case <-ctx.Done():
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, ctx.Err())
+	}
+}
+
+// validateAgentACPConfig checks the user-configurable ACP fields. A built-in
+// provider (opencode, claude-code) supplies its own launch command, so
+// executable is only required for the "custom"/empty provider. Every
+// allow_env and custom_env key must be a valid env var name.
 func validateAgentACPConfig(cfg *v1pb.AgentACPConfig) error {
 	if cfg == nil {
 		return errors.New("acp_config must be set")
 	}
-	if cfg.Executable == "" {
-		return errors.New("acp_config.executable must be set")
+	if cfg.Provider != "" && !knownProviderID(cfg.Provider) {
+		return errors.Errorf("invalid acp_config.provider %q: must be a built-in id or \"custom\"", cfg.Provider)
+	}
+	// A built-in provider derives its command from the registry; anything else
+	// requires a raw executable.
+	_, isBuiltin := provider.Default().Lookup(cfg.Provider)
+	if !isBuiltin && cfg.Executable == "" {
+		return errors.New("acp_config.executable must be set when provider is not a built-in")
 	}
 	for _, name := range cfg.AllowEnv {
 		if !envVarNameRegex.MatchString(name) {
 			return errors.Errorf("invalid allow_env entry %q: must match ^[A-Za-z_][A-Za-z0-9_]*$", name)
 		}
 	}
+	for key := range cfg.CustomEnv {
+		if !envVarNameRegex.MatchString(key) {
+			return errors.Errorf("invalid custom_env key %q: must match ^[A-Za-z_][A-Za-z0-9_]*$", key)
+		}
+	}
 	return nil
+}
+
+// knownProviderID reports whether id is a recognized provider id (a built-in or
+// the "custom" escape hatch).
+func knownProviderID(id string) bool {
+	if id == "custom" {
+		return true
+	}
+	_, ok := provider.Default().Lookup(id)
+	return ok
 }

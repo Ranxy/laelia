@@ -94,20 +94,28 @@ type Dispatcher struct {
 	// under the new session.
 	graceMu sync.Mutex
 	grace   map[int]map[string]context.CancelFunc
+
+	// pendingDiscovers maps a DiscoverProviders request_id to the channel that
+	// the matching ProvidersDiscovered reply will resolve. Used by the unary
+	// RefreshAgentProviders RPC to do a request/response round trip over the
+	// bidi command stream.
+	discoverMu       sync.Mutex
+	pendingDiscovers map[string]chan *v1pb.ProvidersDiscovered
 }
 
 func New(s *store.Store) *Dispatcher {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Dispatcher{
-		store:           s,
-		sessions:        make(map[int]*AgentSession),
-		watchers:        make(map[string]map[chan *v1pb.CommandOutput]struct{}),
-		eventWatchers:   make(map[string]map[chan *v1pb.CommandEvent]struct{}),
-		pingInterval:    15 * time.Second,
-		pingTimeout:     45 * time.Second,
-		grace:           make(map[int]map[string]context.CancelFunc),
-		lifecycleCtx:    ctx,
-		lifecycleCancel: cancel,
+		store:            s,
+		sessions:         make(map[int]*AgentSession),
+		watchers:         make(map[string]map[chan *v1pb.CommandOutput]struct{}),
+		eventWatchers:    make(map[string]map[chan *v1pb.CommandEvent]struct{}),
+		pingInterval:     15 * time.Second,
+		pingTimeout:      45 * time.Second,
+		grace:            make(map[int]map[string]context.CancelFunc),
+		pendingDiscovers: make(map[string]chan *v1pb.ProvidersDiscovered),
+		lifecycleCtx:     ctx,
+		lifecycleCancel:  cancel,
 	}
 }
 
@@ -176,6 +184,67 @@ func (d *Dispatcher) IsAgentConnected(agentID int) bool {
 	defer d.mu.RUnlock()
 	_, ok := d.sessions[agentID]
 	return ok
+}
+
+// RegisterPendingDiscover creates a response channel keyed by requestID for an
+// in-flight DiscoverProviders round trip. The caller sends the control message
+// to the agent (via SendDiscoverProviders), then waits on the returned channel
+// for the ProvidersDiscovered reply. CancelPendingDiscover must be called if
+// the caller gives up waiting, to avoid leaking the entry.
+func (d *Dispatcher) RegisterPendingDiscover(requestID string) chan *v1pb.ProvidersDiscovered {
+	ch := make(chan *v1pb.ProvidersDiscovered, 1)
+	d.discoverMu.Lock()
+	d.pendingDiscovers[requestID] = ch
+	d.discoverMu.Unlock()
+	return ch
+}
+
+// CancelPendingDiscover removes a pending discover entry without delivering a
+// result. Safe to call after the reply arrived (it is a no-op in that case
+// since the entry was already removed).
+func (d *Dispatcher) CancelPendingDiscover(requestID string) {
+	d.discoverMu.Lock()
+	delete(d.pendingDiscovers, requestID)
+	d.discoverMu.Unlock()
+}
+
+// CompletePendingDiscover delivers a ProvidersDiscovered reply to the waiting
+// caller and removes the pending entry. Called from the bidi receive loop when
+// the agent replies. Unknown request ids (late replies, already-cancelled
+// callers) are dropped silently.
+func (d *Dispatcher) CompletePendingDiscover(msg *v1pb.ProvidersDiscovered) {
+	if msg == nil {
+		return
+	}
+	d.discoverMu.Lock()
+	ch, ok := d.pendingDiscovers[msg.RequestId]
+	if ok {
+		delete(d.pendingDiscovers, msg.RequestId)
+	}
+	d.discoverMu.Unlock()
+	if ok {
+		select {
+		case ch <- msg:
+		default:
+		}
+	}
+}
+
+// SendDiscoverProviders sends a DiscoverProviders control message to the
+// agent's active bidi stream. Returns an error if the agent has no active
+// session (the frontend should show "agent offline").
+func (d *Dispatcher) SendDiscoverProviders(agentID int, requestID string) error {
+	d.mu.RLock()
+	sess, ok := d.sessions[agentID]
+	d.mu.RUnlock()
+	if !ok {
+		return errors.New("agent is not connected")
+	}
+	return sess.Send(&v1pb.ManagerStreamMessage{
+		Message: &v1pb.ManagerStreamMessage_DiscoverProviders{
+			DiscoverProviders: &v1pb.DiscoverProviders{RequestId: requestID},
+		},
+	})
 }
 
 // CurrentCommandID returns the command id the agent is currently running in its

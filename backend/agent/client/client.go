@@ -355,6 +355,9 @@ func (c *Client) Run(ctx context.Context) error {
 		defer c.mu.RUnlock()
 		return c.acpConfig
 	}
+	c.cmdStream.refreshProviders = func(ctx context.Context) []provider.Discovered {
+		return c.refreshProviders(ctx)
+	}
 
 	// Probe the host once for installed LLM agent providers + models so the
 	// first AgentInfo report carries them. On-demand re-probing is driven by

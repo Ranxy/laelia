@@ -98,6 +98,9 @@ func (s *AgentStreamService) AgentChannel(
 				slog.Error("failed to send pong", "error", err)
 			}
 
+		case *v1pb.AgentStreamMessage_ProvidersDiscovered:
+			s.dispatcher.CompletePendingDiscover(m.ProvidersDiscovered)
+
 		default:
 			slog.Warn("unknown agent stream message type")
 		}
