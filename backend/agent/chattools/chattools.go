@@ -117,6 +117,11 @@ func senderTypeString(t v1pb.SenderType) string {
 // Surfacing them here is what lets the agent tie a message like "test file" to
 // the file it must `file download <id>` to actually read — without this the
 // attachment metadata the manager returns never reaches the LLM.
+//
+// When an attachment carries section-anchor fields it represents a comment on
+// a span of the file, not a whole-file upload; the section anchor and quoted
+// selection are appended so the LLM sees exactly what the user is reacting to
+// instead of having to download the whole file to guess the context.
 func formatAttachments(attachments []*v1pb.Attachment) string {
 	if len(attachments) == 0 {
 		return ""
@@ -124,6 +129,26 @@ func formatAttachments(attachments []*v1pb.Attachment) string {
 	out := "  attachments:\n"
 	for _, a := range attachments {
 		out += fmt.Sprintf("    - id=%s  name=%s  size=%d  mime=%s\n", a.Id, a.Name, a.SizeBytes, a.MimeType)
+		if a.SectionAnchor != "" || a.QuotedText != "" {
+			out += formatCommentAnchor(a)
+		}
+	}
+	return out
+}
+
+// formatCommentAnchor renders the anchor fields of a comment attachment: the
+// section the user commented on and the exact text they selected. The quote is
+// indented as a blockquote so multi-line selections stay readable and clearly
+// delimited from the surrounding file metadata.
+func formatCommentAnchor(a *v1pb.Attachment) string {
+	out := ""
+	if a.SectionAnchor != "" {
+		out += fmt.Sprintf("      commented on %s\n", a.SectionAnchor)
+	}
+	if a.QuotedText != "" {
+		for _, line := range strings.Split(a.QuotedText, "\n") {
+			out += fmt.Sprintf("        > %s\n", line)
+		}
 	}
 	return out
 }

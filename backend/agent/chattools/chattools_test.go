@@ -129,4 +129,23 @@ func TestFormatMessageLineAttachments(t *testing.T) {
 		"  attachments:\n" +
 		"    - id=f-1  name=report.pdf  size=123456  mime=application/pdf\n"
 	assert.Equal(t, want, got)
+
+	// An anchored-comment attachment surfaces its section anchor and quoted
+	// selection so the agent knows which span of the file the user is reacting
+	// to, instead of seeing only a re-attached file.
+	got = formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", false, "为什么会这样?",
+		[]*v1pb.Attachment{{
+			Id:            "fa764496",
+			Name:          "crystal_design_assessment.md",
+			MimeType:      "text/plain; charset=utf-8",
+			SizeBytes:     10289,
+			SectionAnchor: "§ 2.1 Concurrency (worker pool)",
+			QuotedText:    "the worker pool spawns unbounded goroutines",
+		}})
+	want = "[2026-06-26T07:31:16Z] admin (USER): 为什么会这样?\n" +
+		"  attachments:\n" +
+		"    - id=fa764496  name=crystal_design_assessment.md  size=10289  mime=text/plain; charset=utf-8\n" +
+		"      commented on § 2.1 Concurrency (worker pool)\n" +
+		"        > the worker pool spawns unbounded goroutines\n"
+	assert.Equal(t, want, got)
 }
