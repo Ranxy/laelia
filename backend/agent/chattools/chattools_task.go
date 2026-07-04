@@ -146,7 +146,16 @@ func ClaimTask(ctx context.Context, d Deps, in ClaimTaskInput) (string, error) {
 		return "", wrapManagerError(err)
 	}
 	t := resp.Msg.Message.GetTask()
-	return fmt.Sprintf("Claimed task #%d (status=%s, assignee=you). The task's thread is now subscribed; the human's approval reply will wake you.", t.GetTaskNumber(), taskStatusString(t.GetStatus())), nil
+	// Echo the conversation + the task message name so the agent has the exact
+	// thread-send command ready without reconstructing it, and tell it to post
+	// ALL work in the task's thread (not the main channel) — the root cause of
+	// agents posting task completion to the channel is that the path to the
+	// thread was not obvious right after claiming.
+	conv := normalizeConversationName(resp.Msg.Message.GetConversation())
+	root := in.Message
+	return fmt.Sprintf("Claimed task #%d (status=%s, assignee=you). The task's thread is now subscribed; the human's approval reply will wake you.\n"+
+		"Post ALL work on this task in its THREAD — not the main channel. Run `thread read %s --root %s --version <your processed_version>` to get the --base-version, then `thread send %s --root %s --content \"...\" --base-version <that version>`. Do NOT use `message send` for task progress or completion.",
+		t.GetTaskNumber(), taskStatusString(t.GetStatus()), conv, root, conv, root), nil
 }
 
 // UnclaimTask releases the caller's claim on a task it owns (IN_PROGRESS→TODO)
