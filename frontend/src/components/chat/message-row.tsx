@@ -11,6 +11,7 @@ import { ChatPermissionRequest } from "@/components/chat-events/permission-reque
 import { ChatToolCall } from "@/components/chat-events/tool-call";
 import { ChatWarning } from "@/components/chat-events/warning";
 import { CommandStatusBadge } from "@/components/command-status-badge";
+import { AttachmentCommentCard } from "@/components/preview/attachment-comment-card";
 import {
   isMarkdownAttachment,
   MAX_MARKDOWN_PREVIEW_BYTES,
@@ -385,6 +386,18 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
           {msg.attachments && msg.attachments.length > 0 && (
             <div className="flex flex-col gap-1">
               {msg.attachments.map((att) => {
+                // An attachment carrying a section anchor is a comment on a
+                // span of a file, not a whole-file upload — render the anchor
+                // + quote inline instead of a FileCard.
+                if (att.sectionAnchor) {
+                  return (
+                    <AttachmentCommentCard
+                      key={att.id}
+                      attachment={att}
+                      variant="inline"
+                    />
+                  );
+                }
                 const previewable = isMarkdownAttachment(att);
                 const tooLarge =
                   previewable &&

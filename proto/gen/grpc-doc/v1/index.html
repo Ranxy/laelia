@@ -4014,7 +4014,7 @@ Format: idps/{idp} </p></td>
         
       
         <h3 id="laelia.v1.Attachment">Attachment</h3>
-        <p>Attachment references a file stored in S3 that is attached to a chat message.</p><p>The id is the file row uuid and doubles as the download key (/v1/files/{id}).</p>
+        <p>Attachment references a file stored in S3 that is attached to a chat message.</p><p>The id is the file row uuid and doubles as the download key (/v1/files/{id}).</p><p>The anchor fields below are set only when this attachment represents a</p><p>comment anchoring a span of a file (e.g. a markdown section) rather than a</p><p>whole-file upload. They are caller-supplied (the file row is not their</p><p>source of truth) and left empty for ordinary whole-file attachments.</p>
 
         
           <table class="field-table">
@@ -4049,6 +4049,29 @@ Format: idps/{idp} </p></td>
                   <td><a href="#int64">int64</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>section_anchor</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>section_anchor is the human-readable anchor of the commented section,
+e.g. &#34;§ 2.1 Server (server/)&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>section_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>section_id is the stable DOM id of the section heading within the file,
+used to jump back to the section from a comment. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quoted_text</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>quoted_text is the exact text the commenter selected in the file. </p></td>
                 </tr>
               
             </tbody>

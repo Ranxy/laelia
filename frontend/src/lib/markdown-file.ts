@@ -79,3 +79,60 @@ export function buildOutline(container: HTMLElement): OutlineItem[] {
   });
   return items;
 }
+
+export interface CommentAnchor {
+  sectionId: string;
+  sectionAnchor: string;
+  quotedText: string;
+}
+
+// MAX_QUOTE_CHARS caps the quoted text carried by a comment so a huge
+// selection can't bloat the message payload.
+const MAX_QUOTE_CHARS = 500;
+
+// anchorForSelection locates the section heading preceding the current
+// selection inside `container` and packages it with the selected text into a
+// comment anchor. `outline` must be the result of buildOutline for the same
+// container (it supplies the section number/text); headings are matched by
+// their assigned DOM id. Returns null when there is no selection, the
+// selection is outside the container, or it precedes the first heading (no
+// anchorable section).
+export function anchorForSelection(
+  container: HTMLElement,
+  selection: Selection,
+  outline: OutlineItem[]
+): CommentAnchor | null {
+  if (selection.isCollapsed || selection.rangeCount === 0) return null;
+  const range = selection.getRangeAt(0);
+  const ref = range.startContainer;
+  if (!container.contains(ref)) return null;
+
+  const headings = Array.from(
+    container.querySelectorAll("h1, h2, h3, h4, h5, h6")
+  ) as HTMLHeadingElement[];
+  let heading: HTMLHeadingElement | null = null;
+  for (const h of headings) {
+    // If the selection starts after this heading (or inside it), it is the
+    // nearest preceding section so far. Headings are in document order, so
+    // the first one that no longer precedes the selection ends the search.
+    const pos = h.compareDocumentPosition(ref);
+    if (pos & Node.DOCUMENT_POSITION_FOLLOWING) {
+      heading = h;
+    } else {
+      break;
+    }
+  }
+  if (!heading) return null;
+
+  const item = outline.find((o) => o.id === (heading as HTMLHeadingElement).id);
+  const number = item?.number ?? "";
+  const text = item?.text ?? (heading.textContent ?? "").trim();
+  const sectionAnchor = `§ ${number} ${text}`.trim();
+  const quotedText = selection.toString().trim().slice(0, MAX_QUOTE_CHARS);
+  if (!quotedText) return null;
+  return {
+    sectionId: heading.id,
+    sectionAnchor,
+    quotedText,
+  };
+}

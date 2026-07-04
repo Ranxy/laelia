@@ -80,6 +80,49 @@ export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
     set({ activeThreadRoot: null, activeThreadConversation: null });
   },
 
+  // loadThreadMessages fetches a thread's messages into threadByRoot without
+  // opening the thread panel (no activeThreadRoot, no polling watcher). Used
+  // by the markdown preview's comment aside, which only needs the current
+  // snapshot — the commenter's own reply is optimistically appended by
+  // sendThreadMessage, and reopening reloads. This avoids the side effect of
+  // openThread, which would pop the thread panel open behind the overlay.
+  async loadThreadMessages(conversation, rootMessageId) {
+    try {
+      const res = await commandServiceClient.listThreadMessages(
+        create(ListThreadMessagesRequestSchema, {
+          conversation,
+          threadRoot: rootMessageId,
+          pageSize: 200,
+          pageToken: "",
+        })
+      );
+      const uiMsgs: ChatMessageUI[] = (res.messages ?? []).map(toUiMessage);
+      set((state) => ({
+        threadByRoot: {
+          ...state.threadByRoot,
+          [rootMessageId]: {
+            messages: uiMsgs,
+            currentVersion: res.currentVersion,
+            loading: false,
+          },
+        },
+      }));
+      syncRootReplyCount(set, get, conversation, rootMessageId, uiMsgs[0]);
+    } catch {
+      set((state) => ({
+        threadByRoot: {
+          ...state.threadByRoot,
+          [rootMessageId]: {
+            messages: state.threadByRoot[rootMessageId]?.messages ?? [],
+            currentVersion:
+              state.threadByRoot[rootMessageId]?.currentVersion ?? 0n,
+            loading: false,
+          },
+        },
+      }));
+    }
+  },
+
   async sendThreadMessage(
     conversationId,
     rootMessageId,

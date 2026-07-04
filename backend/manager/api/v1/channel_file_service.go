@@ -293,6 +293,11 @@ func toNullUUID(id uuid.UUID) uuid.NullUUID {
 // message that carries it and prevents referencing files from another
 // conversation. An empty/invalid id, a missing file, or a file tied elsewhere
 // is rejected.
+//
+// The anchor fields (section_anchor/section_id/quoted_text) are caller-supplied
+// semantics, not file-row metadata, so they are preserved verbatim while the
+// file metadata (name/mime/size) is normalized from the file row. This is what
+// carries a "comment on a section of a file" as a thread reply.
 func (s *CommandService) resolveAttachments(ctx context.Context, convID uuid.UUID, attachments []*v1pb.Attachment) ([]*v1pb.Attachment, error) {
 	if len(attachments) == 0 {
 		return attachments, nil
@@ -317,10 +322,13 @@ func (s *CommandService) resolveAttachments(ctx context.Context, convID uuid.UUI
 			return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("file %s is not attached to this conversation; upload it with --conversation first", a.Id))
 		}
 		resolved = append(resolved, &v1pb.Attachment{
-			Id:        f.ID.String(),
-			Name:      f.OriginalName,
-			MimeType:  f.MimeType,
-			SizeBytes: f.SizeBytes,
+			Id:            f.ID.String(),
+			Name:          f.OriginalName,
+			MimeType:      f.MimeType,
+			SizeBytes:     f.SizeBytes,
+			SectionAnchor: a.SectionAnchor,
+			SectionId:     a.SectionId,
+			QuotedText:    a.QuotedText,
 		})
 	}
 	return resolved, nil

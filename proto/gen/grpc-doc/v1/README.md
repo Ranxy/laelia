@@ -1426,6 +1426,11 @@ frontend can associate execution events with the channel.
 Attachment references a file stored in S3 that is attached to a chat message.
 The id is the file row uuid and doubles as the download key (/v1/files/{id}).
 
+The anchor fields below are set only when this attachment represents a
+comment anchoring a span of a file (e.g. a markdown section) rather than a
+whole-file upload. They are caller-supplied (the file row is not their
+source of truth) and left empty for ordinary whole-file attachments.
+
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
@@ -1433,6 +1438,9 @@ The id is the file row uuid and doubles as the download key (/v1/files/{id}).
 | name | [string](#string) |  |  |
 | mime_type | [string](#string) |  |  |
 | size_bytes | [int64](#int64) |  |  |
+| section_anchor | [string](#string) |  | section_anchor is the human-readable anchor of the commented section, e.g. &#34;§ 2.1 Server (server/)&#34;. |
+| section_id | [string](#string) |  | section_id is the stable DOM id of the section heading within the file, used to jump back to the section from a comment. |
+| quoted_text | [string](#string) |  | quoted_text is the exact text the commenter selected in the file. |
 
 
 

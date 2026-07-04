@@ -749,6 +749,11 @@ export declare const MentionSchema: GenMessage<Mention>;
  * Attachment references a file stored in S3 that is attached to a chat message.
  * The id is the file row uuid and doubles as the download key (/v1/files/{id}).
  *
+ * The anchor fields below are set only when this attachment represents a
+ * comment anchoring a span of a file (e.g. a markdown section) rather than a
+ * whole-file upload. They are caller-supplied (the file row is not their
+ * source of truth) and left empty for ordinary whole-file attachments.
+ *
  * @generated from message laelia.v1.Attachment
  */
 export declare type Attachment = Message<"laelia.v1.Attachment"> & {
@@ -771,6 +776,29 @@ export declare type Attachment = Message<"laelia.v1.Attachment"> & {
    * @generated from field: int64 size_bytes = 4;
    */
   sizeBytes: bigint;
+
+  /**
+   * section_anchor is the human-readable anchor of the commented section,
+   * e.g. "§ 2.1 Server (server/)".
+   *
+   * @generated from field: string section_anchor = 5;
+   */
+  sectionAnchor: string;
+
+  /**
+   * section_id is the stable DOM id of the section heading within the file,
+   * used to jump back to the section from a comment.
+   *
+   * @generated from field: string section_id = 6;
+   */
+  sectionId: string;
+
+  /**
+   * quoted_text is the exact text the commenter selected in the file.
+   *
+   * @generated from field: string quoted_text = 7;
+   */
+  quotedText: string;
 };
 
 /**

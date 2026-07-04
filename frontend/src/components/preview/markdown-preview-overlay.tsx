@@ -1,4 +1,11 @@
-import { Download, FileText, List, Loader2, X } from "lucide-react";
+import {
+  Download,
+  FileText,
+  List,
+  Loader2,
+  MessageSquare,
+  X,
+} from "lucide-react";
 import MarkdownRender from "markstream-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -13,6 +20,7 @@ import { downloadAttachment } from "@/lib/file-download";
 import { buildOutline, type OutlineItem } from "@/lib/markdown-file";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
+import { CommentsAside } from "./comments-aside";
 
 // MarkdownPreviewOverlay is a single, store-driven full-page overlay that
 // renders a markdown attachment for focused reading. It portals into the
@@ -28,6 +36,7 @@ export function MarkdownPreviewOverlay() {
 
   const [outline, setOutline] = useState<OutlineItem[]>([]);
   const [outlineOpen, setOutlineOpen] = useState(true);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Esc closes the overlay. Bound only while open.
@@ -55,6 +64,11 @@ export function MarkdownPreviewOverlay() {
 
   if (!active) return null;
   const { attachment } = active;
+
+  const jumpToSection = (id: string) =>
+    document
+      .getElementById(id)
+      ?.scrollIntoView({ block: "start", behavior: "smooth" });
 
   return createPortal(
     <div className="fixed inset-0 z-10 flex flex-col bg-background">
@@ -88,6 +102,19 @@ export function MarkdownPreviewOverlay() {
         >
           <Download className="size-4" />
         </Button>
+        {active.status === "ready" && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCommentsOpen((v) => !v)}
+            aria-pressed={commentsOpen}
+            aria-label={t("preview.comments")}
+            className="flex items-center gap-1.5 px-2.5 py-1.5"
+          >
+            <MessageSquare className="size-4" />
+            <span className="hidden sm:inline">{t("preview.comments")}</span>
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -103,14 +130,7 @@ export function MarkdownPreviewOverlay() {
       <div className="flex min-h-0 flex-1">
         {outlineOpen && outline.length > 0 && (
           <aside className="hidden w-60 shrink-0 overflow-y-auto border-r border-control-border px-3 py-4 md:block">
-            <OutlineList
-              items={outline}
-              onJump={(id) =>
-                document
-                  .getElementById(id)
-                  ?.scrollIntoView({ block: "start", behavior: "smooth" })
-              }
-            />
+            <OutlineList items={outline} onJump={jumpToSection} />
           </aside>
         )}
         <div ref={contentRef} className="flex-1 overflow-y-auto">
@@ -156,6 +176,17 @@ export function MarkdownPreviewOverlay() {
             </div>
           )}
         </div>
+        {commentsOpen && active.status === "ready" && (
+          <CommentsAside
+            conversation={active.conversation}
+            conversationId={active.conversationId}
+            rootMessageId={active.rootMessageId}
+            attachment={attachment}
+            contentRef={contentRef}
+            outline={outline}
+            onJumpToSection={jumpToSection}
+          />
+        )}
       </div>
     </div>,
     getLayerRoot("overlay")

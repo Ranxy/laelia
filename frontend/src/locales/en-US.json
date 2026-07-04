@@ -294,7 +294,13 @@
     "loading": "Loading preview…",
     "error": "Couldn't load this file for preview.",
     "too-large": "This file ({{size}}) is too large to preview in-browser. Download it instead.",
-    "too-large-tooltip": "File is larger than 10 MB — preview not supported. Download instead."
+    "too-large-tooltip": "File is larger than 10 MB — preview not supported. Download instead.",
+    "comments": "Comments",
+    "comments-empty": "No comments yet. Select text in the document to comment on a section.",
+    "comments-placeholder": "Comment on {{name}}…",
+    "comments-select-hint": "Select text in the document to anchor your comment.",
+    "comments-ready": "Anchored — press Enter to send.",
+    "comments-send": "Send comment"
   },
   "tasks": {
     "title": "Tasks",

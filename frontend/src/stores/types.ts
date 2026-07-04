@@ -233,6 +233,12 @@ export interface ThreadSlice {
 
   openThread: (conversation: string, rootMessageId: string) => Promise<void>;
   closeThread: () => void;
+  // Loads a thread snapshot into threadByRoot without opening the thread
+  // panel or starting a watcher (used by the preview comment aside).
+  loadThreadMessages: (
+    conversation: string,
+    rootMessageId: string
+  ) => Promise<void>;
   sendThreadMessage: (
     conversationId: string,
     rootMessageId: string,

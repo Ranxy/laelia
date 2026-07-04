@@ -310,6 +310,16 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("as_task is only valid for top-level messages, not thread replies"))
 	}
 
+	// Validate attachment ids belong to this conversation and normalize their
+	// metadata from the file rows. The agent path (PostMessage) already did
+	// this; doing it here too closes the gap where user-sent attachments were
+	// never membership-checked, and preserves caller-supplied anchor fields
+	// (section_anchor/section_id/quoted_text) used by attachment comments.
+	attachments, err := s.resolveAttachments(ctx, convID, req.Msg.Attachments)
+	if err != nil {
+		return nil, err
+	}
+
 	// Atomically bump conversation.version and write the user message with that
 	// room_version. This is the single source of truth for the room cursor. When
 	// as_task is set, the same tx also inserts the task row (status TODO).
@@ -323,7 +333,7 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 			Content:        req.Msg.Content,
 			SenderType:     store.SenderTypeUser,
 			Mentions:       req.Msg.Mentions,
-			Attachments:    req.Msg.Attachments,
+			Attachments:    attachments,
 		})
 	} else {
 		msg, _, err = s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
@@ -334,7 +344,7 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 			Content:             req.Msg.Content,
 			SenderType:          store.SenderTypeUser,
 			Mentions:            req.Msg.Mentions,
-			Attachments:         req.Msg.Attachments,
+			Attachments:         attachments,
 			ThreadRootMessageID: threadRoot,
 		})
 	}

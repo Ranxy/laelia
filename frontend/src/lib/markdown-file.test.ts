@@ -1,6 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { describe, expect, it } from "vitest";
 import {
+  anchorForSelection,
   buildOutline,
   isMarkdownAttachment,
   isMarkdownPreviewable,
@@ -111,5 +112,66 @@ describe("buildOutline", () => {
     const container = document.createElement("div");
     container.innerHTML = `<p>no headings here</p>`;
     expect(buildOutline(container)).toEqual([]);
+  });
+});
+
+describe("anchorForSelection", () => {
+  function setupDoc() {
+    const container = document.createElement("div");
+    container.innerHTML = `
+      <h2>Intro</h2>
+      <p>first paragraph</p>
+      <h2>Server</h2>
+      <p>buffer size is hardcoded</p>
+    `;
+    document.body.appendChild(container);
+    const outline = buildOutline(container);
+    return { container, outline };
+  }
+
+  function selectText(node: Node, offset: number, length: number) {
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    const range = document.createRange();
+    range.setStart(node, offset);
+    range.setEnd(node, offset + length);
+    sel.addRange(range);
+    return sel;
+  }
+
+  it("TestAnchorForSelection_PrecedingHeading: anchors to the section before the selection", () => {
+    const { container, outline } = setupDoc();
+    // Select text inside the second <p> (under "Server").
+    const secondP = container.querySelectorAll("p")[1].firstChild!;
+    const sel = selectText(secondP, 0, "buffer size".length);
+    const anchor = anchorForSelection(container, sel, outline);
+    expect(anchor).not.toBeNull();
+    expect(anchor!.sectionAnchor).toBe("§ 2 Server");
+    expect(anchor!.quotedText).toBe("buffer size");
+    expect(anchor!.sectionId).not.toBe("");
+    container.remove();
+  });
+
+  it("TestAnchorForSelection_BeforeFirstHeading: returns null when selection precedes any heading", () => {
+    const { container, outline } = setupDoc();
+    // Place a <p> before the first heading and select inside it, so the
+    // selection precedes every heading in document order.
+    const before = document.createElement("p");
+    before.textContent = "preamble text";
+    container.insertBefore(before, container.firstChild!);
+    const sel = selectText(before.firstChild!, 0, "preamble".length);
+    expect(anchorForSelection(container, sel, outline)).toBeNull();
+    container.remove();
+  });
+
+  it("TestAnchorForSelection_OutsideContainer: returns null when selection is outside", () => {
+    const { container, outline } = setupDoc();
+    const other = document.createElement("div");
+    other.textContent = "elsewhere";
+    document.body.appendChild(other);
+    const sel = selectText(other.firstChild!, 0, 4);
+    expect(anchorForSelection(container, sel, outline)).toBeNull();
+    other.remove();
+    container.remove();
   });
 });

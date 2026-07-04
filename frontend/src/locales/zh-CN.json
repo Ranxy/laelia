@@ -294,7 +294,13 @@
     "loading": "正在加载预览…",
     "error": "无法加载该文件以供预览。",
     "too-large": "该文件（{{size}}）过大，不支持在浏览器中预览，请下载查看。",
-    "too-large-tooltip": "文件超过 10 MB，不支持预览，请下载查看。"
+    "too-large-tooltip": "文件超过 10 MB，不支持预览，请下载查看。",
+    "comments": "评论",
+    "comments-empty": "暂无评论。在文档中框选文本即可对某段落发表评论。",
+    "comments-placeholder": "对 {{name}} 发表评论…",
+    "comments-select-hint": "在文档中框选文本，为评论锚定段落。",
+    "comments-ready": "已锚定段落，按 Enter 发送。",
+    "comments-send": "发送评论"
   },
   "tasks": {
     "title": "任务",

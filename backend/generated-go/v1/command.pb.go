@@ -1893,12 +1893,25 @@ func (x *Mention) GetName() string {
 
 // Attachment references a file stored in S3 that is attached to a chat message.
 // The id is the file row uuid and doubles as the download key (/v1/files/{id}).
+//
+// The anchor fields below are set only when this attachment represents a
+// comment anchoring a span of a file (e.g. a markdown section) rather than a
+// whole-file upload. They are caller-supplied (the file row is not their
+// source of truth) and left empty for ordinary whole-file attachments.
 type Attachment struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	MimeType      string                 `protobuf:"bytes,3,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
-	SizeBytes     int64                  `protobuf:"varint,4,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name      string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	MimeType  string                 `protobuf:"bytes,3,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	SizeBytes int64                  `protobuf:"varint,4,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	// section_anchor is the human-readable anchor of the commented section,
+	// e.g. "§ 2.1 Server (server/)".
+	SectionAnchor string `protobuf:"bytes,5,opt,name=section_anchor,json=sectionAnchor,proto3" json:"section_anchor,omitempty"`
+	// section_id is the stable DOM id of the section heading within the file,
+	// used to jump back to the section from a comment.
+	SectionId string `protobuf:"bytes,6,opt,name=section_id,json=sectionId,proto3" json:"section_id,omitempty"`
+	// quoted_text is the exact text the commenter selected in the file.
+	QuotedText    string `protobuf:"bytes,7,opt,name=quoted_text,json=quotedText,proto3" json:"quoted_text,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1959,6 +1972,27 @@ func (x *Attachment) GetSizeBytes() int64 {
 		return x.SizeBytes
 	}
 	return 0
+}
+
+func (x *Attachment) GetSectionAnchor() string {
+	if x != nil {
+		return x.SectionAnchor
+	}
+	return ""
+}
+
+func (x *Attachment) GetSectionId() string {
+	if x != nil {
+		return x.SectionId
+	}
+	return ""
+}
+
+func (x *Attachment) GetQuotedText() string {
+	if x != nil {
+		return x.QuotedText
+	}
+	return ""
 }
 
 // File is the persisted metadata for an S3-backed object.
@@ -6883,14 +6917,19 @@ const file_v1_command_proto_rawDesc = "" +
 	"\aMention\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\"l\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\"\xd3\x01\n" +
 	"\n" +
 	"Attachment\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1b\n" +
 	"\tmime_type\x18\x03 \x01(\tR\bmimeType\x12\x1d\n" +
 	"\n" +
-	"size_bytes\x18\x04 \x01(\x03R\tsizeBytes\"\xbb\x02\n" +
+	"size_bytes\x18\x04 \x01(\x03R\tsizeBytes\x12%\n" +
+	"\x0esection_anchor\x18\x05 \x01(\tR\rsectionAnchor\x12\x1d\n" +
+	"\n" +
+	"section_id\x18\x06 \x01(\tR\tsectionId\x12\x1f\n" +
+	"\vquoted_text\x18\a \x01(\tR\n" +
+	"quotedText\"\xbb\x02\n" +
 	"\x04File\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12<\n" +
 	"\fconversation\x18\x02 \x01(\tB\x18\xfaA\x15\n" +
