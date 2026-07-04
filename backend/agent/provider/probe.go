@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"os/exec"
 
 	"github.com/coder/acp-go-sdk"
@@ -58,6 +59,14 @@ func probeConn(ctx context.Context, cwd string, stdin io.Writer, stdout io.Reade
 	}
 	client := &probeClient{}
 	conn := acp.NewClientSideConnection(client, stdin, stdout)
+	// The probe tears the subprocess down (Kill + Wait) once it has the
+	// ConfigOptions, which closes the stdout pipe out from under the SDK's
+	// reader goroutine. The SDK logs that teardown as `connection closed` at
+	// INFO via slog.Default() — noisy and alarming to users for what is a
+	// normal probe exit. Silence it with a discard logger; the probe's own
+	// failure modes are reported via the returned error / empty models, not
+	// through the SDK's internal logs.
+	conn.SetLogger(slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	if _, err := conn.Initialize(ctx, acp.InitializeRequest{
 		ProtocolVersion: acp.ProtocolVersionNumber,
