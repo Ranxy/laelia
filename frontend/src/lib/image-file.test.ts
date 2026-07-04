@@ -25,9 +25,9 @@ describe("isImageAttachment", () => {
   });
 
   it("TestIsImageAttachment_ByMimeType: matches image/* mime types", () => {
-    expect(isImageAttachment(att({ name: "file", mimeType: "image/png" }))).toBe(
-      true
-    );
+    expect(
+      isImageAttachment(att({ name: "file", mimeType: "image/png" }))
+    ).toBe(true);
     expect(
       isImageAttachment(att({ name: "file", mimeType: "image/jpeg" }))
     ).toBe(true);

@@ -12,10 +12,11 @@ import { useAppStore } from "@/stores";
 
 // ImagePreviewOverlay is the store-driven full-page lightbox for image
 // attachments. It portals into the overlay layer (z-2500) and covers the
-// viewport with a darkened backdrop; the image is centered and scaled to fit
-// within 85vh / 90vw. Esc closes, clicking the backdrop closes, clicking the
-// image does not (so it can be inspected). A download button is provided for
-// the raw file.
+// viewport with a semi-transparent dark backdrop — dark so a white image
+// can't blend into the page background, semi-transparent so the page still
+// faintly shows through. The image carries a faint ring + shadow so its
+// silhouette is visible regardless of image color. Esc closes, clicking the
+// backdrop closes, clicking the image does not (so it can be inspected).
 export function ImagePreviewOverlay() {
   usePreserveHigherLayerAccess("overlay");
   const { t } = useTranslation();
@@ -37,15 +38,15 @@ export function ImagePreviewOverlay() {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-10 flex flex-col bg-background/95"
+      className="fixed inset-0 z-10 flex flex-col bg-black/75"
       onClick={close}
     >
       {/* Top bar — stopPropagation so backdrop click doesn't close via it. */}
       <div
-        className="flex h-14 shrink-0 items-center gap-2 border-b border-control-border px-4"
+        className="flex h-14 shrink-0 items-center gap-2 border-b border-white/10 px-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <span className="truncate text-sm font-medium text-main">
+        <span className="truncate text-sm font-medium text-white/90">
           {attachment.name}
         </span>
         <div className="flex-1" />
@@ -54,7 +55,7 @@ export function ImagePreviewOverlay() {
           size="sm"
           onClick={() => downloadAttachment(attachment)}
           aria-label={t("preview.download")}
-          className="flex size-8 items-center justify-center p-0"
+          className="flex size-8 items-center justify-center p-0 text-white/70 hover:bg-white/10 hover:text-white"
         >
           <Download className="size-4" />
         </Button>
@@ -63,7 +64,7 @@ export function ImagePreviewOverlay() {
           size="sm"
           onClick={close}
           aria-label={t("common.close")}
-          className="flex size-8 items-center justify-center p-0"
+          className="flex size-8 items-center justify-center p-0 text-white/70 hover:bg-white/10 hover:text-white"
         >
           <X className="size-4" />
         </Button>
@@ -75,17 +76,17 @@ export function ImagePreviewOverlay() {
         onClick={close}
       >
         {status === "loading" && (
-          <Loader2 className="size-8 animate-spin text-control-light" />
+          <Loader2 className="size-8 animate-spin text-white/70" />
         )}
         {status === "error" && (
-          <p className="text-sm text-control">{t("preview.error")}</p>
+          <p className="text-sm text-white/80">{t("preview.error")}</p>
         )}
         {status === "ready" && blobUrl && (
           <img
             src={blobUrl}
             alt={attachment.name}
             onClick={(e) => e.stopPropagation()}
-            className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain"
+            className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl ring-1 ring-white/20"
           />
         )}
       </div>
