@@ -21,9 +21,12 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/Ranxy/laelia/backend/agent/credential"
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
@@ -66,6 +69,11 @@ type Client struct {
 	acpConfig   *executor.ACPConfig
 	daemon      *daemonsrv.Server
 	agentName   string
+	// discoveredProviders is the cached result of probing the host for
+	// installed LLM agent providers + their models. Refreshed once at startup
+	// and on demand via the bidi DiscoverProviders control message.
+	discoveredProviders []provider.Discovered
+	discoveredAt        time.Time
 	// resourceID is the agent's stable server-assigned UUID, parsed from the
 	// bootstrap token. It keys the per-agent working dir and local state file.
 	resourceID string
@@ -348,6 +356,13 @@ func (c *Client) Run(ctx context.Context) error {
 		return c.acpConfig
 	}
 
+	// Probe the host once for installed LLM agent providers + models so the
+	// first AgentInfo report carries them. On-demand re-probing is driven by
+	// the bidi DiscoverProviders control message (see command_stream).
+	discoverCtx, discoverCancel := context.WithTimeout(ctx, 2*time.Minute)
+	c.refreshProviders(discoverCtx)
+	discoverCancel()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -363,7 +378,7 @@ func (c *Client) Run(ctx context.Context) error {
 		// AcpConfig (the manager may update it on a reconnect via
 		// handleServerACPConfig). Computing it once before the loop left
 		// Capability stale for the agent's whole lifetime.
-		info := collectAgentInfo(c.acpConfigSnapshot())
+		info := c.collectAgentInfo()
 
 		if err := c.Connect(ctx, info); err != nil {
 			slog.Error("connect failed", "error", err)
@@ -489,16 +504,78 @@ func (c *Client) acpConfigSnapshot() *executor.ACPConfig {
 	return c.acpConfig
 }
 
-func collectAgentInfo(acpConfig *executor.ACPConfig) *v1pb.AgentInfo {
+func (c *Client) collectAgentInfo() *v1pb.AgentInfo {
 	hostname, _ := os.Hostname()
-	return &v1pb.AgentInfo{
-		Hostname:   hostname,
-		Os:         runtime.GOOS,
-		Arch:       runtime.GOARCH,
-		Version:    "0.2.0",
-		Ip:         getOutboundIP(),
-		Capability: acpConfig.Capability(),
+	c.mu.RLock()
+	acpCfg := c.acpConfig
+	providers := c.discoveredProviders
+	discoveredAt := c.discoveredAt
+	c.mu.RUnlock()
+
+	info := &v1pb.AgentInfo{
+		Hostname:           hostname,
+		Os:                 runtime.GOOS,
+		Arch:               runtime.GOARCH,
+		Version:            "0.2.0",
+		Ip:                 getOutboundIP(),
+		Capability:         acpCfg.Capability(),
+		AvailableProviders: discoveredToProto(providers, discoveredAt),
 	}
+	return info
+}
+
+// refreshProviders probes the host for installed LLM agent providers and their
+// models, caching the result so subsequent AgentInfo reports carry it without
+// re-spawning. Safe to call repeatedly; the cache is replaced atomically.
+func (c *Client) refreshProviders(ctx context.Context) []provider.Discovered {
+	discovered := provider.Default().Discover(ctx)
+	c.mu.Lock()
+	c.discoveredProviders = discovered
+	c.discoveredAt = time.Now()
+	c.mu.Unlock()
+	if len(discovered) > 0 {
+		ids := make([]string, 0, len(discovered))
+		for _, d := range discovered {
+			ids = append(ids, d.ProviderID)
+		}
+		slog.Info("discovered LLM agent providers", "providers", ids)
+	} else {
+		slog.Info("no LLM agent providers discovered on host")
+	}
+	return discovered
+}
+
+// discoveredToProto converts the internal discovery result to the proto form
+// reported in AgentInfo.available_providers.
+func discoveredToProto(in []provider.Discovered, at time.Time) []*v1pb.AgentProviderInfo {
+	if len(in) == 0 {
+		return nil
+	}
+	var ts *timestamppb.Timestamp
+	if !at.IsZero() {
+		ts = timestamppb.New(at)
+	}
+	out := make([]*v1pb.AgentProviderInfo, 0, len(in))
+	for _, d := range in {
+		models := make([]*v1pb.AgentModelOption, 0, len(d.Models))
+		for _, m := range d.Models {
+			models = append(models, &v1pb.AgentModelOption{
+				Value:       m.Value,
+				Name:        m.Name,
+				Description: m.Description,
+			})
+		}
+		out = append(out, &v1pb.AgentProviderInfo{
+			ProviderId:                d.ProviderID,
+			DisplayName:               d.DisplayName,
+			Version:                   d.Version,
+			ExecutablePath:            d.ExecutablePath,
+			Models:                    models,
+			SupportsModelConfigOption: d.SupportsModelConfigOption,
+			DetectedAt:                ts,
+		})
+	}
+	return out
 }
 
 func getOutboundIP() string {

@@ -66,8 +66,8 @@ func TestBeginSession_NoStaleResponseAcrossReconnect(t *testing.T) {
 // must yield different AgentInfo when recomputed.
 func TestAgentInfo_RecomputedOnReconnect(t *testing.T) {
 	// Unconfigured agent: SupportsAcp=false.
-	unconfigured := (*executor.ACPConfig)(nil)
-	info0 := collectAgentInfo(unconfigured)
+	c0 := &Client{}
+	info0 := c0.collectAgentInfo()
 	require.NotNil(t, info0.Capability)
 	assert.False(t, info0.Capability.SupportsAcp, "unconfigured agent must report SupportsAcp=false")
 
@@ -81,7 +81,8 @@ func TestAgentInfo_RecomputedOnReconnect(t *testing.T) {
 		SupportsRawEvents:  false,
 		SupportsToolTraces: true,
 	}
-	info1 := collectAgentInfo(configured)
+	c1 := &Client{acpConfig: configured}
+	info1 := c1.collectAgentInfo()
 	require.NotNil(t, info1.Capability)
 	assert.True(t, info1.Capability.SupportsAcp, "configured agent must report SupportsAcp=true")
 	assert.Equal(t, int32(42), info1.Capability.MaxTimeoutSeconds)
