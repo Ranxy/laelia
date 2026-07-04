@@ -29,6 +29,7 @@ import {
   MessageRow,
   rowStreamingProps,
 } from "@/components/chat/message-row";
+import { RemoteImage } from "@/components/chat/remote-image";
 import { EmptyState, LoadingState } from "@/components/chat/states";
 import { TasksPanel } from "@/components/chat/tasks-panel";
 import { ThreadPanel } from "@/components/chat/thread-panel";
@@ -49,6 +50,7 @@ import {
 } from "@/composables/useMentionTargets";
 import { commandServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
+import { isImageAttachment } from "@/lib/image-file";
 import "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -109,6 +111,7 @@ export function ChatConversationPage() {
   const toggleTasksPanel = useAppStore((s) => s.toggleTasksPanel);
   const closeTasksPanel = useAppStore((s) => s.closeTasksPanel);
   const openFilePreview = useAppStore((s) => s.openFilePreview);
+  const openImagePreview = useAppStore((s) => s.openImagePreview);
   const tasksPanelOpen = useAppStore((s) =>
     channelId
       ? (s.tasksPanelOpen[`conversations/${channelId}`] ?? false)
@@ -537,6 +540,15 @@ export function ChatConversationPage() {
     [channelId, conversationName, openFilePreview]
   );
 
+  // Open the image lightbox for an inline image attachment (published message
+  // or thread root/reply). The attachment id is the download key.
+  const handlePreviewImage = useCallback(
+    (att: Attachment) => {
+      openImagePreview(att);
+    },
+    [openImagePreview]
+  );
+
   const handleToggleTasksPanel = useCallback(() => {
     if (!channelId) return;
     // Opening the tasks panel closes the thread panel — two 420px side panels
@@ -662,6 +674,7 @@ export function ChatConversationPage() {
                       onOpenThread={handleOpenThread}
                       onPreviewAttachment={handlePreviewAttachment}
                       onJumpToSection={handleJumpToSection}
+                      onPreviewImage={handlePreviewImage}
                     />
                   </div>
                 );
@@ -702,28 +715,50 @@ export function ChatConversationPage() {
               >
                 {pendingAttachments.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 px-3 pt-2">
-                    {pendingAttachments.map((att) => (
-                      <span
-                        key={att.id}
-                        className="group flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
-                      >
-                        <span className="max-w-[160px] truncate">
-                          {att.name}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPendingAttachments((prev) =>
-                              prev.filter((p) => p.id !== att.id)
-                            )
-                          }
-                          className="text-control-placeholder hover:text-error transition-colors"
-                          aria-label={t("common.delete")}
+                    {pendingAttachments.map((att) =>
+                      isImageAttachment(att) ? (
+                        <div key={att.id} className="group relative shrink-0">
+                          <RemoteImage
+                            attachment={att}
+                            variant="thumb"
+                            onClick={() => openImagePreview(att)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPendingAttachments((prev) =>
+                                prev.filter((p) => p.id !== att.id)
+                              )
+                            }
+                            className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-control-border bg-background text-control-placeholder opacity-0 transition-opacity hover:text-error group-hover:opacity-100"
+                            aria-label={t("common.delete")}
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          key={att.id}
+                          className="group flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
                         >
-                          <X className="size-3" />
-                        </button>
-                      </span>
-                    ))}
+                          <span className="max-w-[160px] truncate">
+                            {att.name}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPendingAttachments((prev) =>
+                                prev.filter((p) => p.id !== att.id)
+                              )
+                            }
+                            className="text-control-placeholder hover:text-error transition-colors"
+                            aria-label={t("common.delete")}
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </span>
+                      )
+                    )}
                   </div>
                 )}
                 <Textarea
@@ -903,6 +938,7 @@ export function ChatConversationPage() {
             onViewInChannel={handleViewInChannel}
             onPreviewAttachment={handlePreviewAttachment}
             onJumpToSection={handleJumpToSection}
+            onPreviewImage={handlePreviewImage}
           />
         )}
         {tasksPanelOpen && channelId && (

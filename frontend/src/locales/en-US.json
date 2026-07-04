@@ -300,7 +300,8 @@
     "comments-placeholder": "Comment on {{name}}…",
     "comments-select-hint": "Select text in the document to anchor your comment.",
     "comments-ready": "Anchored — press Enter to send.",
-    "comments-send": "Send comment"
+    "comments-send": "Send comment",
+    "image-load-failed": "Couldn't load this image."
   },
   "tasks": {
     "title": "Tasks",

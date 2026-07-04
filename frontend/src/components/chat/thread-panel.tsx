@@ -18,6 +18,7 @@ import {
   MessageRow,
   rowStreamingProps,
 } from "@/components/chat/message-row";
+import { RemoteImage } from "@/components/chat/remote-image";
 import { EmptyState, LoadingState } from "@/components/chat/states";
 import { TaskStatusBadge } from "@/components/chat/task-status-badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import {
 } from "@/composables/useMentionTargets";
 import { commandServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
+import { isImageAttachment } from "@/lib/image-file";
 import {
   isMarkdownAttachment,
   MAX_MARKDOWN_PREVIEW_BYTES,
@@ -54,6 +56,7 @@ export interface ThreadPanelProps {
     sectionId: string,
     rootMessageId: string
   ) => void;
+  onPreviewImage?: (attachment: Attachment) => void;
 }
 
 export function ThreadPanel({
@@ -64,6 +67,7 @@ export function ThreadPanel({
   onViewInChannel,
   onPreviewAttachment,
   onJumpToSection,
+  onPreviewImage,
 }: ThreadPanelProps) {
   const { t } = useTranslation();
   const conversationName = `conversations/${channelId}`;
@@ -71,6 +75,7 @@ export function ThreadPanel({
   const thread = useAppStore((s) => s.threadByRoot[rootMessageId]);
   const sendThreadMessage = useAppStore((s) => s.sendThreadMessage);
   const agents = useAppStore((s) => s.agents);
+  const openImagePreview = useAppStore((s) => s.openImagePreview);
 
   const messages = thread?.messages ?? EMPTY_THREAD;
   const loading = thread?.loading ?? false;
@@ -278,6 +283,7 @@ export function ThreadPanel({
               msg={rootMsg}
               agentTitle={agentTitleFor(rootMsg)}
               onPreviewAttachment={onPreviewAttachment}
+              onPreviewImage={onPreviewImage}
             />
           )}
 
@@ -314,6 +320,7 @@ export function ThreadPanel({
                 markdownCustomId="thread-chat"
                 onPreviewAttachment={onPreviewAttachment}
                 onJumpToSection={onJumpToSection}
+                onPreviewImage={onPreviewImage}
               />
             );
           })}
@@ -333,26 +340,48 @@ export function ThreadPanel({
         >
           {pendingAttachments.length > 0 && (
             <div className="flex flex-wrap gap-1.5 px-3 pt-2">
-              {pendingAttachments.map((att) => (
-                <span
-                  key={att.id}
-                  className="group flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
-                >
-                  <span className="max-w-[160px] truncate">{att.name}</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPendingAttachments((prev) =>
-                        prev.filter((p) => p.id !== att.id)
-                      )
-                    }
-                    className="text-control-placeholder hover:text-error transition-colors"
-                    aria-label={t("common.delete")}
+              {pendingAttachments.map((att) =>
+                isImageAttachment(att) ? (
+                  <div key={att.id} className="group relative shrink-0">
+                    <RemoteImage
+                      attachment={att}
+                      variant="thumb"
+                      onClick={() => openImagePreview(att)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPendingAttachments((prev) =>
+                          prev.filter((p) => p.id !== att.id)
+                        )
+                      }
+                      className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-control-border bg-background text-control-placeholder opacity-0 transition-opacity hover:text-error group-hover:opacity-100"
+                      aria-label={t("common.delete")}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <span
+                    key={att.id}
+                    className="group flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
                   >
-                    <X className="size-3" />
-                  </button>
-                </span>
-              ))}
+                    <span className="max-w-[160px] truncate">{att.name}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPendingAttachments((prev) =>
+                          prev.filter((p) => p.id !== att.id)
+                        )
+                      }
+                      className="text-control-placeholder hover:text-error transition-colors"
+                      aria-label={t("common.delete")}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                )
+              )}
             </div>
           )}
           <Textarea
@@ -571,10 +600,12 @@ function RootContext({
   msg,
   agentTitle,
   onPreviewAttachment,
+  onPreviewImage,
 }: {
   msg: ChatMessageUI;
   agentTitle: string;
   onPreviewAttachment?: (attachment: Attachment, rootMessageId: string) => void;
+  onPreviewImage?: (attachment: Attachment) => void;
 }) {
   const { t } = useTranslation();
   const isUser = msg.role === "user";
@@ -600,6 +631,18 @@ function RootContext({
         {msg.attachments && msg.attachments.length > 0 && (
           <div className="flex flex-col gap-1">
             {msg.attachments.map((att) => {
+              if (isImageAttachment(att)) {
+                return (
+                  <RemoteImage
+                    key={att.id}
+                    attachment={att}
+                    variant="inline"
+                    onClick={
+                      onPreviewImage ? () => onPreviewImage(att) : undefined
+                    }
+                  />
+                );
+              }
               const previewable = isMarkdownAttachment(att);
               const tooLarge =
                 previewable &&

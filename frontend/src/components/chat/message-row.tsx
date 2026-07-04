@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Avatar, formatTime } from "@/components/chat/avatar";
 import { FileCard } from "@/components/chat/file-card";
 import { splitByMentions } from "@/components/chat/mentions";
+import { RemoteImage } from "@/components/chat/remote-image";
 import { TaskStatusBadge } from "@/components/chat/task-status-badge";
 import { ChatDiff } from "@/components/chat-events/diff-view";
 import { ChatPermissionRequest } from "@/components/chat-events/permission-request";
@@ -12,6 +13,7 @@ import { ChatToolCall } from "@/components/chat-events/tool-call";
 import { ChatWarning } from "@/components/chat-events/warning";
 import { CommandStatusBadge } from "@/components/command-status-badge";
 import { AttachmentCommentCard } from "@/components/preview/attachment-comment-card";
+import { isImageAttachment } from "@/lib/image-file";
 import {
   isMarkdownAttachment,
   MAX_MARKDOWN_PREVIEW_BYTES,
@@ -106,6 +108,10 @@ export interface MessageRowProps {
     sectionId: string,
     rootMessageId: string
   ) => void;
+  // onPreviewImage, when provided, wires image attachments to the lightbox
+  // overlay. Unlike markdown, images render inline directly (scaled to fit);
+  // this handler is the click-to-zoom affordance on that inline image.
+  onPreviewImage?: (attachment: Attachment) => void;
 }
 
 export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
@@ -122,6 +128,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     onOpenThread,
     onPreviewAttachment,
     onJumpToSection,
+    onPreviewImage,
   } = props;
   const { t } = useTranslation();
   const isUser = msg.role === "user";
@@ -415,6 +422,20 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
                                 msg.threadRoot ?? msg.id
                               )
                           : undefined
+                      }
+                    />
+                  );
+                }
+                // Image attachments render inline directly (scaled to fit the
+                // chat width), with click-to-zoom opening the lightbox.
+                if (isImageAttachment(att)) {
+                  return (
+                    <RemoteImage
+                      key={att.id}
+                      attachment={att}
+                      variant="inline"
+                      onClick={
+                        onPreviewImage ? () => onPreviewImage(att) : undefined
                       }
                     />
                   );

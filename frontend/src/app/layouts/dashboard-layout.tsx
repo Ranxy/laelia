@@ -1,6 +1,7 @@
 import { Menu } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import { ImagePreviewOverlay } from "@/components/preview/image-preview-overlay";
 import { MarkdownPreviewOverlay } from "@/components/preview/markdown-preview-overlay";
 import { DesktopSidebar, MobileSidebar } from "@/components/sidebar";
 import { UserMenu } from "@/components/user-menu";
@@ -60,8 +61,9 @@ export function DashboardLayout() {
           <Outlet />
         </main>
       </div>
-      {/* Store-driven markdown preview overlay (renders only when active). */}
+      {/* Store-driven preview overlays (render only when active). */}
       <MarkdownPreviewOverlay />
+      <ImagePreviewOverlay />
     </div>
   );
 }

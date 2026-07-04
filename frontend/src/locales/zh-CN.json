@@ -300,7 +300,8 @@
     "comments-placeholder": "对 {{name}} 发表评论…",
     "comments-select-hint": "在文档中框选文本，为评论锚定段落。",
     "comments-ready": "已锚定段落，按 Enter 发送。",
-    "comments-send": "发送评论"
+    "comments-send": "发送评论",
+    "image-load-failed": "无法加载该图片。"
   },
   "tasks": {
     "title": "任务",

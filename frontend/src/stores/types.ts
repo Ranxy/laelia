@@ -278,6 +278,21 @@ export interface PreviewSlice {
   closeFilePreview: () => void;
 }
 
+// ImagePreviewSlice owns the image lightbox overlay: the active image (file +
+// decoded blob URL + status) and the actions to open/close it. The overlay is
+// mounted once at the dashboard layout and reads `activeImage`. The blob URL
+// is created on open and revoked on close so we don't leak object URLs.
+export interface ImagePreviewSlice {
+  activeImage: {
+    attachment: Attachment;
+    blobUrl: string | null;
+    status: "loading" | "ready" | "error";
+  } | null;
+
+  openImagePreview: (attachment: Attachment) => Promise<void>;
+  closeImagePreview: () => void;
+}
+
 // TaskSlice owns the channel task board panel: per-conversation task listings
 // (cached as ChatMessageUI so they reuse MessageRow's task badge), panel open
 // state, and the convert-message-to-task mutation. Tasks live in the same
@@ -305,6 +320,7 @@ export type AppStoreState = AuthSlice &
   ThreadSlice &
   TaskSlice &
   UserSlice &
-  PreviewSlice;
+  PreviewSlice &
+  ImagePreviewSlice;
 
 export type AppSliceCreator<Slice> = StateCreator<AppStoreState, [], [], Slice>;
