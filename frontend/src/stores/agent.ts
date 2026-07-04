@@ -1,11 +1,12 @@
 import { create, equals } from "@bufbuild/protobuf";
 import { agentServiceClient } from "@/connect";
-import type { Agent } from "@/types/proto-es/v1/agent_pb";
+import type { Agent, AgentProviderInfo } from "@/types/proto-es/v1/agent_pb";
 import {
   AgentACPConfigSchema,
   AgentSchema,
   CreateAgentRequestSchema,
   DeleteAgentRequestSchema,
+  RefreshAgentProvidersRequestSchema,
   RevokeAgentTokenRequestSchema,
   RotateAgentTokenRequestSchema,
   UpdateAgentACPConfigRequestSchema,
@@ -112,7 +113,14 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
 
   async updateAgentACPConfig(
     name: string,
-    acpConfig: { executable: string; args: string[]; allowEnv: string[] }
+    acpConfig: {
+      executable: string;
+      args: string[];
+      allowEnv: string[];
+      provider: string;
+      model: string;
+      customEnv: Record<string, string>;
+    }
   ) {
     await agentServiceClient.updateAgentACPConfig(
       create(UpdateAgentACPConfigRequestSchema, {
@@ -120,6 +128,16 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
         acpConfig: create(AgentACPConfigSchema, acpConfig),
       })
     );
+  },
+
+  async refreshAgentProviders(name: string): Promise<AgentProviderInfo[]> {
+    const res = await agentServiceClient.refreshAgentProviders(
+      create(RefreshAgentProvidersRequestSchema, { name })
+    );
+    // Force-refresh the cached agent so the new available_providers surface in
+    // the UI immediately, then return the freshly discovered list to the caller.
+    await get().getAgent(name, { force: true });
+    return res.providers;
   },
 });
 

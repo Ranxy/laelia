@@ -20,6 +20,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Sheet,
   SheetBody,
   SheetContent,
@@ -40,6 +47,7 @@ import { formatTimestamp } from "@/lib/command-status";
 import { useAppStore } from "@/stores";
 import {
   type Agent,
+  type AgentProviderInfo,
   AgentStatus_ConnectionState,
 } from "@/types/proto-es/v1/agent_pb";
 
@@ -51,7 +59,11 @@ type Lifecycle =
 
 function agentLifecycle(agent: Agent): Lifecycle {
   const online = agent.status?.state === AgentStatus_ConnectionState.ONLINE;
-  const configured = !!agent.info?.acpConfig?.executable;
+  const cfg = agent.info?.acpConfig;
+  // An agent is "configured" when it has either a selected provider or a
+  // custom executable. A built-in provider derives its command from the
+  // registry, so executable is empty for it.
+  const configured = !!cfg?.provider || !!cfg?.executable;
   if (online && configured) return "ready";
   if (online && !configured) return "pending-config";
   if (!online && configured) return "configured-offline";
@@ -83,8 +95,15 @@ export function AgentsPage() {
   const [executable, setExecutable] = useState("");
   const [args, setArgs] = useState<string[]>([]);
   const [allowEnv, setAllowEnv] = useState<string[]>([]);
+  const [provider, setProvider] = useState("");
+  const [model, setModel] = useState("");
+  const [customEnvEntries, setCustomEnvEntries] = useState<
+    { key: string; value: string }[]
+  >([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState("");
   const [rotateOpen, setRotateOpen] = useState(false);
   const [revokeOpen, setRevokeOpen] = useState(false);
   const [rotating, setRotating] = useState(false);
@@ -175,13 +194,48 @@ export function AgentsPage() {
 
   function handleEditACPConfig(agent: Agent) {
     setSelectedAgent(agent);
-    setExecutable(agent.info?.acpConfig?.executable ?? "");
-    setArgs(agent.info?.acpConfig?.args ? [...agent.info.acpConfig.args] : []);
-    setAllowEnv(
-      agent.info?.acpConfig?.allowEnv ? [...agent.info.acpConfig.allowEnv] : []
+    const cfg = agent.info?.acpConfig;
+    setExecutable(cfg?.executable ?? "");
+    setArgs(cfg?.args ? [...cfg.args] : []);
+    setAllowEnv(cfg?.allowEnv ? [...cfg.allowEnv] : []);
+    setProvider(cfg?.provider ?? "");
+    setModel(cfg?.model ?? "");
+    setCustomEnvEntries(
+      cfg?.customEnv
+        ? Object.entries(cfg.customEnv).map(([key, value]) => ({ key, value }))
+        : []
     );
     setSaveError("");
+    setRefreshError("");
     setAcpConfigOpen(true);
+  }
+
+  async function handleRefreshProviders() {
+    if (!selectedAgent?.name) return;
+    setRefreshing(true);
+    setRefreshError("");
+    try {
+      const refreshAgentProviders =
+        useAppStore.getState().refreshAgentProviders;
+      await refreshAgentProviders(selectedAgent.name);
+      // refreshAgentProviders force-refreshes the cache; pull the updated agent
+      // so the Sheet's availableProviders list re-renders.
+      const updated = await useAppStore
+        .getState()
+        .getAgent(selectedAgent.name, {
+          force: true,
+        });
+      if (updated) setSelectedAgent(updated);
+      load();
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : t("agent.acp-config-refresh-failed");
+      setRefreshError(msg);
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   async function handleRotateToken() {
@@ -230,10 +284,21 @@ export function AgentsPage() {
     setSaving(true);
     setSaveError("");
     try {
+      // Fold the key-value editor entries into a map, dropping entries with
+      // empty keys (empty-value entries are kept so a user can set FOO="").
+      const customEnv: Record<string, string> = {};
+      for (const entry of customEnvEntries) {
+        const key = entry.key.trim();
+        if (!key) continue;
+        customEnv[key] = entry.value;
+      }
       const acpConfig = {
         executable: executable.trim(),
         args: args.map((a) => a.trim()).filter((a) => a !== ""),
         allowEnv: allowEnv.map((e) => e.trim()).filter((e) => e !== ""),
+        provider: provider.trim(),
+        model: model.trim(),
+        customEnv,
       };
       const updateAgentACPConfig = useAppStore.getState().updateAgentACPConfig;
       await updateAgentACPConfig(selectedAgent.name, acpConfig);
@@ -252,6 +317,23 @@ export function AgentsPage() {
       setSaving(false);
     }
   }
+
+  // Available providers are agent-reported (agent.info.availableProviders).
+  // The "custom" escape hatch lets an admin hand-type a command for any
+  // provider the daemon doesn't know about.
+  const availableProviders: AgentProviderInfo[] =
+    selectedAgent?.info?.availableProviders ?? [];
+  const isCustomProvider = provider === "custom";
+  const selectedProviderInfo = availableProviders.find(
+    (p) => p.providerId === provider
+  );
+  const modelOptions = selectedProviderInfo?.models ?? [];
+  const providerSupportsModel =
+    !!selectedProviderInfo?.supportsModelConfigOption;
+  // Save is allowed once a provider (built-in or custom) is chosen. For the
+  // custom path an executable is still required; for a built-in provider the
+  // command is derived from the registry, so executable stays empty.
+  const canSave = isCustomProvider ? executable.trim() !== "" : provider !== "";
 
   return (
     <div className="h-full overflow-y-auto p-6 flex flex-col gap-4 w-full">
@@ -504,25 +586,139 @@ export function AgentsPage() {
             )}
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">
-                  {t("agent.acp-config-executable")}
-                </label>
-                <Input
-                  placeholder={t("agent.acp-config-executable-placeholder")}
-                  value={executable}
-                  onChange={(e) => {
-                    setExecutable(e.target.value);
-                    setSaveError("");
-                  }}
-                />
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">
+                    {t("agent.acp-config-provider")}
+                  </label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={refreshing}
+                    onClick={handleRefreshProviders}
+                  >
+                    {refreshing
+                      ? t("common.loading")
+                      : t("agent.acp-config-refresh-providers")}
+                  </Button>
+                </div>
+                {refreshError && (
+                  <Alert
+                    variant="error"
+                    description={refreshError}
+                    className="mt-1"
+                  />
+                )}
+                {availableProviders.length === 0 ? (
+                  <p className="text-xs text-control-light">
+                    {t("agent.acp-config-no-providers")}
+                  </p>
+                ) : (
+                  <Select
+                    value={provider}
+                    onValueChange={(v) => {
+                      setProvider(String(v ?? ""));
+                      // Reset model when the provider changes — the previous
+                      // value belongs to the old provider's option set.
+                      setModel("");
+                      setSaveError("");
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue>
+                        {(v: string | null) =>
+                          v ? providerLabel(v, availableProviders) : ""
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableProviders.map((p) => (
+                        <SelectItem key={p.providerId} value={p.providerId}>
+                          {providerDisplayName(p)}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="custom">
+                        {t("agent.acp-config-provider-custom")}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
-              <StringListEditor
-                label={t("agent.acp-config-args")}
-                placeholder={t("agent.acp-config-args-placeholder")}
-                values={args}
+              {selectedProviderInfo && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">
+                    {t("agent.acp-config-model")}
+                  </label>
+                  {providerSupportsModel && modelOptions.length > 0 ? (
+                    <Select
+                      value={model}
+                      onValueChange={(v) => {
+                        setModel(String(v ?? ""));
+                        setSaveError("");
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue>
+                          {(v: string | null) =>
+                            v ? modelLabel(v, modelOptions) : ""
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {modelOptions.map((m) => (
+                          <SelectItem key={m.value} value={m.value}>
+                            {m.name || m.value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-xs text-control-light">
+                      {t("agent.acp-config-model-unsupported")}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {isCustomProvider && (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium">
+                      {t("agent.acp-config-executable")}
+                    </label>
+                    <Input
+                      placeholder={t("agent.acp-config-executable-placeholder")}
+                      value={executable}
+                      onChange={(e) => {
+                        setExecutable(e.target.value);
+                        setSaveError("");
+                      }}
+                    />
+                  </div>
+
+                  <StringListEditor
+                    label={t("agent.acp-config-args")}
+                    placeholder={t("agent.acp-config-args-placeholder")}
+                    values={args}
+                    onChange={(next) => {
+                      setArgs(next);
+                      setSaveError("");
+                    }}
+                  />
+                </>
+              )}
+
+              {selectedProviderInfo && !isCustomProvider && (
+                <p className="text-xs text-control-light">
+                  {t("agent.acp-config-derived-command-hint")}
+                </p>
+              )}
+
+              <KeyValueEnvEditor
+                label={t("agent.acp-config-custom-env")}
+                entries={customEnvEntries}
                 onChange={(next) => {
-                  setArgs(next);
+                  setCustomEnvEntries(next);
                   setSaveError("");
                 }}
               />
@@ -546,10 +742,7 @@ export function AgentsPage() {
             >
               {t("common.cancel")}
             </Button>
-            <Button
-              disabled={saving || !executable.trim()}
-              onClick={handleSaveACPConfig}
-            >
+            <Button disabled={saving || !canSave} onClick={handleSaveACPConfig}>
               {saving ? t("common.saving") : t("common.save")}
             </Button>
           </SheetFooter>
@@ -800,6 +993,81 @@ function StringListEditor({
               variant="outline"
               size="sm"
               onClick={() => onChange(values.filter((_, i) => i !== index))}
+            >
+              {t("common.remove")}
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function providerDisplayName(p: AgentProviderInfo): string {
+  if (p.displayName) {
+    return p.version ? `${p.displayName} (${p.version})` : p.displayName;
+  }
+  return p.providerId;
+}
+
+function providerLabel(id: string, providers: AgentProviderInfo[]): string {
+  if (id === "custom") return "";
+  const p = providers.find((it) => it.providerId === id);
+  return p ? providerDisplayName(p) : id;
+}
+
+function modelLabel(value: string, models: { value: string; name: string }[]) {
+  const m = models.find((it) => it.value === value);
+  return m ? m.name || m.value : value;
+}
+
+function KeyValueEnvEditor({
+  label,
+  entries,
+  onChange,
+}: {
+  label: string;
+  entries: { key: string; value: string }[];
+  onChange: (next: { key: string; value: string }[]) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium">{label}</label>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onChange([...entries, { key: "", value: "" }])}
+        >
+          {t("common.add")}
+        </Button>
+      </div>
+      <div className="flex flex-col gap-2">
+        {entries.map((entry, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <Input
+              placeholder={t("agent.acp-config-custom-env-key-placeholder")}
+              value={entry.key}
+              onChange={(e) => {
+                const next = [...entries];
+                next[index] = { ...next[index], key: e.target.value };
+                onChange(next);
+              }}
+            />
+            <Input
+              placeholder={t("agent.acp-config-custom-env-value-placeholder")}
+              value={entry.value}
+              onChange={(e) => {
+                const next = [...entries];
+                next[index] = { ...next[index], value: e.target.value };
+                onChange(next);
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onChange(entries.filter((_, i) => i !== index))}
             >
               {t("common.remove")}
             </Button>

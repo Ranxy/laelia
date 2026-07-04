@@ -1,6 +1,7 @@
 import type { StateCreator } from "zustand";
 import type {
   Agent,
+  AgentProviderInfo,
   CreateAgentResponse,
   RotateAgentTokenResponse,
 } from "@/types/proto-es/v1/agent_pb";
@@ -131,8 +132,16 @@ export interface AgentSlice {
   revokeAgentToken: (name: string, reason?: string) => Promise<void>;
   updateAgentACPConfig: (
     name: string,
-    acpConfig: { executable: string; args: string[]; allowEnv: string[] }
+    acpConfig: {
+      executable: string;
+      args: string[];
+      allowEnv: string[];
+      provider: string;
+      model: string;
+      customEnv: Record<string, string>;
+    }
   ) => Promise<void>;
+  refreshAgentProviders: (name: string) => Promise<AgentProviderInfo[]>;
 }
 
 export interface CommandSlice {
