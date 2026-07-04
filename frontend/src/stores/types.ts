@@ -37,6 +37,19 @@ export interface ChatMessageUI {
   // threadReplyCount is the number of replies under this message; set on root
   // messages, 0/absent otherwise. Drives the "N replies · View thread" entry.
   threadReplyCount?: number;
+  // task is non-null when this message is a channel task (a row exists in the
+  // task table for it). Populated for root messages; absent for replies and
+  // non-task messages. Drives the inline "[task #N status=...]" badge.
+  task?: TaskInfoUI;
+}
+
+// TaskInfoUI is the UI mirror of laelia.v1.TaskInfo attached to a task root
+// message. status is the numeric TaskStatus enum value (see lib/task-status).
+export interface TaskInfoUI {
+  taskNumber: number;
+  status: number;
+  assigneeName?: string;
+  assigneeResourceId?: string;
 }
 
 export interface AuthSlice {
@@ -185,7 +198,8 @@ export interface ChannelSlice {
     conversationId: string,
     content: string,
     mentions?: Mention[],
-    attachments?: Attachment[]
+    attachments?: Attachment[],
+    asTask?: boolean
   ) => Promise<ChatMessage>;
   fetchConversationActivity: (conversationId: string) => Promise<void>;
   startWatchingChannel: (conversationName: string) => void;
@@ -228,12 +242,32 @@ export interface ThreadSlice {
   ) => Promise<ChatMessage>;
 }
 
+// TaskSlice owns the channel task board panel: per-conversation task listings
+// (cached as ChatMessageUI so they reuse MessageRow's task badge), panel open
+// state, and the convert-message-to-task mutation. Tasks live in the same
+// chatMessages flow as regular messages (a task IS a message with metadata);
+// this slice is only the panel's separate view onto the task subset.
+export interface TaskSlice {
+  tasksByConv: Record<string, ChatMessageUI[]>;
+  tasksLoading: Record<string, boolean>;
+  tasksPanelOpen: Record<string, boolean>;
+
+  toggleTasksPanel: (conversationId: string) => void;
+  closeTasksPanel: (conversationId: string) => void;
+  loadTasks: (conversationId: string, statusFilter?: number[]) => Promise<void>;
+  convertMessageToTask: (
+    conversationId: string,
+    messageId: string
+  ) => Promise<void>;
+}
+
 export type AppStoreState = AuthSlice &
   AgentSlice &
   CommandSlice &
   ChatSlice &
   ChannelSlice &
   ThreadSlice &
+  TaskSlice &
   UserSlice;
 
 export type AppSliceCreator<Slice> = StateCreator<AppStoreState, [], [], Slice>;

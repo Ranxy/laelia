@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Bot,
   Hash,
+  ListTodo,
   Loader2,
   Paperclip,
   Plus,
@@ -29,6 +30,7 @@ import {
   rowStreamingProps,
 } from "@/components/chat/message-row";
 import { EmptyState, LoadingState } from "@/components/chat/states";
+import { TasksPanel } from "@/components/chat/tasks-panel";
 import { ThreadPanel } from "@/components/chat/thread-panel";
 import { Button } from "@/components/ui/button";
 import {
@@ -104,6 +106,13 @@ export function ChatConversationPage() {
   const activeThreadConversation = useAppStore(
     (s) => s.activeThreadConversation
   );
+  const toggleTasksPanel = useAppStore((s) => s.toggleTasksPanel);
+  const closeTasksPanel = useAppStore((s) => s.closeTasksPanel);
+  const tasksPanelOpen = useAppStore((s) =>
+    channelId
+      ? (s.tasksPanelOpen[`conversations/${channelId}`] ?? false)
+      : false
+  );
 
   const conversationName = channelId ? `conversations/${channelId}` : "";
   // Per-key slices: subscribe only to this channel's records, not the whole
@@ -160,6 +169,10 @@ export function ChatConversationPage() {
   const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
   const [mentionMap, setMentionMap] = useState<MentionTarget[]>([]);
   const [cursorPos, setCursorPos] = useState(0);
+  // asTask toggles whether the next send creates a channel task (a top-level
+  // message with task metadata) instead of a plain message. It resets to false
+  // after each send so task creation is deliberate per message.
+  const [asTask, setAsTask] = useState(false);
   const [detailMention, setDetailMention] = useState<{
     type: "user" | "agent";
     id: string;
@@ -378,16 +391,26 @@ export function ChatConversationPage() {
     if ((!text && pendingAttachments.length === 0) || sending || !channelId)
       return;
     const attachments = pendingAttachments;
+    const sendAsTask = asTask;
     setInput("");
     setMentionState(null);
     setPendingAttachments([]);
+    setAsTask(false);
     setSending(true);
     const mentions = mentionMap.map(targetToMention);
     try {
-      await sendChannelMessage(channelId, text, mentions, attachments);
+      await sendChannelMessage(
+        channelId,
+        text,
+        mentions,
+        attachments,
+        sendAsTask
+      );
     } catch {
-      // send failed — restore the attachments so the user can retry.
+      // send failed — restore the attachments (and the asTask toggle) so the
+      // user can retry.
       setPendingAttachments(attachments);
+      setAsTask(sendAsTask);
     } finally {
       setSending(false);
     }
@@ -398,6 +421,7 @@ export function ChatConversationPage() {
     mentionMap,
     sendChannelMessage,
     pendingAttachments,
+    asTask,
   ]);
 
   const handleMentionClick = useCallback(
@@ -482,10 +506,19 @@ export function ChatConversationPage() {
   const handleOpenThread = useCallback(
     (msg: ChatMessageUI) => {
       if (!channelId || msg.threadRoot) return;
+      if (channelId) closeTasksPanel(channelId);
       openThread(conversationName, msg.id);
     },
-    [channelId, conversationName, openThread]
+    [channelId, conversationName, openThread, closeTasksPanel]
   );
+
+  const handleToggleTasksPanel = useCallback(() => {
+    if (!channelId) return;
+    // Opening the tasks panel closes the thread panel — two 420px side panels
+    // plus the main list is too wide on most screens.
+    if (!tasksPanelOpen) closeThread();
+    toggleTasksPanel(channelId);
+  }, [channelId, tasksPanelOpen, toggleTasksPanel, closeThread]);
 
   const handleViewInChannel = useCallback(() => {
     const rootId = threadRootOpen;
@@ -527,6 +560,18 @@ export function ChatConversationPage() {
           </h2>
           <AgentStatusBar activities={activities} />
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleToggleTasksPanel}
+          aria-pressed={tasksPanelOpen}
+          className="flex items-center gap-1.5 px-2.5 py-1.5"
+        >
+          <ListTodo className="size-4" />
+          <span className="hidden sm:inline">
+            {t("channelTask.panel-toggle")}
+          </span>
+        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -760,6 +805,25 @@ export function ChatConversationPage() {
                         <Paperclip className="size-4" />
                       )}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setAsTask((v) => !v)}
+                      aria-pressed={asTask}
+                      disabled={sending}
+                      className={cn(
+                        "flex h-7 items-center gap-1 rounded-md px-2 text-xs transition-colors disabled:opacity-50",
+                        asTask
+                          ? "bg-accent/15 text-accent"
+                          : "text-control-placeholder hover:text-main hover:bg-control-bg"
+                      )}
+                      aria-label={t("channelTask.as-task")}
+                      title={t("channelTask.as-task-hint")}
+                    >
+                      <ListTodo className="size-3.5" />
+                      <span className="hidden sm:inline">
+                        {t("channelTask.as-task")}
+                      </span>
+                    </button>
                     <span className="text-xs text-control-placeholder">
                       {t("chat.send-hint")}
                     </span>
@@ -799,6 +863,13 @@ export function ChatConversationPage() {
             rootMessageId={threadRootOpen}
             onClose={closeThread}
             onViewInChannel={handleViewInChannel}
+          />
+        )}
+        {tasksPanelOpen && channelId && (
+          <TasksPanel
+            channelId={channelId}
+            channelTitle={channel?.title ?? channelId ?? ""}
+            onClose={() => closeTasksPanel(channelId)}
           />
         )}
       </div>

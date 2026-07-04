@@ -20,6 +20,14 @@ export function toUiMessage(msg: ChatMessage): ChatMessageUI {
     attachments: msg.attachments,
     threadRoot: msg.threadRoot || undefined,
     threadReplyCount: msg.threadReplyCount || undefined,
+    task: msg.task
+      ? {
+          taskNumber: msg.task.taskNumber,
+          status: msg.task.status,
+          assigneeName: msg.task.assigneeName || undefined,
+          assigneeResourceId: msg.task.assigneeResourceId || undefined,
+        }
+      : undefined,
   };
 }
 

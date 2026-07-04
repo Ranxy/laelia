@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Avatar, formatTime } from "@/components/chat/avatar";
 import { FileCard } from "@/components/chat/file-card";
 import { splitByMentions } from "@/components/chat/mentions";
+import { TaskStatusBadge } from "@/components/chat/task-status-badge";
 import { ChatDiff } from "@/components/chat-events/diff-view";
 import { ChatPermissionRequest } from "@/components/chat-events/permission-request";
 import { ChatToolCall } from "@/components/chat-events/tool-call";
@@ -13,7 +14,7 @@ import { CommandStatusBadge } from "@/components/command-status-badge";
 import { cn } from "@/lib/utils";
 import type { ChatMessageUI } from "@/stores/types";
 import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
-import { CommandEventType } from "@/types/proto-es/v1/command_pb";
+import { CommandEventType, SenderType } from "@/types/proto-es/v1/command_pb";
 
 // Stable empty fallback so selectors returning `undefined` for an unloaded
 // conversation don't create a new array literal each run (which would defeat
@@ -168,6 +169,20 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
 
   const MentionBadgeCmp = MentionBadge;
 
+  // System messages (sender_type=SYSTEM) are task lifecycle notifications —
+  // "📋 Alice created task #3", "🙋 Bob claimed task #3", etc. They render as a
+  // single centered, low-contrast line with no avatar or bubble, so they read as
+  // channel events rather than conversational turns.
+  if (msg.senderType === SenderType.SYSTEM) {
+    return (
+      <div className="flex justify-center py-1">
+        <p className="text-xs text-control-placeholder px-3 py-1 rounded-md bg-control-bg/30 text-center max-w-[90%]">
+          {msg.content}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -205,6 +220,14 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
             {!isUser && msg.status !== undefined && !isStreaming && (
               <CommandStatusBadge
                 status={msg.status}
+                className="text-[10px] px-1.5 py-0"
+              />
+            )}
+            {msg.task && !isStreaming && (
+              <TaskStatusBadge
+                taskNumber={msg.task.taskNumber}
+                status={msg.task.status}
+                assigneeName={msg.task.assigneeName}
                 className="text-[10px] px-1.5 py-0"
               />
             )}

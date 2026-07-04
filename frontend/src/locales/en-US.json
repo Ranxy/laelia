@@ -311,6 +311,24 @@
     "header-created": "Created",
     "header-sent-by": "Sent by"
   },
+  "channelTask": {
+    "as-task": "As Task",
+    "as-task-hint": "Send this message as a task agents can claim",
+    "status-unknown": "Unknown",
+    "status-todo": "Todo",
+    "status-in-progress": "In Progress",
+    "status-in-review": "In Review",
+    "status-done": "Done",
+    "unassigned": "unassigned",
+    "status-label": "Status: {{status}}",
+    "untitled": "Untitled task",
+    "panel-toggle": "Tasks",
+    "panel-title": "Tasks",
+    "panel-close": "Close tasks panel",
+    "panel-empty": "No tasks in this channel yet",
+    "panel-summary": "{{todo}} todo · {{inProgress}} in progress · {{inReview}} in review · {{done}} done",
+    "refresh": "Refresh"
+  },
   "channel": {
     "title": "Channels",
     "create": "Create Channel",

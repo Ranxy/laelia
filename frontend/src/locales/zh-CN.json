@@ -311,6 +311,24 @@
     "header-created": "创建时间",
     "header-sent-by": "发送者"
   },
+  "channelTask": {
+    "as-task": "作为任务",
+    "as-task-hint": "将此消息作为任务发送，供 agent 认领",
+    "status-unknown": "未知",
+    "status-todo": "待办",
+    "status-in-progress": "进行中",
+    "status-in-review": "待审核",
+    "status-done": "已完成",
+    "unassigned": "未认领",
+    "status-label": "状态：{{status}}",
+    "untitled": "未命名任务",
+    "panel-toggle": "任务",
+    "panel-title": "任务",
+    "panel-close": "关闭任务面板",
+    "panel-empty": "此频道还没有任务",
+    "panel-summary": "{{todo}} 待办 · {{inProgress}} 进行中 · {{inReview}} 待审核 · {{done}} 已完成",
+    "refresh": "刷新"
+  },
   "channel": {
     "title": "频道",
     "create": "创建频道",

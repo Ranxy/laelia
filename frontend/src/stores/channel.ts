@@ -69,7 +69,13 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
     }
   },
 
-  async sendChannelMessage(conversationId, content, mentions, attachments) {
+  async sendChannelMessage(
+    conversationId,
+    content,
+    mentions,
+    attachments,
+    asTask
+  ) {
     const conversationName = `conversations/${conversationId}`;
     const res = await commandServiceClient.sendMessage(
       create(SendMessageRequestSchema, {
@@ -77,6 +83,7 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
         content,
         mentions,
         attachments,
+        asTask: asTask ?? false,
       })
     );
     const chatMsg: ChatMessageUI = toUiMessage(res);
