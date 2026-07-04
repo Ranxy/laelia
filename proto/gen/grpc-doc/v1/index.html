@@ -249,6 +249,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.AgentACPConfig.CustomEnvEntry"><span class="badge">M</span>AgentACPConfig.CustomEnvEntry</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.AgentCapability"><span class="badge">M</span>AgentCapability</a>
                 </li>
               
@@ -274,6 +278,14 @@
               
                 <li>
                   <a href="#laelia.v1.AgentMetrics"><span class="badge">M</span>AgentMetrics</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AgentModelOption"><span class="badge">M</span>AgentModelOption</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AgentProviderInfo"><span class="badge">M</span>AgentProviderInfo</a>
                 </li>
               
                 <li>
@@ -342,6 +354,14 @@
               
                 <li>
                   <a href="#laelia.v1.PendingCommandHint.EnvEntry"><span class="badge">M</span>PendingCommandHint.EnvEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RefreshAgentProvidersRequest"><span class="badge">M</span>RefreshAgentProvidersRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.RefreshAgentProvidersResponse"><span class="badge">M</span>RefreshAgentProvidersResponse</a>
                 </li>
               
                 <li>
@@ -626,6 +646,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.DiscoverProviders"><span class="badge">M</span>DiscoverProviders</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.DownloadFileRequest"><span class="badge">M</span>DownloadFileRequest</a>
                 </li>
               
@@ -811,6 +835,10 @@
               
                 <li>
                   <a href="#laelia.v1.PostMessageResponse"><span class="badge">M</span>PostMessageResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ProvidersDiscovered"><span class="badge">M</span>ProvidersDiscovered</a>
                 </li>
               
                 <li>
@@ -1320,7 +1348,7 @@
                   <td>executable</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>command to run, e.g. &#34;npx&#34; </p></td>
+                  <td><p>command to run, e.g. &#34;npx&#34;. Only used when provider is &#34;custom&#34; or empty. </p></td>
                 </tr>
               
                 <tr>
@@ -1335,6 +1363,58 @@
                   <td><a href="#string">string</a></td>
                   <td>repeated</td>
                   <td><p>env var names the child process may inherit </p></td>
+                </tr>
+              
+                <tr>
+                  <td>provider</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>selected LLM agent provider id, e.g. &#34;opencode&#34;, &#34;claude-code&#34;, &#34;custom&#34; </p></td>
+                </tr>
+              
+                <tr>
+                  <td>model</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>selected model valueId, matching an option advertised by the provider in NewSession ConfigOptions </p></td>
+                </tr>
+              
+                <tr>
+                  <td>custom_env</td>
+                  <td><a href="#laelia.v1.AgentACPConfig.CustomEnvEntry">AgentACPConfig.CustomEnvEntry</a></td>
+                  <td>repeated</td>
+                  <td><p>user-defined key-value env vars overlaid (and overriding) the inherited allow_env set </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.AgentACPConfig.CustomEnvEntry">AgentACPConfig.CustomEnvEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -1612,6 +1692,13 @@
                 </tr>
               
                 <tr>
+                  <td>available_providers</td>
+                  <td><a href="#laelia.v1.AgentProviderInfo">AgentProviderInfo</a></td>
+                  <td>repeated</td>
+                  <td><p>LLM agent providers auto-discovered by the agent daemon (agent-owned, not overwritten by the server) </p></td>
+                </tr>
+              
+                <tr>
                   <td>acp_config</td>
                   <td><a href="#laelia.v1.AgentACPConfig">AgentACPConfig</a></td>
                   <td></td>
@@ -1711,6 +1798,110 @@
                 <tr>
                   <td>goroutine_count</td>
                   <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.AgentModelOption">AgentModelOption</h3>
+        <p>AgentModelOption is one model selectable via the ACP session config option</p><p>round trip. Value is the valueId the client sends to SetSessionConfigOption.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.AgentProviderInfo">AgentProviderInfo</h3>
+        <p>AgentProviderInfo describes one LLM agent provider detected on the agent</p><p>daemon's host. Reported via ConnectAgent and refreshed on demand. The server</p><p>treats this as agent-owned: it preserves it across ConnectAgent/Update flows</p><p>the same way it preserves acp_config.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>provider_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>e.g. &#34;opencode&#34;, &#34;claude-code&#34; </p></td>
+                </tr>
+              
+                <tr>
+                  <td>display_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>executable_path</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>models</td>
+                  <td><a href="#laelia.v1.AgentModelOption">AgentModelOption</a></td>
+                  <td>repeated</td>
+                  <td><p>empty when the provider does not advertise a model config option </p></td>
+                </tr>
+              
+                <tr>
+                  <td>supports_model_config_option</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>whether probing observed a category==&#34;model&#34; config option </p></td>
+                </tr>
+              
+                <tr>
+                  <td>detected_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -2365,6 +2556,54 @@
 
         
       
+        <h3 id="laelia.v1.RefreshAgentProvidersRequest">RefreshAgentProvidersRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.RefreshAgentProvidersResponse">RefreshAgentProvidersResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>providers</td>
+                  <td><a href="#laelia.v1.AgentProviderInfo">AgentProviderInfo</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.RefreshAgentTokenRequest">RefreshAgentTokenRequest</h3>
         <p></p>
 
@@ -2677,6 +2916,15 @@
               </tr>
             
               <tr>
+                <td>RefreshAgentProviders</td>
+                <td><a href="#laelia.v1.RefreshAgentProvidersRequest">RefreshAgentProvidersRequest</a></td>
+                <td><a href="#laelia.v1.RefreshAgentProvidersResponse">RefreshAgentProvidersResponse</a></td>
+                <td><p>Ask the agent daemon to re-probe its host for installed LLM agent providers
+and their models. Returns the freshly discovered provider list (also
+persisted into agent.info.available_providers). Admin only.</p></td>
+              </tr>
+            
+              <tr>
                 <td>ConnectAgent</td>
                 <td><a href="#laelia.v1.ConnectAgentRequest">ConnectAgentRequest</a></td>
                 <td><a href="#laelia.v1.ConnectAgentResponse">ConnectAgentResponse</a></td>
@@ -2815,6 +3063,16 @@
                 <td>UpdateAgentACPConfig</td>
                 <td>PATCH</td>
                 <td>/v1/{name=agents/*}:updateAcpConfig</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>RefreshAgentProviders</td>
+                <td>POST</td>
+                <td>/v1/{name=agents/*}:refreshProviders</td>
                 <td>*</td>
               </tr>
               
@@ -4004,6 +4262,13 @@ Format: idps/{idp} </p></td>
                   <td><a href="#laelia.v1.Ping">Ping</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>providers_discovered</td>
+                  <td><a href="#laelia.v1.ProvidersDiscovered">ProvidersDiscovered</a></td>
+                  <td></td>
+                  <td><p>response to ManagerStreamMessage.discover_providers </p></td>
                 </tr>
               
             </tbody>
@@ -5470,6 +5735,30 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
 
         
       
+        <h3 id="laelia.v1.DiscoverProviders">DiscoverProviders</h3>
+        <p>DiscoverProviders asks the agent daemon to re-probe its host for installed</p><p>LLM agent providers and their models. The daemon replies with</p><p>AgentStreamMessage.providers_discovered.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>correlation id for the pending unary RefreshAgentProviders call </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.DownloadFileRequest">DownloadFileRequest</h3>
         <p></p>
 
@@ -6500,6 +6789,13 @@ ordered by task_number ascending. </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>discover_providers</td>
+                  <td><a href="#laelia.v1.DiscoverProviders">DiscoverProviders</a></td>
+                  <td></td>
+                  <td><p>ask the agent daemon to re-probe installed LLM agent providers </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -6996,6 +7292,37 @@ rooted at the given message name. Empty posts a normal channel message. </p></td
                   <td>conflict_description</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ProvidersDiscovered">ProvidersDiscovered</h3>
+        <p>ProvidersDiscovered carries the freshly discovered provider list back to the</p><p>manager, which persists it into agent.info.available_providers and hands it</p><p>to the pending RefreshAgentProviders caller.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>providers</td>
+                  <td><a href="#laelia.v1.AgentProviderInfo">AgentProviderInfo</a></td>
+                  <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
               

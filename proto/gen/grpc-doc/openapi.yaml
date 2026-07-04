@@ -565,6 +565,41 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}:refreshProviders:
+        post:
+            tags:
+                - AgentService
+            description: |-
+                Ask the agent daemon to re-probe its host for installed LLM agent providers
+                 and their models. Returns the freshly discovered provider list (also
+                 persisted into agent.info.available_providers). Admin only.
+            operationId: AgentService_RefreshAgentProviders
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/RefreshAgentProvidersRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/RefreshAgentProvidersResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}:revokeToken:
         post:
             tags:
@@ -1941,6 +1976,14 @@ components:
                     type: array
                     items:
                         type: string
+                provider:
+                    type: string
+                model:
+                    type: string
+                customEnv:
+                    type: object
+                    additionalProperties:
+                        type: string
             description: |-
                 User-configurable ACP settings. Everything else (working dir, capabilities,
                  permissions) is derived from a built-in template, not set by the admin.
@@ -2031,6 +2074,10 @@ components:
                         type: string
                 capability:
                     $ref: '#/components/schemas/AgentCapability'
+                availableProviders:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AgentProviderInfo'
                 acpConfig:
                     $ref: '#/components/schemas/AgentACPConfig'
         AgentMetrics:
@@ -2053,6 +2100,43 @@ components:
                 goroutineCount:
                     type: integer
                     format: uint32
+        AgentModelOption:
+            type: object
+            properties:
+                value:
+                    type: string
+                name:
+                    type: string
+                description:
+                    type: string
+            description: |-
+                AgentModelOption is one model selectable via the ACP session config option
+                 round trip. Value is the valueId the client sends to SetSessionConfigOption.
+        AgentProviderInfo:
+            type: object
+            properties:
+                providerId:
+                    type: string
+                displayName:
+                    type: string
+                version:
+                    type: string
+                executablePath:
+                    type: string
+                models:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AgentModelOption'
+                supportsModelConfigOption:
+                    type: boolean
+                detectedAt:
+                    type: string
+                    format: date-time
+            description: |-
+                AgentProviderInfo describes one LLM agent provider detected on the agent
+                 daemon's host. Reported via ConnectAgent and refreshed on demand. The server
+                 treats this as agent-owned: it preserves it across ConnectAgent/Update flows
+                 the same way it preserves acp_config.
         AgentSession:
             type: object
             properties:
@@ -2918,6 +3002,20 @@ components:
             properties:
                 data:
                     type: object
+        RefreshAgentProvidersRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+        RefreshAgentProvidersResponse:
+            type: object
+            properties:
+                providers:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AgentProviderInfo'
         RefreshAgentTokenRequest:
             type: object
             properties:

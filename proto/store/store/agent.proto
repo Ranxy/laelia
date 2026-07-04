@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package laelia.store;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/Ranxy/laelia/backend/generated-go/store";
 
 enum AgentTokenType {
@@ -27,6 +29,7 @@ message AgentInfo {
   string version = 6;
   map<string, string> labels = 7;
   AgentCapability capability = 8;
+  repeated AgentProviderInfo available_providers = 9;
   AgentACPConfig acp_config = 10;
 }
 
@@ -34,6 +37,25 @@ message AgentACPConfig {
   string executable = 1;
   repeated string args = 2;
   repeated string allow_env = 3;
+  string provider = 4;
+  string model = 5;
+  map<string, string> custom_env = 6;
+}
+
+message AgentProviderInfo {
+  string provider_id = 1;
+  string display_name = 2;
+  string version = 3;
+  string executable_path = 4;
+  repeated AgentModelOption models = 5;
+  bool supports_model_config_option = 6;
+  google.protobuf.Timestamp detected_at = 7;
+}
+
+message AgentModelOption {
+  string value = 1;
+  string name = 2;
+  string description = 3;
 }
 
 message AgentCapability {

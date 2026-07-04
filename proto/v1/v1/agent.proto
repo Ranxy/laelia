@@ -97,6 +97,19 @@ service AgentService {
     option (laelia.v1.audit) = true;
   }
 
+  // Ask the agent daemon to re-probe its host for installed LLM agent providers
+  // and their models. Returns the freshly discovered provider list (also
+  // persisted into agent.info.available_providers). Admin only.
+  rpc RefreshAgentProviders(RefreshAgentProvidersRequest) returns (RefreshAgentProvidersResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=agents/*}:refreshProviders"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agents.updateConfig";
+    option (laelia.v1.audit) = true;
+  }
+
   // ========== Agent Connection APIs (CUSTOM auth, agent tokens) ==========
 
   // Agent initial connection using bootstrap token
@@ -327,6 +340,17 @@ message UpdateAgentACPConfigRequest {
   AgentACPConfig acp_config = 2 [(google.api.field_behavior) = REQUIRED];
 }
 
+message RefreshAgentProvidersRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+}
+
+message RefreshAgentProvidersResponse {
+  repeated AgentProviderInfo providers = 1;
+}
+
 // --- Hello ---
 
 message HelloRequest {}
@@ -368,15 +392,41 @@ message AgentInfo {
   string version = 6;
   map<string, string> labels = 7;
   AgentCapability capability = 8;
+  repeated AgentProviderInfo available_providers = 9; // LLM agent providers auto-discovered by the agent daemon (agent-owned, not overwritten by the server)
   AgentACPConfig acp_config = 10;
+}
+
+// AgentProviderInfo describes one LLM agent provider detected on the agent
+// daemon's host. Reported via ConnectAgent and refreshed on demand. The server
+// treats this as agent-owned: it preserves it across ConnectAgent/Update flows
+// the same way it preserves acp_config.
+message AgentProviderInfo {
+  string provider_id = 1; // e.g. "opencode", "claude-code"
+  string display_name = 2;
+  string version = 3;
+  string executable_path = 4;
+  repeated AgentModelOption models = 5; // empty when the provider does not advertise a model config option
+  bool supports_model_config_option = 6; // whether probing observed a category=="model" config option
+  google.protobuf.Timestamp detected_at = 7;
+}
+
+// AgentModelOption is one model selectable via the ACP session config option
+// round trip. Value is the valueId the client sends to SetSessionConfigOption.
+message AgentModelOption {
+  string value = 1;
+  string name = 2;
+  string description = 3;
 }
 
 // User-configurable ACP settings. Everything else (working dir, capabilities,
 // permissions) is derived from a built-in template, not set by the admin.
 message AgentACPConfig {
-  string executable = 1; // command to run, e.g. "npx"
+  string executable = 1; // command to run, e.g. "npx". Only used when provider is "custom" or empty.
   repeated string args = 2; // args passed to executable, e.g. ["-y", "@agentclientprotocol/claude-agent-acp@latest"]
   repeated string allow_env = 3; // env var names the child process may inherit
+  string provider = 4; // selected LLM agent provider id, e.g. "opencode", "claude-code", "custom"
+  string model = 5; // selected model valueId, matching an option advertised by the provider in NewSession ConfigOptions
+  map<string, string> custom_env = 6; // user-defined key-value env vars overlaid (and overriding) the inherited allow_env set
 }
 
 message AgentCapability {

@@ -22,6 +22,7 @@
     - [Agent](#laelia-v1-Agent)
     - [Agent.LabelsEntry](#laelia-v1-Agent-LabelsEntry)
     - [AgentACPConfig](#laelia-v1-AgentACPConfig)
+    - [AgentACPConfig.CustomEnvEntry](#laelia-v1-AgentACPConfig-CustomEnvEntry)
     - [AgentCapability](#laelia-v1-AgentCapability)
     - [AgentDisconnectRequest](#laelia-v1-AgentDisconnectRequest)
     - [AgentHeartbeatRequest](#laelia-v1-AgentHeartbeatRequest)
@@ -29,6 +30,8 @@
     - [AgentInfo](#laelia-v1-AgentInfo)
     - [AgentInfo.LabelsEntry](#laelia-v1-AgentInfo-LabelsEntry)
     - [AgentMetrics](#laelia-v1-AgentMetrics)
+    - [AgentModelOption](#laelia-v1-AgentModelOption)
+    - [AgentProviderInfo](#laelia-v1-AgentProviderInfo)
     - [AgentSession](#laelia-v1-AgentSession)
     - [AgentStatus](#laelia-v1-AgentStatus)
     - [ConnectAgentRequest](#laelia-v1-ConnectAgentRequest)
@@ -46,6 +49,8 @@
     - [ListAgentsResponse](#laelia-v1-ListAgentsResponse)
     - [PendingCommandHint](#laelia-v1-PendingCommandHint)
     - [PendingCommandHint.EnvEntry](#laelia-v1-PendingCommandHint-EnvEntry)
+    - [RefreshAgentProvidersRequest](#laelia-v1-RefreshAgentProvidersRequest)
+    - [RefreshAgentProvidersResponse](#laelia-v1-RefreshAgentProvidersResponse)
     - [RefreshAgentTokenRequest](#laelia-v1-RefreshAgentTokenRequest)
     - [RefreshAgentTokenResponse](#laelia-v1-RefreshAgentTokenResponse)
     - [RevokeAgentTokenRequest](#laelia-v1-RevokeAgentTokenRequest)
@@ -119,6 +124,7 @@
     - [CreateTaskResponse](#laelia-v1-CreateTaskResponse)
     - [DeleteChannelRequest](#laelia-v1-DeleteChannelRequest)
     - [DiffEmittedPayload](#laelia-v1-DiffEmittedPayload)
+    - [DiscoverProviders](#laelia-v1-DiscoverProviders)
     - [DownloadFileRequest](#laelia-v1-DownloadFileRequest)
     - [DownloadFileResponse](#laelia-v1-DownloadFileResponse)
     - [FetchConversationActivityRequest](#laelia-v1-FetchConversationActivityRequest)
@@ -166,6 +172,7 @@
     - [Pong](#laelia-v1-Pong)
     - [PostMessageRequest](#laelia-v1-PostMessageRequest)
     - [PostMessageResponse](#laelia-v1-PostMessageResponse)
+    - [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered)
     - [RawAcpPayload](#laelia-v1-RawAcpPayload)
     - [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest)
     - [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest)
@@ -379,9 +386,28 @@ permissions) is derived from a built-in template, not set by the admin.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| executable | [string](#string) |  | command to run, e.g. &#34;npx&#34; |
+| executable | [string](#string) |  | command to run, e.g. &#34;npx&#34;. Only used when provider is &#34;custom&#34; or empty. |
 | args | [string](#string) | repeated | args passed to executable, e.g. [&#34;-y&#34;, &#34;@agentclientprotocol/claude-agent-acp@latest&#34;] |
 | allow_env | [string](#string) | repeated | env var names the child process may inherit |
+| provider | [string](#string) |  | selected LLM agent provider id, e.g. &#34;opencode&#34;, &#34;claude-code&#34;, &#34;custom&#34; |
+| model | [string](#string) |  | selected model valueId, matching an option advertised by the provider in NewSession ConfigOptions |
+| custom_env | [AgentACPConfig.CustomEnvEntry](#laelia-v1-AgentACPConfig-CustomEnvEntry) | repeated | user-defined key-value env vars overlaid (and overriding) the inherited allow_env set |
+
+
+
+
+
+
+<a name="laelia-v1-AgentACPConfig-CustomEnvEntry"></a>
+
+### AgentACPConfig.CustomEnvEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
 
 
 
@@ -479,6 +505,7 @@ permissions) is derived from a built-in template, not set by the admin.
 | version | [string](#string) |  |  |
 | labels | [AgentInfo.LabelsEntry](#laelia-v1-AgentInfo-LabelsEntry) | repeated |  |
 | capability | [AgentCapability](#laelia-v1-AgentCapability) |  |  |
+| available_providers | [AgentProviderInfo](#laelia-v1-AgentProviderInfo) | repeated | LLM agent providers auto-discovered by the agent daemon (agent-owned, not overwritten by the server) |
 | acp_config | [AgentACPConfig](#laelia-v1-AgentACPConfig) |  |  |
 
 
@@ -517,6 +544,48 @@ permissions) is derived from a built-in template, not set by the admin.
 | disk_total_bytes | [uint64](#uint64) |  |  |
 | uptime_seconds | [uint32](#uint32) |  |  |
 | goroutine_count | [uint32](#uint32) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-AgentModelOption"></a>
+
+### AgentModelOption
+AgentModelOption is one model selectable via the ACP session config option
+round trip. Value is the valueId the client sends to SetSessionConfigOption.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| value | [string](#string) |  |  |
+| name | [string](#string) |  |  |
+| description | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-AgentProviderInfo"></a>
+
+### AgentProviderInfo
+AgentProviderInfo describes one LLM agent provider detected on the agent
+daemon&#39;s host. Reported via ConnectAgent and refreshed on demand. The server
+treats this as agent-owned: it preserves it across ConnectAgent/Update flows
+the same way it preserves acp_config.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| provider_id | [string](#string) |  | e.g. &#34;opencode&#34;, &#34;claude-code&#34; |
+| display_name | [string](#string) |  |  |
+| version | [string](#string) |  |  |
+| executable_path | [string](#string) |  |  |
+| models | [AgentModelOption](#laelia-v1-AgentModelOption) | repeated | empty when the provider does not advertise a model config option |
+| supports_model_config_option | [bool](#bool) |  | whether probing observed a category==&#34;model&#34; config option |
+| detected_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 
 
 
@@ -809,6 +878,36 @@ permissions) is derived from a built-in template, not set by the admin.
 
 
 
+<a name="laelia-v1-RefreshAgentProvidersRequest"></a>
+
+### RefreshAgentProvidersRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RefreshAgentProvidersResponse"></a>
+
+### RefreshAgentProvidersResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| providers | [AgentProviderInfo](#laelia-v1-AgentProviderInfo) | repeated |  |
+
+
+
+
+
+
 <a name="laelia-v1-RefreshAgentTokenRequest"></a>
 
 ### RefreshAgentTokenRequest
@@ -952,6 +1051,7 @@ permissions) is derived from a built-in template, not set by the admin.
 | ForceDisconnectAgent | [ForceDisconnectAgentRequest](#laelia-v1-ForceDisconnectAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Admin force disconnects an agent connection |
 | ListAgentSessions | [ListAgentSessionsRequest](#laelia-v1-ListAgentSessionsRequest) | [ListAgentSessionsResponse](#laelia-v1-ListAgentSessionsResponse) | List agent sessions |
 | UpdateAgentACPConfig | [UpdateAgentACPConfigRequest](#laelia-v1-UpdateAgentACPConfigRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Update agent ACP config YAML (admin only) |
+| RefreshAgentProviders | [RefreshAgentProvidersRequest](#laelia-v1-RefreshAgentProvidersRequest) | [RefreshAgentProvidersResponse](#laelia-v1-RefreshAgentProvidersResponse) | Ask the agent daemon to re-probe its host for installed LLM agent providers and their models. Returns the freshly discovered provider list (also persisted into agent.info.available_providers). Admin only. |
 | ConnectAgent | [ConnectAgentRequest](#laelia-v1-ConnectAgentRequest) | [ConnectAgentResponse](#laelia-v1-ConnectAgentResponse) | Agent initial connection using bootstrap token |
 | AgentHeartbeat | [AgentHeartbeatRequest](#laelia-v1-AgentHeartbeatRequest) | [AgentHeartbeatResponse](#laelia-v1-AgentHeartbeatResponse) | Agent heartbeat |
 | AgentDisconnect | [AgentDisconnectRequest](#laelia-v1-AgentDisconnectRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Agent graceful disconnect |
@@ -1414,6 +1514,7 @@ frontend can associate execution events with the channel.
 | result | [CommandResult](#laelia-v1-CommandResult) |  |  |
 | event | [CommandEvent](#laelia-v1-CommandEvent) |  |  |
 | ping | [Ping](#laelia-v1-Ping) |  |  |
+| providers_discovered | [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered) |  | response to ManagerStreamMessage.discover_providers |
 
 
 
@@ -1953,6 +2054,23 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | path | [string](#string) |  |  |
 | old_text | [string](#string) |  |  |
 | new_text | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-DiscoverProviders"></a>
+
+### DiscoverProviders
+DiscoverProviders asks the agent daemon to re-probe its host for installed
+LLM agent providers and their models. The daemon replies with
+AgentStreamMessage.providers_discovered.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  | correlation id for the pending unary RefreshAgentProviders call |
 
 
 
@@ -2510,6 +2628,7 @@ the drain loop, before acking the conversation cursor.
 | cancel | [CancelMessage](#laelia-v1-CancelMessage) |  |  |
 | pong | [Pong](#laelia-v1-Pong) |  |  |
 | permission_decision | [PermissionDecision](#laelia-v1-PermissionDecision) |  |  |
+| discover_providers | [DiscoverProviders](#laelia-v1-DiscoverProviders) |  | ask the agent daemon to re-probe installed LLM agent providers |
 
 
 
@@ -2740,6 +2859,24 @@ calling ListChannelUpdates, which compares conversation.version to the cursor.
 | current_version | [int64](#int64) |  |  |
 | new_messages | [ChatMessage](#laelia-v1-ChatMessage) | repeated |  |
 | conflict_description | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ProvidersDiscovered"></a>
+
+### ProvidersDiscovered
+ProvidersDiscovered carries the freshly discovered provider list back to the
+manager, which persists it into agent.info.available_providers and hands it
+to the pending RefreshAgentProviders caller.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  |  |
+| providers | [AgentProviderInfo](#laelia-v1-AgentProviderInfo) | repeated |  |
 
 
 

@@ -20,20 +20,21 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AgentService_CreateAgent_FullMethodName          = "/laelia.v1.AgentService/CreateAgent"
-	AgentService_ListAgents_FullMethodName           = "/laelia.v1.AgentService/ListAgents"
-	AgentService_GetAgent_FullMethodName             = "/laelia.v1.AgentService/GetAgent"
-	AgentService_DeleteAgent_FullMethodName          = "/laelia.v1.AgentService/DeleteAgent"
-	AgentService_RotateAgentToken_FullMethodName     = "/laelia.v1.AgentService/RotateAgentToken"
-	AgentService_RevokeAgentToken_FullMethodName     = "/laelia.v1.AgentService/RevokeAgentToken"
-	AgentService_ForceDisconnectAgent_FullMethodName = "/laelia.v1.AgentService/ForceDisconnectAgent"
-	AgentService_ListAgentSessions_FullMethodName    = "/laelia.v1.AgentService/ListAgentSessions"
-	AgentService_UpdateAgentACPConfig_FullMethodName = "/laelia.v1.AgentService/UpdateAgentACPConfig"
-	AgentService_ConnectAgent_FullMethodName         = "/laelia.v1.AgentService/ConnectAgent"
-	AgentService_AgentHeartbeat_FullMethodName       = "/laelia.v1.AgentService/AgentHeartbeat"
-	AgentService_AgentDisconnect_FullMethodName      = "/laelia.v1.AgentService/AgentDisconnect"
-	AgentService_RefreshAgentToken_FullMethodName    = "/laelia.v1.AgentService/RefreshAgentToken"
-	AgentService_Hello_FullMethodName                = "/laelia.v1.AgentService/Hello"
+	AgentService_CreateAgent_FullMethodName           = "/laelia.v1.AgentService/CreateAgent"
+	AgentService_ListAgents_FullMethodName            = "/laelia.v1.AgentService/ListAgents"
+	AgentService_GetAgent_FullMethodName              = "/laelia.v1.AgentService/GetAgent"
+	AgentService_DeleteAgent_FullMethodName           = "/laelia.v1.AgentService/DeleteAgent"
+	AgentService_RotateAgentToken_FullMethodName      = "/laelia.v1.AgentService/RotateAgentToken"
+	AgentService_RevokeAgentToken_FullMethodName      = "/laelia.v1.AgentService/RevokeAgentToken"
+	AgentService_ForceDisconnectAgent_FullMethodName  = "/laelia.v1.AgentService/ForceDisconnectAgent"
+	AgentService_ListAgentSessions_FullMethodName     = "/laelia.v1.AgentService/ListAgentSessions"
+	AgentService_UpdateAgentACPConfig_FullMethodName  = "/laelia.v1.AgentService/UpdateAgentACPConfig"
+	AgentService_RefreshAgentProviders_FullMethodName = "/laelia.v1.AgentService/RefreshAgentProviders"
+	AgentService_ConnectAgent_FullMethodName          = "/laelia.v1.AgentService/ConnectAgent"
+	AgentService_AgentHeartbeat_FullMethodName        = "/laelia.v1.AgentService/AgentHeartbeat"
+	AgentService_AgentDisconnect_FullMethodName       = "/laelia.v1.AgentService/AgentDisconnect"
+	AgentService_RefreshAgentToken_FullMethodName     = "/laelia.v1.AgentService/RefreshAgentToken"
+	AgentService_Hello_FullMethodName                 = "/laelia.v1.AgentService/Hello"
 )
 
 // AgentServiceClient is the client API for AgentService service.
@@ -54,6 +55,10 @@ type AgentServiceClient interface {
 	ListAgentSessions(ctx context.Context, in *ListAgentSessionsRequest, opts ...grpc.CallOption) (*ListAgentSessionsResponse, error)
 	// Update agent ACP config YAML (admin only)
 	UpdateAgentACPConfig(ctx context.Context, in *UpdateAgentACPConfigRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Ask the agent daemon to re-probe its host for installed LLM agent providers
+	// and their models. Returns the freshly discovered provider list (also
+	// persisted into agent.info.available_providers). Admin only.
+	RefreshAgentProviders(ctx context.Context, in *RefreshAgentProvidersRequest, opts ...grpc.CallOption) (*RefreshAgentProvidersResponse, error)
 	// Agent initial connection using bootstrap token
 	ConnectAgent(ctx context.Context, in *ConnectAgentRequest, opts ...grpc.CallOption) (*ConnectAgentResponse, error)
 	// Agent heartbeat
@@ -164,6 +169,16 @@ func (c *agentServiceClient) UpdateAgentACPConfig(ctx context.Context, in *Updat
 	return out, nil
 }
 
+func (c *agentServiceClient) RefreshAgentProviders(ctx context.Context, in *RefreshAgentProvidersRequest, opts ...grpc.CallOption) (*RefreshAgentProvidersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RefreshAgentProvidersResponse)
+	err := c.cc.Invoke(ctx, AgentService_RefreshAgentProviders_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *agentServiceClient) ConnectAgent(ctx context.Context, in *ConnectAgentRequest, opts ...grpc.CallOption) (*ConnectAgentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ConnectAgentResponse)
@@ -232,6 +247,10 @@ type AgentServiceServer interface {
 	ListAgentSessions(context.Context, *ListAgentSessionsRequest) (*ListAgentSessionsResponse, error)
 	// Update agent ACP config YAML (admin only)
 	UpdateAgentACPConfig(context.Context, *UpdateAgentACPConfigRequest) (*emptypb.Empty, error)
+	// Ask the agent daemon to re-probe its host for installed LLM agent providers
+	// and their models. Returns the freshly discovered provider list (also
+	// persisted into agent.info.available_providers). Admin only.
+	RefreshAgentProviders(context.Context, *RefreshAgentProvidersRequest) (*RefreshAgentProvidersResponse, error)
 	// Agent initial connection using bootstrap token
 	ConnectAgent(context.Context, *ConnectAgentRequest) (*ConnectAgentResponse, error)
 	// Agent heartbeat
@@ -278,6 +297,9 @@ func (UnimplementedAgentServiceServer) ListAgentSessions(context.Context, *ListA
 }
 func (UnimplementedAgentServiceServer) UpdateAgentACPConfig(context.Context, *UpdateAgentACPConfigRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateAgentACPConfig not implemented")
+}
+func (UnimplementedAgentServiceServer) RefreshAgentProviders(context.Context, *RefreshAgentProvidersRequest) (*RefreshAgentProvidersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RefreshAgentProviders not implemented")
 }
 func (UnimplementedAgentServiceServer) ConnectAgent(context.Context, *ConnectAgentRequest) (*ConnectAgentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ConnectAgent not implemented")
@@ -477,6 +499,24 @@ func _AgentService_UpdateAgentACPConfig_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AgentService_RefreshAgentProviders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RefreshAgentProvidersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).RefreshAgentProviders(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_RefreshAgentProviders_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).RefreshAgentProviders(ctx, req.(*RefreshAgentProvidersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AgentService_ConnectAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ConnectAgentRequest)
 	if err := dec(in); err != nil {
@@ -609,6 +649,10 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateAgentACPConfig",
 			Handler:    _AgentService_UpdateAgentACPConfig_Handler,
+		},
+		{
+			MethodName: "RefreshAgentProviders",
+			Handler:    _AgentService_RefreshAgentProviders_Handler,
 		},
 		{
 			MethodName: "ConnectAgent",

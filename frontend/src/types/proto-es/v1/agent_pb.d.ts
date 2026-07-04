@@ -637,6 +637,38 @@ export declare type UpdateAgentACPConfigRequest = Message<"laelia.v1.UpdateAgent
 export declare const UpdateAgentACPConfigRequestSchema: GenMessage<UpdateAgentACPConfigRequest>;
 
 /**
+ * @generated from message laelia.v1.RefreshAgentProvidersRequest
+ */
+export declare type RefreshAgentProvidersRequest = Message<"laelia.v1.RefreshAgentProvidersRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.RefreshAgentProvidersRequest.
+ * Use `create(RefreshAgentProvidersRequestSchema)` to create a new message.
+ */
+export declare const RefreshAgentProvidersRequestSchema: GenMessage<RefreshAgentProvidersRequest>;
+
+/**
+ * @generated from message laelia.v1.RefreshAgentProvidersResponse
+ */
+export declare type RefreshAgentProvidersResponse = Message<"laelia.v1.RefreshAgentProvidersResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.AgentProviderInfo providers = 1;
+   */
+  providers: AgentProviderInfo[];
+};
+
+/**
+ * Describes the message laelia.v1.RefreshAgentProvidersResponse.
+ * Use `create(RefreshAgentProvidersResponseSchema)` to create a new message.
+ */
+export declare const RefreshAgentProvidersResponseSchema: GenMessage<RefreshAgentProvidersResponse>;
+
+/**
  * @generated from message laelia.v1.HelloRequest
  */
 export declare type HelloRequest = Message<"laelia.v1.HelloRequest"> & {
@@ -770,6 +802,13 @@ export declare type AgentInfo = Message<"laelia.v1.AgentInfo"> & {
   capability?: AgentCapability | undefined;
 
   /**
+   * LLM agent providers auto-discovered by the agent daemon (agent-owned, not overwritten by the server)
+   *
+   * @generated from field: repeated laelia.v1.AgentProviderInfo available_providers = 9;
+   */
+  availableProviders: AgentProviderInfo[];
+
+  /**
    * @generated from field: laelia.v1.AgentACPConfig acp_config = 10;
    */
   acpConfig?: AgentACPConfig | undefined;
@@ -782,6 +821,92 @@ export declare type AgentInfo = Message<"laelia.v1.AgentInfo"> & {
 export declare const AgentInfoSchema: GenMessage<AgentInfo>;
 
 /**
+ * AgentProviderInfo describes one LLM agent provider detected on the agent
+ * daemon's host. Reported via ConnectAgent and refreshed on demand. The server
+ * treats this as agent-owned: it preserves it across ConnectAgent/Update flows
+ * the same way it preserves acp_config.
+ *
+ * @generated from message laelia.v1.AgentProviderInfo
+ */
+export declare type AgentProviderInfo = Message<"laelia.v1.AgentProviderInfo"> & {
+  /**
+   * e.g. "opencode", "claude-code"
+   *
+   * @generated from field: string provider_id = 1;
+   */
+  providerId: string;
+
+  /**
+   * @generated from field: string display_name = 2;
+   */
+  displayName: string;
+
+  /**
+   * @generated from field: string version = 3;
+   */
+  version: string;
+
+  /**
+   * @generated from field: string executable_path = 4;
+   */
+  executablePath: string;
+
+  /**
+   * empty when the provider does not advertise a model config option
+   *
+   * @generated from field: repeated laelia.v1.AgentModelOption models = 5;
+   */
+  models: AgentModelOption[];
+
+  /**
+   * whether probing observed a category=="model" config option
+   *
+   * @generated from field: bool supports_model_config_option = 6;
+   */
+  supportsModelConfigOption: boolean;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp detected_at = 7;
+   */
+  detectedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.AgentProviderInfo.
+ * Use `create(AgentProviderInfoSchema)` to create a new message.
+ */
+export declare const AgentProviderInfoSchema: GenMessage<AgentProviderInfo>;
+
+/**
+ * AgentModelOption is one model selectable via the ACP session config option
+ * round trip. Value is the valueId the client sends to SetSessionConfigOption.
+ *
+ * @generated from message laelia.v1.AgentModelOption
+ */
+export declare type AgentModelOption = Message<"laelia.v1.AgentModelOption"> & {
+  /**
+   * @generated from field: string value = 1;
+   */
+  value: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+};
+
+/**
+ * Describes the message laelia.v1.AgentModelOption.
+ * Use `create(AgentModelOptionSchema)` to create a new message.
+ */
+export declare const AgentModelOptionSchema: GenMessage<AgentModelOption>;
+
+/**
  * User-configurable ACP settings. Everything else (working dir, capabilities,
  * permissions) is derived from a built-in template, not set by the admin.
  *
@@ -789,7 +914,7 @@ export declare const AgentInfoSchema: GenMessage<AgentInfo>;
  */
 export declare type AgentACPConfig = Message<"laelia.v1.AgentACPConfig"> & {
   /**
-   * command to run, e.g. "npx"
+   * command to run, e.g. "npx". Only used when provider is "custom" or empty.
    *
    * @generated from field: string executable = 1;
    */
@@ -808,6 +933,27 @@ export declare type AgentACPConfig = Message<"laelia.v1.AgentACPConfig"> & {
    * @generated from field: repeated string allow_env = 3;
    */
   allowEnv: string[];
+
+  /**
+   * selected LLM agent provider id, e.g. "opencode", "claude-code", "custom"
+   *
+   * @generated from field: string provider = 4;
+   */
+  provider: string;
+
+  /**
+   * selected model valueId, matching an option advertised by the provider in NewSession ConfigOptions
+   *
+   * @generated from field: string model = 5;
+   */
+  model: string;
+
+  /**
+   * user-defined key-value env vars overlaid (and overriding) the inherited allow_env set
+   *
+   * @generated from field: map<string, string> custom_env = 6;
+   */
+  customEnv: { [key: string]: string };
 };
 
 /**
@@ -1075,6 +1221,18 @@ export declare const AgentService: GenService<{
     methodKind: "unary";
     input: typeof UpdateAgentACPConfigRequestSchema;
     output: typeof EmptySchema;
+  },
+  /**
+   * Ask the agent daemon to re-probe its host for installed LLM agent providers
+   * and their models. Returns the freshly discovered provider list (also
+   * persisted into agent.info.available_providers). Admin only.
+   *
+   * @generated from rpc laelia.v1.AgentService.RefreshAgentProviders
+   */
+  refreshAgentProviders: {
+    methodKind: "unary";
+    input: typeof RefreshAgentProvidersRequestSchema;
+    output: typeof RefreshAgentProvidersResponseSchema;
   },
   /**
    * Agent initial connection using bootstrap token

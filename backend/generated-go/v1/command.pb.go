@@ -5237,6 +5237,7 @@ type AgentStreamMessage struct {
 	//	*AgentStreamMessage_Result
 	//	*AgentStreamMessage_Event
 	//	*AgentStreamMessage_Ping
+	//	*AgentStreamMessage_ProvidersDiscovered
 	Message       isAgentStreamMessage_Message `protobuf_oneof:"message"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -5333,6 +5334,15 @@ func (x *AgentStreamMessage) GetPing() *Ping {
 	return nil
 }
 
+func (x *AgentStreamMessage) GetProvidersDiscovered() *ProvidersDiscovered {
+	if x != nil {
+		if x, ok := x.Message.(*AgentStreamMessage_ProvidersDiscovered); ok {
+			return x.ProvidersDiscovered
+		}
+	}
+	return nil
+}
+
 type isAgentStreamMessage_Message interface {
 	isAgentStreamMessage_Message()
 }
@@ -5361,6 +5371,10 @@ type AgentStreamMessage_Ping struct {
 	Ping *Ping `protobuf:"bytes,8,opt,name=ping,proto3,oneof"`
 }
 
+type AgentStreamMessage_ProvidersDiscovered struct {
+	ProvidersDiscovered *ProvidersDiscovered `protobuf:"bytes,9,opt,name=providers_discovered,json=providersDiscovered,proto3,oneof"` // response to ManagerStreamMessage.discover_providers
+}
+
 func (*AgentStreamMessage_AgentReady) isAgentStreamMessage_Message() {}
 
 func (*AgentStreamMessage_BeginSession) isAgentStreamMessage_Message() {}
@@ -5373,6 +5387,8 @@ func (*AgentStreamMessage_Event) isAgentStreamMessage_Message() {}
 
 func (*AgentStreamMessage_Ping) isAgentStreamMessage_Message() {}
 
+func (*AgentStreamMessage_ProvidersDiscovered) isAgentStreamMessage_Message() {}
+
 type ManagerStreamMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Message:
@@ -5382,6 +5398,7 @@ type ManagerStreamMessage struct {
 	//	*ManagerStreamMessage_Cancel
 	//	*ManagerStreamMessage_Pong
 	//	*ManagerStreamMessage_PermissionDecision
+	//	*ManagerStreamMessage_DiscoverProviders
 	Message       isManagerStreamMessage_Message `protobuf_oneof:"message"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -5469,6 +5486,15 @@ func (x *ManagerStreamMessage) GetPermissionDecision() *PermissionDecision {
 	return nil
 }
 
+func (x *ManagerStreamMessage) GetDiscoverProviders() *DiscoverProviders {
+	if x != nil {
+		if x, ok := x.Message.(*ManagerStreamMessage_DiscoverProviders); ok {
+			return x.DiscoverProviders
+		}
+	}
+	return nil
+}
+
 type isManagerStreamMessage_Message interface {
 	isManagerStreamMessage_Message()
 }
@@ -5493,6 +5519,10 @@ type ManagerStreamMessage_PermissionDecision struct {
 	PermissionDecision *PermissionDecision `protobuf:"bytes,7,opt,name=permission_decision,json=permissionDecision,proto3,oneof"`
 }
 
+type ManagerStreamMessage_DiscoverProviders struct {
+	DiscoverProviders *DiscoverProviders `protobuf:"bytes,9,opt,name=discover_providers,json=discoverProviders,proto3,oneof"` // ask the agent daemon to re-probe installed LLM agent providers
+}
+
 func (*ManagerStreamMessage_NewMessages) isManagerStreamMessage_Message() {}
 
 func (*ManagerStreamMessage_BeginSessionResponse) isManagerStreamMessage_Message() {}
@@ -5502,6 +5532,8 @@ func (*ManagerStreamMessage_Cancel) isManagerStreamMessage_Message() {}
 func (*ManagerStreamMessage_Pong) isManagerStreamMessage_Message() {}
 
 func (*ManagerStreamMessage_PermissionDecision) isManagerStreamMessage_Message() {}
+
+func (*ManagerStreamMessage_DiscoverProviders) isManagerStreamMessage_Message() {}
 
 type AgentReady struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -5571,6 +5603,108 @@ func (x *AgentReady) GetLastEventSeq() int32 {
 	return 0
 }
 
+// DiscoverProviders asks the agent daemon to re-probe its host for installed
+// LLM agent providers and their models. The daemon replies with
+// AgentStreamMessage.providers_discovered.
+type DiscoverProviders struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"` // correlation id for the pending unary RefreshAgentProviders call
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiscoverProviders) Reset() {
+	*x = DiscoverProviders{}
+	mi := &file_v1_command_proto_msgTypes[79]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiscoverProviders) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscoverProviders) ProtoMessage() {}
+
+func (x *DiscoverProviders) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[79]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscoverProviders.ProtoReflect.Descriptor instead.
+func (*DiscoverProviders) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{79}
+}
+
+func (x *DiscoverProviders) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+// ProvidersDiscovered carries the freshly discovered provider list back to the
+// manager, which persists it into agent.info.available_providers and hands it
+// to the pending RefreshAgentProviders caller.
+type ProvidersDiscovered struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Providers     []*AgentProviderInfo   `protobuf:"bytes,2,rep,name=providers,proto3" json:"providers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProvidersDiscovered) Reset() {
+	*x = ProvidersDiscovered{}
+	mi := &file_v1_command_proto_msgTypes[80]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProvidersDiscovered) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProvidersDiscovered) ProtoMessage() {}
+
+func (x *ProvidersDiscovered) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[80]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProvidersDiscovered.ProtoReflect.Descriptor instead.
+func (*ProvidersDiscovered) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{80}
+}
+
+func (x *ProvidersDiscovered) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *ProvidersDiscovered) GetProviders() []*AgentProviderInfo {
+	if x != nil {
+		return x.Providers
+	}
+	return nil
+}
+
 type CommandRequest struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	CommandId        string                 `protobuf:"bytes,1,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
@@ -5590,7 +5724,7 @@ type CommandRequest struct {
 
 func (x *CommandRequest) Reset() {
 	*x = CommandRequest{}
-	mi := &file_v1_command_proto_msgTypes[79]
+	mi := &file_v1_command_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5602,7 +5736,7 @@ func (x *CommandRequest) String() string {
 func (*CommandRequest) ProtoMessage() {}
 
 func (x *CommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[79]
+	mi := &file_v1_command_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5615,7 +5749,7 @@ func (x *CommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandRequest.ProtoReflect.Descriptor instead.
 func (*CommandRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{79}
+	return file_v1_command_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *CommandRequest) GetCommandId() string {
@@ -5707,7 +5841,7 @@ type CommandProgress struct {
 
 func (x *CommandProgress) Reset() {
 	*x = CommandProgress{}
-	mi := &file_v1_command_proto_msgTypes[80]
+	mi := &file_v1_command_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5719,7 +5853,7 @@ func (x *CommandProgress) String() string {
 func (*CommandProgress) ProtoMessage() {}
 
 func (x *CommandProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[80]
+	mi := &file_v1_command_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5732,7 +5866,7 @@ func (x *CommandProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandProgress.ProtoReflect.Descriptor instead.
 func (*CommandProgress) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{80}
+	return file_v1_command_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *CommandProgress) GetCommandId() string {
@@ -5778,7 +5912,7 @@ type CommandResult struct {
 
 func (x *CommandResult) Reset() {
 	*x = CommandResult{}
-	mi := &file_v1_command_proto_msgTypes[81]
+	mi := &file_v1_command_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5790,7 +5924,7 @@ func (x *CommandResult) String() string {
 func (*CommandResult) ProtoMessage() {}
 
 func (x *CommandResult) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[81]
+	mi := &file_v1_command_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5803,7 +5937,7 @@ func (x *CommandResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandResult.ProtoReflect.Descriptor instead.
 func (*CommandResult) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{81}
+	return file_v1_command_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *CommandResult) GetCommandId() string {
@@ -5864,7 +5998,7 @@ type CancelMessage struct {
 
 func (x *CancelMessage) Reset() {
 	*x = CancelMessage{}
-	mi := &file_v1_command_proto_msgTypes[82]
+	mi := &file_v1_command_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5876,7 +6010,7 @@ func (x *CancelMessage) String() string {
 func (*CancelMessage) ProtoMessage() {}
 
 func (x *CancelMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[82]
+	mi := &file_v1_command_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5889,7 +6023,7 @@ func (x *CancelMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelMessage.ProtoReflect.Descriptor instead.
 func (*CancelMessage) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{82}
+	return file_v1_command_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *CancelMessage) GetCommandId() string {
@@ -5909,7 +6043,7 @@ type Ping struct {
 
 func (x *Ping) Reset() {
 	*x = Ping{}
-	mi := &file_v1_command_proto_msgTypes[83]
+	mi := &file_v1_command_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5921,7 +6055,7 @@ func (x *Ping) String() string {
 func (*Ping) ProtoMessage() {}
 
 func (x *Ping) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[83]
+	mi := &file_v1_command_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5934,7 +6068,7 @@ func (x *Ping) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ping.ProtoReflect.Descriptor instead.
 func (*Ping) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{83}
+	return file_v1_command_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *Ping) GetSeq() int64 {
@@ -5961,7 +6095,7 @@ type Pong struct {
 
 func (x *Pong) Reset() {
 	*x = Pong{}
-	mi := &file_v1_command_proto_msgTypes[84]
+	mi := &file_v1_command_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5973,7 +6107,7 @@ func (x *Pong) String() string {
 func (*Pong) ProtoMessage() {}
 
 func (x *Pong) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[84]
+	mi := &file_v1_command_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5986,7 +6120,7 @@ func (x *Pong) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Pong.ProtoReflect.Descriptor instead.
 func (*Pong) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{84}
+	return file_v1_command_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *Pong) GetSeq() int64 {
@@ -6015,7 +6149,7 @@ type ListCommandsRequest struct {
 
 func (x *ListCommandsRequest) Reset() {
 	*x = ListCommandsRequest{}
-	mi := &file_v1_command_proto_msgTypes[85]
+	mi := &file_v1_command_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6027,7 +6161,7 @@ func (x *ListCommandsRequest) String() string {
 func (*ListCommandsRequest) ProtoMessage() {}
 
 func (x *ListCommandsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[85]
+	mi := &file_v1_command_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6040,7 +6174,7 @@ func (x *ListCommandsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCommandsRequest.ProtoReflect.Descriptor instead.
 func (*ListCommandsRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{85}
+	return file_v1_command_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *ListCommandsRequest) GetAgent() string {
@@ -6081,7 +6215,7 @@ type ListCommandsResponse struct {
 
 func (x *ListCommandsResponse) Reset() {
 	*x = ListCommandsResponse{}
-	mi := &file_v1_command_proto_msgTypes[86]
+	mi := &file_v1_command_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6093,7 +6227,7 @@ func (x *ListCommandsResponse) String() string {
 func (*ListCommandsResponse) ProtoMessage() {}
 
 func (x *ListCommandsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[86]
+	mi := &file_v1_command_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6106,7 +6240,7 @@ func (x *ListCommandsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCommandsResponse.ProtoReflect.Descriptor instead.
 func (*ListCommandsResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{86}
+	return file_v1_command_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *ListCommandsResponse) GetCommands() []*Command {
@@ -6132,7 +6266,7 @@ type GetCommandRequest struct {
 
 func (x *GetCommandRequest) Reset() {
 	*x = GetCommandRequest{}
-	mi := &file_v1_command_proto_msgTypes[87]
+	mi := &file_v1_command_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6144,7 +6278,7 @@ func (x *GetCommandRequest) String() string {
 func (*GetCommandRequest) ProtoMessage() {}
 
 func (x *GetCommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[87]
+	mi := &file_v1_command_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6157,7 +6291,7 @@ func (x *GetCommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCommandRequest.ProtoReflect.Descriptor instead.
 func (*GetCommandRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{87}
+	return file_v1_command_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *GetCommandRequest) GetName() string {
@@ -6177,7 +6311,7 @@ type CancelCommandRequest struct {
 
 func (x *CancelCommandRequest) Reset() {
 	*x = CancelCommandRequest{}
-	mi := &file_v1_command_proto_msgTypes[88]
+	mi := &file_v1_command_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6189,7 +6323,7 @@ func (x *CancelCommandRequest) String() string {
 func (*CancelCommandRequest) ProtoMessage() {}
 
 func (x *CancelCommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[88]
+	mi := &file_v1_command_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6202,7 +6336,7 @@ func (x *CancelCommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelCommandRequest.ProtoReflect.Descriptor instead.
 func (*CancelCommandRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{88}
+	return file_v1_command_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *CancelCommandRequest) GetName() string {
@@ -6229,7 +6363,7 @@ type WatchCommandRequest struct {
 
 func (x *WatchCommandRequest) Reset() {
 	*x = WatchCommandRequest{}
-	mi := &file_v1_command_proto_msgTypes[89]
+	mi := &file_v1_command_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6241,7 +6375,7 @@ func (x *WatchCommandRequest) String() string {
 func (*WatchCommandRequest) ProtoMessage() {}
 
 func (x *WatchCommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[89]
+	mi := &file_v1_command_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6254,7 +6388,7 @@ func (x *WatchCommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchCommandRequest.ProtoReflect.Descriptor instead.
 func (*WatchCommandRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{89}
+	return file_v1_command_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *WatchCommandRequest) GetName() string {
@@ -6281,7 +6415,7 @@ type WatchCommandEventsRequest struct {
 
 func (x *WatchCommandEventsRequest) Reset() {
 	*x = WatchCommandEventsRequest{}
-	mi := &file_v1_command_proto_msgTypes[90]
+	mi := &file_v1_command_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6293,7 +6427,7 @@ func (x *WatchCommandEventsRequest) String() string {
 func (*WatchCommandEventsRequest) ProtoMessage() {}
 
 func (x *WatchCommandEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[90]
+	mi := &file_v1_command_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6306,7 +6440,7 @@ func (x *WatchCommandEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchCommandEventsRequest.ProtoReflect.Descriptor instead.
 func (*WatchCommandEventsRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{90}
+	return file_v1_command_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *WatchCommandEventsRequest) GetName() string {
@@ -6333,7 +6467,7 @@ type PermissionDecision struct {
 
 func (x *PermissionDecision) Reset() {
 	*x = PermissionDecision{}
-	mi := &file_v1_command_proto_msgTypes[91]
+	mi := &file_v1_command_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6345,7 +6479,7 @@ func (x *PermissionDecision) String() string {
 func (*PermissionDecision) ProtoMessage() {}
 
 func (x *PermissionDecision) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[91]
+	mi := &file_v1_command_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6358,7 +6492,7 @@ func (x *PermissionDecision) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionDecision.ProtoReflect.Descriptor instead.
 func (*PermissionDecision) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{91}
+	return file_v1_command_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *PermissionDecision) GetCommandId() string {
@@ -6385,7 +6519,7 @@ type RespondPermissionRequest struct {
 
 func (x *RespondPermissionRequest) Reset() {
 	*x = RespondPermissionRequest{}
-	mi := &file_v1_command_proto_msgTypes[92]
+	mi := &file_v1_command_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6397,7 +6531,7 @@ func (x *RespondPermissionRequest) String() string {
 func (*RespondPermissionRequest) ProtoMessage() {}
 
 func (x *RespondPermissionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[92]
+	mi := &file_v1_command_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6410,7 +6544,7 @@ func (x *RespondPermissionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RespondPermissionRequest.ProtoReflect.Descriptor instead.
 func (*RespondPermissionRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{92}
+	return file_v1_command_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *RespondPermissionRequest) GetName() string {
@@ -6449,7 +6583,7 @@ type NewMessagesAvailable struct {
 
 func (x *NewMessagesAvailable) Reset() {
 	*x = NewMessagesAvailable{}
-	mi := &file_v1_command_proto_msgTypes[93]
+	mi := &file_v1_command_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6461,7 +6595,7 @@ func (x *NewMessagesAvailable) String() string {
 func (*NewMessagesAvailable) ProtoMessage() {}
 
 func (x *NewMessagesAvailable) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[93]
+	mi := &file_v1_command_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6474,7 +6608,7 @@ func (x *NewMessagesAvailable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NewMessagesAvailable.ProtoReflect.Descriptor instead.
 func (*NewMessagesAvailable) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{93}
+	return file_v1_command_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *NewMessagesAvailable) GetConversationIds() []string {
@@ -6512,7 +6646,7 @@ type BeginSession struct {
 
 func (x *BeginSession) Reset() {
 	*x = BeginSession{}
-	mi := &file_v1_command_proto_msgTypes[94]
+	mi := &file_v1_command_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6524,7 +6658,7 @@ func (x *BeginSession) String() string {
 func (*BeginSession) ProtoMessage() {}
 
 func (x *BeginSession) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[94]
+	mi := &file_v1_command_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6537,7 +6671,7 @@ func (x *BeginSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginSession.ProtoReflect.Descriptor instead.
 func (*BeginSession) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{94}
+	return file_v1_command_proto_rawDescGZIP(), []int{96}
 }
 
 type BeginSessionResponse struct {
@@ -6555,7 +6689,7 @@ type BeginSessionResponse struct {
 
 func (x *BeginSessionResponse) Reset() {
 	*x = BeginSessionResponse{}
-	mi := &file_v1_command_proto_msgTypes[95]
+	mi := &file_v1_command_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6567,7 +6701,7 @@ func (x *BeginSessionResponse) String() string {
 func (*BeginSessionResponse) ProtoMessage() {}
 
 func (x *BeginSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[95]
+	mi := &file_v1_command_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6580,7 +6714,7 @@ func (x *BeginSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginSessionResponse.ProtoReflect.Descriptor instead.
 func (*BeginSessionResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{95}
+	return file_v1_command_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *BeginSessionResponse) GetCommandId() string {
@@ -6616,7 +6750,7 @@ type FetchConversationActivityRequest struct {
 
 func (x *FetchConversationActivityRequest) Reset() {
 	*x = FetchConversationActivityRequest{}
-	mi := &file_v1_command_proto_msgTypes[96]
+	mi := &file_v1_command_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6628,7 +6762,7 @@ func (x *FetchConversationActivityRequest) String() string {
 func (*FetchConversationActivityRequest) ProtoMessage() {}
 
 func (x *FetchConversationActivityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[96]
+	mi := &file_v1_command_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6641,7 +6775,7 @@ func (x *FetchConversationActivityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchConversationActivityRequest.ProtoReflect.Descriptor instead.
 func (*FetchConversationActivityRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{96}
+	return file_v1_command_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *FetchConversationActivityRequest) GetConversation() string {
@@ -6660,7 +6794,7 @@ type FetchConversationActivityResponse struct {
 
 func (x *FetchConversationActivityResponse) Reset() {
 	*x = FetchConversationActivityResponse{}
-	mi := &file_v1_command_proto_msgTypes[97]
+	mi := &file_v1_command_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6672,7 +6806,7 @@ func (x *FetchConversationActivityResponse) String() string {
 func (*FetchConversationActivityResponse) ProtoMessage() {}
 
 func (x *FetchConversationActivityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[97]
+	mi := &file_v1_command_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6685,7 +6819,7 @@ func (x *FetchConversationActivityResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use FetchConversationActivityResponse.ProtoReflect.Descriptor instead.
 func (*FetchConversationActivityResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{97}
+	return file_v1_command_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *FetchConversationActivityResponse) GetActivities() []*AgentActivity {
@@ -6707,7 +6841,7 @@ type AgentActivity struct {
 
 func (x *AgentActivity) Reset() {
 	*x = AgentActivity{}
-	mi := &file_v1_command_proto_msgTypes[98]
+	mi := &file_v1_command_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6719,7 +6853,7 @@ func (x *AgentActivity) String() string {
 func (*AgentActivity) ProtoMessage() {}
 
 func (x *AgentActivity) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[98]
+	mi := &file_v1_command_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6732,7 +6866,7 @@ func (x *AgentActivity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentActivity.ProtoReflect.Descriptor instead.
 func (*AgentActivity) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{98}
+	return file_v1_command_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *AgentActivity) GetAgentId() string {
@@ -6767,7 +6901,7 @@ var File_v1_command_proto protoreflect.FileDescriptor
 
 const file_v1_command_proto_rawDesc = "" +
 	"\n" +
-	"\x10v1/command.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13v1/annotation.proto\"\xb1\x01\n" +
+	"\x10v1/command.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0ev1/agent.proto\x1a\x13v1/annotation.proto\"\xb1\x01\n" +
 	"\bTaskInfo\x12\x1f\n" +
 	"\vtask_number\x18\x01 \x01(\x05R\n" +
 	"taskNumber\x12-\n" +
@@ -7172,7 +7306,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\fconversation\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
 	"\x13laelia/ConversationR\fconversation\"A\n" +
 	"\x1cMarkConversationReadResponse\x12!\n" +
-	"\fread_version\x18\x01 \x01(\x03R\vreadVersion\"\xdf\x02\n" +
+	"\fread_version\x18\x01 \x01(\x03R\vreadVersion\"\xb4\x03\n" +
 	"\x12AgentStreamMessage\x128\n" +
 	"\vagent_ready\x18\x01 \x01(\v2\x15.laelia.v1.AgentReadyH\x00R\n" +
 	"agentReady\x12>\n" +
@@ -7180,14 +7314,16 @@ const file_v1_command_proto_rawDesc = "" +
 	"\bprogress\x18\x05 \x01(\v2\x1a.laelia.v1.CommandProgressH\x00R\bprogress\x122\n" +
 	"\x06result\x18\x06 \x01(\v2\x18.laelia.v1.CommandResultH\x00R\x06result\x12/\n" +
 	"\x05event\x18\a \x01(\v2\x17.laelia.v1.CommandEventH\x00R\x05event\x12%\n" +
-	"\x04ping\x18\b \x01(\v2\x0f.laelia.v1.PingH\x00R\x04pingB\t\n" +
-	"\amessage\"\xed\x02\n" +
+	"\x04ping\x18\b \x01(\v2\x0f.laelia.v1.PingH\x00R\x04ping\x12S\n" +
+	"\x14providers_discovered\x18\t \x01(\v2\x1e.laelia.v1.ProvidersDiscoveredH\x00R\x13providersDiscoveredB\t\n" +
+	"\amessage\"\xbc\x03\n" +
 	"\x14ManagerStreamMessage\x12D\n" +
 	"\fnew_messages\x18\x04 \x01(\v2\x1f.laelia.v1.NewMessagesAvailableH\x00R\vnewMessages\x12W\n" +
 	"\x16begin_session_response\x18\b \x01(\v2\x1f.laelia.v1.BeginSessionResponseH\x00R\x14beginSessionResponse\x122\n" +
 	"\x06cancel\x18\x05 \x01(\v2\x18.laelia.v1.CancelMessageH\x00R\x06cancel\x12%\n" +
 	"\x04pong\x18\x06 \x01(\v2\x0f.laelia.v1.PongH\x00R\x04pong\x12P\n" +
-	"\x13permission_decision\x18\a \x01(\v2\x1d.laelia.v1.PermissionDecisionH\x00R\x12permissionDecisionB\t\n" +
+	"\x13permission_decision\x18\a \x01(\v2\x1d.laelia.v1.PermissionDecisionH\x00R\x12permissionDecision\x12M\n" +
+	"\x12discover_providers\x18\t \x01(\v2\x1c.laelia.v1.DiscoverProvidersH\x00R\x11discoverProvidersB\t\n" +
 	"\amessage\"\x9b\x01\n" +
 	"\n" +
 	"AgentReady\x12\x1d\n" +
@@ -7196,7 +7332,14 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x0flast_command_id\x18\x02 \x01(\tR\rlastCommandId\x12 \n" +
 	"\flast_ack_seq\x18\x03 \x01(\x05R\n" +
 	"lastAckSeq\x12$\n" +
-	"\x0elast_event_seq\x18\x04 \x01(\x05R\flastEventSeq\"\xeb\x03\n" +
+	"\x0elast_event_seq\x18\x04 \x01(\x05R\flastEventSeq\"2\n" +
+	"\x11DiscoverProviders\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\"p\n" +
+	"\x13ProvidersDiscovered\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12:\n" +
+	"\tproviders\x18\x02 \x03(\v2\x1c.laelia.v1.AgentProviderInfoR\tproviders\"\xeb\x03\n" +
 	"\x0eCommandRequest\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12 \n" +
@@ -7392,7 +7535,7 @@ func file_v1_command_proto_rawDescGZIP() []byte {
 }
 
 var file_v1_command_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 101)
+var file_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 103)
 var file_v1_command_proto_goTypes = []any{
 	(CommandStatus)(0),                        // 0: laelia.v1.CommandStatus
 	(SenderType)(0),                           // 1: laelia.v1.SenderType
@@ -7478,45 +7621,48 @@ var file_v1_command_proto_goTypes = []any{
 	(*AgentStreamMessage)(nil),                // 81: laelia.v1.AgentStreamMessage
 	(*ManagerStreamMessage)(nil),              // 82: laelia.v1.ManagerStreamMessage
 	(*AgentReady)(nil),                        // 83: laelia.v1.AgentReady
-	(*CommandRequest)(nil),                    // 84: laelia.v1.CommandRequest
-	(*CommandProgress)(nil),                   // 85: laelia.v1.CommandProgress
-	(*CommandResult)(nil),                     // 86: laelia.v1.CommandResult
-	(*CancelMessage)(nil),                     // 87: laelia.v1.CancelMessage
-	(*Ping)(nil),                              // 88: laelia.v1.Ping
-	(*Pong)(nil),                              // 89: laelia.v1.Pong
-	(*ListCommandsRequest)(nil),               // 90: laelia.v1.ListCommandsRequest
-	(*ListCommandsResponse)(nil),              // 91: laelia.v1.ListCommandsResponse
-	(*GetCommandRequest)(nil),                 // 92: laelia.v1.GetCommandRequest
-	(*CancelCommandRequest)(nil),              // 93: laelia.v1.CancelCommandRequest
-	(*WatchCommandRequest)(nil),               // 94: laelia.v1.WatchCommandRequest
-	(*WatchCommandEventsRequest)(nil),         // 95: laelia.v1.WatchCommandEventsRequest
-	(*PermissionDecision)(nil),                // 96: laelia.v1.PermissionDecision
-	(*RespondPermissionRequest)(nil),          // 97: laelia.v1.RespondPermissionRequest
-	(*NewMessagesAvailable)(nil),              // 98: laelia.v1.NewMessagesAvailable
-	(*BeginSession)(nil),                      // 99: laelia.v1.BeginSession
-	(*BeginSessionResponse)(nil),              // 100: laelia.v1.BeginSessionResponse
-	(*FetchConversationActivityRequest)(nil),  // 101: laelia.v1.FetchConversationActivityRequest
-	(*FetchConversationActivityResponse)(nil), // 102: laelia.v1.FetchConversationActivityResponse
-	(*AgentActivity)(nil),                     // 103: laelia.v1.AgentActivity
-	nil,                                       // 104: laelia.v1.Command.EnvEntry
-	nil,                                       // 105: laelia.v1.CommandRequest.EnvEntry
-	(*timestamppb.Timestamp)(nil),             // 106: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),                   // 107: google.protobuf.Struct
-	(*fieldmaskpb.FieldMask)(nil),             // 108: google.protobuf.FieldMask
-	(*emptypb.Empty)(nil),                     // 109: google.protobuf.Empty
+	(*DiscoverProviders)(nil),                 // 84: laelia.v1.DiscoverProviders
+	(*ProvidersDiscovered)(nil),               // 85: laelia.v1.ProvidersDiscovered
+	(*CommandRequest)(nil),                    // 86: laelia.v1.CommandRequest
+	(*CommandProgress)(nil),                   // 87: laelia.v1.CommandProgress
+	(*CommandResult)(nil),                     // 88: laelia.v1.CommandResult
+	(*CancelMessage)(nil),                     // 89: laelia.v1.CancelMessage
+	(*Ping)(nil),                              // 90: laelia.v1.Ping
+	(*Pong)(nil),                              // 91: laelia.v1.Pong
+	(*ListCommandsRequest)(nil),               // 92: laelia.v1.ListCommandsRequest
+	(*ListCommandsResponse)(nil),              // 93: laelia.v1.ListCommandsResponse
+	(*GetCommandRequest)(nil),                 // 94: laelia.v1.GetCommandRequest
+	(*CancelCommandRequest)(nil),              // 95: laelia.v1.CancelCommandRequest
+	(*WatchCommandRequest)(nil),               // 96: laelia.v1.WatchCommandRequest
+	(*WatchCommandEventsRequest)(nil),         // 97: laelia.v1.WatchCommandEventsRequest
+	(*PermissionDecision)(nil),                // 98: laelia.v1.PermissionDecision
+	(*RespondPermissionRequest)(nil),          // 99: laelia.v1.RespondPermissionRequest
+	(*NewMessagesAvailable)(nil),              // 100: laelia.v1.NewMessagesAvailable
+	(*BeginSession)(nil),                      // 101: laelia.v1.BeginSession
+	(*BeginSessionResponse)(nil),              // 102: laelia.v1.BeginSessionResponse
+	(*FetchConversationActivityRequest)(nil),  // 103: laelia.v1.FetchConversationActivityRequest
+	(*FetchConversationActivityResponse)(nil), // 104: laelia.v1.FetchConversationActivityResponse
+	(*AgentActivity)(nil),                     // 105: laelia.v1.AgentActivity
+	nil,                                       // 106: laelia.v1.Command.EnvEntry
+	nil,                                       // 107: laelia.v1.CommandRequest.EnvEntry
+	(*timestamppb.Timestamp)(nil),             // 108: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                   // 109: google.protobuf.Struct
+	(*fieldmaskpb.FieldMask)(nil),             // 110: google.protobuf.FieldMask
+	(*AgentProviderInfo)(nil),                 // 111: laelia.v1.AgentProviderInfo
+	(*emptypb.Empty)(nil),                     // 112: google.protobuf.Empty
 }
 var file_v1_command_proto_depIdxs = []int32{
 	2,   // 0: laelia.v1.TaskInfo.status:type_name -> laelia.v1.TaskStatus
 	0,   // 1: laelia.v1.Command.status:type_name -> laelia.v1.CommandStatus
-	106, // 2: laelia.v1.Command.created_at:type_name -> google.protobuf.Timestamp
-	106, // 3: laelia.v1.Command.started_at:type_name -> google.protobuf.Timestamp
-	106, // 4: laelia.v1.Command.completed_at:type_name -> google.protobuf.Timestamp
-	104, // 5: laelia.v1.Command.env:type_name -> laelia.v1.Command.EnvEntry
-	107, // 6: laelia.v1.Command.result:type_name -> google.protobuf.Struct
+	108, // 2: laelia.v1.Command.created_at:type_name -> google.protobuf.Timestamp
+	108, // 3: laelia.v1.Command.started_at:type_name -> google.protobuf.Timestamp
+	108, // 4: laelia.v1.Command.completed_at:type_name -> google.protobuf.Timestamp
+	106, // 5: laelia.v1.Command.env:type_name -> laelia.v1.Command.EnvEntry
+	109, // 6: laelia.v1.Command.result:type_name -> google.protobuf.Struct
 	4,   // 7: laelia.v1.CommandOutput.type:type_name -> laelia.v1.CommandOutput.StreamType
-	106, // 8: laelia.v1.CommandOutput.timestamp:type_name -> google.protobuf.Timestamp
+	108, // 8: laelia.v1.CommandOutput.timestamp:type_name -> google.protobuf.Timestamp
 	3,   // 9: laelia.v1.CommandEvent.type:type_name -> laelia.v1.CommandEventType
-	106, // 10: laelia.v1.CommandEvent.timestamp:type_name -> google.protobuf.Timestamp
+	108, // 10: laelia.v1.CommandEvent.timestamp:type_name -> google.protobuf.Timestamp
 	9,   // 11: laelia.v1.CommandEvent.lifecycle:type_name -> laelia.v1.LifecyclePayload
 	10,  // 12: laelia.v1.CommandEvent.text_delta:type_name -> laelia.v1.TextDeltaPayload
 	11,  // 13: laelia.v1.CommandEvent.tool_call_started:type_name -> laelia.v1.ToolCallStartedPayload
@@ -7528,33 +7674,33 @@ var file_v1_command_proto_depIdxs = []int32{
 	17,  // 19: laelia.v1.CommandEvent.permission_requested:type_name -> laelia.v1.PermissionRequestedPayload
 	19,  // 20: laelia.v1.CommandEvent.permission_timed_out:type_name -> laelia.v1.PermissionTimedOutPayload
 	20,  // 21: laelia.v1.CommandEvent.permission_decided:type_name -> laelia.v1.PermissionDecidedPayload
-	107, // 22: laelia.v1.ToolCallStartedPayload.raw_input:type_name -> google.protobuf.Struct
-	107, // 23: laelia.v1.ToolCallFinishedPayload.raw_output:type_name -> google.protobuf.Struct
-	107, // 24: laelia.v1.RawAcpPayload.data:type_name -> google.protobuf.Struct
+	109, // 22: laelia.v1.ToolCallStartedPayload.raw_input:type_name -> google.protobuf.Struct
+	109, // 23: laelia.v1.ToolCallFinishedPayload.raw_output:type_name -> google.protobuf.Struct
+	109, // 24: laelia.v1.RawAcpPayload.data:type_name -> google.protobuf.Struct
 	18,  // 25: laelia.v1.PermissionRequestedPayload.options:type_name -> laelia.v1.PermissionOptionPayload
-	106, // 26: laelia.v1.SearchChatHistoryRequest.since:type_name -> google.protobuf.Timestamp
-	106, // 27: laelia.v1.SearchChatHistoryRequest.until:type_name -> google.protobuf.Timestamp
+	108, // 26: laelia.v1.SearchChatHistoryRequest.since:type_name -> google.protobuf.Timestamp
+	108, // 27: laelia.v1.SearchChatHistoryRequest.until:type_name -> google.protobuf.Timestamp
 	32,  // 28: laelia.v1.SearchChatHistoryResponse.entries:type_name -> laelia.v1.ChatMessage
-	106, // 29: laelia.v1.ChatHistoryEntry.created_at:type_name -> google.protobuf.Timestamp
-	106, // 30: laelia.v1.File.created_at:type_name -> google.protobuf.Timestamp
+	108, // 29: laelia.v1.ChatHistoryEntry.created_at:type_name -> google.protobuf.Timestamp
+	108, // 30: laelia.v1.File.created_at:type_name -> google.protobuf.Timestamp
 	26,  // 31: laelia.v1.DownloadFileResponse.file:type_name -> laelia.v1.File
 	26,  // 32: laelia.v1.ListFilesResponse.files:type_name -> laelia.v1.File
-	106, // 33: laelia.v1.ChatMessage.created_at:type_name -> google.protobuf.Timestamp
+	108, // 33: laelia.v1.ChatMessage.created_at:type_name -> google.protobuf.Timestamp
 	1,   // 34: laelia.v1.ChatMessage.sender_type:type_name -> laelia.v1.SenderType
 	24,  // 35: laelia.v1.ChatMessage.mentions:type_name -> laelia.v1.Mention
 	25,  // 36: laelia.v1.ChatMessage.attachments:type_name -> laelia.v1.Attachment
 	5,   // 37: laelia.v1.ChatMessage.task:type_name -> laelia.v1.TaskInfo
-	106, // 38: laelia.v1.Conversation.created_at:type_name -> google.protobuf.Timestamp
-	106, // 39: laelia.v1.Conversation.updated_at:type_name -> google.protobuf.Timestamp
-	106, // 40: laelia.v1.ChannelMember.joined_at:type_name -> google.protobuf.Timestamp
+	108, // 38: laelia.v1.Conversation.created_at:type_name -> google.protobuf.Timestamp
+	108, // 39: laelia.v1.Conversation.updated_at:type_name -> google.protobuf.Timestamp
+	108, // 40: laelia.v1.ChannelMember.joined_at:type_name -> google.protobuf.Timestamp
 	32,  // 41: laelia.v1.ListConversationMessagesResponse.messages:type_name -> laelia.v1.ChatMessage
 	32,  // 42: laelia.v1.ListThreadMessagesResponse.messages:type_name -> laelia.v1.ChatMessage
-	106, // 43: laelia.v1.ChannelThread.latest_reply_at:type_name -> google.protobuf.Timestamp
+	108, // 43: laelia.v1.ChannelThread.latest_reply_at:type_name -> google.protobuf.Timestamp
 	40,  // 44: laelia.v1.ListChannelThreadsResponse.threads:type_name -> laelia.v1.ChannelThread
 	43,  // 45: laelia.v1.ListThreadUpdatesResponse.updates:type_name -> laelia.v1.ThreadUpdate
 	33,  // 46: laelia.v1.ListChannelsResponse.channels:type_name -> laelia.v1.Conversation
 	33,  // 47: laelia.v1.UpdateChannelRequest.conversation:type_name -> laelia.v1.Conversation
-	108, // 48: laelia.v1.UpdateChannelRequest.update_mask:type_name -> google.protobuf.FieldMask
+	110, // 48: laelia.v1.UpdateChannelRequest.update_mask:type_name -> google.protobuf.FieldMask
 	34,  // 49: laelia.v1.ListChannelMembersResponse.members:type_name -> laelia.v1.ChannelMember
 	24,  // 50: laelia.v1.SendMessageRequest.mentions:type_name -> laelia.v1.Mention
 	25,  // 51: laelia.v1.SendMessageRequest.attachments:type_name -> laelia.v1.Attachment
@@ -7576,101 +7722,104 @@ var file_v1_command_proto_depIdxs = []int32{
 	32,  // 67: laelia.v1.CreateTaskResponse.message:type_name -> laelia.v1.ChatMessage
 	75,  // 68: laelia.v1.ListChannelUpdatesResponse.updates:type_name -> laelia.v1.ChannelUpdate
 	83,  // 69: laelia.v1.AgentStreamMessage.agent_ready:type_name -> laelia.v1.AgentReady
-	99,  // 70: laelia.v1.AgentStreamMessage.begin_session:type_name -> laelia.v1.BeginSession
-	85,  // 71: laelia.v1.AgentStreamMessage.progress:type_name -> laelia.v1.CommandProgress
-	86,  // 72: laelia.v1.AgentStreamMessage.result:type_name -> laelia.v1.CommandResult
+	101, // 70: laelia.v1.AgentStreamMessage.begin_session:type_name -> laelia.v1.BeginSession
+	87,  // 71: laelia.v1.AgentStreamMessage.progress:type_name -> laelia.v1.CommandProgress
+	88,  // 72: laelia.v1.AgentStreamMessage.result:type_name -> laelia.v1.CommandResult
 	8,   // 73: laelia.v1.AgentStreamMessage.event:type_name -> laelia.v1.CommandEvent
-	88,  // 74: laelia.v1.AgentStreamMessage.ping:type_name -> laelia.v1.Ping
-	98,  // 75: laelia.v1.ManagerStreamMessage.new_messages:type_name -> laelia.v1.NewMessagesAvailable
-	100, // 76: laelia.v1.ManagerStreamMessage.begin_session_response:type_name -> laelia.v1.BeginSessionResponse
-	87,  // 77: laelia.v1.ManagerStreamMessage.cancel:type_name -> laelia.v1.CancelMessage
-	89,  // 78: laelia.v1.ManagerStreamMessage.pong:type_name -> laelia.v1.Pong
-	96,  // 79: laelia.v1.ManagerStreamMessage.permission_decision:type_name -> laelia.v1.PermissionDecision
-	105, // 80: laelia.v1.CommandRequest.env:type_name -> laelia.v1.CommandRequest.EnvEntry
-	4,   // 81: laelia.v1.CommandProgress.type:type_name -> laelia.v1.CommandOutput.StreamType
-	107, // 82: laelia.v1.CommandResult.result:type_name -> google.protobuf.Struct
-	0,   // 83: laelia.v1.ListCommandsRequest.status:type_name -> laelia.v1.CommandStatus
-	6,   // 84: laelia.v1.ListCommandsResponse.commands:type_name -> laelia.v1.Command
-	103, // 85: laelia.v1.FetchConversationActivityResponse.activities:type_name -> laelia.v1.AgentActivity
-	90,  // 86: laelia.v1.CommandService.ListCommands:input_type -> laelia.v1.ListCommandsRequest
-	92,  // 87: laelia.v1.CommandService.GetCommand:input_type -> laelia.v1.GetCommandRequest
-	93,  // 88: laelia.v1.CommandService.CancelCommand:input_type -> laelia.v1.CancelCommandRequest
-	94,  // 89: laelia.v1.CommandService.WatchCommand:input_type -> laelia.v1.WatchCommandRequest
-	95,  // 90: laelia.v1.CommandService.WatchCommandEvents:input_type -> laelia.v1.WatchCommandEventsRequest
-	97,  // 91: laelia.v1.CommandService.RespondPermission:input_type -> laelia.v1.RespondPermissionRequest
-	21,  // 92: laelia.v1.CommandService.SearchChatHistory:input_type -> laelia.v1.SearchChatHistoryRequest
-	58,  // 93: laelia.v1.CommandService.GetCommandContext:input_type -> laelia.v1.GetCommandContextRequest
-	45,  // 94: laelia.v1.CommandService.GetOrCreateConversation:input_type -> laelia.v1.GetOrCreateConversationRequest
-	35,  // 95: laelia.v1.CommandService.ListConversationMessages:input_type -> laelia.v1.ListConversationMessagesRequest
-	37,  // 96: laelia.v1.CommandService.ListThreadMessages:input_type -> laelia.v1.ListThreadMessagesRequest
-	39,  // 97: laelia.v1.CommandService.ListChannelThreads:input_type -> laelia.v1.ListChannelThreadsRequest
-	47,  // 98: laelia.v1.CommandService.CreateChannel:input_type -> laelia.v1.CreateChannelRequest
-	48,  // 99: laelia.v1.CommandService.ListChannels:input_type -> laelia.v1.ListChannelsRequest
-	50,  // 100: laelia.v1.CommandService.GetChannel:input_type -> laelia.v1.GetChannelRequest
-	51,  // 101: laelia.v1.CommandService.UpdateChannel:input_type -> laelia.v1.UpdateChannelRequest
-	52,  // 102: laelia.v1.CommandService.DeleteChannel:input_type -> laelia.v1.DeleteChannelRequest
-	53,  // 103: laelia.v1.CommandService.AddChannelMember:input_type -> laelia.v1.AddChannelMemberRequest
-	54,  // 104: laelia.v1.CommandService.RemoveChannelMember:input_type -> laelia.v1.RemoveChannelMemberRequest
-	55,  // 105: laelia.v1.CommandService.ListChannelMembers:input_type -> laelia.v1.ListChannelMembersRequest
-	57,  // 106: laelia.v1.CommandService.SendMessage:input_type -> laelia.v1.SendMessageRequest
-	60,  // 107: laelia.v1.CommandService.PostMessage:input_type -> laelia.v1.PostMessageRequest
-	62,  // 108: laelia.v1.CommandService.ConvertMessageToTask:input_type -> laelia.v1.ConvertMessageToTaskRequest
-	64,  // 109: laelia.v1.CommandService.ListTasks:input_type -> laelia.v1.ListTasksRequest
-	72,  // 110: laelia.v1.CommandService.CreateTask:input_type -> laelia.v1.CreateTaskRequest
-	66,  // 111: laelia.v1.CommandService.ClaimTask:input_type -> laelia.v1.ClaimTaskRequest
-	68,  // 112: laelia.v1.CommandService.UnclaimTask:input_type -> laelia.v1.UnclaimTaskRequest
-	70,  // 113: laelia.v1.CommandService.UpdateTaskStatus:input_type -> laelia.v1.UpdateTaskStatusRequest
-	74,  // 114: laelia.v1.CommandService.ListChannelUpdates:input_type -> laelia.v1.ListChannelUpdatesRequest
-	42,  // 115: laelia.v1.CommandService.ListThreadUpdates:input_type -> laelia.v1.ListThreadUpdatesRequest
-	77,  // 116: laelia.v1.CommandService.AckProcessedVersion:input_type -> laelia.v1.AckProcessedVersionRequest
-	101, // 117: laelia.v1.CommandService.FetchConversationActivity:input_type -> laelia.v1.FetchConversationActivityRequest
-	79,  // 118: laelia.v1.CommandService.MarkConversationRead:input_type -> laelia.v1.MarkConversationReadRequest
-	27,  // 119: laelia.v1.CommandService.UploadFile:input_type -> laelia.v1.UploadFileRequest
-	28,  // 120: laelia.v1.CommandService.DownloadFile:input_type -> laelia.v1.DownloadFileRequest
-	30,  // 121: laelia.v1.CommandService.ListFiles:input_type -> laelia.v1.ListFilesRequest
-	81,  // 122: laelia.v1.AgentStreamService.AgentChannel:input_type -> laelia.v1.AgentStreamMessage
-	91,  // 123: laelia.v1.CommandService.ListCommands:output_type -> laelia.v1.ListCommandsResponse
-	6,   // 124: laelia.v1.CommandService.GetCommand:output_type -> laelia.v1.Command
-	6,   // 125: laelia.v1.CommandService.CancelCommand:output_type -> laelia.v1.Command
-	7,   // 126: laelia.v1.CommandService.WatchCommand:output_type -> laelia.v1.CommandOutput
-	8,   // 127: laelia.v1.CommandService.WatchCommandEvents:output_type -> laelia.v1.CommandEvent
-	109, // 128: laelia.v1.CommandService.RespondPermission:output_type -> google.protobuf.Empty
-	22,  // 129: laelia.v1.CommandService.SearchChatHistory:output_type -> laelia.v1.SearchChatHistoryResponse
-	59,  // 130: laelia.v1.CommandService.GetCommandContext:output_type -> laelia.v1.GetCommandContextResponse
-	46,  // 131: laelia.v1.CommandService.GetOrCreateConversation:output_type -> laelia.v1.GetOrCreateConversationResponse
-	36,  // 132: laelia.v1.CommandService.ListConversationMessages:output_type -> laelia.v1.ListConversationMessagesResponse
-	38,  // 133: laelia.v1.CommandService.ListThreadMessages:output_type -> laelia.v1.ListThreadMessagesResponse
-	41,  // 134: laelia.v1.CommandService.ListChannelThreads:output_type -> laelia.v1.ListChannelThreadsResponse
-	33,  // 135: laelia.v1.CommandService.CreateChannel:output_type -> laelia.v1.Conversation
-	49,  // 136: laelia.v1.CommandService.ListChannels:output_type -> laelia.v1.ListChannelsResponse
-	33,  // 137: laelia.v1.CommandService.GetChannel:output_type -> laelia.v1.Conversation
-	33,  // 138: laelia.v1.CommandService.UpdateChannel:output_type -> laelia.v1.Conversation
-	109, // 139: laelia.v1.CommandService.DeleteChannel:output_type -> google.protobuf.Empty
-	34,  // 140: laelia.v1.CommandService.AddChannelMember:output_type -> laelia.v1.ChannelMember
-	109, // 141: laelia.v1.CommandService.RemoveChannelMember:output_type -> google.protobuf.Empty
-	56,  // 142: laelia.v1.CommandService.ListChannelMembers:output_type -> laelia.v1.ListChannelMembersResponse
-	32,  // 143: laelia.v1.CommandService.SendMessage:output_type -> laelia.v1.ChatMessage
-	61,  // 144: laelia.v1.CommandService.PostMessage:output_type -> laelia.v1.PostMessageResponse
-	63,  // 145: laelia.v1.CommandService.ConvertMessageToTask:output_type -> laelia.v1.ConvertMessageToTaskResponse
-	65,  // 146: laelia.v1.CommandService.ListTasks:output_type -> laelia.v1.ListTasksResponse
-	73,  // 147: laelia.v1.CommandService.CreateTask:output_type -> laelia.v1.CreateTaskResponse
-	67,  // 148: laelia.v1.CommandService.ClaimTask:output_type -> laelia.v1.ClaimTaskResponse
-	69,  // 149: laelia.v1.CommandService.UnclaimTask:output_type -> laelia.v1.UnclaimTaskResponse
-	71,  // 150: laelia.v1.CommandService.UpdateTaskStatus:output_type -> laelia.v1.UpdateTaskStatusResponse
-	76,  // 151: laelia.v1.CommandService.ListChannelUpdates:output_type -> laelia.v1.ListChannelUpdatesResponse
-	44,  // 152: laelia.v1.CommandService.ListThreadUpdates:output_type -> laelia.v1.ListThreadUpdatesResponse
-	78,  // 153: laelia.v1.CommandService.AckProcessedVersion:output_type -> laelia.v1.AckProcessedVersionResponse
-	102, // 154: laelia.v1.CommandService.FetchConversationActivity:output_type -> laelia.v1.FetchConversationActivityResponse
-	80,  // 155: laelia.v1.CommandService.MarkConversationRead:output_type -> laelia.v1.MarkConversationReadResponse
-	26,  // 156: laelia.v1.CommandService.UploadFile:output_type -> laelia.v1.File
-	29,  // 157: laelia.v1.CommandService.DownloadFile:output_type -> laelia.v1.DownloadFileResponse
-	31,  // 158: laelia.v1.CommandService.ListFiles:output_type -> laelia.v1.ListFilesResponse
-	82,  // 159: laelia.v1.AgentStreamService.AgentChannel:output_type -> laelia.v1.ManagerStreamMessage
-	123, // [123:160] is the sub-list for method output_type
-	86,  // [86:123] is the sub-list for method input_type
-	86,  // [86:86] is the sub-list for extension type_name
-	86,  // [86:86] is the sub-list for extension extendee
-	0,   // [0:86] is the sub-list for field type_name
+	90,  // 74: laelia.v1.AgentStreamMessage.ping:type_name -> laelia.v1.Ping
+	85,  // 75: laelia.v1.AgentStreamMessage.providers_discovered:type_name -> laelia.v1.ProvidersDiscovered
+	100, // 76: laelia.v1.ManagerStreamMessage.new_messages:type_name -> laelia.v1.NewMessagesAvailable
+	102, // 77: laelia.v1.ManagerStreamMessage.begin_session_response:type_name -> laelia.v1.BeginSessionResponse
+	89,  // 78: laelia.v1.ManagerStreamMessage.cancel:type_name -> laelia.v1.CancelMessage
+	91,  // 79: laelia.v1.ManagerStreamMessage.pong:type_name -> laelia.v1.Pong
+	98,  // 80: laelia.v1.ManagerStreamMessage.permission_decision:type_name -> laelia.v1.PermissionDecision
+	84,  // 81: laelia.v1.ManagerStreamMessage.discover_providers:type_name -> laelia.v1.DiscoverProviders
+	111, // 82: laelia.v1.ProvidersDiscovered.providers:type_name -> laelia.v1.AgentProviderInfo
+	107, // 83: laelia.v1.CommandRequest.env:type_name -> laelia.v1.CommandRequest.EnvEntry
+	4,   // 84: laelia.v1.CommandProgress.type:type_name -> laelia.v1.CommandOutput.StreamType
+	109, // 85: laelia.v1.CommandResult.result:type_name -> google.protobuf.Struct
+	0,   // 86: laelia.v1.ListCommandsRequest.status:type_name -> laelia.v1.CommandStatus
+	6,   // 87: laelia.v1.ListCommandsResponse.commands:type_name -> laelia.v1.Command
+	105, // 88: laelia.v1.FetchConversationActivityResponse.activities:type_name -> laelia.v1.AgentActivity
+	92,  // 89: laelia.v1.CommandService.ListCommands:input_type -> laelia.v1.ListCommandsRequest
+	94,  // 90: laelia.v1.CommandService.GetCommand:input_type -> laelia.v1.GetCommandRequest
+	95,  // 91: laelia.v1.CommandService.CancelCommand:input_type -> laelia.v1.CancelCommandRequest
+	96,  // 92: laelia.v1.CommandService.WatchCommand:input_type -> laelia.v1.WatchCommandRequest
+	97,  // 93: laelia.v1.CommandService.WatchCommandEvents:input_type -> laelia.v1.WatchCommandEventsRequest
+	99,  // 94: laelia.v1.CommandService.RespondPermission:input_type -> laelia.v1.RespondPermissionRequest
+	21,  // 95: laelia.v1.CommandService.SearchChatHistory:input_type -> laelia.v1.SearchChatHistoryRequest
+	58,  // 96: laelia.v1.CommandService.GetCommandContext:input_type -> laelia.v1.GetCommandContextRequest
+	45,  // 97: laelia.v1.CommandService.GetOrCreateConversation:input_type -> laelia.v1.GetOrCreateConversationRequest
+	35,  // 98: laelia.v1.CommandService.ListConversationMessages:input_type -> laelia.v1.ListConversationMessagesRequest
+	37,  // 99: laelia.v1.CommandService.ListThreadMessages:input_type -> laelia.v1.ListThreadMessagesRequest
+	39,  // 100: laelia.v1.CommandService.ListChannelThreads:input_type -> laelia.v1.ListChannelThreadsRequest
+	47,  // 101: laelia.v1.CommandService.CreateChannel:input_type -> laelia.v1.CreateChannelRequest
+	48,  // 102: laelia.v1.CommandService.ListChannels:input_type -> laelia.v1.ListChannelsRequest
+	50,  // 103: laelia.v1.CommandService.GetChannel:input_type -> laelia.v1.GetChannelRequest
+	51,  // 104: laelia.v1.CommandService.UpdateChannel:input_type -> laelia.v1.UpdateChannelRequest
+	52,  // 105: laelia.v1.CommandService.DeleteChannel:input_type -> laelia.v1.DeleteChannelRequest
+	53,  // 106: laelia.v1.CommandService.AddChannelMember:input_type -> laelia.v1.AddChannelMemberRequest
+	54,  // 107: laelia.v1.CommandService.RemoveChannelMember:input_type -> laelia.v1.RemoveChannelMemberRequest
+	55,  // 108: laelia.v1.CommandService.ListChannelMembers:input_type -> laelia.v1.ListChannelMembersRequest
+	57,  // 109: laelia.v1.CommandService.SendMessage:input_type -> laelia.v1.SendMessageRequest
+	60,  // 110: laelia.v1.CommandService.PostMessage:input_type -> laelia.v1.PostMessageRequest
+	62,  // 111: laelia.v1.CommandService.ConvertMessageToTask:input_type -> laelia.v1.ConvertMessageToTaskRequest
+	64,  // 112: laelia.v1.CommandService.ListTasks:input_type -> laelia.v1.ListTasksRequest
+	72,  // 113: laelia.v1.CommandService.CreateTask:input_type -> laelia.v1.CreateTaskRequest
+	66,  // 114: laelia.v1.CommandService.ClaimTask:input_type -> laelia.v1.ClaimTaskRequest
+	68,  // 115: laelia.v1.CommandService.UnclaimTask:input_type -> laelia.v1.UnclaimTaskRequest
+	70,  // 116: laelia.v1.CommandService.UpdateTaskStatus:input_type -> laelia.v1.UpdateTaskStatusRequest
+	74,  // 117: laelia.v1.CommandService.ListChannelUpdates:input_type -> laelia.v1.ListChannelUpdatesRequest
+	42,  // 118: laelia.v1.CommandService.ListThreadUpdates:input_type -> laelia.v1.ListThreadUpdatesRequest
+	77,  // 119: laelia.v1.CommandService.AckProcessedVersion:input_type -> laelia.v1.AckProcessedVersionRequest
+	103, // 120: laelia.v1.CommandService.FetchConversationActivity:input_type -> laelia.v1.FetchConversationActivityRequest
+	79,  // 121: laelia.v1.CommandService.MarkConversationRead:input_type -> laelia.v1.MarkConversationReadRequest
+	27,  // 122: laelia.v1.CommandService.UploadFile:input_type -> laelia.v1.UploadFileRequest
+	28,  // 123: laelia.v1.CommandService.DownloadFile:input_type -> laelia.v1.DownloadFileRequest
+	30,  // 124: laelia.v1.CommandService.ListFiles:input_type -> laelia.v1.ListFilesRequest
+	81,  // 125: laelia.v1.AgentStreamService.AgentChannel:input_type -> laelia.v1.AgentStreamMessage
+	93,  // 126: laelia.v1.CommandService.ListCommands:output_type -> laelia.v1.ListCommandsResponse
+	6,   // 127: laelia.v1.CommandService.GetCommand:output_type -> laelia.v1.Command
+	6,   // 128: laelia.v1.CommandService.CancelCommand:output_type -> laelia.v1.Command
+	7,   // 129: laelia.v1.CommandService.WatchCommand:output_type -> laelia.v1.CommandOutput
+	8,   // 130: laelia.v1.CommandService.WatchCommandEvents:output_type -> laelia.v1.CommandEvent
+	112, // 131: laelia.v1.CommandService.RespondPermission:output_type -> google.protobuf.Empty
+	22,  // 132: laelia.v1.CommandService.SearchChatHistory:output_type -> laelia.v1.SearchChatHistoryResponse
+	59,  // 133: laelia.v1.CommandService.GetCommandContext:output_type -> laelia.v1.GetCommandContextResponse
+	46,  // 134: laelia.v1.CommandService.GetOrCreateConversation:output_type -> laelia.v1.GetOrCreateConversationResponse
+	36,  // 135: laelia.v1.CommandService.ListConversationMessages:output_type -> laelia.v1.ListConversationMessagesResponse
+	38,  // 136: laelia.v1.CommandService.ListThreadMessages:output_type -> laelia.v1.ListThreadMessagesResponse
+	41,  // 137: laelia.v1.CommandService.ListChannelThreads:output_type -> laelia.v1.ListChannelThreadsResponse
+	33,  // 138: laelia.v1.CommandService.CreateChannel:output_type -> laelia.v1.Conversation
+	49,  // 139: laelia.v1.CommandService.ListChannels:output_type -> laelia.v1.ListChannelsResponse
+	33,  // 140: laelia.v1.CommandService.GetChannel:output_type -> laelia.v1.Conversation
+	33,  // 141: laelia.v1.CommandService.UpdateChannel:output_type -> laelia.v1.Conversation
+	112, // 142: laelia.v1.CommandService.DeleteChannel:output_type -> google.protobuf.Empty
+	34,  // 143: laelia.v1.CommandService.AddChannelMember:output_type -> laelia.v1.ChannelMember
+	112, // 144: laelia.v1.CommandService.RemoveChannelMember:output_type -> google.protobuf.Empty
+	56,  // 145: laelia.v1.CommandService.ListChannelMembers:output_type -> laelia.v1.ListChannelMembersResponse
+	32,  // 146: laelia.v1.CommandService.SendMessage:output_type -> laelia.v1.ChatMessage
+	61,  // 147: laelia.v1.CommandService.PostMessage:output_type -> laelia.v1.PostMessageResponse
+	63,  // 148: laelia.v1.CommandService.ConvertMessageToTask:output_type -> laelia.v1.ConvertMessageToTaskResponse
+	65,  // 149: laelia.v1.CommandService.ListTasks:output_type -> laelia.v1.ListTasksResponse
+	73,  // 150: laelia.v1.CommandService.CreateTask:output_type -> laelia.v1.CreateTaskResponse
+	67,  // 151: laelia.v1.CommandService.ClaimTask:output_type -> laelia.v1.ClaimTaskResponse
+	69,  // 152: laelia.v1.CommandService.UnclaimTask:output_type -> laelia.v1.UnclaimTaskResponse
+	71,  // 153: laelia.v1.CommandService.UpdateTaskStatus:output_type -> laelia.v1.UpdateTaskStatusResponse
+	76,  // 154: laelia.v1.CommandService.ListChannelUpdates:output_type -> laelia.v1.ListChannelUpdatesResponse
+	44,  // 155: laelia.v1.CommandService.ListThreadUpdates:output_type -> laelia.v1.ListThreadUpdatesResponse
+	78,  // 156: laelia.v1.CommandService.AckProcessedVersion:output_type -> laelia.v1.AckProcessedVersionResponse
+	104, // 157: laelia.v1.CommandService.FetchConversationActivity:output_type -> laelia.v1.FetchConversationActivityResponse
+	80,  // 158: laelia.v1.CommandService.MarkConversationRead:output_type -> laelia.v1.MarkConversationReadResponse
+	26,  // 159: laelia.v1.CommandService.UploadFile:output_type -> laelia.v1.File
+	29,  // 160: laelia.v1.CommandService.DownloadFile:output_type -> laelia.v1.DownloadFileResponse
+	31,  // 161: laelia.v1.CommandService.ListFiles:output_type -> laelia.v1.ListFilesResponse
+	82,  // 162: laelia.v1.AgentStreamService.AgentChannel:output_type -> laelia.v1.ManagerStreamMessage
+	126, // [126:163] is the sub-list for method output_type
+	89,  // [89:126] is the sub-list for method input_type
+	89,  // [89:89] is the sub-list for extension type_name
+	89,  // [89:89] is the sub-list for extension extendee
+	0,   // [0:89] is the sub-list for field type_name
 }
 
 func init() { file_v1_command_proto_init() }
@@ -7678,6 +7827,7 @@ func file_v1_command_proto_init() {
 	if File_v1_command_proto != nil {
 		return
 	}
+	file_v1_agent_proto_init()
 	file_v1_annotation_proto_init()
 	file_v1_command_proto_msgTypes[3].OneofWrappers = []any{
 		(*CommandEvent_Lifecycle)(nil),
@@ -7699,6 +7849,7 @@ func file_v1_command_proto_init() {
 		(*AgentStreamMessage_Result)(nil),
 		(*AgentStreamMessage_Event)(nil),
 		(*AgentStreamMessage_Ping)(nil),
+		(*AgentStreamMessage_ProvidersDiscovered)(nil),
 	}
 	file_v1_command_proto_msgTypes[77].OneofWrappers = []any{
 		(*ManagerStreamMessage_NewMessages)(nil),
@@ -7706,6 +7857,7 @@ func file_v1_command_proto_init() {
 		(*ManagerStreamMessage_Cancel)(nil),
 		(*ManagerStreamMessage_Pong)(nil),
 		(*ManagerStreamMessage_PermissionDecision)(nil),
+		(*ManagerStreamMessage_DiscoverProviders)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -7713,7 +7865,7 @@ func file_v1_command_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_command_proto_rawDesc), len(file_v1_command_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   101,
+			NumMessages:   103,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

@@ -59,6 +59,9 @@ const (
 	// AgentServiceUpdateAgentACPConfigProcedure is the fully-qualified name of the AgentService's
 	// UpdateAgentACPConfig RPC.
 	AgentServiceUpdateAgentACPConfigProcedure = "/laelia.v1.AgentService/UpdateAgentACPConfig"
+	// AgentServiceRefreshAgentProvidersProcedure is the fully-qualified name of the AgentService's
+	// RefreshAgentProviders RPC.
+	AgentServiceRefreshAgentProvidersProcedure = "/laelia.v1.AgentService/RefreshAgentProviders"
 	// AgentServiceConnectAgentProcedure is the fully-qualified name of the AgentService's ConnectAgent
 	// RPC.
 	AgentServiceConnectAgentProcedure = "/laelia.v1.AgentService/ConnectAgent"
@@ -91,6 +94,10 @@ type AgentServiceClient interface {
 	ListAgentSessions(context.Context, *connect.Request[v1.ListAgentSessionsRequest]) (*connect.Response[v1.ListAgentSessionsResponse], error)
 	// Update agent ACP config YAML (admin only)
 	UpdateAgentACPConfig(context.Context, *connect.Request[v1.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error)
+	// Ask the agent daemon to re-probe its host for installed LLM agent providers
+	// and their models. Returns the freshly discovered provider list (also
+	// persisted into agent.info.available_providers). Admin only.
+	RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error)
 	// Agent initial connection using bootstrap token
 	ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error)
 	// Agent heartbeat
@@ -168,6 +175,12 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(agentServiceMethods.ByName("UpdateAgentACPConfig")),
 			connect.WithClientOptions(opts...),
 		),
+		refreshAgentProviders: connect.NewClient[v1.RefreshAgentProvidersRequest, v1.RefreshAgentProvidersResponse](
+			httpClient,
+			baseURL+AgentServiceRefreshAgentProvidersProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("RefreshAgentProviders")),
+			connect.WithClientOptions(opts...),
+		),
 		connectAgent: connect.NewClient[v1.ConnectAgentRequest, v1.ConnectAgentResponse](
 			httpClient,
 			baseURL+AgentServiceConnectAgentProcedure,
@@ -203,20 +216,21 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 
 // agentServiceClient implements AgentServiceClient.
 type agentServiceClient struct {
-	createAgent          *connect.Client[v1.CreateAgentRequest, v1.CreateAgentResponse]
-	listAgents           *connect.Client[v1.ListAgentsRequest, v1.ListAgentsResponse]
-	getAgent             *connect.Client[v1.GetAgentRequest, v1.Agent]
-	deleteAgent          *connect.Client[v1.DeleteAgentRequest, emptypb.Empty]
-	rotateAgentToken     *connect.Client[v1.RotateAgentTokenRequest, v1.RotateAgentTokenResponse]
-	revokeAgentToken     *connect.Client[v1.RevokeAgentTokenRequest, v1.RevokeAgentTokenResponse]
-	forceDisconnectAgent *connect.Client[v1.ForceDisconnectAgentRequest, emptypb.Empty]
-	listAgentSessions    *connect.Client[v1.ListAgentSessionsRequest, v1.ListAgentSessionsResponse]
-	updateAgentACPConfig *connect.Client[v1.UpdateAgentACPConfigRequest, emptypb.Empty]
-	connectAgent         *connect.Client[v1.ConnectAgentRequest, v1.ConnectAgentResponse]
-	agentHeartbeat       *connect.Client[v1.AgentHeartbeatRequest, v1.AgentHeartbeatResponse]
-	agentDisconnect      *connect.Client[v1.AgentDisconnectRequest, emptypb.Empty]
-	refreshAgentToken    *connect.Client[v1.RefreshAgentTokenRequest, v1.RefreshAgentTokenResponse]
-	hello                *connect.Client[v1.HelloRequest, v1.HelloResponse]
+	createAgent           *connect.Client[v1.CreateAgentRequest, v1.CreateAgentResponse]
+	listAgents            *connect.Client[v1.ListAgentsRequest, v1.ListAgentsResponse]
+	getAgent              *connect.Client[v1.GetAgentRequest, v1.Agent]
+	deleteAgent           *connect.Client[v1.DeleteAgentRequest, emptypb.Empty]
+	rotateAgentToken      *connect.Client[v1.RotateAgentTokenRequest, v1.RotateAgentTokenResponse]
+	revokeAgentToken      *connect.Client[v1.RevokeAgentTokenRequest, v1.RevokeAgentTokenResponse]
+	forceDisconnectAgent  *connect.Client[v1.ForceDisconnectAgentRequest, emptypb.Empty]
+	listAgentSessions     *connect.Client[v1.ListAgentSessionsRequest, v1.ListAgentSessionsResponse]
+	updateAgentACPConfig  *connect.Client[v1.UpdateAgentACPConfigRequest, emptypb.Empty]
+	refreshAgentProviders *connect.Client[v1.RefreshAgentProvidersRequest, v1.RefreshAgentProvidersResponse]
+	connectAgent          *connect.Client[v1.ConnectAgentRequest, v1.ConnectAgentResponse]
+	agentHeartbeat        *connect.Client[v1.AgentHeartbeatRequest, v1.AgentHeartbeatResponse]
+	agentDisconnect       *connect.Client[v1.AgentDisconnectRequest, emptypb.Empty]
+	refreshAgentToken     *connect.Client[v1.RefreshAgentTokenRequest, v1.RefreshAgentTokenResponse]
+	hello                 *connect.Client[v1.HelloRequest, v1.HelloResponse]
 }
 
 // CreateAgent calls laelia.v1.AgentService.CreateAgent.
@@ -264,6 +278,11 @@ func (c *agentServiceClient) UpdateAgentACPConfig(ctx context.Context, req *conn
 	return c.updateAgentACPConfig.CallUnary(ctx, req)
 }
 
+// RefreshAgentProviders calls laelia.v1.AgentService.RefreshAgentProviders.
+func (c *agentServiceClient) RefreshAgentProviders(ctx context.Context, req *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error) {
+	return c.refreshAgentProviders.CallUnary(ctx, req)
+}
+
 // ConnectAgent calls laelia.v1.AgentService.ConnectAgent.
 func (c *agentServiceClient) ConnectAgent(ctx context.Context, req *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error) {
 	return c.connectAgent.CallUnary(ctx, req)
@@ -305,6 +324,10 @@ type AgentServiceHandler interface {
 	ListAgentSessions(context.Context, *connect.Request[v1.ListAgentSessionsRequest]) (*connect.Response[v1.ListAgentSessionsResponse], error)
 	// Update agent ACP config YAML (admin only)
 	UpdateAgentACPConfig(context.Context, *connect.Request[v1.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error)
+	// Ask the agent daemon to re-probe its host for installed LLM agent providers
+	// and their models. Returns the freshly discovered provider list (also
+	// persisted into agent.info.available_providers). Admin only.
+	RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error)
 	// Agent initial connection using bootstrap token
 	ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error)
 	// Agent heartbeat
@@ -378,6 +401,12 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(agentServiceMethods.ByName("UpdateAgentACPConfig")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentServiceRefreshAgentProvidersHandler := connect.NewUnaryHandler(
+		AgentServiceRefreshAgentProvidersProcedure,
+		svc.RefreshAgentProviders,
+		connect.WithSchema(agentServiceMethods.ByName("RefreshAgentProviders")),
+		connect.WithHandlerOptions(opts...),
+	)
 	agentServiceConnectAgentHandler := connect.NewUnaryHandler(
 		AgentServiceConnectAgentProcedure,
 		svc.ConnectAgent,
@@ -428,6 +457,8 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 			agentServiceListAgentSessionsHandler.ServeHTTP(w, r)
 		case AgentServiceUpdateAgentACPConfigProcedure:
 			agentServiceUpdateAgentACPConfigHandler.ServeHTTP(w, r)
+		case AgentServiceRefreshAgentProvidersProcedure:
+			agentServiceRefreshAgentProvidersHandler.ServeHTTP(w, r)
 		case AgentServiceConnectAgentProcedure:
 			agentServiceConnectAgentHandler.ServeHTTP(w, r)
 		case AgentServiceAgentHeartbeatProcedure:
@@ -481,6 +512,10 @@ func (UnimplementedAgentServiceHandler) ListAgentSessions(context.Context, *conn
 
 func (UnimplementedAgentServiceHandler) UpdateAgentACPConfig(context.Context, *connect.Request[v1.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.UpdateAgentACPConfig is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.RefreshAgentProviders is not implemented"))
 }
 
 func (UnimplementedAgentServiceHandler) ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error) {

@@ -5,6 +5,7 @@
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { JsonObject, Message } from "@bufbuild/protobuf";
 import type { EmptySchema, FieldMask, Timestamp } from "@bufbuild/protobuf/wkt";
+import type { AgentProviderInfo } from "./agent_pb";
 
 /**
  * Describes the file v1/command.proto.
@@ -2317,6 +2318,14 @@ export declare type AgentStreamMessage = Message<"laelia.v1.AgentStreamMessage">
      */
     value: Ping;
     case: "ping";
+  } | {
+    /**
+     * response to ManagerStreamMessage.discover_providers
+     *
+     * @generated from field: laelia.v1.ProvidersDiscovered providers_discovered = 9;
+     */
+    value: ProvidersDiscovered;
+    case: "providersDiscovered";
   } | { case: undefined; value?: undefined };
 };
 
@@ -2363,6 +2372,14 @@ export declare type ManagerStreamMessage = Message<"laelia.v1.ManagerStreamMessa
      */
     value: PermissionDecision;
     case: "permissionDecision";
+  } | {
+    /**
+     * ask the agent daemon to re-probe installed LLM agent providers
+     *
+     * @generated from field: laelia.v1.DiscoverProviders discover_providers = 9;
+     */
+    value: DiscoverProviders;
+    case: "discoverProviders";
   } | { case: undefined; value?: undefined };
 };
 
@@ -2402,6 +2419,53 @@ export declare type AgentReady = Message<"laelia.v1.AgentReady"> & {
  * Use `create(AgentReadySchema)` to create a new message.
  */
 export declare const AgentReadySchema: GenMessage<AgentReady>;
+
+/**
+ * DiscoverProviders asks the agent daemon to re-probe its host for installed
+ * LLM agent providers and their models. The daemon replies with
+ * AgentStreamMessage.providers_discovered.
+ *
+ * @generated from message laelia.v1.DiscoverProviders
+ */
+export declare type DiscoverProviders = Message<"laelia.v1.DiscoverProviders"> & {
+  /**
+   * correlation id for the pending unary RefreshAgentProviders call
+   *
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+};
+
+/**
+ * Describes the message laelia.v1.DiscoverProviders.
+ * Use `create(DiscoverProvidersSchema)` to create a new message.
+ */
+export declare const DiscoverProvidersSchema: GenMessage<DiscoverProviders>;
+
+/**
+ * ProvidersDiscovered carries the freshly discovered provider list back to the
+ * manager, which persists it into agent.info.available_providers and hands it
+ * to the pending RefreshAgentProviders caller.
+ *
+ * @generated from message laelia.v1.ProvidersDiscovered
+ */
+export declare type ProvidersDiscovered = Message<"laelia.v1.ProvidersDiscovered"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: repeated laelia.v1.AgentProviderInfo providers = 2;
+   */
+  providers: AgentProviderInfo[];
+};
+
+/**
+ * Describes the message laelia.v1.ProvidersDiscovered.
+ * Use `create(ProvidersDiscoveredSchema)` to create a new message.
+ */
+export declare const ProvidersDiscoveredSchema: GenMessage<ProvidersDiscovered>;
 
 /**
  * @generated from message laelia.v1.CommandRequest

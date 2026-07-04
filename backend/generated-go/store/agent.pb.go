@@ -9,6 +9,7 @@ package store
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -177,22 +178,23 @@ func (x AgentStatus_ConnectionState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AgentStatus_ConnectionState.Descriptor instead.
 func (AgentStatus_ConnectionState) EnumDescriptor() ([]byte, []int) {
-	return file_store_agent_proto_rawDescGZIP(), []int{3, 0}
+	return file_store_agent_proto_rawDescGZIP(), []int{5, 0}
 }
 
 type AgentInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AgentType     string                 `protobuf:"bytes,1,opt,name=agent_type,json=agentType,proto3" json:"agent_type,omitempty"`
-	Hostname      string                 `protobuf:"bytes,2,opt,name=hostname,proto3" json:"hostname,omitempty"`
-	Os            string                 `protobuf:"bytes,3,opt,name=os,proto3" json:"os,omitempty"`
-	Arch          string                 `protobuf:"bytes,4,opt,name=arch,proto3" json:"arch,omitempty"`
-	Ip            string                 `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"`
-	Version       string                 `protobuf:"bytes,6,opt,name=version,proto3" json:"version,omitempty"`
-	Labels        map[string]string      `protobuf:"bytes,7,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Capability    *AgentCapability       `protobuf:"bytes,8,opt,name=capability,proto3" json:"capability,omitempty"`
-	AcpConfig     *AgentACPConfig        `protobuf:"bytes,10,opt,name=acp_config,json=acpConfig,proto3" json:"acp_config,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	AgentType          string                 `protobuf:"bytes,1,opt,name=agent_type,json=agentType,proto3" json:"agent_type,omitempty"`
+	Hostname           string                 `protobuf:"bytes,2,opt,name=hostname,proto3" json:"hostname,omitempty"`
+	Os                 string                 `protobuf:"bytes,3,opt,name=os,proto3" json:"os,omitempty"`
+	Arch               string                 `protobuf:"bytes,4,opt,name=arch,proto3" json:"arch,omitempty"`
+	Ip                 string                 `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"`
+	Version            string                 `protobuf:"bytes,6,opt,name=version,proto3" json:"version,omitempty"`
+	Labels             map[string]string      `protobuf:"bytes,7,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Capability         *AgentCapability       `protobuf:"bytes,8,opt,name=capability,proto3" json:"capability,omitempty"`
+	AvailableProviders []*AgentProviderInfo   `protobuf:"bytes,9,rep,name=available_providers,json=availableProviders,proto3" json:"available_providers,omitempty"`
+	AcpConfig          *AgentACPConfig        `protobuf:"bytes,10,opt,name=acp_config,json=acpConfig,proto3" json:"acp_config,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *AgentInfo) Reset() {
@@ -281,6 +283,13 @@ func (x *AgentInfo) GetCapability() *AgentCapability {
 	return nil
 }
 
+func (x *AgentInfo) GetAvailableProviders() []*AgentProviderInfo {
+	if x != nil {
+		return x.AvailableProviders
+	}
+	return nil
+}
+
 func (x *AgentInfo) GetAcpConfig() *AgentACPConfig {
 	if x != nil {
 		return x.AcpConfig
@@ -293,6 +302,9 @@ type AgentACPConfig struct {
 	Executable    string                 `protobuf:"bytes,1,opt,name=executable,proto3" json:"executable,omitempty"`
 	Args          []string               `protobuf:"bytes,2,rep,name=args,proto3" json:"args,omitempty"`
 	AllowEnv      []string               `protobuf:"bytes,3,rep,name=allow_env,json=allowEnv,proto3" json:"allow_env,omitempty"`
+	Provider      string                 `protobuf:"bytes,4,opt,name=provider,proto3" json:"provider,omitempty"`
+	Model         string                 `protobuf:"bytes,5,opt,name=model,proto3" json:"model,omitempty"`
+	CustomEnv     map[string]string      `protobuf:"bytes,6,rep,name=custom_env,json=customEnv,proto3" json:"custom_env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -348,6 +360,179 @@ func (x *AgentACPConfig) GetAllowEnv() []string {
 	return nil
 }
 
+func (x *AgentACPConfig) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *AgentACPConfig) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *AgentACPConfig) GetCustomEnv() map[string]string {
+	if x != nil {
+		return x.CustomEnv
+	}
+	return nil
+}
+
+type AgentProviderInfo struct {
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	ProviderId                string                 `protobuf:"bytes,1,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	DisplayName               string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Version                   string                 `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
+	ExecutablePath            string                 `protobuf:"bytes,4,opt,name=executable_path,json=executablePath,proto3" json:"executable_path,omitempty"`
+	Models                    []*AgentModelOption    `protobuf:"bytes,5,rep,name=models,proto3" json:"models,omitempty"`
+	SupportsModelConfigOption bool                   `protobuf:"varint,6,opt,name=supports_model_config_option,json=supportsModelConfigOption,proto3" json:"supports_model_config_option,omitempty"`
+	DetectedAt                *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=detected_at,json=detectedAt,proto3" json:"detected_at,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *AgentProviderInfo) Reset() {
+	*x = AgentProviderInfo{}
+	mi := &file_store_agent_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentProviderInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentProviderInfo) ProtoMessage() {}
+
+func (x *AgentProviderInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_store_agent_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentProviderInfo.ProtoReflect.Descriptor instead.
+func (*AgentProviderInfo) Descriptor() ([]byte, []int) {
+	return file_store_agent_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *AgentProviderInfo) GetProviderId() string {
+	if x != nil {
+		return x.ProviderId
+	}
+	return ""
+}
+
+func (x *AgentProviderInfo) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *AgentProviderInfo) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *AgentProviderInfo) GetExecutablePath() string {
+	if x != nil {
+		return x.ExecutablePath
+	}
+	return ""
+}
+
+func (x *AgentProviderInfo) GetModels() []*AgentModelOption {
+	if x != nil {
+		return x.Models
+	}
+	return nil
+}
+
+func (x *AgentProviderInfo) GetSupportsModelConfigOption() bool {
+	if x != nil {
+		return x.SupportsModelConfigOption
+	}
+	return false
+}
+
+func (x *AgentProviderInfo) GetDetectedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.DetectedAt
+	}
+	return nil
+}
+
+type AgentModelOption struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Value         string                 `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentModelOption) Reset() {
+	*x = AgentModelOption{}
+	mi := &file_store_agent_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentModelOption) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentModelOption) ProtoMessage() {}
+
+func (x *AgentModelOption) ProtoReflect() protoreflect.Message {
+	mi := &file_store_agent_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentModelOption.ProtoReflect.Descriptor instead.
+func (*AgentModelOption) Descriptor() ([]byte, []int) {
+	return file_store_agent_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *AgentModelOption) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *AgentModelOption) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AgentModelOption) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
 type AgentCapability struct {
 	state                      protoimpl.MessageState `protogen:"open.v1"`
 	SupportsAcp                bool                   `protobuf:"varint,1,opt,name=supports_acp,json=supportsAcp,proto3" json:"supports_acp,omitempty"`
@@ -364,7 +549,7 @@ type AgentCapability struct {
 
 func (x *AgentCapability) Reset() {
 	*x = AgentCapability{}
-	mi := &file_store_agent_proto_msgTypes[2]
+	mi := &file_store_agent_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -376,7 +561,7 @@ func (x *AgentCapability) String() string {
 func (*AgentCapability) ProtoMessage() {}
 
 func (x *AgentCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_store_agent_proto_msgTypes[2]
+	mi := &file_store_agent_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -389,7 +574,7 @@ func (x *AgentCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentCapability.ProtoReflect.Descriptor instead.
 func (*AgentCapability) Descriptor() ([]byte, []int) {
-	return file_store_agent_proto_rawDescGZIP(), []int{2}
+	return file_store_agent_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AgentCapability) GetSupportsAcp() bool {
@@ -461,7 +646,7 @@ type AgentStatus struct {
 
 func (x *AgentStatus) Reset() {
 	*x = AgentStatus{}
-	mi := &file_store_agent_proto_msgTypes[3]
+	mi := &file_store_agent_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -473,7 +658,7 @@ func (x *AgentStatus) String() string {
 func (*AgentStatus) ProtoMessage() {}
 
 func (x *AgentStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_store_agent_proto_msgTypes[3]
+	mi := &file_store_agent_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -486,7 +671,7 @@ func (x *AgentStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentStatus.ProtoReflect.Descriptor instead.
 func (*AgentStatus) Descriptor() ([]byte, []int) {
-	return file_store_agent_proto_rawDescGZIP(), []int{3}
+	return file_store_agent_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *AgentStatus) GetState() AgentStatus_ConnectionState {
@@ -528,7 +713,7 @@ var File_store_agent_proto protoreflect.FileDescriptor
 
 const file_store_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x11store/agent.proto\x12\flaelia.store\"\x88\x03\n" +
+	"\x11store/agent.proto\x12\flaelia.store\x1a\x1fgoogle/protobuf/timestamp.proto\"\xda\x03\n" +
 	"\tAgentInfo\x12\x1d\n" +
 	"\n" +
 	"agent_type\x18\x01 \x01(\tR\tagentType\x12\x1a\n" +
@@ -540,19 +725,41 @@ const file_store_agent_proto_rawDesc = "" +
 	"\x06labels\x18\a \x03(\v2#.laelia.store.AgentInfo.LabelsEntryR\x06labels\x12=\n" +
 	"\n" +
 	"capability\x18\b \x01(\v2\x1d.laelia.store.AgentCapabilityR\n" +
-	"capability\x12;\n" +
+	"capability\x12P\n" +
+	"\x13available_providers\x18\t \x03(\v2\x1f.laelia.store.AgentProviderInfoR\x12availableProviders\x12;\n" +
 	"\n" +
 	"acp_config\x18\n" +
 	" \x01(\v2\x1c.laelia.store.AgentACPConfigR\tacpConfig\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"a\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9d\x02\n" +
 	"\x0eAgentACPConfig\x12\x1e\n" +
 	"\n" +
 	"executable\x18\x01 \x01(\tR\n" +
 	"executable\x12\x12\n" +
 	"\x04args\x18\x02 \x03(\tR\x04args\x12\x1b\n" +
-	"\tallow_env\x18\x03 \x03(\tR\ballowEnv\"\xff\x02\n" +
+	"\tallow_env\x18\x03 \x03(\tR\ballowEnv\x12\x1a\n" +
+	"\bprovider\x18\x04 \x01(\tR\bprovider\x12\x14\n" +
+	"\x05model\x18\x05 \x01(\tR\x05model\x12J\n" +
+	"\n" +
+	"custom_env\x18\x06 \x03(\v2+.laelia.store.AgentACPConfig.CustomEnvEntryR\tcustomEnv\x1a<\n" +
+	"\x0eCustomEnvEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd0\x02\n" +
+	"\x11AgentProviderInfo\x12\x1f\n" +
+	"\vprovider_id\x18\x01 \x01(\tR\n" +
+	"providerId\x12!\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x18\n" +
+	"\aversion\x18\x03 \x01(\tR\aversion\x12'\n" +
+	"\x0fexecutable_path\x18\x04 \x01(\tR\x0eexecutablePath\x126\n" +
+	"\x06models\x18\x05 \x03(\v2\x1e.laelia.store.AgentModelOptionR\x06models\x12?\n" +
+	"\x1csupports_model_config_option\x18\x06 \x01(\bR\x19supportsModelConfigOption\x12;\n" +
+	"\vdetected_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"detectedAt\"^\n" +
+	"\x10AgentModelOption\x12\x14\n" +
+	"\x05value\x18\x01 \x01(\tR\x05value\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\"\xff\x02\n" +
 	"\x0fAgentCapability\x12!\n" +
 	"\fsupports_acp\x18\x01 \x01(\bR\vsupportsAcp\x12.\n" +
 	"\x13max_timeout_seconds\x18\x03 \x01(\x05R\x11maxTimeoutSeconds\x12#\n" +
@@ -602,27 +809,35 @@ func file_store_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_store_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_store_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_store_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_store_agent_proto_goTypes = []any{
 	(AgentTokenType)(0),              // 0: laelia.store.AgentTokenType
 	(AgentTokenState)(0),             // 1: laelia.store.AgentTokenState
 	(AgentStatus_ConnectionState)(0), // 2: laelia.store.AgentStatus.ConnectionState
 	(*AgentInfo)(nil),                // 3: laelia.store.AgentInfo
 	(*AgentACPConfig)(nil),           // 4: laelia.store.AgentACPConfig
-	(*AgentCapability)(nil),          // 5: laelia.store.AgentCapability
-	(*AgentStatus)(nil),              // 6: laelia.store.AgentStatus
-	nil,                              // 7: laelia.store.AgentInfo.LabelsEntry
+	(*AgentProviderInfo)(nil),        // 5: laelia.store.AgentProviderInfo
+	(*AgentModelOption)(nil),         // 6: laelia.store.AgentModelOption
+	(*AgentCapability)(nil),          // 7: laelia.store.AgentCapability
+	(*AgentStatus)(nil),              // 8: laelia.store.AgentStatus
+	nil,                              // 9: laelia.store.AgentInfo.LabelsEntry
+	nil,                              // 10: laelia.store.AgentACPConfig.CustomEnvEntry
+	(*timestamppb.Timestamp)(nil),    // 11: google.protobuf.Timestamp
 }
 var file_store_agent_proto_depIdxs = []int32{
-	7, // 0: laelia.store.AgentInfo.labels:type_name -> laelia.store.AgentInfo.LabelsEntry
-	5, // 1: laelia.store.AgentInfo.capability:type_name -> laelia.store.AgentCapability
-	4, // 2: laelia.store.AgentInfo.acp_config:type_name -> laelia.store.AgentACPConfig
-	2, // 3: laelia.store.AgentStatus.state:type_name -> laelia.store.AgentStatus.ConnectionState
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	9,  // 0: laelia.store.AgentInfo.labels:type_name -> laelia.store.AgentInfo.LabelsEntry
+	7,  // 1: laelia.store.AgentInfo.capability:type_name -> laelia.store.AgentCapability
+	5,  // 2: laelia.store.AgentInfo.available_providers:type_name -> laelia.store.AgentProviderInfo
+	4,  // 3: laelia.store.AgentInfo.acp_config:type_name -> laelia.store.AgentACPConfig
+	10, // 4: laelia.store.AgentACPConfig.custom_env:type_name -> laelia.store.AgentACPConfig.CustomEnvEntry
+	6,  // 5: laelia.store.AgentProviderInfo.models:type_name -> laelia.store.AgentModelOption
+	11, // 6: laelia.store.AgentProviderInfo.detected_at:type_name -> google.protobuf.Timestamp
+	2,  // 7: laelia.store.AgentStatus.state:type_name -> laelia.store.AgentStatus.ConnectionState
+	8,  // [8:8] is the sub-list for method output_type
+	8,  // [8:8] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_store_agent_proto_init() }
@@ -636,7 +851,7 @@ func file_store_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_store_agent_proto_rawDesc), len(file_store_agent_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   5,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

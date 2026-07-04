@@ -183,6 +183,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.store.AgentACPConfig.CustomEnvEntry"><span class="badge">M</span>AgentACPConfig.CustomEnvEntry</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.store.AgentCapability"><span class="badge">M</span>AgentCapability</a>
                 </li>
               
@@ -192,6 +196,14 @@
               
                 <li>
                   <a href="#laelia.store.AgentInfo.LabelsEntry"><span class="badge">M</span>AgentInfo.LabelsEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.AgentModelOption"><span class="badge">M</span>AgentModelOption</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.AgentProviderInfo"><span class="badge">M</span>AgentProviderInfo</a>
                 </li>
               
                 <li>
@@ -480,6 +492,58 @@
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>provider</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>model</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>custom_env</td>
+                  <td><a href="#laelia.store.AgentACPConfig.CustomEnvEntry">AgentACPConfig.CustomEnvEntry</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.AgentACPConfig.CustomEnvEntry">AgentACPConfig.CustomEnvEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -627,6 +691,13 @@
                 </tr>
               
                 <tr>
+                  <td>available_providers</td>
+                  <td><a href="#laelia.store.AgentProviderInfo">AgentProviderInfo</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
                   <td>acp_config</td>
                   <td><a href="#laelia.store.AgentACPConfig">AgentACPConfig</a></td>
                   <td></td>
@@ -660,6 +731,110 @@
                 <tr>
                   <td>value</td>
                   <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.AgentModelOption">AgentModelOption</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.store.AgentProviderInfo">AgentProviderInfo</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>provider_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>display_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>executable_path</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>models</td>
+                  <td><a href="#laelia.store.AgentModelOption">AgentModelOption</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>supports_model_config_option</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>detected_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>

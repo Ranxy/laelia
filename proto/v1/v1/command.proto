@@ -9,6 +9,7 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
+import "v1/agent.proto";
 import "v1/annotation.proto";
 
 option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
@@ -1032,6 +1033,7 @@ message AgentStreamMessage {
     CommandResult result = 6;
     CommandEvent event = 7;
     Ping ping = 8;
+    ProvidersDiscovered providers_discovered = 9; // response to ManagerStreamMessage.discover_providers
   }
 }
 
@@ -1042,6 +1044,7 @@ message ManagerStreamMessage {
     CancelMessage cancel = 5;
     Pong pong = 6;
     PermissionDecision permission_decision = 7;
+    DiscoverProviders discover_providers = 9; // ask the agent daemon to re-probe installed LLM agent providers
   }
 }
 
@@ -1050,6 +1053,21 @@ message AgentReady {
   string last_command_id = 2;
   int32 last_ack_seq = 3;
   int32 last_event_seq = 4;
+}
+
+// DiscoverProviders asks the agent daemon to re-probe its host for installed
+// LLM agent providers and their models. The daemon replies with
+// AgentStreamMessage.providers_discovered.
+message DiscoverProviders {
+  string request_id = 1; // correlation id for the pending unary RefreshAgentProviders call
+}
+
+// ProvidersDiscovered carries the freshly discovered provider list back to the
+// manager, which persists it into agent.info.available_providers and hands it
+// to the pending RefreshAgentProviders caller.
+message ProvidersDiscovered {
+  string request_id = 1;
+  repeated AgentProviderInfo providers = 2;
 }
 
 message CommandRequest {

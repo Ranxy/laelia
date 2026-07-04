@@ -5,9 +5,12 @@
 
 - [store/agent.proto](#store_agent-proto)
     - [AgentACPConfig](#laelia-store-AgentACPConfig)
+    - [AgentACPConfig.CustomEnvEntry](#laelia-store-AgentACPConfig-CustomEnvEntry)
     - [AgentCapability](#laelia-store-AgentCapability)
     - [AgentInfo](#laelia-store-AgentInfo)
     - [AgentInfo.LabelsEntry](#laelia-store-AgentInfo-LabelsEntry)
+    - [AgentModelOption](#laelia-store-AgentModelOption)
+    - [AgentProviderInfo](#laelia-store-AgentProviderInfo)
     - [AgentStatus](#laelia-store-AgentStatus)
   
     - [AgentStatus.ConnectionState](#laelia-store-AgentStatus-ConnectionState)
@@ -91,6 +94,25 @@
 | executable | [string](#string) |  |  |
 | args | [string](#string) | repeated |  |
 | allow_env | [string](#string) | repeated |  |
+| provider | [string](#string) |  |  |
+| model | [string](#string) |  |  |
+| custom_env | [AgentACPConfig.CustomEnvEntry](#laelia-store-AgentACPConfig-CustomEnvEntry) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-store-AgentACPConfig-CustomEnvEntry"></a>
+
+### AgentACPConfig.CustomEnvEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
 
 
 
@@ -135,6 +157,7 @@
 | version | [string](#string) |  |  |
 | labels | [AgentInfo.LabelsEntry](#laelia-store-AgentInfo-LabelsEntry) | repeated |  |
 | capability | [AgentCapability](#laelia-store-AgentCapability) |  |  |
+| available_providers | [AgentProviderInfo](#laelia-store-AgentProviderInfo) | repeated |  |
 | acp_config | [AgentACPConfig](#laelia-store-AgentACPConfig) |  |  |
 
 
@@ -152,6 +175,44 @@
 | ----- | ---- | ----- | ----------- |
 | key | [string](#string) |  |  |
 | value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-store-AgentModelOption"></a>
+
+### AgentModelOption
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| value | [string](#string) |  |  |
+| name | [string](#string) |  |  |
+| description | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-store-AgentProviderInfo"></a>
+
+### AgentProviderInfo
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| provider_id | [string](#string) |  |  |
+| display_name | [string](#string) |  |  |
+| version | [string](#string) |  |  |
+| executable_path | [string](#string) |  |  |
+| models | [AgentModelOption](#laelia-store-AgentModelOption) | repeated |  |
+| supports_model_config_option | [bool](#bool) |  |  |
+| detected_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 
 
 
