@@ -30,6 +30,10 @@ import {
 } from "@/composables/useMentionTargets";
 import { commandServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
+import {
+  isMarkdownAttachment,
+  MAX_MARKDOWN_PREVIEW_BYTES,
+} from "@/lib/markdown-file";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { ChatMessageUI } from "@/stores/types";
@@ -44,6 +48,7 @@ export interface ThreadPanelProps {
   rootMessageId: string;
   onClose: () => void;
   onViewInChannel: () => void;
+  onPreviewAttachment?: (attachment: Attachment, rootMessageId: string) => void;
 }
 
 export function ThreadPanel({
@@ -52,6 +57,7 @@ export function ThreadPanel({
   rootMessageId,
   onClose,
   onViewInChannel,
+  onPreviewAttachment,
 }: ThreadPanelProps) {
   const { t } = useTranslation();
   const conversationName = `conversations/${channelId}`;
@@ -262,7 +268,11 @@ export function ThreadPanel({
         <div className="flex flex-col gap-3 px-4 pt-4 pb-4">
           {/* Root message context. */}
           {rootMsg && (
-            <RootContext msg={rootMsg} agentTitle={agentTitleFor(rootMsg)} />
+            <RootContext
+              msg={rootMsg}
+              agentTitle={agentTitleFor(rootMsg)}
+              onPreviewAttachment={onPreviewAttachment}
+            />
           )}
 
           {/* Beginning-of-replies divider. */}
@@ -296,6 +306,7 @@ export function ThreadPanel({
                 onViewDetails={noopViewDetails}
                 MentionBadge={MentionBadge}
                 markdownCustomId="thread-chat"
+                onPreviewAttachment={onPreviewAttachment}
               />
             );
           })}
@@ -552,9 +563,11 @@ function ThreadHeader({
 function RootContext({
   msg,
   agentTitle,
+  onPreviewAttachment,
 }: {
   msg: ChatMessageUI;
   agentTitle: string;
+  onPreviewAttachment?: (attachment: Attachment, rootMessageId: string) => void;
 }) {
   const { t } = useTranslation();
   const isUser = msg.role === "user";
@@ -579,9 +592,26 @@ function RootContext({
         </div>
         {msg.attachments && msg.attachments.length > 0 && (
           <div className="flex flex-col gap-1">
-            {msg.attachments.map((att) => (
-              <FileCard key={att.id} attachment={att} />
-            ))}
+            {msg.attachments.map((att) => {
+              const previewable = isMarkdownAttachment(att);
+              const tooLarge =
+                previewable &&
+                (att.sizeBytes ?? 0n) > MAX_MARKDOWN_PREVIEW_BYTES;
+              return (
+                <FileCard
+                  key={att.id}
+                  attachment={att}
+                  onPreview={
+                    previewable && onPreviewAttachment
+                      ? () => onPreviewAttachment(att, msg.id)
+                      : undefined
+                  }
+                  previewDisabledReason={
+                    tooLarge ? t("preview.too-large-tooltip") : undefined
+                  }
+                />
+              );
+            })}
           </div>
         )}
       </div>

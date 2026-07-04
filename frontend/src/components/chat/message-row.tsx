@@ -11,9 +11,13 @@ import { ChatPermissionRequest } from "@/components/chat-events/permission-reque
 import { ChatToolCall } from "@/components/chat-events/tool-call";
 import { ChatWarning } from "@/components/chat-events/warning";
 import { CommandStatusBadge } from "@/components/command-status-badge";
+import {
+  isMarkdownAttachment,
+  MAX_MARKDOWN_PREVIEW_BYTES,
+} from "@/lib/markdown-file";
 import { cn } from "@/lib/utils";
 import type { ChatMessageUI } from "@/stores/types";
-import type { CommandEvent } from "@/types/proto-es/v1/command_pb";
+import type { Attachment, CommandEvent } from "@/types/proto-es/v1/command_pb";
 import { CommandEventType, SenderType } from "@/types/proto-es/v1/command_pb";
 
 // Stable empty fallback so selectors returning `undefined` for an unloaded
@@ -86,6 +90,11 @@ export interface MessageRowProps {
   // thread" hover action and the reply-count entry. The message's id is the
   // thread root id the panel opens against.
   onOpenThread?: (msg: ChatMessageUI) => void;
+  // onPreviewAttachment, when provided, wires markdown attachments to the
+  // full-page preview overlay. Receives the attachment and the effective
+  // thread root (the message's threadRoot, or its own id when it is a root)
+  // so Phase 2 comments can route to the right thread.
+  onPreviewAttachment?: (attachment: Attachment, rootMessageId: string) => void;
 }
 
 export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
@@ -100,6 +109,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     MentionBadge,
     markdownCustomId,
     onOpenThread,
+    onPreviewAttachment,
   } = props;
   const { t } = useTranslation();
   const isUser = msg.role === "user";
@@ -374,9 +384,27 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
           ) : null}
           {msg.attachments && msg.attachments.length > 0 && (
             <div className="flex flex-col gap-1">
-              {msg.attachments.map((att) => (
-                <FileCard key={att.id} attachment={att} />
-              ))}
+              {msg.attachments.map((att) => {
+                const previewable = isMarkdownAttachment(att);
+                const tooLarge =
+                  previewable &&
+                  (att.sizeBytes ?? 0n) > MAX_MARKDOWN_PREVIEW_BYTES;
+                const rootMessageId = msg.threadRoot ?? msg.id;
+                return (
+                  <FileCard
+                    key={att.id}
+                    attachment={att}
+                    onPreview={
+                      previewable && onPreviewAttachment
+                        ? () => onPreviewAttachment(att, rootMessageId)
+                        : undefined
+                    }
+                    previewDisabledReason={
+                      tooLarge ? t("preview.too-large-tooltip") : undefined
+                    }
+                  />
+                );
+              })}
             </div>
           )}
         </div>

@@ -288,6 +288,14 @@
     "thread-empty": "还没有回复",
     "thread-close": "关闭话题"
   },
+  "preview": {
+    "outline": "大纲",
+    "download": "下载",
+    "loading": "正在加载预览…",
+    "error": "无法加载该文件以供预览。",
+    "too-large": "该文件（{{size}}）过大，不支持在浏览器中预览，请下载查看。",
+    "too-large-tooltip": "文件超过 10 MB，不支持预览，请下载查看。"
+  },
   "tasks": {
     "title": "任务",
     "new": "新建任务",

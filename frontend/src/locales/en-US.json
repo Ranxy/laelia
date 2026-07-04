@@ -288,6 +288,14 @@
     "thread-empty": "No replies yet",
     "thread-close": "Close thread"
   },
+  "preview": {
+    "outline": "Outline",
+    "download": "Download",
+    "loading": "Loading preview…",
+    "error": "Couldn't load this file for preview.",
+    "too-large": "This file ({{size}}) is too large to preview in-browser. Download it instead.",
+    "too-large-tooltip": "File is larger than 10 MB — preview not supported. Download instead."
+  },
   "tasks": {
     "title": "Tasks",
     "new": "New Task",

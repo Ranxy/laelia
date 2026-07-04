@@ -242,6 +242,30 @@ export interface ThreadSlice {
   ) => Promise<ChatMessage>;
 }
 
+// PreviewSlice owns the markdown file preview overlay: the active preview
+// (file + decoded text + status) and the actions to open/close it. The overlay
+// is mounted once at the dashboard layout and reads `activePreview`.
+export interface PreviewSlice {
+  activePreview: {
+    conversation: string; // "conversations/{id}"
+    conversationId: string; // bare id
+    // Thread root the previewed attachment belongs to (the attachment owner's
+    // threadRoot, or the owner's own id when it is a root). Used in Phase 2 to
+    // route section-anchored comments as replies on this thread.
+    rootMessageId: string;
+    attachment: Attachment;
+    content: string;
+    status: "loading" | "ready" | "error" | "too-large";
+  } | null;
+
+  openFilePreview: (
+    conversation: string,
+    rootMessageId: string,
+    attachment: Attachment
+  ) => Promise<void>;
+  closeFilePreview: () => void;
+}
+
 // TaskSlice owns the channel task board panel: per-conversation task listings
 // (cached as ChatMessageUI so they reuse MessageRow's task badge), panel open
 // state, and the convert-message-to-task mutation. Tasks live in the same
@@ -268,6 +292,7 @@ export type AppStoreState = AuthSlice &
   ChannelSlice &
   ThreadSlice &
   TaskSlice &
-  UserSlice;
+  UserSlice &
+  PreviewSlice;
 
 export type AppSliceCreator<Slice> = StateCreator<AppStoreState, [], [], Slice>;

@@ -108,6 +108,7 @@ export function ChatConversationPage() {
   );
   const toggleTasksPanel = useAppStore((s) => s.toggleTasksPanel);
   const closeTasksPanel = useAppStore((s) => s.closeTasksPanel);
+  const openFilePreview = useAppStore((s) => s.openFilePreview);
   const tasksPanelOpen = useAppStore((s) =>
     channelId
       ? (s.tasksPanelOpen[`conversations/${channelId}`] ?? false)
@@ -512,6 +513,17 @@ export function ChatConversationPage() {
     [channelId, conversationName, openThread, closeTasksPanel]
   );
 
+  // Open the full-page markdown preview for an attachment. The rootMessageId
+  // is the attachment owner's effective thread root (its own threadRoot when
+  // it is a reply, otherwise its own id) — used in Phase 2 to route comments.
+  const handlePreviewAttachment = useCallback(
+    (att: Attachment, rootMessageId: string) => {
+      if (!channelId) return;
+      openFilePreview(conversationName, rootMessageId, att);
+    },
+    [channelId, conversationName, openFilePreview]
+  );
+
   const handleToggleTasksPanel = useCallback(() => {
     if (!channelId) return;
     // Opening the tasks panel closes the thread panel — two 420px side panels
@@ -635,6 +647,7 @@ export function ChatConversationPage() {
                       MentionBadge={MentionBadge}
                       markdownCustomId="channel-chat"
                       onOpenThread={handleOpenThread}
+                      onPreviewAttachment={handlePreviewAttachment}
                     />
                   </div>
                 );
@@ -874,6 +887,7 @@ export function ChatConversationPage() {
             rootMessageId={threadRootOpen}
             onClose={closeThread}
             onViewInChannel={handleViewInChannel}
+            onPreviewAttachment={handlePreviewAttachment}
           />
         )}
         {tasksPanelOpen && channelId && (
