@@ -36,15 +36,17 @@ type ChannelUpdate struct {
 // agentRelevantMessageCondition is the per-message predicate selecting
 // chat_message rows beyond the agent's cursor that the agent cares about: a
 // root message (thread_root_message_id IS NULL — normal channel traffic) OR a
-// reply in a thread the agent is subscribed to (thread_participant). Used by
-// ListChannelsWithUpdates and HasUpdates so non-subscribed thread replies do
-// not surface the channel for a non-participant agent (@mention-pull-in /
-// subscription model). The $1 placeholder is the agent id bind parameter.
-const agentRelevantMessageCondition = `m.thread_root_message_id IS NULL
+// reply in a thread the agent is subscribed to (thread_participant), excluding
+// SYSTEM messages (task lifecycle notifications and other system rows are not
+// work for an agent). Used by ListChannelsWithUpdates and HasUpdates so
+// non-subscribed thread replies do not surface the channel for a non-participant
+// agent (@mention-pull-in / subscription model), and so system notifications
+// never wake an agent. The $1 placeholder is the agent id bind parameter.
+const agentRelevantMessageCondition = `(m.thread_root_message_id IS NULL
 	OR EXISTS (
 		SELECT 1 FROM thread_participant tp
 		WHERE tp.thread_root_message_id = m.thread_root_message_id AND tp.agent_id = $1
-	)`
+	)) AND m.sender_type <> 3`
 
 // UpsertCursor advances the agent's cursor for a conversation to
 // processedVersion. The update is monotonic: a lower value never overwrites a

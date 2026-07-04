@@ -50,6 +50,11 @@ type ChatMessage struct {
 	// message. Populated only for root messages by ListConversationMessages; 0
 	// otherwise.
 	ThreadReplyCount int32
+	// TaskInfo is non-nil when this message is a task (a row exists in the task
+	// table for this message id). Populated by fillTaskInfo for root messages
+	// via ListConversationMessages / ListThreadMessages / ListTasks /
+	// GetTaskMessage; nil for non-task messages and thread replies.
+	TaskInfo *TaskInfo
 }
 
 // chatMessageScanner scans a chat_message row from the common column order
@@ -162,23 +167,9 @@ func (s *Store) CreateChatMessageBumpVersion(ctx context.Context, msg *ChatMessa
 		return nil, 0, errors.Wrapf(err, "failed to bump conversation version")
 	}
 
-	mentionsBytes, err := marshalMentions(msg.Mentions)
+	id, createdAt, err := createChatMessageInTx(ctx, tx, msg, newVersion)
 	if err != nil {
 		return nil, 0, err
-	}
-	attachmentsBytes, err := marshalAttachments(msg.Attachments)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	var id uuid.UUID
-	var createdAt time.Time
-	if err := tx.QueryRowContext(ctx, `
-		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions, attachments, thread_root_message_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		RETURNING id, created_at
-	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, newVersion, msg.SenderType, mentionsBytes, attachmentsBytes, msg.ThreadRootMessageID).Scan(&id, &createdAt); err != nil {
-		return nil, 0, errors.Wrapf(err, "failed to create chat message")
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -202,6 +193,31 @@ func (s *Store) CreateChatMessageBumpVersion(ctx context.Context, msg *ChatMessa
 		Attachments:         msg.Attachments,
 		ThreadRootMessageID: msg.ThreadRootMessageID,
 	}, newVersion, nil
+}
+
+// createChatMessageInTx inserts a chat_message row carrying roomVersion within
+// an existing transaction. It is shared by CreateChatMessageBumpVersion (plain
+// message) and CreateTaskMessageBumpVersion (message + task row) so the insert
+// SQL and mention/attachment marshaling live in exactly one place.
+func createChatMessageInTx(ctx context.Context, tx *sql.Tx, msg *ChatMessage, roomVersion int64) (uuid.UUID, time.Time, error) {
+	mentionsBytes, err := marshalMentions(msg.Mentions)
+	if err != nil {
+		return uuid.Nil, time.Time{}, err
+	}
+	attachmentsBytes, err := marshalAttachments(msg.Attachments)
+	if err != nil {
+		return uuid.Nil, time.Time{}, err
+	}
+	var id uuid.UUID
+	var createdAt time.Time
+	if err := tx.QueryRowContext(ctx, `
+		INSERT INTO chat_message (conversation_id, principal_id, role, content, command_id, sender_agent_id, room_version, sender_type, mentions, attachments, thread_root_message_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		RETURNING id, created_at
+	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, roomVersion, msg.SenderType, mentionsBytes, attachmentsBytes, msg.ThreadRootMessageID).Scan(&id, &createdAt); err != nil {
+		return uuid.Nil, time.Time{}, errors.Wrapf(err, "failed to create chat message")
+	}
+	return id, createdAt, nil
 }
 
 func (s *Store) ListConversationMessages(ctx context.Context, conversationID uuid.UUID, afterVersion, beforeVersion int64, limit, offset int) ([]*ChatMessage, int64, error) {
@@ -269,6 +285,11 @@ func (s *Store) ListConversationMessages(ctx context.Context, conversationID uui
 	// Populate thread_reply_count on each root message so the frontend can
 	// render the reply-count badge. One grouped query for the page's roots.
 	if err := s.fillThreadReplyCounts(ctx, msgs); err != nil {
+		return nil, 0, err
+	}
+	// Populate task metadata on any task root messages in the page so the
+	// frontend can render the [task #N status=...] badge inline.
+	if err := s.fillTaskInfo(ctx, msgs); err != nil {
 		return nil, 0, err
 	}
 
@@ -414,6 +435,11 @@ func (s *Store) ListThreadMessages(ctx context.Context, conversationID, rootID u
 	// the frontend syncing the root badge back into the main channel list) see
 	// the authoritative count rather than 0. Replies keep count 0.
 	if err := s.fillThreadReplyCounts(ctx, []*ChatMessage{root}); err != nil {
+		return nil, 0, err
+	}
+	// Populate task metadata on the root so the thread panel shows the
+	// [task #N status=...] badge when the thread is a task's discussion thread.
+	if err := s.fillTaskInfo(ctx, []*ChatMessage{root}); err != nil {
 		return nil, 0, err
 	}
 
