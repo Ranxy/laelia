@@ -157,6 +157,11 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/message/thread/check", s.handleThreadCheck)
 	mux.HandleFunc("/message/thread/read", s.handleThreadRead)
 	mux.HandleFunc("/message/thread/send", s.handleThreadSend)
+	mux.HandleFunc("/task/list", s.handleTaskList)
+	mux.HandleFunc("/task/claim", s.handleTaskClaim)
+	mux.HandleFunc("/task/unclaim", s.handleTaskUnclaim)
+	mux.HandleFunc("/task/update", s.handleTaskUpdate)
+	mux.HandleFunc("/task/create", s.handleTaskCreate)
 	mux.HandleFunc("/command/context", s.handleCommandContext)
 	mux.HandleFunc("/file/upload", s.handleFileUpload)
 	mux.HandleFunc("/file/download", s.handleFileDownload)
@@ -200,6 +205,13 @@ type Request struct {
 	CommandID        string `json:"command_id,omitempty"`
 	// Root is the thread root message id, for thread read/send.
 	Root string `json:"root,omitempty"`
+	// Message is a task's full message resource name
+	// ("conversations/{c}/messages/{m}"), for the task RPCs.
+	Message string `json:"message,omitempty"`
+	// Status is a single task status token (for `task review`/`task done`).
+	Status string `json:"status,omitempty"`
+	// Statuses is the repeatable status filter for `task list --status`.
+	Statuses []string `json:"statuses,omitempty"`
 
 	// File command fields.
 	LocalPath    string `json:"local_path,omitempty"`
@@ -374,6 +386,55 @@ func (s *Server) handleCommandContext(w http.ResponseWriter, r *http.Request) {
 	s.run(w, r, func(req Request) (string, *chattools.Error) {
 		text, err := chattools.GetCommandContext(r.Context(), s.deps(req), chattools.GetCommandContextInput{
 			CommandID: req.CommandID,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleTaskList(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.ListTasks(r.Context(), s.deps(req), chattools.ListTasksInput{
+			Conversation: req.Conversation,
+			Statuses:     req.Statuses,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleTaskClaim(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.ClaimTask(r.Context(), s.deps(req), chattools.ClaimTaskInput{
+			Message: req.Message,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleTaskUnclaim(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.UnclaimTask(r.Context(), s.deps(req), chattools.UnclaimTaskInput{
+			Message: req.Message,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleTaskUpdate(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.UpdateTaskStatus(r.Context(), s.deps(req), chattools.UpdateTaskStatusInput{
+			Message: req.Message,
+			Status:  req.Status,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleTaskCreate(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.CreateTask(r.Context(), s.deps(req), chattools.CreateTaskInput{
+			Conversation:  req.Conversation,
+			Content:       req.Content,
+			AttachmentIDs: req.AttachmentIDs,
 		})
 		return text, asChatError(err)
 	})
