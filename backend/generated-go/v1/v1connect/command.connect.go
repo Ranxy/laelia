@@ -78,6 +78,9 @@ const (
 	// CommandServiceListChannelsProcedure is the fully-qualified name of the CommandService's
 	// ListChannels RPC.
 	CommandServiceListChannelsProcedure = "/laelia.v1.CommandService/ListChannels"
+	// CommandServiceListChannelsForAgentProcedure is the fully-qualified name of the CommandService's
+	// ListChannelsForAgent RPC.
+	CommandServiceListChannelsForAgentProcedure = "/laelia.v1.CommandService/ListChannelsForAgent"
 	// CommandServiceGetChannelProcedure is the fully-qualified name of the CommandService's GetChannel
 	// RPC.
 	CommandServiceGetChannelProcedure = "/laelia.v1.CommandService/GetChannel"
@@ -165,6 +168,10 @@ type CommandServiceClient interface {
 	ListChannelThreads(context.Context, *connect.Request[v1.ListChannelThreadsRequest]) (*connect.Response[v1.ListChannelThreadsResponse], error)
 	CreateChannel(context.Context, *connect.Request[v1.CreateChannelRequest]) (*connect.Response[v1.Conversation], error)
 	ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error)
+	// ListChannelsForAgent returns every conversation the given agent is a member
+	// of (both direct DMs with users and multi-user channels), used by the agent
+	// detail page's "Chat" tab. Admin-scoped: gated by laelia.agents.get.
+	ListChannelsForAgent(context.Context, *connect.Request[v1.ListChannelsForAgentRequest]) (*connect.Response[v1.ListChannelsForAgentResponse], error)
 	GetChannel(context.Context, *connect.Request[v1.GetChannelRequest]) (*connect.Response[v1.Conversation], error)
 	UpdateChannel(context.Context, *connect.Request[v1.UpdateChannelRequest]) (*connect.Response[v1.Conversation], error)
 	DeleteChannel(context.Context, *connect.Request[v1.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error)
@@ -313,6 +320,12 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			httpClient,
 			baseURL+CommandServiceListChannelsProcedure,
 			connect.WithSchema(commandServiceMethods.ByName("ListChannels")),
+			connect.WithClientOptions(opts...),
+		),
+		listChannelsForAgent: connect.NewClient[v1.ListChannelsForAgentRequest, v1.ListChannelsForAgentResponse](
+			httpClient,
+			baseURL+CommandServiceListChannelsForAgentProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ListChannelsForAgent")),
 			connect.WithClientOptions(opts...),
 		),
 		getChannel: connect.NewClient[v1.GetChannelRequest, v1.Conversation](
@@ -466,6 +479,7 @@ type commandServiceClient struct {
 	listChannelThreads        *connect.Client[v1.ListChannelThreadsRequest, v1.ListChannelThreadsResponse]
 	createChannel             *connect.Client[v1.CreateChannelRequest, v1.Conversation]
 	listChannels              *connect.Client[v1.ListChannelsRequest, v1.ListChannelsResponse]
+	listChannelsForAgent      *connect.Client[v1.ListChannelsForAgentRequest, v1.ListChannelsForAgentResponse]
 	getChannel                *connect.Client[v1.GetChannelRequest, v1.Conversation]
 	updateChannel             *connect.Client[v1.UpdateChannelRequest, v1.Conversation]
 	deleteChannel             *connect.Client[v1.DeleteChannelRequest, emptypb.Empty]
@@ -558,6 +572,11 @@ func (c *commandServiceClient) CreateChannel(ctx context.Context, req *connect.R
 // ListChannels calls laelia.v1.CommandService.ListChannels.
 func (c *commandServiceClient) ListChannels(ctx context.Context, req *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error) {
 	return c.listChannels.CallUnary(ctx, req)
+}
+
+// ListChannelsForAgent calls laelia.v1.CommandService.ListChannelsForAgent.
+func (c *commandServiceClient) ListChannelsForAgent(ctx context.Context, req *connect.Request[v1.ListChannelsForAgentRequest]) (*connect.Response[v1.ListChannelsForAgentResponse], error) {
+	return c.listChannelsForAgent.CallUnary(ctx, req)
 }
 
 // GetChannel calls laelia.v1.CommandService.GetChannel.
@@ -686,6 +705,10 @@ type CommandServiceHandler interface {
 	ListChannelThreads(context.Context, *connect.Request[v1.ListChannelThreadsRequest]) (*connect.Response[v1.ListChannelThreadsResponse], error)
 	CreateChannel(context.Context, *connect.Request[v1.CreateChannelRequest]) (*connect.Response[v1.Conversation], error)
 	ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error)
+	// ListChannelsForAgent returns every conversation the given agent is a member
+	// of (both direct DMs with users and multi-user channels), used by the agent
+	// detail page's "Chat" tab. Admin-scoped: gated by laelia.agents.get.
+	ListChannelsForAgent(context.Context, *connect.Request[v1.ListChannelsForAgentRequest]) (*connect.Response[v1.ListChannelsForAgentResponse], error)
 	GetChannel(context.Context, *connect.Request[v1.GetChannelRequest]) (*connect.Response[v1.Conversation], error)
 	UpdateChannel(context.Context, *connect.Request[v1.UpdateChannelRequest]) (*connect.Response[v1.Conversation], error)
 	DeleteChannel(context.Context, *connect.Request[v1.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error)
@@ -830,6 +853,12 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		CommandServiceListChannelsProcedure,
 		svc.ListChannels,
 		connect.WithSchema(commandServiceMethods.ByName("ListChannels")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceListChannelsForAgentHandler := connect.NewUnaryHandler(
+		CommandServiceListChannelsForAgentProcedure,
+		svc.ListChannelsForAgent,
+		connect.WithSchema(commandServiceMethods.ByName("ListChannelsForAgent")),
 		connect.WithHandlerOptions(opts...),
 	)
 	commandServiceGetChannelHandler := connect.NewUnaryHandler(
@@ -994,6 +1023,8 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceCreateChannelHandler.ServeHTTP(w, r)
 		case CommandServiceListChannelsProcedure:
 			commandServiceListChannelsHandler.ServeHTTP(w, r)
+		case CommandServiceListChannelsForAgentProcedure:
+			commandServiceListChannelsForAgentHandler.ServeHTTP(w, r)
 		case CommandServiceGetChannelProcedure:
 			commandServiceGetChannelHandler.ServeHTTP(w, r)
 		case CommandServiceUpdateChannelProcedure:
@@ -1101,6 +1132,10 @@ func (UnimplementedCommandServiceHandler) CreateChannel(context.Context, *connec
 
 func (UnimplementedCommandServiceHandler) ListChannels(context.Context, *connect.Request[v1.ListChannelsRequest]) (*connect.Response[v1.ListChannelsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListChannels is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ListChannelsForAgent(context.Context, *connect.Request[v1.ListChannelsForAgentRequest]) (*connect.Response[v1.ListChannelsForAgentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListChannelsForAgent is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) GetChannel(context.Context, *connect.Request[v1.GetChannelRequest]) (*connect.Response[v1.Conversation], error) {

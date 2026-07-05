@@ -1565,6 +1565,53 @@ export declare type ListChannelsResponse = Message<"laelia.v1.ListChannelsRespon
 export declare const ListChannelsResponseSchema: GenMessage<ListChannelsResponse>;
 
 /**
+ * @generated from message laelia.v1.ListChannelsForAgentRequest
+ */
+export declare type ListChannelsForAgentRequest = Message<"laelia.v1.ListChannelsForAgentRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: int32 page_size = 2;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 3;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListChannelsForAgentRequest.
+ * Use `create(ListChannelsForAgentRequestSchema)` to create a new message.
+ */
+export declare const ListChannelsForAgentRequestSchema: GenMessage<ListChannelsForAgentRequest>;
+
+/**
+ * @generated from message laelia.v1.ListChannelsForAgentResponse
+ */
+export declare type ListChannelsForAgentResponse = Message<"laelia.v1.ListChannelsForAgentResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.Conversation channels = 1;
+   */
+  channels: Conversation[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListChannelsForAgentResponse.
+ * Use `create(ListChannelsForAgentResponseSchema)` to create a new message.
+ */
+export declare const ListChannelsForAgentResponseSchema: GenMessage<ListChannelsForAgentResponse>;
+
+/**
  * @generated from message laelia.v1.GetChannelRequest
  */
 export declare type GetChannelRequest = Message<"laelia.v1.GetChannelRequest"> & {
@@ -3304,6 +3351,18 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof ListChannelsRequestSchema;
     output: typeof ListChannelsResponseSchema;
+  },
+  /**
+   * ListChannelsForAgent returns every conversation the given agent is a member
+   * of (both direct DMs with users and multi-user channels), used by the agent
+   * detail page's "Chat" tab. Admin-scoped: gated by laelia.agents.get.
+   *
+   * @generated from rpc laelia.v1.CommandService.ListChannelsForAgent
+   */
+  listChannelsForAgent: {
+    methodKind: "unary";
+    input: typeof ListChannelsForAgentRequestSchema;
+    output: typeof ListChannelsForAgentResponseSchema;
   },
   /**
    * @generated from rpc laelia.v1.CommandService.GetChannel

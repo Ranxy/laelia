@@ -497,6 +497,20 @@ message ListChannelsResponse {
   string next_page_token = 2;
 }
 
+message ListChannelsForAgentRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Agent"
+  ];
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListChannelsForAgentResponse {
+  repeated Conversation channels = 1;
+  string next_page_token = 2;
+}
+
 message GetChannelRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
@@ -835,6 +849,15 @@ service CommandService {
     option (google.api.http) = {get: "/v1/channels"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
+  }
+
+  // ListChannelsForAgent returns every conversation the given agent is a member
+  // of (both direct DMs with users and multi-user channels), used by the agent
+  // detail page's "Chat" tab. Admin-scoped: gated by laelia.agents.get.
+  rpc ListChannelsForAgent(ListChannelsForAgentRequest) returns (ListChannelsForAgentResponse) {
+    option (google.api.http) = {get: "/v1/{name=agents/*}/channels"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agents.get";
   }
 
   rpc GetChannel(GetChannelRequest) returns (Conversation) {

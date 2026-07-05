@@ -273,6 +273,46 @@ func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID
 	return convs, nil
 }
 
+// ListAgentConversations returns every conversation the given agent is a member
+// of, ordered by updated_at DESC. It mirrors ListUserConversationsWithUnread but
+// binds conversation_member to MemberTypeAgent + the agent's resource_id string
+// (which is how agent memberships are stored, see findDirectConversation).
+//
+// The unread count is intentionally 0: agent_channel_cursor tracks the agent's
+// own read position for its inbox, which is not meaningful to an admin viewing
+// the agent's channel roster from the agent detail page.
+func (s *Store) ListAgentConversations(ctx context.Context, agentResourceID string, limit, offset int) ([]*UserConversation, error) {
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version
+		FROM conversation c
+		JOIN conversation_member cm ON cm.conversation_id = c.id
+		WHERE cm.member_type = $1 AND cm.member_id = $2
+		ORDER BY c.updated_at DESC
+		LIMIT $3 OFFSET $4
+	`, MemberTypeAgent, agentResourceID, limit, offset)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list agent conversations")
+	}
+	defer rows.Close()
+
+	var convs []*UserConversation
+	for rows.Next() {
+		var uc UserConversation
+		conv := &uc.Conversation
+		if err := rows.Scan(
+			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+		); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan agent conversation")
+		}
+		uc.UnreadCount = 0
+		convs = append(convs, &uc)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate agent conversations")
+	}
+	return convs, nil
+}
+
 func (s *Store) GetConversationMemberCount(ctx context.Context, id uuid.UUID) (int, error) {
 	var count int
 	err := s.GetDB().QueryRowContext(ctx, `

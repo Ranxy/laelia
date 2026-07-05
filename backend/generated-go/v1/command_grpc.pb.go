@@ -34,6 +34,7 @@ const (
 	CommandService_ListChannelThreads_FullMethodName        = "/laelia.v1.CommandService/ListChannelThreads"
 	CommandService_CreateChannel_FullMethodName             = "/laelia.v1.CommandService/CreateChannel"
 	CommandService_ListChannels_FullMethodName              = "/laelia.v1.CommandService/ListChannels"
+	CommandService_ListChannelsForAgent_FullMethodName      = "/laelia.v1.CommandService/ListChannelsForAgent"
 	CommandService_GetChannel_FullMethodName                = "/laelia.v1.CommandService/GetChannel"
 	CommandService_UpdateChannel_FullMethodName             = "/laelia.v1.CommandService/UpdateChannel"
 	CommandService_DeleteChannel_FullMethodName             = "/laelia.v1.CommandService/DeleteChannel"
@@ -76,6 +77,10 @@ type CommandServiceClient interface {
 	ListChannelThreads(ctx context.Context, in *ListChannelThreadsRequest, opts ...grpc.CallOption) (*ListChannelThreadsResponse, error)
 	CreateChannel(ctx context.Context, in *CreateChannelRequest, opts ...grpc.CallOption) (*Conversation, error)
 	ListChannels(ctx context.Context, in *ListChannelsRequest, opts ...grpc.CallOption) (*ListChannelsResponse, error)
+	// ListChannelsForAgent returns every conversation the given agent is a member
+	// of (both direct DMs with users and multi-user channels), used by the agent
+	// detail page's "Chat" tab. Admin-scoped: gated by laelia.agents.get.
+	ListChannelsForAgent(ctx context.Context, in *ListChannelsForAgentRequest, opts ...grpc.CallOption) (*ListChannelsForAgentResponse, error)
 	GetChannel(ctx context.Context, in *GetChannelRequest, opts ...grpc.CallOption) (*Conversation, error)
 	UpdateChannel(ctx context.Context, in *UpdateChannelRequest, opts ...grpc.CallOption) (*Conversation, error)
 	DeleteChannel(ctx context.Context, in *DeleteChannelRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -291,6 +296,16 @@ func (c *commandServiceClient) ListChannels(ctx context.Context, in *ListChannel
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListChannelsResponse)
 	err := c.cc.Invoke(ctx, CommandService_ListChannels_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) ListChannelsForAgent(ctx context.Context, in *ListChannelsForAgentRequest, opts ...grpc.CallOption) (*ListChannelsForAgentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListChannelsForAgentResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListChannelsForAgent_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -535,6 +550,10 @@ type CommandServiceServer interface {
 	ListChannelThreads(context.Context, *ListChannelThreadsRequest) (*ListChannelThreadsResponse, error)
 	CreateChannel(context.Context, *CreateChannelRequest) (*Conversation, error)
 	ListChannels(context.Context, *ListChannelsRequest) (*ListChannelsResponse, error)
+	// ListChannelsForAgent returns every conversation the given agent is a member
+	// of (both direct DMs with users and multi-user channels), used by the agent
+	// detail page's "Chat" tab. Admin-scoped: gated by laelia.agents.get.
+	ListChannelsForAgent(context.Context, *ListChannelsForAgentRequest) (*ListChannelsForAgentResponse, error)
 	GetChannel(context.Context, *GetChannelRequest) (*Conversation, error)
 	UpdateChannel(context.Context, *UpdateChannelRequest) (*Conversation, error)
 	DeleteChannel(context.Context, *DeleteChannelRequest) (*emptypb.Empty, error)
@@ -639,6 +658,9 @@ func (UnimplementedCommandServiceServer) CreateChannel(context.Context, *CreateC
 }
 func (UnimplementedCommandServiceServer) ListChannels(context.Context, *ListChannelsRequest) (*ListChannelsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListChannels not implemented")
+}
+func (UnimplementedCommandServiceServer) ListChannelsForAgent(context.Context, *ListChannelsForAgentRequest) (*ListChannelsForAgentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListChannelsForAgent not implemented")
 }
 func (UnimplementedCommandServiceServer) GetChannel(context.Context, *GetChannelRequest) (*Conversation, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetChannel not implemented")
@@ -961,6 +983,24 @@ func _CommandService_ListChannels_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CommandServiceServer).ListChannels(ctx, req.(*ListChannelsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_ListChannelsForAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListChannelsForAgentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListChannelsForAgent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListChannelsForAgent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListChannelsForAgent(ctx, req.(*ListChannelsForAgentRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1415,6 +1455,10 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListChannels",
 			Handler:    _CommandService_ListChannels_Handler,
+		},
+		{
+			MethodName: "ListChannelsForAgent",
+			Handler:    _CommandService_ListChannelsForAgent_Handler,
 		},
 		{
 			MethodName: "GetChannel",

@@ -144,6 +144,8 @@
     - [ListChannelThreadsResponse](#laelia-v1-ListChannelThreadsResponse)
     - [ListChannelUpdatesRequest](#laelia-v1-ListChannelUpdatesRequest)
     - [ListChannelUpdatesResponse](#laelia-v1-ListChannelUpdatesResponse)
+    - [ListChannelsForAgentRequest](#laelia-v1-ListChannelsForAgentRequest)
+    - [ListChannelsForAgentResponse](#laelia-v1-ListChannelsForAgentResponse)
     - [ListChannelsRequest](#laelia-v1-ListChannelsRequest)
     - [ListChannelsResponse](#laelia-v1-ListChannelsResponse)
     - [ListCommandsRequest](#laelia-v1-ListCommandsRequest)
@@ -2381,6 +2383,39 @@ drain loop. The agent identity is resolved from the auth context.
 
 
 
+<a name="laelia-v1-ListChannelsForAgentRequest"></a>
+
+### ListChannelsForAgentRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListChannelsForAgentResponse"></a>
+
+### ListChannelsForAgentResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| channels | [Conversation](#laelia-v1-Conversation) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-ListChannelsRequest"></a>
 
 ### ListChannelsRequest
@@ -3345,6 +3380,7 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | ListChannelThreads | [ListChannelThreadsRequest](#laelia-v1-ListChannelThreadsRequest) | [ListChannelThreadsResponse](#laelia-v1-ListChannelThreadsResponse) |  |
 | CreateChannel | [CreateChannelRequest](#laelia-v1-CreateChannelRequest) | [Conversation](#laelia-v1-Conversation) |  |
 | ListChannels | [ListChannelsRequest](#laelia-v1-ListChannelsRequest) | [ListChannelsResponse](#laelia-v1-ListChannelsResponse) |  |
+| ListChannelsForAgent | [ListChannelsForAgentRequest](#laelia-v1-ListChannelsForAgentRequest) | [ListChannelsForAgentResponse](#laelia-v1-ListChannelsForAgentResponse) | ListChannelsForAgent returns every conversation the given agent is a member of (both direct DMs with users and multi-user channels), used by the agent detail page&#39;s &#34;Chat&#34; tab. Admin-scoped: gated by laelia.agents.get. |
 | GetChannel | [GetChannelRequest](#laelia-v1-GetChannelRequest) | [Conversation](#laelia-v1-Conversation) |  |
 | UpdateChannel | [UpdateChannelRequest](#laelia-v1-UpdateChannelRequest) | [Conversation](#laelia-v1-Conversation) |  |
 | DeleteChannel | [DeleteChannelRequest](#laelia-v1-DeleteChannelRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |

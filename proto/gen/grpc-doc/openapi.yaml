@@ -168,6 +168,44 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}/channels:
+        get:
+            tags:
+                - CommandService
+            description: |-
+                ListChannelsForAgent returns every conversation the given agent is a member
+                 of (both direct DMs with users and multi-user channels), used by the agent
+                 detail page's "Chat" tab. Admin-scoped: gated by laelia.agents.get.
+            operationId: CommandService_ListChannelsForAgent
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListChannelsForAgentResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}/chat-history:
         get:
             tags:
@@ -2764,6 +2802,15 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/ChannelUpdate'
+        ListChannelsForAgentResponse:
+            type: object
+            properties:
+                channels:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Conversation'
+                nextPageToken:
+                    type: string
         ListChannelsResponse:
             type: object
             properties:

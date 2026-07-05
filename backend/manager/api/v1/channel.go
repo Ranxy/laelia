@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -82,6 +83,59 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 	}
 
 	return connect.NewResponse(&v1pb.ListChannelsResponse{
+		Channels:      v1Convs,
+		NextPageToken: nextPageToken,
+	}), nil
+}
+
+func (s *CommandService) ListChannelsForAgent(ctx context.Context, req *connect.Request[v1pb.ListChannelsForAgentRequest]) (*connect.Response[v1pb.ListChannelsForAgentResponse], error) {
+	if _, ok := GetUserFromContext(ctx); !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+
+	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid agent name %q", req.Msg.Name))
+	}
+
+	offset, err := parseLimitAndOffset(&pageSize{
+		token:   req.Msg.PageToken,
+		limit:   int(req.Msg.PageSize),
+		maximum: 100,
+	})
+	if err != nil {
+		return nil, err
+	}
+	limitPlusOne := offset.limit + 1
+
+	convs, err := s.store.ListAgentConversations(ctx, resourceID, limitPlusOne, offset.offset)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list channels for agent"))
+	}
+
+	nextPageToken := ""
+	if len(convs) == limitPlusOne {
+		convs = convs[:offset.limit]
+		nextPageToken, _ = offset.getNextPageToken()
+	}
+
+	v1Convs := make([]*v1pb.Conversation, 0, len(convs))
+	for _, uc := range convs {
+		conv := uc.Conversation
+		memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
+		ownerName := resolveUserName(ctx, s.store, conv.OwnerID)
+		// Direct conversations store no title; surface the agent's display name
+		// so the row renders without an extra member fetch, mirroring ListChannels.
+		title := conv.Title
+		if conv.Type == 1 && conv.AgentID.Valid {
+			if agent, agentErr := s.store.GetAgent(ctx, int(conv.AgentID.Int32)); agentErr == nil && agent != nil && agent.Name != "" {
+				title = agent.Name
+			}
+		}
+		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, memberCount, uc.UnreadCount, title))
+	}
+
+	return connect.NewResponse(&v1pb.ListChannelsForAgentResponse{
 		Channels:      v1Convs,
 		NextPageToken: nextPageToken,
 	}), nil

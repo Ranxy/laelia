@@ -726,6 +726,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ListChannelsForAgentRequest"><span class="badge">M</span>ListChannelsForAgentRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListChannelsForAgentResponse"><span class="badge">M</span>ListChannelsForAgentResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ListChannelsRequest"><span class="badge">M</span>ListChannelsRequest</a>
                 </li>
               
@@ -6282,6 +6290,75 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
 
         
       
+        <h3 id="laelia.v1.ListChannelsForAgentRequest">ListChannelsForAgentRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListChannelsForAgentResponse">ListChannelsForAgentResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>channels</td>
+                  <td><a href="#laelia.v1.Conversation">Conversation</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ListChannelsRequest">ListChannelsRequest</h3>
         <p></p>
 
@@ -8420,6 +8497,15 @@ is performed by ClaimTask, not this RPC. </p></td>
               </tr>
             
               <tr>
+                <td>ListChannelsForAgent</td>
+                <td><a href="#laelia.v1.ListChannelsForAgentRequest">ListChannelsForAgentRequest</a></td>
+                <td><a href="#laelia.v1.ListChannelsForAgentResponse">ListChannelsForAgentResponse</a></td>
+                <td><p>ListChannelsForAgent returns every conversation the given agent is a member
+of (both direct DMs with users and multi-user channels), used by the agent
+detail page&#39;s &#34;Chat&#34; tab. Admin-scoped: gated by laelia.agents.get.</p></td>
+              </tr>
+            
+              <tr>
                 <td>GetChannel</td>
                 <td><a href="#laelia.v1.GetChannelRequest">GetChannelRequest</a></td>
                 <td><a href="#laelia.v1.Conversation">Conversation</a></td>
@@ -8749,6 +8835,16 @@ a member.</p></td>
                 <td>ListChannels</td>
                 <td>GET</td>
                 <td>/v1/channels</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListChannelsForAgent</td>
+                <td>GET</td>
+                <td>/v1/{name=agents/*}/channels</td>
                 <td></td>
               </tr>
               
