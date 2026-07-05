@@ -136,9 +136,7 @@
     "description": "You are now signed in to Laelia AI. More features coming soon."
   },
   "workspace": {
-    "back-to-agents": "Back to Agents",
-    "tab-chat": "Chat",
-    "tab-tasks": "Tasks"
+    "back-to-agents": "Back to Agents"
   },
   "router": {
     "error-title": "Something went wrong",
@@ -159,7 +157,6 @@
     "created-title": "Agent Created",
     "created-description": "Use the command below to connect your agent to the manager. The token is only shown once.",
     "created-run-hint": "Run this on the target machine:",
-    "detail-title": "Agent Details",
     "detail-name": "Name",
     "detail-status": "Status",
     "detail-hostname": "Hostname",
@@ -205,8 +202,6 @@
     "waiting-connection-hint": "Run the bootstrap command on the host to connect this agent, then configure its executable.",
     "pending-config-hint": "Agent is connected. Set its executable to make it usable.",
     "acp-config": "ACP Config",
-    "acp-config-title": "ACP Config — {{title}}",
-    "acp-config-description": "Configure the LLM agent to run. Everything else uses built-in defaults.",
     "acp-config-provider": "Provider",
     "acp-config-provider-custom": "Custom (manual command)",
     "acp-config-refresh-providers": "Refresh",
@@ -225,8 +220,6 @@
     "acp-config-allow-env": "Allow env",
     "acp-config-allow-env-placeholder": "MY_CUSTOM_VAR",
     "acp-config-save-failed": "Failed to save ACP config",
-    "action-chat": "Chat",
-    "action-commands": "Commands",
     "row-open-detail": "Open agent {{title}} details",
     "delete-confirm-title": "Delete agent",
     "delete-confirm-description": "Are you sure you want to delete agent {{title}}? This cannot be undone."

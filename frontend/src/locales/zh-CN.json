@@ -136,9 +136,7 @@
     "description": "您已登录 Laelia AI。更多功能即将上线。"
   },
   "workspace": {
-    "back-to-agents": "返回 Agent 列表",
-    "tab-chat": "对话",
-    "tab-tasks": "任务"
+    "back-to-agents": "返回 Agent 列表"
   },
   "router": {
     "error-title": "出错了",
@@ -159,7 +157,6 @@
     "created-title": "Agent 已创建",
     "created-description": "请在目标机器上使用以下命令连接 Agent。Token 仅显示一次。",
     "created-run-hint": "在目标机器上运行：",
-    "detail-title": "Agent 详情",
     "detail-name": "名称",
     "detail-status": "状态",
     "detail-hostname": "主机名",
@@ -205,8 +202,6 @@
     "waiting-connection-hint": "在主机上运行 bootstrap 命令以连接该 Agent,然后配置其可执行程序。",
     "pending-config-hint": "Agent 已连接。设置其可执行程序以启用。",
     "acp-config": "ACP 配置",
-    "acp-config-title": "ACP 配置 — {{title}}",
-    "acp-config-description": "配置要运行的 LLM Agent。其余配置使用内置默认值。",
     "acp-config-provider": "Provider",
     "acp-config-provider-custom": "自定义（手动命令）",
     "acp-config-refresh-providers": "刷新",
@@ -225,8 +220,6 @@
     "acp-config-allow-env": "允许的环境变量",
     "acp-config-allow-env-placeholder": "MY_CUSTOM_VAR",
     "acp-config-save-failed": "保存 ACP 配置失败",
-    "action-chat": "对话",
-    "action-commands": "命令",
     "row-open-detail": "打开 Agent {{title}} 详情",
     "delete-confirm-title": "删除 Agent",
     "delete-confirm-description": "确定要删除 Agent {{title}} 吗?此操作无法撤销。"
