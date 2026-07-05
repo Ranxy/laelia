@@ -191,7 +191,8 @@
     "detail-configuration": "Configuration",
     "profile": {
       "section-identity": "Identity & Status",
-      "section-token": "Bootstrap Token"
+      "section-token": "Bootstrap Token",
+      "get-connection-command": "Get connection command"
     },
     "lifecycle": {
       "ready": "Ready",

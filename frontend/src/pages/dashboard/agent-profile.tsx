@@ -346,28 +346,41 @@ export function AgentProfilePage() {
                 {actionError && (
                   <Alert variant="error" description={actionError} />
                 )}
-                <div className="flex gap-2">
+                {lifecycle === "waiting-connection" ? (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      setActionError("");
-                      setRotateOpen(true);
-                    }}
+                    disabled={rotating}
+                    onClick={handleRotateToken}
                   >
-                    {t("agent.rotate-token")}
+                    {rotating
+                      ? t("common.loading")
+                      : t("agent.profile.get-connection-command")}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setActionError("");
-                      setRevokeOpen(true);
-                    }}
-                  >
-                    {t("agent.revoke-token")}
-                  </Button>
-                </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setActionError("");
+                        setRotateOpen(true);
+                      }}
+                    >
+                      {t("agent.rotate-token")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setActionError("");
+                        setRevokeOpen(true);
+                      }}
+                    >
+                      {t("agent.revoke-token")}
+                    </Button>
+                  </div>
+                )}
               </Card>
             </div>
           </div>
