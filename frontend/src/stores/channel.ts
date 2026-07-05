@@ -5,6 +5,7 @@ import {
   CreateChannelRequestSchema,
   FetchConversationActivityRequestSchema,
   ListChannelMembersRequestSchema,
+  ListChannelsForAgentRequestSchema,
   ListChannelsRequestSchema,
   ListChannelThreadsRequestSchema,
   ListConversationMessagesRequestSchema,
@@ -29,6 +30,8 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
   agentActivities: {},
   unreadByConv: {},
   channelWatchers: {},
+  agentChannelsByAgent: {},
+  agentChannelsLoading: false,
 
   async fetchChannels() {
     set({ channelsLoading: true });
@@ -42,6 +45,28 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
       set({ channels: list, unreadByConv, channelsLoading: false });
     } catch {
       set({ channelsLoading: false });
+    }
+  },
+
+  async fetchChannelsForAgent(agentName: string) {
+    set({ agentChannelsLoading: true });
+    try {
+      const res = await commandServiceClient.listChannelsForAgent(
+        create(ListChannelsForAgentRequestSchema, {
+          name: agentName,
+          pageSize: 100,
+          pageToken: "",
+        })
+      );
+      set((s) => ({
+        agentChannelsByAgent: {
+          ...s.agentChannelsByAgent,
+          [agentName]: res.channels ?? [],
+        },
+        agentChannelsLoading: false,
+      }));
+    } catch {
+      set({ agentChannelsLoading: false });
     }
   },
 

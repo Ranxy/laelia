@@ -199,8 +199,15 @@ export interface ChannelSlice {
   // name. Held in store state (not a module-level registry) so it is testable
   // and survives HMR without leaking timers.
   channelWatchers: Record<string, ReturnType<typeof setInterval>>;
+  // Channels an agent is a member of, keyed by agent resource name
+  // (`agents/{id}`). Populated by fetchChannelsForAgent for the agent detail
+  // page's Chat tab; unread is always 0 here (the backend does not compute a
+  // per-agent unread for this view).
+  agentChannelsByAgent: Record<string, Conversation[]>;
+  agentChannelsLoading: boolean;
 
   fetchChannels: () => Promise<void>;
+  fetchChannelsForAgent: (agentName: string) => Promise<void>;
   createChannel: (title: string) => Promise<Conversation>;
   markConversationRead: (conversationId: string) => Promise<void>;
   sendChannelMessage: (
