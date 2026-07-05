@@ -25,7 +25,7 @@ function TabsTrigger({
   return (
     <BaseTabs.Tab
       className={cn(
-        "relative px-1 pb-2 text-sm font-medium text-control-light transition-colors hover:text-control cursor-pointer",
+        "relative inline-flex items-center gap-2 px-1 pb-2 text-sm font-medium text-control-light transition-colors hover:text-control cursor-pointer",
         "aria-selected:text-accent aria-selected:after:absolute aria-selected:after:inset-x-0 aria-selected:after:-bottom-px aria-selected:after:h-0.5 aria-selected:after:bg-accent",
         "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
         className

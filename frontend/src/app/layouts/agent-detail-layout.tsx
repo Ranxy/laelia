@@ -71,7 +71,7 @@ export function AgentDetailLayout() {
                 navigate(resolvePath(AGENT_ROUTE_PROFILE, { agentId }))
               }
             >
-              <UserCircle className="size-4 mr-2" />
+              <UserCircle className="size-4" />
               {t("agent.tab-profile")}
             </TabsTrigger>
             <TabsTrigger
@@ -81,7 +81,7 @@ export function AgentDetailLayout() {
                 navigate(resolvePath(COMMAND_ROUTE_LIST, { agentId }))
               }
             >
-              <ListChecks className="size-4 mr-2" />
+              <ListChecks className="size-4" />
               {t("agent.tab-commands")}
             </TabsTrigger>
             <TabsTrigger
@@ -91,7 +91,7 @@ export function AgentDetailLayout() {
                 navigate(resolvePath(AGENT_ROUTE_CHAT, { agentId }))
               }
             >
-              <MessageSquare className="size-4 mr-2" />
+              <MessageSquare className="size-4" />
               {t("agent.tab-chat")}
             </TabsTrigger>
           </TabsList>
