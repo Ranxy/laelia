@@ -147,6 +147,11 @@
   },
   "agent": {
     "title": "Agent 管理",
+    "tab-profile": "配置",
+    "tab-commands": "命令",
+    "tab-chat": "聊天",
+    "no-selection": "请选择一个 Agent 查看详情。",
+    "chat-empty": "该 Agent 尚未加入任何频道。",
     "create": "创建 Agent",
     "create-title": "创建 Agent",
     "create-description": "为新 Agent 输入名称。",

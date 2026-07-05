@@ -147,6 +147,11 @@
   },
   "agent": {
     "title": "Agents",
+    "tab-profile": "Profile",
+    "tab-commands": "Commands",
+    "tab-chat": "Chat",
+    "no-selection": "Select an agent to view its details.",
+    "chat-empty": "This agent has not joined any channels yet.",
     "create": "Create Agent",
     "create-title": "Create Agent",
     "create-description": "Enter a name for the new agent.",

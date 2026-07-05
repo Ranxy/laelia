@@ -1,9 +1,10 @@
 import type { RouteObject } from "react-router-dom";
 import { Navigate } from "react-router-dom";
-import { AgentWorkspaceLayout } from "@/app/layouts/agent-workspace-layout";
 import { DashboardLayout } from "@/app/layouts/dashboard-layout";
 import {
+  AGENT_ROUTE_CHAT,
   AGENT_ROUTE_LIST,
+  AGENT_ROUTE_PROFILE,
   CHAT_ROUTE,
   CHAT_ROUTE_DETAIL,
   COMMAND_ROUTE_DETAIL,
@@ -27,34 +28,61 @@ export const dashboardRoutes: RouteObject[] = [
       },
       {
         path: "agents",
-        handle: { name: AGENT_ROUTE_LIST },
         lazy: () =>
           import("@/pages/dashboard/agents").then((m) => ({
             Component: m.AgentsPage,
           })),
-      },
-      {
-        path: "agents/:agentId",
-        element: <AgentWorkspaceLayout />,
         children: [
-          // Chat lives in the unified /chat page now; the agent workspace hosts
-          // only the tasks/commands views.
-          { index: true, element: <Navigate to="commands" replace /> },
           {
-            path: "commands",
-            handle: { name: COMMAND_ROUTE_LIST },
+            index: true,
+            handle: { name: AGENT_ROUTE_LIST },
             lazy: () =>
-              import("@/pages/dashboard/command-list").then((m) => ({
-                Component: m.CommandListPage,
-              })),
+              import("@/pages/dashboard/agent-detail-empty-state").then(
+                (m) => ({
+                  Component: m.AgentDetailEmptyState,
+                })
+              ),
           },
           {
-            path: "commands/:commandId",
-            handle: { name: COMMAND_ROUTE_DETAIL },
+            path: ":agentId",
             lazy: () =>
-              import("@/pages/dashboard/command-detail").then((m) => ({
-                Component: m.CommandDetailPage,
+              import("@/app/layouts/agent-detail-layout").then((m) => ({
+                Component: m.AgentDetailLayout,
               })),
+            children: [
+              {
+                index: true,
+                handle: { name: AGENT_ROUTE_PROFILE },
+                lazy: () =>
+                  import("@/pages/dashboard/agent-profile").then((m) => ({
+                    Component: m.AgentProfilePage,
+                  })),
+              },
+              {
+                path: "commands",
+                handle: { name: COMMAND_ROUTE_LIST },
+                lazy: () =>
+                  import("@/pages/dashboard/command-list").then((m) => ({
+                    Component: m.CommandListPage,
+                  })),
+              },
+              {
+                path: "commands/:commandId",
+                handle: { name: COMMAND_ROUTE_DETAIL },
+                lazy: () =>
+                  import("@/pages/dashboard/command-detail").then((m) => ({
+                    Component: m.CommandDetailPage,
+                  })),
+              },
+              {
+                path: "chat",
+                handle: { name: AGENT_ROUTE_CHAT },
+                lazy: () =>
+                  import("@/pages/dashboard/agent-chat").then((m) => ({
+                    Component: m.AgentChatPage,
+                  })),
+              },
+            ],
           },
         ],
       },

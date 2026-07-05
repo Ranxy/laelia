@@ -1,19 +1,26 @@
-import { ArrowLeft, ListChecks, MessageSquare } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowLeft, ListChecks, MessageSquare, UserCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Outlet, useNavigate, useParams } from "react-router-dom";
+import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { agentResourceName } from "@/lib/command-status";
-import { COMMAND_ROUTE_LIST } from "@/router/handles";
+import {
+  AGENT_ROUTE_CHAT,
+  AGENT_ROUTE_PROFILE,
+  COMMAND_ROUTE_LIST,
+} from "@/router/handles";
 import { resolvePath } from "@/router/route-index";
 import { useAppStore } from "@/stores";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
 
-export function AgentWorkspaceLayout() {
+type TabKey = "profile" | "commands" | "chat";
+
+export function AgentDetailLayout() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { agentId } = useParams<{ agentId: string }>();
   const getAgent = useAppStore((s) => s.getAgent);
   const agentCache = useAppStore((s) => s.agentCache);
@@ -30,28 +37,21 @@ export function AgentWorkspaceLayout() {
   const cached = agentCache[agentName];
   const displayAgent = agent ?? cached;
 
-  // The agent workspace now hosts only the tasks/commands views; chat lives in
-  // the unified /chat page. The Chat tab opens (creating if needed) the 1:1
-  // conversation with this agent and navigates there. The workspace only ever
-  // shows the tasks tab now, so it is always active.
-  const activeTab = "tasks";
-
   const title = displayAgent?.title ?? agentId ?? "";
 
-  const openDirectChat = async () => {
-    try {
-      const convName = await useAppStore
-        .getState()
-        .getOrCreateConversation(agentName);
-      const convId = convName.split("/").pop();
-      if (convId) navigate(`/chat/${convId}`);
-    } catch {
-      // open failed — stay on the workspace
-    }
-  };
+  // Derive the active tab from the URL so deep links, refresh, and back/forward
+  // keep the highlight in sync with the rendered child route.
+  const activeTab = useMemo<TabKey>(() => {
+    const segments = location.pathname.split("/").filter(Boolean);
+    // ["agents", "<id>", ("commands"|"chat" | "commands", "<cmdId>")]
+    const afterId = segments[2];
+    if (afterId === "commands") return "commands";
+    if (afterId === "chat") return "chat";
+    return "profile";
+  }, [location.pathname]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-hidden">
       <div className="flex items-center gap-3 border-b border-control-border px-4 py-2.5 shrink-0">
         <Button variant="ghost" size="sm" onClick={() => navigate("/agents")}>
           <ArrowLeft className="size-4" />
@@ -66,18 +66,32 @@ export function AgentWorkspaceLayout() {
       <Tabs value={activeTab} className="flex h-full flex-col overflow-hidden">
         <div className="px-4 border-b border-control-border shrink-0">
           <TabsList className="border-b-0">
-            <TabsTrigger value="chat" onClick={() => openDirectChat()}>
-              <MessageSquare className="size-3.5 mr-1.5" />
-              {t("workspace.tab-chat")}
+            <TabsTrigger
+              value="profile"
+              onClick={() =>
+                navigate(resolvePath(AGENT_ROUTE_PROFILE, { agentId }))
+              }
+            >
+              <UserCircle className="size-3.5 mr-1.5" />
+              {t("agent.tab-profile")}
             </TabsTrigger>
             <TabsTrigger
-              value="tasks"
+              value="commands"
               onClick={() =>
                 navigate(resolvePath(COMMAND_ROUTE_LIST, { agentId }))
               }
             >
               <ListChecks className="size-3.5 mr-1.5" />
-              {t("workspace.tab-tasks")}
+              {t("agent.tab-commands")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="chat"
+              onClick={() =>
+                navigate(resolvePath(AGENT_ROUTE_CHAT, { agentId }))
+              }
+            >
+              <MessageSquare className="size-3.5 mr-1.5" />
+              {t("agent.tab-chat")}
             </TabsTrigger>
           </TabsList>
         </div>
