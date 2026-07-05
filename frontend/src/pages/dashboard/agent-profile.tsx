@@ -52,6 +52,49 @@ function modelLabel(value: string, models: { value: string; name: string }[]) {
   return m ? m.name || m.value : value;
 }
 
+// Field renders a labeled value row in the identity grid. The label is muted
+// and right-aligned on a fixed column so values line up vertically.
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <dt className="text-xs text-control-light whitespace-nowrap pt-0.5">
+        {label}
+      </dt>
+      <dd className="text-sm text-main min-w-0 break-words">{children}</dd>
+    </>
+  );
+}
+
+function Card({
+  title,
+  children,
+  footer,
+}: {
+  title: string;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+}) {
+  return (
+    <section className="flex flex-col rounded-lg border border-control-border bg-background shadow-xs">
+      <header className="border-b border-control-border px-5 py-3">
+        <h2 className="text-sm font-semibold text-control">{title}</h2>
+      </header>
+      <div className="flex flex-col gap-4 p-5">{children}</div>
+      {footer && (
+        <footer className="border-t border-control-border px-5 py-3">
+          {footer}
+        </footer>
+      )}
+    </section>
+  );
+}
+
 export function AgentProfilePage() {
   const { t } = useTranslation();
   const { agentId } = useParams<{ agentId: string }>();
@@ -226,309 +269,280 @@ export function AgentProfilePage() {
   // command is derived from the registry, so executable stays empty.
   const canSave = isCustomProvider ? executable.trim() !== "" : provider !== "";
 
+  const lifecycle = agentLifecycle(agent);
+
   return (
-    <div className="h-full overflow-y-auto p-6 flex flex-col gap-6 w-full max-w-2xl">
-      {/* Identity & status */}
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold text-control">
-          {t("agent.profile.section-identity")}
-        </h2>
-        <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-          <span className="text-control-light whitespace-nowrap">
-            {t("agent.detail-name")}
-          </span>
-          <span>{agent.title}</span>
-
-          <span className="text-control-light whitespace-nowrap">
-            {t("agent.detail-status")}
-          </span>
-          <span>
-            <ConnectionBadge state={agent.status?.state} />
-          </span>
-
-          <span className="text-control-light whitespace-nowrap">
-            {t("agent.detail-configuration")}
-          </span>
-          <span>{lifecycleLabel(t, agentLifecycle(agent))}</span>
-
-          {agent.info?.hostname && (
-            <>
-              <span className="text-control-light whitespace-nowrap">
-                {t("agent.detail-hostname")}
-              </span>
-              <span>{agent.info.hostname}</span>
-            </>
-          )}
-          {agent.info?.os && (
-            <>
-              <span className="text-control-light whitespace-nowrap">
-                {t("agent.detail-os")}
-              </span>
-              <span>
-                {agent.info.os}/{agent.info.arch ?? ""}
-              </span>
-            </>
-          )}
-          {agent.info?.ip && (
-            <>
-              <span className="text-control-light whitespace-nowrap">
-                {t("agent.detail-ip")}
-              </span>
-              <span>{agent.info.ip}</span>
-            </>
-          )}
-          {agent.info?.version && (
-            <>
-              <span className="text-control-light whitespace-nowrap">
-                {t("agent.detail-version")}
-              </span>
-              <span>{agent.info.version}</span>
-            </>
-          )}
-          {agent.status?.connectedTime && (
-            <>
-              <span className="text-control-light whitespace-nowrap">
-                {t("agent.detail-connected")}
-              </span>
-              <span>{formatTimestamp(agent.status.connectedTime)}</span>
-            </>
-          )}
-          {agent.status?.lastHeartbeatTime && (
-            <>
-              <span className="text-control-light whitespace-nowrap">
-                {t("agent.detail-last-heartbeat")}
-              </span>
-              <span>{formatTimestamp(agent.status.lastHeartbeatTime)}</span>
-            </>
-          )}
-          {agent.createdAt && (
-            <>
-              <span className="text-control-light whitespace-nowrap">
-                {t("agent.detail-created")}
-              </span>
-              <span>{formatTimestamp(agent.createdAt)}</span>
-            </>
-          )}
-          <span className="text-control-light whitespace-nowrap">
-            {t("agent.detail-token-version")}
-          </span>
-          <span>{agent.tokenVersion ?? "-"}</span>
-          {agent.lastTokenRotatedAt && (
-            <>
-              <span className="text-control-light whitespace-nowrap">
-                {t("agent.detail-last-rotated")}
-              </span>
-              <span>{formatTimestamp(agent.lastTokenRotatedAt)}</span>
-            </>
-          )}
-        </div>
-        {agentLifecycle(agent) === "waiting-connection" && (
+    <div className="h-full overflow-y-auto p-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+        {lifecycle === "waiting-connection" && (
           <Alert
             variant="info"
             description={t("agent.waiting-connection-hint")}
-            className="mt-1"
           />
         )}
-        {agentLifecycle(agent) === "pending-config" && (
-          <Alert
-            variant="info"
-            description={t("agent.pending-config-hint")}
-            className="mt-1"
-          />
+        {lifecycle === "pending-config" && (
+          <Alert variant="info" description={t("agent.pending-config-hint")} />
         )}
-      </section>
 
-      {/* ACP config */}
-      <section className="flex flex-col gap-3 pt-4 border-t border-control-border">
-        <h2 className="text-sm font-semibold text-control">
-          {t("agent.acp-config")}
-        </h2>
-        {saveError && <Alert variant="error" description={saveError} />}
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">
-                {t("agent.acp-config-provider")}
-              </label>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={refreshing}
-                onClick={handleRefreshProviders}
-              >
-                {refreshing
-                  ? t("common.loading")
-                  : t("agent.acp-config-refresh-providers")}
-              </Button>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* Identity & status */}
+          <div className="lg:col-span-4">
+            <Card title={t("agent.profile.section-identity")}>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+                <Field label={t("agent.detail-name")}>{agent.title}</Field>
+                <Field label={t("agent.detail-status")}>
+                  <ConnectionBadge state={agent.status?.state} />
+                </Field>
+                <Field label={t("agent.detail-configuration")}>
+                  {lifecycleLabel(t, lifecycle)}
+                </Field>
+                {agent.info?.hostname && (
+                  <Field label={t("agent.detail-hostname")}>
+                    {agent.info.hostname}
+                  </Field>
+                )}
+                {agent.info?.os && (
+                  <Field label={t("agent.detail-os")}>
+                    {agent.info.os}/{agent.info.arch ?? ""}
+                  </Field>
+                )}
+                {agent.info?.ip && (
+                  <Field label={t("agent.detail-ip")}>{agent.info.ip}</Field>
+                )}
+                {agent.info?.version && (
+                  <Field label={t("agent.detail-version")}>
+                    {agent.info.version}
+                  </Field>
+                )}
+                {agent.status?.connectedTime && (
+                  <Field label={t("agent.detail-connected")}>
+                    {formatTimestamp(agent.status.connectedTime)}
+                  </Field>
+                )}
+                {agent.status?.lastHeartbeatTime && (
+                  <Field label={t("agent.detail-last-heartbeat")}>
+                    {formatTimestamp(agent.status.lastHeartbeatTime)}
+                  </Field>
+                )}
+                {agent.createdAt && (
+                  <Field label={t("agent.detail-created")}>
+                    {formatTimestamp(agent.createdAt)}
+                  </Field>
+                )}
+                <Field label={t("agent.detail-token-version")}>
+                  {agent.tokenVersion ?? "-"}
+                </Field>
+                {agent.lastTokenRotatedAt && (
+                  <Field label={t("agent.detail-last-rotated")}>
+                    {formatTimestamp(agent.lastTokenRotatedAt)}
+                  </Field>
+                )}
+              </dl>
+            </Card>
+
+            {/* Token actions */}
+            <div className="mt-6">
+              <Card title={t("agent.profile.section-token")}>
+                {actionError && (
+                  <Alert variant="error" description={actionError} />
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setActionError("");
+                      setRotateOpen(true);
+                    }}
+                  >
+                    {t("agent.rotate-token")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setActionError("");
+                      setRevokeOpen(true);
+                    }}
+                  >
+                    {t("agent.revoke-token")}
+                  </Button>
+                </div>
+              </Card>
             </div>
-            {refreshError && (
-              <Alert
-                variant="error"
-                description={refreshError}
-                className="mt-1"
-              />
-            )}
-            {availableProviders.length === 0 ? (
-              <p className="text-xs text-control-light">
-                {t("agent.acp-config-no-providers")}
-              </p>
-            ) : (
-              <Select
-                value={provider}
-                onValueChange={(v) => {
-                  setProvider(String(v ?? ""));
-                  // Reset model when the provider changes — the previous value
-                  // belongs to the old provider's option set.
-                  setModel("");
-                  setSaveError("");
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue>
-                    {(v: string | null) =>
-                      v ? providerLabel(v, availableProviders) : ""
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {availableProviders.map((p) => (
-                    <SelectItem key={p.providerId} value={p.providerId}>
-                      {providerDisplayName(p)}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="custom">
-                    {t("agent.acp-config-provider-custom")}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            )}
           </div>
 
-          {selectedProviderInfo && (
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">
-                {t("agent.acp-config-model")}
-              </label>
-              {providerSupportsModel && modelOptions.length > 0 ? (
-                <Select
-                  value={model}
-                  onValueChange={(v) => {
-                    setModel(String(v ?? ""));
+          {/* ACP config */}
+          <div className="lg:col-span-8">
+            <Card
+              title={t("agent.acp-config")}
+              footer={
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    disabled={saving || !canSave}
+                    onClick={handleSaveACPConfig}
+                  >
+                    {saving ? t("common.saving") : t("common.save")}
+                  </Button>
+                </div>
+              }
+            >
+              {saveError && <Alert variant="error" description={saveError} />}
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">
+                      {t("agent.acp-config-provider")}
+                    </label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={refreshing}
+                      onClick={handleRefreshProviders}
+                    >
+                      {refreshing
+                        ? t("common.loading")
+                        : t("agent.acp-config-refresh-providers")}
+                    </Button>
+                  </div>
+                  {refreshError && (
+                    <Alert
+                      variant="error"
+                      description={refreshError}
+                      className="mt-1"
+                    />
+                  )}
+                  {availableProviders.length === 0 ? (
+                    <p className="text-xs text-control-light">
+                      {t("agent.acp-config-no-providers")}
+                    </p>
+                  ) : (
+                    <Select
+                      value={provider}
+                      onValueChange={(v) => {
+                        setProvider(String(v ?? ""));
+                        // Reset model when the provider changes — the previous
+                        // value belongs to the old provider's option set.
+                        setModel("");
+                        setSaveError("");
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue>
+                          {(v: string | null) =>
+                            v ? providerLabel(v, availableProviders) : ""
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableProviders.map((p) => (
+                          <SelectItem key={p.providerId} value={p.providerId}>
+                            {providerDisplayName(p)}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="custom">
+                          {t("agent.acp-config-provider-custom")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+
+                {selectedProviderInfo && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium">
+                      {t("agent.acp-config-model")}
+                    </label>
+                    {providerSupportsModel && modelOptions.length > 0 ? (
+                      <Select
+                        value={model}
+                        onValueChange={(v) => {
+                          setModel(String(v ?? ""));
+                          setSaveError("");
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue>
+                            {(v: string | null) =>
+                              v ? modelLabel(v, modelOptions) : ""
+                            }
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {modelOptions.map((m) => (
+                            <SelectItem key={m.value} value={m.value}>
+                              {m.name || m.value}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-xs text-control-light">
+                        {t("agent.acp-config-model-unsupported")}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {isCustomProvider && (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm font-medium">
+                        {t("agent.acp-config-executable")}
+                      </label>
+                      <Input
+                        placeholder={t(
+                          "agent.acp-config-executable-placeholder"
+                        )}
+                        value={executable}
+                        onChange={(e) => {
+                          setExecutable(e.target.value);
+                          setSaveError("");
+                        }}
+                      />
+                    </div>
+
+                    <StringListEditor
+                      label={t("agent.acp-config-args")}
+                      placeholder={t("agent.acp-config-args-placeholder")}
+                      values={args}
+                      onChange={(next) => {
+                        setArgs(next);
+                        setSaveError("");
+                      }}
+                    />
+                  </>
+                )}
+
+                {selectedProviderInfo && !isCustomProvider && (
+                  <p className="text-xs text-control-light">
+                    {t("agent.acp-config-derived-command-hint")}
+                  </p>
+                )}
+
+                <KeyValueEnvEditor
+                  label={t("agent.acp-config-custom-env")}
+                  entries={customEnvEntries}
+                  onChange={(next) => {
+                    setCustomEnvEntries(next);
                     setSaveError("");
                   }}
-                >
-                  <SelectTrigger>
-                    <SelectValue>
-                      {(v: string | null) =>
-                        v ? modelLabel(v, modelOptions) : ""
-                      }
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {modelOptions.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>
-                        {m.name || m.value}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <p className="text-xs text-control-light">
-                  {t("agent.acp-config-model-unsupported")}
-                </p>
-              )}
-            </div>
-          )}
+                />
 
-          {isCustomProvider && (
-            <>
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">
-                  {t("agent.acp-config-executable")}
-                </label>
-                <Input
-                  placeholder={t("agent.acp-config-executable-placeholder")}
-                  value={executable}
-                  onChange={(e) => {
-                    setExecutable(e.target.value);
+                <StringListEditor
+                  label={t("agent.acp-config-allow-env")}
+                  placeholder={t("agent.acp-config-allow-env-placeholder")}
+                  values={allowEnv}
+                  onChange={(next) => {
+                    setAllowEnv(next);
                     setSaveError("");
                   }}
                 />
               </div>
-
-              <StringListEditor
-                label={t("agent.acp-config-args")}
-                placeholder={t("agent.acp-config-args-placeholder")}
-                values={args}
-                onChange={(next) => {
-                  setArgs(next);
-                  setSaveError("");
-                }}
-              />
-            </>
-          )}
-
-          {selectedProviderInfo && !isCustomProvider && (
-            <p className="text-xs text-control-light">
-              {t("agent.acp-config-derived-command-hint")}
-            </p>
-          )}
-
-          <KeyValueEnvEditor
-            label={t("agent.acp-config-custom-env")}
-            entries={customEnvEntries}
-            onChange={(next) => {
-              setCustomEnvEntries(next);
-              setSaveError("");
-            }}
-          />
-
-          <StringListEditor
-            label={t("agent.acp-config-allow-env")}
-            placeholder={t("agent.acp-config-allow-env-placeholder")}
-            values={allowEnv}
-            onChange={(next) => {
-              setAllowEnv(next);
-              setSaveError("");
-            }}
-          />
+            </Card>
+          </div>
         </div>
-        <div className="flex justify-end">
-          <Button disabled={saving || !canSave} onClick={handleSaveACPConfig}>
-            {saving ? t("common.saving") : t("common.save")}
-          </Button>
-        </div>
-      </section>
-
-      {/* Token actions */}
-      <section className="flex flex-col gap-2 pt-4 border-t border-control-border">
-        <h2 className="text-sm font-semibold text-control">
-          {t("agent.profile.section-token")}
-        </h2>
-        {actionError && <Alert variant="error" description={actionError} />}
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setActionError("");
-              setRotateOpen(true);
-            }}
-          >
-            {t("agent.rotate-token")}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setActionError("");
-              setRevokeOpen(true);
-            }}
-          >
-            {t("agent.revoke-token")}
-          </Button>
-        </div>
-      </section>
+      </div>
 
       <Dialog
         open={tokenOpen}

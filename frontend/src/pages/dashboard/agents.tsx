@@ -25,15 +25,8 @@ import {
   SheetDescription,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { buildAgentRunCommand } from "@/lib/agent-token";
+import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import {
   type Agent,
@@ -147,9 +140,9 @@ export function AgentsPage() {
 
   return (
     <div className="flex h-full w-full">
-      <div className="flex w-[360px] shrink-0 flex-col border-r border-control-border overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-control-border shrink-0">
-          <h1 className="text-base font-semibold text-main">
+      <aside className="flex w-56 shrink-0 flex-col border-r border-control-border overflow-hidden">
+        <div className="flex items-center justify-between gap-2 border-b border-control-border px-3 py-3 shrink-0">
+          <h1 className="text-sm font-semibold text-main truncate">
             {t("agent.title")}
           </h1>
           <Button size="sm" onClick={() => setCreateOpen(true)}>
@@ -157,84 +150,73 @@ export function AgentsPage() {
           </Button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto py-1">
           {loading ? (
-            <p className="px-4 py-3 text-control-light">
+            <p className="px-3 py-2 text-sm text-control-light">
               {t("common.loading")}
             </p>
+          ) : agents.length === 0 ? (
+            <p className="px-3 py-2 text-sm text-control-light">
+              {t("common.no-data")}
+            </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("agent.header-name")}</TableHead>
-                  <TableHead>{t("agent.header-status")}</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {agents.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={3}
-                      className="text-center text-control-light"
+            <ul className="flex flex-col">
+              {agents.map((agent) => {
+                const resourceId = agent.name.replace(/^agents\//, "");
+                const selected = resourceId === selectedAgentId;
+                return (
+                  <li key={agent.name}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-label={t("agent.row-open-detail", {
+                        title: agent.title,
+                      })}
+                      className={cn(
+                        "group flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors",
+                        "border-l-2",
+                        selected
+                          ? "border-accent bg-control-bg"
+                          : "border-transparent hover:bg-control-bg/60"
+                      )}
+                      onClick={() => navigate(`/agents/${resourceId}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          navigate(`/agents/${resourceId}`);
+                        }
+                      }}
                     >
-                      {t("common.no-data")}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  agents.map((agent) => {
-                    const resourceId = agent.name.replace(/^agents\//, "");
-                    const selected = resourceId === selectedAgentId;
-                    return (
-                      <TableRow
-                        key={agent.name}
-                        className="cursor-pointer"
-                        data-state={selected ? "selected" : undefined}
-                        tabIndex={0}
-                        aria-label={t("agent.row-open-detail", {
-                          title: agent.title,
-                        })}
-                        onClick={() => navigate(`/agents/${resourceId}`)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            navigate(`/agents/${resourceId}`);
-                          }
+                      <div className="min-w-0 flex-1 flex flex-col gap-1">
+                        <span className="truncate text-sm font-medium text-main">
+                          {agent.title}
+                        </span>
+                        <ConnectionBadge state={agent.status?.state} />
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="size-6 shrink-0 p-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                        aria-label={t("common.delete")}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget({
+                            name: agent.name,
+                            title: agent.title,
+                          });
+                          setDeleteOpen(true);
                         }}
                       >
-                        <TableCell className="font-medium">
-                          {agent.title}
-                        </TableCell>
-                        <TableCell>
-                          <ConnectionBadge state={agent.status?.state} />
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="size-7 p-0"
-                            aria-label={t("common.delete")}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteTarget({
-                                name: agent.name,
-                                title: agent.title,
-                              });
-                              setDeleteOpen(true);
-                            }}
-                          >
-                            <Trash className="size-3.5" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
+                        <Trash className="size-3.5" />
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
-      </div>
+      </aside>
 
       <div className="flex-1 overflow-hidden">
         <Outlet />

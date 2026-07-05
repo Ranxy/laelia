@@ -1,11 +1,11 @@
-import { ArrowLeft, ListChecks, MessageSquare, UserCircle } from "lucide-react";
+import { ListChecks, MessageSquare, UserCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ConnectionBadge } from "@/components/connection-badge";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { agentResourceName } from "@/lib/command-status";
+import { agentLifecycle, lifecycleLabel } from "@/pages/dashboard/agents";
 import {
   AGENT_ROUTE_CHAT,
   AGENT_ROUTE_PROFILE,
@@ -43,7 +43,6 @@ export function AgentDetailLayout() {
   // keep the highlight in sync with the rendered child route.
   const activeTab = useMemo<TabKey>(() => {
     const segments = location.pathname.split("/").filter(Boolean);
-    // ["agents", "<id>", ("commands"|"chat" | "commands", "<cmdId>")]
     const afterId = segments[2];
     if (afterId === "commands") return "commands";
     if (afterId === "chat") return "chat";
@@ -52,45 +51,47 @@ export function AgentDetailLayout() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex items-center gap-3 border-b border-control-border px-4 py-2.5 shrink-0">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/agents")}>
-          <ArrowLeft className="size-4" />
-          {t("workspace.back-to-agents")}
-        </Button>
-        <div className="flex items-center gap-2 min-w-0">
-          <h1 className="text-sm font-semibold text-main truncate">{title}</h1>
-          <ConnectionBadge state={displayAgent?.status?.state} />
-        </div>
+      <div className="flex items-center gap-3 border-b border-control-border px-6 py-3 shrink-0">
+        <h1 className="text-base font-semibold text-main truncate">{title}</h1>
+        <ConnectionBadge state={displayAgent?.status?.state} />
+        {displayAgent && (
+          <span className="text-xs text-control-light">
+            {lifecycleLabel(t, agentLifecycle(displayAgent))}
+          </span>
+        )}
       </div>
 
       <Tabs value={activeTab} className="flex h-full flex-col overflow-hidden">
-        <div className="px-4 border-b border-control-border shrink-0">
-          <TabsList className="border-b-0">
+        <div className="px-6 border-b border-control-border shrink-0">
+          <TabsList className="gap-x-6">
             <TabsTrigger
               value="profile"
+              className="px-1"
               onClick={() =>
                 navigate(resolvePath(AGENT_ROUTE_PROFILE, { agentId }))
               }
             >
-              <UserCircle className="size-3.5 mr-1.5" />
+              <UserCircle className="size-4 mr-2" />
               {t("agent.tab-profile")}
             </TabsTrigger>
             <TabsTrigger
               value="commands"
+              className="px-1"
               onClick={() =>
                 navigate(resolvePath(COMMAND_ROUTE_LIST, { agentId }))
               }
             >
-              <ListChecks className="size-3.5 mr-1.5" />
+              <ListChecks className="size-4 mr-2" />
               {t("agent.tab-commands")}
             </TabsTrigger>
             <TabsTrigger
               value="chat"
+              className="px-1"
               onClick={() =>
                 navigate(resolvePath(AGENT_ROUTE_CHAT, { agentId }))
               }
             >
-              <MessageSquare className="size-3.5 mr-1.5" />
+              <MessageSquare className="size-4 mr-2" />
               {t("agent.tab-chat")}
             </TabsTrigger>
           </TabsList>

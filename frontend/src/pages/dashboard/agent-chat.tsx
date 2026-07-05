@@ -46,7 +46,7 @@ export function AgentChatPage() {
                 key={conv.name}
                 type="button"
                 onClick={() => openConversation(conv)}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-control-bg/40"
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-accent/10 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               >
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-control-bg text-control">
                   {isDm ? (
