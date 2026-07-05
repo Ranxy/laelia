@@ -337,7 +337,13 @@
     "header-task": "Task",
     "header-duration": "Duration",
     "header-created": "Created",
-    "header-sent-by": "Sent by"
+    "header-sent-by": "Sent by",
+    "header-final-summary": "Final Summary",
+    "final-summary": "Final Summary",
+    "show-final-summary": "Show final summary",
+    "page": "Page {{n}}",
+    "prev": "Prev",
+    "next": "Next"
   },
   "channelTask": {
     "as-task": "As Task",

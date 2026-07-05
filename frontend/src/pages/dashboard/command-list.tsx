@@ -1,10 +1,10 @@
-import { Plus, Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, Expand, Plus } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { CommandStatusBadge } from "@/components/command-status-badge";
+import { FinalSummary } from "@/components/command-terminal";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetBody,
@@ -34,16 +34,16 @@ import { CommandStatus } from "@/types/proto-es/v1/command_pb";
 
 type StatusFilter = "all" | "pending" | "running" | "done" | "failed";
 
-const statusFilterToStatuses: Record<StatusFilter, CommandStatus[]> = {
-  all: [],
-  pending: [CommandStatus.PENDING],
-  running: [CommandStatus.RUNNING],
-  done: [CommandStatus.COMPLETED],
-  failed: [
-    CommandStatus.FAILED,
-    CommandStatus.CANCELLED,
-    CommandStatus.TIMEOUT,
-  ],
+const PAGE_SIZE = 50;
+
+// 服务端 ListCommandsRequest.status 为单个 CommandStatus。`failed` tab 仅按
+// FAILED 过滤，CANCELLED/TIMEOUT 不在此 tab 内（避免后端改动为 repeated）。
+const statusFilterToStatusValue: Record<StatusFilter, CommandStatus> = {
+  all: CommandStatus.COMMAND_STATUS_UNSPECIFIED,
+  pending: CommandStatus.PENDING,
+  running: CommandStatus.RUNNING,
+  done: CommandStatus.COMPLETED,
+  failed: CommandStatus.FAILED,
 };
 
 export function CommandListPage() {
@@ -61,29 +61,48 @@ export function CommandListPage() {
   const [instruction, setInstruction] = useState("");
   const [sending, setSending] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [search, setSearch] = useState("");
 
-  const load = useCallback(() => {
+  // 分页：pageTokens 为已访问页的 cursor 栈，pageIndex 指向当前页。
+  const [pageTokens, setPageTokens] = useState<string[]>([""]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [nextPageToken, setNextPageToken] = useState("");
+  const [expandedSummary, setExpandedSummary] = useState<Command | null>(null);
+
+  const pageToken = pageTokens[pageIndex] ?? "";
+  const canPrev = pageIndex > 0;
+  const canNext = nextPageToken !== "";
+
+  const load = useCallback(async () => {
     if (!agent) return;
-    listCommands(agent, { pageSize: 100 });
-  }, [agent, listCommands]);
+    const res = await listCommands(agent, {
+      pageSize: PAGE_SIZE,
+      pageToken,
+      status: statusFilterToStatusValue[statusFilter],
+    });
+    setNextPageToken(res?.nextPageToken ?? "");
+  }, [agent, listCommands, pageToken, statusFilter]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const filteredCommands = useMemo(() => {
-    const statuses = statusFilterToStatuses[statusFilter];
-    const searchLower = search.trim().toLowerCase();
-    return commands.filter((cmd) => {
-      if (statuses.length > 0 && !statuses.includes(cmd.status)) return false;
-      if (searchLower) {
-        const text = (cmd.instruction || cmd.command || "").toLowerCase();
-        if (!text.includes(searchLower)) return false;
-      }
-      return true;
-    });
-  }, [commands, statusFilter, search]);
+  const handleStatusFilterChange = (f: StatusFilter) => {
+    setStatusFilter(f);
+    setPageTokens([""]);
+    setPageIndex(0);
+    setNextPageToken("");
+  };
+
+  const onNext = () => {
+    if (!canNext) return;
+    setPageTokens((t) => [...t, nextPageToken]);
+    setPageIndex((i) => i + 1);
+  };
+
+  const onPrev = () => {
+    if (!canPrev) return;
+    setPageIndex((i) => Math.max(0, i - 1));
+  };
 
   const handleSend = async () => {
     if (!agent || !instruction.trim()) return;
@@ -92,7 +111,14 @@ export function CommandListPage() {
       await sendChatMessage(agent, instruction.trim());
       setInstruction("");
       setSendOpen(false);
-      load();
+      setPageTokens([""]);
+      setPageIndex(0);
+      setNextPageToken("");
+      await listCommands(agent, {
+        pageSize: PAGE_SIZE,
+        pageToken: "",
+        status: statusFilterToStatusValue[statusFilter],
+      });
     } finally {
       setSending(false);
     }
@@ -101,10 +127,6 @@ export function CommandListPage() {
   function handleRowClick(cmd: Command) {
     if (!cmd.name) return;
     navigate(`/agents/${agentId}/commands/${cmd.name.split("/").pop()}`);
-  }
-
-  function displayTaskText(cmd: Command): string {
-    return cmd.instruction || cmd.command || "";
   }
 
   return (
@@ -118,7 +140,7 @@ export function CommandListPage() {
               <button
                 key={f}
                 type="button"
-                onClick={() => setStatusFilter(f)}
+                onClick={() => handleStatusFilterChange(f)}
                 className={
                   statusFilter === f
                     ? "rounded-xs px-2.5 py-1 text-xs font-medium bg-accent text-accent-foreground"
@@ -129,19 +151,12 @@ export function CommandListPage() {
               </button>
             ))}
           </div>
-          <div className="relative flex-1 max-w-xs ml-auto">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-control-light" />
-            <Input
-              className="pl-8 h-8 text-xs"
-              placeholder={t("tasks.search")}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="ml-auto">
+            <Button onClick={() => setSendOpen(true)} size="sm">
+              <Plus className="size-3.5" />
+              {t("tasks.new")}
+            </Button>
           </div>
-          <Button onClick={() => setSendOpen(true)} size="sm">
-            <Plus className="size-3.5" />
-            {t("tasks.new")}
-          </Button>
         </div>
       </div>
 
@@ -150,15 +165,17 @@ export function CommandListPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-20">{t("tasks.header-type")}</TableHead>
-                <TableHead className="w-24">
+                <TableHead className="w-20 whitespace-nowrap">
+                  {t("tasks.header-type")}
+                </TableHead>
+                <TableHead className="w-24 whitespace-nowrap">
                   {t("tasks.header-status")}
                 </TableHead>
-                <TableHead>{t("tasks.header-task")}</TableHead>
-                <TableHead className="w-24">
+                <TableHead>{t("tasks.header-final-summary")}</TableHead>
+                <TableHead className="w-24 whitespace-nowrap">
                   {t("tasks.header-duration")}
                 </TableHead>
-                <TableHead className="w-32">
+                <TableHead className="w-44 whitespace-nowrap">
                   {t("tasks.header-created")}
                 </TableHead>
               </TableRow>
@@ -174,7 +191,7 @@ export function CommandListPage() {
                   </TableCell>
                 </TableRow>
               )}
-              {!loading && filteredCommands.length === 0 && (
+              {!loading && commands.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-12">
                     <div className="flex flex-col items-center gap-3">
@@ -193,41 +210,88 @@ export function CommandListPage() {
                   </TableCell>
                 </TableRow>
               )}
-              {filteredCommands.map((cmd) => (
-                <TableRow
-                  key={cmd.name}
-                  className="cursor-pointer"
-                  tabIndex={0}
-                  aria-label={t("command.row-open-detail")}
-                  onClick={() => handleRowClick(cmd)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      handleRowClick(cmd);
-                    }
-                  }}
-                >
-                  <TableCell>
-                    <span className="text-xs text-control-light">
-                      {t("command.executor-acp")}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <CommandStatusBadge status={cmd.status} />
-                  </TableCell>
-                  <TableCell className="font-mono text-xs truncate max-w-md">
-                    {displayTaskText(cmd)}
-                  </TableCell>
-                  <TableCell className="text-control-light text-xs">
-                    {formatDuration(cmd.durationMs)}
-                  </TableCell>
-                  <TableCell className="text-control-light text-xs">
-                    {formatTimestamp(cmd.createdAt)}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {!loading &&
+                commands.map((cmd) => (
+                  <TableRow
+                    key={cmd.name}
+                    className="cursor-pointer"
+                    tabIndex={0}
+                    aria-label={t("command.row-open-detail")}
+                    onClick={() => handleRowClick(cmd)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleRowClick(cmd);
+                      }
+                    }}
+                  >
+                    <TableCell className="whitespace-nowrap">
+                      <span className="text-xs text-control-light">
+                        {t("command.executor-acp")}
+                      </span>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <CommandStatusBadge status={cmd.status} />
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {cmd.finalSummary ? (
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="truncate flex-1 min-w-0 max-w-md">
+                            {cmd.finalSummary}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            className="shrink-0 px-1"
+                            aria-label={t("tasks.show-final-summary")}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedSummary(cmd);
+                            }}
+                          >
+                            <Expand className="size-3.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-control-light">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-control-light text-xs">
+                      {formatDuration(cmd.durationMs)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-control-light text-xs">
+                      {formatTimestamp(cmd.createdAt)}
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
+        </div>
+      </div>
+
+      <div className="shrink-0 border-t border-control-border px-4 py-2">
+        <div className="mx-auto max-w-5xl flex items-center justify-between text-xs text-control-light">
+          <span>{t("tasks.page", { n: pageIndex + 1 })}</span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canPrev || loading}
+              onClick={onPrev}
+            >
+              <ChevronLeft className="size-3.5" />
+              {t("tasks.prev")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canNext || loading}
+              onClick={onNext}
+            >
+              {t("tasks.next")}
+              <ChevronRight className="size-3.5" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -240,6 +304,22 @@ export function CommandListPage() {
         sending={sending}
         onSend={handleSend}
       />
+
+      <Sheet
+        open={!!expandedSummary}
+        onOpenChange={(next) => !next && setExpandedSummary(null)}
+      >
+        <SheetContent width="standard">
+          <SheetHeader>
+            <SheetTitle>{t("tasks.final-summary")}</SheetTitle>
+          </SheetHeader>
+          <SheetBody className="overflow-y-auto">
+            {expandedSummary?.finalSummary ? (
+              <FinalSummary content={expandedSummary.finalSummary} />
+            ) : null}
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

@@ -337,7 +337,13 @@
     "header-task": "任务",
     "header-duration": "耗时",
     "header-created": "创建时间",
-    "header-sent-by": "发送者"
+    "header-sent-by": "发送者",
+    "header-final-summary": "Final Summary",
+    "final-summary": "Final Summary",
+    "show-final-summary": "查看 Final Summary",
+    "page": "第 {{n}} 页",
+    "prev": "上一页",
+    "next": "下一页"
   },
   "channelTask": {
     "as-task": "作为任务",
