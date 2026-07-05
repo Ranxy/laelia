@@ -192,6 +192,10 @@
     "header-ip": "IP",
     "header-actions": "Actions",
     "detail-configuration": "Configuration",
+    "profile": {
+      "section-identity": "Identity & Status",
+      "section-token": "Bootstrap Token"
+    },
     "lifecycle": {
       "ready": "Ready",
       "pending-config": "Connected — pending configuration",

@@ -192,6 +192,10 @@
     "header-ip": "IP 地址",
     "header-actions": "操作",
     "detail-configuration": "配置",
+    "profile": {
+      "section-identity": "身份与状态",
+      "section-token": "Bootstrap 令牌"
+    },
     "lifecycle": {
       "ready": "就绪",
       "pending-config": "已连接 — 待配置",

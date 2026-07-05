@@ -33,6 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { buildAgentRunCommand } from "@/lib/agent-token";
 import { useAppStore } from "@/stores";
 import {
   type Agent,
@@ -66,20 +67,6 @@ export function lifecycleLabel(
   state: Lifecycle
 ): string {
   return t(`agent.lifecycle.${state}`);
-}
-
-function formatToken(token: string): string {
-  if (token.length <= 20) {
-    return token.slice(0, 6) + "*".repeat(token.length - 6);
-  }
-  return `${token.slice(0, 10)}${"*".repeat(20)}${token.slice(-6)}`;
-}
-
-function getManagerURL(): string {
-  return (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(
-    /\/+$/,
-    ""
-  );
 }
 
 export function AgentsPage() {
@@ -293,16 +280,16 @@ export function AgentsPage() {
               {t("agent.created-run-hint")}
             </p>
             <div className="rounded bg-white border border-control-border p-3 font-mono text-xs break-all text-black dark:bg-zinc-900 dark:text-white">
-              {token &&
-                `laelia-agent run --manager ${getManagerURL()} --token ${formatToken(token)}`}
+              {token && buildAgentRunCommand(token, true)}
             </div>
             <Button
               variant="outline"
               className="w-full"
               onClick={() => {
                 if (token) {
-                  const cmd = `laelia-agent run --manager ${getManagerURL()} --token ${token}`;
-                  navigator.clipboard.writeText(cmd).catch(() => {});
+                  navigator.clipboard
+                    .writeText(buildAgentRunCommand(token, false))
+                    .catch(() => {});
                 }
               }}
             >
