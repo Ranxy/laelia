@@ -554,6 +554,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.CancelReminderRequest"><span class="badge">M</span>CancelReminderRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.CancelReminderResponse"><span class="badge">M</span>CancelReminderResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ChannelMember"><span class="badge">M</span>ChannelMember</a>
                 </li>
               
@@ -614,7 +622,23 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.CompleteReminderRequest"><span class="badge">M</span>CompleteReminderRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.CompleteReminderResponse"><span class="badge">M</span>CompleteReminderResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.Conversation"><span class="badge">M</span>Conversation</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ConvertMessageToReminderRequest"><span class="badge">M</span>ConvertMessageToReminderRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ConvertMessageToReminderResponse"><span class="badge">M</span>ConvertMessageToReminderResponse</a>
                 </li>
               
                 <li>
@@ -658,6 +682,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.FailReminderRequest"><span class="badge">M</span>FailReminderRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.FailReminderResponse"><span class="badge">M</span>FailReminderResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.FetchConversationActivityRequest"><span class="badge">M</span>FetchConversationActivityRequest</a>
                 </li>
               
@@ -695,6 +727,14 @@
               
                 <li>
                   <a href="#laelia.v1.GetOrCreateConversationResponse"><span class="badge">M</span>GetOrCreateConversationResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetReminderRequest"><span class="badge">M</span>GetReminderRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetReminderResponse"><span class="badge">M</span>GetReminderResponse</a>
                 </li>
               
                 <li>
@@ -758,11 +798,27 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ListDueRemindersRequest"><span class="badge">M</span>ListDueRemindersRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListDueRemindersResponse"><span class="badge">M</span>ListDueRemindersResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ListFilesRequest"><span class="badge">M</span>ListFilesRequest</a>
                 </li>
               
                 <li>
                   <a href="#laelia.v1.ListFilesResponse"><span class="badge">M</span>ListFilesResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListRemindersRequest"><span class="badge">M</span>ListRemindersRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListRemindersResponse"><span class="badge">M</span>ListRemindersResponse</a>
                 </li>
               
                 <li>
@@ -854,6 +910,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.Reminder"><span class="badge">M</span>Reminder</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.RemoveChannelMemberRequest"><span class="badge">M</span>RemoveChannelMemberRequest</a>
                 </li>
               
@@ -906,6 +966,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.UpdateReminderRequest"><span class="badge">M</span>UpdateReminderRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateReminderResponse"><span class="badge">M</span>UpdateReminderResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.UpdateTaskStatusRequest"><span class="badge">M</span>UpdateTaskStatusRequest</a>
                 </li>
               
@@ -940,6 +1008,10 @@
               
                 <li>
                   <a href="#laelia.v1.CommandStatus"><span class="badge">E</span>CommandStatus</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ReminderStatus"><span class="badge">E</span>ReminderStatus</a>
                 </li>
               
                 <li>
@@ -4457,6 +4529,54 @@ messages and @mentions of itself. </p></td>
 
         
       
+        <h3 id="laelia.v1.CancelReminderRequest">CancelReminderRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.CancelReminderResponse">CancelReminderResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>reminder</td>
+                  <td><a href="#laelia.v1.Reminder">Reminder</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ChannelMember">ChannelMember</h3>
         <p></p>
 
@@ -5453,6 +5573,64 @@ FAILED_PRECONDITION instead and this response is not sent. </p></td>
 
         
       
+        <h3 id="laelia.v1.CompleteReminderRequest">CompleteReminderRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>name is the reminder resource name (&#34;reminders/{message_id}&#34;). Only the
+owning agent may call this, and only when the reminder is DUE. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>result</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>result is the agent&#39;s completion report, posted as a single system message
+in the reminder&#39;s thread. The backend posts it atomically with the status
+update so it never appears twice. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.CompleteReminderResponse">CompleteReminderResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>reminder</td>
+                  <td><a href="#laelia.v1.Reminder">Reminder</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.Conversation">Conversation</h3>
         <p></p>
 
@@ -5526,6 +5704,86 @@ FAILED_PRECONDITION instead and this response is not sent. </p></td>
                   <td><p>unread_count is the number of chat_message rows with room_version beyond
 the requesting user&#39;s read cursor for this conversation. Populated by
 ListChannels; 0 (or unset) when the user is caught up. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ConvertMessageToReminderRequest">ConvertMessageToReminderRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>message is the resource name of the trigger message
+(&#34;conversations/{c}/messages/{m}&#34;). Must be a root message in the
+conversation (thread_root empty) and not already a reminder. The calling
+agent claims the reminder at creation (assignee = caller). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>task_content</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>task_content is the agent&#39;s structured summary of the scheduled work. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>fire_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p>fire_at is the first fire time. Required. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>cron_expr</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>cron_expr, when non-empty, makes the reminder recurring (5-field cron in
+tz). Empty = one-shot. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>tz</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>tz is the IANA timezone for cron_expr. Defaults to &#34;UTC&#34; when empty. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ConvertMessageToReminderResponse">ConvertMessageToReminderResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>reminder</td>
+                  <td><a href="#laelia.v1.Reminder">Reminder</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -5811,6 +6069,61 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
                 <tr>
                   <td>data</td>
                   <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.FailReminderRequest">FailReminderRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>error</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>error is the failure reason, posted as a system message in the thread. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.FailReminderResponse">FailReminderResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>reminder</td>
+                  <td><a href="#laelia.v1.Reminder">Reminder</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -6121,6 +6434,54 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
                 <tr>
                   <td>name</td>
                   <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetReminderRequest">GetReminderRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>name is the reminder resource name (&#34;reminders/{message_id}&#34;). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetReminderResponse">GetReminderResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>reminder</td>
+                  <td><a href="#laelia.v1.Reminder">Reminder</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -6587,6 +6948,39 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
 
         
       
+        <h3 id="laelia.v1.ListDueRemindersRequest">ListDueRemindersRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.ListDueRemindersResponse">ListDueRemindersResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>reminders</td>
+                  <td><a href="#laelia.v1.Reminder">Reminder</a></td>
+                  <td>repeated</td>
+                  <td><p>reminders are the DUE reminders owned by the calling agent, ordered by
+fire_at ascending. The agent drain loop calls this each session to pick up
+fired reminders and process them. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ListFilesRequest">ListFilesRequest</h3>
         <p></p>
 
@@ -6625,6 +7019,91 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
                   <td>files</td>
                   <td><a href="#laelia.v1.File">File</a></td>
                   <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListRemindersRequest">ListRemindersRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>agent, when set, restricts the result to reminders owned by the given agent
+(&#34;agents/{id}&#34;). The agent-page Reminders tab filters by the viewed agent. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>conversation, when set, restricts the result to reminders in that
+conversation. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>status_filter</td>
+                  <td><a href="#laelia.v1.ReminderStatus">ReminderStatus</a></td>
+                  <td>repeated</td>
+                  <td><p>status_filter, when non-empty, restricts the result to the given statuses. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListRemindersResponse">ListRemindersResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>reminders</td>
+                  <td><a href="#laelia.v1.Reminder">Reminder</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
                   <td><p> </p></td>
                 </tr>
               
@@ -7434,6 +7913,158 @@ rooted at the given message name. Empty posts a normal channel message. </p></td
 
         
       
+        <h3 id="laelia.v1.Reminder">Reminder</h3>
+        <p>Reminder is the scheduled-task metadata attached to a root chat_message. The</p><p>chat_message (root) remains the source of truth for the trigger content; this</p><p>row carries the schedule, assignee, and lifecycle state. The resource name is</p><p>"reminders/{message_id}" — the reminder's identity is its trigger message.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>conversation is the conversation the trigger message belongs to
+(&#34;conversations/{id}&#34;). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>message is the trigger message (&#34;conversations/{c}/messages/{m}&#34;); it is
+also the thread root for the reminder&#39;s discussion. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>assignee_agent</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>assignee_agent is the owning agent (&#34;agents/{id}&#34;); the agent that claimed
+the reminder at creation. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>assignee_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>task_content</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>task_content is the agent&#39;s structured summary of the work to perform on
+each fire. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>fire_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p>fire_at is the next fire time. For one-shot reminders (cron_expr empty) it
+is the single trigger time; for recurring reminders it is the next cron
+fire, recomputed after each completion/miss. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>cron_expr</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>cron_expr, when non-empty, makes the reminder recurring. A standard
+5-field cron (min hour dom month dow) interpreted in tz. Empty = one-shot. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>tz</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>tz is the IANA timezone name used to interpret cron_expr (e.g.
+&#34;Asia/Shanghai&#34;). &#34;UTC&#34; by default. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>status</td>
+                  <td><a href="#laelia.v1.ReminderStatus">ReminderStatus</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>retry_count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>retry_count is the number of delivery attempts since the last fire for an
+offline agent (0 when the agent was reached on the first try). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_retry_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_attempt_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_fired_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_completed_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>result</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>result is the agent&#39;s completion/failure report from the most recent fire. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>updated_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.RemoveChannelMemberRequest">RemoveChannelMemberRequest</h3>
         <p></p>
 
@@ -7928,6 +8559,84 @@ the agent&#39;s processed_version for this conversation. </p></td>
 
         
       
+        <h3 id="laelia.v1.UpdateReminderRequest">UpdateReminderRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>name is the reminder resource name (&#34;reminders/{message_id}&#34;). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>fire_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p>fire_at, cron_expr, tz, task_content are the editable fields. At least one
+must be set. Editing a DUE or MISSED reminder resets it to PENDING with the
+new schedule. COMPLETED/CANCELLED/FAILED reminders cannot be edited. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>cron_expr</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>tz</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>task_content</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateReminderResponse">UpdateReminderResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>reminder</td>
+                  <td><a href="#laelia.v1.Reminder">Reminder</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.UpdateTaskStatusRequest">UpdateTaskStatusRequest</h3>
         <p></p>
 
@@ -8291,6 +9000,59 @@ is performed by ClaimTask, not this RPC. </p></td>
           </tbody>
         </table>
       
+        <h3 id="laelia.v1.ReminderStatus">ReminderStatus</h3>
+        <p>ReminderStatus is the lifecycle state of a reminder. Values prefixed to</p><p>satisfy protobuf's C++ scoping rules (sibling enums cannot share value</p><p>names), matching TaskStatus/SenderType.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>REMINDER_STATUS_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>REMINDER_STATUS_PENDING</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>REMINDER_STATUS_DUE</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>REMINDER_STATUS_COMPLETED</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>REMINDER_STATUS_CANCELLED</td>
+                <td>4</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>REMINDER_STATUS_MISSED</td>
+                <td>5</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>REMINDER_STATUS_FAILED</td>
+                <td>6</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
         <h3 id="laelia.v1.SenderType">SenderType</h3>
         <p>SenderType distinguishes who authored a chat message. It replaces the</p><p>deprecated CommandSource enum and covers programmatic (SYSTEM) senders that</p><p>CommandSource could not express inside chat conversations. Values are</p><p>prefixed because UserType already occupies the unprefixed USER/SYSTEM_BOT</p><p>names (protobuf C++ scoping rules forbid sibling enums from sharing value</p><p>names).</p>
         <table class="enum-table">
@@ -8616,6 +9378,76 @@ the assignee&#39;s work ready for human review; IN_REVIEW -&gt; DONE marks it
 complete (the assignee should call this only after detecting the human&#39;s
 approval in the task&#39;s thread). Only the assignee may call this. Emits a
 system notification row.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ConvertMessageToReminder</td>
+                <td><a href="#laelia.v1.ConvertMessageToReminderRequest">ConvertMessageToReminderRequest</a></td>
+                <td><a href="#laelia.v1.ConvertMessageToReminderResponse">ConvertMessageToReminderResponse</a></td>
+                <td><p>ConvertMessageToReminder turns an existing top-level message into a
+scheduled reminder owned by the calling agent (atomic create&#43;claim). The
+message must be a root in the conversation and not already a reminder. The
+agent is subscribed to the reminder&#39;s thread so discussion replies wake it.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ListReminders</td>
+                <td><a href="#laelia.v1.ListRemindersRequest">ListRemindersRequest</a></td>
+                <td><a href="#laelia.v1.ListRemindersResponse">ListRemindersResponse</a></td>
+                <td><p>ListReminders returns reminders, optionally filtered by owning agent,
+conversation, and status. Used by the agent-page Reminders tab (user) and
+the agent CLI (self-list).</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetReminder</td>
+                <td><a href="#laelia.v1.GetReminderRequest">GetReminderRequest</a></td>
+                <td><a href="#laelia.v1.GetReminderResponse">GetReminderResponse</a></td>
+                <td><p>GetReminder returns a single reminder by its resource name.</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateReminder</td>
+                <td><a href="#laelia.v1.UpdateReminderRequest">UpdateReminderRequest</a></td>
+                <td><a href="#laelia.v1.UpdateReminderResponse">UpdateReminderResponse</a></td>
+                <td><p>UpdateReminder edits the schedule (fire_at/cron_expr/tz) or task_content of
+a reminder. The caller is the owning agent or a workspace admin. Editing a
+DUE or MISSED reminder resets it to PENDING with the new schedule.</p></td>
+              </tr>
+            
+              <tr>
+                <td>CancelReminder</td>
+                <td><a href="#laelia.v1.CancelReminderRequest">CancelReminderRequest</a></td>
+                <td><a href="#laelia.v1.CancelReminderResponse">CancelReminderResponse</a></td>
+                <td><p>CancelReminder cancels a reminder. The caller is the owning agent or a
+workspace admin. A cancelled reminder is terminal.</p></td>
+              </tr>
+            
+              <tr>
+                <td>CompleteReminder</td>
+                <td><a href="#laelia.v1.CompleteReminderRequest">CompleteReminderRequest</a></td>
+                <td><a href="#laelia.v1.CompleteReminderResponse">CompleteReminderResponse</a></td>
+                <td><p>CompleteReminder marks a DUE reminder completed and atomically posts the
+result as a single system message in the reminder&#39;s thread. Only the owning
+agent may call this. Recurring reminders reschedule to the next cron fire.</p></td>
+              </tr>
+            
+              <tr>
+                <td>FailReminder</td>
+                <td><a href="#laelia.v1.FailReminderRequest">FailReminderRequest</a></td>
+                <td><a href="#laelia.v1.FailReminderResponse">FailReminderResponse</a></td>
+                <td><p>FailReminder marks a DUE reminder failed with the given error and posts it
+as a system thread message. Recurring reminders reschedule. Only the owning
+agent may call this.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ListDueReminders</td>
+                <td><a href="#laelia.v1.ListDueRemindersRequest">ListDueRemindersRequest</a></td>
+                <td><a href="#laelia.v1.ListDueRemindersResponse">ListDueRemindersResponse</a></td>
+                <td><p>ListDueReminders returns the DUE reminders owned by the calling agent, for
+the autonomous drain loop to pick up fired work. Agent identity is resolved
+from the auth context.</p></td>
               </tr>
             
               <tr>
@@ -8986,6 +9818,86 @@ a member.</p></td>
                 <td>POST</td>
                 <td>/v1/{message=conversations/*/messages/*}:updateTaskStatus</td>
                 <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ConvertMessageToReminder</td>
+                <td>POST</td>
+                <td>/v1/{message=conversations/*/messages/*}:convertToReminder</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListReminders</td>
+                <td>GET</td>
+                <td>/v1/reminders</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetReminder</td>
+                <td>GET</td>
+                <td>/v1/{name=reminders/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateReminder</td>
+                <td>PATCH</td>
+                <td>/v1/{name=reminders/*}</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>CancelReminder</td>
+                <td>POST</td>
+                <td>/v1/{name=reminders/*}:cancel</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>CompleteReminder</td>
+                <td>POST</td>
+                <td>/v1/{name=reminders/*}:complete</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>FailReminder</td>
+                <td>POST</td>
+                <td>/v1/{name=reminders/*}:fail</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListDueReminders</td>
+                <td>GET</td>
+                <td>/v1/agents/-/dueReminders</td>
+                <td></td>
               </tr>
               
             

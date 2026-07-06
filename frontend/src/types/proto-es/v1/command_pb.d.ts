@@ -2168,6 +2168,509 @@ export declare type CreateTaskResponse = Message<"laelia.v1.CreateTaskResponse">
 export declare const CreateTaskResponseSchema: GenMessage<CreateTaskResponse>;
 
 /**
+ * Reminder is the scheduled-task metadata attached to a root chat_message. The
+ * chat_message (root) remains the source of truth for the trigger content; this
+ * row carries the schedule, assignee, and lifecycle state. The resource name is
+ * "reminders/{message_id}" — the reminder's identity is its trigger message.
+ *
+ * @generated from message laelia.v1.Reminder
+ */
+export declare type Reminder = Message<"laelia.v1.Reminder"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * conversation is the conversation the trigger message belongs to
+   * ("conversations/{id}").
+   *
+   * @generated from field: string conversation = 2;
+   */
+  conversation: string;
+
+  /**
+   * message is the trigger message ("conversations/{c}/messages/{m}"); it is
+   * also the thread root for the reminder's discussion.
+   *
+   * @generated from field: string message = 3;
+   */
+  message: string;
+
+  /**
+   * assignee_agent is the owning agent ("agents/{id}"); the agent that claimed
+   * the reminder at creation.
+   *
+   * @generated from field: string assignee_agent = 4;
+   */
+  assigneeAgent: string;
+
+  /**
+   * @generated from field: string assignee_name = 5;
+   */
+  assigneeName: string;
+
+  /**
+   * task_content is the agent's structured summary of the work to perform on
+   * each fire.
+   *
+   * @generated from field: string task_content = 6;
+   */
+  taskContent: string;
+
+  /**
+   * fire_at is the next fire time. For one-shot reminders (cron_expr empty) it
+   * is the single trigger time; for recurring reminders it is the next cron
+   * fire, recomputed after each completion/miss.
+   *
+   * @generated from field: google.protobuf.Timestamp fire_at = 7;
+   */
+  fireAt?: Timestamp | undefined;
+
+  /**
+   * cron_expr, when non-empty, makes the reminder recurring. A standard
+   * 5-field cron (min hour dom month dow) interpreted in tz. Empty = one-shot.
+   *
+   * @generated from field: string cron_expr = 8;
+   */
+  cronExpr: string;
+
+  /**
+   * tz is the IANA timezone name used to interpret cron_expr (e.g.
+   * "Asia/Shanghai"). "UTC" by default.
+   *
+   * @generated from field: string tz = 9;
+   */
+  tz: string;
+
+  /**
+   * @generated from field: laelia.v1.ReminderStatus status = 10;
+   */
+  status: ReminderStatus;
+
+  /**
+   * retry_count is the number of delivery attempts since the last fire for an
+   * offline agent (0 when the agent was reached on the first try).
+   *
+   * @generated from field: int32 retry_count = 11;
+   */
+  retryCount: number;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp next_retry_at = 12;
+   */
+  nextRetryAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp last_attempt_at = 13;
+   */
+  lastAttemptAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp last_fired_at = 14;
+   */
+  lastFiredAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp last_completed_at = 15;
+   */
+  lastCompletedAt?: Timestamp | undefined;
+
+  /**
+   * result is the agent's completion/failure report from the most recent fire.
+   *
+   * @generated from field: string result = 16;
+   */
+  result: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 17;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 18;
+   */
+  updatedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.Reminder.
+ * Use `create(ReminderSchema)` to create a new message.
+ */
+export declare const ReminderSchema: GenMessage<Reminder>;
+
+/**
+ * @generated from message laelia.v1.ConvertMessageToReminderRequest
+ */
+export declare type ConvertMessageToReminderRequest = Message<"laelia.v1.ConvertMessageToReminderRequest"> & {
+  /**
+   * message is the resource name of the trigger message
+   * ("conversations/{c}/messages/{m}"). Must be a root message in the
+   * conversation (thread_root empty) and not already a reminder. The calling
+   * agent claims the reminder at creation (assignee = caller).
+   *
+   * @generated from field: string message = 1;
+   */
+  message: string;
+
+  /**
+   * task_content is the agent's structured summary of the scheduled work.
+   *
+   * @generated from field: string task_content = 2;
+   */
+  taskContent: string;
+
+  /**
+   * fire_at is the first fire time. Required.
+   *
+   * @generated from field: google.protobuf.Timestamp fire_at = 3;
+   */
+  fireAt?: Timestamp | undefined;
+
+  /**
+   * cron_expr, when non-empty, makes the reminder recurring (5-field cron in
+   * tz). Empty = one-shot.
+   *
+   * @generated from field: string cron_expr = 4;
+   */
+  cronExpr: string;
+
+  /**
+   * tz is the IANA timezone for cron_expr. Defaults to "UTC" when empty.
+   *
+   * @generated from field: string tz = 5;
+   */
+  tz: string;
+};
+
+/**
+ * Describes the message laelia.v1.ConvertMessageToReminderRequest.
+ * Use `create(ConvertMessageToReminderRequestSchema)` to create a new message.
+ */
+export declare const ConvertMessageToReminderRequestSchema: GenMessage<ConvertMessageToReminderRequest>;
+
+/**
+ * @generated from message laelia.v1.ConvertMessageToReminderResponse
+ */
+export declare type ConvertMessageToReminderResponse = Message<"laelia.v1.ConvertMessageToReminderResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Reminder reminder = 1;
+   */
+  reminder?: Reminder | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.ConvertMessageToReminderResponse.
+ * Use `create(ConvertMessageToReminderResponseSchema)` to create a new message.
+ */
+export declare const ConvertMessageToReminderResponseSchema: GenMessage<ConvertMessageToReminderResponse>;
+
+/**
+ * @generated from message laelia.v1.ListRemindersRequest
+ */
+export declare type ListRemindersRequest = Message<"laelia.v1.ListRemindersRequest"> & {
+  /**
+   * agent, when set, restricts the result to reminders owned by the given agent
+   * ("agents/{id}"). The agent-page Reminders tab filters by the viewed agent.
+   *
+   * @generated from field: string agent = 1;
+   */
+  agent: string;
+
+  /**
+   * conversation, when set, restricts the result to reminders in that
+   * conversation.
+   *
+   * @generated from field: string conversation = 2;
+   */
+  conversation: string;
+
+  /**
+   * status_filter, when non-empty, restricts the result to the given statuses.
+   *
+   * @generated from field: repeated laelia.v1.ReminderStatus status_filter = 3;
+   */
+  statusFilter: ReminderStatus[];
+
+  /**
+   * @generated from field: int32 page_size = 4;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 5;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListRemindersRequest.
+ * Use `create(ListRemindersRequestSchema)` to create a new message.
+ */
+export declare const ListRemindersRequestSchema: GenMessage<ListRemindersRequest>;
+
+/**
+ * @generated from message laelia.v1.ListRemindersResponse
+ */
+export declare type ListRemindersResponse = Message<"laelia.v1.ListRemindersResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.Reminder reminders = 1;
+   */
+  reminders: Reminder[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListRemindersResponse.
+ * Use `create(ListRemindersResponseSchema)` to create a new message.
+ */
+export declare const ListRemindersResponseSchema: GenMessage<ListRemindersResponse>;
+
+/**
+ * @generated from message laelia.v1.GetReminderRequest
+ */
+export declare type GetReminderRequest = Message<"laelia.v1.GetReminderRequest"> & {
+  /**
+   * name is the reminder resource name ("reminders/{message_id}").
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetReminderRequest.
+ * Use `create(GetReminderRequestSchema)` to create a new message.
+ */
+export declare const GetReminderRequestSchema: GenMessage<GetReminderRequest>;
+
+/**
+ * @generated from message laelia.v1.GetReminderResponse
+ */
+export declare type GetReminderResponse = Message<"laelia.v1.GetReminderResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Reminder reminder = 1;
+   */
+  reminder?: Reminder | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.GetReminderResponse.
+ * Use `create(GetReminderResponseSchema)` to create a new message.
+ */
+export declare const GetReminderResponseSchema: GenMessage<GetReminderResponse>;
+
+/**
+ * @generated from message laelia.v1.UpdateReminderRequest
+ */
+export declare type UpdateReminderRequest = Message<"laelia.v1.UpdateReminderRequest"> & {
+  /**
+   * name is the reminder resource name ("reminders/{message_id}").
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * fire_at, cron_expr, tz, task_content are the editable fields. At least one
+   * must be set. Editing a DUE or MISSED reminder resets it to PENDING with the
+   * new schedule. COMPLETED/CANCELLED/FAILED reminders cannot be edited.
+   *
+   * @generated from field: google.protobuf.Timestamp fire_at = 2;
+   */
+  fireAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string cron_expr = 3;
+   */
+  cronExpr: string;
+
+  /**
+   * @generated from field: string tz = 4;
+   */
+  tz: string;
+
+  /**
+   * @generated from field: string task_content = 5;
+   */
+  taskContent: string;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateReminderRequest.
+ * Use `create(UpdateReminderRequestSchema)` to create a new message.
+ */
+export declare const UpdateReminderRequestSchema: GenMessage<UpdateReminderRequest>;
+
+/**
+ * @generated from message laelia.v1.UpdateReminderResponse
+ */
+export declare type UpdateReminderResponse = Message<"laelia.v1.UpdateReminderResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Reminder reminder = 1;
+   */
+  reminder?: Reminder | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateReminderResponse.
+ * Use `create(UpdateReminderResponseSchema)` to create a new message.
+ */
+export declare const UpdateReminderResponseSchema: GenMessage<UpdateReminderResponse>;
+
+/**
+ * @generated from message laelia.v1.CancelReminderRequest
+ */
+export declare type CancelReminderRequest = Message<"laelia.v1.CancelReminderRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.CancelReminderRequest.
+ * Use `create(CancelReminderRequestSchema)` to create a new message.
+ */
+export declare const CancelReminderRequestSchema: GenMessage<CancelReminderRequest>;
+
+/**
+ * @generated from message laelia.v1.CancelReminderResponse
+ */
+export declare type CancelReminderResponse = Message<"laelia.v1.CancelReminderResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Reminder reminder = 1;
+   */
+  reminder?: Reminder | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.CancelReminderResponse.
+ * Use `create(CancelReminderResponseSchema)` to create a new message.
+ */
+export declare const CancelReminderResponseSchema: GenMessage<CancelReminderResponse>;
+
+/**
+ * @generated from message laelia.v1.CompleteReminderRequest
+ */
+export declare type CompleteReminderRequest = Message<"laelia.v1.CompleteReminderRequest"> & {
+  /**
+   * name is the reminder resource name ("reminders/{message_id}"). Only the
+   * owning agent may call this, and only when the reminder is DUE.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * result is the agent's completion report, posted as a single system message
+   * in the reminder's thread. The backend posts it atomically with the status
+   * update so it never appears twice.
+   *
+   * @generated from field: string result = 2;
+   */
+  result: string;
+};
+
+/**
+ * Describes the message laelia.v1.CompleteReminderRequest.
+ * Use `create(CompleteReminderRequestSchema)` to create a new message.
+ */
+export declare const CompleteReminderRequestSchema: GenMessage<CompleteReminderRequest>;
+
+/**
+ * @generated from message laelia.v1.CompleteReminderResponse
+ */
+export declare type CompleteReminderResponse = Message<"laelia.v1.CompleteReminderResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Reminder reminder = 1;
+   */
+  reminder?: Reminder | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.CompleteReminderResponse.
+ * Use `create(CompleteReminderResponseSchema)` to create a new message.
+ */
+export declare const CompleteReminderResponseSchema: GenMessage<CompleteReminderResponse>;
+
+/**
+ * @generated from message laelia.v1.FailReminderRequest
+ */
+export declare type FailReminderRequest = Message<"laelia.v1.FailReminderRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * error is the failure reason, posted as a system message in the thread.
+   *
+   * @generated from field: string error = 2;
+   */
+  error: string;
+};
+
+/**
+ * Describes the message laelia.v1.FailReminderRequest.
+ * Use `create(FailReminderRequestSchema)` to create a new message.
+ */
+export declare const FailReminderRequestSchema: GenMessage<FailReminderRequest>;
+
+/**
+ * @generated from message laelia.v1.FailReminderResponse
+ */
+export declare type FailReminderResponse = Message<"laelia.v1.FailReminderResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Reminder reminder = 1;
+   */
+  reminder?: Reminder | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.FailReminderResponse.
+ * Use `create(FailReminderResponseSchema)` to create a new message.
+ */
+export declare const FailReminderResponseSchema: GenMessage<FailReminderResponse>;
+
+/**
+ * @generated from message laelia.v1.ListDueRemindersRequest
+ */
+export declare type ListDueRemindersRequest = Message<"laelia.v1.ListDueRemindersRequest"> & {
+};
+
+/**
+ * Describes the message laelia.v1.ListDueRemindersRequest.
+ * Use `create(ListDueRemindersRequestSchema)` to create a new message.
+ */
+export declare const ListDueRemindersRequestSchema: GenMessage<ListDueRemindersRequest>;
+
+/**
+ * @generated from message laelia.v1.ListDueRemindersResponse
+ */
+export declare type ListDueRemindersResponse = Message<"laelia.v1.ListDueRemindersResponse"> & {
+  /**
+   * reminders are the DUE reminders owned by the calling agent, ordered by
+   * fire_at ascending. The agent drain loop calls this each session to pick up
+   * fired reminders and process them.
+   *
+   * @generated from field: repeated laelia.v1.Reminder reminders = 1;
+   */
+  reminders: Reminder[];
+};
+
+/**
+ * Describes the message laelia.v1.ListDueRemindersResponse.
+ * Use `create(ListDueRemindersResponseSchema)` to create a new message.
+ */
+export declare const ListDueRemindersResponseSchema: GenMessage<ListDueRemindersResponse>;
+
+/**
  * ListChannelUpdates returns, for the authenticated agent, every conversation
  * it is a member of whose current room_version is greater than the agent's
  * stored per-channel cursor — i.e. the channels that have unread messages. It
@@ -3237,6 +3740,55 @@ export enum CommandEventType {
 export declare const CommandEventTypeSchema: GenEnum<CommandEventType>;
 
 /**
+ * ReminderStatus is the lifecycle state of a reminder. Values prefixed to
+ * satisfy protobuf's C++ scoping rules (sibling enums cannot share value
+ * names), matching TaskStatus/SenderType.
+ *
+ * @generated from enum laelia.v1.ReminderStatus
+ */
+export enum ReminderStatus {
+  /**
+   * @generated from enum value: REMINDER_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: REMINDER_STATUS_PENDING = 1;
+   */
+  PENDING = 1,
+
+  /**
+   * @generated from enum value: REMINDER_STATUS_DUE = 2;
+   */
+  DUE = 2,
+
+  /**
+   * @generated from enum value: REMINDER_STATUS_COMPLETED = 3;
+   */
+  COMPLETED = 3,
+
+  /**
+   * @generated from enum value: REMINDER_STATUS_CANCELLED = 4;
+   */
+  CANCELLED = 4,
+
+  /**
+   * @generated from enum value: REMINDER_STATUS_MISSED = 5;
+   */
+  MISSED = 5,
+
+  /**
+   * @generated from enum value: REMINDER_STATUS_FAILED = 6;
+   */
+  FAILED = 6,
+}
+
+/**
+ * Describes the enum laelia.v1.ReminderStatus.
+ */
+export declare const ReminderStatusSchema: GenEnum<ReminderStatus>;
+
+/**
  * @generated from service laelia.v1.CommandService
  */
 export declare const CommandService: GenService<{
@@ -3502,6 +4054,100 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof UpdateTaskStatusRequestSchema;
     output: typeof UpdateTaskStatusResponseSchema;
+  },
+  /**
+   * ConvertMessageToReminder turns an existing top-level message into a
+   * scheduled reminder owned by the calling agent (atomic create+claim). The
+   * message must be a root in the conversation and not already a reminder. The
+   * agent is subscribed to the reminder's thread so discussion replies wake it.
+   *
+   * @generated from rpc laelia.v1.CommandService.ConvertMessageToReminder
+   */
+  convertMessageToReminder: {
+    methodKind: "unary";
+    input: typeof ConvertMessageToReminderRequestSchema;
+    output: typeof ConvertMessageToReminderResponseSchema;
+  },
+  /**
+   * ListReminders returns reminders, optionally filtered by owning agent,
+   * conversation, and status. Used by the agent-page Reminders tab (user) and
+   * the agent CLI (self-list).
+   *
+   * @generated from rpc laelia.v1.CommandService.ListReminders
+   */
+  listReminders: {
+    methodKind: "unary";
+    input: typeof ListRemindersRequestSchema;
+    output: typeof ListRemindersResponseSchema;
+  },
+  /**
+   * GetReminder returns a single reminder by its resource name.
+   *
+   * @generated from rpc laelia.v1.CommandService.GetReminder
+   */
+  getReminder: {
+    methodKind: "unary";
+    input: typeof GetReminderRequestSchema;
+    output: typeof GetReminderResponseSchema;
+  },
+  /**
+   * UpdateReminder edits the schedule (fire_at/cron_expr/tz) or task_content of
+   * a reminder. The caller is the owning agent or a workspace admin. Editing a
+   * DUE or MISSED reminder resets it to PENDING with the new schedule.
+   *
+   * @generated from rpc laelia.v1.CommandService.UpdateReminder
+   */
+  updateReminder: {
+    methodKind: "unary";
+    input: typeof UpdateReminderRequestSchema;
+    output: typeof UpdateReminderResponseSchema;
+  },
+  /**
+   * CancelReminder cancels a reminder. The caller is the owning agent or a
+   * workspace admin. A cancelled reminder is terminal.
+   *
+   * @generated from rpc laelia.v1.CommandService.CancelReminder
+   */
+  cancelReminder: {
+    methodKind: "unary";
+    input: typeof CancelReminderRequestSchema;
+    output: typeof CancelReminderResponseSchema;
+  },
+  /**
+   * CompleteReminder marks a DUE reminder completed and atomically posts the
+   * result as a single system message in the reminder's thread. Only the owning
+   * agent may call this. Recurring reminders reschedule to the next cron fire.
+   *
+   * @generated from rpc laelia.v1.CommandService.CompleteReminder
+   */
+  completeReminder: {
+    methodKind: "unary";
+    input: typeof CompleteReminderRequestSchema;
+    output: typeof CompleteReminderResponseSchema;
+  },
+  /**
+   * FailReminder marks a DUE reminder failed with the given error and posts it
+   * as a system thread message. Recurring reminders reschedule. Only the owning
+   * agent may call this.
+   *
+   * @generated from rpc laelia.v1.CommandService.FailReminder
+   */
+  failReminder: {
+    methodKind: "unary";
+    input: typeof FailReminderRequestSchema;
+    output: typeof FailReminderResponseSchema;
+  },
+  /**
+   * ListDueReminders returns the DUE reminders owned by the calling agent, for
+   * the autonomous drain loop to pick up fired work. Agent identity is resolved
+   * from the auth context.
+   *
+   * @generated from rpc laelia.v1.CommandService.ListDueReminders
+   */
+  listDueReminders: {
+    methodKind: "unary";
+    input: typeof ListDueRemindersRequestSchema;
+    output: typeof ListDueRemindersResponseSchema;
   },
   /**
    * @generated from rpc laelia.v1.CommandService.ListChannelUpdates

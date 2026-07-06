@@ -104,6 +104,28 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/-/dueReminders:
+        get:
+            tags:
+                - CommandService
+            description: |-
+                ListDueReminders returns the DUE reminders owned by the calling agent, for
+                 the autonomous drain loop to pick up fired work. Agent identity is resolved
+                 from the auth context.
+            operationId: CommandService_ListDueReminders
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListDueRemindersResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/-/threadUpdates:
         get:
             tags:
@@ -1209,6 +1231,48 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/messages/{message}:convertToReminder:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                ConvertMessageToReminder turns an existing top-level message into a
+                 scheduled reminder owned by the calling agent (atomic create+claim). The
+                 message must be a root in the conversation and not already a reminder. The
+                 agent is subscribed to the reminder's thread so discussion replies wake it.
+            operationId: CommandService_ConvertMessageToReminder
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+                - name: message
+                  in: path
+                  description: The message id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ConvertMessageToReminderRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ConvertMessageToReminderResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/conversations/{conversation}/messages/{message}:convertToTask:
         post:
             tags:
@@ -1606,6 +1670,232 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/PostMessageResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/reminders:
+        get:
+            tags:
+                - CommandService
+            description: |-
+                ListReminders returns reminders, optionally filtered by owning agent,
+                 conversation, and status. Used by the agent-page Reminders tab (user) and
+                 the agent CLI (self-list).
+            operationId: CommandService_ListReminders
+            parameters:
+                - name: agent
+                  in: query
+                  description: |-
+                    agent, when set, restricts the result to reminders owned by the given agent
+                     ("agents/{id}"). The agent-page Reminders tab filters by the viewed agent.
+                  schema:
+                    type: string
+                - name: conversation
+                  in: query
+                  description: |-
+                    conversation, when set, restricts the result to reminders in that
+                     conversation.
+                  schema:
+                    type: string
+                - name: statusFilter
+                  in: query
+                  description: status_filter, when non-empty, restricts the result to the given statuses.
+                  schema:
+                    type: array
+                    items:
+                        enum:
+                            - REMINDER_STATUS_UNSPECIFIED
+                            - REMINDER_STATUS_PENDING
+                            - REMINDER_STATUS_DUE
+                            - REMINDER_STATUS_COMPLETED
+                            - REMINDER_STATUS_CANCELLED
+                            - REMINDER_STATUS_MISSED
+                            - REMINDER_STATUS_FAILED
+                        type: string
+                        format: enum
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListRemindersResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/reminders/{reminder}:
+        get:
+            tags:
+                - CommandService
+            description: GetReminder returns a single reminder by its resource name.
+            operationId: CommandService_GetReminder
+            parameters:
+                - name: reminder
+                  in: path
+                  description: The reminder id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetReminderResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - CommandService
+            description: |-
+                UpdateReminder edits the schedule (fire_at/cron_expr/tz) or task_content of
+                 a reminder. The caller is the owning agent or a workspace admin. Editing a
+                 DUE or MISSED reminder resets it to PENDING with the new schedule.
+            operationId: CommandService_UpdateReminder
+            parameters:
+                - name: reminder
+                  in: path
+                  description: The reminder id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UpdateReminderRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UpdateReminderResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/reminders/{reminder}:cancel:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                CancelReminder cancels a reminder. The caller is the owning agent or a
+                 workspace admin. A cancelled reminder is terminal.
+            operationId: CommandService_CancelReminder
+            parameters:
+                - name: reminder
+                  in: path
+                  description: The reminder id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/CancelReminderRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/CancelReminderResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/reminders/{reminder}:complete:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                CompleteReminder marks a DUE reminder completed and atomically posts the
+                 result as a single system message in the reminder's thread. Only the owning
+                 agent may call this. Recurring reminders reschedule to the next cron fire.
+            operationId: CommandService_CompleteReminder
+            parameters:
+                - name: reminder
+                  in: path
+                  description: The reminder id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/CompleteReminderRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/CompleteReminderResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/reminders/{reminder}:fail:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                FailReminder marks a DUE reminder failed with the given error and posts it
+                 as a system thread message. Recurring reminders reschedule. Only the owning
+                 agent may call this.
+            operationId: CommandService_FailReminder
+            parameters:
+                - name: reminder
+                  in: path
+                  description: The reminder id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/FailReminderRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/FailReminderResponse'
                 default:
                     description: Default error response
                     content:
@@ -2279,6 +2569,18 @@ components:
                     type: string
                 reason:
                     type: string
+        CancelReminderRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+        CancelReminderResponse:
+            type: object
+            properties:
+                reminder:
+                    $ref: '#/components/schemas/Reminder'
         ChannelMember:
             type: object
             properties:
@@ -2559,6 +2861,28 @@ components:
                 timestamp:
                     type: string
                     format: date-time
+        CompleteReminderRequest:
+            required:
+                - name
+                - result
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: |-
+                        name is the reminder resource name ("reminders/{message_id}"). Only the
+                         owning agent may call this, and only when the reminder is DUE.
+                result:
+                    type: string
+                    description: |-
+                        result is the agent's completion report, posted as a single system message
+                         in the reminder's thread. The backend posts it atomically with the status
+                         update so it never appears twice.
+        CompleteReminderResponse:
+            type: object
+            properties:
+                reminder:
+                    $ref: '#/components/schemas/Reminder'
         ConnectAgentRequest:
             type: object
             properties:
@@ -2616,6 +2940,40 @@ components:
                          the requesting user's read cursor for this conversation. Populated by
                          ListChannels; 0 (or unset) when the user is caught up.
                     format: int32
+        ConvertMessageToReminderRequest:
+            required:
+                - message
+                - taskContent
+                - fireAt
+            type: object
+            properties:
+                message:
+                    type: string
+                    description: |-
+                        message is the resource name of the trigger message
+                         ("conversations/{c}/messages/{m}"). Must be a root message in the
+                         conversation (thread_root empty) and not already a reminder. The calling
+                         agent claims the reminder at creation (assignee = caller).
+                taskContent:
+                    type: string
+                    description: task_content is the agent's structured summary of the scheduled work.
+                fireAt:
+                    type: string
+                    description: fire_at is the first fire time. Required.
+                    format: date-time
+                cronExpr:
+                    type: string
+                    description: |-
+                        cron_expr, when non-empty, makes the reminder recurring (5-field cron in
+                         tz). Empty = one-shot.
+                tz:
+                    type: string
+                    description: tz is the IANA timezone for cron_expr. Defaults to "UTC" when empty.
+        ConvertMessageToReminderResponse:
+            type: object
+            properties:
+                reminder:
+                    $ref: '#/components/schemas/Reminder'
         ConvertMessageToTaskRequest:
             required:
                 - message
@@ -2687,6 +3045,22 @@ components:
                     type: string
                 newText:
                     type: string
+        FailReminderRequest:
+            required:
+                - name
+                - error
+            type: object
+            properties:
+                name:
+                    type: string
+                error:
+                    type: string
+                    description: error is the failure reason, posted as a system message in the thread.
+        FailReminderResponse:
+            type: object
+            properties:
+                reminder:
+                    $ref: '#/components/schemas/Reminder'
         FetchConversationActivityResponse:
             type: object
             properties:
@@ -2728,6 +3102,11 @@ components:
             properties:
                 name:
                     type: string
+        GetReminderResponse:
+            type: object
+            properties:
+                reminder:
+                    $ref: '#/components/schemas/Reminder'
         GetS3ConfigResponse:
             type: object
             properties:
@@ -2839,6 +3218,26 @@ components:
                 nextPageToken:
                     type: string
                 currentVersion:
+                    type: string
+        ListDueRemindersResponse:
+            type: object
+            properties:
+                reminders:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Reminder'
+                    description: |-
+                        reminders are the DUE reminders owned by the calling agent, ordered by
+                         fire_at ascending. The agent drain loop calls this each session to pick up
+                         fired reminders and process them.
+        ListRemindersResponse:
+            type: object
+            properties:
+                reminders:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Reminder'
+                nextPageToken:
                     type: string
         ListTasksResponse:
             type: object
@@ -3080,6 +3479,93 @@ components:
                 accessTokenExpiresAt:
                     type: string
                     format: date-time
+        Reminder:
+            type: object
+            properties:
+                name:
+                    type: string
+                conversation:
+                    type: string
+                    description: |-
+                        conversation is the conversation the trigger message belongs to
+                         ("conversations/{id}").
+                message:
+                    type: string
+                    description: |-
+                        message is the trigger message ("conversations/{c}/messages/{m}"); it is
+                         also the thread root for the reminder's discussion.
+                assigneeAgent:
+                    type: string
+                    description: |-
+                        assignee_agent is the owning agent ("agents/{id}"); the agent that claimed
+                         the reminder at creation.
+                assigneeName:
+                    type: string
+                taskContent:
+                    type: string
+                    description: |-
+                        task_content is the agent's structured summary of the work to perform on
+                         each fire.
+                fireAt:
+                    type: string
+                    description: |-
+                        fire_at is the next fire time. For one-shot reminders (cron_expr empty) it
+                         is the single trigger time; for recurring reminders it is the next cron
+                         fire, recomputed after each completion/miss.
+                    format: date-time
+                cronExpr:
+                    type: string
+                    description: |-
+                        cron_expr, when non-empty, makes the reminder recurring. A standard
+                         5-field cron (min hour dom month dow) interpreted in tz. Empty = one-shot.
+                tz:
+                    type: string
+                    description: |-
+                        tz is the IANA timezone name used to interpret cron_expr (e.g.
+                         "Asia/Shanghai"). "UTC" by default.
+                status:
+                    enum:
+                        - REMINDER_STATUS_UNSPECIFIED
+                        - REMINDER_STATUS_PENDING
+                        - REMINDER_STATUS_DUE
+                        - REMINDER_STATUS_COMPLETED
+                        - REMINDER_STATUS_CANCELLED
+                        - REMINDER_STATUS_MISSED
+                        - REMINDER_STATUS_FAILED
+                    type: string
+                    format: enum
+                retryCount:
+                    type: integer
+                    description: |-
+                        retry_count is the number of delivery attempts since the last fire for an
+                         offline agent (0 when the agent was reached on the first try).
+                    format: int32
+                nextRetryAt:
+                    type: string
+                    format: date-time
+                lastAttemptAt:
+                    type: string
+                    format: date-time
+                lastFiredAt:
+                    type: string
+                    format: date-time
+                lastCompletedAt:
+                    type: string
+                    format: date-time
+                result:
+                    type: string
+                    description: result is the agent's completion/failure report from the most recent fire.
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
+            description: |-
+                Reminder is the scheduled-task metadata attached to a root chat_message. The
+                 chat_message (root) remains the source of truth for the trigger content; this
+                 row carries the schedule, assignee, and lifecycle state. The resource name is
+                 "reminders/{message_id}" — the reminder's identity is its trigger message.
         RespondPermissionRequest:
             required:
                 - name
@@ -3308,6 +3794,32 @@ components:
                     type: string
                 acpConfig:
                     $ref: '#/components/schemas/AgentACPConfig'
+        UpdateReminderRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: name is the reminder resource name ("reminders/{message_id}").
+                fireAt:
+                    type: string
+                    description: |-
+                        fire_at, cron_expr, tz, task_content are the editable fields. At least one
+                         must be set. Editing a DUE or MISSED reminder resets it to PENDING with the
+                         new schedule. COMPLETED/CANCELLED/FAILED reminders cannot be edited.
+                    format: date-time
+                cronExpr:
+                    type: string
+                tz:
+                    type: string
+                taskContent:
+                    type: string
+        UpdateReminderResponse:
+            type: object
+            properties:
+                reminder:
+                    $ref: '#/components/schemas/Reminder'
         UpdateS3ConfigResponse:
             type: object
             properties:

@@ -49,6 +49,14 @@ const (
 	CommandService_ClaimTask_FullMethodName                 = "/laelia.v1.CommandService/ClaimTask"
 	CommandService_UnclaimTask_FullMethodName               = "/laelia.v1.CommandService/UnclaimTask"
 	CommandService_UpdateTaskStatus_FullMethodName          = "/laelia.v1.CommandService/UpdateTaskStatus"
+	CommandService_ConvertMessageToReminder_FullMethodName  = "/laelia.v1.CommandService/ConvertMessageToReminder"
+	CommandService_ListReminders_FullMethodName             = "/laelia.v1.CommandService/ListReminders"
+	CommandService_GetReminder_FullMethodName               = "/laelia.v1.CommandService/GetReminder"
+	CommandService_UpdateReminder_FullMethodName            = "/laelia.v1.CommandService/UpdateReminder"
+	CommandService_CancelReminder_FullMethodName            = "/laelia.v1.CommandService/CancelReminder"
+	CommandService_CompleteReminder_FullMethodName          = "/laelia.v1.CommandService/CompleteReminder"
+	CommandService_FailReminder_FullMethodName              = "/laelia.v1.CommandService/FailReminder"
+	CommandService_ListDueReminders_FullMethodName          = "/laelia.v1.CommandService/ListDueReminders"
 	CommandService_ListChannelUpdates_FullMethodName        = "/laelia.v1.CommandService/ListChannelUpdates"
 	CommandService_ListThreadUpdates_FullMethodName         = "/laelia.v1.CommandService/ListThreadUpdates"
 	CommandService_AckProcessedVersion_FullMethodName       = "/laelia.v1.CommandService/AckProcessedVersion"
@@ -116,6 +124,36 @@ type CommandServiceClient interface {
 	// approval in the task's thread). Only the assignee may call this. Emits a
 	// system notification row.
 	UpdateTaskStatus(ctx context.Context, in *UpdateTaskStatusRequest, opts ...grpc.CallOption) (*UpdateTaskStatusResponse, error)
+	// ConvertMessageToReminder turns an existing top-level message into a
+	// scheduled reminder owned by the calling agent (atomic create+claim). The
+	// message must be a root in the conversation and not already a reminder. The
+	// agent is subscribed to the reminder's thread so discussion replies wake it.
+	ConvertMessageToReminder(ctx context.Context, in *ConvertMessageToReminderRequest, opts ...grpc.CallOption) (*ConvertMessageToReminderResponse, error)
+	// ListReminders returns reminders, optionally filtered by owning agent,
+	// conversation, and status. Used by the agent-page Reminders tab (user) and
+	// the agent CLI (self-list).
+	ListReminders(ctx context.Context, in *ListRemindersRequest, opts ...grpc.CallOption) (*ListRemindersResponse, error)
+	// GetReminder returns a single reminder by its resource name.
+	GetReminder(ctx context.Context, in *GetReminderRequest, opts ...grpc.CallOption) (*GetReminderResponse, error)
+	// UpdateReminder edits the schedule (fire_at/cron_expr/tz) or task_content of
+	// a reminder. The caller is the owning agent or a workspace admin. Editing a
+	// DUE or MISSED reminder resets it to PENDING with the new schedule.
+	UpdateReminder(ctx context.Context, in *UpdateReminderRequest, opts ...grpc.CallOption) (*UpdateReminderResponse, error)
+	// CancelReminder cancels a reminder. The caller is the owning agent or a
+	// workspace admin. A cancelled reminder is terminal.
+	CancelReminder(ctx context.Context, in *CancelReminderRequest, opts ...grpc.CallOption) (*CancelReminderResponse, error)
+	// CompleteReminder marks a DUE reminder completed and atomically posts the
+	// result as a single system message in the reminder's thread. Only the owning
+	// agent may call this. Recurring reminders reschedule to the next cron fire.
+	CompleteReminder(ctx context.Context, in *CompleteReminderRequest, opts ...grpc.CallOption) (*CompleteReminderResponse, error)
+	// FailReminder marks a DUE reminder failed with the given error and posts it
+	// as a system thread message. Recurring reminders reschedule. Only the owning
+	// agent may call this.
+	FailReminder(ctx context.Context, in *FailReminderRequest, opts ...grpc.CallOption) (*FailReminderResponse, error)
+	// ListDueReminders returns the DUE reminders owned by the calling agent, for
+	// the autonomous drain loop to pick up fired work. Agent identity is resolved
+	// from the auth context.
+	ListDueReminders(ctx context.Context, in *ListDueRemindersRequest, opts ...grpc.CallOption) (*ListDueRemindersResponse, error)
 	ListChannelUpdates(ctx context.Context, in *ListChannelUpdatesRequest, opts ...grpc.CallOption) (*ListChannelUpdatesResponse, error)
 	ListThreadUpdates(ctx context.Context, in *ListThreadUpdatesRequest, opts ...grpc.CallOption) (*ListThreadUpdatesResponse, error)
 	AckProcessedVersion(ctx context.Context, in *AckProcessedVersionRequest, opts ...grpc.CallOption) (*AckProcessedVersionResponse, error)
@@ -452,6 +490,86 @@ func (c *commandServiceClient) UpdateTaskStatus(ctx context.Context, in *UpdateT
 	return out, nil
 }
 
+func (c *commandServiceClient) ConvertMessageToReminder(ctx context.Context, in *ConvertMessageToReminderRequest, opts ...grpc.CallOption) (*ConvertMessageToReminderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConvertMessageToReminderResponse)
+	err := c.cc.Invoke(ctx, CommandService_ConvertMessageToReminder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) ListReminders(ctx context.Context, in *ListRemindersRequest, opts ...grpc.CallOption) (*ListRemindersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListRemindersResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListReminders_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) GetReminder(ctx context.Context, in *GetReminderRequest, opts ...grpc.CallOption) (*GetReminderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetReminderResponse)
+	err := c.cc.Invoke(ctx, CommandService_GetReminder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) UpdateReminder(ctx context.Context, in *UpdateReminderRequest, opts ...grpc.CallOption) (*UpdateReminderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateReminderResponse)
+	err := c.cc.Invoke(ctx, CommandService_UpdateReminder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) CancelReminder(ctx context.Context, in *CancelReminderRequest, opts ...grpc.CallOption) (*CancelReminderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelReminderResponse)
+	err := c.cc.Invoke(ctx, CommandService_CancelReminder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) CompleteReminder(ctx context.Context, in *CompleteReminderRequest, opts ...grpc.CallOption) (*CompleteReminderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompleteReminderResponse)
+	err := c.cc.Invoke(ctx, CommandService_CompleteReminder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) FailReminder(ctx context.Context, in *FailReminderRequest, opts ...grpc.CallOption) (*FailReminderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FailReminderResponse)
+	err := c.cc.Invoke(ctx, CommandService_FailReminder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) ListDueReminders(ctx context.Context, in *ListDueRemindersRequest, opts ...grpc.CallOption) (*ListDueRemindersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListDueRemindersResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListDueReminders_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *commandServiceClient) ListChannelUpdates(ctx context.Context, in *ListChannelUpdatesRequest, opts ...grpc.CallOption) (*ListChannelUpdatesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListChannelUpdatesResponse)
@@ -589,6 +707,36 @@ type CommandServiceServer interface {
 	// approval in the task's thread). Only the assignee may call this. Emits a
 	// system notification row.
 	UpdateTaskStatus(context.Context, *UpdateTaskStatusRequest) (*UpdateTaskStatusResponse, error)
+	// ConvertMessageToReminder turns an existing top-level message into a
+	// scheduled reminder owned by the calling agent (atomic create+claim). The
+	// message must be a root in the conversation and not already a reminder. The
+	// agent is subscribed to the reminder's thread so discussion replies wake it.
+	ConvertMessageToReminder(context.Context, *ConvertMessageToReminderRequest) (*ConvertMessageToReminderResponse, error)
+	// ListReminders returns reminders, optionally filtered by owning agent,
+	// conversation, and status. Used by the agent-page Reminders tab (user) and
+	// the agent CLI (self-list).
+	ListReminders(context.Context, *ListRemindersRequest) (*ListRemindersResponse, error)
+	// GetReminder returns a single reminder by its resource name.
+	GetReminder(context.Context, *GetReminderRequest) (*GetReminderResponse, error)
+	// UpdateReminder edits the schedule (fire_at/cron_expr/tz) or task_content of
+	// a reminder. The caller is the owning agent or a workspace admin. Editing a
+	// DUE or MISSED reminder resets it to PENDING with the new schedule.
+	UpdateReminder(context.Context, *UpdateReminderRequest) (*UpdateReminderResponse, error)
+	// CancelReminder cancels a reminder. The caller is the owning agent or a
+	// workspace admin. A cancelled reminder is terminal.
+	CancelReminder(context.Context, *CancelReminderRequest) (*CancelReminderResponse, error)
+	// CompleteReminder marks a DUE reminder completed and atomically posts the
+	// result as a single system message in the reminder's thread. Only the owning
+	// agent may call this. Recurring reminders reschedule to the next cron fire.
+	CompleteReminder(context.Context, *CompleteReminderRequest) (*CompleteReminderResponse, error)
+	// FailReminder marks a DUE reminder failed with the given error and posts it
+	// as a system thread message. Recurring reminders reschedule. Only the owning
+	// agent may call this.
+	FailReminder(context.Context, *FailReminderRequest) (*FailReminderResponse, error)
+	// ListDueReminders returns the DUE reminders owned by the calling agent, for
+	// the autonomous drain loop to pick up fired work. Agent identity is resolved
+	// from the auth context.
+	ListDueReminders(context.Context, *ListDueRemindersRequest) (*ListDueRemindersResponse, error)
 	ListChannelUpdates(context.Context, *ListChannelUpdatesRequest) (*ListChannelUpdatesResponse, error)
 	ListThreadUpdates(context.Context, *ListThreadUpdatesRequest) (*ListThreadUpdatesResponse, error)
 	AckProcessedVersion(context.Context, *AckProcessedVersionRequest) (*AckProcessedVersionResponse, error)
@@ -703,6 +851,30 @@ func (UnimplementedCommandServiceServer) UnclaimTask(context.Context, *UnclaimTa
 }
 func (UnimplementedCommandServiceServer) UpdateTaskStatus(context.Context, *UpdateTaskStatusRequest) (*UpdateTaskStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateTaskStatus not implemented")
+}
+func (UnimplementedCommandServiceServer) ConvertMessageToReminder(context.Context, *ConvertMessageToReminderRequest) (*ConvertMessageToReminderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConvertMessageToReminder not implemented")
+}
+func (UnimplementedCommandServiceServer) ListReminders(context.Context, *ListRemindersRequest) (*ListRemindersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListReminders not implemented")
+}
+func (UnimplementedCommandServiceServer) GetReminder(context.Context, *GetReminderRequest) (*GetReminderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetReminder not implemented")
+}
+func (UnimplementedCommandServiceServer) UpdateReminder(context.Context, *UpdateReminderRequest) (*UpdateReminderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateReminder not implemented")
+}
+func (UnimplementedCommandServiceServer) CancelReminder(context.Context, *CancelReminderRequest) (*CancelReminderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelReminder not implemented")
+}
+func (UnimplementedCommandServiceServer) CompleteReminder(context.Context, *CompleteReminderRequest) (*CompleteReminderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CompleteReminder not implemented")
+}
+func (UnimplementedCommandServiceServer) FailReminder(context.Context, *FailReminderRequest) (*FailReminderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method FailReminder not implemented")
+}
+func (UnimplementedCommandServiceServer) ListDueReminders(context.Context, *ListDueRemindersRequest) (*ListDueRemindersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListDueReminders not implemented")
 }
 func (UnimplementedCommandServiceServer) ListChannelUpdates(context.Context, *ListChannelUpdatesRequest) (*ListChannelUpdatesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListChannelUpdates not implemented")
@@ -1257,6 +1429,150 @@ func _CommandService_UpdateTaskStatus_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommandService_ConvertMessageToReminder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConvertMessageToReminderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ConvertMessageToReminder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ConvertMessageToReminder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ConvertMessageToReminder(ctx, req.(*ConvertMessageToReminderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_ListReminders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRemindersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListReminders(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListReminders_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListReminders(ctx, req.(*ListRemindersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_GetReminder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetReminderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).GetReminder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_GetReminder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).GetReminder(ctx, req.(*GetReminderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_UpdateReminder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateReminderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).UpdateReminder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_UpdateReminder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).UpdateReminder(ctx, req.(*UpdateReminderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_CancelReminder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelReminderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).CancelReminder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_CancelReminder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).CancelReminder(ctx, req.(*CancelReminderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_CompleteReminder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompleteReminderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).CompleteReminder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_CompleteReminder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).CompleteReminder(ctx, req.(*CompleteReminderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_FailReminder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FailReminderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).FailReminder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_FailReminder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).FailReminder(ctx, req.(*FailReminderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_ListDueReminders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListDueRemindersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListDueReminders(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListDueReminders_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListDueReminders(ctx, req.(*ListDueRemindersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CommandService_ListChannelUpdates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListChannelUpdatesRequest)
 	if err := dec(in); err != nil {
@@ -1515,6 +1831,38 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateTaskStatus",
 			Handler:    _CommandService_UpdateTaskStatus_Handler,
+		},
+		{
+			MethodName: "ConvertMessageToReminder",
+			Handler:    _CommandService_ConvertMessageToReminder_Handler,
+		},
+		{
+			MethodName: "ListReminders",
+			Handler:    _CommandService_ListReminders_Handler,
+		},
+		{
+			MethodName: "GetReminder",
+			Handler:    _CommandService_GetReminder_Handler,
+		},
+		{
+			MethodName: "UpdateReminder",
+			Handler:    _CommandService_UpdateReminder_Handler,
+		},
+		{
+			MethodName: "CancelReminder",
+			Handler:    _CommandService_CancelReminder_Handler,
+		},
+		{
+			MethodName: "CompleteReminder",
+			Handler:    _CommandService_CompleteReminder_Handler,
+		},
+		{
+			MethodName: "FailReminder",
+			Handler:    _CommandService_FailReminder_Handler,
+		},
+		{
+			MethodName: "ListDueReminders",
+			Handler:    _CommandService_ListDueReminders_Handler,
 		},
 		{
 			MethodName: "ListChannelUpdates",

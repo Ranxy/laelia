@@ -699,6 +699,172 @@ message CreateTaskResponse {
   ChatMessage message = 1;
 }
 
+// === Reminders ===
+// A reminder is a scheduled/recurring task owned by an agent. Like a task, a
+// reminder IS its root chat_message (PK = message_id); the thread rooted at that
+// message is the discussion channel where the user and agent negotiate the
+// schedule, and where completion/miss reports are posted as system messages.
+// The agent that recognizes the scheduling intent claims the reminder at
+// creation (assignee = calling agent). The manager-side scheduler fires the
+// reminder at fire_at (one-shot) or per cron_expr (recurring, interpreted in
+// tz), wakes the agent, and the agent runs the work and calls
+// CompleteReminder/FailReminder; the backend atomically flips the status and
+// posts a single system thread message (never duplicated).
+
+// ReminderStatus is the lifecycle state of a reminder. Values prefixed to
+// satisfy protobuf's C++ scoping rules (sibling enums cannot share value
+// names), matching TaskStatus/SenderType.
+enum ReminderStatus {
+  REMINDER_STATUS_UNSPECIFIED = 0;
+  REMINDER_STATUS_PENDING = 1;
+  REMINDER_STATUS_DUE = 2;
+  REMINDER_STATUS_COMPLETED = 3;
+  REMINDER_STATUS_CANCELLED = 4;
+  REMINDER_STATUS_MISSED = 5;
+  REMINDER_STATUS_FAILED = 6;
+}
+
+// Reminder is the scheduled-task metadata attached to a root chat_message. The
+// chat_message (root) remains the source of truth for the trigger content; this
+// row carries the schedule, assignee, and lifecycle state. The resource name is
+// "reminders/{message_id}" — the reminder's identity is its trigger message.
+message Reminder {
+  string name = 1;
+  // conversation is the conversation the trigger message belongs to
+  // ("conversations/{id}").
+  string conversation = 2 [(google.api.resource_reference).type = "laelia/Conversation"];
+  // message is the trigger message ("conversations/{c}/messages/{m}"); it is
+  // also the thread root for the reminder's discussion.
+  string message = 3;
+  // assignee_agent is the owning agent ("agents/{id}"); the agent that claimed
+  // the reminder at creation.
+  string assignee_agent = 4 [(google.api.resource_reference).type = "laelia/Agent"];
+  string assignee_name = 5;
+  // task_content is the agent's structured summary of the work to perform on
+  // each fire.
+  string task_content = 6;
+  // fire_at is the next fire time. For one-shot reminders (cron_expr empty) it
+  // is the single trigger time; for recurring reminders it is the next cron
+  // fire, recomputed after each completion/miss.
+  google.protobuf.Timestamp fire_at = 7;
+  // cron_expr, when non-empty, makes the reminder recurring. A standard
+  // 5-field cron (min hour dom month dow) interpreted in tz. Empty = one-shot.
+  string cron_expr = 8;
+  // tz is the IANA timezone name used to interpret cron_expr (e.g.
+  // "Asia/Shanghai"). "UTC" by default.
+  string tz = 9;
+  ReminderStatus status = 10;
+  // retry_count is the number of delivery attempts since the last fire for an
+  // offline agent (0 when the agent was reached on the first try).
+  int32 retry_count = 11;
+  google.protobuf.Timestamp next_retry_at = 12;
+  google.protobuf.Timestamp last_attempt_at = 13;
+  google.protobuf.Timestamp last_fired_at = 14;
+  google.protobuf.Timestamp last_completed_at = 15;
+  // result is the agent's completion/failure report from the most recent fire.
+  string result = 16;
+  google.protobuf.Timestamp created_at = 17;
+  google.protobuf.Timestamp updated_at = 18;
+}
+
+message ConvertMessageToReminderRequest {
+  // message is the resource name of the trigger message
+  // ("conversations/{c}/messages/{m}"). Must be a root message in the
+  // conversation (thread_root empty) and not already a reminder. The calling
+  // agent claims the reminder at creation (assignee = caller).
+  string message = 1 [(google.api.field_behavior) = REQUIRED];
+  // task_content is the agent's structured summary of the scheduled work.
+  string task_content = 2 [(google.api.field_behavior) = REQUIRED];
+  // fire_at is the first fire time. Required.
+  google.protobuf.Timestamp fire_at = 3 [(google.api.field_behavior) = REQUIRED];
+  // cron_expr, when non-empty, makes the reminder recurring (5-field cron in
+  // tz). Empty = one-shot.
+  string cron_expr = 4;
+  // tz is the IANA timezone for cron_expr. Defaults to "UTC" when empty.
+  string tz = 5;
+}
+message ConvertMessageToReminderResponse {
+  Reminder reminder = 1;
+}
+
+message ListRemindersRequest {
+  // agent, when set, restricts the result to reminders owned by the given agent
+  // ("agents/{id}"). The agent-page Reminders tab filters by the viewed agent.
+  string agent = 1 [(google.api.resource_reference).type = "laelia/Agent"];
+  // conversation, when set, restricts the result to reminders in that
+  // conversation.
+  string conversation = 2 [(google.api.resource_reference).type = "laelia/Conversation"];
+  // status_filter, when non-empty, restricts the result to the given statuses.
+  repeated ReminderStatus status_filter = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+message ListRemindersResponse {
+  repeated Reminder reminders = 1;
+  string next_page_token = 2;
+}
+
+message GetReminderRequest {
+  // name is the reminder resource name ("reminders/{message_id}").
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+message GetReminderResponse {
+  Reminder reminder = 1;
+}
+
+message UpdateReminderRequest {
+  // name is the reminder resource name ("reminders/{message_id}").
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+  // fire_at, cron_expr, tz, task_content are the editable fields. At least one
+  // must be set. Editing a DUE or MISSED reminder resets it to PENDING with the
+  // new schedule. COMPLETED/CANCELLED/FAILED reminders cannot be edited.
+  google.protobuf.Timestamp fire_at = 2;
+  string cron_expr = 3;
+  string tz = 4;
+  string task_content = 5;
+}
+message UpdateReminderResponse {
+  Reminder reminder = 1;
+}
+
+message CancelReminderRequest {
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+message CancelReminderResponse {
+  Reminder reminder = 1;
+}
+
+message CompleteReminderRequest {
+  // name is the reminder resource name ("reminders/{message_id}"). Only the
+  // owning agent may call this, and only when the reminder is DUE.
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+  // result is the agent's completion report, posted as a single system message
+  // in the reminder's thread. The backend posts it atomically with the status
+  // update so it never appears twice.
+  string result = 2 [(google.api.field_behavior) = REQUIRED];
+}
+message CompleteReminderResponse {
+  Reminder reminder = 1;
+}
+
+message FailReminderRequest {
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+  // error is the failure reason, posted as a system message in the thread.
+  string error = 2 [(google.api.field_behavior) = REQUIRED];
+}
+message FailReminderResponse {
+  Reminder reminder = 1;
+}
+
+message ListDueRemindersRequest {}
+
+message ListDueRemindersResponse {
+  // reminders are the DUE reminders owned by the calling agent, ordered by
+  // fire_at ascending. The agent drain loop calls this each session to pick up
+  // fired reminders and process them.
+  repeated Reminder reminders = 1;
+}
+
 // ListChannelUpdates returns, for the authenticated agent, every conversation
 // it is a member of whose current room_version is greater than the agent's
 // stored per-channel cursor — i.e. the channels that have unread messages. It
@@ -986,6 +1152,85 @@ service CommandService {
       post: "/v1/{message=conversations/*/messages/*}:updateTaskStatus"
       body: "*"
     };
+  }
+
+  // ConvertMessageToReminder turns an existing top-level message into a
+  // scheduled reminder owned by the calling agent (atomic create+claim). The
+  // message must be a root in the conversation and not already a reminder. The
+  // agent is subscribed to the reminder's thread so discussion replies wake it.
+  rpc ConvertMessageToReminder(ConvertMessageToReminderRequest) returns (ConvertMessageToReminderResponse) {
+    option (google.api.http) = {
+      post: "/v1/{message=conversations/*/messages/*}:convertToReminder"
+      body: "*"
+    };
+  }
+
+  // ListReminders returns reminders, optionally filtered by owning agent,
+  // conversation, and status. Used by the agent-page Reminders tab (user) and
+  // the agent CLI (self-list).
+  rpc ListReminders(ListRemindersRequest) returns (ListRemindersResponse) {
+    option (google.api.http) = {get: "/v1/reminders"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.read";
+  }
+
+  // GetReminder returns a single reminder by its resource name.
+  rpc GetReminder(GetReminderRequest) returns (GetReminderResponse) {
+    option (google.api.http) = {get: "/v1/{name=reminders/*}"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.read";
+  }
+
+  // UpdateReminder edits the schedule (fire_at/cron_expr/tz) or task_content of
+  // a reminder. The caller is the owning agent or a workspace admin. Editing a
+  // DUE or MISSED reminder resets it to PENDING with the new schedule.
+  rpc UpdateReminder(UpdateReminderRequest) returns (UpdateReminderResponse) {
+    option (google.api.http) = {
+      patch: "/v1/{name=reminders/*}"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.send";
+    option (laelia.v1.audit) = true;
+  }
+
+  // CancelReminder cancels a reminder. The caller is the owning agent or a
+  // workspace admin. A cancelled reminder is terminal.
+  rpc CancelReminder(CancelReminderRequest) returns (CancelReminderResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=reminders/*}:cancel"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.send";
+    option (laelia.v1.audit) = true;
+  }
+
+  // CompleteReminder marks a DUE reminder completed and atomically posts the
+  // result as a single system message in the reminder's thread. Only the owning
+  // agent may call this. Recurring reminders reschedule to the next cron fire.
+  rpc CompleteReminder(CompleteReminderRequest) returns (CompleteReminderResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=reminders/*}:complete"
+      body: "*"
+    };
+  }
+
+  // FailReminder marks a DUE reminder failed with the given error and posts it
+  // as a system thread message. Recurring reminders reschedule. Only the owning
+  // agent may call this.
+  rpc FailReminder(FailReminderRequest) returns (FailReminderResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=reminders/*}:fail"
+      body: "*"
+    };
+  }
+
+  // ListDueReminders returns the DUE reminders owned by the calling agent, for
+  // the autonomous drain loop to pick up fired work. Agent identity is resolved
+  // from the auth context.
+  rpc ListDueReminders(ListDueRemindersRequest) returns (ListDueRemindersResponse) {
+    option (google.api.http) = {get: "/v1/agents/-/dueReminders"};
   }
 
   rpc ListChannelUpdates(ListChannelUpdatesRequest) returns (ListChannelUpdatesResponse) {

@@ -516,3 +516,42 @@ CREATE TABLE IF NOT EXISTS task (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_task_conversation_number ON task(conversation_id, task_number);
 CREATE INDEX IF NOT EXISTS idx_task_conversation_status ON task(conversation_id, status);
 CREATE INDEX IF NOT EXISTS idx_task_assignee ON task(assignee_agent_id) WHERE assignee_agent_id IS NOT NULL;
+
+-- === Reminders (scheduled/recurring agent-owned tasks) ===
+-- A reminder mirrors the task shape: a top-level chat_message (the trigger
+-- message) with attached schedule metadata. message_id is both PK and FK, so a
+-- reminder IS its trigger message and deleting the message cascades. The thread
+-- rooted at the trigger message is the reminder's discussion channel and where
+-- completion/miss system messages are posted. The owning agent (the one that
+-- recognized the scheduling intent) claims it at creation, so assignee_agent_id
+-- is NOT NULL. status: 1=PENDING, 2=DUE, 3=COMPLETED, 4=CANCELLED, 5=MISSED,
+-- 6=FAILED. fire_at is the next fire; cron_expr (NULL = one-shot) + tz drive
+-- recurring rescheduling. The retry_* columns record the offline-at-fire
+-- backoff attempts so the scheduler's retry process is auditable.
+CREATE TABLE IF NOT EXISTS reminder (
+    message_id UUID PRIMARY KEY REFERENCES chat_message(id) ON DELETE CASCADE,
+    conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+    assignee_agent_id INTEGER NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
+    task_content TEXT NOT NULL,
+    fire_at TIMESTAMPTZ NOT NULL,
+    cron_expr TEXT,
+    tz TEXT NOT NULL DEFAULT 'UTC',
+    status SMALLINT NOT NULL DEFAULT 1,
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    next_retry_at TIMESTAMPTZ,
+    last_attempt_at TIMESTAMPTZ,
+    last_fired_at TIMESTAMPTZ,
+    last_completed_at TIMESTAMPTZ,
+    result TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT reminder_status_check CHECK (status IN (1,2,3,4,5,6))
+);
+
+CREATE INDEX IF NOT EXISTS idx_reminder_assignee_status ON reminder(assignee_agent_id, status);
+-- PENDING due scan: the scheduler's 1s tick selects rows whose fire_at has
+-- passed. Partial index on status=1 keeps it cheap.
+CREATE INDEX IF NOT EXISTS idx_reminder_fire_at ON reminder(fire_at) WHERE status = 1;
+-- DUE retry scan: the scheduler's retry tick selects DUE rows whose
+-- next_retry_at has passed.
+CREATE INDEX IF NOT EXISTS idx_reminder_retry ON reminder(next_retry_at) WHERE status = 2;

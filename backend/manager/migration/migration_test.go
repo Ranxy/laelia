@@ -67,6 +67,34 @@ func TestUniqueConstraintsPresent(t *testing.T) {
 	}
 }
 
+// TestReminderTablePresent locks in the reminder table that backs scheduled/
+// recurring agent tasks. It mirrors task (1:1 with its trigger message, thread
+// rooted at it) plus schedule columns (fire_at, cron_expr, tz) and retry-audit
+// columns. The assignee is NOT NULL (atomic create+claim). All declarations are
+// idempotent so re-applying the schema is safe.
+func TestReminderTablePresent(t *testing.T) {
+	sql := latestSQL(t)
+
+	for _, want := range []string{
+		"CREATE TABLE IF NOT EXISTS reminder",
+		"message_id UUID PRIMARY KEY REFERENCES chat_message(id) ON DELETE CASCADE",
+		"conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE",
+		"assignee_agent_id INTEGER NOT NULL REFERENCES agent(id) ON DELETE CASCADE",
+		"task_content TEXT NOT NULL",
+		"fire_at TIMESTAMPTZ NOT NULL",
+		"cron_expr TEXT",
+		"tz TEXT NOT NULL DEFAULT 'UTC'",
+		"CONSTRAINT reminder_status_check CHECK (status IN (1,2,3,4,5,6))",
+		"CREATE INDEX IF NOT EXISTS idx_reminder_assignee_status ON reminder(assignee_agent_id, status)",
+		"CREATE INDEX IF NOT EXISTS idx_reminder_fire_at ON reminder(fire_at) WHERE status = 1",
+		"CREATE INDEX IF NOT EXISTS idx_reminder_retry ON reminder(next_retry_at) WHERE status = 2",
+	} {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration missing reminder declaration: %q", want)
+		}
+	}
+}
+
 // TestUserChannelCursorPresent locks in the user_channel_cursor table that backs
 // the user-facing unread badge. It mirrors agent_channel_cursor: monotonic
 // read_version, cascade deletes, and a missing row treated as caught-up. All

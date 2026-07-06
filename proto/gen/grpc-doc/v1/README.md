@@ -101,6 +101,8 @@
     - [BeginSessionResponse](#laelia-v1-BeginSessionResponse)
     - [CancelCommandRequest](#laelia-v1-CancelCommandRequest)
     - [CancelMessage](#laelia-v1-CancelMessage)
+    - [CancelReminderRequest](#laelia-v1-CancelReminderRequest)
+    - [CancelReminderResponse](#laelia-v1-CancelReminderResponse)
     - [ChannelMember](#laelia-v1-ChannelMember)
     - [ChannelThread](#laelia-v1-ChannelThread)
     - [ChannelUpdate](#laelia-v1-ChannelUpdate)
@@ -116,7 +118,11 @@
     - [CommandRequest](#laelia-v1-CommandRequest)
     - [CommandRequest.EnvEntry](#laelia-v1-CommandRequest-EnvEntry)
     - [CommandResult](#laelia-v1-CommandResult)
+    - [CompleteReminderRequest](#laelia-v1-CompleteReminderRequest)
+    - [CompleteReminderResponse](#laelia-v1-CompleteReminderResponse)
     - [Conversation](#laelia-v1-Conversation)
+    - [ConvertMessageToReminderRequest](#laelia-v1-ConvertMessageToReminderRequest)
+    - [ConvertMessageToReminderResponse](#laelia-v1-ConvertMessageToReminderResponse)
     - [ConvertMessageToTaskRequest](#laelia-v1-ConvertMessageToTaskRequest)
     - [ConvertMessageToTaskResponse](#laelia-v1-ConvertMessageToTaskResponse)
     - [CreateChannelRequest](#laelia-v1-CreateChannelRequest)
@@ -127,6 +133,8 @@
     - [DiscoverProviders](#laelia-v1-DiscoverProviders)
     - [DownloadFileRequest](#laelia-v1-DownloadFileRequest)
     - [DownloadFileResponse](#laelia-v1-DownloadFileResponse)
+    - [FailReminderRequest](#laelia-v1-FailReminderRequest)
+    - [FailReminderResponse](#laelia-v1-FailReminderResponse)
     - [FetchConversationActivityRequest](#laelia-v1-FetchConversationActivityRequest)
     - [FetchConversationActivityResponse](#laelia-v1-FetchConversationActivityResponse)
     - [File](#laelia-v1-File)
@@ -137,6 +145,8 @@
     - [GetCommandRequest](#laelia-v1-GetCommandRequest)
     - [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest)
     - [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse)
+    - [GetReminderRequest](#laelia-v1-GetReminderRequest)
+    - [GetReminderResponse](#laelia-v1-GetReminderResponse)
     - [LifecyclePayload](#laelia-v1-LifecyclePayload)
     - [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest)
     - [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse)
@@ -152,8 +162,12 @@
     - [ListCommandsResponse](#laelia-v1-ListCommandsResponse)
     - [ListConversationMessagesRequest](#laelia-v1-ListConversationMessagesRequest)
     - [ListConversationMessagesResponse](#laelia-v1-ListConversationMessagesResponse)
+    - [ListDueRemindersRequest](#laelia-v1-ListDueRemindersRequest)
+    - [ListDueRemindersResponse](#laelia-v1-ListDueRemindersResponse)
     - [ListFilesRequest](#laelia-v1-ListFilesRequest)
     - [ListFilesResponse](#laelia-v1-ListFilesResponse)
+    - [ListRemindersRequest](#laelia-v1-ListRemindersRequest)
+    - [ListRemindersResponse](#laelia-v1-ListRemindersResponse)
     - [ListTasksRequest](#laelia-v1-ListTasksRequest)
     - [ListTasksResponse](#laelia-v1-ListTasksResponse)
     - [ListThreadMessagesRequest](#laelia-v1-ListThreadMessagesRequest)
@@ -176,6 +190,7 @@
     - [PostMessageResponse](#laelia-v1-PostMessageResponse)
     - [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered)
     - [RawAcpPayload](#laelia-v1-RawAcpPayload)
+    - [Reminder](#laelia-v1-Reminder)
     - [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest)
     - [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest)
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
@@ -189,6 +204,8 @@
     - [UnclaimTaskRequest](#laelia-v1-UnclaimTaskRequest)
     - [UnclaimTaskResponse](#laelia-v1-UnclaimTaskResponse)
     - [UpdateChannelRequest](#laelia-v1-UpdateChannelRequest)
+    - [UpdateReminderRequest](#laelia-v1-UpdateReminderRequest)
+    - [UpdateReminderResponse](#laelia-v1-UpdateReminderResponse)
     - [UpdateTaskStatusRequest](#laelia-v1-UpdateTaskStatusRequest)
     - [UpdateTaskStatusResponse](#laelia-v1-UpdateTaskStatusResponse)
     - [UploadFileRequest](#laelia-v1-UploadFileRequest)
@@ -199,6 +216,7 @@
     - [CommandEventType](#laelia-v1-CommandEventType)
     - [CommandOutput.StreamType](#laelia-v1-CommandOutput-StreamType)
     - [CommandStatus](#laelia-v1-CommandStatus)
+    - [ReminderStatus](#laelia-v1-ReminderStatus)
     - [SenderType](#laelia-v1-SenderType)
     - [TaskStatus](#laelia-v1-TaskStatus)
   
@@ -1613,6 +1631,36 @@ the agent uses to anchor its execution events and link any posted replies.
 
 
 
+<a name="laelia-v1-CancelReminderRequest"></a>
+
+### CancelReminderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-CancelReminderResponse"></a>
+
+### CancelReminderResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reminder | [Reminder](#laelia-v1-Reminder) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-ChannelMember"></a>
 
 ### ChannelMember
@@ -1929,6 +1977,37 @@ room_version greater than the agent&#39;s processed_version for that channel.
 
 
 
+<a name="laelia-v1-CompleteReminderRequest"></a>
+
+### CompleteReminderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | name is the reminder resource name (&#34;reminders/{message_id}&#34;). Only the owning agent may call this, and only when the reminder is DUE. |
+| result | [string](#string) |  | result is the agent&#39;s completion report, posted as a single system message in the reminder&#39;s thread. The backend posts it atomically with the status update so it never appears twice. |
+
+
+
+
+
+
+<a name="laelia-v1-CompleteReminderResponse"></a>
+
+### CompleteReminderResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reminder | [Reminder](#laelia-v1-Reminder) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-Conversation"></a>
 
 ### Conversation
@@ -1946,6 +2025,40 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | updated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | unread_count | [int32](#int32) |  | unread_count is the number of chat_message rows with room_version beyond the requesting user&#39;s read cursor for this conversation. Populated by ListChannels; 0 (or unset) when the user is caught up. |
+
+
+
+
+
+
+<a name="laelia-v1-ConvertMessageToReminderRequest"></a>
+
+### ConvertMessageToReminderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [string](#string) |  | message is the resource name of the trigger message (&#34;conversations/{c}/messages/{m}&#34;). Must be a root message in the conversation (thread_root empty) and not already a reminder. The calling agent claims the reminder at creation (assignee = caller). |
+| task_content | [string](#string) |  | task_content is the agent&#39;s structured summary of the scheduled work. |
+| fire_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | fire_at is the first fire time. Required. |
+| cron_expr | [string](#string) |  | cron_expr, when non-empty, makes the reminder recurring (5-field cron in tz). Empty = one-shot. |
+| tz | [string](#string) |  | tz is the IANA timezone for cron_expr. Defaults to &#34;UTC&#34; when empty. |
+
+
+
+
+
+
+<a name="laelia-v1-ConvertMessageToReminderResponse"></a>
+
+### ConvertMessageToReminderResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reminder | [Reminder](#laelia-v1-Reminder) |  |  |
 
 
 
@@ -2110,6 +2223,37 @@ AgentStreamMessage.providers_discovered.
 
 
 
+<a name="laelia-v1-FailReminderRequest"></a>
+
+### FailReminderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| error | [string](#string) |  | error is the failure reason, posted as a system message in the thread. |
+
+
+
+
+
+
+<a name="laelia-v1-FailReminderResponse"></a>
+
+### FailReminderResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reminder | [Reminder](#laelia-v1-Reminder) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-FetchConversationActivityRequest"></a>
 
 ### FetchConversationActivityRequest
@@ -2266,6 +2410,36 @@ File is the persisted metadata for an S3-backed object.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetReminderRequest"></a>
+
+### GetReminderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | name is the reminder resource name (&#34;reminders/{message_id}&#34;). |
+
+
+
+
+
+
+<a name="laelia-v1-GetReminderResponse"></a>
+
+### GetReminderResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reminder | [Reminder](#laelia-v1-Reminder) |  |  |
 
 
 
@@ -2518,6 +2692,31 @@ drain loop. The agent identity is resolved from the auth context.
 
 
 
+<a name="laelia-v1-ListDueRemindersRequest"></a>
+
+### ListDueRemindersRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-ListDueRemindersResponse"></a>
+
+### ListDueRemindersResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reminders | [Reminder](#laelia-v1-Reminder) | repeated | reminders are the DUE reminders owned by the calling agent, ordered by fire_at ascending. The agent drain loop calls this each session to pick up fired reminders and process them. |
+
+
+
+
+
+
 <a name="laelia-v1-ListFilesRequest"></a>
 
 ### ListFilesRequest
@@ -2542,6 +2741,41 @@ drain loop. The agent identity is resolved from the auth context.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | files | [File](#laelia-v1-File) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListRemindersRequest"></a>
+
+### ListRemindersRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent | [string](#string) |  | agent, when set, restricts the result to reminders owned by the given agent (&#34;agents/{id}&#34;). The agent-page Reminders tab filters by the viewed agent. |
+| conversation | [string](#string) |  | conversation, when set, restricts the result to reminders in that conversation. |
+| status_filter | [ReminderStatus](#laelia-v1-ReminderStatus) | repeated | status_filter, when non-empty, restricts the result to the given statuses. |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListRemindersResponse"></a>
+
+### ListRemindersResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reminders | [Reminder](#laelia-v1-Reminder) | repeated |  |
+| next_page_token | [string](#string) |  |  |
 
 
 
@@ -2933,6 +3167,41 @@ to the pending RefreshAgentProviders caller.
 
 
 
+<a name="laelia-v1-Reminder"></a>
+
+### Reminder
+Reminder is the scheduled-task metadata attached to a root chat_message. The
+chat_message (root) remains the source of truth for the trigger content; this
+row carries the schedule, assignee, and lifecycle state. The resource name is
+&#34;reminders/{message_id}&#34; — the reminder&#39;s identity is its trigger message.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| conversation | [string](#string) |  | conversation is the conversation the trigger message belongs to (&#34;conversations/{id}&#34;). |
+| message | [string](#string) |  | message is the trigger message (&#34;conversations/{c}/messages/{m}&#34;); it is also the thread root for the reminder&#39;s discussion. |
+| assignee_agent | [string](#string) |  | assignee_agent is the owning agent (&#34;agents/{id}&#34;); the agent that claimed the reminder at creation. |
+| assignee_name | [string](#string) |  |  |
+| task_content | [string](#string) |  | task_content is the agent&#39;s structured summary of the work to perform on each fire. |
+| fire_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | fire_at is the next fire time. For one-shot reminders (cron_expr empty) it is the single trigger time; for recurring reminders it is the next cron fire, recomputed after each completion/miss. |
+| cron_expr | [string](#string) |  | cron_expr, when non-empty, makes the reminder recurring. A standard 5-field cron (min hour dom month dow) interpreted in tz. Empty = one-shot. |
+| tz | [string](#string) |  | tz is the IANA timezone name used to interpret cron_expr (e.g. &#34;Asia/Shanghai&#34;). &#34;UTC&#34; by default. |
+| status | [ReminderStatus](#laelia-v1-ReminderStatus) |  |  |
+| retry_count | [int32](#int32) |  | retry_count is the number of delivery attempts since the last fire for an offline agent (0 when the agent was reached on the first try). |
+| next_retry_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| last_attempt_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| last_fired_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| last_completed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| result | [string](#string) |  | result is the agent&#39;s completion/failure report from the most recent fire. |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| updated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-RemoveChannelMemberRequest"></a>
 
 ### RemoveChannelMemberRequest
@@ -3157,6 +3426,40 @@ ThreadUpdate describes one subscribed thread with unread replies.
 
 
 
+<a name="laelia-v1-UpdateReminderRequest"></a>
+
+### UpdateReminderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | name is the reminder resource name (&#34;reminders/{message_id}&#34;). |
+| fire_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | fire_at, cron_expr, tz, task_content are the editable fields. At least one must be set. Editing a DUE or MISSED reminder resets it to PENDING with the new schedule. COMPLETED/CANCELLED/FAILED reminders cannot be edited. |
+| cron_expr | [string](#string) |  |  |
+| tz | [string](#string) |  |  |
+| task_content | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateReminderResponse"></a>
+
+### UpdateReminderResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reminder | [Reminder](#laelia-v1-Reminder) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-UpdateTaskStatusRequest"></a>
 
 ### UpdateTaskStatusRequest
@@ -3308,6 +3611,25 @@ ThreadUpdate describes one subscribed thread with unread replies.
 
 
 
+<a name="laelia-v1-ReminderStatus"></a>
+
+### ReminderStatus
+ReminderStatus is the lifecycle state of a reminder. Values prefixed to
+satisfy protobuf&#39;s C&#43;&#43; scoping rules (sibling enums cannot share value
+names), matching TaskStatus/SenderType.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| REMINDER_STATUS_UNSPECIFIED | 0 |  |
+| REMINDER_STATUS_PENDING | 1 |  |
+| REMINDER_STATUS_DUE | 2 |  |
+| REMINDER_STATUS_COMPLETED | 3 |  |
+| REMINDER_STATUS_CANCELLED | 4 |  |
+| REMINDER_STATUS_MISSED | 5 |  |
+| REMINDER_STATUS_FAILED | 6 |  |
+
+
+
 <a name="laelia-v1-SenderType"></a>
 
 ### SenderType
@@ -3395,6 +3717,14 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | ClaimTask | [ClaimTaskRequest](#laelia-v1-ClaimTaskRequest) | [ClaimTaskResponse](#laelia-v1-ClaimTaskResponse) | ClaimTask atomically transitions a TODO task to IN_PROGRESS and assigns it to the calling agent, subscribing the agent to the task&#39;s thread so approval replies wake it. Returns FAILED_PRECONDITION if the task is already claimed or not in TODO. Emits a system notification row. |
 | UnclaimTask | [UnclaimTaskRequest](#laelia-v1-UnclaimTaskRequest) | [UnclaimTaskResponse](#laelia-v1-UnclaimTaskResponse) | UnclaimTask releases the calling agent&#39;s claim on a task it owns, setting it back to TODO so another agent may claim it. Not allowed on DONE (terminal). Emits a system notification row. |
 | UpdateTaskStatus | [UpdateTaskStatusRequest](#laelia-v1-UpdateTaskStatusRequest) | [UpdateTaskStatusResponse](#laelia-v1-UpdateTaskStatusResponse) | UpdateTaskStatus advances a task&#39;s status. IN_PROGRESS -&gt; IN_REVIEW marks the assignee&#39;s work ready for human review; IN_REVIEW -&gt; DONE marks it complete (the assignee should call this only after detecting the human&#39;s approval in the task&#39;s thread). Only the assignee may call this. Emits a system notification row. |
+| ConvertMessageToReminder | [ConvertMessageToReminderRequest](#laelia-v1-ConvertMessageToReminderRequest) | [ConvertMessageToReminderResponse](#laelia-v1-ConvertMessageToReminderResponse) | ConvertMessageToReminder turns an existing top-level message into a scheduled reminder owned by the calling agent (atomic create&#43;claim). The message must be a root in the conversation and not already a reminder. The agent is subscribed to the reminder&#39;s thread so discussion replies wake it. |
+| ListReminders | [ListRemindersRequest](#laelia-v1-ListRemindersRequest) | [ListRemindersResponse](#laelia-v1-ListRemindersResponse) | ListReminders returns reminders, optionally filtered by owning agent, conversation, and status. Used by the agent-page Reminders tab (user) and the agent CLI (self-list). |
+| GetReminder | [GetReminderRequest](#laelia-v1-GetReminderRequest) | [GetReminderResponse](#laelia-v1-GetReminderResponse) | GetReminder returns a single reminder by its resource name. |
+| UpdateReminder | [UpdateReminderRequest](#laelia-v1-UpdateReminderRequest) | [UpdateReminderResponse](#laelia-v1-UpdateReminderResponse) | UpdateReminder edits the schedule (fire_at/cron_expr/tz) or task_content of a reminder. The caller is the owning agent or a workspace admin. Editing a DUE or MISSED reminder resets it to PENDING with the new schedule. |
+| CancelReminder | [CancelReminderRequest](#laelia-v1-CancelReminderRequest) | [CancelReminderResponse](#laelia-v1-CancelReminderResponse) | CancelReminder cancels a reminder. The caller is the owning agent or a workspace admin. A cancelled reminder is terminal. |
+| CompleteReminder | [CompleteReminderRequest](#laelia-v1-CompleteReminderRequest) | [CompleteReminderResponse](#laelia-v1-CompleteReminderResponse) | CompleteReminder marks a DUE reminder completed and atomically posts the result as a single system message in the reminder&#39;s thread. Only the owning agent may call this. Recurring reminders reschedule to the next cron fire. |
+| FailReminder | [FailReminderRequest](#laelia-v1-FailReminderRequest) | [FailReminderResponse](#laelia-v1-FailReminderResponse) | FailReminder marks a DUE reminder failed with the given error and posts it as a system thread message. Recurring reminders reschedule. Only the owning agent may call this. |
+| ListDueReminders | [ListDueRemindersRequest](#laelia-v1-ListDueRemindersRequest) | [ListDueRemindersResponse](#laelia-v1-ListDueRemindersResponse) | ListDueReminders returns the DUE reminders owned by the calling agent, for the autonomous drain loop to pick up fired work. Agent identity is resolved from the auth context. |
 | ListChannelUpdates | [ListChannelUpdatesRequest](#laelia-v1-ListChannelUpdatesRequest) | [ListChannelUpdatesResponse](#laelia-v1-ListChannelUpdatesResponse) |  |
 | ListThreadUpdates | [ListThreadUpdatesRequest](#laelia-v1-ListThreadUpdatesRequest) | [ListThreadUpdatesResponse](#laelia-v1-ListThreadUpdatesResponse) |  |
 | AckProcessedVersion | [AckProcessedVersionRequest](#laelia-v1-AckProcessedVersionRequest) | [AckProcessedVersionResponse](#laelia-v1-AckProcessedVersionResponse) |  |

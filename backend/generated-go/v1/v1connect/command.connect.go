@@ -123,6 +123,30 @@ const (
 	// CommandServiceUpdateTaskStatusProcedure is the fully-qualified name of the CommandService's
 	// UpdateTaskStatus RPC.
 	CommandServiceUpdateTaskStatusProcedure = "/laelia.v1.CommandService/UpdateTaskStatus"
+	// CommandServiceConvertMessageToReminderProcedure is the fully-qualified name of the
+	// CommandService's ConvertMessageToReminder RPC.
+	CommandServiceConvertMessageToReminderProcedure = "/laelia.v1.CommandService/ConvertMessageToReminder"
+	// CommandServiceListRemindersProcedure is the fully-qualified name of the CommandService's
+	// ListReminders RPC.
+	CommandServiceListRemindersProcedure = "/laelia.v1.CommandService/ListReminders"
+	// CommandServiceGetReminderProcedure is the fully-qualified name of the CommandService's
+	// GetReminder RPC.
+	CommandServiceGetReminderProcedure = "/laelia.v1.CommandService/GetReminder"
+	// CommandServiceUpdateReminderProcedure is the fully-qualified name of the CommandService's
+	// UpdateReminder RPC.
+	CommandServiceUpdateReminderProcedure = "/laelia.v1.CommandService/UpdateReminder"
+	// CommandServiceCancelReminderProcedure is the fully-qualified name of the CommandService's
+	// CancelReminder RPC.
+	CommandServiceCancelReminderProcedure = "/laelia.v1.CommandService/CancelReminder"
+	// CommandServiceCompleteReminderProcedure is the fully-qualified name of the CommandService's
+	// CompleteReminder RPC.
+	CommandServiceCompleteReminderProcedure = "/laelia.v1.CommandService/CompleteReminder"
+	// CommandServiceFailReminderProcedure is the fully-qualified name of the CommandService's
+	// FailReminder RPC.
+	CommandServiceFailReminderProcedure = "/laelia.v1.CommandService/FailReminder"
+	// CommandServiceListDueRemindersProcedure is the fully-qualified name of the CommandService's
+	// ListDueReminders RPC.
+	CommandServiceListDueRemindersProcedure = "/laelia.v1.CommandService/ListDueReminders"
 	// CommandServiceListChannelUpdatesProcedure is the fully-qualified name of the CommandService's
 	// ListChannelUpdates RPC.
 	CommandServiceListChannelUpdatesProcedure = "/laelia.v1.CommandService/ListChannelUpdates"
@@ -207,6 +231,36 @@ type CommandServiceClient interface {
 	// approval in the task's thread). Only the assignee may call this. Emits a
 	// system notification row.
 	UpdateTaskStatus(context.Context, *connect.Request[v1.UpdateTaskStatusRequest]) (*connect.Response[v1.UpdateTaskStatusResponse], error)
+	// ConvertMessageToReminder turns an existing top-level message into a
+	// scheduled reminder owned by the calling agent (atomic create+claim). The
+	// message must be a root in the conversation and not already a reminder. The
+	// agent is subscribed to the reminder's thread so discussion replies wake it.
+	ConvertMessageToReminder(context.Context, *connect.Request[v1.ConvertMessageToReminderRequest]) (*connect.Response[v1.ConvertMessageToReminderResponse], error)
+	// ListReminders returns reminders, optionally filtered by owning agent,
+	// conversation, and status. Used by the agent-page Reminders tab (user) and
+	// the agent CLI (self-list).
+	ListReminders(context.Context, *connect.Request[v1.ListRemindersRequest]) (*connect.Response[v1.ListRemindersResponse], error)
+	// GetReminder returns a single reminder by its resource name.
+	GetReminder(context.Context, *connect.Request[v1.GetReminderRequest]) (*connect.Response[v1.GetReminderResponse], error)
+	// UpdateReminder edits the schedule (fire_at/cron_expr/tz) or task_content of
+	// a reminder. The caller is the owning agent or a workspace admin. Editing a
+	// DUE or MISSED reminder resets it to PENDING with the new schedule.
+	UpdateReminder(context.Context, *connect.Request[v1.UpdateReminderRequest]) (*connect.Response[v1.UpdateReminderResponse], error)
+	// CancelReminder cancels a reminder. The caller is the owning agent or a
+	// workspace admin. A cancelled reminder is terminal.
+	CancelReminder(context.Context, *connect.Request[v1.CancelReminderRequest]) (*connect.Response[v1.CancelReminderResponse], error)
+	// CompleteReminder marks a DUE reminder completed and atomically posts the
+	// result as a single system message in the reminder's thread. Only the owning
+	// agent may call this. Recurring reminders reschedule to the next cron fire.
+	CompleteReminder(context.Context, *connect.Request[v1.CompleteReminderRequest]) (*connect.Response[v1.CompleteReminderResponse], error)
+	// FailReminder marks a DUE reminder failed with the given error and posts it
+	// as a system thread message. Recurring reminders reschedule. Only the owning
+	// agent may call this.
+	FailReminder(context.Context, *connect.Request[v1.FailReminderRequest]) (*connect.Response[v1.FailReminderResponse], error)
+	// ListDueReminders returns the DUE reminders owned by the calling agent, for
+	// the autonomous drain loop to pick up fired work. Agent identity is resolved
+	// from the auth context.
+	ListDueReminders(context.Context, *connect.Request[v1.ListDueRemindersRequest]) (*connect.Response[v1.ListDueRemindersResponse], error)
 	ListChannelUpdates(context.Context, *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error)
 	ListThreadUpdates(context.Context, *connect.Request[v1.ListThreadUpdatesRequest]) (*connect.Response[v1.ListThreadUpdatesResponse], error)
 	AckProcessedVersion(context.Context, *connect.Request[v1.AckProcessedVersionRequest]) (*connect.Response[v1.AckProcessedVersionResponse], error)
@@ -412,6 +466,54 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("UpdateTaskStatus")),
 			connect.WithClientOptions(opts...),
 		),
+		convertMessageToReminder: connect.NewClient[v1.ConvertMessageToReminderRequest, v1.ConvertMessageToReminderResponse](
+			httpClient,
+			baseURL+CommandServiceConvertMessageToReminderProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ConvertMessageToReminder")),
+			connect.WithClientOptions(opts...),
+		),
+		listReminders: connect.NewClient[v1.ListRemindersRequest, v1.ListRemindersResponse](
+			httpClient,
+			baseURL+CommandServiceListRemindersProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ListReminders")),
+			connect.WithClientOptions(opts...),
+		),
+		getReminder: connect.NewClient[v1.GetReminderRequest, v1.GetReminderResponse](
+			httpClient,
+			baseURL+CommandServiceGetReminderProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("GetReminder")),
+			connect.WithClientOptions(opts...),
+		),
+		updateReminder: connect.NewClient[v1.UpdateReminderRequest, v1.UpdateReminderResponse](
+			httpClient,
+			baseURL+CommandServiceUpdateReminderProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("UpdateReminder")),
+			connect.WithClientOptions(opts...),
+		),
+		cancelReminder: connect.NewClient[v1.CancelReminderRequest, v1.CancelReminderResponse](
+			httpClient,
+			baseURL+CommandServiceCancelReminderProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("CancelReminder")),
+			connect.WithClientOptions(opts...),
+		),
+		completeReminder: connect.NewClient[v1.CompleteReminderRequest, v1.CompleteReminderResponse](
+			httpClient,
+			baseURL+CommandServiceCompleteReminderProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("CompleteReminder")),
+			connect.WithClientOptions(opts...),
+		),
+		failReminder: connect.NewClient[v1.FailReminderRequest, v1.FailReminderResponse](
+			httpClient,
+			baseURL+CommandServiceFailReminderProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("FailReminder")),
+			connect.WithClientOptions(opts...),
+		),
+		listDueReminders: connect.NewClient[v1.ListDueRemindersRequest, v1.ListDueRemindersResponse](
+			httpClient,
+			baseURL+CommandServiceListDueRemindersProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ListDueReminders")),
+			connect.WithClientOptions(opts...),
+		),
 		listChannelUpdates: connect.NewClient[v1.ListChannelUpdatesRequest, v1.ListChannelUpdatesResponse](
 			httpClient,
 			baseURL+CommandServiceListChannelUpdatesProcedure,
@@ -494,6 +596,14 @@ type commandServiceClient struct {
 	claimTask                 *connect.Client[v1.ClaimTaskRequest, v1.ClaimTaskResponse]
 	unclaimTask               *connect.Client[v1.UnclaimTaskRequest, v1.UnclaimTaskResponse]
 	updateTaskStatus          *connect.Client[v1.UpdateTaskStatusRequest, v1.UpdateTaskStatusResponse]
+	convertMessageToReminder  *connect.Client[v1.ConvertMessageToReminderRequest, v1.ConvertMessageToReminderResponse]
+	listReminders             *connect.Client[v1.ListRemindersRequest, v1.ListRemindersResponse]
+	getReminder               *connect.Client[v1.GetReminderRequest, v1.GetReminderResponse]
+	updateReminder            *connect.Client[v1.UpdateReminderRequest, v1.UpdateReminderResponse]
+	cancelReminder            *connect.Client[v1.CancelReminderRequest, v1.CancelReminderResponse]
+	completeReminder          *connect.Client[v1.CompleteReminderRequest, v1.CompleteReminderResponse]
+	failReminder              *connect.Client[v1.FailReminderRequest, v1.FailReminderResponse]
+	listDueReminders          *connect.Client[v1.ListDueRemindersRequest, v1.ListDueRemindersResponse]
 	listChannelUpdates        *connect.Client[v1.ListChannelUpdatesRequest, v1.ListChannelUpdatesResponse]
 	listThreadUpdates         *connect.Client[v1.ListThreadUpdatesRequest, v1.ListThreadUpdatesResponse]
 	ackProcessedVersion       *connect.Client[v1.AckProcessedVersionRequest, v1.AckProcessedVersionResponse]
@@ -649,6 +759,46 @@ func (c *commandServiceClient) UpdateTaskStatus(ctx context.Context, req *connec
 	return c.updateTaskStatus.CallUnary(ctx, req)
 }
 
+// ConvertMessageToReminder calls laelia.v1.CommandService.ConvertMessageToReminder.
+func (c *commandServiceClient) ConvertMessageToReminder(ctx context.Context, req *connect.Request[v1.ConvertMessageToReminderRequest]) (*connect.Response[v1.ConvertMessageToReminderResponse], error) {
+	return c.convertMessageToReminder.CallUnary(ctx, req)
+}
+
+// ListReminders calls laelia.v1.CommandService.ListReminders.
+func (c *commandServiceClient) ListReminders(ctx context.Context, req *connect.Request[v1.ListRemindersRequest]) (*connect.Response[v1.ListRemindersResponse], error) {
+	return c.listReminders.CallUnary(ctx, req)
+}
+
+// GetReminder calls laelia.v1.CommandService.GetReminder.
+func (c *commandServiceClient) GetReminder(ctx context.Context, req *connect.Request[v1.GetReminderRequest]) (*connect.Response[v1.GetReminderResponse], error) {
+	return c.getReminder.CallUnary(ctx, req)
+}
+
+// UpdateReminder calls laelia.v1.CommandService.UpdateReminder.
+func (c *commandServiceClient) UpdateReminder(ctx context.Context, req *connect.Request[v1.UpdateReminderRequest]) (*connect.Response[v1.UpdateReminderResponse], error) {
+	return c.updateReminder.CallUnary(ctx, req)
+}
+
+// CancelReminder calls laelia.v1.CommandService.CancelReminder.
+func (c *commandServiceClient) CancelReminder(ctx context.Context, req *connect.Request[v1.CancelReminderRequest]) (*connect.Response[v1.CancelReminderResponse], error) {
+	return c.cancelReminder.CallUnary(ctx, req)
+}
+
+// CompleteReminder calls laelia.v1.CommandService.CompleteReminder.
+func (c *commandServiceClient) CompleteReminder(ctx context.Context, req *connect.Request[v1.CompleteReminderRequest]) (*connect.Response[v1.CompleteReminderResponse], error) {
+	return c.completeReminder.CallUnary(ctx, req)
+}
+
+// FailReminder calls laelia.v1.CommandService.FailReminder.
+func (c *commandServiceClient) FailReminder(ctx context.Context, req *connect.Request[v1.FailReminderRequest]) (*connect.Response[v1.FailReminderResponse], error) {
+	return c.failReminder.CallUnary(ctx, req)
+}
+
+// ListDueReminders calls laelia.v1.CommandService.ListDueReminders.
+func (c *commandServiceClient) ListDueReminders(ctx context.Context, req *connect.Request[v1.ListDueRemindersRequest]) (*connect.Response[v1.ListDueRemindersResponse], error) {
+	return c.listDueReminders.CallUnary(ctx, req)
+}
+
 // ListChannelUpdates calls laelia.v1.CommandService.ListChannelUpdates.
 func (c *commandServiceClient) ListChannelUpdates(ctx context.Context, req *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error) {
 	return c.listChannelUpdates.CallUnary(ctx, req)
@@ -744,6 +894,36 @@ type CommandServiceHandler interface {
 	// approval in the task's thread). Only the assignee may call this. Emits a
 	// system notification row.
 	UpdateTaskStatus(context.Context, *connect.Request[v1.UpdateTaskStatusRequest]) (*connect.Response[v1.UpdateTaskStatusResponse], error)
+	// ConvertMessageToReminder turns an existing top-level message into a
+	// scheduled reminder owned by the calling agent (atomic create+claim). The
+	// message must be a root in the conversation and not already a reminder. The
+	// agent is subscribed to the reminder's thread so discussion replies wake it.
+	ConvertMessageToReminder(context.Context, *connect.Request[v1.ConvertMessageToReminderRequest]) (*connect.Response[v1.ConvertMessageToReminderResponse], error)
+	// ListReminders returns reminders, optionally filtered by owning agent,
+	// conversation, and status. Used by the agent-page Reminders tab (user) and
+	// the agent CLI (self-list).
+	ListReminders(context.Context, *connect.Request[v1.ListRemindersRequest]) (*connect.Response[v1.ListRemindersResponse], error)
+	// GetReminder returns a single reminder by its resource name.
+	GetReminder(context.Context, *connect.Request[v1.GetReminderRequest]) (*connect.Response[v1.GetReminderResponse], error)
+	// UpdateReminder edits the schedule (fire_at/cron_expr/tz) or task_content of
+	// a reminder. The caller is the owning agent or a workspace admin. Editing a
+	// DUE or MISSED reminder resets it to PENDING with the new schedule.
+	UpdateReminder(context.Context, *connect.Request[v1.UpdateReminderRequest]) (*connect.Response[v1.UpdateReminderResponse], error)
+	// CancelReminder cancels a reminder. The caller is the owning agent or a
+	// workspace admin. A cancelled reminder is terminal.
+	CancelReminder(context.Context, *connect.Request[v1.CancelReminderRequest]) (*connect.Response[v1.CancelReminderResponse], error)
+	// CompleteReminder marks a DUE reminder completed and atomically posts the
+	// result as a single system message in the reminder's thread. Only the owning
+	// agent may call this. Recurring reminders reschedule to the next cron fire.
+	CompleteReminder(context.Context, *connect.Request[v1.CompleteReminderRequest]) (*connect.Response[v1.CompleteReminderResponse], error)
+	// FailReminder marks a DUE reminder failed with the given error and posts it
+	// as a system thread message. Recurring reminders reschedule. Only the owning
+	// agent may call this.
+	FailReminder(context.Context, *connect.Request[v1.FailReminderRequest]) (*connect.Response[v1.FailReminderResponse], error)
+	// ListDueReminders returns the DUE reminders owned by the calling agent, for
+	// the autonomous drain loop to pick up fired work. Agent identity is resolved
+	// from the auth context.
+	ListDueReminders(context.Context, *connect.Request[v1.ListDueRemindersRequest]) (*connect.Response[v1.ListDueRemindersResponse], error)
 	ListChannelUpdates(context.Context, *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error)
 	ListThreadUpdates(context.Context, *connect.Request[v1.ListThreadUpdatesRequest]) (*connect.Response[v1.ListThreadUpdatesResponse], error)
 	AckProcessedVersion(context.Context, *connect.Request[v1.AckProcessedVersionRequest]) (*connect.Response[v1.AckProcessedVersionResponse], error)
@@ -945,6 +1125,54 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("UpdateTaskStatus")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceConvertMessageToReminderHandler := connect.NewUnaryHandler(
+		CommandServiceConvertMessageToReminderProcedure,
+		svc.ConvertMessageToReminder,
+		connect.WithSchema(commandServiceMethods.ByName("ConvertMessageToReminder")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceListRemindersHandler := connect.NewUnaryHandler(
+		CommandServiceListRemindersProcedure,
+		svc.ListReminders,
+		connect.WithSchema(commandServiceMethods.ByName("ListReminders")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceGetReminderHandler := connect.NewUnaryHandler(
+		CommandServiceGetReminderProcedure,
+		svc.GetReminder,
+		connect.WithSchema(commandServiceMethods.ByName("GetReminder")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceUpdateReminderHandler := connect.NewUnaryHandler(
+		CommandServiceUpdateReminderProcedure,
+		svc.UpdateReminder,
+		connect.WithSchema(commandServiceMethods.ByName("UpdateReminder")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceCancelReminderHandler := connect.NewUnaryHandler(
+		CommandServiceCancelReminderProcedure,
+		svc.CancelReminder,
+		connect.WithSchema(commandServiceMethods.ByName("CancelReminder")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceCompleteReminderHandler := connect.NewUnaryHandler(
+		CommandServiceCompleteReminderProcedure,
+		svc.CompleteReminder,
+		connect.WithSchema(commandServiceMethods.ByName("CompleteReminder")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceFailReminderHandler := connect.NewUnaryHandler(
+		CommandServiceFailReminderProcedure,
+		svc.FailReminder,
+		connect.WithSchema(commandServiceMethods.ByName("FailReminder")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceListDueRemindersHandler := connect.NewUnaryHandler(
+		CommandServiceListDueRemindersProcedure,
+		svc.ListDueReminders,
+		connect.WithSchema(commandServiceMethods.ByName("ListDueReminders")),
+		connect.WithHandlerOptions(opts...),
+	)
 	commandServiceListChannelUpdatesHandler := connect.NewUnaryHandler(
 		CommandServiceListChannelUpdatesProcedure,
 		svc.ListChannelUpdates,
@@ -1053,6 +1281,22 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceUnclaimTaskHandler.ServeHTTP(w, r)
 		case CommandServiceUpdateTaskStatusProcedure:
 			commandServiceUpdateTaskStatusHandler.ServeHTTP(w, r)
+		case CommandServiceConvertMessageToReminderProcedure:
+			commandServiceConvertMessageToReminderHandler.ServeHTTP(w, r)
+		case CommandServiceListRemindersProcedure:
+			commandServiceListRemindersHandler.ServeHTTP(w, r)
+		case CommandServiceGetReminderProcedure:
+			commandServiceGetReminderHandler.ServeHTTP(w, r)
+		case CommandServiceUpdateReminderProcedure:
+			commandServiceUpdateReminderHandler.ServeHTTP(w, r)
+		case CommandServiceCancelReminderProcedure:
+			commandServiceCancelReminderHandler.ServeHTTP(w, r)
+		case CommandServiceCompleteReminderProcedure:
+			commandServiceCompleteReminderHandler.ServeHTTP(w, r)
+		case CommandServiceFailReminderProcedure:
+			commandServiceFailReminderHandler.ServeHTTP(w, r)
+		case CommandServiceListDueRemindersProcedure:
+			commandServiceListDueRemindersHandler.ServeHTTP(w, r)
 		case CommandServiceListChannelUpdatesProcedure:
 			commandServiceListChannelUpdatesHandler.ServeHTTP(w, r)
 		case CommandServiceListThreadUpdatesProcedure:
@@ -1192,6 +1436,38 @@ func (UnimplementedCommandServiceHandler) UnclaimTask(context.Context, *connect.
 
 func (UnimplementedCommandServiceHandler) UpdateTaskStatus(context.Context, *connect.Request[v1.UpdateTaskStatusRequest]) (*connect.Response[v1.UpdateTaskStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.UpdateTaskStatus is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ConvertMessageToReminder(context.Context, *connect.Request[v1.ConvertMessageToReminderRequest]) (*connect.Response[v1.ConvertMessageToReminderResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ConvertMessageToReminder is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ListReminders(context.Context, *connect.Request[v1.ListRemindersRequest]) (*connect.Response[v1.ListRemindersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListReminders is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) GetReminder(context.Context, *connect.Request[v1.GetReminderRequest]) (*connect.Response[v1.GetReminderResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.GetReminder is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) UpdateReminder(context.Context, *connect.Request[v1.UpdateReminderRequest]) (*connect.Response[v1.UpdateReminderResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.UpdateReminder is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) CancelReminder(context.Context, *connect.Request[v1.CancelReminderRequest]) (*connect.Response[v1.CancelReminderResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.CancelReminder is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) CompleteReminder(context.Context, *connect.Request[v1.CompleteReminderRequest]) (*connect.Response[v1.CompleteReminderResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.CompleteReminder is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) FailReminder(context.Context, *connect.Request[v1.FailReminderRequest]) (*connect.Response[v1.FailReminderResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.FailReminder is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ListDueReminders(context.Context, *connect.Request[v1.ListDueRemindersRequest]) (*connect.Response[v1.ListDueRemindersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListDueReminders is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) ListChannelUpdates(context.Context, *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error) {
