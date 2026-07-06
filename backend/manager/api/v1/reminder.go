@@ -357,9 +357,12 @@ func (s *CommandService) CompleteReminder(ctx context.Context, req *connect.Requ
 	if err := s.requireReminderOwner(ctx, r); err != nil {
 		return nil, err
 	}
-	content := fmt.Sprintf("✅ %s completed the reminder:\n%s", r.AssigneeName, req.Msg.Result)
+	// The result is posted as a normal agent reply (markdown); the label is a
+	// short SYSTEM lifecycle pill. Splitting them keeps long/markdown results
+	// readable in the thread while preserving the status event.
+	label := fmt.Sprintf("✅ %s completed the reminder", r.AssigneeName)
 	nextFireAt := s.nextFireOrNil(r)
-	updated, err := s.store.CompleteReminderAndPostNotification(ctx, msgID, content, nextFireAt)
+	updated, err := s.store.CompleteReminderAndPostNotification(ctx, msgID, req.Msg.Result, label, nextFireAt)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to complete reminder"))
 	}
@@ -386,9 +389,9 @@ func (s *CommandService) FailReminder(ctx context.Context, req *connect.Request[
 	if err := s.requireReminderOwner(ctx, r); err != nil {
 		return nil, err
 	}
-	content := fmt.Sprintf("❌ %s failed the reminder:\n%s", r.AssigneeName, req.Msg.Error)
+	label := fmt.Sprintf("❌ %s failed the reminder", r.AssigneeName)
 	nextFireAt := s.nextFireOrNil(r)
-	updated, err := s.store.FailReminderAndPostNotification(ctx, msgID, content, nextFireAt)
+	updated, err := s.store.FailReminderAndPostNotification(ctx, msgID, req.Msg.Error, label, nextFireAt)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to fail reminder"))
 	}

@@ -420,12 +420,18 @@ func (s *Store) CancelReminder(ctx context.Context, msgID uuid.UUID) (*Reminder,
 
 // completeReminderTx is the shared tx body for CompleteReminder and FailReminder:
 // it flips a DUE reminder to finalStatus (or back to PENDING with nextFireAt for
-// recurring), bumps the conversation version, and inserts a single SYSTEM thread
-// reply carrying content — all atomically. Idempotent: if the reminder is not
-// DUE (already completed/cancelled, or a duplicate complete), no row is updated
-// and no message is posted; the current state is returned. The caller computes
-// nextFireAt (nil for one-shot or no reschedule) using the cron helper.
-func (s *Store) completeReminderTx(ctx context.Context, msgID uuid.UUID, content string, finalStatus int16, nextFireAt *time.Time) (*Reminder, error) {
+// recurring), bumps the conversation version, and inserts TWO thread replies —
+// a short SYSTEM lifecycle pill (label, e.g. "✅ Jane completed the reminder")
+// and a normal AGENT message carrying the result/error text as markdown content
+// so it renders like any other agent reply (avatar, name, markdown) instead of
+// being jammed into a system notification line. All atomic. Idempotent: if the
+// reminder is not DUE (already completed/cancelled, or a duplicate complete), no
+// row is updated and no messages are posted; the current state is returned. The
+// caller computes nextFireAt (nil for one-shot or no reschedule) and the label.
+// The tx posts directly via createChatMessageInTx and does NOT call NotifyWake,
+// so posting never wakes any agent (the owner consumes its own message in the
+// same drain session via message check / thread check, IsOwn → ignored → ack).
+func (s *Store) completeReminderTx(ctx context.Context, msgID uuid.UUID, result, label string, finalStatus int16, nextFireAt *time.Time) (*Reminder, error) {
 	tx, err := s.GetDB().BeginTx(ctx, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to begin tx")
@@ -433,6 +439,7 @@ func (s *Store) completeReminderTx(ctx context.Context, msgID uuid.UUID, content
 	defer tx.Rollback()
 
 	var convID uuid.UUID
+	var assigneeAgentID int32
 	if nextFireAt != nil {
 		// Recurring: reset to PENDING with the next cron fire.
 		if err := tx.QueryRowContext(ctx, `
@@ -441,8 +448,8 @@ func (s *Store) completeReminderTx(ctx context.Context, msgID uuid.UUID, content
 			       retry_count = 0, next_retry_at = NULL, last_attempt_at = NULL,
 			       status = $5, fire_at = $3, updated_at = now()
 			 WHERE message_id = $1 AND status = $4
-			RETURNING conversation_id
-		`, msgID, content, *nextFireAt, ReminderStatusDue, ReminderStatusPending).Scan(&convID); err != nil {
+			RETURNING conversation_id, assignee_agent_id
+		`, msgID, result, *nextFireAt, ReminderStatusDue, ReminderStatusPending).Scan(&convID, &assigneeAgentID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return s.GetReminder(ctx, msgID)
 			}
@@ -456,8 +463,8 @@ func (s *Store) completeReminderTx(ctx context.Context, msgID uuid.UUID, content
 			       retry_count = 0, next_retry_at = NULL, last_attempt_at = NULL,
 			       status = $3, updated_at = now()
 			 WHERE message_id = $1 AND status = $4
-			RETURNING conversation_id
-		`, msgID, content, finalStatus, ReminderStatusDue).Scan(&convID); err != nil {
+			RETURNING conversation_id, assignee_agent_id
+		`, msgID, result, finalStatus, ReminderStatusDue).Scan(&convID, &assigneeAgentID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return s.GetReminder(ctx, msgID)
 			}
@@ -465,20 +472,45 @@ func (s *Store) completeReminderTx(ctx context.Context, msgID uuid.UUID, content
 		}
 	}
 
-	var newVersion int64
-	if err := tx.QueryRowContext(ctx, conversationVersionBumpSQL, convID).Scan(&newVersion); err != nil {
-		return nil, errors.Wrapf(err, "failed to bump conversation version")
+	// The conversation owner's principal anchors the agent message (mirrors
+	// PostMessage, which uses conv.OwnerID as principal_id for agent replies).
+	var principalID int
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(owner_id, 1) FROM conversation WHERE id = $1`, convID).Scan(&principalID); err != nil {
+		return nil, errors.Wrapf(err, "failed to load conversation owner")
 	}
 
+	// First message: the short SYSTEM lifecycle pill (e.g. "✅ … completed").
+	var pillVersion int64
+	if err := tx.QueryRowContext(ctx, conversationVersionBumpSQL, convID).Scan(&pillVersion); err != nil {
+		return nil, errors.Wrapf(err, "failed to bump conversation version")
+	}
 	if _, _, err := createChatMessageInTx(ctx, tx, &ChatMessage{
 		ConversationID:      convID,
 		PrincipalID:         1, // system bot (seeded principal id 1)
 		Role:                1,
-		Content:             content,
+		Content:             label,
 		SenderType:          SenderTypeSystem,
 		ThreadRootMessageID: uuid.NullUUID{UUID: msgID, Valid: true},
-	}, newVersion); err != nil {
-		return nil, errors.Wrapf(err, "failed to post reminder completion message")
+	}, pillVersion); err != nil {
+		return nil, errors.Wrapf(err, "failed to post reminder lifecycle message")
+	}
+
+	// Second message: the result/error as a normal agent reply (markdown,
+	// avatar, name) so it reads like a conversational turn, not a notification.
+	var resultVersion int64
+	if err := tx.QueryRowContext(ctx, conversationVersionBumpSQL, convID).Scan(&resultVersion); err != nil {
+		return nil, errors.Wrapf(err, "failed to bump conversation version")
+	}
+	if _, _, err := createChatMessageInTx(ctx, tx, &ChatMessage{
+		ConversationID:      convID,
+		PrincipalID:         principalID,
+		SenderAgentID:       sql.NullInt32{Int32: assigneeAgentID, Valid: assigneeAgentID > 0},
+		Role:                2,
+		Content:             result,
+		SenderType:          SenderTypeAgent,
+		ThreadRootMessageID: uuid.NullUUID{UUID: msgID, Valid: true},
+	}, resultVersion); err != nil {
+		return nil, errors.Wrapf(err, "failed to post reminder result message")
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -489,18 +521,19 @@ func (s *Store) completeReminderTx(ctx context.Context, msgID uuid.UUID, content
 
 // CompleteReminderAndPostNotification marks a DUE reminder COMPLETED (one-shot)
 // or reschedules it to the next cron fire (recurring, nextFireAt non-nil), and
-// atomically posts the result as a single SYSTEM thread message. Idempotent: a
-// duplicate call on a non-DUE reminder returns the current state without posting
-// again. Returns ErrReminderNotFound if the reminder does not exist.
-func (s *Store) CompleteReminderAndPostNotification(ctx context.Context, msgID uuid.UUID, result string, nextFireAt *time.Time) (*Reminder, error) {
-	return s.completeReminderTx(ctx, msgID, result, ReminderStatusCompleted, nextFireAt)
+// atomically posts a SYSTEM lifecycle pill (label) plus the result as a normal
+// agent thread reply. Idempotent: a duplicate call on a non-DUE reminder returns
+// the current state without posting again.
+func (s *Store) CompleteReminderAndPostNotification(ctx context.Context, msgID uuid.UUID, result, label string, nextFireAt *time.Time) (*Reminder, error) {
+	return s.completeReminderTx(ctx, msgID, result, label, ReminderStatusCompleted, nextFireAt)
 }
 
 // FailReminderAndPostNotification marks a DUE reminder FAILED (one-shot) or
-// reschedules it (recurring), and atomically posts the error as a SYSTEM thread
-// message. Idempotent like CompleteReminderAndPostNotification.
-func (s *Store) FailReminderAndPostNotification(ctx context.Context, msgID uuid.UUID, errMsg string, nextFireAt *time.Time) (*Reminder, error) {
-	return s.completeReminderTx(ctx, msgID, errMsg, ReminderStatusFailed, nextFireAt)
+// reschedules it (recurring), and atomically posts a SYSTEM lifecycle pill
+// (label) plus the error as a normal agent thread reply. Idempotent like
+// CompleteReminderAndPostNotification.
+func (s *Store) FailReminderAndPostNotification(ctx context.Context, msgID uuid.UUID, errMsg, label string, nextFireAt *time.Time) (*Reminder, error) {
+	return s.completeReminderTx(ctx, msgID, errMsg, label, ReminderStatusFailed, nextFireAt)
 }
 
 // MarkMissedAndPostNotification is called by the scheduler when the offline-retry
