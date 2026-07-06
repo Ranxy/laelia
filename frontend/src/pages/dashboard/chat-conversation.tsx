@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
 import {
   MemberPicker,
@@ -260,6 +260,41 @@ export function ChatConversationPage() {
       closeThread();
     };
   }, [init, stopWatchingChannel, closeThread]);
+
+  // Deep-link from outside the channel (e.g. a reminder's "View in channel"):
+  // ?thread=<rootId> opens that thread and scrolls the main list to its root
+  // message once the channel's messages are mounted. Runs at most once per
+  // root id so it doesn't fight the user's own navigation.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const threadDeepLinkId = searchParams.get("thread") ?? "";
+  const threadDeepLinkRef = useRef<string>("");
+  useEffect(() => {
+    if (!channelId || !threadDeepLinkId) return;
+    if (threadDeepLinkRef.current === threadDeepLinkId) return;
+    if (messages.length === 0) return; // wait for the channel to load
+    threadDeepLinkRef.current = threadDeepLinkId;
+    openThread(`conversations/${channelId}`, threadDeepLinkId);
+    // Defer so the root message is in the DOM.
+    requestAnimationFrame(() => {
+      scrollRef.current
+        ?.querySelector(`[data-msg-id="${threadDeepLinkId}"]`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+    // Clean the param so a later in-page open of a different thread doesn't
+    // re-trigger this.
+    setSearchParams((prev) => {
+      if (!prev.has("thread")) return prev;
+      const next = new URLSearchParams(prev);
+      next.delete("thread");
+      return next;
+    });
+  }, [
+    channelId,
+    threadDeepLinkId,
+    messages.length,
+    openThread,
+    setSearchParams,
+  ]);
 
   // Restore the entering conversation's draft. Declared before the persist
   // effect so it reads the saved draft before any stale write lands.

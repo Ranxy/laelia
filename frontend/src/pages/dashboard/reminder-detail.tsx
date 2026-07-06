@@ -85,6 +85,8 @@ export function ReminderDetailPage() {
   const updateReminder = useAppStore((s) => s.updateReminder);
   const cancelReminder = useAppStore((s) => s.cancelReminder);
   const channels = useAppStore((s) => s.channels);
+  const openThread = useAppStore((s) => s.openThread);
+  const closeThread = useAppStore((s) => s.closeThread);
 
   const [reminder, setReminder] = useState<Reminder | undefined>(undefined);
   const [loading, setLoading] = useState(true);
@@ -114,6 +116,19 @@ export function ReminderDetailPage() {
     const handle = setInterval(load, 2000);
     return () => clearInterval(handle);
   }, [load]);
+
+  // Open the reminder's discussion thread so ThreadPanel has messages to
+  // render. ThreadPanel reads threadByRoot[rootId], which is populated by
+  // openThread (it also starts a polling watcher). Depends only on the root
+  // id so the 2s reminder re-fetch doesn't close/reopen the thread. Closed on
+  // unmount or when a different reminder's thread is opened.
+  const threadConvId = reminder ? conversationId(reminder) : "";
+  const threadRootId = reminder ? messageId(reminder) : "";
+  useEffect(() => {
+    if (!threadConvId || !threadRootId) return;
+    openThread(`conversations/${threadConvId}`, threadRootId);
+    return () => closeThread();
+  }, [threadConvId, threadRootId, openThread, closeThread]);
 
   // Terminal reminders cannot be edited or cancelled.
   const isTerminal =
@@ -314,19 +329,27 @@ export function ReminderDetailPage() {
 
         {/* The reminder's discussion thread: its root is the trigger message,
             so chatting here lets the user negotiate the schedule with the agent
-            (requirement #5). ThreadPanel polls and renders replies + composer. */}
+            (requirement #5). ThreadPanel polls and renders replies + composer.
+            `fluid` makes it fill this container instead of the 420px right-dock
+            aside used in the channel page. */}
         {convId && rootId && (
           <div className="mx-auto max-w-5xl px-4 pb-4">
             <h2 className="text-sm font-medium text-control mb-2">
               {t("reminders.thread")}
             </h2>
-            <div className="rounded border border-control-border h-[480px]">
+            <div className="h-[480px] overflow-hidden rounded-lg border border-control-border">
               <ThreadPanel
                 channelId={convId}
                 channelTitle={channelTitle}
                 rootMessageId={rootId}
+                fluid
                 onClose={() => navigate(`/agents/${agentId}/reminders`)}
-                onViewInChannel={() => navigate(`/agents/${agentId}/chat`)}
+                onViewInChannel={() => {
+                  // Jump to the trigger message's channel and open its thread
+                  // there. The chat page reads ?thread= on mount.
+                  closeThread();
+                  navigate(`/chat/${convId}?thread=${rootId}`);
+                }}
               />
             </div>
           </div>

@@ -57,6 +57,10 @@ export interface ThreadPanelProps {
     rootMessageId: string
   ) => void;
   onPreviewImage?: (attachment: Attachment) => void;
+  // fluid makes the panel fill its container's width/height instead of the
+  // fixed 420px right-dock aside used in the channel page. Used when the
+  // panel is embedded standalone (e.g. the reminder detail page).
+  fluid?: boolean;
 }
 
 export function ThreadPanel({
@@ -68,9 +72,13 @@ export function ThreadPanel({
   onPreviewAttachment,
   onJumpToSection,
   onPreviewImage,
+  fluid,
 }: ThreadPanelProps) {
   const { t } = useTranslation();
   const conversationName = `conversations/${channelId}`;
+  const asideClass = fluid
+    ? "flex h-full w-full flex-col"
+    : "flex w-[420px] shrink-0 flex-col border-l border-control-border";
 
   const thread = useAppStore((s) => s.threadByRoot[rootMessageId]);
   const sendThreadMessage = useAppStore((s) => s.sendThreadMessage);
@@ -245,7 +253,7 @@ export function ThreadPanel({
 
   if (loading && !rootMsg) {
     return (
-      <aside className="flex w-[420px] shrink-0 flex-col border-l border-control-border">
+      <aside className={asideClass}>
         <ThreadHeader
           title={t("chat.thread-title")}
           channelName={channelTitle}
@@ -260,7 +268,7 @@ export function ThreadPanel({
   }
 
   return (
-    <aside className="flex w-[420px] shrink-0 flex-col border-l border-control-border">
+    <aside className={asideClass}>
       <ThreadHeader
         title={t("chat.thread-title")}
         channelName={channelTitle}
