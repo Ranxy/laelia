@@ -6,6 +6,7 @@ import { createCommandSlice } from "./command";
 import { createChatSlice } from "./chat";
 import { createChannelSlice } from "./channel";
 import { createTaskSlice } from "./task";
+import { createReminderSlice } from "./reminder";
 import { createThreadSlice } from "./thread";
 import { createUserSlice } from "./user";
 import { createImagePreviewSlice } from "./image-preview";
@@ -19,6 +20,7 @@ export const useAppStore = create<AppStoreState>()((...args) => ({
   ...createChannelSlice(...args),
   ...createThreadSlice(...args),
   ...createTaskSlice(...args),
+  ...createReminderSlice(...args),
   ...createUserSlice(...args),
   ...createPreviewSlice(...args),
   ...createImagePreviewSlice(...args),

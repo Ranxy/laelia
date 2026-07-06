@@ -1,4 +1,4 @@
-import { ListChecks, MessageSquare, UserCircle } from "lucide-react";
+import { Bell, ListChecks, MessageSquare, UserCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -10,12 +10,13 @@ import {
   AGENT_ROUTE_CHAT,
   AGENT_ROUTE_PROFILE,
   COMMAND_ROUTE_LIST,
+  REMINDER_ROUTE_LIST,
 } from "@/router/handles";
 import { resolvePath } from "@/router/route-index";
 import { useAppStore } from "@/stores";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
 
-type TabKey = "profile" | "commands" | "chat";
+type TabKey = "profile" | "commands" | "reminders" | "chat";
 
 export function AgentDetailLayout() {
   const { t } = useTranslation();
@@ -45,6 +46,7 @@ export function AgentDetailLayout() {
     const segments = location.pathname.split("/").filter(Boolean);
     const afterId = segments[2];
     if (afterId === "commands") return "commands";
+    if (afterId === "reminders") return "reminders";
     if (afterId === "chat") return "chat";
     return "profile";
   }, [location.pathname]);
@@ -83,6 +85,16 @@ export function AgentDetailLayout() {
             >
               <ListChecks className="size-4" />
               {t("agent.tab-commands")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="reminders"
+              className="px-1"
+              onClick={() =>
+                navigate(resolvePath(REMINDER_ROUTE_LIST, { agentId }))
+              }
+            >
+              <Bell className="size-4" />
+              {t("agent.tab-reminders")}
             </TabsTrigger>
             <TabsTrigger
               value="chat"

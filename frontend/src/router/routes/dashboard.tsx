@@ -9,6 +9,8 @@ import {
   CHAT_ROUTE_DETAIL,
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
+  REMINDER_ROUTE_DETAIL,
+  REMINDER_ROUTE_LIST,
   SETTINGS_ROUTE_STORAGE,
   SETTINGS_ROUTE_USERS,
   WORKSPACE_ROUTE_LANDING,
@@ -72,6 +74,22 @@ export const dashboardRoutes: RouteObject[] = [
                 lazy: () =>
                   import("@/pages/dashboard/command-detail").then((m) => ({
                     Component: m.CommandDetailPage,
+                  })),
+              },
+              {
+                path: "reminders",
+                handle: { name: REMINDER_ROUTE_LIST },
+                lazy: () =>
+                  import("@/pages/dashboard/reminder-list").then((m) => ({
+                    Component: m.ReminderListPage,
+                  })),
+              },
+              {
+                path: "reminders/:reminderId",
+                handle: { name: REMINDER_ROUTE_DETAIL },
+                lazy: () =>
+                  import("@/pages/dashboard/reminder-detail").then((m) => ({
+                    Component: m.ReminderDetailPage,
                   })),
               },
               {

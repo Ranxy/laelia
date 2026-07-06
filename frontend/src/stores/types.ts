@@ -15,6 +15,7 @@ import type {
   CommandOutput,
   Conversation,
   Mention,
+  Reminder,
 } from "@/types/proto-es/v1/command_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";
 
@@ -328,6 +329,31 @@ export interface TaskSlice {
   ) => Promise<void>;
 }
 
+export interface ReminderSlice {
+  reminders: Reminder[];
+  remindersLoading: boolean;
+
+  listReminders: (
+    agent: string,
+    params?: {
+      pageSize?: number;
+      pageToken?: string;
+      statusFilter?: number[];
+    }
+  ) => Promise<{ reminders: Reminder[]; nextPageToken: string } | undefined>;
+  getReminder: (name: string) => Promise<Reminder | undefined>;
+  updateReminder: (
+    name: string,
+    fields: {
+      fireAt?: Date;
+      cronExpr?: string;
+      tz?: string;
+      taskContent?: string;
+    }
+  ) => Promise<Reminder | undefined>;
+  cancelReminder: (name: string) => Promise<Reminder | undefined>;
+}
+
 export type AppStoreState = AuthSlice &
   AgentSlice &
   CommandSlice &
@@ -335,6 +361,7 @@ export type AppStoreState = AuthSlice &
   ChannelSlice &
   ThreadSlice &
   TaskSlice &
+  ReminderSlice &
   UserSlice &
   PreviewSlice &
   ImagePreviewSlice;
