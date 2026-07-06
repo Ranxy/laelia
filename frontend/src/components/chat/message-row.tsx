@@ -198,6 +198,29 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
 
   const MentionBadgeCmp = MentionBadge;
 
+  // "Reply in thread" entry. Rendered in the header when the header is shown
+  // (showAvatar), and as a standalone hover row otherwise — so every root
+  // message in a consecutive group exposes the action, not just the first.
+  // (Consecutive messages from the same sender skip the header to group the
+  // bubble, which previously swallowed this button along with it.)
+  const renderReplyInThread = () =>
+    onOpenThread && !msg.threadRoot && !isStreaming ? (
+      <button
+        type="button"
+        onClick={() => onOpenThread(msg)}
+        // A task's thread is its workspace, so keep the entry visible on
+        // task messages instead of hover-only; non-task roots stay hover-gated.
+        className={cn(
+          "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-control-placeholder transition-all hover:bg-control-bg hover:text-main focus:opacity-100 cursor-pointer",
+          msg.task ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        )}
+        aria-label={t("chat.reply-in-thread")}
+      >
+        <MessageCircleReply className="size-3" />
+        <span className="hidden sm:inline">{t("chat.reply-in-thread")}</span>
+      </button>
+    ) : null;
+
   // System messages (sender_type=SYSTEM) are task lifecycle notifications —
   // "📋 Alice created task #3", "🙋 Bob claimed task #3", etc. They render as a
   // single centered, low-contrast line with no avatar or bubble, so they read as
@@ -260,26 +283,14 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
                 className="text-[10px] px-1.5 py-0"
               />
             )}
-            {onOpenThread && !msg.threadRoot && !isStreaming && (
-              <button
-                type="button"
-                onClick={() => onOpenThread(msg)}
-                // A task's thread is its workspace, so keep the entry visible on
-                // task messages instead of hover-only; non-task roots stay hover-gated.
-                className={cn(
-                  "ml-1 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-control-placeholder transition-all hover:bg-control-bg hover:text-main focus:opacity-100 cursor-pointer",
-                  msg.task ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                )}
-                aria-label={t("chat.reply-in-thread")}
-              >
-                <MessageCircleReply className="size-3" />
-                <span className="hidden sm:inline">
-                  {t("chat.reply-in-thread")}
-                </span>
-              </button>
-            )}
+            {renderReplyInThread()}
           </div>
         )}
+
+        {/* Standalone "Reply in thread" entry for grouped messages whose
+            header is suppressed (showAvatar=false). Keeps the action available
+            on every root message, not just the first in a consecutive group. */}
+        {!showAvatar && renderReplyInThread()}
 
         {/* Events (tool calls, diffs, warnings) */}
         {hasEvents && !eventsCollapsed && (
