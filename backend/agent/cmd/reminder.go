@@ -26,12 +26,12 @@ var reminderCmd = &cobra.Command{
 	Short: "Convert messages to scheduled reminders, list due reminders, and complete/fail them (LLM-facing, used during drain sessions)",
 }
 
-// reminder convert <message-name> --content <text|-> --fire-at <RFC3339>
+// reminder convert <message-name> --content <text|-> [--fire-at <RFC3339>]
 // [--cron <5-field>] [--tz <IANA>] atomically creates+claims a reminder owned by
 // the caller, rooted at the trigger message. One-shot needs --fire-at;
-// recurring needs --cron (+ optional --tz, default UTC) and --fire-at is the
-// first fire (or it is computed from cron at the manager if omitted when --cron
-// is set — but the CLI requires --fire-at for an explicit first fire).
+// recurring needs --cron (+ optional --tz, default UTC) and --fire-at may be
+// omitted — the manager computes the first fire from the cron expression
+// starting at now and returns it in the reminder.
 var (
 	reminderConvertContent string
 	reminderConvertFireAt  string
@@ -212,7 +212,7 @@ var reminderFailCmd = &cobra.Command{
 
 func init() {
 	reminderConvertCmd.Flags().StringVar(&reminderConvertContent, "content", "", "structured summary of the scheduled work; \"-\" reads from stdin")
-	reminderConvertCmd.Flags().StringVar(&reminderConvertFireAt, "fire-at", "", "first fire time, RFC3339 (e.g. 2026-07-07T03:00:00Z); required")
+	reminderConvertCmd.Flags().StringVar(&reminderConvertFireAt, "fire-at", "", "first fire time, RFC3339 (e.g. 2026-07-07T03:00:00Z); required for one-shot, optional with --cron (manager computes first fire)")
 	reminderConvertCmd.Flags().StringVar(&reminderConvertCron, "cron", "", "5-field cron expression for a recurring reminder (empty = one-shot)")
 	reminderConvertCmd.Flags().StringVar(&reminderConvertTz, "tz", "", "IANA timezone for --cron (default UTC)")
 

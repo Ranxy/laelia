@@ -113,19 +113,32 @@ func TestGetCommandContextFallsBackToDepsCommand(t *testing.T) {
 // attachment id/name/size/mime must appear inline so the LLM can act on it
 // without a second round-trip.
 func TestFormatMessageLineAttachments(t *testing.T) {
-	// No attachments: the line is unchanged.
+	// No attachments and no message id: the line is unchanged.
 	assert.Equal(t, "[2026-06-26T07:31:16Z] admin (USER): test file\n",
-		formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", false, "test file", nil))
+		formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", false, "", "", 0, "test file", nil))
 
 	// Own message keeps the (YOU) tag.
 	assert.Equal(t, "[2026-06-26T07:31:16Z] admin (USER, YOU): hi\n",
-		formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", true, "hi", nil))
+		formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", true, "", "", 0, "hi", nil))
+
+	// With a message id: the full resource name and room version appear on an
+	// indented line so the agent can pass it straight to `reminder convert` /
+	// `task claim` without reconstructing it from the conversation id.
+	got := formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", false,
+		"0d8856c0-ed2d-476b-9a86-33c0c333f5b9", "11111111-2222-3333-4444-555555555555", 58,
+		"每天3点分析github提交", nil)
+	want := "[2026-06-26T07:31:16Z] admin (USER): 每天3点分析github提交\n" +
+		"  message: conversations/0d8856c0-ed2d-476b-9a86-33c0c333f5b9/messages/11111111-2222-3333-4444-555555555555  version: 58\n"
+	assert.Equal(t, want, got)
 
 	// With attachments: the id appears so `file download <id>` is callable, in
-	// the same id/name/size/mime shape `file list` uses.
-	got := formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", false, "test file",
+	// the same id/name/size/mime shape `file list` uses. The message handle line
+	// comes before the attachments block.
+	got = formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", false,
+		"0d8856c0-ed2d-476b-9a86-33c0c333f5b9", "11111111-2222-3333-4444-555555555555", 58, "test file",
 		[]*v1pb.Attachment{{Id: "f-1", Name: "report.pdf", MimeType: "application/pdf", SizeBytes: 123456}})
-	want := "[2026-06-26T07:31:16Z] admin (USER): test file\n" +
+	want = "[2026-06-26T07:31:16Z] admin (USER): test file\n" +
+		"  message: conversations/0d8856c0-ed2d-476b-9a86-33c0c333f5b9/messages/11111111-2222-3333-4444-555555555555  version: 58\n" +
 		"  attachments:\n" +
 		"    - id=f-1  name=report.pdf  size=123456  mime=application/pdf\n"
 	assert.Equal(t, want, got)
@@ -133,7 +146,7 @@ func TestFormatMessageLineAttachments(t *testing.T) {
 	// An anchored-comment attachment surfaces its section anchor and quoted
 	// selection so the agent knows which span of the file the user is reacting
 	// to, instead of seeing only a re-attached file.
-	got = formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", false, "为什么会这样?",
+	got = formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", false, "", "", 0, "为什么会这样?",
 		[]*v1pb.Attachment{{
 			Id:            "fa764496",
 			Name:          "crystal_design_assessment.md",

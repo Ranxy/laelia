@@ -113,14 +113,27 @@ func ConvertMessageToReminder(ctx context.Context, d Deps, in ConvertMessageToRe
 	if strings.TrimSpace(in.TaskContent) == "" {
 		return "", localError("INVALID_ARGUMENT_FAILED", "task_content is required (a structured summary of the scheduled work)", "Pass --task-content with the work summary.")
 	}
-	fireAt, err := parseFireAt(in.FireAt)
-	if err != nil {
-		return "", err
+	// fire_at is required for a one-shot reminder; for a recurring reminder
+	// (--cron) it may be omitted and the manager computes the first fire from
+	// the cron expression starting at now. The manager returns the resolved
+	// fire_at in the Reminder, so the agent learns the first fire without
+	// computing it itself.
+	var fireAtPB *timestamppb.Timestamp
+	if strings.TrimSpace(in.FireAt) != "" {
+		fireAt, err := parseFireAt(in.FireAt)
+		if err != nil {
+			return "", err
+		}
+		fireAtPB = timestamppb.New(mustParseRFC3339(fireAt))
+	} else if strings.TrimSpace(in.CronExpr) == "" {
+		return "", localError("INVALID_ARGUMENT_FAILED",
+			"either --fire-at (one-shot) or --cron (recurring) is required",
+			"Pass --fire-at with an RFC3339 timestamp for a one-shot reminder, or --cron for a recurring reminder (the manager computes the first fire).")
 	}
 	resp, err := d.Client.ConvertMessageToReminder(ctx, connect.NewRequest(&v1pb.ConvertMessageToReminderRequest{
 		Message:     in.Message,
 		TaskContent: in.TaskContent,
-		FireAt:      timestamppb.New(mustParseRFC3339(fireAt)),
+		FireAt:      fireAtPB,
 		CronExpr:    in.CronExpr,
 		Tz:          in.Tz,
 	}))

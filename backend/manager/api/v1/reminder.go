@@ -128,10 +128,6 @@ func (s *CommandService) ConvertMessageToReminder(ctx context.Context, req *conn
 	if strings.TrimSpace(req.Msg.TaskContent) == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("task_content must not be empty"))
 	}
-	fireAt, err := validateFireAt(req.Msg.FireAt)
-	if err != nil {
-		return nil, err
-	}
 	cronExpr := strings.TrimSpace(req.Msg.CronExpr)
 	tz := strings.TrimSpace(req.Msg.Tz)
 	if tz == "" {
@@ -141,6 +137,14 @@ func (s *CommandService) ConvertMessageToReminder(ctx context.Context, req *conn
 		if err := schedule.Validate(cronExpr, tz); err != nil {
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
+	}
+	// Determine the first fire. An explicit fire_at (when provided and valid)
+	// wins and must be in the future; otherwise, for a recurring reminder (cron
+	// set), compute the first fire from the cron expression starting at now. A
+	// one-shot reminder (no cron) requires an explicit fire_at.
+	fireAt, err := resolveFireAt(req.Msg.FireAt, cronExpr, tz)
+	if err != nil {
+		return nil, err
 	}
 
 	isRoot, err := s.store.IsThreadRoot(ctx, convID, msgID)
@@ -425,17 +429,27 @@ func (*CommandService) nextFireOrNil(r *store.Reminder) *time.Time {
 	return &next
 }
 
-// validateFireAt parses and validates a fire_at timestamp: it must be present
-// and in the future.
-func validateFireAt(ts *timestamppb.Timestamp) (time.Time, error) {
-	if ts == nil || !ts.IsValid() || ts.AsTime().Unix() <= 0 {
-		return time.Time{}, connect.NewError(connect.CodeInvalidArgument, errors.New("fire_at is required"))
+// resolveFireAt determines a reminder's first fire time. An explicit fire_at
+// (when provided and valid) wins and must be in the future; otherwise, for a
+// recurring reminder (cronExpr set), the first fire is computed from the cron
+// expression starting at now. A one-shot reminder (no cron) requires an
+// explicit fire_at. Used by ConvertMessageToReminder.
+func resolveFireAt(ts *timestamppb.Timestamp, cronExpr, tz string) (time.Time, error) {
+	if ts != nil && ts.IsValid() && ts.AsTime().Unix() > 0 {
+		fireAt := ts.AsTime()
+		if !fireAt.After(time.Now()) {
+			return time.Time{}, connect.NewError(connect.CodeInvalidArgument, errors.New("fire_at must be in the future"))
+		}
+		return fireAt, nil
 	}
-	fireAt := ts.AsTime()
-	if !fireAt.After(time.Now()) {
-		return time.Time{}, connect.NewError(connect.CodeInvalidArgument, errors.New("fire_at must be in the future"))
+	if cronExpr != "" {
+		fireAt, err := schedule.NextFire(cronExpr, tz, time.Now())
+		if err != nil {
+			return time.Time{}, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to compute first fire"))
+		}
+		return fireAt, nil
 	}
-	return fireAt, nil
+	return time.Time{}, connect.NewError(connect.CodeInvalidArgument, errors.New("fire_at is required for a one-shot reminder (or set cron_expr and the manager computes the first fire)"))
 }
 
 // postReminderSystemMessage inserts a sender_type=SYSTEM thread reply rooted at

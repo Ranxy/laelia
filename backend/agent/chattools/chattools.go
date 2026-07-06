@@ -155,13 +155,22 @@ func formatCommentAnchor(a *v1pb.Attachment) string {
 
 // formatMessageLine renders one message for the text output. Own messages are
 // tagged "(YOU)" so the agent can recognize its own past messages at a glance
-// and avoid replying to itself. Any attachments follow on indented lines.
-func formatMessageLine(timestamp, senderName, senderType string, isOwn bool, content string, attachments []*v1pb.Attachment) string {
+// and avoid replying to itself. The full message resource name and its room
+// version follow on an indented line so the agent can pass the message straight
+// to commands that need it (`reminder convert`, `task claim`/`review`/`done`)
+// without reconstructing it from the conversation id. Any attachments follow on
+// further indented lines. messageID empty (e.g. a synthetic listing) omits the
+// handle line.
+func formatMessageLine(timestamp, senderName, senderType string, isOwn bool, conversationID, messageID string, version int64, content string, attachments []*v1pb.Attachment) string {
 	senderTag := senderType
 	if isOwn {
 		senderTag += ", YOU"
 	}
-	return fmt.Sprintf("[%s] %s (%s): %s\n", timestamp, senderName, senderTag, content) + formatAttachments(attachments)
+	out := fmt.Sprintf("[%s] %s (%s): %s\n", timestamp, senderName, senderTag, content)
+	if messageID != "" {
+		out += fmt.Sprintf("  message: conversations/%s/messages/%s  version: %d\n", conversationID, messageID, version)
+	}
+	return out + formatAttachments(attachments)
 }
 
 // --- Inputs ---------------------------------------------------------------
@@ -243,7 +252,8 @@ func SearchChatHistory(ctx context.Context, d Deps, in SearchChatHistoryInput) (
 	for _, e := range resp.Msg.Entries {
 		text += formatMessageLine(
 			e.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
-			e.SenderName, senderTypeString(e.SenderType), e.IsOwn, e.Content, e.Attachments,
+			e.SenderName, senderTypeString(e.SenderType), e.IsOwn,
+			e.Conversation, e.Name, e.RoomVersion, e.Content, e.Attachments,
 		)
 	}
 	return text, nil
@@ -326,7 +336,8 @@ func GetConversationMessages(ctx context.Context, d Deps, in GetConversationMess
 		for _, m := range resp.Msg.Messages {
 			text += formatMessageLine(
 				m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
-				m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Content, m.Attachments,
+				m.SenderName, senderTypeString(m.SenderType), m.IsOwn,
+				m.Conversation, m.Name, m.RoomVersion, m.Content, m.Attachments,
 			)
 		}
 		if direction == "before" && len(resp.Msg.Messages) == limit {
@@ -383,7 +394,7 @@ func PostMessage(ctx context.Context, d Deps, in PostMessageInput) (string, erro
 			if m.CreatedAt != nil {
 				ts = m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z")
 			}
-			text += formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Content, m.Attachments)
+			text += formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Conversation, m.Name, m.RoomVersion, m.Content, m.Attachments)
 		}
 	}
 	text += fmt.Sprintf("\nTo resolve: call `laelia-agent message read %s --version %d --after` to get full context, then call `laelia-agent message send` again with --base-version %d.",
@@ -613,7 +624,7 @@ func GetThreadMessages(ctx context.Context, d Deps, in GetThreadMessagesInput) (
 	// distinguishes the root from the replies it must respond to.
 	for i, m := range resp.Msg.Messages {
 		ts := m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z")
-		line := formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Content, m.Attachments)
+		line := formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Conversation, m.Name, m.RoomVersion, m.Content, m.Attachments)
 		if i == 0 {
 			text += "[ROOT] " + line
 		} else {
@@ -675,7 +686,7 @@ func PostThreadMessage(ctx context.Context, d Deps, in PostThreadMessageInput) (
 			if m.CreatedAt != nil {
 				ts = m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z")
 			}
-			text += formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Content, m.Attachments)
+			text += formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Conversation, m.Name, m.RoomVersion, m.Content, m.Attachments)
 		}
 	}
 	text += fmt.Sprintf("\nTo resolve: call `laelia-agent thread read %s --root %s --version %d` to get full context, then call `laelia-agent thread send` again with --base-version %d.",
