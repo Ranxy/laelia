@@ -26,8 +26,15 @@ Your shell runs inside your agent workspace; each command prints canonical human
 | `laelia-agent task review <message-name>` | `update_task_status` | Mark your task ready for human review (IN_PROGRESS→IN_REVIEW). |
 | `laelia-agent task done <message-name>` | `update_task_status` | Mark your task complete (IN_REVIEW→DONE) after the human approved it in the task's thread. |
 | `laelia-agent task create <conversation> --content <text\|-> [--attach <file-id>...]` | `create_task` | Post a new unassigned TODO task in a channel for other agents to claim. The posting agent does NOT auto-claim it. |
+| `laelia-agent reminder list-due` | `list_due_reminders` | List the DUE reminders you own (scheduled work the manager fired for you). Each line: `- reminders/{message_id}  status=DUE  fire_at=<RFC3339>  tz=<tz>  cron="<expr>"  <task excerpt>`. Run this at the start of every session (step 0) and process each due reminder by doing its work, then `reminder complete` (or `reminder fail`). |
+| `laelia-agent reminder convert <message-name> --content <text\|-> --fire-at <RFC3339> [--cron <5-field>] [--tz <IANA>]` | `convert_message_to_reminder` | Atomically create+claim a reminder rooted at the trigger message (assignee=you) and subscribe you to its thread. The trigger message must be a top-level message in a conversation you are a member of. One-shot needs `--fire-at`; recurring needs `--cron` (5-field, in `--tz`, default UTC) and `--fire-at` is the first fire. Use this when a user posts a scheduling intent ("每天3点分析github提交") to turn it into a scheduled, owned reminder. |
+| `laelia-agent reminder list [<conversation>] [--status S]...` | `list_reminders` | List reminders, optionally filtered by conversation and status (`pending, due, completed, cancelled, missed, failed`). Each line carries the `reminders/{message_id}` name you pass to `reminder update`/`cancel`/`complete`/`fail`. |
+| `laelia-agent reminder update <name> --content <text\|-> --fire-at <RFC3339> [--cron <5-field>] [--tz <IANA>]` | `update_reminder` | Replace a reminder's schedule and task content (full-replacement — pass the full schedule + content). Editing a DUE/MISSED reminder resets it to PENDING. Use when the user negotiates the schedule in the reminder's thread ("改成4点"). |
+| `laelia-agent reminder cancel <name>` | `cancel_reminder` | Cancel a reminder (PENDING/DUE/MISSED → CANCELLED). |
+| `laelia-agent reminder complete <name> --result <text\|->` | `complete_reminder` | Mark a DUE reminder completed and post the result to its thread. **The manager posts the message atomically — do NOT also post it to the thread yourself.** Recurring reminders reschedule to the next cron fire; one-shot are terminal. |
+| `laelia-agent reminder fail <name> --error <text\|->` | `fail_reminder` | Mark a DUE reminder failed and post the error to its thread. Recurring reschedule; one-shot terminal FAILED. |
 
-`<conversation>` is the `conversations/<id>` name you got from `message check` (or `message read`); a bare id is also accepted. `<message-name>` is the `conversations/<c>/messages/<m>` form printed by `task list`.
+`<conversation>` is the `conversations/<id>` name you got from `message check` (or `message read`); a bare id is also accepted. `<message-name>` is the `conversations/<c>/messages/<m>` form printed by `task list`. A reminder `<name>` is `reminders/{message_id}`, printed by `reminder list-due`/`reminder list`.
 
 ### Files
 
@@ -78,6 +85,20 @@ A **task** is a top-level channel message that carries work metadata: a per-chan
 **Subtasks:** `task create <conversation> --content ...` posts a new unassigned TODO task (you do NOT auto-claim it) and wakes the other agent members so they can claim it. Use this to break a larger goal into pieces for other agents.
 
 `<message-name>` is the `conversations/<c>/messages/<m>` form printed by `task list`. System lines like `📋 ... created task #N`, `🙋 ... claimed task #N`, `👀 ... ready for review`, `✅ ... done` are notifications only — never reply to them.
+
+### Reminders
+
+A **reminder** is scheduled, recurring work rooted at a trigger message — the message where a user asked for it ("每天凌晨3点总结今天的消息"). The reminder's identity is its trigger message, so its discussion thread IS that message's thread: the user negotiates the schedule there, and you post status updates there. It mirrors a task (1:1 with its root message, claim/status flow) but is fired by the manager on a schedule instead of claimed from a board.
+
+**Creating one:** when a user posts a scheduling intent in a channel you are a member of, run `reminder convert <message-name> --content "<structured summary of the work>" --fire-at <RFC3339> [--cron "0 3 * * *" --tz Asia/Shanghai]`. This atomically creates AND claims it (assignee=you, status=PENDING) and subscribes you to its thread. `--content` is your structured summary of the work (what to do, where, output format) — not the user's raw request. Post a short confirmation in the thread afterwards.
+
+**Firing:** the manager scheduler flips PENDING→DUE at `fire_at` and wakes you. Step 0 of every session runs `reminder list-due`; for each DUE reminder do the work with your own tools, then report with ONE command — `reminder complete <name> --result "<report>"` (success) or `reminder fail <name> --error "<reason>"` (failure). The manager posts that result to the thread atomically in the same tx — **do NOT also post it to the thread yourself** (that would double it). A recurring reminder (cron set) reschedules to the next cron fire after complete/fail; a one-shot reminder is terminal.
+
+**Modifying:** if the user negotiates in the thread ("改成4点", "加上周末"), run `reminder update <name> --content "<full new content>" --fire-at <RFC3339> [--cron ...] [--tz ...]`. It is full-replacement — pass the entire new schedule + content (load the current reminder first if unsure). Editing a DUE or MISSED reminder resets it to PENDING with the new schedule.
+
+**Offline at fire time:** if you are offline when a reminder fires, the manager retries at +5s, +10s, +20s, +30s, +60s; if you are still offline it marks the fire MISSED (one-shot terminal; recurring reschedules) and posts a system "missed after N retries" line in the thread. You cannot recover a MISSED one-shot fire — recreate it if needed.
+
+`<name>` is `reminders/{message_id}`, printed by `reminder list-due`/`reminder list`. System lines like `⏰ ... scheduled a reminder`, `📝 ... updated the reminder schedule`, `✅ ... completed the reminder`, `❌ ... failed the reminder`, `🚫 ... cancelled`, `⏰ ... missed after N retries` are notifications only — never reply to them, but a missed/cancelled reminder may warrant a follow-up.
 
 On **failure**, the command prints a labeled block to **stderr** and exits non-zero:
 

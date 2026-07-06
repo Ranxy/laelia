@@ -162,6 +162,13 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/task/unclaim", s.handleTaskUnclaim)
 	mux.HandleFunc("/task/update", s.handleTaskUpdate)
 	mux.HandleFunc("/task/create", s.handleTaskCreate)
+	mux.HandleFunc("/reminder/convert", s.handleReminderConvert)
+	mux.HandleFunc("/reminder/list", s.handleReminderList)
+	mux.HandleFunc("/reminder/list-due", s.handleReminderListDue)
+	mux.HandleFunc("/reminder/update", s.handleReminderUpdate)
+	mux.HandleFunc("/reminder/cancel", s.handleReminderCancel)
+	mux.HandleFunc("/reminder/complete", s.handleReminderComplete)
+	mux.HandleFunc("/reminder/fail", s.handleReminderFail)
 	mux.HandleFunc("/command/context", s.handleCommandContext)
 	mux.HandleFunc("/file/upload", s.handleFileUpload)
 	mux.HandleFunc("/file/download", s.handleFileDownload)
@@ -222,6 +229,17 @@ type Request struct {
 
 	// AttachmentIDs are file ids to attach to a posted message.
 	AttachmentIDs []string `json:"attachment_ids,omitempty"`
+
+	// Reminder fields. Name is a reminder resource name
+	// ("reminders/{message_id}"). FireAt is an RFC3339 timestamp; CronExpr is a
+	// 5-field cron expression (empty = one-shot); Tz is an IANA timezone.
+	// Result/Error are the completion/failure reports posted to the thread.
+	Name     string `json:"name,omitempty"`
+	FireAt   string `json:"fire_at,omitempty"`
+	CronExpr string `json:"cron_expr,omitempty"`
+	Tz       string `json:"tz,omitempty"`
+	Result   string `json:"result,omitempty"`
+	Error    string `json:"error,omitempty"`
 }
 
 // Response is the shared envelope. Success: Text set, Code empty. Failure:
@@ -435,6 +453,78 @@ func (s *Server) handleTaskCreate(w http.ResponseWriter, r *http.Request) {
 			Conversation:  req.Conversation,
 			Content:       req.Content,
 			AttachmentIDs: req.AttachmentIDs,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleReminderConvert(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.ConvertMessageToReminder(r.Context(), s.deps(req), chattools.ConvertMessageToReminderInput{
+			Message:     req.Message,
+			TaskContent: req.Content,
+			FireAt:      req.FireAt,
+			CronExpr:    req.CronExpr,
+			Tz:          req.Tz,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleReminderList(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.ListReminders(r.Context(), s.deps(req), chattools.ListRemindersInput{
+			Conversation: req.Conversation,
+			Statuses:     req.Statuses,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleReminderListDue(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.ListDueReminders(r.Context(), s.deps(req), chattools.ListDueRemindersInput{})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleReminderUpdate(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.UpdateReminder(r.Context(), s.deps(req), chattools.UpdateReminderInput{
+			Name:        req.Name,
+			TaskContent: req.Content,
+			FireAt:      req.FireAt,
+			CronExpr:    req.CronExpr,
+			Tz:          req.Tz,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleReminderCancel(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.CancelReminder(r.Context(), s.deps(req), chattools.CancelReminderInput{
+			Name: req.Name,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleReminderComplete(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.CompleteReminder(r.Context(), s.deps(req), chattools.CompleteReminderInput{
+			Name:   req.Name,
+			Result: req.Result,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleReminderFail(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.FailReminder(r.Context(), s.deps(req), chattools.FailReminderInput{
+			Name:  req.Name,
+			Error: req.Error,
 		})
 		return text, asChatError(err)
 	})

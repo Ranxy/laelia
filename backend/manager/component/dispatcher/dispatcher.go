@@ -277,7 +277,11 @@ func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to check channel updates")
 	}
-	if !hasUpdates {
+	hasReminders, err := d.store.HasDueReminders(ctx, agentID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to check due reminders")
+	}
+	if !hasUpdates && !hasReminders {
 		return &v1pb.BeginSessionResponse{Idle: true}, nil
 	}
 

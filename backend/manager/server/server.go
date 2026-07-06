@@ -16,6 +16,7 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
+	"github.com/Ranxy/laelia/backend/manager/component/scheduler"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -49,6 +50,11 @@ type Server struct {
 	// dispatcher is the command dispatcher; Stop joins its ping monitor and
 	// grace goroutines on shutdown.
 	dispatcher *dispatcher.Dispatcher
+
+	// scheduler fires reminders at their scheduled time; Stop joins its scan
+	// loops on shutdown. It is stopped before the dispatcher so it stops waking
+	// agents while the dispatcher tears down sessions.
+	scheduler *scheduler.Scheduler
 
 	// boot specifies that whether the server boot correctly
 	cancel context.CancelFunc
@@ -100,6 +106,7 @@ func NewServer(ctx context.Context, profile *config.Profile) (*Server, error) {
 	}
 
 	s.dispatcher = dispatcher.New(stores)
+	s.scheduler = scheduler.New(stores, s.dispatcher)
 
 	if err := configureGrpcRouters(ctx, s.echoServer, s.store, secret, s.profile, s.stateCfg, s.s3clientManager, s.dispatcher); err != nil {
 		return nil, errors.Wrapf(err, "failed to configure gRPC routers")
@@ -163,6 +170,12 @@ func (s *Server) Run(ctx context.Context, port int) error {
 		s.stateCfg.HeartbeatBuffer.Start(s.runnerCtx)
 	}
 
+	// Start the reminder scheduler once the dispatcher is ready (it wakes agents
+	// via the dispatcher). Start spawns its own goroutines.
+	if s.scheduler != nil {
+		s.scheduler.Start()
+	}
+
 	// pprof is served on a separate, dedicated listener — never the public
 	// port — and only when runtime debug is enabled and an address is set.
 	// Heap/goroutine/profile dumps are sensitive; binding to localhost keeps
@@ -208,6 +221,13 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// Shutdown the standalone pprof server (best-effort; it may be nil).
 	if s.pprofServer != nil {
 		_ = s.pprofServer.Shutdown(ctx)
+	}
+
+	// Stop the reminder scheduler before the dispatcher so it stops firing
+	// wakes while the dispatcher tears down sessions, and before the store is
+	// closed so its scan loops do not use a closed *sql.DB.
+	if s.scheduler != nil {
+		s.scheduler.Stop()
 	}
 
 	// Join the dispatcher's ping monitor and any in-flight grace goroutines
