@@ -79,9 +79,19 @@ export function ChatToolCall({
               <div className="text-[10px] font-medium text-control-light mb-1">
                 {t("chat.tool-input")}
               </div>
-              <pre className="text-[11px] font-mono text-control bg-background/50 rounded p-2 overflow-auto max-h-40 whitespace-pre-wrap">
+              <pre className="text-[11px] font-mono text-control bg-background/50 rounded p-2 overflow-auto max-h-40 whitespace-pre-wrap break-all min-w-0">
                 {JSON.stringify(rawInput, null, 2)}
               </pre>
+            </div>
+          )}
+          {rawInput === undefined && (
+            <div>
+              <div className="text-[10px] font-medium text-control-light mb-1">
+                {t("chat.tool-input")}
+              </div>
+              <div className="text-[11px] text-control-light italic">
+                {t("chat.input-not-captured")}
+              </div>
             </div>
           )}
           {rawOutput !== undefined && (
@@ -91,7 +101,7 @@ export function ChatToolCall({
               </div>
               <pre
                 className={cn(
-                  "text-[11px] font-mono text-control bg-background/50 rounded p-2 overflow-auto max-h-40 whitespace-pre-wrap"
+                  "text-[11px] font-mono text-control bg-background/50 rounded p-2 overflow-auto max-h-40 whitespace-pre-wrap break-all min-w-0"
                 )}
               >
                 {JSON.stringify(rawOutput, null, 2)}

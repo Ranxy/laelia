@@ -1,5 +1,6 @@
 import MarkdownRender from "markstream-react";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
+import { useAutoScroll } from "@/lib/use-auto-scroll";
 import { cn } from "@/lib/utils";
 import type { CommandOutput } from "@/types/proto-es/v1/command_pb";
 import { CommandOutput_StreamType } from "@/types/proto-es/v1/command_pb";
@@ -11,19 +12,7 @@ interface CommandTerminalProps {
 
 export function CommandTerminal({ outputs, className }: CommandTerminalProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const autoScrollRef = useRef(true);
-
-  useEffect(() => {
-    if (autoScrollRef.current && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [outputs]);
-
-  const handleScroll = () => {
-    if (!scrollRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    autoScrollRef.current = scrollHeight - scrollTop - clientHeight < 40;
-  };
+  const { onScroll } = useAutoScroll(scrollRef, [outputs]);
 
   if (outputs.length === 0) {
     return (
@@ -41,7 +30,7 @@ export function CommandTerminal({ outputs, className }: CommandTerminalProps) {
   return (
     <div
       ref={scrollRef}
-      onScroll={handleScroll}
+      onScroll={onScroll}
       className={cn(
         "rounded bg-dark-bg p-4 font-mono text-xs overflow-auto max-h-96",
         className

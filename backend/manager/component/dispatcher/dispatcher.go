@@ -653,6 +653,13 @@ func (d *Dispatcher) HandleProgress(ctx context.Context, _ int, progress *v1pb.C
 		Type:      progress.Type,
 		Content:   progress.Content,
 		SeqNo:     progress.SeqNo,
+		// CommandProgress carries no timestamp; stamp the live broadcast with
+		// now so the frontend timeline can order it against tool-call events
+		// (which carry their own timestamp). Without this, streamed outputs sort
+		// to the top (zero ts) and tool cards sink to the bottom. Historical
+		// replay (WatchCommand) reads created_at from the DB, so this only
+		// affects the live path.
+		Timestamp: timestamppb.Now(),
 	}
 
 	d.broadcast(progress.CommandId, output)
@@ -747,6 +754,7 @@ func (d *Dispatcher) HandleResult(ctx context.Context, agentID int, result *v1pb
 		Type:      v1pb.CommandOutput_SYSTEM,
 		Content:   formatResultMessage(result),
 		SeqNo:     result.LastSeqNo + 1,
+		Timestamp: timestamppb.Now(),
 	}
 	d.broadcast(result.CommandId, output)
 

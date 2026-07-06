@@ -290,6 +290,7 @@
     "send-hint": "Enter to send · Shift+Enter for newline",
     "tool-input": "Input",
     "tool-output": "Output",
+    "input-not-captured": "Input not captured",
     "mention-list-aria-label": "Mention suggestions",
     "mention-no-matches": "No matches for '@{{query}}'",
     "mention-group-users": "Users",

@@ -290,6 +290,7 @@
     "send-hint": "Enter 发送 · Shift+Enter 换行",
     "tool-input": "输入",
     "tool-output": "输出",
+    "input-not-captured": "未捕获输入",
     "mention-list-aria-label": "@提及建议",
     "mention-no-matches": "没有找到 '@{{query}}' 的匹配",
     "mention-group-users": "用户",

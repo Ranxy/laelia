@@ -27,6 +27,12 @@ const flushOutputInterval = 500 * time.Millisecond
 const maxRawEventBatchSize = 256
 const permissionTimeout = 120 * time.Second
 
+// debugToolCalls gates verbose logging of every ACP ToolCall / ToolCallUpdate
+// frame the agent receives, so we can see exactly which fields (esp. rawInput,
+// where the bash command should live) the ACP agent populates. Enable with
+// LAELIA_DEBUG_TOOL_CALLS=1 on the agent process.
+var debugToolCalls = os.Getenv("LAELIA_DEBUG_TOOL_CALLS") == "1"
+
 type outputBuffer struct {
 	mu     sync.Mutex
 	stdout strings.Builder
@@ -155,28 +161,38 @@ func (b *rawEventBatch) buildData() *structpb.Struct {
 }
 
 type ACPExecutor struct {
-	ctx              context.Context
-	cancel           context.CancelFunc
-	request          Request
-	config           *ACPConfig
-	workingDir       string
-	allowedRoots     []string
-	cmd              *exec.Cmd
-	conn             *acp.ClientSideConnection
-	client           *acpRuntimeClient
-	outputCh         chan OutputChunk
-	eventCh          chan Event
-	resultCh         chan Result
-	done             chan struct{}
-	seqNo            atomic.Int32
-	startedAt        time.Time
-	outputBytes      atomic.Int64
-	eventCount       atomic.Int32
-	toolCallCount    atomic.Int32
-	outputLimited    atomic.Bool
-	eventLimitHit    atomic.Bool
-	summaryText      string
-	warnMu           sync.Mutex
+	ctx           context.Context
+	cancel        context.CancelFunc
+	request       Request
+	config        *ACPConfig
+	workingDir    string
+	allowedRoots  []string
+	cmd           *exec.Cmd
+	conn          *acp.ClientSideConnection
+	client        *acpRuntimeClient
+	outputCh      chan OutputChunk
+	eventCh       chan Event
+	resultCh      chan Result
+	done          chan struct{}
+	seqNo         atomic.Int32
+	startedAt     time.Time
+	outputBytes   atomic.Int64
+	eventCount    atomic.Int32
+	toolCallCount atomic.Int32
+	outputLimited atomic.Bool
+	eventLimitHit atomic.Bool
+	summaryText   string
+	warnMu        sync.Mutex
+	// toolCallStartMu guards toolCallStates, which tracks per-toolCallId
+	// metadata used to defer TOOL_CALL_STARTED emission until the tool's input
+	// is available. Some ACP agents (e.g. claude-code) send the ToolCall create
+	// event with an empty RawInput and only deliver the actual command in a
+	// later content-only ToolCallUpdate; emitting STARTED at the create would
+	// surface an empty input, so the title is recorded at create and the
+	// STARTED is emitted when RawInput arrives (or as a late fallback when the
+	// status update arrives with no input ever captured).
+	toolCallStartMu  sync.Mutex
+	toolCallStates   map[string]*toolCallState
 	sessionID        string
 	initializedAgent string
 	buffer           outputBuffer
@@ -237,6 +253,7 @@ func NewACP(req Request, cfg *ACPConfig) (Runtime, error) {
 		permissionCh:     make(chan acp.PermissionOptionId, 1),
 		perCommandAllow:  map[string]bool{},
 		perCommandReject: map[string]bool{},
+		toolCallStates:   map[string]*toolCallState{},
 	}
 	exec.client = &acpRuntimeClient{executor: exec}
 	return exec, nil
@@ -493,6 +510,100 @@ func (e *ACPExecutor) flushIfNeeded() {
 	}
 }
 
+// toolCallState tracks per-toolCallId metadata used to defer TOOL_CALL_STARTED
+// emission until the tool's input is available. title is captured from the
+// ToolCall create event so a later deferred STARTED (driven by a
+// ToolCallUpdate carrying RawInput) can use it when the update has no title.
+type toolCallState struct {
+	title   string
+	started bool
+}
+
+// recordToolCallTitle stores the title observed on a ToolCall create event so
+// a later deferred TOOL_CALL_STARTED can use it. It does NOT mark the id as
+// started; the STARTED is emitted only when RawInput arrives (or as a late
+// fallback), so an agent that sends the command in a content-only update is
+// not short-circuited by an empty-input create.
+func (e *ACPExecutor) recordToolCallTitle(id, title string) {
+	if id == "" {
+		return
+	}
+	e.toolCallStartMu.Lock()
+	st, ok := e.toolCallStates[id]
+	if !ok {
+		st = &toolCallState{}
+		e.toolCallStates[id] = st
+	}
+	if title != "" {
+		st.title = title
+	}
+	e.toolCallStartMu.Unlock()
+}
+
+// beginToolCallStarted claims a toolCallId for TOOL_CALL_STARTED emission the
+// first time it is seen, returning the stored title (from a prior create, or
+// empty) and ok=true. Subsequent calls return ok=false so each tool call emits
+// exactly one STARTED. This drives both the synthesized STARTED for
+// ToolCallUpdate-only agents and the deferred STARTED for agents whose create
+// carried an empty RawInput.
+func (e *ACPExecutor) beginToolCallStarted(id string) (title string, ok bool) {
+	if id == "" {
+		return "", false
+	}
+	e.toolCallStartMu.Lock()
+	defer e.toolCallStartMu.Unlock()
+	st, exists := e.toolCallStates[id]
+	if !exists {
+		st = &toolCallState{}
+		e.toolCallStates[id] = st
+	}
+	if st.started {
+		return st.title, false
+	}
+	st.started = true
+	return st.title, true
+}
+
+// emitToolCallStarted emits one TOOL_CALL_STARTED event for the given tool call
+// and (when debug logging is on) records the source frame and the captured
+// input so the deferred-emission logic is observable from the agent logs.
+func (e *ACPExecutor) emitToolCallStarted(title string, rawIn *structpb.Struct, source string) {
+	e.toolCallCount.Add(1)
+	if debugToolCalls {
+		slog.Info("acp tool_call_started emitted", "source", source, "title", title, "rawInput", toJSONString(rawIn))
+	}
+	e.sendEvent(Event{
+		Type:    v1pb.CommandEventType_TOOL_CALL_STARTED,
+		Summary: title,
+		ToolCallStarted: &v1pb.ToolCallStartedPayload{
+			Title:    title,
+			RawInput: rawIn,
+		},
+	})
+}
+
+// toolPayloadStruct converts an ACP RawInput/RawOutput value into a protobuf
+// Struct for the ToolCallStartedPayload/ToolCallFinishedPayload fields. Inputs
+// are JSON objects (e.g. {"command": "...", "description": "..."}); outputs are
+// often a JSON string. Map values pass through; scalar values are wrapped under
+// "value" so they survive structpb.NewStruct (which only accepts maps). Empty
+// or nil input returns nil so the frontend renders its "Input not captured"
+// fallback instead of an empty object.
+func toolPayloadStruct(in any) *structpb.Struct {
+	if in == nil {
+		return nil
+	}
+	s := toJSONString(in)
+	if s == "{}" || s == "null" {
+		return nil
+	}
+	if _, ok := toJSONMap(in)["unmarshal_error"]; ok {
+		// Scalar (string/number) — wrap so structpb.NewStruct accepts it.
+		return toProtobufStruct(map[string]any{"value": in})
+	}
+	return toProtobufStruct(in)
+}
+
 func (e *ACPExecutor) sendEvent(event Event) {
 	if !e.allowEvent() {
 		return
@@ -719,15 +830,53 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 	case u.ToolCall != nil:
 		c.executor.buffer.flush(c.executor)
 		c.executor.rawEvents.flush(c.executor)
-		c.executor.toolCallCount.Add(1)
+		id := string(u.ToolCall.ToolCallId)
+		c.executor.recordToolCallTitle(id, u.ToolCall.Title)
+		if debugToolCalls {
+			slog.Info("acp tool_call create", "toolCallId", id,
+				"title", u.ToolCall.Title, "kind", string(u.ToolCall.Kind),
+				"rawInput", toJSONString(u.ToolCall.RawInput),
+				"contentCount", len(u.ToolCall.Content))
+		}
+		// Emit STARTED now only when the create already carries the tool input.
+		// Some agents (e.g. claude-code) send an empty RawInput here and deliver
+		// the actual command in a later content-only ToolCallUpdate; for those we
+		// defer the STARTED to that update rather than surfacing an empty input.
 		if c.executor.config.SupportsToolTraces {
-			c.executor.sendEvent(Event{
-				Type:            v1pb.CommandEventType_TOOL_CALL_STARTED,
-				Summary:         u.ToolCall.Title,
-				ToolCallStarted: &v1pb.ToolCallStartedPayload{Title: u.ToolCall.Title, RawInput: toProtobufStruct(u.ToolCall)},
-			})
+			if rawIn := toolPayloadStruct(u.ToolCall.RawInput); rawIn != nil {
+				if _, ok := c.executor.beginToolCallStarted(id); ok {
+					c.executor.emitToolCallStarted(u.ToolCall.Title, rawIn, "create")
+				}
+			}
 		}
 	case u.ToolCallUpdate != nil:
+		id := string(u.ToolCallUpdate.ToolCallId)
+		if debugToolCalls {
+			status := ""
+			if u.ToolCallUpdate.Status != nil {
+				status = string(*u.ToolCallUpdate.Status)
+			}
+			slog.Info("acp tool_call_update", "toolCallId", id,
+				"status", status,
+				"rawInput", toJSONString(u.ToolCallUpdate.RawInput),
+				"rawOutput", toJSONString(u.ToolCallUpdate.RawOutput),
+				"contentCount", len(u.ToolCallUpdate.Content))
+		}
+		// Defer TOOL_CALL_STARTED until the tool's input is available. If the
+		// create event carried an empty RawInput (or no create was ever sent),
+		// emit the STARTED from the first content-only update that carries
+		// RawInput so the actual command is surfaced.
+		if c.executor.config.SupportsToolTraces && u.ToolCallUpdate.Status == nil {
+			if rawIn := toolPayloadStruct(u.ToolCallUpdate.RawInput); rawIn != nil {
+				if storedTitle, ok := c.executor.beginToolCallStarted(id); ok {
+					title := storedTitle
+					if u.ToolCallUpdate.Title != nil && *u.ToolCallUpdate.Title != "" {
+						title = *u.ToolCallUpdate.Title
+					}
+					c.executor.emitToolCallStarted(title, rawIn, "update")
+				}
+			}
+		}
 		for _, content := range u.ToolCallUpdate.Content {
 			if content.Content != nil {
 				text := contentBlockText(content.Content.Content)
@@ -756,12 +905,19 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 			c.executor.rawEvents.append(c.executor, "tool_call_update", toJSONMap(u.ToolCallUpdate))
 		}
 		if c.executor.config.SupportsToolTraces && u.ToolCallUpdate.Status != nil {
+			// If no STARTED was ever emitted (no create and no content-only
+			// RawInput), emit a late STARTED so every tool call has a
+			// STARTED+FINISHED pair; the input is empty and the frontend shows
+			// its "Input not captured" fallback.
+			if storedTitle, ok := c.executor.beginToolCallStarted(id); ok {
+				c.executor.emitToolCallStarted(storedTitle, nil, "late")
+			}
 			c.executor.sendEvent(Event{
 				Type:    v1pb.CommandEventType_TOOL_CALL_FINISHED,
 				Summary: string(*u.ToolCallUpdate.Status),
 				ToolCallFinished: &v1pb.ToolCallFinishedPayload{
 					Status:    string(*u.ToolCallUpdate.Status),
-					RawOutput: toProtobufStruct(u.ToolCallUpdate),
+					RawOutput: toolPayloadStruct(u.ToolCallUpdate.RawOutput),
 				},
 			})
 		}
@@ -1086,6 +1242,19 @@ func toJSONMap(value any) map[string]any {
 		return map[string]any{"unmarshal_error": err.Error()}
 	}
 	return payload
+}
+
+// toJSONString renders any value as a compact JSON string for debug logging,
+// tolerating nil and marshal errors so it never panics the producer.
+func toJSONString(value any) string {
+	if value == nil {
+		return "<nil>"
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Sprintf("<marshal_error: %v>", err)
+	}
+	return string(data)
 }
 
 func toProtobufStruct(value any) *structpb.Struct {
