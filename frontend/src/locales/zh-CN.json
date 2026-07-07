@@ -212,6 +212,8 @@
     "acp-config-model": "模型",
     "acp-config-model-unsupported": "该 provider 未通过协议暴露 model 选择。",
     "acp-config-derived-command-hint": "启动命令由所选 provider 自动派生。",
+    "acp-config-persona-prompt": "自我认知 Prompt",
+    "acp-config-persona-prompt-placeholder": "描述这个 agent 的性格、聊天风格、专精方向等。留空则不加载。",
     "acp-config-custom-env": "自定义环境变量",
     "acp-config-custom-env-key-placeholder": "API_KEY",
     "acp-config-custom-env-value-placeholder": "value",

@@ -929,12 +929,13 @@ func convertToV1AgentACPConfig(cfg *storepb.AgentACPConfig) *v1pb.AgentACPConfig
 		return nil
 	}
 	return &v1pb.AgentACPConfig{
-		Executable: cfg.Executable,
-		Args:       cfg.Args,
-		AllowEnv:   cfg.AllowEnv,
-		Provider:   cfg.Provider,
-		Model:      cfg.Model,
-		CustomEnv:  cfg.CustomEnv,
+		Executable:    cfg.Executable,
+		Args:          cfg.Args,
+		AllowEnv:      cfg.AllowEnv,
+		Provider:      cfg.Provider,
+		Model:         cfg.Model,
+		CustomEnv:     cfg.CustomEnv,
+		PersonaPrompt: cfg.PersonaPrompt,
 	}
 }
 
@@ -943,12 +944,13 @@ func convertToStoreAgentACPConfig(cfg *v1pb.AgentACPConfig) *storepb.AgentACPCon
 		return nil
 	}
 	return &storepb.AgentACPConfig{
-		Executable: cfg.Executable,
-		Args:       cfg.Args,
-		AllowEnv:   cfg.AllowEnv,
-		Provider:   cfg.Provider,
-		Model:      cfg.Model,
-		CustomEnv:  cfg.CustomEnv,
+		Executable:    cfg.Executable,
+		Args:          cfg.Args,
+		AllowEnv:      cfg.AllowEnv,
+		Provider:      cfg.Provider,
+		Model:         cfg.Model,
+		CustomEnv:     cfg.CustomEnv,
+		PersonaPrompt: cfg.PersonaPrompt,
 	}
 }
 

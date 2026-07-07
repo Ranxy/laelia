@@ -2004,6 +2004,7 @@ type AgentACPConfig struct {
 	Provider      string                 `protobuf:"bytes,4,opt,name=provider,proto3" json:"provider,omitempty"`                                                                                              // selected LLM agent provider id, e.g. "opencode", "claude-code", "custom"
 	Model         string                 `protobuf:"bytes,5,opt,name=model,proto3" json:"model,omitempty"`                                                                                                    // selected model valueId, matching an option advertised by the provider in NewSession ConfigOptions
 	CustomEnv     map[string]string      `protobuf:"bytes,6,rep,name=custom_env,json=customEnv,proto3" json:"custom_env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // user-defined key-value env vars overlaid (and overriding) the inherited allow_env set
+	PersonaPrompt string                 `protobuf:"bytes,7,opt,name=persona_prompt,json=personaPrompt,proto3" json:"persona_prompt,omitempty"`                                                               // admin-authored self-awareness prompt: personality, chat style, focus area. Empty = not loaded.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2078,6 +2079,13 @@ func (x *AgentACPConfig) GetCustomEnv() map[string]string {
 		return x.CustomEnv
 	}
 	return nil
+}
+
+func (x *AgentACPConfig) GetPersonaPrompt() string {
+	if x != nil {
+		return x.PersonaPrompt
+	}
+	return ""
 }
 
 type AgentCapability struct {
@@ -2523,7 +2531,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x10AgentModelOption\x12\x14\n" +
 	"\x05value\x18\x01 \x01(\tR\x05value\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\"\x9a\x02\n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\"\xc1\x02\n" +
 	"\x0eAgentACPConfig\x12\x1e\n" +
 	"\n" +
 	"executable\x18\x01 \x01(\tR\n" +
@@ -2533,7 +2541,8 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\bprovider\x18\x04 \x01(\tR\bprovider\x12\x14\n" +
 	"\x05model\x18\x05 \x01(\tR\x05model\x12G\n" +
 	"\n" +
-	"custom_env\x18\x06 \x03(\v2(.laelia.v1.AgentACPConfig.CustomEnvEntryR\tcustomEnv\x1a<\n" +
+	"custom_env\x18\x06 \x03(\v2(.laelia.v1.AgentACPConfig.CustomEnvEntryR\tcustomEnv\x12%\n" +
+	"\x0epersona_prompt\x18\a \x01(\tR\rpersonaPrompt\x1a<\n" +
 	"\x0eCustomEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xff\x02\n" +

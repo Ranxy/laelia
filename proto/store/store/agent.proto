@@ -40,6 +40,7 @@ message AgentACPConfig {
   string provider = 4;
   string model = 5;
   map<string, string> custom_env = 6;
+  string persona_prompt = 7;
 }
 
 message AgentProviderInfo {

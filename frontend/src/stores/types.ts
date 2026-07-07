@@ -140,6 +140,7 @@ export interface AgentSlice {
       provider: string;
       model: string;
       customEnv: Record<string, string>;
+      personaPrompt: string;
     }
   ) => Promise<void>;
   refreshAgentProviders: (name: string) => Promise<AgentProviderInfo[]>;

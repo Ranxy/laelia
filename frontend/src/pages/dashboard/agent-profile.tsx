@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { buildAgentRunCommand } from "@/lib/agent-token";
 import { agentResourceName, formatTimestamp } from "@/lib/command-status";
 import { useAppStore } from "@/stores";
@@ -111,6 +112,7 @@ export function AgentProfilePage() {
   const [allowEnv, setAllowEnv] = useState<string[]>([]);
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
+  const [personaPrompt, setPersonaPrompt] = useState("");
   const [customEnvEntries, setCustomEnvEntries] = useState<
     { key: string; value: string }[]
   >([]);
@@ -144,6 +146,7 @@ export function AgentProfilePage() {
     setAllowEnv(cfg?.allowEnv ? [...cfg.allowEnv] : []);
     setProvider(cfg?.provider ?? "");
     setModel(cfg?.model ?? "");
+    setPersonaPrompt(cfg?.personaPrompt ?? "");
     setCustomEnvEntries(
       cfg?.customEnv
         ? Object.entries(cfg.customEnv).map(([key, value]) => ({ key, value }))
@@ -200,6 +203,7 @@ export function AgentProfilePage() {
         allowEnv: allowEnv.map((e) => e.trim()).filter((e) => e !== ""),
         provider: provider.trim(),
         model: model.trim(),
+        personaPrompt: personaPrompt.trim(),
         customEnv,
       });
       await getAgent(agentName, { force: true });
@@ -532,6 +536,23 @@ export function AgentProfilePage() {
                     {t("agent.acp-config-derived-command-hint")}
                   </p>
                 )}
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">
+                    {t("agent.acp-config-persona-prompt")}
+                  </label>
+                  <Textarea
+                    className="font-mono text-sm min-h-[160px]"
+                    placeholder={t(
+                      "agent.acp-config-persona-prompt-placeholder"
+                    )}
+                    value={personaPrompt}
+                    onChange={(e) => {
+                      setPersonaPrompt(e.target.value);
+                      setSaveError("");
+                    }}
+                  />
+                </div>
 
                 <KeyValueEnvEditor
                   label={t("agent.acp-config-custom-env")}

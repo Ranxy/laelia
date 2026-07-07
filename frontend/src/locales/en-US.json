@@ -212,6 +212,8 @@
     "acp-config-model": "Model",
     "acp-config-model-unsupported": "This provider does not expose model selection via the protocol.",
     "acp-config-derived-command-hint": "The launch command is derived from the selected provider.",
+    "acp-config-persona-prompt": "Persona prompt",
+    "acp-config-persona-prompt-placeholder": "Describe this agent's personality, chat style, and focus area. Empty = not loaded.",
     "acp-config-custom-env": "Custom env",
     "acp-config-custom-env-key-placeholder": "API_KEY",
     "acp-config-custom-env-value-placeholder": "value",

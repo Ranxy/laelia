@@ -2312,6 +2312,8 @@ components:
                     type: object
                     additionalProperties:
                         type: string
+                personaPrompt:
+                    type: string
             description: |-
                 User-configurable ACP settings. Everything else (working dir, capabilities,
                  permissions) is derived from a built-in template, not set by the admin.

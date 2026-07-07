@@ -97,6 +97,7 @@
 | provider | [string](#string) |  |  |
 | model | [string](#string) |  |  |
 | custom_env | [AgentACPConfig.CustomEnvEntry](#laelia-store-AgentACPConfig-CustomEnvEntry) | repeated |  |
+| persona_prompt | [string](#string) |  |  |
 
 
 

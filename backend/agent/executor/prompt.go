@@ -6,13 +6,18 @@ import (
 	"strings"
 )
 
-func buildPrompt(name string) string {
+func buildPrompt(name, personaPrompt string) string {
 	prompts := []string{
 		agentIdentityText(name),
+	}
+	if trimmed := strings.TrimSpace(personaPrompt); trimmed != "" {
+		prompts = append(prompts, "## Your persona\n\n"+trimmed)
+	}
+	prompts = append(prompts,
 		AgentCommunicationPrompt,
 		AgentFirstPromptBody,
 		AgentMemoryPrompt,
-	}
+	)
 
 	return strings.Join(prompts, "\n\n")
 }

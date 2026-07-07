@@ -379,7 +379,7 @@ func (e *ACPExecutor) run() {
 	if identityName == "" {
 		identityName = e.request.AgentResourceID
 	}
-	promptText := buildPrompt(identityName)
+	promptText := buildPrompt(identityName, e.config.PersonaPrompt)
 
 	promptResp, err := e.conn.Prompt(e.ctx, acp.PromptRequest{
 		SessionId: sessionResp.SessionId,

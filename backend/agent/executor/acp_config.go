@@ -48,10 +48,11 @@ type ACPConfig struct {
 	MaxOutputBytes    int64 `yaml:"max_output_bytes"`
 	OutputFlushBytes  int32 `yaml:"output_flush_bytes"`
 
-	Provider   string   `yaml:"provider"`
-	Model      string   `yaml:"model"`
-	Executable string   `yaml:"executable"`
-	Args       []string `yaml:"args"`
+	Provider      string   `yaml:"provider"`
+	Model         string   `yaml:"model"`
+	Executable    string   `yaml:"executable"`
+	Args          []string `yaml:"args"`
+	PersonaPrompt string   `yaml:"persona_prompt"`
 	// Env is the template env overlay (currently unused; kept for the built-in
 	// template). CustomEnv below is the admin-authored key-value overlay.
 	Env                   map[string]string `yaml:"env"`
@@ -102,6 +103,7 @@ func BuildACPConfig(user *v1pb.AgentACPConfig, agentID string) *ACPConfig {
 		Model:                user.Model,
 		Executable:           executable,
 		Args:                 args,
+		PersonaPrompt:        user.PersonaPrompt,
 		CustomEnv:            user.CustomEnv,
 		AllowEnv:             user.AllowEnv,
 		WorkingDir:           AgentWorkingDir(agentID),

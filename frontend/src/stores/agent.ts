@@ -120,6 +120,7 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
       provider: string;
       model: string;
       customEnv: Record<string, string>;
+      personaPrompt: string;
     }
   ) {
     await agentServiceClient.updateAgentACPConfig(

@@ -954,6 +954,13 @@ export declare type AgentACPConfig = Message<"laelia.v1.AgentACPConfig"> & {
    * @generated from field: map<string, string> custom_env = 6;
    */
   customEnv: { [key: string]: string };
+
+  /**
+   * admin-authored self-awareness prompt: personality, chat style, focus area. Empty = not loaded.
+   *
+   * @generated from field: string persona_prompt = 7;
+   */
+  personaPrompt: string;
 };
 
 /**

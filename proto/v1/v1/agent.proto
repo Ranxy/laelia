@@ -427,6 +427,7 @@ message AgentACPConfig {
   string provider = 4; // selected LLM agent provider id, e.g. "opencode", "claude-code", "custom"
   string model = 5; // selected model valueId, matching an option advertised by the provider in NewSession ConfigOptions
   map<string, string> custom_env = 6; // user-defined key-value env vars overlaid (and overriding) the inherited allow_env set
+  string persona_prompt = 7; // admin-authored self-awareness prompt: personality, chat style, focus area. Empty = not loaded.
 }
 
 message AgentCapability {

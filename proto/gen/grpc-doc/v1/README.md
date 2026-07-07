@@ -412,6 +412,7 @@ permissions) is derived from a built-in template, not set by the admin.
 | provider | [string](#string) |  | selected LLM agent provider id, e.g. &#34;opencode&#34;, &#34;claude-code&#34;, &#34;custom&#34; |
 | model | [string](#string) |  | selected model valueId, matching an option advertised by the provider in NewSession ConfigOptions |
 | custom_env | [AgentACPConfig.CustomEnvEntry](#laelia-v1-AgentACPConfig-CustomEnvEntry) | repeated | user-defined key-value env vars overlaid (and overriding) the inherited allow_env set |
+| persona_prompt | [string](#string) |  | admin-authored self-awareness prompt: personality, chat style, focus area. Empty = not loaded. |
 
 
 
