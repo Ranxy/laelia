@@ -9,8 +9,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Avatar, formatTime } from "@/components/chat/avatar";
-import { FileCard } from "@/components/chat/file-card";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionPopup } from "@/components/chat/mention-popup";
 import {
@@ -20,7 +18,6 @@ import {
 } from "@/components/chat/message-row";
 import { RemoteImage } from "@/components/chat/remote-image";
 import { EmptyState, LoadingState } from "@/components/chat/states";
-import { TaskStatusBadge } from "@/components/chat/task-status-badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { detectMention } from "@/composables/useMentionDetect";
@@ -32,10 +29,6 @@ import {
 import { commandServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
 import { isImageAttachment } from "@/lib/image-file";
-import {
-  isMarkdownAttachment,
-  MAX_MARKDOWN_PREVIEW_BYTES,
-} from "@/lib/markdown-file";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { ChatMessageUI } from "@/stores/types";
@@ -285,12 +278,21 @@ export function ThreadPanel({
         className="flex-1 overflow-y-auto"
       >
         <div className="flex flex-col gap-3 px-4 pt-4 pb-4">
-          {/* Root message context. */}
+          {/* Root message context. Rendered through the shared MessageRow so it
+              gets the same markdown/mention/attachment treatment as channel
+              chat and thread replies (it previously rendered raw text). */}
           {rootMsg && (
-            <RootContext
+            <MessageRow
               msg={rootMsg}
+              showAvatar
               agentTitle={agentTitleFor(rootMsg)}
+              streamingContent=""
+              streamingEvents={rootMsg.events ?? EMPTY_EVENTS}
+              onViewDetails={noopViewDetails}
+              MentionBadge={MentionBadge}
+              markdownCustomId="thread-chat"
               onPreviewAttachment={onPreviewAttachment}
+              onJumpToSection={onJumpToSection}
               onPreviewImage={onPreviewImage}
             />
           )}
@@ -574,14 +576,6 @@ function ThreadHeader({
           {title} — #{channelName}
         </p>
       </div>
-      {isTask && rootMsg?.task && (
-        <TaskStatusBadge
-          taskNumber={rootMsg.task.taskNumber}
-          status={rootMsg.task.status}
-          assigneeName={rootMsg.task.assigneeName}
-          className="text-[10px] px-1.5 py-0"
-        />
-      )}
       <button
         type="button"
         onClick={onViewInChannel}
@@ -600,79 +594,6 @@ function ThreadHeader({
       >
         <X className="size-4" />
       </button>
-    </div>
-  );
-}
-
-function RootContext({
-  msg,
-  agentTitle,
-  onPreviewAttachment,
-  onPreviewImage,
-}: {
-  msg: ChatMessageUI;
-  agentTitle: string;
-  onPreviewAttachment?: (attachment: Attachment, rootMessageId: string) => void;
-  onPreviewImage?: (attachment: Attachment) => void;
-}) {
-  const { t } = useTranslation();
-  const isUser = msg.role === "user";
-  return (
-    <div className="flex gap-2.5">
-      <div className="flex shrink-0 flex-col items-center pt-0.5">
-        <Avatar label={isUser ? "U" : agentTitle || "A"} />
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex items-center gap-2 px-0.5">
-          <span className="text-xs font-medium text-control">
-            {isUser
-              ? t("chat.you")
-              : agentTitle || msg.senderName || t("chat.agent")}
-          </span>
-          <span className="text-xs text-control-placeholder">
-            {formatTime(msg.timestamp)}
-          </span>
-        </div>
-        <div className="rounded-2xl bg-control-bg/60 text-main rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words">
-          {msg.content}
-        </div>
-        {msg.attachments && msg.attachments.length > 0 && (
-          <div className="flex flex-col gap-1">
-            {msg.attachments.map((att) => {
-              if (isImageAttachment(att)) {
-                return (
-                  <RemoteImage
-                    key={att.id}
-                    attachment={att}
-                    variant="inline"
-                    onClick={
-                      onPreviewImage ? () => onPreviewImage(att) : undefined
-                    }
-                  />
-                );
-              }
-              const previewable = isMarkdownAttachment(att);
-              const tooLarge =
-                previewable &&
-                (att.sizeBytes ?? 0n) > MAX_MARKDOWN_PREVIEW_BYTES;
-              return (
-                <FileCard
-                  key={att.id}
-                  attachment={att}
-                  onPreview={
-                    previewable && onPreviewAttachment
-                      ? () => onPreviewAttachment(att, msg.id)
-                      : undefined
-                  }
-                  previewDisabledReason={
-                    tooLarge ? t("preview.too-large-tooltip") : undefined
-                  }
-                />
-              );
-            })}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
