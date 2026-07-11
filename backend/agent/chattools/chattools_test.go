@@ -3,7 +3,9 @@ package chattools
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
@@ -161,4 +163,99 @@ func TestFormatMessageLineAttachments(t *testing.T) {
 		"      commented on § 2.1 Concurrency (worker pool)\n" +
 		"        > the worker pool spawns unbounded goroutines\n"
 	assert.Equal(t, want, got)
+}
+
+func TestMemberTypeString(t *testing.T) {
+	assert.Equal(t, "user", memberTypeString(1))
+	assert.Equal(t, "agent", memberTypeString(2))
+	assert.Equal(t, "unknown", memberTypeString(0))
+	assert.Equal(t, "unknown", memberTypeString(7))
+}
+
+func TestMemberRoleString(t *testing.T) {
+	assert.Equal(t, "owner", memberRoleString(1))
+	assert.Equal(t, "member", memberRoleString(2))
+	assert.Equal(t, "", memberRoleString(0)) // thread participants: role not meaningful
+}
+
+func TestTruncateDescription(t *testing.T) {
+	assert.Equal(t, "", truncateDescription("   ", 140))
+	assert.Equal(t, "short bio", truncateDescription("  short bio  ", 140))
+	// Exact length is not truncated.
+	exact := strings.Repeat("a", 10)
+	assert.Equal(t, exact, truncateDescription(exact, 10))
+	// Over length is clipped with an ellipsis.
+	long := strings.Repeat("b", 20)
+	assert.Equal(t, strings.Repeat("b", 10)+"…", truncateDescription(long, 10))
+	// n<=0 means no truncation.
+	assert.Equal(t, "anything", truncateDescription("anything", 0))
+}
+
+// TestFormatMemberLine locks the roster rendering the agent reads to decide whom
+// to @mention: type, display name, role, and a short description; agents carry
+// their "agents/<id>" handle so `agent detail` can be called without reconstructing it.
+func TestFormatMemberLine(t *testing.T) {
+	// User owner with a description.
+	assert.Equal(t, "- [user] Alice (owner) — 后端工程师, 专注 agent 构建\n",
+		formatMemberLine(&v1pb.ChannelMember{
+			MemberType: 1, DisplayName: "Alice", MemberRole: 1, Description: "后端工程师, 专注 agent 构建",
+		}))
+
+	// Agent member: the agents/<id> handle appears, description truncated.
+	long := strings.Repeat("x", 200)
+	got := formatMemberLine(&v1pb.ChannelMember{
+		MemberType: 2, MemberId: "abc-123", DisplayName: "backend-bot", MemberRole: 2, Description: long,
+	})
+	assert.Equal(t, "- [agent] backend-bot [agents/abc-123] (member) — "+strings.Repeat("x", 140)+"…\n", got)
+
+	// Thread participant: role 0 → no role parenthetical.
+	assert.Equal(t, "- [user] Bob\n",
+		formatMemberLine(&v1pb.ChannelMember{MemberType: 1, DisplayName: "Bob", MemberRole: 0}))
+
+	// No description → no trailing em dash.
+	assert.Equal(t, "- [agent] dev [agents/9] (member)\n",
+		formatMemberLine(&v1pb.ChannelMember{MemberType: 2, MemberId: "9", DisplayName: "dev", MemberRole: 2}))
+
+	// nil is safe.
+	assert.Equal(t, "", formatMemberLine(nil))
+}
+
+func TestListChannelMembersRequiresConversation(t *testing.T) {
+	_, err := ListChannelMembers(context.Background(), Deps{}, ListChannelMembersInput{})
+	e, ok := err.(*Error)
+	assert.True(t, ok)
+	assert.Equal(t, "MISSING_CONVERSATION", e.Code)
+}
+
+func TestListThreadParticipantsRequiresRoot(t *testing.T) {
+	_, err := ListThreadParticipants(context.Background(), Deps{}, ListThreadParticipantsInput{Conversation: "conversations/c"})
+	e, ok := err.(*Error)
+	assert.True(t, ok)
+	assert.Equal(t, "INVALID_ARGUMENT_FAILED", e.Code)
+}
+
+func TestGetAgentProfileRequiresAgent(t *testing.T) {
+	_, err := GetAgentProfile(context.Background(), Deps{}, GetAgentProfileInput{Conversation: "conversations/c"})
+	e, ok := err.(*Error)
+	assert.True(t, ok)
+	assert.Equal(t, "INVALID_ARGUMENT_FAILED", e.Code)
+}
+
+// TestParseFireAtTime guards the one-shot fire_at parse: empty is an error, a
+// bad timestamp is an error, and a valid RFC3339 value round-trips. This
+// replaces the old parseFireAt+mustParseRFC3339 pair whose "Unreachable" fallback
+// silently returned time.Now() on a logic slip.
+func TestParseFireAtTime(t *testing.T) {
+	_, err := parseFireAtTime("   ")
+	e, ok := err.(*Error)
+	assert.True(t, ok)
+	assert.Equal(t, "INVALID_ARGUMENT_FAILED", e.Code)
+
+	_, err = parseFireAtTime("not-a-date")
+	assert.Error(t, err)
+
+	got, err := parseFireAtTime("2026-07-07T03:00:00Z")
+	assert.NoError(t, err)
+	want, _ := time.Parse(time.RFC3339, "2026-07-07T03:00:00Z")
+	assert.True(t, got.Equal(want))
 }

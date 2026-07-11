@@ -88,18 +88,20 @@ func formatReminderLine(r *v1pb.Reminder) string {
 		r.Name, reminderStatusString(r.Status), fire, r.Tz, r.CronExpr, task)
 }
 
-// parseFireAt parses an RFC3339 fire-at string. The empty string is an error:
-// a reminder must have an explicit fire time.
-func parseFireAt(s string) (string, error) {
+// parseFireAtTime parses an RFC3339 fire-at string into a time.Time. The empty
+// string is an error: a one-shot reminder must have an explicit fire time
+// (callers that allow an empty fire_at in favor of --cron check for empty
+// before calling).
+func parseFireAtTime(s string) (time.Time, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return "", localError("INVALID_ARGUMENT_FAILED", "fire_at is required (RFC3339, e.g. 2026-07-07T03:00:00Z)", "Pass --fire-at with an RFC3339 timestamp.")
+		return time.Time{}, localError("INVALID_ARGUMENT_FAILED", "fire_at is required (RFC3339, e.g. 2026-07-07T03:00:00Z)", "Pass --fire-at with an RFC3339 timestamp.")
 	}
 	t, err := time.Parse(time.RFC3339, s)
 	if err != nil {
-		return "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("invalid fire_at %q (want RFC3339)", s), "Use an RFC3339 timestamp like 2026-07-07T03:00:00Z.")
+		return time.Time{}, localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("invalid fire_at %q (want RFC3339)", s), "Use an RFC3339 timestamp like 2026-07-07T03:00:00Z.")
 	}
-	return t.Format(time.RFC3339), nil
+	return t, nil
 }
 
 // ConvertMessageToReminder turns the trigger message into a scheduled reminder
@@ -120,11 +122,11 @@ func ConvertMessageToReminder(ctx context.Context, d Deps, in ConvertMessageToRe
 	// computing it itself.
 	var fireAtPB *timestamppb.Timestamp
 	if strings.TrimSpace(in.FireAt) != "" {
-		fireAt, err := parseFireAt(in.FireAt)
+		fireAt, err := parseFireAtTime(in.FireAt)
 		if err != nil {
 			return "", err
 		}
-		fireAtPB = timestamppb.New(mustParseRFC3339(fireAt))
+		fireAtPB = timestamppb.New(fireAt)
 	} else if strings.TrimSpace(in.CronExpr) == "" {
 		return "", localError("INVALID_ARGUMENT_FAILED",
 			"either --fire-at (one-shot) or --cron (recurring) is required",
@@ -266,19 +268,19 @@ func UpdateReminder(ctx context.Context, d Deps, in UpdateReminderInput) (string
 	if strings.TrimSpace(in.TaskContent) == "" {
 		return "", localError("INVALID_ARGUMENT_FAILED", "task_content is required", "Pass --task-content.")
 	}
-	fireAt, err := parseFireAt(in.FireAt)
-	if err != nil {
-		// fire_at may be omitted when cron is set; the manager computes the next
-		// fire. Re-allow an empty fire_at here only when cron is provided.
-		if in.CronExpr != "" {
-			fireAt = ""
-		} else {
+	// fire_at may be omitted when cron is set; the manager computes the next
+	// fire. Re-allow an empty fire_at here only when cron is provided.
+	var fireAtPB *timestamppb.Timestamp
+	if strings.TrimSpace(in.FireAt) != "" {
+		fireAt, err := parseFireAtTime(in.FireAt)
+		if err != nil {
 			return "", err
 		}
-	}
-	var fireAtPB *timestamppb.Timestamp
-	if fireAt != "" {
-		fireAtPB = timestamppb.New(mustParseRFC3339(fireAt))
+		fireAtPB = timestamppb.New(fireAt)
+	} else if strings.TrimSpace(in.CronExpr) == "" {
+		return "", localError("INVALID_ARGUMENT_FAILED",
+			"either --fire-at (one-shot) or --cron (recurring) is required",
+			"Pass --fire-at with an RFC3339 timestamp for a one-shot reminder, or --cron for a recurring reminder (the manager computes the first fire).")
 	}
 	resp, err := d.Client.UpdateReminder(ctx, connect.NewRequest(&v1pb.UpdateReminderRequest{
 		Name:        in.Name,
@@ -305,15 +307,4 @@ func CancelReminder(ctx context.Context, d Deps, in CancelReminderInput) (string
 	}
 	r := resp.Msg.Reminder
 	return fmt.Sprintf("Reminder %s is now %s.", r.Name, reminderStatusString(r.Status)), nil
-}
-
-// mustParseRFC3339 parses an RFC3339 string into a time.Time. The caller must
-// have validated the string already (parseFireAt does this).
-func mustParseRFC3339(s string) time.Time {
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		// Unreachable: parseFireAt validated s before this is called.
-		return time.Now()
-	}
-	return t
 }
