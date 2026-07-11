@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { formatTimestamp } from "@/lib/command-status";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
@@ -77,6 +78,7 @@ export function UserListPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editDescription, setEditDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState("");
 
@@ -156,6 +158,7 @@ export function UserListPage() {
     setEditTitle(user.title);
     setEditEmail(user.email);
     setEditPhone(user.phone);
+    setEditDescription(user.description);
     setEditError("");
     setEditOpen(true);
   }
@@ -164,7 +167,12 @@ export function UserListPage() {
     if (!editTarget?.name) return;
     setEditError("");
     const maskPaths: string[] = [];
-    const fields: { title?: string; email?: string; phone?: string } = {};
+    const fields: {
+      title?: string;
+      email?: string;
+      phone?: string;
+      description?: string;
+    } = {};
     if (editTitle !== editTarget.title) {
       maskPaths.push("title");
       fields.title = editTitle;
@@ -180,6 +188,10 @@ export function UserListPage() {
     if (editPhone !== editTarget.phone) {
       maskPaths.push("phone");
       fields.phone = editPhone;
+    }
+    if (editDescription !== editTarget.description) {
+      maskPaths.push("description");
+      fields.description = editDescription;
     }
     if (maskPaths.length === 0) {
       setEditOpen(false);
@@ -542,6 +554,20 @@ export function UserListPage() {
                   value={editPhone}
                   onChange={(e) => {
                     setEditPhone(e.target.value);
+                    setEditError("");
+                  }}
+                />
+              </FieldRow>
+              <FieldRow
+                label={t("user.field-description")}
+                hint={t("user.field-description-hint")}
+              >
+                <Textarea
+                  className="min-h-[80px]"
+                  placeholder={t("user.field-description-placeholder")}
+                  value={editDescription}
+                  onChange={(e) => {
+                    setEditDescription(e.target.value);
                     setEditError("");
                   }}
                 />

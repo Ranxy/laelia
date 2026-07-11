@@ -24,7 +24,8 @@
     "add": "添加",
     "remove": "移除",
     "toggle-password-visibility": "切换密码可见性",
-    "dismiss": "关闭"
+    "dismiss": "关闭",
+    "profile": "个人资料"
   },
   "auth": {
     "sign-in": {
@@ -62,6 +63,15 @@
   },
   "settings": {
     "title": "设置",
+    "profile": {
+      "title": "个人资料",
+      "description": "你在 agent 和其他成员眼中的样子。描述能帮助 agent 感知你的角色,把合适的任务交给你。",
+      "field-description": "描述",
+      "field-description-placeholder": "例如:后端工程师,专注于构建 agent",
+      "field-description-hint": "会与你的名字一起显示在频道和会话的花名册中,供 agent 查看。",
+      "saved": "个人资料已保存",
+      "save-failed": "保存个人资料失败"
+    },
     "s3": {
       "title": "存储配置",
       "description": "配置用于存储上传文件的 S3 兼容对象存储。配置完成前,上传与下载将被禁用。",
@@ -97,13 +107,16 @@
     "field-phone": "手机号",
     "field-phone-placeholder": "+8613800138000",
     "field-phone-hint": "可选。需符合 E.164 格式。",
+    "field-description": "描述",
+    "field-description-placeholder": "例如:后端工程师,专注于构建 agent",
+    "field-description-hint": "会显示在频道/会话花名册中,供 agent 据此找到对的人。",
     "field-password": "初始密码",
     "field-password-placeholder": "输入初始密码",
     "field-password-new": "新密码",
     "field-password-confirm": "确认新密码",
     "edit": "编辑",
     "edit-title": "编辑用户 — {{title}}",
-    "edit-description": "修改用户的称呼、邮箱或手机号。",
+    "edit-description": "修改用户的称呼、邮箱、手机号或描述。",
     "reset-password": "重置密码",
     "reset-password-title": "重置 {{title}} 的密码",
     "reset-password-description": "为该用户设置一个新密码。用户需使用新密码登录。",

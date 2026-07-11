@@ -43,7 +43,10 @@ function userOption(u: User): Option {
   return {
     memberId: memberIdOf(u.name),
     label: u.title || u.email || memberIdOf(u.name),
-    sublabel: u.email || undefined,
+    // Prefer the self-description so an admin picking members sees each
+    // person's role; fall back to email when none is set so the entry still
+    // disambiguates users with the same title.
+    sublabel: u.description || u.email || undefined,
   };
 }
 

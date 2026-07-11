@@ -112,6 +112,16 @@ export function MentionDetailSheet({
                     <span>{agent.info.version}</span>
                   </>
                 )}
+                {agent.info?.acpConfig?.personaPrompt && (
+                  <>
+                    <span className="text-control-light whitespace-nowrap">
+                      Persona
+                    </span>
+                    <span className="whitespace-pre-wrap">
+                      {agent.info.acpConfig.personaPrompt}
+                    </span>
+                  </>
+                )}
               </>
             )}
 
@@ -125,6 +135,16 @@ export function MentionDetailSheet({
                   Title
                 </span>
                 <span>{user.title || "-"}</span>
+                {user.description && (
+                  <>
+                    <span className="text-control-light whitespace-nowrap">
+                      Description
+                    </span>
+                    <span className="whitespace-pre-wrap">
+                      {user.description}
+                    </span>
+                  </>
+                )}
               </>
             )}
 

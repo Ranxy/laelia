@@ -24,7 +24,8 @@
     "add": "Add",
     "remove": "Remove",
     "toggle-password-visibility": "Toggle password visibility",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "profile": "Profile"
   },
   "auth": {
     "sign-in": {
@@ -62,6 +63,15 @@
   },
   "settings": {
     "title": "Settings",
+    "profile": {
+      "title": "Profile",
+      "description": "How you appear to agents and other members. Your description helps agents perceive your role and address you for the right tasks.",
+      "field-description": "Description",
+      "field-description-placeholder": "e.g. Backend engineer, focused on building agents",
+      "field-description-hint": "Shown to agents alongside your name in channel and thread rosters.",
+      "saved": "Profile saved",
+      "save-failed": "Failed to save profile"
+    },
     "s3": {
       "title": "Storage",
       "description": "Configure the S3-compatible object storage used to store uploaded files. Upload and download are disabled until this is configured.",
@@ -97,13 +107,16 @@
     "field-phone": "Phone",
     "field-phone-placeholder": "+14155550100",
     "field-phone-hint": "Optional. Must be E.164 compliant.",
+    "field-description": "Description",
+    "field-description-placeholder": "e.g. Backend engineer, focused on building agents",
+    "field-description-hint": "Shown to agents in channel/thread rosters so they can address the right person.",
     "field-password": "Initial password",
     "field-password-placeholder": "Enter the initial password",
     "field-password-new": "New password",
     "field-password-confirm": "Confirm new password",
     "edit": "Edit",
     "edit-title": "Edit user — {{title}}",
-    "edit-description": "Change the user's title, email or phone.",
+    "edit-description": "Change the user's title, email, phone or description.",
     "reset-password": "Reset password",
     "reset-password-title": "Reset password for {{title}}",
     "reset-password-description": "Set a new password for this user. They will need it to sign in.",

@@ -11,6 +11,7 @@ import {
   COMMAND_ROUTE_LIST,
   REMINDER_ROUTE_DETAIL,
   REMINDER_ROUTE_LIST,
+  SETTINGS_ROUTE_PROFILE,
   SETTINGS_ROUTE_STORAGE,
   SETTINGS_ROUTE_USERS,
   WORKSPACE_ROUTE_LANDING,
@@ -133,6 +134,14 @@ export const dashboardRoutes: RouteObject[] = [
         path: "settings",
         children: [
           { index: true, element: <Navigate to="storage" replace /> },
+          {
+            path: "profile",
+            handle: { name: SETTINGS_ROUTE_PROFILE },
+            lazy: () =>
+              import("@/pages/dashboard/settings-profile").then((m) => ({
+                Component: m.SettingsProfilePage,
+              })),
+          },
           {
             path: "storage",
             handle: { name: SETTINGS_ROUTE_STORAGE },

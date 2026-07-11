@@ -61,6 +61,7 @@ export const createUserSlice: AppSliceCreator<UserSlice> = (set) => ({
           email: input.email,
           title: input.title,
           phone: input.phone ?? "",
+          description: input.description ?? "",
           password: input.password,
           userType: UserType.USER,
         }),

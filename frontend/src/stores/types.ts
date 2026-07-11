@@ -94,10 +94,16 @@ export interface UserSlice {
     title: string;
     password: string;
     phone?: string;
+    description?: string;
   }) => Promise<User>;
   updateUser: (
     name: string,
-    fields: { title?: string; email?: string; phone?: string },
+    fields: {
+      title?: string;
+      email?: string;
+      phone?: string;
+      description?: string;
+    },
     maskPaths: string[]
   ) => Promise<User>;
   resetPassword: (name: string, newPassword: string) => Promise<User>;

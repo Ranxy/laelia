@@ -11,5 +11,6 @@ export const REMINDER_ROUTE_DETAIL = "reminder.detail";
 export const CHAT_ROUTE = "chat";
 export const CHAT_ROUTE_DETAIL = "chat.detail";
 export const SETTINGS_ROUTE = "settings";
+export const SETTINGS_ROUTE_PROFILE = "settings.profile";
 export const SETTINGS_ROUTE_STORAGE = "settings.storage";
 export const SETTINGS_ROUTE_USERS = "settings.users";

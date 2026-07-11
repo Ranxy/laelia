@@ -57,6 +57,15 @@ export function UserMenu() {
         </div>
         <DropdownMenuSeparator />
 
+        <DropdownMenuItem
+          onClick={() => {
+            setOpen(false);
+            navigate("/settings/profile");
+          }}
+        >
+          {t("common.profile")}
+        </DropdownMenuItem>
+
         {/* Language submenu */}
         <DropdownMenuSubmenu>
           <DropdownMenuSubmenuTrigger>
