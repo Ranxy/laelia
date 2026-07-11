@@ -26,8 +26,16 @@ const (
 // Deps) — no new manager RPC and no proto change: ListChannelUpdates gives the
 // unread channels + counts, GetChannel resolves each channel's title/type/peer
 // for the target= prefix, and ListConversationMessages fetches the latest few
-// messages per channel. Returns "" when there is no unread work (the caller
-// should not have opened a turn, but this keeps it harmless).
+// messages per channel.
+//
+// Each channel header carries its `conversations/<id>` resource name and the
+// agent's `processed_version` cursor, so the agent can go straight to
+// `thread check <conversation>` and `message read <conversation> --version
+// <processed_version>` (then `message ack`) without a per-turn `message check`
+// round-trip to resolve the name and cursor. `message check` is now only needed
+// for channels beyond the batch, which are listed below as unread with the same
+// cursor so they can be read directly too. Returns "" when there is no unread
+// work (the caller should not have opened a turn, but this keeps it harmless).
 func BuildTurnBatch(ctx context.Context, d Deps) (string, error) {
 	updatesResp, err := d.Client.ListChannelUpdates(ctx, connect.NewRequest(&v1pb.ListChannelUpdatesRequest{}))
 	if err != nil {
@@ -42,10 +50,13 @@ func BuildTurnBatch(ctx context.Context, d Deps) (string, error) {
 		return "No new channel messages this turn.\n\n" + reminderNudge, nil
 	}
 
+	// Per-channel blocks (header + preview lines) for the shown channels, plus a
+	// summary line per channel left out of the preview (beyond the channel
+	// bound). The header carries the conversation name + processed_version so
+	// the agent can act without `message check`.
 	var (
-		lines      []string
-		overflow   []string // "- <target>: N unread" for channels beyond the bound
-		overflowCh []string // channels within the bound but with more msgs than shown
+		blocks   []string
+		overflow []string
 	)
 	shown := 0
 	for _, u := range updates {
@@ -55,38 +66,37 @@ func BuildTurnBatch(ctx context.Context, d Deps) (string, error) {
 			// the agent still has a usable reply target.
 			target = u.GetConversation()
 		}
+		cursor := fmt.Sprintf("%s (%s, your processed_version=%d)", target, u.GetConversation(), u.GetProcessedVersion())
 		if shown >= turnBatchMaxChannels {
-			overflow = append(overflow, fmt.Sprintf("- %s: %d unread", target, u.GetNewMessageCount()))
+			overflow = append(overflow, fmt.Sprintf("- %s: %d unread", cursor, u.GetNewMessageCount()))
 			continue
 		}
 		shown++
-		msgs, gotAll, err := latestChannelMessages(ctx, d, u)
+		msgs, err := latestChannelMessages(ctx, d, u)
 		if err != nil {
 			return "", err
 		}
+		var block strings.Builder
+		// The header always states the true new-message count, so a channel with
+		// more messages than the preview bound is never silently dropped — the
+		// count + cursor tell the agent to `message read` the full delta.
+		_, _ = fmt.Fprintf(&block, "%s: %d new\n", cursor, u.GetNewMessageCount())
 		for _, m := range msgs {
-			lines = append(lines, formatBatchLine(target, m))
+			_, _ = block.WriteString(formatBatchLine(target, m))
+			_, _ = block.WriteString("\n")
 		}
-		if !gotAll {
-			overflowCh = append(overflowCh, fmt.Sprintf("- %s: %d unread", target, u.GetNewMessageCount()))
-		}
+		blocks = append(blocks, strings.TrimRight(block.String(), "\n"))
 	}
 
 	var b strings.Builder
 	_, _ = b.WriteString("New messages received:\n\n")
-	if len(lines) == 0 {
-		_, _ = b.WriteString("(no message bodies could be surfaced; use `laelia-agent message check` to inspect your inbox.)\n")
-	} else {
-		_, _ = b.WriteString(strings.Join(lines, "\n"))
-		_, _ = b.WriteString("\n")
-	}
-	_, _ = b.WriteString("\nRespond as appropriate. Complete all your work before stopping.\n")
+	_, _ = b.WriteString(strings.Join(blocks, "\n\n"))
+	_, _ = b.WriteString("\n\nRespond as appropriate. Complete all your work before stopping.\n")
 	_, _ = b.WriteString("Reply in the channel or create/reply in a thread as appropriate; use each message's content to choose the exact target.\n")
-	overflow = append(overflow, overflowCh...)
 	if len(overflow) > 0 {
 		_, _ = b.WriteString("\nSome unread channels may not be included in this bounded startup batch:\n")
 		_, _ = b.WriteString(strings.Join(overflow, "\n"))
-		_, _ = b.WriteString("\n\nUse the inbox/read commands at a natural breakpoint if you choose to inspect those targets.\n")
+		_, _ = b.WriteString("\n\nUse `message check` or `message read` at a natural breakpoint if you choose to inspect those targets.\n")
 	}
 	_, _ = b.WriteString("\n" + reminderNudge)
 	return b.String(), nil
@@ -127,11 +137,12 @@ func resolveChannelTarget(ctx context.Context, d Deps, conversation string) (tar
 
 // latestChannelMessages fetches the latest turnBatchMaxMessages new messages
 // for one channel (those with room_version > the agent's processed_version).
-// gotAll is false when the channel had more new messages than the bound, so the
-// caller can list it as unread. When there are more new messages than the bound,
-// the newest bound are fetched via beforeVersion paging; otherwise the full
-// (chronological) delta is fetched via afterVersion.
-func latestChannelMessages(ctx context.Context, d Deps, u *v1pb.ChannelUpdate) (msgs []*v1pb.ChatMessage, gotAll bool, err error) {
+// When there are more new messages than the bound, the newest bound are fetched
+// via beforeVersion paging; otherwise the full (chronological) delta is fetched
+// via afterVersion. The header emitted by BuildTurnBatch always states the true
+// new-message count, so truncation is never silent — the caller no longer needs
+// a gotAll signal.
+func latestChannelMessages(ctx context.Context, d Deps, u *v1pb.ChannelUpdate) ([]*v1pb.ChatMessage, error) {
 	count := u.GetNewMessageCount()
 	limit := int32(turnBatchMaxMessages)
 	req := &v1pb.ListConversationMessagesRequest{
@@ -148,13 +159,11 @@ func latestChannelMessages(ctx context.Context, d Deps, u *v1pb.ChannelUpdate) (
 		// Fetch the full unread delta (chronological).
 		req.AfterVersion = u.GetProcessedVersion()
 	}
-	resp, lerr := d.Client.ListConversationMessages(ctx, connect.NewRequest(req))
-	if lerr != nil {
-		return nil, false, wrapManagerError(lerr)
+	resp, err := d.Client.ListConversationMessages(ctx, connect.NewRequest(req))
+	if err != nil {
+		return nil, wrapManagerError(err)
 	}
-	msgs = resp.Msg.GetMessages()
-	gotAll = count <= limit
-	return msgs, gotAll, nil
+	return resp.Msg.GetMessages(), nil
 }
 
 // formatBatchLine renders one message in the batch's [target=...] header form:
