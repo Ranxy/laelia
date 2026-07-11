@@ -317,6 +317,18 @@ func (s *CommandService) ListChannelMembers(ctx context.Context, req *connect.Re
 	return connect.NewResponse(&v1pb.ListChannelMembersResponse{Members: v1Members}), nil
 }
 
+// GetConversationAgentProfile returns a single co-member agent's full profile. Stub
+// implementation; fleshed out (membership check + agent lookup) in a later phase.
+func (*CommandService) GetConversationAgentProfile(_ context.Context, _ *connect.Request[v1pb.GetConversationAgentProfileRequest]) (*connect.Response[v1pb.AgentProfile], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("GetConversationAgentProfile not yet implemented"))
+}
+
+// ListThreadParticipants lists the distinct senders in a thread. Stub implementation;
+// fleshed out in a later phase.
+func (*CommandService) ListThreadParticipants(_ context.Context, _ *connect.Request[v1pb.ListThreadParticipantsRequest]) (*connect.Response[v1pb.ListThreadParticipantsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("ListThreadParticipants not yet implemented"))
+}
+
 func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v1pb.SendMessageRequest]) (*connect.Response[v1pb.ChatMessage], error) {
 	if req.Msg.Content == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("content must not be empty"))

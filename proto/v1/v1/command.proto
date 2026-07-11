@@ -377,6 +377,12 @@ message ChannelMember {
   string display_name = 3;
   int32 member_role = 4;
   google.protobuf.Timestamp joined_at = 5;
+  // description is the member's self-description: for users it is User.description,
+  // for agents it is the agent's persona_prompt (from AgentACPConfig). Surfaced so an
+  // agent can perceive who is in a channel/thread and decide whom to address. The
+  // chattool roster may truncate it for display; use GetConversationAgentProfile for
+  // an agent's full persona_prompt.
+  string description = 6;
 }
 
 message ListConversationMessagesRequest {
@@ -556,6 +562,48 @@ message ListChannelMembersRequest {
 }
 
 message ListChannelMembersResponse {
+  repeated ChannelMember members = 1;
+}
+
+// GetConversationAgentProfileRequest fetches a single co-member agent's profile
+// (title, persona_prompt, status) so an agent can read the full persona_prompt of a
+// specific agent it wants to address. The caller must be a member of the conversation.
+message GetConversationAgentProfileRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
+  // agent is the "agents/<id>" resource name of the agent whose profile to fetch.
+  string agent = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// AgentProfile is the full profile of one agent, returned by
+// GetConversationAgentProfile. persona_prompt is the admin-authored self-awareness
+// prompt; empty when the agent has none.
+message AgentProfile {
+  string name = 1;
+  string title = 2;
+  string persona_prompt = 3;
+  string status = 4;
+}
+
+// ListThreadParticipantsRequest lists the distinct senders (users and agents) that
+// have posted in a thread (the root message and its replies). Participants are derived
+// from message senders, not from a membership table, so this reflects who actually
+// took part in the thread. The caller must be a member of the conversation.
+message ListThreadParticipantsRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
+  // thread_root is the resource name of the thread's root message
+  // ("conversations/{c}/messages/{m}").
+  string thread_root = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ListThreadParticipantsResponse {
+  // members is the distinct senders in the thread. member_role is not meaningful for
+  // thread participation and is left 0.
   repeated ChannelMember members = 1;
 }
 
@@ -1068,6 +1116,25 @@ service CommandService {
 
   rpc ListChannelMembers(ListChannelMembersRequest) returns (ListChannelMembersResponse) {
     option (google.api.http) = {get: "/v1/{conversation=conversations/*}/members"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.read";
+  }
+
+  // GetConversationAgentProfile returns a single co-member agent's full profile
+  // (title, persona_prompt, status). Intended for the agent daemon: an agent reads a
+  // specific agent's full persona_prompt before deciding to address it. The caller
+  // must be a member of the conversation.
+  rpc GetConversationAgentProfile(GetConversationAgentProfileRequest) returns (AgentProfile) {
+    option (google.api.http) = {get: "/v1/{conversation=conversations/*}:getAgentProfile"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.read";
+  }
+
+  // ListThreadParticipants lists the distinct senders (users and agents) that posted
+  // in a thread. Intended for the agent daemon. The caller must be a member of the
+  // conversation.
+  rpc ListThreadParticipants(ListThreadParticipantsRequest) returns (ListThreadParticipantsResponse) {
+    option (google.api.http) = {get: "/v1/{conversation=conversations/*}:listThreadParticipants"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }

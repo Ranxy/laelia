@@ -240,6 +240,12 @@ message User {
   // workspace_admin is true when the user holds the roles/workspaceAdmin role.
   // Only populated for the current caller (GetCurrentUser).
   bool workspace_admin = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // description is a short, user-authored self-description surfaced to agents and
+  // other users so they know who this user is and what they focus on, e.g.
+  // "Backend engineer, focused on agent building" or "UI/UX expert, reviews come to
+  // me". Editable via UpdateUser with update_mask "description".
+  string description = 16;
 }
 
 enum UserType {

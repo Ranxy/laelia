@@ -20,51 +20,53 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CommandService_ListCommands_FullMethodName              = "/laelia.v1.CommandService/ListCommands"
-	CommandService_GetCommand_FullMethodName                = "/laelia.v1.CommandService/GetCommand"
-	CommandService_CancelCommand_FullMethodName             = "/laelia.v1.CommandService/CancelCommand"
-	CommandService_WatchCommand_FullMethodName              = "/laelia.v1.CommandService/WatchCommand"
-	CommandService_WatchCommandEvents_FullMethodName        = "/laelia.v1.CommandService/WatchCommandEvents"
-	CommandService_RespondPermission_FullMethodName         = "/laelia.v1.CommandService/RespondPermission"
-	CommandService_SearchChatHistory_FullMethodName         = "/laelia.v1.CommandService/SearchChatHistory"
-	CommandService_GetCommandContext_FullMethodName         = "/laelia.v1.CommandService/GetCommandContext"
-	CommandService_GetOrCreateConversation_FullMethodName   = "/laelia.v1.CommandService/GetOrCreateConversation"
-	CommandService_ListConversationMessages_FullMethodName  = "/laelia.v1.CommandService/ListConversationMessages"
-	CommandService_ListThreadMessages_FullMethodName        = "/laelia.v1.CommandService/ListThreadMessages"
-	CommandService_ListChannelThreads_FullMethodName        = "/laelia.v1.CommandService/ListChannelThreads"
-	CommandService_CreateChannel_FullMethodName             = "/laelia.v1.CommandService/CreateChannel"
-	CommandService_ListChannels_FullMethodName              = "/laelia.v1.CommandService/ListChannels"
-	CommandService_ListChannelsForAgent_FullMethodName      = "/laelia.v1.CommandService/ListChannelsForAgent"
-	CommandService_GetChannel_FullMethodName                = "/laelia.v1.CommandService/GetChannel"
-	CommandService_UpdateChannel_FullMethodName             = "/laelia.v1.CommandService/UpdateChannel"
-	CommandService_DeleteChannel_FullMethodName             = "/laelia.v1.CommandService/DeleteChannel"
-	CommandService_AddChannelMember_FullMethodName          = "/laelia.v1.CommandService/AddChannelMember"
-	CommandService_RemoveChannelMember_FullMethodName       = "/laelia.v1.CommandService/RemoveChannelMember"
-	CommandService_ListChannelMembers_FullMethodName        = "/laelia.v1.CommandService/ListChannelMembers"
-	CommandService_SendMessage_FullMethodName               = "/laelia.v1.CommandService/SendMessage"
-	CommandService_PostMessage_FullMethodName               = "/laelia.v1.CommandService/PostMessage"
-	CommandService_ConvertMessageToTask_FullMethodName      = "/laelia.v1.CommandService/ConvertMessageToTask"
-	CommandService_ListTasks_FullMethodName                 = "/laelia.v1.CommandService/ListTasks"
-	CommandService_CreateTask_FullMethodName                = "/laelia.v1.CommandService/CreateTask"
-	CommandService_ClaimTask_FullMethodName                 = "/laelia.v1.CommandService/ClaimTask"
-	CommandService_UnclaimTask_FullMethodName               = "/laelia.v1.CommandService/UnclaimTask"
-	CommandService_UpdateTaskStatus_FullMethodName          = "/laelia.v1.CommandService/UpdateTaskStatus"
-	CommandService_ConvertMessageToReminder_FullMethodName  = "/laelia.v1.CommandService/ConvertMessageToReminder"
-	CommandService_ListReminders_FullMethodName             = "/laelia.v1.CommandService/ListReminders"
-	CommandService_GetReminder_FullMethodName               = "/laelia.v1.CommandService/GetReminder"
-	CommandService_UpdateReminder_FullMethodName            = "/laelia.v1.CommandService/UpdateReminder"
-	CommandService_CancelReminder_FullMethodName            = "/laelia.v1.CommandService/CancelReminder"
-	CommandService_CompleteReminder_FullMethodName          = "/laelia.v1.CommandService/CompleteReminder"
-	CommandService_FailReminder_FullMethodName              = "/laelia.v1.CommandService/FailReminder"
-	CommandService_ListDueReminders_FullMethodName          = "/laelia.v1.CommandService/ListDueReminders"
-	CommandService_ListChannelUpdates_FullMethodName        = "/laelia.v1.CommandService/ListChannelUpdates"
-	CommandService_ListThreadUpdates_FullMethodName         = "/laelia.v1.CommandService/ListThreadUpdates"
-	CommandService_AckProcessedVersion_FullMethodName       = "/laelia.v1.CommandService/AckProcessedVersion"
-	CommandService_FetchConversationActivity_FullMethodName = "/laelia.v1.CommandService/FetchConversationActivity"
-	CommandService_MarkConversationRead_FullMethodName      = "/laelia.v1.CommandService/MarkConversationRead"
-	CommandService_UploadFile_FullMethodName                = "/laelia.v1.CommandService/UploadFile"
-	CommandService_DownloadFile_FullMethodName              = "/laelia.v1.CommandService/DownloadFile"
-	CommandService_ListFiles_FullMethodName                 = "/laelia.v1.CommandService/ListFiles"
+	CommandService_ListCommands_FullMethodName                = "/laelia.v1.CommandService/ListCommands"
+	CommandService_GetCommand_FullMethodName                  = "/laelia.v1.CommandService/GetCommand"
+	CommandService_CancelCommand_FullMethodName               = "/laelia.v1.CommandService/CancelCommand"
+	CommandService_WatchCommand_FullMethodName                = "/laelia.v1.CommandService/WatchCommand"
+	CommandService_WatchCommandEvents_FullMethodName          = "/laelia.v1.CommandService/WatchCommandEvents"
+	CommandService_RespondPermission_FullMethodName           = "/laelia.v1.CommandService/RespondPermission"
+	CommandService_SearchChatHistory_FullMethodName           = "/laelia.v1.CommandService/SearchChatHistory"
+	CommandService_GetCommandContext_FullMethodName           = "/laelia.v1.CommandService/GetCommandContext"
+	CommandService_GetOrCreateConversation_FullMethodName     = "/laelia.v1.CommandService/GetOrCreateConversation"
+	CommandService_ListConversationMessages_FullMethodName    = "/laelia.v1.CommandService/ListConversationMessages"
+	CommandService_ListThreadMessages_FullMethodName          = "/laelia.v1.CommandService/ListThreadMessages"
+	CommandService_ListChannelThreads_FullMethodName          = "/laelia.v1.CommandService/ListChannelThreads"
+	CommandService_CreateChannel_FullMethodName               = "/laelia.v1.CommandService/CreateChannel"
+	CommandService_ListChannels_FullMethodName                = "/laelia.v1.CommandService/ListChannels"
+	CommandService_ListChannelsForAgent_FullMethodName        = "/laelia.v1.CommandService/ListChannelsForAgent"
+	CommandService_GetChannel_FullMethodName                  = "/laelia.v1.CommandService/GetChannel"
+	CommandService_UpdateChannel_FullMethodName               = "/laelia.v1.CommandService/UpdateChannel"
+	CommandService_DeleteChannel_FullMethodName               = "/laelia.v1.CommandService/DeleteChannel"
+	CommandService_AddChannelMember_FullMethodName            = "/laelia.v1.CommandService/AddChannelMember"
+	CommandService_RemoveChannelMember_FullMethodName         = "/laelia.v1.CommandService/RemoveChannelMember"
+	CommandService_ListChannelMembers_FullMethodName          = "/laelia.v1.CommandService/ListChannelMembers"
+	CommandService_GetConversationAgentProfile_FullMethodName = "/laelia.v1.CommandService/GetConversationAgentProfile"
+	CommandService_ListThreadParticipants_FullMethodName      = "/laelia.v1.CommandService/ListThreadParticipants"
+	CommandService_SendMessage_FullMethodName                 = "/laelia.v1.CommandService/SendMessage"
+	CommandService_PostMessage_FullMethodName                 = "/laelia.v1.CommandService/PostMessage"
+	CommandService_ConvertMessageToTask_FullMethodName        = "/laelia.v1.CommandService/ConvertMessageToTask"
+	CommandService_ListTasks_FullMethodName                   = "/laelia.v1.CommandService/ListTasks"
+	CommandService_CreateTask_FullMethodName                  = "/laelia.v1.CommandService/CreateTask"
+	CommandService_ClaimTask_FullMethodName                   = "/laelia.v1.CommandService/ClaimTask"
+	CommandService_UnclaimTask_FullMethodName                 = "/laelia.v1.CommandService/UnclaimTask"
+	CommandService_UpdateTaskStatus_FullMethodName            = "/laelia.v1.CommandService/UpdateTaskStatus"
+	CommandService_ConvertMessageToReminder_FullMethodName    = "/laelia.v1.CommandService/ConvertMessageToReminder"
+	CommandService_ListReminders_FullMethodName               = "/laelia.v1.CommandService/ListReminders"
+	CommandService_GetReminder_FullMethodName                 = "/laelia.v1.CommandService/GetReminder"
+	CommandService_UpdateReminder_FullMethodName              = "/laelia.v1.CommandService/UpdateReminder"
+	CommandService_CancelReminder_FullMethodName              = "/laelia.v1.CommandService/CancelReminder"
+	CommandService_CompleteReminder_FullMethodName            = "/laelia.v1.CommandService/CompleteReminder"
+	CommandService_FailReminder_FullMethodName                = "/laelia.v1.CommandService/FailReminder"
+	CommandService_ListDueReminders_FullMethodName            = "/laelia.v1.CommandService/ListDueReminders"
+	CommandService_ListChannelUpdates_FullMethodName          = "/laelia.v1.CommandService/ListChannelUpdates"
+	CommandService_ListThreadUpdates_FullMethodName           = "/laelia.v1.CommandService/ListThreadUpdates"
+	CommandService_AckProcessedVersion_FullMethodName         = "/laelia.v1.CommandService/AckProcessedVersion"
+	CommandService_FetchConversationActivity_FullMethodName   = "/laelia.v1.CommandService/FetchConversationActivity"
+	CommandService_MarkConversationRead_FullMethodName        = "/laelia.v1.CommandService/MarkConversationRead"
+	CommandService_UploadFile_FullMethodName                  = "/laelia.v1.CommandService/UploadFile"
+	CommandService_DownloadFile_FullMethodName                = "/laelia.v1.CommandService/DownloadFile"
+	CommandService_ListFiles_FullMethodName                   = "/laelia.v1.CommandService/ListFiles"
 )
 
 // CommandServiceClient is the client API for CommandService service.
@@ -95,6 +97,15 @@ type CommandServiceClient interface {
 	AddChannelMember(ctx context.Context, in *AddChannelMemberRequest, opts ...grpc.CallOption) (*ChannelMember, error)
 	RemoveChannelMember(ctx context.Context, in *RemoveChannelMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ListChannelMembers(ctx context.Context, in *ListChannelMembersRequest, opts ...grpc.CallOption) (*ListChannelMembersResponse, error)
+	// GetConversationAgentProfile returns a single co-member agent's full profile
+	// (title, persona_prompt, status). Intended for the agent daemon: an agent reads a
+	// specific agent's full persona_prompt before deciding to address it. The caller
+	// must be a member of the conversation.
+	GetConversationAgentProfile(ctx context.Context, in *GetConversationAgentProfileRequest, opts ...grpc.CallOption) (*AgentProfile, error)
+	// ListThreadParticipants lists the distinct senders (users and agents) that posted
+	// in a thread. Intended for the agent daemon. The caller must be a member of the
+	// conversation.
+	ListThreadParticipants(ctx context.Context, in *ListThreadParticipantsRequest, opts ...grpc.CallOption) (*ListThreadParticipantsResponse, error)
 	SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*ChatMessage, error)
 	PostMessage(ctx context.Context, in *PostMessageRequest, opts ...grpc.CallOption) (*PostMessageResponse, error)
 	// ConvertMessageToTask turns an existing top-level message into a task by
@@ -410,6 +421,26 @@ func (c *commandServiceClient) ListChannelMembers(ctx context.Context, in *ListC
 	return out, nil
 }
 
+func (c *commandServiceClient) GetConversationAgentProfile(ctx context.Context, in *GetConversationAgentProfileRequest, opts ...grpc.CallOption) (*AgentProfile, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentProfile)
+	err := c.cc.Invoke(ctx, CommandService_GetConversationAgentProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) ListThreadParticipants(ctx context.Context, in *ListThreadParticipantsRequest, opts ...grpc.CallOption) (*ListThreadParticipantsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListThreadParticipantsResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListThreadParticipants_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *commandServiceClient) SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*ChatMessage, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ChatMessage)
@@ -678,6 +709,15 @@ type CommandServiceServer interface {
 	AddChannelMember(context.Context, *AddChannelMemberRequest) (*ChannelMember, error)
 	RemoveChannelMember(context.Context, *RemoveChannelMemberRequest) (*emptypb.Empty, error)
 	ListChannelMembers(context.Context, *ListChannelMembersRequest) (*ListChannelMembersResponse, error)
+	// GetConversationAgentProfile returns a single co-member agent's full profile
+	// (title, persona_prompt, status). Intended for the agent daemon: an agent reads a
+	// specific agent's full persona_prompt before deciding to address it. The caller
+	// must be a member of the conversation.
+	GetConversationAgentProfile(context.Context, *GetConversationAgentProfileRequest) (*AgentProfile, error)
+	// ListThreadParticipants lists the distinct senders (users and agents) that posted
+	// in a thread. Intended for the agent daemon. The caller must be a member of the
+	// conversation.
+	ListThreadParticipants(context.Context, *ListThreadParticipantsRequest) (*ListThreadParticipantsResponse, error)
 	SendMessage(context.Context, *SendMessageRequest) (*ChatMessage, error)
 	PostMessage(context.Context, *PostMessageRequest) (*PostMessageResponse, error)
 	// ConvertMessageToTask turns an existing top-level message into a task by
@@ -827,6 +867,12 @@ func (UnimplementedCommandServiceServer) RemoveChannelMember(context.Context, *R
 }
 func (UnimplementedCommandServiceServer) ListChannelMembers(context.Context, *ListChannelMembersRequest) (*ListChannelMembersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListChannelMembers not implemented")
+}
+func (UnimplementedCommandServiceServer) GetConversationAgentProfile(context.Context, *GetConversationAgentProfileRequest) (*AgentProfile, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetConversationAgentProfile not implemented")
+}
+func (UnimplementedCommandServiceServer) ListThreadParticipants(context.Context, *ListThreadParticipantsRequest) (*ListThreadParticipantsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListThreadParticipants not implemented")
 }
 func (UnimplementedCommandServiceServer) SendMessage(context.Context, *SendMessageRequest) (*ChatMessage, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendMessage not implemented")
@@ -1281,6 +1327,42 @@ func _CommandService_ListChannelMembers_Handler(srv interface{}, ctx context.Con
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CommandServiceServer).ListChannelMembers(ctx, req.(*ListChannelMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_GetConversationAgentProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetConversationAgentProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).GetConversationAgentProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_GetConversationAgentProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).GetConversationAgentProfile(ctx, req.(*GetConversationAgentProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_ListThreadParticipants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListThreadParticipantsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListThreadParticipants(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListThreadParticipants_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListThreadParticipants(ctx, req.(*ListThreadParticipantsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1799,6 +1881,14 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListChannelMembers",
 			Handler:    _CommandService_ListChannelMembers_Handler,
+		},
+		{
+			MethodName: "GetConversationAgentProfile",
+			Handler:    _CommandService_GetConversationAgentProfile_Handler,
+		},
+		{
+			MethodName: "ListThreadParticipants",
+			Handler:    _CommandService_ListThreadParticipants_Handler,
 		},
 		{
 			MethodName: "SendMessage",

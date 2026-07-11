@@ -1614,6 +1614,77 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}:getAgentProfile:
+        get:
+            tags:
+                - CommandService
+            description: |-
+                GetConversationAgentProfile returns a single co-member agent's full profile
+                 (title, persona_prompt, status). Intended for the agent daemon: an agent reads a
+                 specific agent's full persona_prompt before deciding to address it. The caller
+                 must be a member of the conversation.
+            operationId: CommandService_GetConversationAgentProfile
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+                - name: agent
+                  in: query
+                  description: agent is the "agents/<id>" resource name of the agent whose profile to fetch.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AgentProfile'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}:listThreadParticipants:
+        get:
+            tags:
+                - CommandService
+            description: |-
+                ListThreadParticipants lists the distinct senders (users and agents) that posted
+                 in a thread. Intended for the agent daemon. The caller must be a member of the
+                 conversation.
+            operationId: CommandService_ListThreadParticipants
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+                - name: threadRoot
+                  in: query
+                  description: |-
+                    thread_root is the resource name of the thread's root message
+                     ("conversations/{c}/messages/{m}").
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListThreadParticipantsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/conversations/{conversation}:markRead:
         post:
             tags:
@@ -2442,6 +2513,21 @@ components:
             description: |-
                 AgentModelOption is one model selectable via the ACP session config option
                  round trip. Value is the valueId the client sends to SetSessionConfigOption.
+        AgentProfile:
+            type: object
+            properties:
+                name:
+                    type: string
+                title:
+                    type: string
+                personaPrompt:
+                    type: string
+                status:
+                    type: string
+            description: |-
+                AgentProfile is the full profile of one agent, returned by
+                 GetConversationAgentProfile. persona_prompt is the admin-authored self-awareness
+                 prompt; empty when the agent has none.
         AgentProviderInfo:
             type: object
             properties:
@@ -2599,6 +2685,14 @@ components:
                 joinedAt:
                     type: string
                     format: date-time
+                description:
+                    type: string
+                    description: |-
+                        description is the member's self-description: for users it is User.description,
+                         for agents it is the agent's persona_prompt (from AgentACPConfig). Surfaced so an
+                         agent can perceive who is in a channel/thread and decide whom to address. The
+                         chattool roster may truncate it for display; use GetConversationAgentProfile for
+                         an agent's full persona_prompt.
         ChannelThread:
             type: object
             properties:
@@ -3263,6 +3357,16 @@ components:
                     type: string
                 currentVersion:
                     type: string
+        ListThreadParticipantsResponse:
+            type: object
+            properties:
+                members:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ChannelMember'
+                    description: |-
+                        members is the distinct senders in the thread. member_role is not meaningful for
+                         thread participation and is left 0.
         ListThreadUpdatesResponse:
             type: object
             properties:
@@ -3915,6 +4019,13 @@ components:
                     description: |-
                         workspace_admin is true when the user holds the roles/workspaceAdmin role.
                          Only populated for the current caller (GetCurrentUser).
+                description:
+                    type: string
+                    description: |-
+                        description is a short, user-authored self-description surfaced to agents and
+                         other users so they know who this user is and what they focus on, e.g.
+                         "Backend engineer, focused on agent building" or "UI/UX expert, reviews come to
+                         me". Editable via UpdateUser with update_mask "description".
         UserProfile:
             type: object
             properties:

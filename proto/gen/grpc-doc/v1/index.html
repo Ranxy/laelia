@@ -526,6 +526,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.AgentProfile"><span class="badge">M</span>AgentProfile</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.AgentReady"><span class="badge">M</span>AgentReady</a>
                 </li>
               
@@ -722,6 +726,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.GetConversationAgentProfileRequest"><span class="badge">M</span>GetConversationAgentProfileRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.GetOrCreateConversationRequest"><span class="badge">M</span>GetOrCreateConversationRequest</a>
                 </li>
               
@@ -835,6 +843,14 @@
               
                 <li>
                   <a href="#laelia.v1.ListThreadMessagesResponse"><span class="badge">M</span>ListThreadMessagesResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListThreadParticipantsRequest"><span class="badge">M</span>ListThreadParticipantsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListThreadParticipantsResponse"><span class="badge">M</span>ListThreadParticipantsResponse</a>
                 </li>
               
                 <li>
@@ -3620,6 +3636,16 @@ Format: groups/{email} </p></td>
 Only populated for the current caller (GetCurrentUser). </p></td>
                 </tr>
               
+                <tr>
+                  <td>description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>description is a short, user-authored self-description surfaced to agents and
+other users so they know who this user is and what they focus on, e.g.
+&#34;Backend engineer, focused on agent building&#34; or &#34;UI/UX expert, reviews come to
+me&#34;. Editable via UpdateUser with update_mask &#34;description&#34;. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -4254,6 +4280,51 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.AgentProfile">AgentProfile</h3>
+        <p>AgentProfile is the full profile of one agent, returned by</p><p>GetConversationAgentProfile. persona_prompt is the admin-authored self-awareness</p><p>prompt; empty when the agent has none.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>persona_prompt</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>status</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.AgentReady">AgentReady</h3>
         <p></p>
 
@@ -4627,6 +4698,17 @@ messages and @mentions of itself. </p></td>
                   <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>description is the member&#39;s self-description: for users it is User.description,
+for agents it is the agent&#39;s persona_prompt (from AgentACPConfig). Surfaced so an
+agent can perceive who is in a channel/thread and decide whom to address. The
+chattool roster may truncate it for display; use GetConversationAgentProfile for
+an agent&#39;s full persona_prompt. </p></td>
                 </tr>
               
             </tbody>
@@ -6404,6 +6486,37 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
 
         
       
+        <h3 id="laelia.v1.GetConversationAgentProfileRequest">GetConversationAgentProfileRequest</h3>
+        <p>GetConversationAgentProfileRequest fetches a single co-member agent's profile</p><p>(title, persona_prompt, status) so an agent can read the full persona_prompt of a</p><p>specific agent it wants to address. The caller must be a member of the conversation.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>agent</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>agent is the &#34;agents/&lt;id&gt;&#34; resource name of the agent whose profile to fetch. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.GetOrCreateConversationRequest">GetOrCreateConversationRequest</h3>
         <p></p>
 
@@ -7267,6 +7380,63 @@ ordered by task_number ascending. </p></td>
                   <td><a href="#int64">int64</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListThreadParticipantsRequest">ListThreadParticipantsRequest</h3>
+        <p>ListThreadParticipantsRequest lists the distinct senders (users and agents) that</p><p>have posted in a thread (the root message and its replies). Participants are derived</p><p>from message senders, not from a membership table, so this reflects who actually</p><p>took part in the thread. The caller must be a member of the conversation.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>thread_root</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>thread_root is the resource name of the thread&#39;s root message
+(&#34;conversations/{c}/messages/{m}&#34;). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListThreadParticipantsResponse">ListThreadParticipantsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>members</td>
+                  <td><a href="#laelia.v1.ChannelMember">ChannelMember</a></td>
+                  <td>repeated</td>
+                  <td><p>members is the distinct senders in the thread. member_role is not meaningful for
+thread participation and is left 0. </p></td>
                 </tr>
               
             </tbody>
@@ -9317,6 +9487,25 @@ detail page&#39;s &#34;Chat&#34; tab. Admin-scoped: gated by laelia.agents.get.<
               </tr>
             
               <tr>
+                <td>GetConversationAgentProfile</td>
+                <td><a href="#laelia.v1.GetConversationAgentProfileRequest">GetConversationAgentProfileRequest</a></td>
+                <td><a href="#laelia.v1.AgentProfile">AgentProfile</a></td>
+                <td><p>GetConversationAgentProfile returns a single co-member agent&#39;s full profile
+(title, persona_prompt, status). Intended for the agent daemon: an agent reads a
+specific agent&#39;s full persona_prompt before deciding to address it. The caller
+must be a member of the conversation.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ListThreadParticipants</td>
+                <td><a href="#laelia.v1.ListThreadParticipantsRequest">ListThreadParticipantsRequest</a></td>
+                <td><a href="#laelia.v1.ListThreadParticipantsResponse">ListThreadParticipantsResponse</a></td>
+                <td><p>ListThreadParticipants lists the distinct senders (users and agents) that posted
+in a thread. Intended for the agent daemon. The caller must be a member of the
+conversation.</p></td>
+              </tr>
+            
+              <tr>
                 <td>SendMessage</td>
                 <td><a href="#laelia.v1.SendMessageRequest">SendMessageRequest</a></td>
                 <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
@@ -9744,6 +9933,26 @@ a member.</p></td>
                 <td>ListChannelMembers</td>
                 <td>GET</td>
                 <td>/v1/{conversation=conversations/*}/members</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetConversationAgentProfile</td>
+                <td>GET</td>
+                <td>/v1/{conversation=conversations/*}:getAgentProfile</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListThreadParticipants</td>
+                <td>GET</td>
+                <td>/v1/{conversation=conversations/*}:listThreadParticipants</td>
                 <td></td>
               </tr>
               

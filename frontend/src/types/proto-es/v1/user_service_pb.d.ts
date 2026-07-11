@@ -331,6 +331,16 @@ export declare type User = Message<"laelia.v1.User"> & {
    * @generated from field: bool workspace_admin = 15;
    */
   workspaceAdmin: boolean;
+
+  /**
+   * description is a short, user-authored self-description surfaced to agents and
+   * other users so they know who this user is and what they focus on, e.g.
+   * "Backend engineer, focused on agent building" or "UI/UX expert, reviews come to
+   * me". Editable via UpdateUser with update_mask "description".
+   *
+   * @generated from field: string description = 16;
+   */
+  description: string;
 };
 
 /**

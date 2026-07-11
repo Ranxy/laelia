@@ -597,8 +597,13 @@ type User struct {
 	// workspace_admin is true when the user holds the roles/workspaceAdmin role.
 	// Only populated for the current caller (GetCurrentUser).
 	WorkspaceAdmin bool `protobuf:"varint,15,opt,name=workspace_admin,json=workspaceAdmin,proto3" json:"workspace_admin,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// description is a short, user-authored self-description surfaced to agents and
+	// other users so they know who this user is and what they focus on, e.g.
+	// "Backend engineer, focused on agent building" or "UI/UX expert, reviews come to
+	// me". Editable via UpdateUser with update_mask "description".
+	Description   string `protobuf:"bytes,16,opt,name=description,proto3" json:"description,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -715,6 +720,13 @@ func (x *User) GetWorkspaceAdmin() bool {
 	return false
 }
 
+func (x *User) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
 type UserProfile struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	LastLoginTime          *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=last_login_time,json=lastLoginTime,proto3" json:"last_login_time,omitempty"`
@@ -810,7 +822,7 @@ const file_v1_user_service_proto_rawDesc = "" +
 	"\vlaelia/UserR\x04name\">\n" +
 	"\x13UndeleteUserRequest\x12'\n" +
 	"\x04name\x18\x01 \x01(\tB\x13\xe0A\x02\xfaA\r\n" +
-	"\vlaelia/UserR\x04name\"\xc6\x03\n" +
+	"\vlaelia/UserR\x04name\"\xe8\x03\n" +
 	"\x04User\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -824,7 +836,8 @@ const file_v1_user_service_proto_rawDesc = "" +
 	"\x05phone\x18\f \x01(\tR\x05phone\x120\n" +
 	"\aprofile\x18\r \x01(\v2\x16.laelia.v1.UserProfileR\aprofile\x12\x1b\n" +
 	"\x06groups\x18\x0e \x03(\tB\x03\xe0A\x03R\x06groups\x12,\n" +
-	"\x0fworkspace_admin\x18\x0f \x01(\bB\x03\xe0A\x03R\x0eworkspaceAdmin:\x1e\xeaA\x1b\n" +
+	"\x0fworkspace_admin\x18\x0f \x01(\bB\x03\xe0A\x03R\x0eworkspaceAdmin\x12 \n" +
+	"\vdescription\x18\x10 \x01(\tR\vdescription:\x1e\xeaA\x1b\n" +
 	"\vlaelia/User\x12\fusers/{user}\"\xc0\x01\n" +
 	"\vUserProfile\x12B\n" +
 	"\x0flast_login_time\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\rlastLoginTime\x12U\n" +

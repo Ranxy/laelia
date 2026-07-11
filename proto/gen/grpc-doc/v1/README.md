@@ -94,6 +94,7 @@
     - [AckProcessedVersionResponse](#laelia-v1-AckProcessedVersionResponse)
     - [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest)
     - [AgentActivity](#laelia-v1-AgentActivity)
+    - [AgentProfile](#laelia-v1-AgentProfile)
     - [AgentReady](#laelia-v1-AgentReady)
     - [AgentStreamMessage](#laelia-v1-AgentStreamMessage)
     - [Attachment](#laelia-v1-Attachment)
@@ -143,6 +144,7 @@
     - [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest)
     - [GetCommandContextResponse](#laelia-v1-GetCommandContextResponse)
     - [GetCommandRequest](#laelia-v1-GetCommandRequest)
+    - [GetConversationAgentProfileRequest](#laelia-v1-GetConversationAgentProfileRequest)
     - [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest)
     - [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse)
     - [GetReminderRequest](#laelia-v1-GetReminderRequest)
@@ -172,6 +174,8 @@
     - [ListTasksResponse](#laelia-v1-ListTasksResponse)
     - [ListThreadMessagesRequest](#laelia-v1-ListThreadMessagesRequest)
     - [ListThreadMessagesResponse](#laelia-v1-ListThreadMessagesResponse)
+    - [ListThreadParticipantsRequest](#laelia-v1-ListThreadParticipantsRequest)
+    - [ListThreadParticipantsResponse](#laelia-v1-ListThreadParticipantsResponse)
     - [ListThreadUpdatesRequest](#laelia-v1-ListThreadUpdatesRequest)
     - [ListThreadUpdatesResponse](#laelia-v1-ListThreadUpdatesResponse)
     - [ManagerStreamMessage](#laelia-v1-ManagerStreamMessage)
@@ -1259,6 +1263,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | profile | [UserProfile](#laelia-v1-UserProfile) |  |  |
 | groups | [string](#string) | repeated | The groups for the user. Format: groups/{email} |
 | workspace_admin | [bool](#bool) |  | workspace_admin is true when the user holds the roles/workspaceAdmin role. Only populated for the current caller (GetCurrentUser). |
+| description | [string](#string) |  | description is a short, user-authored self-description surfaced to agents and other users so they know who this user is and what they focus on, e.g. &#34;Backend engineer, focused on agent building&#34; or &#34;UI/UX expert, reviews come to me&#34;. Editable via UpdateUser with update_mask &#34;description&#34;. |
 
 
 
@@ -1503,6 +1508,26 @@ frontend can associate execution events with the channel.
 
 
 
+<a name="laelia-v1-AgentProfile"></a>
+
+### AgentProfile
+AgentProfile is the full profile of one agent, returned by
+GetConversationAgentProfile. persona_prompt is the admin-authored self-awareness
+prompt; empty when the agent has none.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| title | [string](#string) |  |  |
+| persona_prompt | [string](#string) |  |  |
+| status | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-AgentReady"></a>
 
 ### AgentReady
@@ -1675,6 +1700,7 @@ the agent uses to anchor its execution events and link any posted replies.
 | display_name | [string](#string) |  |  |
 | member_role | [int32](#int32) |  |  |
 | joined_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| description | [string](#string) |  | description is the member&#39;s self-description: for users it is User.description, for agents it is the agent&#39;s persona_prompt (from AgentACPConfig). Surfaced so an agent can perceive who is in a channel/thread and decide whom to address. The chattool roster may truncate it for display; use GetConversationAgentProfile for an agent&#39;s full persona_prompt. |
 
 
 
@@ -2387,6 +2413,24 @@ File is the persisted metadata for an S3-backed object.
 
 
 
+<a name="laelia-v1-GetConversationAgentProfileRequest"></a>
+
+### GetConversationAgentProfileRequest
+GetConversationAgentProfileRequest fetches a single co-member agent&#39;s profile
+(title, persona_prompt, status) so an agent can read the full persona_prompt of a
+specific agent it wants to address. The caller must be a member of the conversation.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| agent | [string](#string) |  | agent is the &#34;agents/&lt;id&gt;&#34; resource name of the agent whose profile to fetch. |
+
+
+
+
+
+
 <a name="laelia-v1-GetOrCreateConversationRequest"></a>
 
 ### GetOrCreateConversationRequest
@@ -2850,6 +2894,40 @@ pivot, and the default returns the latest N replies.
 | messages | [ChatMessage](#laelia-v1-ChatMessage) | repeated | messages is [root, ...replies] in room_version order. |
 | next_page_token | [string](#string) |  |  |
 | current_version | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListThreadParticipantsRequest"></a>
+
+### ListThreadParticipantsRequest
+ListThreadParticipantsRequest lists the distinct senders (users and agents) that
+have posted in a thread (the root message and its replies). Participants are derived
+from message senders, not from a membership table, so this reflects who actually
+took part in the thread. The caller must be a member of the conversation.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| thread_root | [string](#string) |  | thread_root is the resource name of the thread&#39;s root message (&#34;conversations/{c}/messages/{m}&#34;). |
+
+
+
+
+
+
+<a name="laelia-v1-ListThreadParticipantsResponse"></a>
+
+### ListThreadParticipantsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| members | [ChannelMember](#laelia-v1-ChannelMember) | repeated | members is the distinct senders in the thread. member_role is not meaningful for thread participation and is left 0. |
 
 
 
@@ -3710,6 +3788,8 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | AddChannelMember | [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest) | [ChannelMember](#laelia-v1-ChannelMember) |  |
 | RemoveChannelMember | [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 | ListChannelMembers | [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest) | [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse) |  |
+| GetConversationAgentProfile | [GetConversationAgentProfileRequest](#laelia-v1-GetConversationAgentProfileRequest) | [AgentProfile](#laelia-v1-AgentProfile) | GetConversationAgentProfile returns a single co-member agent&#39;s full profile (title, persona_prompt, status). Intended for the agent daemon: an agent reads a specific agent&#39;s full persona_prompt before deciding to address it. The caller must be a member of the conversation. |
+| ListThreadParticipants | [ListThreadParticipantsRequest](#laelia-v1-ListThreadParticipantsRequest) | [ListThreadParticipantsResponse](#laelia-v1-ListThreadParticipantsResponse) | ListThreadParticipants lists the distinct senders (users and agents) that posted in a thread. Intended for the agent daemon. The caller must be a member of the conversation. |
 | SendMessage | [SendMessageRequest](#laelia-v1-SendMessageRequest) | [ChatMessage](#laelia-v1-ChatMessage) |  |
 | PostMessage | [PostMessageRequest](#laelia-v1-PostMessageRequest) | [PostMessageResponse](#laelia-v1-PostMessageResponse) |  |
 | ConvertMessageToTask | [ConvertMessageToTaskRequest](#laelia-v1-ConvertMessageToTaskRequest) | [ConvertMessageToTaskResponse](#laelia-v1-ConvertMessageToTaskResponse) | ConvertMessageToTask turns an existing top-level message into a task by attaching task metadata (number, status=TODO, no assignee). Any channel member (user or agent) may convert. Emits a system notification row. |
