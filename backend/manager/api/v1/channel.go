@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -305,28 +306,97 @@ func (s *CommandService) ListChannelMembers(ctx context.Context, req *connect.Re
 
 	var v1Members []*v1pb.ChannelMember
 	for _, m := range members {
-		v1Members = append(v1Members, &v1pb.ChannelMember{
-			MemberType:  m.MemberType,
-			MemberId:    m.MemberID,
-			DisplayName: resolveMemberDisplayName(ctx, s.store, m.MemberType, m.MemberID),
-			MemberRole:  m.MemberRole,
-			JoinedAt:    timestamppb.New(m.JoinedAt),
-		})
+		v1Members = append(v1Members, buildChannelMember(ctx, s.store, m.MemberType, m.MemberID, m.MemberRole, m.JoinedAt))
 	}
 
 	return connect.NewResponse(&v1pb.ListChannelMembersResponse{Members: v1Members}), nil
 }
 
-// GetConversationAgentProfile returns a single co-member agent's full profile. Stub
-// implementation; fleshed out (membership check + agent lookup) in a later phase.
-func (*CommandService) GetConversationAgentProfile(_ context.Context, _ *connect.Request[v1pb.GetConversationAgentProfileRequest]) (*connect.Response[v1pb.AgentProfile], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("GetConversationAgentProfile not yet implemented"))
+// GetConversationAgentProfile returns a single co-member agent's full profile
+// (title, persona_prompt, status) so an agent can read the full persona_prompt of a
+// specific agent it wants to address. The caller must be a member of the
+// conversation; the requested agent must also be a member.
+func (s *CommandService) GetConversationAgentProfile(ctx context.Context, req *connect.Request[v1pb.GetConversationAgentProfileRequest]) (*connect.Response[v1pb.AgentProfile], error) {
+	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
+	if err != nil {
+		return nil, err
+	}
+
+	resourceID, err := common.GetAgentResourceID(req.Msg.Agent)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid agent name %q", req.Msg.Agent))
+	}
+
+	isMember, err := s.store.IsConversationMember(ctx, convID, store.MemberTypeAgent, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check agent membership"))
+	}
+	if !isMember {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %q is not a member of this conversation", req.Msg.Agent))
+	}
+
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil || agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %q not found", req.Msg.Agent))
+	}
+
+	return connect.NewResponse(&v1pb.AgentProfile{
+		Name:          fmt.Sprintf("agents/%s", resourceID),
+		Title:         agent.Name,
+		PersonaPrompt: agent.Info.GetAcpConfig().GetPersonaPrompt(),
+		Status:        agent.Status.GetState().String(),
+	}), nil
 }
 
-// ListThreadParticipants lists the distinct senders in a thread. Stub implementation;
-// fleshed out in a later phase.
-func (*CommandService) ListThreadParticipants(_ context.Context, _ *connect.Request[v1pb.ListThreadParticipantsRequest]) (*connect.Response[v1pb.ListThreadParticipantsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("ListThreadParticipants not yet implemented"))
+// ListThreadParticipants lists the distinct users and agents that posted in a
+// thread (the root message plus its replies), derived from message senders. The
+// caller must be a member of the conversation.
+func (s *CommandService) ListThreadParticipants(ctx context.Context, req *connect.Request[v1pb.ListThreadParticipantsRequest]) (*connect.Response[v1pb.ListThreadParticipantsResponse], error) {
+	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
+	if err != nil {
+		return nil, err
+	}
+
+	rootID, parseErr := uuid.Parse(req.Msg.ThreadRoot)
+	if parseErr != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(parseErr, "invalid thread_root"))
+	}
+	isRoot, rootErr := s.store.IsThreadRoot(ctx, convID, rootID)
+	if rootErr != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(rootErr, "failed to validate thread root"))
+	}
+	if !isRoot {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("thread_root is not a root message in this conversation"))
+	}
+
+	senders, err := s.store.ListThreadSenders(ctx, convID, rootID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to list thread senders"))
+	}
+
+	var v1Members []*v1pb.ChannelMember
+	for _, ts := range senders {
+		var memberID string
+		switch ts.SenderType {
+		case store.SenderTypeUser:
+			memberID = strconv.Itoa(ts.PrincipalID)
+		case store.SenderTypeAgent:
+			if !ts.AgentID.Valid {
+				continue
+			}
+			agent, agentErr := s.store.GetAgent(ctx, int(ts.AgentID.Int32))
+			if agentErr != nil || agent == nil {
+				continue
+			}
+			memberID = agent.ResourceID
+		default:
+			continue
+		}
+		// Thread participation has no role; leave MemberRole 0.
+		v1Members = append(v1Members, buildChannelMember(ctx, s.store, ts.SenderType, memberID, 0, time.Time{}))
+	}
+
+	return connect.NewResponse(&v1pb.ListThreadParticipantsResponse{Members: v1Members}), nil
 }
 
 func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v1pb.SendMessageRequest]) (*connect.Response[v1pb.ChatMessage], error) {
@@ -605,4 +675,47 @@ func resolveMemberDisplayName(ctx context.Context, s *store.Store, memberType in
 		return agent.Name
 	}
 	return memberID
+}
+
+// resolveMemberDescription returns a member's self-description: for users, the
+// user-authored User.description; for agents, the admin-authored persona_prompt
+// from AgentACPConfig. Surfaced in channel/thread rosters so an agent can perceive
+// who a member is and decide whom to address. Empty when unavailable.
+func resolveMemberDescription(ctx context.Context, s *store.Store, memberType int32, memberID string) string {
+	if memberType == store.MemberTypeUser {
+		uid, err := strconv.Atoi(memberID)
+		if err != nil {
+			return ""
+		}
+		u, err := s.GetUserByID(ctx, uid)
+		if err != nil || u == nil {
+			return ""
+		}
+		return u.Description
+	}
+	if memberType == store.MemberTypeAgent {
+		agent, err := s.GetAgentByResourceID(ctx, memberID)
+		if err != nil || agent == nil {
+			return ""
+		}
+		return agent.Info.GetAcpConfig().GetPersonaPrompt()
+	}
+	return ""
+}
+
+// buildChannelMember assembles a v1 ChannelMember from a membership row, resolving
+// the display name and self-description. Shared by ListChannelMembers and
+// ListThreadParticipants so both rosters render identity consistently.
+func buildChannelMember(ctx context.Context, s *store.Store, memberType int32, memberID string, role int32, joinedAt time.Time) *v1pb.ChannelMember {
+	m := &v1pb.ChannelMember{
+		MemberType:  memberType,
+		MemberId:    memberID,
+		DisplayName: resolveMemberDisplayName(ctx, s, memberType, memberID),
+		MemberRole:  role,
+		Description: resolveMemberDescription(ctx, s, memberType, memberID),
+	}
+	if !joinedAt.IsZero() {
+		m.JoinedAt = timestamppb.New(joinedAt)
+	}
+	return m
 }

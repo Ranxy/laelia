@@ -811,6 +811,12 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 			threadRoot = uuid.NullUUID{UUID: rootID, Valid: true}
 		}
 
+		// The agent addresses other agents/users by typing content-only
+		// `@someone`; the manager parses those tokens into structured Mentions
+		// (the agent never sets Mentions itself). Parsed mentions are persisted on
+		// the message and drive thread subscription / wake routing below.
+		mentions := s.parseContentMentions(ctx, convUUID, req.Msg.Content, agent.ResourceID)
+
 		msg, newVersion, createErr := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
 			ConversationID:      convUUID,
 			PrincipalID:         principalID,
@@ -820,6 +826,7 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 			CommandID:           commandID,
 			SenderType:          store.SenderTypeAgent,
 			Attachments:         attachments,
+			Mentions:            mentions,
 			ThreadRootMessageID: threadRoot,
 		})
 		if createErr != nil {
@@ -830,7 +837,7 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 			// Thread reply: subscribe the posting agent and any @mentioned
 			// agents, then wake every subscriber except the poster. The poster
 			// is excluded so its own reply does not re-wake itself.
-			s.subscribeAndNotifyThread(ctx, convUUID, threadRoot.UUID, newVersion, nil, &agent.ID)
+			s.subscribeAndNotifyThread(ctx, convUUID, threadRoot.UUID, newVersion, mentions, &agent.ID)
 		} else {
 			// Agent-first: wake every OTHER agent member of this conversation so
 			// they can pull this agent's reply. The posting agent is excluded (it
