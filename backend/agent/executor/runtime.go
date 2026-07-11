@@ -21,6 +21,20 @@ type Request struct {
 	ConversationID   string
 	AgentResourceID  string
 	AgentDisplayName string
+	// AgentID is the agent's stable server-assigned UUID (parsed from the
+	// bootstrap token). It keys the per-agent working dir and the persistent
+	// ACP session-state file (acp-session.json) that lets drain turns resume
+	// the same ACP session instead of cold-starting. Distinct from
+	// AgentResourceID (the --agent-name flag).
+	AgentID string
+	// TurnPrompt is the "New messages received:" bounded batch the LLM is
+	// prompted with this turn. On a cold turn (no reusable ACP session) the
+	// executor prepends the full init prompt (buildPrompt) and then the batch;
+	// on a warm turn (resumed session) only the batch is sent — the init prompt
+	// lives in the resumed session history. Empty means "no new work surfaced
+	// this turn" (cold start with an idle inbox), in which case the executor
+	// sends the init prompt alone so the agent is primed for future turns.
+	TurnPrompt string
 	// DaemonSocket / SessionToken / BinaryDir configure the CLI the LLM shells
 	// out to. The executor injects them into the ACP subprocess env so the
 	// `laelia-agent message ...` / `laelia-agent command context` subcommands can

@@ -128,16 +128,24 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 	return created, nil
 }
 
-// SetCommandConversationID links a command to the conversation the agent ended
-// up processing during its autonomous session. A session's command is created
-// before the agent has chosen which channel to work on, so the link is filled
-// in when the agent commits to a channel (via AckProcessedVersion).
-func (s *Store) SetCommandConversationID(ctx context.Context, commandID, conversationID uuid.UUID) error {
-	_, err := s.GetDB().ExecContext(ctx, `
-		UPDATE command SET conversation_id = $1 WHERE id = $2
-	`, conversationID, commandID)
-	if err != nil {
-		return errors.Wrapf(err, "failed to set command conversation id")
+// LinkCommandConversation records that a command touched a conversation. A
+// multi-channel drain turn may post/ack in several conversations, so the link
+// is many-to-many (command_conversation) and this is idempotent. It also sets
+// command.conversation_id on first-wins (only when still NULL) so the command's
+// "primary conversation" for the command-detail view is the first one the agent
+// committed to. FetchConversationActivity reads the junction so the agent
+// appears "running" in every conversation its current command is active in.
+func (s *Store) LinkCommandConversation(ctx context.Context, commandID, conversationID uuid.UUID) error {
+	if _, err := s.GetDB().ExecContext(ctx, `
+		INSERT INTO command_conversation (command_id, conversation_id) VALUES ($1, $2)
+		ON CONFLICT (command_id, conversation_id) DO NOTHING
+	`, commandID, conversationID); err != nil {
+		return errors.Wrapf(err, "failed to link command to conversation")
+	}
+	if _, err := s.GetDB().ExecContext(ctx, `
+		UPDATE command SET conversation_id = $1 WHERE id = $2 AND conversation_id IS NULL
+	`, conversationID, commandID); err != nil {
+		return errors.Wrapf(err, "failed to set command primary conversation")
 	}
 	return nil
 }
@@ -629,6 +637,7 @@ func (s *Store) GetRunningCommandsForConversation(ctx context.Context, agentIDs 
 	rows, err := s.GetDB().QueryContext(ctx, `
 		SELECT c.agent_id, c.id, ce.event_type, ce.summary
 		FROM command c
+		JOIN command_conversation cc ON cc.command_id = c.id
 		LEFT JOIN LATERAL (
 			SELECT event_type, summary FROM command_event
 			WHERE command_id = c.id
@@ -636,7 +645,7 @@ func (s *Store) GetRunningCommandsForConversation(ctx context.Context, agentIDs 
 			LIMIT 1
 		) ce ON true
 		WHERE c.agent_id = ANY($1::int[])
-		  AND c.conversation_id = $2
+		  AND cc.conversation_id = $2
 		  AND c.status = 2
 	`, arrayLiteral, conversationID)
 	if err != nil {

@@ -100,6 +100,15 @@ func (s *Server) SocketPath() string   { return s.socketPath }
 func (s *Server) SessionToken() string { return s.sessionToken }
 func (s *Server) TempDir() string      { return s.tempDir }
 
+// BatchDeps returns a Deps whose Client carries the live agent access token,
+// for in-process calls from the agent client's drain loop (the turn-batch
+// builder). Only the Client is meaningful for the read-only batch RPCs
+// (ListChannelUpdates, GetChannel, ListConversationMessages), which resolve
+// the caller from auth rather than the Deps.Agent/Command fields.
+func (s *Server) BatchDeps() chattools.Deps {
+	return chattools.Deps{Client: s.commandClient(), Agent: s.agentResourceID}
+}
+
 // client builds (once) a CommandServiceClient that carries the live access
 // token on every call via an interceptor.
 func (s *Server) commandClient() v1connect.CommandServiceClient {

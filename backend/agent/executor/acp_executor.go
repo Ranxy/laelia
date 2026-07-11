@@ -414,36 +414,97 @@ func (e *ACPExecutor) run() {
 	// strict array schema and reject a missing/null value with -32602 Invalid
 	// params. We expose no MCP servers — the LLM drives the chat loop via the
 	// `laelia-agent` CLI instead.
-	sessionResp, err := e.conn.NewSession(e.ctx, acp.NewSessionRequest{
-		Cwd:                   e.workingDir,
-		AdditionalDirectories: additionalRoots(e.allowedRoots, e.workingDir),
-		McpServers:            []acp.McpServer{},
-	})
-	if err != nil {
-		e.finishACPProcess(err)
-		return
+	mcpServers := []acp.McpServer{}
+	extraDirs := additionalRoots(e.allowedRoots, e.workingDir)
+
+	// Session inheritance: each turn spawns a fresh subprocess but resumes the
+	// SAME ACP SessionId when one is persisted for this agent with a matching
+	// config fingerprint. The init prompt (identity + persona + communication +
+	// memory + procedure) is sent only on a cold NewSession and lives in the
+	// resumed session's history thereafter — that is the per-turn token saving.
+	fingerprint := sessionFingerprint(e.config.Provider, e.config.Model, e.workingDir)
+	resumed := false
+	var configOpts []acp.SessionConfigOption
+	if existing, loadErr := loadACPSession(e.request.AgentID); loadErr != nil {
+		slog.Warn("failed to load persisted acp session state; cold-starting", "agent", e.request.AgentID, "error", loadErr)
+	} else if existing != nil && existing.SessionID != "" && existing.Fingerprint == fingerprint {
+		resumeResp, resumeErr := e.conn.ResumeSession(e.ctx, acp.ResumeSessionRequest{
+			SessionId:             acp.SessionId(existing.SessionID),
+			Cwd:                   e.workingDir,
+			AdditionalDirectories: extraDirs,
+			McpServers:            mcpServers,
+		})
+		if resumeErr != nil {
+			// The provider lost the session (crash, eviction, config drift the
+			// fingerprint did not catch). Drop the stale id and cold-start so we
+			// do not loop forever on a dead session — the cursor is the source of
+			// truth, so no message is lost, only the init prompt is re-sent.
+			slog.Warn("acp session resume failed; cold-starting", "agent", e.request.AgentID, "session_id", existing.SessionID, "error", resumeErr)
+			clearACPSession(e.request.AgentID)
+		} else {
+			e.sessionID = existing.SessionID
+			configOpts = resumeResp.ConfigOptions
+			resumed = true
+		}
 	}
-	e.sessionID = string(sessionResp.SessionId)
+
+	if !resumed {
+		sessionResp, newErr := e.conn.NewSession(e.ctx, acp.NewSessionRequest{
+			Cwd:                   e.workingDir,
+			AdditionalDirectories: extraDirs,
+			McpServers:            mcpServers,
+		})
+		if newErr != nil {
+			e.finishACPProcess(newErr)
+			return
+		}
+		e.sessionID = string(sessionResp.SessionId)
+		configOpts = sessionResp.ConfigOptions
+	}
 
 	// Apply the admin-selected model via the ACP session config option round
-	// trip: find the model config option the agent advertised in NewSession and
-	// set its value before the first prompt. This is the protocol-sanctioned way
-	// to select a model (ACP has no model field on initialize/newSession/prompt).
-	// If the agent did not advertise a model option, or the selected valueId is
-	// not among the advertised options, we log and continue with the agent's
-	// default rather than failing the session.
-	if err := e.applySelectedModel(sessionResp.ConfigOptions); err != nil {
+	// trip: find the model config option the agent advertised in NewSession (or
+	// re-advertised on ResumeSession) and set its value before the prompt. This
+	// is the protocol-sanctioned way to select a model (ACP has no model field on
+	// initialize/newSession/prompt). If the agent did not advertise a model
+	// option, or the selected valueId is not among the advertised options, we
+	// log and continue with the agent's default rather than failing the session.
+	if err := e.applySelectedModel(configOpts); err != nil {
 		slog.Warn("failed to apply selected model", "agent", e.initializedAgent, "model", e.config.Model, "error", err)
 	}
 
-	identityName := e.request.AgentDisplayName
-	if identityName == "" {
-		identityName = e.request.AgentResourceID
+	// Persist the session id now that NewSession/ResumeSession has accepted it,
+	// so the next turn can resume even if the Prompt below fails — the cursor is
+	// the source of truth, so a re-prompt next turn is safe.
+	if saveErr := saveACPSession(e.request.AgentID, &acpSessionState{
+		SessionID:   e.sessionID,
+		Fingerprint: fingerprint,
+		CreatedAt:   time.Now().Unix(),
+	}); saveErr != nil {
+		slog.Warn("failed to persist acp session state; next turn will cold-start", "agent", e.request.AgentID, "error", saveErr)
 	}
-	promptText := buildPrompt(identityName, e.config.PersonaPrompt)
+
+	promptText := e.turnPromptText(resumed)
+	if promptText == "" {
+		// Defensive: a warm turn should always carry a batch. If it does not,
+		// do not send an empty Prompt — finish cleanly and let the drain loop
+		// re-gate. The session is already persisted for the next turn.
+		_ = e.cmd.Process.Kill()
+		_ = e.cmd.Wait()
+		e.buffer.flush(e)
+		e.rawEvents.flush(e)
+		e.sendACPResult(Result{
+			ExitCode:     0,
+			DurationMs:   time.Since(e.startedAt).Milliseconds(),
+			FinalSummary: "no turn prompt; session persisted",
+			SessionID:    e.sessionID,
+			Resumed:      resumed,
+		})
+		return
+	}
 
 	promptResp, err := e.conn.Prompt(e.ctx, acp.PromptRequest{
-		SessionId: sessionResp.SessionId,
+		SessionId: acp.SessionId(e.sessionID),
 		Prompt:    []acp.ContentBlock{acp.TextBlock(promptText)},
 	})
 	if err != nil {
@@ -488,7 +549,38 @@ func (e *ACPExecutor) run() {
 		DurationMs:   time.Since(e.startedAt).Milliseconds(),
 		FinalSummary: finalSummary,
 		Result:       resultPayload,
+		SessionID:    e.sessionID,
+		Resumed:      resumed,
 	})
+}
+
+// turnPromptText composes the user message for this turn's Prompt call. On a
+// warm (resumed) turn only the "New messages received:" batch is sent — the
+// init prompt is already in the session history. On a cold turn the full init
+// prompt (identity + persona + communication + procedure + memory) is sent
+// first, with the batch appended when there is pending work so the first turn
+// is not wasted; a cold turn with no batch just primes the session for future
+// notifications.
+func (e *ACPExecutor) turnPromptText(resumed bool) string {
+	// TurnPrompt is the drain-loop batch. Direct callers (e.g. integration
+	// tests) may set Instruction instead; honor it as a fallback so those paths
+	// still reach the LLM without every caller knowing about TurnPrompt.
+	batch := strings.TrimSpace(e.request.TurnPrompt)
+	if batch == "" {
+		batch = strings.TrimSpace(e.request.Instruction)
+	}
+	if resumed {
+		return batch
+	}
+	identityName := e.request.AgentDisplayName
+	if identityName == "" {
+		identityName = e.request.AgentResourceID
+	}
+	initPrompt := buildPrompt(identityName, e.config.PersonaPrompt)
+	if batch == "" {
+		return initPrompt
+	}
+	return initPrompt + "\n\n" + batch
 }
 
 func (e *ACPExecutor) finishACPProcess(err error) {

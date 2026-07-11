@@ -108,6 +108,10 @@ type commandStream struct {
 	// newSessionRuntime builds the runtime for a drain session. It defaults to
 	// buildRuntime (real ACP) and is overridable in tests.
 	newSessionRuntime func(req *v1pb.CommandRequest) (executor.Runtime, error)
+	// buildTurnBatch renders the "New messages received:" batch that opens a
+	// drain turn, using the auth-bearing CommandServiceClient the daemon exposes.
+	// Nil in tests (the test supplies TurnPrompt directly on the request).
+	buildTurnBatch func(ctx context.Context) (string, error)
 }
 
 func newCommandStream(httpClient *http.Client, managerURL, socketPath, sessionToken, binaryDir, agentResourceID, resourceID string) *commandStream {
@@ -405,9 +409,21 @@ func (c *commandStream) beginSession(ctx context.Context, stream *connect.BidiSt
 // shelling out to the `laelia-agent` CLI over the local daemon. Blocking:
 // returns when the session finishes.
 func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, agentDisplayName string) {
+	// Build the "New messages received:" bounded batch that opens this turn. It
+	// is the user message the LLM is prompted with (the init prompt is sent only
+	// once, at cold start, and inherited via session resume on warm turns).
+	turnPrompt := ""
+	if c.buildTurnBatch != nil {
+		if batch, err := c.buildTurnBatch(ctx); err != nil {
+			slog.Warn("failed to build turn batch; proceeding with empty batch", "commandID", commandID, "error", err)
+		} else {
+			turnPrompt = batch
+		}
+	}
+
 	req := &v1pb.CommandRequest{
 		CommandId:        commandID,
-		Instruction:      executor.AgentFirstPromptBody,
+		Instruction:      turnPrompt,
 		AgentDisplayName: agentDisplayName,
 		TimeoutSeconds:   0,
 	}
@@ -628,6 +644,7 @@ func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime
 	return executor.NewACP(executor.Request{
 		CommandID:        req.CommandId,
 		Instruction:      req.Instruction,
+		TurnPrompt:       req.Instruction,
 		Profile:          req.Profile,
 		WorkingDir:       req.WorkingDir,
 		Env:              req.Env,
@@ -636,6 +653,7 @@ func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime
 		ConversationID:   req.ConversationId,
 		AgentResourceID:  c.agentResourceID,
 		AgentDisplayName: req.AgentDisplayName,
+		AgentID:          c.resourceID,
 		DaemonSocket:     c.socketPath,
 		SessionToken:     c.sessionToken,
 		BinaryDir:        c.binaryDir,

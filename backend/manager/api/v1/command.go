@@ -616,11 +616,12 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 	// the work is done) so FetchConversationActivity can surface the agent's live
 	// status while it works — without this the channel status bar stays "idle"
 	// throughout execution. User/frontend callers have no session command and are
-	// skipped. SetCommandConversationID is an idempotent UPDATE.
+	// skipped. LinkCommandConversation is an idempotent insert (+ first-wins
+	// column set) so a multi-channel turn links its command to every channel.
 	if callerAgent != nil {
 		if cmdID := s.dispatcher.CurrentCommandID(callerAgent.ID); cmdID != "" {
 			if cid, parseErr := uuid.Parse(cmdID); parseErr == nil {
-				if linkErr := s.store.SetCommandConversationID(ctx, cid, convID); linkErr != nil {
+				if linkErr := s.store.LinkCommandConversation(ctx, cid, convID); linkErr != nil {
 					slog.Warn("failed to link command to conversation on read", "commandID", cmdID, "conversationID", convID, "error", linkErr)
 				}
 			}
@@ -697,7 +698,7 @@ func (s *CommandService) ListThreadMessages(ctx context.Context, req *connect.Re
 	if callerAgent != nil {
 		if cmdID := s.dispatcher.CurrentCommandID(callerAgent.ID); cmdID != "" {
 			if cid, parseErr := uuid.Parse(cmdID); parseErr == nil {
-				if linkErr := s.store.SetCommandConversationID(ctx, cid, convID); linkErr != nil {
+				if linkErr := s.store.LinkCommandConversation(ctx, cid, convID); linkErr != nil {
 					slog.Warn("failed to link command to conversation on thread read", "commandID", cmdID, "conversationID", convID, "error", linkErr)
 				}
 			}
@@ -1040,12 +1041,13 @@ func (s *CommandService) AckProcessedVersion(ctx context.Context, req *connect.R
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to ack processed version"))
 	}
 
-	// Link the session's command to this conversation. One session processes
-	// one channel, so this is unambiguous. A missing/empty command_id (e.g. an
-	// ack outside a session) is ignored.
+	// Link the session's command to this conversation. LinkCommandConversation is
+	// an idempotent insert (+ first-wins column set) so a multi-channel turn that
+	// acks in several conversations links its command to each of them. A
+	// missing/empty command_id (e.g. an ack outside a session) is ignored.
 	if req.Msg.CommandId != "" {
 		if cid, parseErr := uuid.Parse(req.Msg.CommandId); parseErr == nil {
-			if linkErr := s.store.SetCommandConversationID(ctx, cid, convUUID); linkErr != nil {
+			if linkErr := s.store.LinkCommandConversation(ctx, cid, convUUID); linkErr != nil {
 				slog.Warn("failed to link command to conversation", "commandID", req.Msg.CommandId, "conversationID", convUUID, "error", linkErr)
 			}
 		}

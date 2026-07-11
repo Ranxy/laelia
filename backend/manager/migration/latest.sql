@@ -277,6 +277,21 @@ CREATE TABLE conversation_member (
     PRIMARY KEY (conversation_id, member_type, member_id)
 );
 
+-- command_conversation links a drain command to every conversation it touched.
+-- A single multi-channel turn may post/ack in several conversations, so this is
+-- many-to-many: FetchConversationActivity uses it to show an agent as "running"
+-- in each conversation its current command is active in (not just the one
+-- command.conversation_id column, which records only the first/primary). The
+-- column is retained for the command-detail "primary conversation" view.
+CREATE TABLE command_conversation (
+    command_id UUID NOT NULL REFERENCES command(id) ON DELETE CASCADE,
+    conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+    linked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (command_id, conversation_id)
+);
+
+CREATE INDEX idx_command_conversation_conversation ON command_conversation(conversation_id);
+
 CREATE TABLE chat_message (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,

@@ -283,6 +283,11 @@ type acpTestObservation struct {
 	gotResult bool
 }
 
+// runACPTestRuntime drives a runtime until it produces a result. timeout is a
+// per-call knob (kept configurable even though current callers use 150s) so a
+// hung subprocess can be bounded tighter or looser without rewriting the helper.
+//
+//nolint:unparam // timeout is intentionally a tunable knob
 func runACPTestRuntime(t *testing.T, runtime Runtime, timeout time.Duration, cancelAfter time.Duration) acpTestObservation {
 	t.Helper()
 	runtime.Start()

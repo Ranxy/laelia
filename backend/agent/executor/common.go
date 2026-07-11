@@ -26,4 +26,12 @@ type Result struct {
 	LastSeqNo    int32
 	FinalSummary string
 	Result       *structpb.Struct
+	// SessionID is the ACP session id this turn used (newly created on a cold
+	// turn, resumed on a warm turn). The executor persists it to
+	// acp-session.json itself; this field mirrors it back so callers/tests can
+	// observe which path ran without re-reading the file.
+	SessionID string
+	// Resumed reports whether the turn resumed an existing ACP session (warm)
+	// or created a new one (cold). Drives metrics/debugging.
+	Resumed bool
 }

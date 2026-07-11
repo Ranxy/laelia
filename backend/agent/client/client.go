@@ -23,6 +23,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/Ranxy/laelia/backend/agent/chattools"
 	"github.com/Ranxy/laelia/backend/agent/credential"
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	"github.com/Ranxy/laelia/backend/agent/executor"
@@ -357,6 +358,9 @@ func (c *Client) Run(ctx context.Context) error {
 	}
 	c.cmdStream.refreshProviders = func(ctx context.Context) []provider.Discovered {
 		return c.refreshProviders(ctx)
+	}
+	c.cmdStream.buildTurnBatch = func(ctx context.Context) (string, error) {
+		return chattools.BuildTurnBatch(ctx, daemonSrv.BatchDeps())
 	}
 
 	// Probe the host once for installed LLM agent providers + models so the
