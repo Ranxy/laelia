@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 
 	"github.com/google/uuid"
@@ -92,6 +93,48 @@ func (s *Store) IsThreadParticipant(ctx context.Context, rootID uuid.UUID, agent
 		return false, errors.Wrapf(err, "failed to check thread participant")
 	}
 	return exists, nil
+}
+
+// ThreadSender is one distinct sender of a thread (the root message or any reply).
+// PrincipalID is always populated (it is the conversation owner for agent messages);
+// AgentID is valid only for agent senders (SenderType == SenderTypeAgent). The
+// handler maps these to a ChannelMember: users by PrincipalID, agents by AgentID.
+type ThreadSender struct {
+	SenderType  int32
+	PrincipalID int
+	AgentID     sql.NullInt32
+}
+
+// ListThreadSenders returns the distinct users and agents that posted in a thread
+// (the root message plus its replies), ordered by first appearance. System
+// senders are excluded. This is the basis for the thread-participants roster: it
+// reflects who actually took part, derived from message senders rather than a
+// membership table.
+func (s *Store) ListThreadSenders(ctx context.Context, conversationID, rootID uuid.UUID) ([]ThreadSender, error) {
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT DISTINCT sender_type, principal_id, sender_agent_id
+		FROM chat_message
+		WHERE conversation_id = $2
+		  AND (id = $1 OR thread_root_message_id = $1)
+		  AND sender_type IN ($3, $4)
+		ORDER BY sender_type, principal_id, sender_agent_id
+	`, rootID, conversationID, SenderTypeUser, SenderTypeAgent)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list thread senders")
+	}
+	defer rows.Close()
+	var senders []ThreadSender
+	for rows.Next() {
+		var ts ThreadSender
+		if err := rows.Scan(&ts.SenderType, &ts.PrincipalID, &ts.AgentID); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan thread sender")
+		}
+		senders = append(senders, ts)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate thread senders")
+	}
+	return senders, nil
 }
 
 // ListSubscribedThreadUpdates returns every thread the agent is subscribed to

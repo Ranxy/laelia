@@ -371,6 +371,7 @@ func (s *UserService) CreateUser(ctx context.Context, request *connect.Request[v
 		Phone:        request.Msg.User.Phone,
 		Type:         principalType,
 		PasswordHash: string(passwordHash),
+		Description:  request.Msg.User.Description,
 	}
 
 	user, err := s.store.CreateUser(ctx, userMessage)
@@ -517,6 +518,8 @@ func (s *UserService) UpdateUser(ctx context.Context, request *connect.Request[v
 				}
 			}
 			patch.Phone = &request.Msg.User.Phone
+		case "description":
+			patch.Description = &request.Msg.User.Description
 		default:
 		}
 	}
@@ -692,12 +695,13 @@ func convertToV1UserType(userType storepb.PrincipalType) v1pb.UserType {
 
 func convertToUser(user *store.UserMessage) *v1pb.User {
 	convertedUser := &v1pb.User{
-		Name:     common.FormatUserUID(user.ID),
-		State:    convertDeletedToState(user.MemberDeleted),
-		Email:    user.Email,
-		Phone:    user.Phone,
-		Title:    user.Name,
-		UserType: convertToV1UserType(user.Type),
+		Name:        common.FormatUserUID(user.ID),
+		State:       convertDeletedToState(user.MemberDeleted),
+		Email:       user.Email,
+		Phone:       user.Phone,
+		Title:       user.Name,
+		Description: user.Description,
+		UserType:    convertToV1UserType(user.Type),
 		Profile: &v1pb.UserProfile{
 			LastLoginTime:          user.Profile.LastLoginTime,
 			LastChangePasswordTime: user.Profile.LastChangePasswordTime,

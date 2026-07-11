@@ -45,6 +45,7 @@ type UpdateUserMessage struct {
 	Delete       *bool
 	Profile      *models.UserProfile
 	Phone        *string
+	Description  *string
 }
 
 // UserMessage is the message for an user.
@@ -63,6 +64,9 @@ type UserMessage struct {
 	CreatedAt time.Time
 	// The group email list
 	Groups []string
+	// Description is the user-authored self-description surfaced in channel/thread
+	// rosters so agents and other users can perceive who this user is.
+	Description string
 }
 
 // GetResourceID returns the stable per-user resource name used to key
@@ -315,7 +319,8 @@ func buildListUsersQuery(find *FindUserMessage) (string, []any) {
 		principal.phone,
 		principal.profile,
 		principal.created_at,
-		user_groups.groups
+		user_groups.groups,
+		principal.description
 	FROM principal
 	INNER JOIN user_groups ON principal.id = user_groups.user_id
 	` + join + ` WHERE ` + strings.Join(where, " AND ") + ` ORDER BY type DESC, created_at ASC`
@@ -354,6 +359,7 @@ func listUserImpl(ctx context.Context, txn *sql.Tx, find *FindUserMessage) ([]*U
 			&profileBytes,
 			&userMessage.CreatedAt,
 			&groups,
+			&userMessage.Description,
 		); err != nil {
 			return nil, err
 		}
@@ -401,8 +407,8 @@ func (s *Store) CreateUser(ctx context.Context, create *UserMessage) (*UserMessa
 		return nil, err
 	}
 
-	set := []string{"email", "name", "type", "password_hash", "phone", "profile"}
-	args := []any{create.Email, create.Name, create.Type.String(), create.PasswordHash, create.Phone, profileBytes}
+	set := []string{"email", "name", "type", "password_hash", "phone", "profile", "description"}
+	args := []any{create.Email, create.Name, create.Type.String(), create.PasswordHash, create.Phone, profileBytes, create.Description}
 	placeholder := []string{}
 	for index := range set {
 		placeholder = append(placeholder, fmt.Sprintf("$%d", index+1))
@@ -437,6 +443,7 @@ func (s *Store) CreateUser(ctx context.Context, create *UserMessage) (*UserMessa
 		Phone:        create.Phone,
 		CreatedAt:    create.CreatedAt,
 		Profile:      create.Profile,
+		Description:  create.Description,
 	}
 	s.cacheActiveUser(user)
 	return user, nil
@@ -474,6 +481,9 @@ func (s *Store) UpdateUser(ctx context.Context, currentUser *UserMessage, patch 
 			return nil, err
 		}
 		principalSet, principalArgs = append(principalSet, fmt.Sprintf("profile = $%d", len(principalArgs)+1)), append(principalArgs, profileBytes)
+	}
+	if v := patch.Description; v != nil {
+		principalSet, principalArgs = append(principalSet, fmt.Sprintf("description = $%d", len(principalArgs)+1)), append(principalArgs, *v)
 	}
 	principalArgs = append(principalArgs, currentUser.ID)
 

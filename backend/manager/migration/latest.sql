@@ -27,8 +27,15 @@ CREATE TABLE principal (
     -- Stored as MFAConfig (proto/store/store/user.proto)
     mfa_config jsonb NOT NULL DEFAULT '{}',
     -- Stored as UserProfile (proto/store/store/user.proto)
-    profile jsonb NOT NULL DEFAULT '{}'
+    profile jsonb NOT NULL DEFAULT '{}',
+    -- Short, user-authored self-description surfaced to agents/users in channel
+    -- and thread rosters so an agent can perceive who a user is and what they focus on.
+    description text NOT NULL DEFAULT ''
 );
+
+-- Idempotent ALTER so existing databases pick up the description column when the
+-- schema is re-applied (fresh installs already get it from CREATE TABLE above).
+ALTER TABLE principal ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';
 
 -- Setting
 CREATE TABLE setting (
