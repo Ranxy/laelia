@@ -1167,10 +1167,9 @@ export declare type ChannelMember = Message<"laelia.v1.ChannelMember"> & {
 
   /**
    * description is the member's self-description: for users it is User.description,
-   * for agents it is the agent's persona_prompt (from AgentACPConfig). Surfaced so an
-   * agent can perceive who is in a channel/thread and decide whom to address. The
-   * chattool roster may truncate it for display; use GetConversationAgentProfile for
-   * an agent's full persona_prompt.
+   * for agents it is the agent's full persona_prompt (from AgentACPConfig). Surfaced
+   * inline in the roster so an agent can perceive who is in a channel/thread — and
+   * each co-agent's persona — in a single lookup, and decide whom to address.
    *
    * @generated from field: string description = 6;
    */
@@ -1758,68 +1757,6 @@ export declare type ListChannelMembersResponse = Message<"laelia.v1.ListChannelM
  * Use `create(ListChannelMembersResponseSchema)` to create a new message.
  */
 export declare const ListChannelMembersResponseSchema: GenMessage<ListChannelMembersResponse>;
-
-/**
- * GetConversationAgentProfileRequest fetches a single co-member agent's profile
- * (title, persona_prompt, status) so an agent can read the full persona_prompt of a
- * specific agent it wants to address. The caller must be a member of the conversation.
- *
- * @generated from message laelia.v1.GetConversationAgentProfileRequest
- */
-export declare type GetConversationAgentProfileRequest = Message<"laelia.v1.GetConversationAgentProfileRequest"> & {
-  /**
-   * @generated from field: string conversation = 1;
-   */
-  conversation: string;
-
-  /**
-   * agent is the "agents/<id>" resource name of the agent whose profile to fetch.
-   *
-   * @generated from field: string agent = 2;
-   */
-  agent: string;
-};
-
-/**
- * Describes the message laelia.v1.GetConversationAgentProfileRequest.
- * Use `create(GetConversationAgentProfileRequestSchema)` to create a new message.
- */
-export declare const GetConversationAgentProfileRequestSchema: GenMessage<GetConversationAgentProfileRequest>;
-
-/**
- * AgentProfile is the full profile of one agent, returned by
- * GetConversationAgentProfile. persona_prompt is the admin-authored self-awareness
- * prompt; empty when the agent has none.
- *
- * @generated from message laelia.v1.AgentProfile
- */
-export declare type AgentProfile = Message<"laelia.v1.AgentProfile"> & {
-  /**
-   * @generated from field: string name = 1;
-   */
-  name: string;
-
-  /**
-   * @generated from field: string title = 2;
-   */
-  title: string;
-
-  /**
-   * @generated from field: string persona_prompt = 3;
-   */
-  personaPrompt: string;
-
-  /**
-   * @generated from field: string status = 4;
-   */
-  status: string;
-};
-
-/**
- * Describes the message laelia.v1.AgentProfile.
- * Use `create(AgentProfileSchema)` to create a new message.
- */
-export declare const AgentProfileSchema: GenMessage<AgentProfile>;
 
 /**
  * ListThreadParticipantsRequest lists the distinct senders (users and agents) that
@@ -4084,19 +4021,6 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof ListChannelMembersRequestSchema;
     output: typeof ListChannelMembersResponseSchema;
-  },
-  /**
-   * GetConversationAgentProfile returns a single co-member agent's full profile
-   * (title, persona_prompt, status). Intended for the agent daemon: an agent reads a
-   * specific agent's full persona_prompt before deciding to address it. The caller
-   * must be a member of the conversation.
-   *
-   * @generated from rpc laelia.v1.CommandService.GetConversationAgentProfile
-   */
-  getConversationAgentProfile: {
-    methodKind: "unary";
-    input: typeof GetConversationAgentProfileRequestSchema;
-    output: typeof AgentProfileSchema;
   },
   /**
    * ListThreadParticipants lists the distinct senders (users and agents) that posted

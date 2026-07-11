@@ -99,9 +99,6 @@ const (
 	// CommandServiceListChannelMembersProcedure is the fully-qualified name of the CommandService's
 	// ListChannelMembers RPC.
 	CommandServiceListChannelMembersProcedure = "/laelia.v1.CommandService/ListChannelMembers"
-	// CommandServiceGetConversationAgentProfileProcedure is the fully-qualified name of the
-	// CommandService's GetConversationAgentProfile RPC.
-	CommandServiceGetConversationAgentProfileProcedure = "/laelia.v1.CommandService/GetConversationAgentProfile"
 	// CommandServiceListThreadParticipantsProcedure is the fully-qualified name of the CommandService's
 	// ListThreadParticipants RPC.
 	CommandServiceListThreadParticipantsProcedure = "/laelia.v1.CommandService/ListThreadParticipants"
@@ -208,11 +205,6 @@ type CommandServiceClient interface {
 	AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.ChannelMember], error)
 	RemoveChannelMember(context.Context, *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error)
 	ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error)
-	// GetConversationAgentProfile returns a single co-member agent's full profile
-	// (title, persona_prompt, status). Intended for the agent daemon: an agent reads a
-	// specific agent's full persona_prompt before deciding to address it. The caller
-	// must be a member of the conversation.
-	GetConversationAgentProfile(context.Context, *connect.Request[v1.GetConversationAgentProfileRequest]) (*connect.Response[v1.AgentProfile], error)
 	// ListThreadParticipants lists the distinct senders (users and agents) that posted
 	// in a thread. Intended for the agent daemon. The caller must be a member of the
 	// conversation.
@@ -433,12 +425,6 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("ListChannelMembers")),
 			connect.WithClientOptions(opts...),
 		),
-		getConversationAgentProfile: connect.NewClient[v1.GetConversationAgentProfileRequest, v1.AgentProfile](
-			httpClient,
-			baseURL+CommandServiceGetConversationAgentProfileProcedure,
-			connect.WithSchema(commandServiceMethods.ByName("GetConversationAgentProfile")),
-			connect.WithClientOptions(opts...),
-		),
 		listThreadParticipants: connect.NewClient[v1.ListThreadParticipantsRequest, v1.ListThreadParticipantsResponse](
 			httpClient,
 			baseURL+CommandServiceListThreadParticipantsProcedure,
@@ -594,53 +580,52 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 
 // commandServiceClient implements CommandServiceClient.
 type commandServiceClient struct {
-	listCommands                *connect.Client[v1.ListCommandsRequest, v1.ListCommandsResponse]
-	getCommand                  *connect.Client[v1.GetCommandRequest, v1.Command]
-	cancelCommand               *connect.Client[v1.CancelCommandRequest, v1.Command]
-	watchCommand                *connect.Client[v1.WatchCommandRequest, v1.CommandOutput]
-	watchCommandEvents          *connect.Client[v1.WatchCommandEventsRequest, v1.CommandEvent]
-	respondPermission           *connect.Client[v1.RespondPermissionRequest, emptypb.Empty]
-	searchChatHistory           *connect.Client[v1.SearchChatHistoryRequest, v1.SearchChatHistoryResponse]
-	getCommandContext           *connect.Client[v1.GetCommandContextRequest, v1.GetCommandContextResponse]
-	getOrCreateConversation     *connect.Client[v1.GetOrCreateConversationRequest, v1.GetOrCreateConversationResponse]
-	listConversationMessages    *connect.Client[v1.ListConversationMessagesRequest, v1.ListConversationMessagesResponse]
-	listThreadMessages          *connect.Client[v1.ListThreadMessagesRequest, v1.ListThreadMessagesResponse]
-	listChannelThreads          *connect.Client[v1.ListChannelThreadsRequest, v1.ListChannelThreadsResponse]
-	createChannel               *connect.Client[v1.CreateChannelRequest, v1.Conversation]
-	listChannels                *connect.Client[v1.ListChannelsRequest, v1.ListChannelsResponse]
-	listChannelsForAgent        *connect.Client[v1.ListChannelsForAgentRequest, v1.ListChannelsForAgentResponse]
-	getChannel                  *connect.Client[v1.GetChannelRequest, v1.Conversation]
-	updateChannel               *connect.Client[v1.UpdateChannelRequest, v1.Conversation]
-	deleteChannel               *connect.Client[v1.DeleteChannelRequest, emptypb.Empty]
-	addChannelMember            *connect.Client[v1.AddChannelMemberRequest, v1.ChannelMember]
-	removeChannelMember         *connect.Client[v1.RemoveChannelMemberRequest, emptypb.Empty]
-	listChannelMembers          *connect.Client[v1.ListChannelMembersRequest, v1.ListChannelMembersResponse]
-	getConversationAgentProfile *connect.Client[v1.GetConversationAgentProfileRequest, v1.AgentProfile]
-	listThreadParticipants      *connect.Client[v1.ListThreadParticipantsRequest, v1.ListThreadParticipantsResponse]
-	sendMessage                 *connect.Client[v1.SendMessageRequest, v1.ChatMessage]
-	postMessage                 *connect.Client[v1.PostMessageRequest, v1.PostMessageResponse]
-	convertMessageToTask        *connect.Client[v1.ConvertMessageToTaskRequest, v1.ConvertMessageToTaskResponse]
-	listTasks                   *connect.Client[v1.ListTasksRequest, v1.ListTasksResponse]
-	createTask                  *connect.Client[v1.CreateTaskRequest, v1.CreateTaskResponse]
-	claimTask                   *connect.Client[v1.ClaimTaskRequest, v1.ClaimTaskResponse]
-	unclaimTask                 *connect.Client[v1.UnclaimTaskRequest, v1.UnclaimTaskResponse]
-	updateTaskStatus            *connect.Client[v1.UpdateTaskStatusRequest, v1.UpdateTaskStatusResponse]
-	convertMessageToReminder    *connect.Client[v1.ConvertMessageToReminderRequest, v1.ConvertMessageToReminderResponse]
-	listReminders               *connect.Client[v1.ListRemindersRequest, v1.ListRemindersResponse]
-	getReminder                 *connect.Client[v1.GetReminderRequest, v1.GetReminderResponse]
-	updateReminder              *connect.Client[v1.UpdateReminderRequest, v1.UpdateReminderResponse]
-	cancelReminder              *connect.Client[v1.CancelReminderRequest, v1.CancelReminderResponse]
-	completeReminder            *connect.Client[v1.CompleteReminderRequest, v1.CompleteReminderResponse]
-	failReminder                *connect.Client[v1.FailReminderRequest, v1.FailReminderResponse]
-	listDueReminders            *connect.Client[v1.ListDueRemindersRequest, v1.ListDueRemindersResponse]
-	listChannelUpdates          *connect.Client[v1.ListChannelUpdatesRequest, v1.ListChannelUpdatesResponse]
-	listThreadUpdates           *connect.Client[v1.ListThreadUpdatesRequest, v1.ListThreadUpdatesResponse]
-	ackProcessedVersion         *connect.Client[v1.AckProcessedVersionRequest, v1.AckProcessedVersionResponse]
-	fetchConversationActivity   *connect.Client[v1.FetchConversationActivityRequest, v1.FetchConversationActivityResponse]
-	markConversationRead        *connect.Client[v1.MarkConversationReadRequest, v1.MarkConversationReadResponse]
-	uploadFile                  *connect.Client[v1.UploadFileRequest, v1.File]
-	downloadFile                *connect.Client[v1.DownloadFileRequest, v1.DownloadFileResponse]
-	listFiles                   *connect.Client[v1.ListFilesRequest, v1.ListFilesResponse]
+	listCommands              *connect.Client[v1.ListCommandsRequest, v1.ListCommandsResponse]
+	getCommand                *connect.Client[v1.GetCommandRequest, v1.Command]
+	cancelCommand             *connect.Client[v1.CancelCommandRequest, v1.Command]
+	watchCommand              *connect.Client[v1.WatchCommandRequest, v1.CommandOutput]
+	watchCommandEvents        *connect.Client[v1.WatchCommandEventsRequest, v1.CommandEvent]
+	respondPermission         *connect.Client[v1.RespondPermissionRequest, emptypb.Empty]
+	searchChatHistory         *connect.Client[v1.SearchChatHistoryRequest, v1.SearchChatHistoryResponse]
+	getCommandContext         *connect.Client[v1.GetCommandContextRequest, v1.GetCommandContextResponse]
+	getOrCreateConversation   *connect.Client[v1.GetOrCreateConversationRequest, v1.GetOrCreateConversationResponse]
+	listConversationMessages  *connect.Client[v1.ListConversationMessagesRequest, v1.ListConversationMessagesResponse]
+	listThreadMessages        *connect.Client[v1.ListThreadMessagesRequest, v1.ListThreadMessagesResponse]
+	listChannelThreads        *connect.Client[v1.ListChannelThreadsRequest, v1.ListChannelThreadsResponse]
+	createChannel             *connect.Client[v1.CreateChannelRequest, v1.Conversation]
+	listChannels              *connect.Client[v1.ListChannelsRequest, v1.ListChannelsResponse]
+	listChannelsForAgent      *connect.Client[v1.ListChannelsForAgentRequest, v1.ListChannelsForAgentResponse]
+	getChannel                *connect.Client[v1.GetChannelRequest, v1.Conversation]
+	updateChannel             *connect.Client[v1.UpdateChannelRequest, v1.Conversation]
+	deleteChannel             *connect.Client[v1.DeleteChannelRequest, emptypb.Empty]
+	addChannelMember          *connect.Client[v1.AddChannelMemberRequest, v1.ChannelMember]
+	removeChannelMember       *connect.Client[v1.RemoveChannelMemberRequest, emptypb.Empty]
+	listChannelMembers        *connect.Client[v1.ListChannelMembersRequest, v1.ListChannelMembersResponse]
+	listThreadParticipants    *connect.Client[v1.ListThreadParticipantsRequest, v1.ListThreadParticipantsResponse]
+	sendMessage               *connect.Client[v1.SendMessageRequest, v1.ChatMessage]
+	postMessage               *connect.Client[v1.PostMessageRequest, v1.PostMessageResponse]
+	convertMessageToTask      *connect.Client[v1.ConvertMessageToTaskRequest, v1.ConvertMessageToTaskResponse]
+	listTasks                 *connect.Client[v1.ListTasksRequest, v1.ListTasksResponse]
+	createTask                *connect.Client[v1.CreateTaskRequest, v1.CreateTaskResponse]
+	claimTask                 *connect.Client[v1.ClaimTaskRequest, v1.ClaimTaskResponse]
+	unclaimTask               *connect.Client[v1.UnclaimTaskRequest, v1.UnclaimTaskResponse]
+	updateTaskStatus          *connect.Client[v1.UpdateTaskStatusRequest, v1.UpdateTaskStatusResponse]
+	convertMessageToReminder  *connect.Client[v1.ConvertMessageToReminderRequest, v1.ConvertMessageToReminderResponse]
+	listReminders             *connect.Client[v1.ListRemindersRequest, v1.ListRemindersResponse]
+	getReminder               *connect.Client[v1.GetReminderRequest, v1.GetReminderResponse]
+	updateReminder            *connect.Client[v1.UpdateReminderRequest, v1.UpdateReminderResponse]
+	cancelReminder            *connect.Client[v1.CancelReminderRequest, v1.CancelReminderResponse]
+	completeReminder          *connect.Client[v1.CompleteReminderRequest, v1.CompleteReminderResponse]
+	failReminder              *connect.Client[v1.FailReminderRequest, v1.FailReminderResponse]
+	listDueReminders          *connect.Client[v1.ListDueRemindersRequest, v1.ListDueRemindersResponse]
+	listChannelUpdates        *connect.Client[v1.ListChannelUpdatesRequest, v1.ListChannelUpdatesResponse]
+	listThreadUpdates         *connect.Client[v1.ListThreadUpdatesRequest, v1.ListThreadUpdatesResponse]
+	ackProcessedVersion       *connect.Client[v1.AckProcessedVersionRequest, v1.AckProcessedVersionResponse]
+	fetchConversationActivity *connect.Client[v1.FetchConversationActivityRequest, v1.FetchConversationActivityResponse]
+	markConversationRead      *connect.Client[v1.MarkConversationReadRequest, v1.MarkConversationReadResponse]
+	uploadFile                *connect.Client[v1.UploadFileRequest, v1.File]
+	downloadFile              *connect.Client[v1.DownloadFileRequest, v1.DownloadFileResponse]
+	listFiles                 *connect.Client[v1.ListFilesRequest, v1.ListFilesResponse]
 }
 
 // ListCommands calls laelia.v1.CommandService.ListCommands.
@@ -746,11 +731,6 @@ func (c *commandServiceClient) RemoveChannelMember(ctx context.Context, req *con
 // ListChannelMembers calls laelia.v1.CommandService.ListChannelMembers.
 func (c *commandServiceClient) ListChannelMembers(ctx context.Context, req *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error) {
 	return c.listChannelMembers.CallUnary(ctx, req)
-}
-
-// GetConversationAgentProfile calls laelia.v1.CommandService.GetConversationAgentProfile.
-func (c *commandServiceClient) GetConversationAgentProfile(ctx context.Context, req *connect.Request[v1.GetConversationAgentProfileRequest]) (*connect.Response[v1.AgentProfile], error) {
-	return c.getConversationAgentProfile.CallUnary(ctx, req)
 }
 
 // ListThreadParticipants calls laelia.v1.CommandService.ListThreadParticipants.
@@ -904,11 +884,6 @@ type CommandServiceHandler interface {
 	AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.ChannelMember], error)
 	RemoveChannelMember(context.Context, *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error)
 	ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error)
-	// GetConversationAgentProfile returns a single co-member agent's full profile
-	// (title, persona_prompt, status). Intended for the agent daemon: an agent reads a
-	// specific agent's full persona_prompt before deciding to address it. The caller
-	// must be a member of the conversation.
-	GetConversationAgentProfile(context.Context, *connect.Request[v1.GetConversationAgentProfileRequest]) (*connect.Response[v1.AgentProfile], error)
 	// ListThreadParticipants lists the distinct senders (users and agents) that posted
 	// in a thread. Intended for the agent daemon. The caller must be a member of the
 	// conversation.
@@ -1125,12 +1100,6 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("ListChannelMembers")),
 		connect.WithHandlerOptions(opts...),
 	)
-	commandServiceGetConversationAgentProfileHandler := connect.NewUnaryHandler(
-		CommandServiceGetConversationAgentProfileProcedure,
-		svc.GetConversationAgentProfile,
-		connect.WithSchema(commandServiceMethods.ByName("GetConversationAgentProfile")),
-		connect.WithHandlerOptions(opts...),
-	)
 	commandServiceListThreadParticipantsHandler := connect.NewUnaryHandler(
 		CommandServiceListThreadParticipantsProcedure,
 		svc.ListThreadParticipants,
@@ -1325,8 +1294,6 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceRemoveChannelMemberHandler.ServeHTTP(w, r)
 		case CommandServiceListChannelMembersProcedure:
 			commandServiceListChannelMembersHandler.ServeHTTP(w, r)
-		case CommandServiceGetConversationAgentProfileProcedure:
-			commandServiceGetConversationAgentProfileHandler.ServeHTTP(w, r)
 		case CommandServiceListThreadParticipantsProcedure:
 			commandServiceListThreadParticipantsHandler.ServeHTTP(w, r)
 		case CommandServiceSendMessageProcedure:
@@ -1468,10 +1435,6 @@ func (UnimplementedCommandServiceHandler) RemoveChannelMember(context.Context, *
 
 func (UnimplementedCommandServiceHandler) ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListChannelMembers is not implemented"))
-}
-
-func (UnimplementedCommandServiceHandler) GetConversationAgentProfile(context.Context, *connect.Request[v1.GetConversationAgentProfileRequest]) (*connect.Response[v1.AgentProfile], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.GetConversationAgentProfile is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) ListThreadParticipants(context.Context, *connect.Request[v1.ListThreadParticipantsRequest]) (*connect.Response[v1.ListThreadParticipantsResponse], error) {

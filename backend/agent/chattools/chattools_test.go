@@ -3,7 +3,6 @@ package chattools
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -178,41 +177,34 @@ func TestMemberRoleString(t *testing.T) {
 	assert.Equal(t, "", memberRoleString(0)) // thread participants: role not meaningful
 }
 
-func TestTruncateDescription(t *testing.T) {
-	assert.Equal(t, "", truncateDescription("   ", 140))
-	assert.Equal(t, "short bio", truncateDescription("  short bio  ", 140))
-	// Exact length is not truncated.
-	exact := strings.Repeat("a", 10)
-	assert.Equal(t, exact, truncateDescription(exact, 10))
-	// Over length is clipped with an ellipsis.
-	long := strings.Repeat("b", 20)
-	assert.Equal(t, strings.Repeat("b", 10)+"…", truncateDescription(long, 10))
-	// n<=0 means no truncation.
-	assert.Equal(t, "anything", truncateDescription("anything", 0))
-}
-
 // TestFormatMemberLine locks the roster rendering the agent reads to decide whom
-// to @mention: type, display name, role, and a short description; agents carry
-// their "agents/<id>" handle so `agent detail` can be called without reconstructing it.
+// to @mention: type, display name, agents/<id> handle for agents, role when
+// meaningful, and the member's full description as an indented block — for users
+// their self-description, for agents their complete persona_prompt (untruncated,
+// so one roster call carries every co-agent's persona).
 func TestFormatMemberLine(t *testing.T) {
-	// User owner with a description.
-	assert.Equal(t, "- [user] Alice (owner) — 后端工程师, 专注 agent 构建\n",
+	// User owner with a single-line description: header line + indented block.
+	assert.Equal(t, "- [user] Alice (owner)\n  后端工程师, 专注 agent 构建\n",
 		formatMemberLine(&v1pb.ChannelMember{
 			MemberType: 1, DisplayName: "Alice", MemberRole: 1, Description: "后端工程师, 专注 agent 构建",
 		}))
 
-	// Agent member: the agents/<id> handle appears, description truncated.
-	long := strings.Repeat("x", 200)
+	// Agent member: the agents/<id> handle appears; a multi-line persona is
+	// emitted in full, one indented line per source line — no truncation.
 	got := formatMemberLine(&v1pb.ChannelMember{
-		MemberType: 2, MemberId: "abc-123", DisplayName: "backend-bot", MemberRole: 2, Description: long,
+		MemberType: 2, MemberId: "abc-123", DisplayName: "backend-bot", MemberRole: 2,
+		Description: "精通后端, 专注构建 agent。\n前端任务请转给 @ui-expert。",
 	})
-	assert.Equal(t, "- [agent] backend-bot [agents/abc-123] (member) — "+strings.Repeat("x", 140)+"…\n", got)
+	want := "- [agent] backend-bot [agents/abc-123] (member)\n" +
+		"  精通后端, 专注构建 agent。\n" +
+		"  前端任务请转给 @ui-expert。\n"
+	assert.Equal(t, want, got)
 
 	// Thread participant: role 0 → no role parenthetical.
 	assert.Equal(t, "- [user] Bob\n",
 		formatMemberLine(&v1pb.ChannelMember{MemberType: 1, DisplayName: "Bob", MemberRole: 0}))
 
-	// No description → no trailing em dash.
+	// No description → no indented block.
 	assert.Equal(t, "- [agent] dev [agents/9] (member)\n",
 		formatMemberLine(&v1pb.ChannelMember{MemberType: 2, MemberId: "9", DisplayName: "dev", MemberRole: 2}))
 
@@ -220,25 +212,13 @@ func TestFormatMemberLine(t *testing.T) {
 	assert.Equal(t, "", formatMemberLine(nil))
 }
 
-func TestListChannelMembersRequiresConversation(t *testing.T) {
-	_, err := ListChannelMembers(context.Background(), Deps{}, ListChannelMembersInput{})
+func TestListMembersRequiresConversation(t *testing.T) {
+	// No client call is made when the conversation is missing; this is a local
+	// bootstrap error surfaced as MISSING_CONVERSATION.
+	_, err := ListMembers(context.Background(), Deps{}, ListMembersInput{})
 	e, ok := err.(*Error)
 	assert.True(t, ok)
 	assert.Equal(t, "MISSING_CONVERSATION", e.Code)
-}
-
-func TestListThreadParticipantsRequiresRoot(t *testing.T) {
-	_, err := ListThreadParticipants(context.Background(), Deps{}, ListThreadParticipantsInput{Conversation: "conversations/c"})
-	e, ok := err.(*Error)
-	assert.True(t, ok)
-	assert.Equal(t, "INVALID_ARGUMENT_FAILED", e.Code)
-}
-
-func TestGetAgentProfileRequiresAgent(t *testing.T) {
-	_, err := GetAgentProfile(context.Background(), Deps{}, GetAgentProfileInput{Conversation: "conversations/c"})
-	e, ok := err.(*Error)
-	assert.True(t, ok)
-	assert.Equal(t, "INVALID_ARGUMENT_FAILED", e.Code)
 }
 
 // TestParseFireAtTime guards the one-shot fire_at parse: empty is an error, a

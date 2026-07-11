@@ -312,42 +312,6 @@ func (s *CommandService) ListChannelMembers(ctx context.Context, req *connect.Re
 	return connect.NewResponse(&v1pb.ListChannelMembersResponse{Members: v1Members}), nil
 }
 
-// GetConversationAgentProfile returns a single co-member agent's full profile
-// (title, persona_prompt, status) so an agent can read the full persona_prompt of a
-// specific agent it wants to address. The caller must be a member of the
-// conversation; the requested agent must also be a member.
-func (s *CommandService) GetConversationAgentProfile(ctx context.Context, req *connect.Request[v1pb.GetConversationAgentProfileRequest]) (*connect.Response[v1pb.AgentProfile], error) {
-	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
-	if err != nil {
-		return nil, err
-	}
-
-	resourceID, err := common.GetAgentResourceID(req.Msg.Agent)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid agent name %q", req.Msg.Agent))
-	}
-
-	isMember, err := s.store.IsConversationMember(ctx, convID, store.MemberTypeAgent, resourceID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check agent membership"))
-	}
-	if !isMember {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %q is not a member of this conversation", req.Msg.Agent))
-	}
-
-	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
-	if err != nil || agent == nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %q not found", req.Msg.Agent))
-	}
-
-	return connect.NewResponse(&v1pb.AgentProfile{
-		Name:          fmt.Sprintf("agents/%s", resourceID),
-		Title:         agent.Name,
-		PersonaPrompt: agent.Info.GetAcpConfig().GetPersonaPrompt(),
-		Status:        agent.Status.GetState().String(),
-	}), nil
-}
-
 // ListThreadParticipants lists the distinct users and agents that posted in a
 // thread (the root message plus its replies), derived from message senders. The
 // caller must be a member of the conversation.

@@ -1,5 +1,29 @@
 # Plan: Channel/Thread Roster Awareness + User Self-Description for Agents
 
+## Revision — single `members` tool (post-implementation)
+
+After implementing the plan, the roster tool surface was collapsed from three
+tools to one. The original plan exposed `channel members` + `thread
+participants` + `agent detail` as separate tools, which forced an agent to call
+twice (roster, then `agent detail` per target) just to learn whom to @mention —
+extra reasoning steps that easily break. Since `persona_prompt` and user
+self-descriptions are short, they are now carried **inline, untruncated** in the
+roster itself. The implemented design:
+
+- One tool: `laelia-agent members <conversation> [--root <root-msg-id>]`. No
+  `--root` → channel members; with `--root` → thread participants. Server-side
+  `ListChannelMembers` and `ListThreadParticipants` RPCs remain (different data
+  sources: membership table vs message senders); the single CLI command routes
+  to the right one internally.
+- `GetConversationAgentProfile` / `AgentProfile` were **removed entirely**
+  (proto, manager handler, chattool, daemon route, CLI, prompt). Each roster
+  entry's `description` now carries the agent's full `persona_prompt` inline.
+- `ChannelMember.description` is no longer truncated for display; the chattool
+  renders it as an indented block under each member line.
+
+Parts 1/3/4/5 below describe the original three-tool design and are retained as
+the design rationale; the bullet above is the as-built surface.
+
 ## Context
 
 Today an autonomous agent in laelia has no way to see *who else is in a channel or thread*. The drain loop discovers unread messages and threads, but the agent cannot enumerate the members of a conversation, cannot read another agent's `persona_prompt`, and cannot perceive users well enough to proactively `@mention` the right person/agent for a task. Concretely:

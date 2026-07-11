@@ -22,20 +22,18 @@ const (
 	memberRoleMember int32 = 2
 )
 
-// --- Channel / thread inputs ---------------------------------------------
+// --- Members input -------------------------------------------------------
 
-type ListChannelMembersInput struct {
+// ListMembersInput scopes the roster lookup: a conversation, and optionally a
+// thread root. With Root empty the roster is the conversation's members; with
+// Root set it is the distinct senders of that thread (root + replies). One tool,
+// one call — the agent perceives who is present and each co-agent's full persona
+// in a single lookup.
+type ListMembersInput struct {
 	Conversation string `json:"conversation"`
-}
-
-type ListThreadParticipantsInput struct {
-	Conversation string `json:"conversation"`
-	Root         string `json:"root"`
-}
-
-type GetAgentProfileInput struct {
-	Conversation string `json:"conversation"`
-	Agent        string `json:"agent"`
+	// Root is an optional thread-root message id; when set, the roster is the
+	// thread's participants instead of the channel's members.
+	Root string `json:"root,omitempty"`
 }
 
 // memberTypeString renders a ChannelMember member_type for roster output.
@@ -61,22 +59,12 @@ func memberRoleString(r int32) string {
 	return ""
 }
 
-// truncateDescription clips a self-description to roughly n runes for roster
-// display, appending an ellipsis when it was truncated. The full text for
-// agents is available via GetAgentProfile; the roster only needs a preview so
-// it does not drown out the member list.
-func truncateDescription(s string, n int) string {
-	s = strings.TrimSpace(s)
-	if n <= 0 || len([]rune(s)) <= n {
-		return s
-	}
-	return string([]rune(s)[:n]) + "…"
-}
-
-// formatMemberLine renders one roster entry. Agents carry their "agents/<id>"
-// resource handle so the agent can pass it straight to `agent detail`; users
-// show only their display name and role. The description, when present,
-// follows an em dash so it reads as a short bio.
+// formatMemberLine renders one roster entry: the header line (type, display
+// name, agents/<id> handle for agents, role when meaningful), followed by the
+// member's full description as an indented block when present — for users this
+// is their self-description, for agents it is the complete persona_prompt. The
+// full text is emitted untruncated so the agent gets every co-agent's persona in
+// the one call that produced this roster.
 func formatMemberLine(m *v1pb.ChannelMember) string {
 	if m == nil {
 		return ""
@@ -88,117 +76,61 @@ func formatMemberLine(m *v1pb.ChannelMember) string {
 	if role := memberRoleString(m.MemberRole); role != "" {
 		line += fmt.Sprintf(" (%s)", role)
 	}
-	if desc := truncateDescription(m.Description, 140); desc != "" {
-		line += fmt.Sprintf(" — %s", desc)
+	line += "\n"
+	if desc := strings.TrimSpace(m.Description); desc != "" {
+		for _, l := range strings.Split(desc, "\n") {
+			line += "  " + l + "\n"
+		}
 	}
-	return line + "\n"
+	return line
 }
 
-// --- Channel / thread operations ------------------------------------------
+// --- Members operation ----------------------------------------------------
 
-// ListChannelMembers returns the roster of a conversation's users and agents
-// with a short description for each (User.description for users,
-// persona_prompt preview for agents). Run this before deciding whom to
-// @mention for a task so the addressing is grounded in who is actually present
-// and what each person does. For an agent's full persona_prompt, use
-// GetAgentProfile with the "agents/<id>" handle printed here.
-func ListChannelMembers(ctx context.Context, d Deps, in ListChannelMembersInput) (string, error) {
+// ListMembers returns the roster of a conversation's members (or, with Root, the
+// distinct senders of a thread), each with their full description inline — for
+// users their self-description, for agents their complete persona_prompt. Run
+// this before deciding whom to @mention so the addressing is grounded in who is
+// present, each person's role, and each co-agent's persona, all in one call.
+//
+// The agent only writes @<display_name> in its reply content; the manager
+// resolves the token to the member.
+func ListMembers(ctx context.Context, d Deps, in ListMembersInput) (string, error) {
 	name := normalizeConversationName(in.Conversation)
 	if name == "" {
 		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the conversation name from `laelia-agent message check`)", "")
 	}
+
+	if root := normalizeThreadRoot(in.Root); root != "" {
+		resp, err := d.Client.ListThreadParticipants(ctx, connect.NewRequest(&v1pb.ListThreadParticipantsRequest{
+			Conversation: name,
+			ThreadRoot:   root,
+		}))
+		if err != nil {
+			return "", wrapManagerError(err)
+		}
+		return formatRoster(fmt.Sprintf("Participants in thread %s of %s", root, name), resp.Msg.Members), nil
+	}
+
 	resp, err := d.Client.ListChannelMembers(ctx, connect.NewRequest(&v1pb.ListChannelMembersRequest{Conversation: name}))
 	if err != nil {
 		return "", wrapManagerError(err)
 	}
-
-	text := fmt.Sprintf("Members in %s (%d):\n", name, len(resp.Msg.Members))
-	if len(resp.Msg.Members) == 0 {
-		text += "(none)\n"
-		return text, nil
-	}
-	for _, m := range resp.Msg.Members {
-		text += formatMemberLine(m)
-	}
-	text += "\nTo address someone, write @<display_name> in your reply content (the manager resolves it). For an agent's full persona_prompt, run `laelia-agent agent detail --conversation <c> --agent agents/<id>` with the [agents/<id>] handle above.\n"
-	return text, nil
+	return formatRoster(fmt.Sprintf("Members in %s", name), resp.Msg.Members), nil
 }
 
-// ListThreadParticipants returns the distinct senders (users and agents) that
-// posted in a thread — the root message and its replies — so the agent can see
-// exactly who took part in a specific conversation thread and address them.
-// Roles are not meaningful for threads, so they are omitted.
-func ListThreadParticipants(ctx context.Context, d Deps, in ListThreadParticipantsInput) (string, error) {
-	name := normalizeConversationName(in.Conversation)
-	if name == "" {
-		return "", localError("MISSING_CONVERSATION", "conversation is required", "")
-	}
-	if in.Root == "" {
-		return "", localError("INVALID_ARGUMENT_FAILED", "root is required (the thread root message id from `thread check`)", "Pass --root <thread_root>.")
-	}
-	root := normalizeThreadRoot(in.Root)
-
-	resp, err := d.Client.ListThreadParticipants(ctx, connect.NewRequest(&v1pb.ListThreadParticipantsRequest{
-		Conversation: name,
-		ThreadRoot:   root,
-	}))
-	if err != nil {
-		return "", wrapManagerError(err)
-	}
-
-	text := fmt.Sprintf("Participants in thread %s of %s (%d):\n", root, name, len(resp.Msg.Members))
-	if len(resp.Msg.Members) == 0 {
+// formatRoster renders the shared roster body: a header with the count, one
+// formatMemberLine per member (or "(none)"), and a footer reminding the agent
+// how to address someone.
+func formatRoster(header string, members []*v1pb.ChannelMember) string {
+	text := fmt.Sprintf("%s (%d):\n", header, len(members))
+	if len(members) == 0 {
 		text += "(none)\n"
-		return text, nil
+		return text
 	}
-	for _, m := range resp.Msg.Members {
+	for _, m := range members {
 		text += formatMemberLine(m)
 	}
-	text += "\nTo address someone, write @<display_name> in your thread reply content (the manager resolves it).\n"
-	return text, nil
-}
-
-// GetAgentProfile fetches one co-member agent's full profile — title, status,
-// and the complete persona_prompt (the admin-authored self-awareness prompt)
-// — so the agent can decide how to best address a specific agent for a task.
-// Pass the "agents/<id>" handle printed by `channel members` / `thread participants`.
-func GetAgentProfile(ctx context.Context, d Deps, in GetAgentProfileInput) (string, error) {
-	name := normalizeConversationName(in.Conversation)
-	if name == "" {
-		return "", localError("MISSING_CONVERSATION", "conversation is required", "")
-	}
-	if in.Agent == "" {
-		return "", localError("INVALID_ARGUMENT_FAILED", "agent is required (the agents/<id> handle from `channel members`)", "Pass --agent agents/<id>.")
-	}
-	agent := in.Agent
-	if !strings.HasPrefix(agent, "agents/") {
-		agent = "agents/" + agent
-	}
-
-	resp, err := d.Client.GetConversationAgentProfile(ctx, connect.NewRequest(&v1pb.GetConversationAgentProfileRequest{
-		Conversation: name,
-		Agent:        agent,
-	}))
-	if err != nil {
-		return "", wrapManagerError(err)
-	}
-
-	p := resp.Msg
-	text := fmt.Sprintf("Agent profile for %s (agents/%s):\n", p.Name, strings.TrimPrefix(agent, "agents/"))
-	if p.Title != "" {
-		text += fmt.Sprintf("  title: %s\n", p.Title)
-	}
-	if p.Status != "" {
-		text += fmt.Sprintf("  status: %s\n", p.Status)
-	}
-	persona := strings.TrimSpace(p.PersonaPrompt)
-	if persona == "" {
-		text += "  persona_prompt: (none)\n"
-	} else {
-		text += "  persona_prompt:\n"
-		for _, line := range strings.Split(persona, "\n") {
-			text += fmt.Sprintf("    %s\n", line)
-		}
-	}
-	return text, nil
+	text += "\nTo address someone, write @<display_name> in your reply content (the manager resolves it). For a multi-word or spaced name, use @\"display name\".\n"
+	return text
 }

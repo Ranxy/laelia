@@ -173,9 +173,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/file/upload", s.handleFileUpload)
 	mux.HandleFunc("/file/download", s.handleFileDownload)
 	mux.HandleFunc("/file/list", s.handleFileList)
-	mux.HandleFunc("/channel/members", s.handleChannelMembers)
-	mux.HandleFunc("/thread/participants", s.handleThreadParticipants)
-	mux.HandleFunc("/agent/profile", s.handleAgentProfile)
+	mux.HandleFunc("/members", s.handleMembers)
 
 	s.httpServer = &http.Server{Handler: mux}
 	go func() {
@@ -213,12 +211,9 @@ type Request struct {
 	BaseVersion      int64  `json:"base_version,omitempty"`
 	ProcessedVersion int64  `json:"processed_version,omitempty"`
 	CommandID        string `json:"command_id,omitempty"`
-	// Root is the thread root message id, for thread read/send.
+	// Root is the thread root message id, for thread read/send and for scoping
+	// `members` to a thread's participants.
 	Root string `json:"root,omitempty"`
-	// TargetAgent is the "agents/<id>" handle of the agent whose profile to
-	// fetch (for `agent detail`). Distinct from Agent, which is the caller's
-	// own identity (the CLI overwrites Agent from env on every call).
-	TargetAgent string `json:"target_agent,omitempty"`
 	// Message is a task's full message resource name
 	// ("conversations/{c}/messages/{m}"), for the task RPCs.
 	Message string `json:"message,omitempty"`
@@ -693,30 +688,15 @@ func (s *Server) handleFileList(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleChannelMembers(w http.ResponseWriter, r *http.Request) {
+// handleMembers serves the single roster tool: conversation members when Root is
+// empty, thread participants when Root is set. Each entry carries the member's
+// full description inline, so the agent perceives who is present and each
+// co-agent's persona in one call.
+func (s *Server) handleMembers(w http.ResponseWriter, r *http.Request) {
 	s.run(w, r, func(req Request) (string, *chattools.Error) {
-		text, err := chattools.ListChannelMembers(r.Context(), s.deps(req), chattools.ListChannelMembersInput{
-			Conversation: req.Conversation,
-		})
-		return text, asChatError(err)
-	})
-}
-
-func (s *Server) handleThreadParticipants(w http.ResponseWriter, r *http.Request) {
-	s.run(w, r, func(req Request) (string, *chattools.Error) {
-		text, err := chattools.ListThreadParticipants(r.Context(), s.deps(req), chattools.ListThreadParticipantsInput{
+		text, err := chattools.ListMembers(r.Context(), s.deps(req), chattools.ListMembersInput{
 			Conversation: req.Conversation,
 			Root:         req.Root,
-		})
-		return text, asChatError(err)
-	})
-}
-
-func (s *Server) handleAgentProfile(w http.ResponseWriter, r *http.Request) {
-	s.run(w, r, func(req Request) (string, *chattools.Error) {
-		text, err := chattools.GetAgentProfile(r.Context(), s.deps(req), chattools.GetAgentProfileInput{
-			Conversation: req.Conversation,
-			Agent:        req.TargetAgent,
 		})
 		return text, asChatError(err)
 	})
