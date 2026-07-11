@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -57,10 +58,13 @@ func TestACPRequestPermissionSelectsAllowOption(t *testing.T) {
 func TestACPSessionUpdateEmitsDiffEvent(t *testing.T) {
 	status := acp.ToolCallStatusCompleted
 	exec := &ACPExecutor{
-		request:  Request{AllowDiff: true},
-		config:   &ACPConfig{SupportsDiff: true, SupportsToolTraces: true, MaxEventCount: 10},
-		outputCh: make(chan OutputChunk, 4),
-		eventCh:  make(chan Event, 4),
+		ctx:             context.Background(),
+		request:         Request{AllowDiff: true},
+		config:          &ACPConfig{SupportsDiff: true, SupportsToolTraces: true, MaxEventCount: 10},
+		outputCh:        make(chan OutputChunk, 4),
+		eventCh:         make(chan Event, 4),
+		toolCallStates:  map[string]*toolCallState{},
+		toolCallAdapter: provider.DefaultAdapter{},
 	}
 	client := &acpRuntimeClient{executor: exec}
 
@@ -423,9 +427,12 @@ func compactText(input string) string {
 
 func newTestBufferedExecutor() *ACPExecutor {
 	e := &ACPExecutor{
-		config:   &ACPConfig{OutputFlushBytes: defaultOutputFlushBytes, MaxEventCount: 10},
-		outputCh: make(chan OutputChunk, 16),
-		eventCh:  make(chan Event, 16),
+		ctx:             context.Background(),
+		config:          &ACPConfig{OutputFlushBytes: defaultOutputFlushBytes, MaxEventCount: 10},
+		outputCh:        make(chan OutputChunk, 16),
+		eventCh:         make(chan Event, 16),
+		toolCallStates:  map[string]*toolCallState{},
+		toolCallAdapter: provider.DefaultAdapter{},
 	}
 	e.client = &acpRuntimeClient{executor: e}
 	return e

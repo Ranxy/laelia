@@ -12,6 +12,11 @@ type ClaudeCodeProvider struct{}
 func (*ClaudeCodeProvider) ID() string          { return "claude-code" }
 func (*ClaudeCodeProvider) DisplayName() string { return "Claude Code" }
 
+// ToolCallAdapter returns the DefaultAdapter: claude-code sends an empty-input
+// create, then a content-only update carrying the command, then a completed
+// status update with the output.
+func (*ClaudeCodeProvider) ToolCallAdapter() ToolCallAdapter { return DefaultAdapter{} }
+
 // BuildCommand launches the ACP wrapper via npx. The package pins to latest;
 // npx caches it after the first download.
 func (*ClaudeCodeProvider) BuildCommand(_ string) (string, []string) {

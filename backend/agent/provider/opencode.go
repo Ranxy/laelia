@@ -15,6 +15,11 @@ type OpenCodeProvider struct{}
 func (*OpenCodeProvider) ID() string          { return "opencode" }
 func (*OpenCodeProvider) DisplayName() string { return "OpenCode" }
 
+// ToolCallAdapter returns the OpenCodeAdapter: opencode's create carries only
+// partial {cwd} metadata under a generic title; the real command and full
+// RawInput arrive in the first in_progress status update.
+func (*OpenCodeProvider) ToolCallAdapter() ToolCallAdapter { return OpenCodeAdapter{} }
+
 // BuildCommand mirrors the launch shape used by the executor integration test
 // (acp_executor_test.go: opencode acp --pure --cwd <workspace>).
 func (*OpenCodeProvider) BuildCommand(workspaceDir string) (string, []string) {

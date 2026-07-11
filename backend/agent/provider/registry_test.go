@@ -42,6 +42,8 @@ func (f *fakeProvider) ProbeModels(context.Context, string) ([]ModelOption, bool
 	return f.models, f.supports, nil
 }
 
+func (*fakeProvider) ToolCallAdapter() ToolCallAdapter { return DefaultAdapter{} }
+
 func TestRegistryLookup(t *testing.T) {
 	r := New(&fakeProvider{id: "opencode", display: "OpenCode"}, &fakeProvider{id: "claude-code", display: "Claude Code"})
 	if p, ok := r.Lookup("opencode"); !ok || p.ID() != "opencode" {

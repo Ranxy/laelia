@@ -20,6 +20,7 @@ import (
 	pkgerrors "github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/structpb"
 
+	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -195,9 +196,14 @@ type ACPExecutor struct {
 	toolCallStates   map[string]*toolCallState
 	sessionID        string
 	initializedAgent string
-	buffer           outputBuffer
-	rawEvents        rawEventBatch
-	permissionCh     chan acp.PermissionOptionId
+	// toolCallAdapter maps the agent's ACP ToolCall create/update frames to
+	// TOOL_CALL_STARTED/FINISHED events per its wire shape (e.g. opencode
+	// delivers the command in the first in_progress status update, not the
+	// create). Resolved once at NewACP.
+	toolCallAdapter provider.ToolCallAdapter
+	buffer          outputBuffer
+	rawEvents       rawEventBatch
+	permissionCh    chan acp.PermissionOptionId
 	// permMu guards perCommandAllow/perCommandReject. The ACP client methods
 	// may be invoked concurrently; without a lock these maps would race.
 	permMu           sync.Mutex
@@ -254,10 +260,65 @@ func NewACP(req Request, cfg *ACPConfig) (Runtime, error) {
 		perCommandAllow:  map[string]bool{},
 		perCommandReject: map[string]bool{},
 		toolCallStates:   map[string]*toolCallState{},
+		toolCallAdapter:  resolveToolCallAdapter(cfg),
 	}
 	exec.client = &acpRuntimeClient{executor: exec}
 	return exec, nil
 }
+
+// resolveToolCallAdapter picks the ToolCallAdapter for an agent's ACP wire shape
+// from the configured provider id. The provider id is authoritative when set
+// (it comes from the provider registry); when it is empty or "custom" the
+// launch command is sniffed so a legacy/unclassified binary (e.g. Rei's
+// /home/ran/.opencode/bin/opencode with Provider="") still gets the right
+// adapter. Newly configured agents always set a provider, so the sniff is only
+// a fallback for that legacy case.
+func resolveToolCallAdapter(cfg *ACPConfig) provider.ToolCallAdapter {
+	if p, ok := provider.Default().Lookup(cfg.Provider); ok {
+		return p.ToolCallAdapter()
+	}
+	if strings.Contains(filepath.Base(cfg.Executable), "opencode") {
+		return provider.OpenCodeAdapter{}
+	}
+	for _, a := range cfg.Args {
+		if strings.Contains(a, "claude-agent-acp") {
+			return provider.DefaultAdapter{}
+		}
+	}
+	return provider.DefaultAdapter{}
+}
+
+// BeginStarted claims the first TOOL_CALL_STARTED for a toolCallId. It is the
+// provider.ToolCallSink wrapper over beginToolCallStarted.
+func (e *ACPExecutor) BeginStarted(id string) (string, bool) { return e.beginToolCallStarted(id) }
+
+// EmitStarted emits a TOOL_CALL_STARTED event. provider.ToolCallSink wrapper
+// over emitToolCallStarted.
+func (e *ACPExecutor) EmitStarted(title string, rawIn *structpb.Struct, source string) {
+	e.emitToolCallStarted(title, rawIn, source)
+}
+
+// EmitFinished emits a TOOL_CALL_FINISHED event with the terminal status and
+// raw output. provider.ToolCallSink wrapper.
+func (e *ACPExecutor) EmitFinished(status string, rawOut *structpb.Struct) {
+	e.sendEvent(Event{
+		Type:    v1pb.CommandEventType_TOOL_CALL_FINISHED,
+		Summary: status,
+		ToolCallFinished: &v1pb.ToolCallFinishedPayload{
+			Status:    status,
+			RawOutput: rawOut,
+		},
+	})
+}
+
+// Payload converts an ACP RawInput/RawOutput value into the protobuf Struct
+// stored on the event (or nil when empty). provider.ToolCallSink wrapper over
+// toolPayloadStruct.
+func (*ACPExecutor) Payload(in any) *structpb.Struct { return toolPayloadStruct(in) }
+
+// ToolTracesEnabled reports whether the session opts into tool-call tracing.
+// provider.ToolCallSink wrapper.
+func (e *ACPExecutor) ToolTracesEnabled() bool { return e.config.SupportsToolTraces }
 
 func (e *ACPExecutor) Start() {
 	go e.run()
@@ -838,17 +899,12 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 				"rawInput", toJSONString(u.ToolCall.RawInput),
 				"contentCount", len(u.ToolCall.Content))
 		}
-		// Emit STARTED now only when the create already carries the tool input.
-		// Some agents (e.g. claude-code) send an empty RawInput here and deliver
-		// the actual command in a later content-only ToolCallUpdate; for those we
-		// defer the STARTED to that update rather than surfacing an empty input.
-		if c.executor.config.SupportsToolTraces {
-			if rawIn := toolPayloadStruct(u.ToolCall.RawInput); rawIn != nil {
-				if _, ok := c.executor.beginToolCallStarted(id); ok {
-					c.executor.emitToolCallStarted(u.ToolCall.Title, rawIn, "create")
-				}
-			}
-		}
+		// The adapter decides whether to emit STARTED at the create. claude-code
+		// sends an empty RawInput here and delivers the command in a later
+		// content-only update; opencode sends partial {cwd} metadata and delivers
+		// the command in the first in_progress status update. For both, emitting
+		// STARTED now would surface an empty/partial input, so the adapter defers.
+		c.executor.toolCallAdapter.OnCreate(c.executor, u.ToolCall)
 	case u.ToolCallUpdate != nil:
 		id := string(u.ToolCallUpdate.ToolCallId)
 		if debugToolCalls {
@@ -862,20 +918,12 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 				"rawOutput", toJSONString(u.ToolCallUpdate.RawOutput),
 				"contentCount", len(u.ToolCallUpdate.Content))
 		}
-		// Defer TOOL_CALL_STARTED until the tool's input is available. If the
-		// create event carried an empty RawInput (or no create was ever sent),
-		// emit the STARTED from the first content-only update that carries
-		// RawInput so the actual command is surfaced.
-		if c.executor.config.SupportsToolTraces && u.ToolCallUpdate.Status == nil {
-			if rawIn := toolPayloadStruct(u.ToolCallUpdate.RawInput); rawIn != nil {
-				if storedTitle, ok := c.executor.beginToolCallStarted(id); ok {
-					title := storedTitle
-					if u.ToolCallUpdate.Title != nil && *u.ToolCallUpdate.Title != "" {
-						title = *u.ToolCallUpdate.Title
-					}
-					c.executor.emitToolCallStarted(title, rawIn, "update")
-				}
-			}
+		// A content-only update (Status==nil) may carry the tool input for agents
+		// that send an empty/partial create (e.g. claude-code); the adapter emits
+		// the deferred STARTED from it. Status updates are handled after the
+		// content loop below so output streams before the FINISHED.
+		if u.ToolCallUpdate.Status == nil {
+			c.executor.toolCallAdapter.OnContentUpdate(c.executor, u.ToolCallUpdate)
 		}
 		for _, content := range u.ToolCallUpdate.Content {
 			if content.Content != nil {
@@ -904,22 +952,13 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 		if u.ToolCallUpdate.Status != nil {
 			c.executor.rawEvents.append(c.executor, "tool_call_update", toJSONMap(u.ToolCallUpdate))
 		}
-		if c.executor.config.SupportsToolTraces && u.ToolCallUpdate.Status != nil {
-			// If no STARTED was ever emitted (no create and no content-only
-			// RawInput), emit a late STARTED so every tool call has a
-			// STARTED+FINISHED pair; the input is empty and the frontend shows
-			// its "Input not captured" fallback.
-			if storedTitle, ok := c.executor.beginToolCallStarted(id); ok {
-				c.executor.emitToolCallStarted(storedTitle, nil, "late")
-			}
-			c.executor.sendEvent(Event{
-				Type:    v1pb.CommandEventType_TOOL_CALL_FINISHED,
-				Summary: string(*u.ToolCallUpdate.Status),
-				ToolCallFinished: &v1pb.ToolCallFinishedPayload{
-					Status:    string(*u.ToolCallUpdate.Status),
-					RawOutput: toolPayloadStruct(u.ToolCallUpdate.RawOutput),
-				},
-			})
+		if u.ToolCallUpdate.Status != nil {
+			// The adapter emits a late STARTED if none was emitted yet (using
+			// this update's RawInput when present, e.g. opencode's in_progress
+			// update carrying the command) and a FINISHED only on terminal
+			// status — so repeated in_progress updates no longer orphan the
+			// real completed event.
+			c.executor.toolCallAdapter.OnStatusUpdate(c.executor, u.ToolCallUpdate)
 		}
 	case u.Plan != nil:
 		c.executor.buffer.flush(c.executor)

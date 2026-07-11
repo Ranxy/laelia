@@ -49,6 +49,11 @@ type Provider interface {
 	// all, and any error. An empty list with supportsConfigOption=true means
 	// the agent advertised a model selector but exposed no options.
 	ProbeModels(ctx context.Context, workspaceDir string) (models []ModelOption, supportsConfigOption bool, err error)
+	// ToolCallAdapter returns the adapter that maps this provider's ACP ToolCall
+	// create/update frames to laelia TOOL_CALL_STARTED/FINISHED events. It
+	// encodes the provider's tool-call wire shape so the executor can record
+	// events correctly per agent.
+	ToolCallAdapter() ToolCallAdapter
 }
 
 // Detected is the cheap, spawn-free result of Detect.
