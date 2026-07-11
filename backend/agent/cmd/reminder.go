@@ -94,7 +94,7 @@ var reminderListCmd = &cobra.Command{
 // due reminder by doing its work and calling `reminder complete`/`fail`.
 var reminderListDueCmd = &cobra.Command{
 	Use:   "list-due",
-	Short: "List the DUE reminders owned by you (run at the start of every session)",
+	Short: "List the DUE reminders owned by you (cold-start step 0; warm turns are nudged by the turn batch)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 0, args) {
 			return ErrCLIFailed
