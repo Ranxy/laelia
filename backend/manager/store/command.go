@@ -150,6 +150,30 @@ func (s *Store) LinkCommandConversation(ctx context.Context, commandID, conversa
 	return nil
 }
 
+// IsCommandConversationMember reports whether the given caller is a member of
+// ANY conversation linked to the command via the command_conversation junction.
+// A multi-channel drain turn may link its command to several conversations, so
+// command access must be granted to a member of any of them — not just the
+// first-wins "primary" stored on command.conversation_id. The junction is
+// always populated alongside that column (LinkCommandConversation writes both),
+// so this query also covers the primary; callers need not check the column
+// separately.
+func (s *Store) IsCommandConversationMember(ctx context.Context, commandID uuid.UUID, memberType int32, memberID string) (bool, error) {
+	var exists bool
+	err := s.GetDB().QueryRowContext(ctx, `
+		SELECT EXISTS(
+			SELECT 1
+			FROM command_conversation cc
+			JOIN conversation_member cm ON cm.conversation_id = cc.conversation_id
+			WHERE cc.command_id = $1 AND cm.member_type = $2 AND cm.member_id = $3
+		)
+	`, commandID, memberType, memberID).Scan(&exists)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to check command conversation membership")
+	}
+	return exists, nil
+}
+
 func (s *Store) GetCommand(ctx context.Context, id uuid.UUID) (*CommandMessage, error) {
 	query := `SELECT
 		c.id, c.agent_id, c.principal_id, c.command, c.instruction, c.profile, c.allow_diff, c.status,

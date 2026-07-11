@@ -91,9 +91,12 @@ func requireChannelOwner(ctx context.Context, stores *store.Store, conv *store.C
 // Access is granted to:
 //   - the agent that owns the command (agents read their own command output),
 //   - a workspace admin,
-//   - any member of the conversation the command is linked to.
+//   - any member of a conversation the command is linked to.
 //
-// Commands without a linked conversation (e.g. a not-yet-linked autonomous
+// A multi-channel drain turn may link its command to several conversations via
+// command_conversation, so membership is checked against ANY linked
+// conversation — not just the first-wins "primary" on command.conversation_id.
+// Commands without any linked conversation (e.g. a not-yet-linked autonomous
 // session) are only accessible to the owning agent or an admin.
 func requireCommandAccess(ctx context.Context, stores *store.Store, cmd *store.CommandMessage) error {
 	agent, _ := GetAgentFromContext(ctx)
@@ -112,18 +115,19 @@ func requireCommandAccess(ctx context.Context, stores *store.Store, cmd *store.C
 		}
 	}
 
-	if cmd.ConversationID != nil {
-		memberType, memberID, ok := callerMemberInfo(user, agent)
-		if !ok {
-			return connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
-		}
-		isMember, err := stores.IsConversationMember(ctx, *cmd.ConversationID, memberType, memberID)
-		if err != nil {
-			return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check conversation membership"))
-		}
-		if isMember {
-			return nil
-		}
+	memberType, memberID, ok := callerMemberInfo(user, agent)
+	if !ok {
+		return connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	// Grant access if the caller is a member of any conversation this command
+	// touched (junction-linked). Covers the primary too, since the junction is
+	// always populated alongside command.conversation_id.
+	isMember, err := stores.IsCommandConversationMember(ctx, cmd.ID, memberType, memberID)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check command conversation membership"))
+	}
+	if isMember {
+		return nil
 	}
 
 	return connect.NewError(connect.CodePermissionDenied, errors.New("no access to command"))
