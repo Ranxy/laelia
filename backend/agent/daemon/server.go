@@ -173,6 +173,9 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/file/upload", s.handleFileUpload)
 	mux.HandleFunc("/file/download", s.handleFileDownload)
 	mux.HandleFunc("/file/list", s.handleFileList)
+	mux.HandleFunc("/channel/members", s.handleChannelMembers)
+	mux.HandleFunc("/thread/participants", s.handleThreadParticipants)
+	mux.HandleFunc("/agent/profile", s.handleAgentProfile)
 
 	s.httpServer = &http.Server{Handler: mux}
 	go func() {
@@ -212,6 +215,10 @@ type Request struct {
 	CommandID        string `json:"command_id,omitempty"`
 	// Root is the thread root message id, for thread read/send.
 	Root string `json:"root,omitempty"`
+	// TargetAgent is the "agents/<id>" handle of the agent whose profile to
+	// fetch (for `agent detail`). Distinct from Agent, which is the caller's
+	// own identity (the CLI overwrites Agent from env on every call).
+	TargetAgent string `json:"target_agent,omitempty"`
 	// Message is a task's full message resource name
 	// ("conversations/{c}/messages/{m}"), for the task RPCs.
 	Message string `json:"message,omitempty"`
@@ -681,6 +688,35 @@ func (s *Server) handleFileList(w http.ResponseWriter, r *http.Request) {
 	s.run(w, r, func(req Request) (string, *chattools.Error) {
 		text, err := chattools.ListFiles(r.Context(), s.deps(req), chattools.ListFilesInput{
 			Conversation: req.Conversation,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleChannelMembers(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.ListChannelMembers(r.Context(), s.deps(req), chattools.ListChannelMembersInput{
+			Conversation: req.Conversation,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleThreadParticipants(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.ListThreadParticipants(r.Context(), s.deps(req), chattools.ListThreadParticipantsInput{
+			Conversation: req.Conversation,
+			Root:         req.Root,
+		})
+		return text, asChatError(err)
+	})
+}
+
+func (s *Server) handleAgentProfile(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.GetAgentProfile(r.Context(), s.deps(req), chattools.GetAgentProfileInput{
+			Conversation: req.Conversation,
+			Agent:        req.TargetAgent,
 		})
 		return text, asChatError(err)
 	})

@@ -8,7 +8,7 @@ import (
 
 func init() {
 	rootCmd.AddCommand(threadCmd)
-	threadCmd.AddCommand(threadCheckCmd, threadReadCmd, threadSendCmd)
+	threadCmd.AddCommand(threadCheckCmd, threadReadCmd, threadSendCmd, threadParticipantsCmd)
 }
 
 var threadCmd = &cobra.Command{
@@ -111,4 +111,33 @@ func init() {
 	threadSendCmd.Flags().StringVar(&threadSendContent, "content", "", "reply text; \"-\" reads from stdin")
 	threadSendCmd.Flags().Int64Var(&threadSendBaseVersion, "base-version", 0, "room version the reply is based on (from `thread read` current_version)")
 	threadSendCmd.Flags().StringArrayVar(&threadSendAttachments, "attach", nil, "file id to attach to this reply (repeatable); the file must already be uploaded to this conversation via `file upload --conversation`")
+
+	// thread participants <conversation> --root <root-msg-id>
+	threadParticipantsCmd.Flags().StringVar(&threadParticipantsRoot, "root", "", "thread root message id (required, from `thread check`)")
+}
+
+// thread participants <conversation> --root <root-msg-id> lists the distinct
+// senders (users and agents) that posted in a thread, so the agent can see who
+// took part in that specific conversation thread.
+var threadParticipantsRoot string
+
+var threadParticipantsCmd = &cobra.Command{
+	Use:   "participants <conversation>",
+	Short: "List the distinct senders (users and agents) that posted in a thread",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if !requireArgs(cmd, 1, args) {
+			return ErrCLIFailed
+		}
+		if threadParticipantsRoot == "" {
+			printError("INVALID_ARGUMENT_FAILED", "--root is required", "Pass --root <thread_root> from `thread check`.")
+			return ErrCLIFailed
+		}
+		if !call("/thread/participants", daemonsrv.Request{
+			Conversation: args[0],
+			Root:         threadParticipantsRoot,
+		}) {
+			return ErrCLIFailed
+		}
+		return nil
+	},
 }
