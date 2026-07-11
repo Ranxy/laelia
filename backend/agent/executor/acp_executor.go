@@ -562,13 +562,10 @@ func (e *ACPExecutor) run() {
 // is not wasted; a cold turn with no batch just primes the session for future
 // notifications.
 func (e *ACPExecutor) turnPromptText(resumed bool) string {
-	// TurnPrompt is the drain-loop batch. Direct callers (e.g. integration
-	// tests) may set Instruction instead; honor it as a fallback so those paths
-	// still reach the LLM without every caller knowing about TurnPrompt.
+	// TurnPrompt is the "New messages received:" batch the drain loop assembled
+	// for this turn; empty means no new work surfaced (cold start with an idle
+	// inbox), in which case the init prompt alone primes the session.
 	batch := strings.TrimSpace(e.request.TurnPrompt)
-	if batch == "" {
-		batch = strings.TrimSpace(e.request.Instruction)
-	}
 	if resumed {
 		return batch
 	}

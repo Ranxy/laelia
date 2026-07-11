@@ -233,7 +233,7 @@ func TestACPExecutorWithOpencodeReadFile(t *testing.T) {
 
 	runtime, err := NewACP(Request{
 		CommandID:      "read-file",
-		Instruction:    "Read the file context.txt in the current workspace and reply with exactly its contents. Do not add quotes or any extra words.",
+		TurnPrompt:     "Read the file context.txt in the current workspace and reply with exactly its contents. Do not add quotes or any extra words.",
 		WorkingDir:     workspace,
 		TimeoutSeconds: 120,
 	}, newOpencodeTestConfig(bin, workspace, false))
@@ -259,7 +259,7 @@ func TestACPExecutorWithOpencodeWriteFile(t *testing.T) {
 
 	runtime, err := NewACP(Request{
 		CommandID:      "write-file",
-		Instruction:    "Use your file editing tool to replace the entire contents of note.txt with exactly LAELIA_WRITE_OK. After the write succeeds, reply with exactly DONE.",
+		TurnPrompt:     "Use your file editing tool to replace the entire contents of note.txt with exactly LAELIA_WRITE_OK. After the write succeeds, reply with exactly DONE.",
 		WorkingDir:     workspace,
 		TimeoutSeconds: 120,
 		AllowDiff:      true,

@@ -51,7 +51,7 @@ func TestACPExecutorColdThenWarmResumesSession(t *testing.T) {
 	coldRuntime, err := NewACP(Request{
 		CommandID:      "resume-cold",
 		AgentID:        agentID,
-		Instruction:    "Read the file secret.txt in the current workspace and reply with exactly its contents. Do not add quotes or any extra words.",
+		TurnPrompt:     "Read the file secret.txt in the current workspace and reply with exactly its contents. Do not add quotes or any extra words.",
 		WorkingDir:     workspace,
 		TimeoutSeconds: 120,
 	}, newOpencodeTestConfig(bin, workspace, false))
@@ -73,7 +73,7 @@ func TestACPExecutorColdThenWarmResumesSession(t *testing.T) {
 	warmRuntime, err := NewACP(Request{
 		CommandID:      "resume-warm",
 		AgentID:        agentID,
-		Instruction:    "Reply with exactly the single secret word I told you earlier in this conversation, nothing else. Do not read any file.",
+		TurnPrompt:     "Reply with exactly the single secret word I told you earlier in this conversation, nothing else. Do not read any file.",
 		WorkingDir:     workspace,
 		TimeoutSeconds: 120,
 	}, newOpencodeTestConfig(bin, workspace, false))

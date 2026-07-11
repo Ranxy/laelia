@@ -643,7 +643,6 @@ func drainOutput(
 func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime, error) {
 	return executor.NewACP(executor.Request{
 		CommandID:        req.CommandId,
-		Instruction:      req.Instruction,
 		TurnPrompt:       req.Instruction,
 		Profile:          req.Profile,
 		WorkingDir:       req.WorkingDir,

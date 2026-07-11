@@ -12,7 +12,6 @@ const outputBufferSize = 1024
 
 type Request struct {
 	CommandID        string
-	Instruction      string
 	Profile          string
 	WorkingDir       string
 	Env              map[string]string
