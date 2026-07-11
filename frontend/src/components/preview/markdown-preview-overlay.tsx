@@ -179,7 +179,7 @@ export function MarkdownPreviewOverlay() {
                 final
                 fade
                 batchRendering
-                deferNodesUntilVisible
+                deferNodesUntilVisible={false}
               />
             </div>
           )}
