@@ -17,10 +17,10 @@ import (
 // into the canonical "conversations/<id>" / "conversations/<id>/messages/<m>"
 // resource names the manager expects, creating DMs if absent.
 //
-// The resolver is the input-side counterpart of turn_batch's address formatter
-// (resolveChannelTarget): output emits "<address>", input accepts "<address>".
-// Mid-refactor the agent still holds legacy "conversations/<id>" handles, so
-// any unrecognized form falls through to normalizeConversationName unchanged.
+// The resolver is the input-side counterpart of conversationAddress (also in
+// this file): output emits "<address>", input accepts "<address>". Mid-refactor
+// the agent still holds legacy "conversations/<id>" handles, so any
+// unrecognized form falls through to normalizeConversationName unchanged.
 
 // resolveConversationAddress turns a conversation address into the canonical
 // "conversations/<id>" resource name. "#<title>" resolves (never creates) a
@@ -226,4 +226,46 @@ func bareRootID(root string) string {
 		return msgID
 	}
 	return strings.TrimSpace(convAddr)
+}
+
+// conversationAddress renders the canonical display address ("#<title>",
+// "dm:@<peer>") for a conversation given its "conversations/<id>" resource name,
+// by looking it up via GetChannel and reading the manager-populated Address
+// field (the single source of truth for the grammar — it already encodes the
+// type-3 agent-DM peer). It is the emit-side counterpart of
+// resolveConversationAddress. A lookup failure or an empty address falls back to
+// the resource name so an emit site never breaks the agent's ability to act on
+// the handle: the resolver accepts the legacy "conversations/<id>" form, and a
+// "<name>:<uuid>" message handle built from a fallback name round-trips through
+// splitMessageAddress because the message id is a UUID.
+func conversationAddress(ctx context.Context, d Deps, name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	resp, err := d.Client.GetChannel(ctx, connect.NewRequest(&v1pb.GetChannelRequest{Name: name}))
+	if err != nil {
+		return name
+	}
+	if addr := strings.TrimSpace(resp.Msg.GetAddress()); addr != "" {
+		return addr
+	}
+	return name
+}
+
+// messageHandle renders the message handle an agent copies from output into
+// task/reminder/thread commands: "<address>:<message-id>" when addr is a real
+// address, or the legacy "<conversations/<id>>/messages/<message-id>" form when
+// addr fell back to a resource name (e.g. GetChannel failed). Either form
+// round-trips through the resolver. Returns "" when either part is empty.
+func messageHandle(addr, messageID string) string {
+	addr = strings.TrimSpace(addr)
+	messageID = strings.TrimSpace(messageID)
+	if addr == "" || messageID == "" {
+		return ""
+	}
+	if strings.HasPrefix(addr, "conversations/") {
+		return addr + "/messages/" + messageID
+	}
+	return addr + ":" + messageID
 }

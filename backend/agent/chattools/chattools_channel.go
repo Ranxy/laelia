@@ -101,7 +101,7 @@ func ListMembers(ctx context.Context, d Deps, in ListMembersInput) (string, erro
 		return "", err
 	}
 	if name == "" {
-		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the conversation name from `laelia-agent message check`)", "")
+		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the address from the batch header or `laelia-agent message check`, e.g. #general or dm:@alice)", "")
 	}
 
 	if root := bareRootID(in.Root); root != "" {
@@ -112,14 +112,14 @@ func ListMembers(ctx context.Context, d Deps, in ListMembersInput) (string, erro
 		if err != nil {
 			return "", wrapManagerError(err)
 		}
-		return formatRoster(fmt.Sprintf("Participants in thread %s of %s", root, name), resp.Msg.Members), nil
+		return formatRoster(fmt.Sprintf("Participants in thread %s of %s", root, conversationAddress(ctx, d, name)), resp.Msg.Members), nil
 	}
 
 	resp, err := d.Client.ListChannelMembers(ctx, connect.NewRequest(&v1pb.ListChannelMembersRequest{Conversation: name}))
 	if err != nil {
 		return "", wrapManagerError(err)
 	}
-	return formatRoster(fmt.Sprintf("Members in %s", name), resp.Msg.Members), nil
+	return formatRoster(fmt.Sprintf("Members in %s", conversationAddress(ctx, d, name)), resp.Msg.Members), nil
 }
 
 // formatRoster renders the shared roster body: a header with the count, one

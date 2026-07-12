@@ -140,20 +140,21 @@ func formatCommentAnchor(a *v1pb.Attachment) string {
 
 // formatMessageLine renders one message for the text output. Own messages are
 // tagged "(YOU)" so the agent can recognize its own past messages at a glance
-// and avoid replying to itself. The full message resource name and its room
-// version follow on an indented line so the agent can pass the message straight
-// to commands that need it (`reminder convert`, `task claim`/`review`/`done`)
-// without reconstructing it from the conversation id. Any attachments follow on
+// and avoid replying to itself. The message handle ("<address>:<message-id>" or
+// the legacy "conversations/<c>/messages/<m>" when the address could not be
+// resolved) and its room version follow on an indented line so the agent can
+// pass the message straight to commands that need it (`reminder convert`, `task
+// claim`/`review`/`done`) without reconstructing it. Any attachments follow on
 // further indented lines. messageID empty (e.g. a synthetic listing) omits the
 // handle line.
-func formatMessageLine(timestamp, senderName, senderType string, isOwn bool, conversationID, messageID string, version int64, content string, attachments []*v1pb.Attachment) string {
+func formatMessageLine(timestamp, senderName, senderType string, isOwn bool, conversationAddr, messageID string, version int64, content string, attachments []*v1pb.Attachment) string {
 	senderTag := senderType
 	if isOwn {
 		senderTag += ", YOU"
 	}
 	out := fmt.Sprintf("[%s] %s (%s): %s\n", timestamp, senderName, senderTag, content)
-	if messageID != "" {
-		out += fmt.Sprintf("  message: conversations/%s/messages/%s  version: %d\n", conversationID, messageID, version)
+	if handle := messageHandle(conversationAddr, messageID); handle != "" {
+		out += fmt.Sprintf("  message: %s  version: %d\n", handle, version)
 	}
 	return out + formatAttachments(attachments)
 }
@@ -236,11 +237,19 @@ func SearchChatHistory(ctx context.Context, d Deps, in SearchChatHistoryInput) (
 		text += " (more results available — use page_token to continue)"
 	}
 	text += ":\n"
+	// Entries may span conversations, so resolve each one's address once
+	// (cached by conversation name to bound the GetChannel calls).
+	addrs := make(map[string]string)
 	for _, e := range resp.Msg.Entries {
+		addr, ok := addrs[e.GetConversation()]
+		if !ok {
+			addr = conversationAddress(ctx, d, e.GetConversation())
+			addrs[e.GetConversation()] = addr
+		}
 		text += formatMessageLine(
 			e.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
 			e.SenderName, senderTypeString(e.SenderType), e.IsOwn,
-			e.Conversation, e.Name, e.RoomVersion, e.Content, e.Attachments,
+			addr, e.Name, e.RoomVersion, e.Content, e.Attachments,
 		)
 	}
 	return text, nil
@@ -287,7 +296,7 @@ func GetConversationMessages(ctx context.Context, d Deps, in GetConversationMess
 		return "", err
 	}
 	if name == "" {
-		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the conversation name from `laelia-agent message check`)", "")
+		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the address from the batch header or `laelia-agent message check`, e.g. #general or dm:@alice)", "")
 	}
 
 	direction := in.Direction
@@ -295,7 +304,7 @@ func GetConversationMessages(ctx context.Context, d Deps, in GetConversationMess
 		direction = "after"
 	}
 	if direction != "before" && direction != "after" {
-		return "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("direction must be \"before\" or \"after\", got %q", direction), "Use --after or --before.")
+		return "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("direction must be \"before\" or \"after\", got %q", direction), "Use --before, or omit it for the default after direction.")
 	}
 
 	limit := in.Limit
@@ -323,11 +332,12 @@ func GetConversationMessages(ctx context.Context, d Deps, in GetConversationMess
 	if len(resp.Msg.Messages) == 0 {
 		text += "(no messages)\n"
 	} else {
+		addr := conversationAddress(ctx, d, name)
 		for _, m := range resp.Msg.Messages {
 			text += formatMessageLine(
 				m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
 				m.SenderName, senderTypeString(m.SenderType), m.IsOwn,
-				m.Conversation, m.Name, m.RoomVersion, m.Content, m.Attachments,
+				addr, m.Name, m.RoomVersion, m.Content, m.Attachments,
 			)
 		}
 		if direction == "before" && len(resp.Msg.Messages) == limit {
@@ -348,7 +358,7 @@ func PostMessage(ctx context.Context, d Deps, in PostMessageInput) (string, erro
 		return "", err
 	}
 	if name == "" {
-		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the conversation name from `laelia-agent message check`)", "")
+		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the address from the batch header or `laelia-agent message check`, e.g. #general or dm:@alice)", "")
 	}
 
 	// Build id-only attachment references; the manager resolves each id to full
@@ -379,6 +389,7 @@ func PostMessage(ctx context.Context, d Deps, in PostMessageInput) (string, erro
 	}
 
 	text := resp.Msg.ConflictDescription + "\nNew messages:\n"
+	addr := conversationAddress(ctx, d, name)
 	if len(resp.Msg.NewMessages) == 0 {
 		text += "(no new messages)\n"
 	} else {
@@ -387,11 +398,11 @@ func PostMessage(ctx context.Context, d Deps, in PostMessageInput) (string, erro
 			if m.CreatedAt != nil {
 				ts = m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z")
 			}
-			text += formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Conversation, m.Name, m.RoomVersion, m.Content, m.Attachments)
+			text += formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, addr, m.Name, m.RoomVersion, m.Content, m.Attachments)
 		}
 	}
-	text += fmt.Sprintf("\nTo resolve: call `laelia-agent message read %s --version %d --after` to get full context, then call `laelia-agent message send` again with --base-version %d.",
-		name, resp.Msg.CurrentVersion, resp.Msg.CurrentVersion)
+	text += fmt.Sprintf("\nTo resolve: call `laelia-agent message read %s --version %d` to get full context, then call `laelia-agent message send` again with --base-version %d.",
+		addr, resp.Msg.CurrentVersion, resp.Msg.CurrentVersion)
 	return text, nil
 }
 
@@ -410,9 +421,9 @@ func ListChannelUpdates(ctx context.Context, d Deps) (string, error) {
 	} else {
 		for _, u := range resp.Msg.Updates {
 			text += fmt.Sprintf("- %s: %d new (current_version=%d, your processed_version=%d)\n",
-				u.Conversation, u.NewMessageCount, u.CurrentVersion, u.ProcessedVersion)
+				conversationAddress(ctx, d, u.GetConversation()), u.NewMessageCount, u.CurrentVersion, u.ProcessedVersion)
 		}
-		text += "\nPick ONE channel. Call `laelia-agent message read <conversation> --version <processed_version> --after` to read the new messages.\n"
+		text += "\nPick ONE channel. Call `laelia-agent message read <address> --version <processed_version>` to read the new messages.\n"
 	}
 	return text, nil
 }
@@ -441,7 +452,7 @@ func AckProcessedVersion(ctx context.Context, d Deps, in AckProcessedVersionInpu
 	if err != nil {
 		return "", wrapManagerError(err)
 	}
-	return fmt.Sprintf("Cursor advanced to processed_version=%d for %s.", resp.Msg.ProcessedVersion, name), nil
+	return fmt.Sprintf("Cursor advanced to processed_version=%d for %s.", resp.Msg.ProcessedVersion, conversationAddress(ctx, d, name)), nil
 }
 
 // UploadFile uploads a blob to S3 via the manager. Returns the canonical text
@@ -510,7 +521,7 @@ func ListFiles(ctx context.Context, d Deps, in ListFilesInput) (string, error) {
 	if err != nil {
 		return "", wrapManagerError(err)
 	}
-	text := fmt.Sprintf("Files in %s (%d):\n", name, len(resp.Msg.Files))
+	text := fmt.Sprintf("Files in %s (%d):\n", conversationAddress(ctx, d, name), len(resp.Msg.Files))
 	if len(resp.Msg.Files) == 0 {
 		text += "(none)\n"
 		return text, nil
@@ -561,11 +572,20 @@ func ListThreadUpdates(ctx context.Context, d Deps, _ ListThreadUpdatesInput) (s
 		text += "(none — no subscribed thread has new replies)\n"
 		return text, nil
 	}
+	// Multiple threads may share a conversation; resolve each conversation's
+	// address once (cached by name to bound the GetChannel calls).
+	addrs := make(map[string]string)
 	for _, u := range resp.Msg.Updates {
+		conv := u.GetConversation()
+		addr, ok := addrs[conv]
+		if !ok {
+			addr = conversationAddress(ctx, d, conv)
+			addrs[conv] = addr
+		}
 		text += fmt.Sprintf("- %s thread %s: %d new replies (latest_version=%d)\n",
-			u.Conversation, u.ThreadRoot, u.NewReplyCount, u.LatestVersion)
+			addr, u.GetThreadRoot(), u.NewReplyCount, u.LatestVersion)
 	}
-	text += "\nFor each thread, call `laelia-agent thread read <conversation> --root <thread_root> --version <your processed_version for that conversation>` (default direction returns replies newer than that version) to read the new replies, then reply with `laelia-agent thread send` if you should respond.\n"
+	text += "\nFor each thread, call `laelia-agent thread read <address> --root <thread-root> --version <your processed_version for that conversation>` to read the new replies, then reply with `laelia-agent thread send <address> --root <thread-root>` if you should respond.\n"
 	return text, nil
 }
 
@@ -593,7 +613,7 @@ func GetThreadMessages(ctx context.Context, d Deps, in GetThreadMessagesInput) (
 		direction = "after"
 	}
 	if direction != "before" && direction != "after" {
-		return "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("direction must be \"before\" or \"after\", got %q", direction), "Use --after or --before.")
+		return "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("direction must be \"before\" or \"after\", got %q", direction), "Use --before, or omit it for the default after direction.")
 	}
 
 	limit := in.Limit
@@ -624,10 +644,13 @@ func GetThreadMessages(ctx context.Context, d Deps, in GetThreadMessagesInput) (
 		return text, nil
 	}
 	// The first message is the thread root (context); label it so the agent
-	// distinguishes the root from the replies it must respond to.
+	// distinguishes the root from the replies it must respond to. All replies
+	// share the thread's conversation address; the root's own handle carries
+	// the root id.
+	addr := conversationAddress(ctx, d, name)
 	for i, m := range resp.Msg.Messages {
 		ts := m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z")
-		line := formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Conversation, m.Name, m.RoomVersion, m.Content, m.Attachments)
+		line := formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, addr, m.Name, m.RoomVersion, m.Content, m.Attachments)
 		if i == 0 {
 			text += "[ROOT] " + line
 		} else {
@@ -683,6 +706,7 @@ func PostThreadMessage(ctx context.Context, d Deps, in PostThreadMessageInput) (
 	}
 
 	text := resp.Msg.ConflictDescription + "\nNew messages:\n"
+	addr := conversationAddress(ctx, d, name)
 	if len(resp.Msg.NewMessages) == 0 {
 		text += "(no new messages)\n"
 	} else {
@@ -691,10 +715,10 @@ func PostThreadMessage(ctx context.Context, d Deps, in PostThreadMessageInput) (
 			if m.CreatedAt != nil {
 				ts = m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z")
 			}
-			text += formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, m.Conversation, m.Name, m.RoomVersion, m.Content, m.Attachments)
+			text += formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, addr, m.Name, m.RoomVersion, m.Content, m.Attachments)
 		}
 	}
 	text += fmt.Sprintf("\nTo resolve: call `laelia-agent thread read %s --root %s --version %d` to get full context, then call `laelia-agent thread send` again with --base-version %d.",
-		name, in.Root, resp.Msg.CurrentVersion, resp.Msg.CurrentVersion)
+		addr, root, resp.Msg.CurrentVersion, resp.Msg.CurrentVersion)
 	return text, nil
 }

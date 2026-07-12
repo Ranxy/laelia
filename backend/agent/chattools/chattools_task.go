@@ -69,11 +69,13 @@ func taskStatusString(s v1pb.TaskStatus) string {
 	return "UNSPECIFIED"
 }
 
-// formatTaskLine renders one task for `task list` output: the full message
-// resource name (so the agent can pass it straight to `task claim`/`review`/
-// `done`), the task number, status, assignee, and a one-line content excerpt.
-func formatTaskLine(m *v1pb.ChatMessage) string {
-	name := fmt.Sprintf("conversations/%s/messages/%s", m.Conversation, m.Name)
+// formatTaskLine renders one task for `task list` output: the message handle
+// "<address>:<message-id>" (so the agent can pass it straight to `task claim`/
+// `review`/`done`), the task number, status, assignee, and a one-line content
+// excerpt. addr is the conversation's display address (resolved once by the
+// caller since every task in a listing shares one conversation).
+func formatTaskLine(addr string, m *v1pb.ChatMessage) string {
+	handle := messageHandle(addr, m.GetName())
 	assignee := "none"
 	if m.Task != nil && m.Task.AssigneeName != "" {
 		assignee = m.Task.AssigneeName
@@ -84,7 +86,7 @@ func formatTaskLine(m *v1pb.ChatMessage) string {
 		title = string([]rune(title)[:80]) + "…"
 	}
 	return fmt.Sprintf("- %s  #%d  status=%s  assignee=%s  %s\n",
-		name, m.Task.GetTaskNumber(), taskStatusString(m.Task.GetStatus()), assignee, title)
+		handle, m.Task.GetTaskNumber(), taskStatusString(m.Task.GetStatus()), assignee, title)
 }
 
 // --- Task operations ------------------------------------------------------
@@ -100,7 +102,7 @@ func ListTasks(ctx context.Context, d Deps, in ListTasksInput) (string, error) {
 		return "", err
 	}
 	if name == "" {
-		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the conversation name from `laelia-agent message check`)", "")
+		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the address from the batch header or `laelia-agent message check`, e.g. #general or dm:@alice)", "")
 	}
 
 	var filter []v1pb.TaskStatus
@@ -123,15 +125,16 @@ func ListTasks(ctx context.Context, d Deps, in ListTasksInput) (string, error) {
 		return "", wrapManagerError(err)
 	}
 
-	text := fmt.Sprintf("Tasks in %s (%d):\n", name, len(resp.Msg.Tasks))
+	addr := conversationAddress(ctx, d, name)
+	text := fmt.Sprintf("Tasks in %s (%d):\n", addr, len(resp.Msg.Tasks))
 	if len(resp.Msg.Tasks) == 0 {
 		text += "(none)\n"
 		return text, nil
 	}
 	for _, t := range resp.Msg.Tasks {
-		text += formatTaskLine(t)
+		text += formatTaskLine(addr, t)
 	}
-	text += "\nPass a task's `conversations/.../messages/...` name to `laelia-agent task claim` (TODO→IN_PROGRESS), `task review` (IN_PROGRESS→IN_REVIEW), or `task done` (IN_REVIEW→DONE).\n"
+	text += "\nPass a task's `<address>:<message-id>` handle to `laelia-agent task claim` (TODO→IN_PROGRESS), `task review` (IN_PROGRESS→IN_REVIEW), or `task done` (IN_REVIEW→DONE).\n"
 	return text, nil
 }
 
@@ -142,7 +145,7 @@ func ListTasks(ctx context.Context, d Deps, in ListTasksInput) (string, error) {
 // other tasks rather than retry.
 func ClaimTask(ctx context.Context, d Deps, in ClaimTaskInput) (string, error) {
 	if in.Message == "" {
-		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the task's conversations/{c}/messages/{m} name from `task list`)", "Pass the message name from `laelia-agent task list`.")
+		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the task's `<address>:<message-id>` handle from `task list`)", "Pass the message handle from `laelia-agent task list`.")
 	}
 	message, err := resolveMessageName(ctx, d, in.Message)
 	if err != nil {
@@ -153,23 +156,23 @@ func ClaimTask(ctx context.Context, d Deps, in ClaimTaskInput) (string, error) {
 		return "", wrapManagerError(err)
 	}
 	t := resp.Msg.Message.GetTask()
-	// Echo the conversation + the task message name so the agent has the exact
-	// thread-send command ready without reconstructing it, and tell it to post
-	// ALL work in the task's thread (not the main channel) — the root cause of
-	// agents posting task completion to the channel is that the path to the
-	// thread was not obvious right after claiming.
-	conv := normalizeConversationName(resp.Msg.Message.GetConversation())
-	root := in.Message
+	// Echo the conversation address + the thread-root handle so the agent has
+	// the exact thread-send command ready without reconstructing it, and tell
+	// it to post ALL work in the task's thread (not the main channel) — the root
+	// cause of agents posting task completion to the channel is that the path to
+	// the thread was not obvious right after claiming.
+	addr := conversationAddress(ctx, d, resp.Msg.Message.GetConversation())
+	rootID := resp.Msg.Message.GetName()
 	return fmt.Sprintf("Claimed task #%d (status=%s, assignee=you). The task's thread is now subscribed; the human's approval reply will wake you.\n"+
 		"Post ALL work on this task in its THREAD — not the main channel. Run `thread read %s --root %s --version <your processed_version>` to get the --base-version, then `thread send %s --root %s --content \"...\" --base-version <that version>`. Do NOT use `message send` for task progress or completion.",
-		t.GetTaskNumber(), taskStatusString(t.GetStatus()), conv, root, conv, root), nil
+		t.GetTaskNumber(), taskStatusString(t.GetStatus()), addr, rootID, addr, rootID), nil
 }
 
 // UnclaimTask releases the caller's claim on a task it owns (IN_PROGRESS→TODO)
 // so another agent may claim it. DONE is terminal and cannot be unclaimed.
 func UnclaimTask(ctx context.Context, d Deps, in UnclaimTaskInput) (string, error) {
 	if in.Message == "" {
-		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the task's conversations/{c}/messages/{m} name)", "Pass the message name from `laelia-agent task list`.")
+		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the task's `<address>:<message-id>` handle)", "Pass the message handle from `laelia-agent task list`.")
 	}
 	message, err := resolveMessageName(ctx, d, in.Message)
 	if err != nil {
@@ -189,7 +192,7 @@ func UnclaimTask(ctx context.Context, d Deps, in UnclaimTaskInput) (string, erro
 // ClaimTask, not here.
 func UpdateTaskStatus(ctx context.Context, d Deps, in UpdateTaskStatusInput) (string, error) {
 	if in.Message == "" {
-		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the task's conversations/{c}/messages/{m} name)", "Pass the message name from `laelia-agent task list`.")
+		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the task's `<address>:<message-id>` handle)", "Pass the message handle from `laelia-agent task list`.")
 	}
 	target, ok := parseTaskStatus(in.Status)
 	if !ok || target == v1pb.TaskStatus_TASK_STATUS_TODO || target == v1pb.TaskStatus_TASK_STATUS_UNSPECIFIED {
@@ -240,5 +243,5 @@ func CreateTask(ctx context.Context, d Deps, in CreateTaskInput) (string, error)
 		return "", wrapManagerError(err)
 	}
 	t := resp.Msg.Message.GetTask()
-	return fmt.Sprintf("Created task #%d (status=%s) in %s; it is unassigned — other agents may claim it.", t.GetTaskNumber(), taskStatusString(t.GetStatus()), name), nil
+	return fmt.Sprintf("Created task #%d (status=%s) in %s; it is unassigned — other agents may claim it.", t.GetTaskNumber(), taskStatusString(t.GetStatus()), conversationAddress(ctx, d, name)), nil
 }

@@ -40,6 +40,24 @@ func (f *fakeBatchClient) GetChannel(_ context.Context, req *connect.Request[v1p
 	if !ok {
 		conv = &v1pb.Conversation{Name: req.Msg.GetName()}
 	}
+	// Mirror convertToV1Conversation's Address population so conversationAddress
+	// (which reads conv.GetAddress()) behaves like production.
+	if conv.GetAddress() == "" {
+		switch conv.GetType() {
+		case 1:
+			if conv.GetOwnerName() != "" {
+				conv.Address = "dm:@" + conv.GetOwnerName()
+			}
+		case 2:
+			if conv.GetTitle() != "" {
+				conv.Address = "#" + conv.GetTitle()
+			}
+		default:
+			// type 3 (agent DM) and others: the manager populates Address for
+			// these; the fake leaves it empty so conversationAddress falls back
+			// to the resource name.
+		}
+	}
 	return connect.NewResponse(conv), nil
 }
 
@@ -113,10 +131,10 @@ func TestBuildTurnBatch_RendersTargetAndSender(t *testing.T) {
 	assert.Contains(t, out, "[target=#image msg=e5a69e1f")
 	assert.Contains(t, out, "type=system")
 	assert.Contains(t, out, "@system:")
-	// Each channel header carries its conversations/<id> name + processed_version
-	// cursor so the agent can act without a `message check` round-trip.
-	assert.Contains(t, out, "dm:@alice (conversations/dm-alice, your processed_version=0): 1 new")
-	assert.Contains(t, out, "#image (conversations/img, your processed_version=0): 1 new")
+	// Each channel header carries its address + processed_version cursor so the
+	// agent can act without a `message check` round-trip.
+	assert.Contains(t, out, "dm:@alice (your processed_version=0): 1 new")
+	assert.Contains(t, out, "#image (your processed_version=0): 1 new")
 	assert.Contains(t, out, reminderNudge)
 }
 
@@ -139,9 +157,9 @@ func TestBuildTurnBatch_ChannelBoundSummarizesOverflow(t *testing.T) {
 	out, err := BuildTurnBatch(context.Background(), batchDeps(c))
 	require.NoError(t, err)
 	assert.Contains(t, out, "bounded startup batch")
-	// The overflow channel is listed with its conversation name + cursor (not
-	// dropped), so the agent can `message read` it directly without `message check`.
-	overflow := "#c" + itoa(n-1) + " (conversations/c" + itoa(n-1) + ", your processed_version=0): 1 unread"
+	// The overflow channel is listed with its address + cursor (not dropped), so
+	// the agent can `message read` it directly without `message check`.
+	overflow := "#c" + itoa(n-1) + " (your processed_version=0): 1 unread"
 	assert.Contains(t, out, overflow, "the overflow channel must be listed with its cursor, not dropped")
 }
 
@@ -170,7 +188,7 @@ func TestBuildTurnBatch_MessageBoundSummarizesOverflow(t *testing.T) {
 	// The header states the true count (5 new) with the cursor, so truncation is
 	// never silent — the agent reads the full delta via the cursor, not a
 	// separate "unread" summary line.
-	assert.Contains(t, out, "#chatty (conversations/chatty, your processed_version=0): "+itoa(count)+" new")
+	assert.Contains(t, out, "#chatty (your processed_version=0): "+itoa(count)+" new")
 }
 
 func itoa(i int) string {

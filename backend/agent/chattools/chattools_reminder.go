@@ -110,7 +110,7 @@ func parseFireAtTime(s string) (time.Time, error) {
 // the schedule (one-shot fire_at, or recurring cron + tz).
 func ConvertMessageToReminder(ctx context.Context, d Deps, in ConvertMessageToReminderInput) (string, error) {
 	if in.Message == "" {
-		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the trigger message's conversations/{c}/messages/{m} name)", "Pass the message name from `laelia-agent message check`/`message read`.")
+		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the trigger message's `<address>:<message-id>` handle)", "Pass the message handle from `laelia-agent message read`.")
 	}
 	if strings.TrimSpace(in.TaskContent) == "" {
 		return "", localError("INVALID_ARGUMENT_FAILED", "task_content is required (a structured summary of the scheduled work)", "Pass --task-content with the work summary.")

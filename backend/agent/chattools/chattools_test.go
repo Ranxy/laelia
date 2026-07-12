@@ -131,13 +131,22 @@ func TestFormatMessageLineAttachments(t *testing.T) {
 	assert.Equal(t, "[2026-06-26T07:31:16Z] admin (USER, YOU): hi\n",
 		formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", true, "", "", 0, "hi", nil))
 
-	// With a message id: the full resource name and room version appear on an
-	// indented line so the agent can pass it straight to `reminder convert` /
-	// `task claim` without reconstructing it from the conversation id.
+	// With a message id: the address-form handle ("<address>:<message-id>") and
+	// room version appear on an indented line so the agent can pass it straight
+	// to `reminder convert` / `task claim` without reconstructing it.
 	got := formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", false,
-		"0d8856c0-ed2d-476b-9a86-33c0c333f5b9", "11111111-2222-3333-4444-555555555555", 58,
+		"#general", "11111111-2222-3333-4444-555555555555", 58,
 		"每天3点分析github提交", nil)
 	want := "[2026-06-26T07:31:16Z] admin (USER): 每天3点分析github提交\n" +
+		"  message: #general:11111111-2222-3333-4444-555555555555  version: 58\n"
+	assert.Equal(t, want, got)
+
+	// A conversations/<id> address (the GetChannel-failed fallback) renders the
+	// legacy full-name handle so the agent still gets a resolver-acceptable name.
+	got = formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", false,
+		"conversations/0d8856c0-ed2d-476b-9a86-33c0c333f5b9", "11111111-2222-3333-4444-555555555555", 58,
+		"legacy handle", nil)
+	want = "[2026-06-26T07:31:16Z] admin (USER): legacy handle\n" +
 		"  message: conversations/0d8856c0-ed2d-476b-9a86-33c0c333f5b9/messages/11111111-2222-3333-4444-555555555555  version: 58\n"
 	assert.Equal(t, want, got)
 
@@ -145,10 +154,10 @@ func TestFormatMessageLineAttachments(t *testing.T) {
 	// the same id/name/size/mime shape `file list` uses. The message handle line
 	// comes before the attachments block.
 	got = formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", false,
-		"0d8856c0-ed2d-476b-9a86-33c0c333f5b9", "11111111-2222-3333-4444-555555555555", 58, "test file",
+		"#general", "11111111-2222-3333-4444-555555555555", 58, "test file",
 		[]*v1pb.Attachment{{Id: "f-1", Name: "report.pdf", MimeType: "application/pdf", SizeBytes: 123456}})
 	want = "[2026-06-26T07:31:16Z] admin (USER): test file\n" +
-		"  message: conversations/0d8856c0-ed2d-476b-9a86-33c0c333f5b9/messages/11111111-2222-3333-4444-555555555555  version: 58\n" +
+		"  message: #general:11111111-2222-3333-4444-555555555555  version: 58\n" +
 		"  attachments:\n" +
 		"    - id=f-1  name=report.pdf  size=123456  mime=application/pdf\n"
 	assert.Equal(t, want, got)

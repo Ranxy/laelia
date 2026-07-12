@@ -28,9 +28,9 @@ const (
 // for the target= prefix, and ListConversationMessages fetches the latest few
 // messages per channel.
 //
-// Each channel header carries its `conversations/<id>` resource name and the
+// Each channel header carries its address ("#<title>" / "dm:@<peer>") and the
 // agent's `processed_version` cursor, so the agent can go straight to
-// `thread check <conversation>` and `message read <conversation> --version
+// `thread check <address>` and `message read <address> --version
 // <processed_version>` (then `message ack`) without a per-turn `message check`
 // round-trip to resolve the name and cursor. `message check` is now only needed
 // for channels beyond the batch, which are listed below as unread with the same
@@ -52,21 +52,16 @@ func BuildTurnBatch(ctx context.Context, d Deps) (string, error) {
 
 	// Per-channel blocks (header + preview lines) for the shown channels, plus a
 	// summary line per channel left out of the preview (beyond the channel
-	// bound). The header carries the conversation name + processed_version so
-	// the agent can act without `message check`.
+	// bound). The header carries the address + processed_version so the agent
+	// can act without `message check`.
 	var (
 		blocks   []string
 		overflow []string
 	)
 	shown := 0
 	for _, u := range updates {
-		target, ok := resolveChannelTarget(ctx, d, u.GetConversation())
-		if !ok {
-			// Could not resolve metadata; fall back to the conversation name so
-			// the agent still has a usable reply target.
-			target = u.GetConversation()
-		}
-		cursor := fmt.Sprintf("%s (%s, your processed_version=%d)", target, u.GetConversation(), u.GetProcessedVersion())
+		target := conversationAddress(ctx, d, u.GetConversation())
+		cursor := fmt.Sprintf("%s (your processed_version=%d)", target, u.GetProcessedVersion())
 		if shown >= turnBatchMaxChannels {
 			overflow = append(overflow, fmt.Sprintf("- %s: %d unread", cursor, u.GetNewMessageCount()))
 			continue
@@ -107,33 +102,6 @@ func BuildTurnBatch(ctx context.Context, d Deps) (string, error) {
 // reminders. Cold turns carry it too (redundant with the init procedure, but
 // harmless and keeps the two paths consistent).
 const reminderNudge = "Before ending your turn, also run `laelia-agent reminder list-due` and handle any due scheduled reminders."
-
-// resolveChannelTarget fetches conversation metadata and renders the batch
-// target label: "#<title>" for a channel (type 2), "dm:@<peer>" for a direct
-// message (type 1, peer = the other member, surfaced as owner_name). ok is false
-// when GetChannel failed, in which case the caller falls back to the bare
-// conversation name.
-func resolveChannelTarget(ctx context.Context, d Deps, conversation string) (target string, ok bool) {
-	resp, err := d.Client.GetChannel(ctx, connect.NewRequest(&v1pb.GetChannelRequest{Name: conversation}))
-	if err != nil {
-		return "", false
-	}
-	conv := resp.Msg
-	switch conv.GetType() {
-	case 1: // direct conversation
-		peer := strings.TrimSpace(conv.GetOwnerName())
-		if peer == "" {
-			peer = conversation
-		}
-		return "dm:@" + peer, true
-	default: // channel (type 2) or anything else
-		title := strings.TrimSpace(conv.GetTitle())
-		if title == "" {
-			title = conversation
-		}
-		return "#" + title, true
-	}
-}
 
 // latestChannelMessages fetches the latest turnBatchMaxMessages new messages
 // for one channel (those with room_version > the agent's processed_version).
