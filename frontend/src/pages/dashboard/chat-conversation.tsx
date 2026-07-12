@@ -73,8 +73,10 @@ const EMPTY_ACTIVITIES: AgentActivity[] = [];
 // aria-controls / aria-activedescendant to the active option.
 const MENTION_POPUP_ID = "mention-popup";
 
-// Conversation type values mirror Conversation.type: 1 = direct/DM, 2 = channel.
+// Conversation type values mirror Conversation.type: 1 = direct/DM (user+agent),
+// 2 = channel, 3 = AGENT_DM (agent+agent, owned by the system bot).
 const CONVERSATION_TYPE_DM = 1;
+const CONVERSATION_TYPE_AGENT_DM = 3;
 
 function memberTypeLabel(
   t: (key: string) => string,
@@ -185,6 +187,11 @@ export function ChatConversationPage() {
 
   const channel = channels.find((c) => c.name === conversationName);
   const isDm = channel?.type === CONVERSATION_TYPE_DM;
+  // Agent-to-agent DMs (type 3) are admin view-only: a user cannot send or
+  // alter membership there. membershipFixed covers both DM shapes (user+agent
+  // and agent+agent), whose rosters are fixed at creation.
+  const isAgentDm = channel?.type === CONVERSATION_TYPE_AGENT_DM;
+  const membershipFixed = isDm || isAgentDm;
   const isOwner =
     channel && currentUser
       ? channel.ownerId === currentUser.name.split("/").pop()
@@ -632,10 +639,16 @@ export function ChatConversationPage() {
         <div
           className={cn(
             "flex size-8 items-center justify-center rounded-lg",
-            isDm ? "bg-accent/10 text-accent" : "bg-control-bg text-control"
+            isDm || isAgentDm
+              ? "bg-accent/10 text-accent"
+              : "bg-control-bg text-control"
           )}
         >
-          {isDm ? <Bot className="size-4" /> : <Hash className="size-4" />}
+          {isDm || isAgentDm ? (
+            <Bot className="size-4" />
+          ) : (
+            <Hash className="size-4" />
+          )}
         </div>
         <div className="min-w-0 flex-1 flex items-center gap-3">
           <h2 className="text-sm font-semibold text-main truncate">
@@ -734,234 +747,246 @@ export function ChatConversationPage() {
             </button>
           )}
 
-          {/* Input area */}
+          {/* Input area — hidden for agent-to-agent DMs (type 3), which are
+              admin view-only: a user can read but cannot send or intervene. */}
           <div className="shrink-0 bg-background">
-            <div className="mx-auto max-w-3xl px-6 pb-5 pt-2">
-              <div
-                className="rounded-2xl border border-control-border bg-control-bg/40 focus-within:border-accent focus-within:bg-background transition-colors"
-                onDragOver={(e) => {
-                  e.preventDefault();
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (e.dataTransfer.files.length > 0)
-                    handleFiles(e.dataTransfer.files);
-                }}
-              >
-                {pendingAttachments.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 px-3 pt-2">
-                    {pendingAttachments.map((att) =>
-                      isImageAttachment(att) ? (
-                        <div key={att.id} className="group relative shrink-0">
-                          <RemoteImage
-                            attachment={att}
-                            variant="thumb"
-                            onClick={() => openImagePreview(att)}
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPendingAttachments((prev) =>
-                                prev.filter((p) => p.id !== att.id)
-                              )
-                            }
-                            className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-control-border bg-background text-control-placeholder opacity-0 transition-opacity hover:text-error group-hover:opacity-100"
-                            aria-label={t("common.delete")}
-                          >
-                            <X className="size-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <span
-                          key={att.id}
-                          className="group flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
-                        >
-                          <span className="max-w-[160px] truncate">
-                            {att.name}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPendingAttachments((prev) =>
-                                prev.filter((p) => p.id !== att.id)
-                              )
-                            }
-                            className="text-control-placeholder hover:text-error transition-colors"
-                            aria-label={t("common.delete")}
-                          >
-                            <X className="size-3" />
-                          </button>
-                        </span>
-                      )
-                    )}
-                  </div>
-                )}
-                <Textarea
-                  ref={textareaRef}
-                  className={cn(
-                    "block w-full resize-none border-0 bg-transparent px-4 py-3 text-sm text-main",
-                    "placeholder:text-control-placeholder focus:ring-0 focus:border-transparent",
-                    "max-h-[200px] min-h-[24px]"
-                  )}
-                  rows={1}
-                  placeholder={t("channel.placeholder")}
-                  aria-controls={
-                    mentionState?.active ? MENTION_POPUP_ID : undefined
-                  }
-                  aria-activedescendant={
-                    mentionState?.active && mentionState.matched.length > 0
-                      ? `${MENTION_POPUP_ID}-opt-${mentionSelectedIndex}`
-                      : undefined
-                  }
-                  value={input}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setInput(value);
-                    const pos = e.target.selectionStart ?? 0;
-                    setCursorPos(pos);
-                    const state = detectMention(value, pos, mentionTargets);
-                    setMentionState(state);
-                    setMentionSelectedIndex(0);
-                    if (state?.active) {
-                      const newMap: MentionTarget[] = [];
-                      const re = /(?:^|\s)@(\S+)/g;
-                      let m: RegExpExecArray | null;
-                      while ((m = re.exec(value)) !== null) {
-                        const name = m[1];
-                        const found = mentionTargets.find(
-                          (t) => t.name === name
-                        );
-                        if (found) newMap.push(found);
-                      }
-                      setMentionMap(newMap);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (mentionState?.active) {
-                      const total = mentionState.matched.length;
-                      if (e.key === "ArrowDown") {
-                        e.preventDefault();
-                        setMentionSelectedIndex((idx) =>
-                          idx + 1 < total ? idx + 1 : 0
-                        );
-                        return;
-                      }
-                      if (e.key === "ArrowUp") {
-                        e.preventDefault();
-                        setMentionSelectedIndex((idx) =>
-                          idx - 1 >= 0 ? idx - 1 : total - 1
-                        );
-                        return;
-                      }
-                      if (e.key === "Enter" || e.key === "Tab") {
-                        if (total === 0) return;
-                        e.preventDefault();
-                        if (mentionState.matched[mentionSelectedIndex]) {
-                          handleMentionSelect(
-                            mentionState.matched[mentionSelectedIndex]
-                          );
-                        }
-                        return;
-                      }
-                      if (e.key === "Escape") {
-                        e.preventDefault();
-                        setMentionState(null);
-                        return;
-                      }
-                    }
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  onSelect={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    const pos = target.selectionStart ?? 0;
-                    setCursorPos(pos);
-                    const state = detectMention(
-                      target.value,
-                      pos,
-                      mentionTargets
-                    );
-                    setMentionState(state);
-                    setMentionSelectedIndex(0);
-                  }}
-                  disabled={sending}
-                />
-                <div className="flex items-center justify-between px-3 pb-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files) handleFiles(e.target.files);
-                        e.target.value = "";
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading || sending}
-                      className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors disabled:opacity-50"
-                      aria-label={t("channel.attach-file")}
-                    >
-                      {uploading ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Paperclip className="size-4" />
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAsTask((v) => !v)}
-                      aria-pressed={asTask}
-                      disabled={sending}
-                      className={cn(
-                        "flex h-7 items-center gap-1 rounded-md px-2 text-xs transition-colors disabled:opacity-50",
-                        asTask
-                          ? "bg-accent/15 text-accent"
-                          : "text-control-placeholder hover:text-main hover:bg-control-bg"
-                      )}
-                      aria-label={t("channelTask.as-task")}
-                      title={t("channelTask.as-task-hint")}
-                    >
-                      <ListTodo className="size-3.5" />
-                      <span className="hidden sm:inline">
-                        {t("channelTask.as-task")}
-                      </span>
-                    </button>
-                    <span className="text-xs text-control-placeholder">
-                      {t("chat.send-hint")}
-                    </span>
-                  </div>
-                  <Button
-                    type="button"
-                    size="xs"
-                    onClick={handleSend}
-                    disabled={
-                      (!input.trim() && pendingAttachments.length === 0) ||
-                      sending
-                    }
-                  >
-                    <Send className="size-3" />
-                    {t("common.send")}
-                  </Button>
+            {isAgentDm ? (
+              <div className="mx-auto max-w-3xl px-6 py-4">
+                <div className="rounded-2xl border border-control-border bg-control-bg/40 px-4 py-3 text-center text-xs text-control-placeholder">
+                  {t("chat.agent-dm-view-only")}
                 </div>
               </div>
-              {mentionState?.active && textareaRef.current && (
-                <MentionPopup
-                  id={MENTION_POPUP_ID}
-                  targets={mentionState.matched}
-                  query={mentionState.query}
-                  position={getCaretCoordinates(textareaRef.current, cursorPos)}
-                  selectedIndex={mentionSelectedIndex}
-                  onSelect={handleMentionSelect}
-                  onClose={() => setMentionState(null)}
-                />
-              )}
-            </div>
+            ) : (
+              <div className="mx-auto max-w-3xl px-6 pb-5 pt-2">
+                <div
+                  className="rounded-2xl border border-control-border bg-control-bg/40 focus-within:border-accent focus-within:bg-background transition-colors"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files.length > 0)
+                      handleFiles(e.dataTransfer.files);
+                  }}
+                >
+                  {pendingAttachments.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 px-3 pt-2">
+                      {pendingAttachments.map((att) =>
+                        isImageAttachment(att) ? (
+                          <div key={att.id} className="group relative shrink-0">
+                            <RemoteImage
+                              attachment={att}
+                              variant="thumb"
+                              onClick={() => openImagePreview(att)}
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPendingAttachments((prev) =>
+                                  prev.filter((p) => p.id !== att.id)
+                                )
+                              }
+                              className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-control-border bg-background text-control-placeholder opacity-0 transition-opacity hover:text-error group-hover:opacity-100"
+                              aria-label={t("common.delete")}
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span
+                            key={att.id}
+                            className="group flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
+                          >
+                            <span className="max-w-[160px] truncate">
+                              {att.name}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPendingAttachments((prev) =>
+                                  prev.filter((p) => p.id !== att.id)
+                                )
+                              }
+                              className="text-control-placeholder hover:text-error transition-colors"
+                              aria-label={t("common.delete")}
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </span>
+                        )
+                      )}
+                    </div>
+                  )}
+                  <Textarea
+                    ref={textareaRef}
+                    className={cn(
+                      "block w-full resize-none border-0 bg-transparent px-4 py-3 text-sm text-main",
+                      "placeholder:text-control-placeholder focus:ring-0 focus:border-transparent",
+                      "max-h-[200px] min-h-[24px]"
+                    )}
+                    rows={1}
+                    placeholder={t("channel.placeholder")}
+                    aria-controls={
+                      mentionState?.active ? MENTION_POPUP_ID : undefined
+                    }
+                    aria-activedescendant={
+                      mentionState?.active && mentionState.matched.length > 0
+                        ? `${MENTION_POPUP_ID}-opt-${mentionSelectedIndex}`
+                        : undefined
+                    }
+                    value={input}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setInput(value);
+                      const pos = e.target.selectionStart ?? 0;
+                      setCursorPos(pos);
+                      const state = detectMention(value, pos, mentionTargets);
+                      setMentionState(state);
+                      setMentionSelectedIndex(0);
+                      if (state?.active) {
+                        const newMap: MentionTarget[] = [];
+                        const re = /(?:^|\s)@(\S+)/g;
+                        let m: RegExpExecArray | null;
+                        while ((m = re.exec(value)) !== null) {
+                          const name = m[1];
+                          const found = mentionTargets.find(
+                            (t) => t.name === name
+                          );
+                          if (found) newMap.push(found);
+                        }
+                        setMentionMap(newMap);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (mentionState?.active) {
+                        const total = mentionState.matched.length;
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setMentionSelectedIndex((idx) =>
+                            idx + 1 < total ? idx + 1 : 0
+                          );
+                          return;
+                        }
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setMentionSelectedIndex((idx) =>
+                            idx - 1 >= 0 ? idx - 1 : total - 1
+                          );
+                          return;
+                        }
+                        if (e.key === "Enter" || e.key === "Tab") {
+                          if (total === 0) return;
+                          e.preventDefault();
+                          if (mentionState.matched[mentionSelectedIndex]) {
+                            handleMentionSelect(
+                              mentionState.matched[mentionSelectedIndex]
+                            );
+                          }
+                          return;
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          setMentionState(null);
+                          return;
+                        }
+                      }
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    onSelect={(e) => {
+                      const target = e.target as HTMLTextAreaElement;
+                      const pos = target.selectionStart ?? 0;
+                      setCursorPos(pos);
+                      const state = detectMention(
+                        target.value,
+                        pos,
+                        mentionTargets
+                      );
+                      setMentionState(state);
+                      setMentionSelectedIndex(0);
+                    }}
+                    disabled={sending}
+                  />
+                  <div className="flex items-center justify-between px-3 pb-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files) handleFiles(e.target.files);
+                          e.target.value = "";
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading || sending}
+                        className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors disabled:opacity-50"
+                        aria-label={t("channel.attach-file")}
+                      >
+                        {uploading ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Paperclip className="size-4" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAsTask((v) => !v)}
+                        aria-pressed={asTask}
+                        disabled={sending}
+                        className={cn(
+                          "flex h-7 items-center gap-1 rounded-md px-2 text-xs transition-colors disabled:opacity-50",
+                          asTask
+                            ? "bg-accent/15 text-accent"
+                            : "text-control-placeholder hover:text-main hover:bg-control-bg"
+                        )}
+                        aria-label={t("channelTask.as-task")}
+                        title={t("channelTask.as-task-hint")}
+                      >
+                        <ListTodo className="size-3.5" />
+                        <span className="hidden sm:inline">
+                          {t("channelTask.as-task")}
+                        </span>
+                      </button>
+                      <span className="text-xs text-control-placeholder">
+                        {t("chat.send-hint")}
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      size="xs"
+                      onClick={handleSend}
+                      disabled={
+                        (!input.trim() && pendingAttachments.length === 0) ||
+                        sending
+                      }
+                    >
+                      <Send className="size-3" />
+                      {t("common.send")}
+                    </Button>
+                  </div>
+                </div>
+                {mentionState?.active && textareaRef.current && (
+                  <MentionPopup
+                    id={MENTION_POPUP_ID}
+                    targets={mentionState.matched}
+                    query={mentionState.query}
+                    position={getCaretCoordinates(
+                      textareaRef.current,
+                      cursorPos
+                    )}
+                    selectedIndex={mentionSelectedIndex}
+                    onSelect={handleMentionSelect}
+                    onClose={() => setMentionState(null)}
+                  />
+                )}
+              </div>
+            )}
           </div>
         </div>
         {threadRootOpen && (
@@ -1024,7 +1049,7 @@ export function ChatConversationPage() {
                     </div>
                     {/* DMs have fixed membership (user + agent); only channel
                         owners can remove members. */}
-                    {!isDm && isOwner && m.memberRole !== 1 && (
+                    {!membershipFixed && isOwner && m.memberRole !== 1 && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1042,8 +1067,9 @@ export function ChatConversationPage() {
               </div>
             )}
 
-            {/* Add member section — channels only (DMs are 1:1 with an agent). */}
-            {!isDm && isOwner && (
+            {/* Add member section — channels only (both DM shapes are fixed
+                1:1 rosters: user+agent and agent+agent). */}
+            {!membershipFixed && isOwner && (
               <div className="mt-auto border-t border-control-border pt-4 px-1">
                 {addMemberOpen ? (
                   <div className="space-y-3">
