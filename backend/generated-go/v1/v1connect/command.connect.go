@@ -63,6 +63,18 @@ const (
 	// CommandServiceGetOrCreateConversationProcedure is the fully-qualified name of the
 	// CommandService's GetOrCreateConversation RPC.
 	CommandServiceGetOrCreateConversationProcedure = "/laelia.v1.CommandService/GetOrCreateConversation"
+	// CommandServiceResolveChannelByTitleProcedure is the fully-qualified name of the CommandService's
+	// ResolveChannelByTitle RPC.
+	CommandServiceResolveChannelByTitleProcedure = "/laelia.v1.CommandService/ResolveChannelByTitle"
+	// CommandServiceGetOrCreateUserDMProcedure is the fully-qualified name of the CommandService's
+	// GetOrCreateUserDM RPC.
+	CommandServiceGetOrCreateUserDMProcedure = "/laelia.v1.CommandService/GetOrCreateUserDM"
+	// CommandServiceGetOrCreateAgentDMProcedure is the fully-qualified name of the CommandService's
+	// GetOrCreateAgentDM RPC.
+	CommandServiceGetOrCreateAgentDMProcedure = "/laelia.v1.CommandService/GetOrCreateAgentDM"
+	// CommandServiceListPeerAgentsProcedure is the fully-qualified name of the CommandService's
+	// ListPeerAgents RPC.
+	CommandServiceListPeerAgentsProcedure = "/laelia.v1.CommandService/ListPeerAgents"
 	// CommandServiceListConversationMessagesProcedure is the fully-qualified name of the
 	// CommandService's ListConversationMessages RPC.
 	CommandServiceListConversationMessagesProcedure = "/laelia.v1.CommandService/ListConversationMessages"
@@ -190,6 +202,25 @@ type CommandServiceClient interface {
 	SearchChatHistory(context.Context, *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error)
 	GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error)
 	GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error)
+	// ResolveChannelByTitle looks up the unique channel (type 2) with the given
+	// title, returning NOT_FOUND when absent (it never creates one). Agent-
+	// callable: no auth_method annotation, identity from GetAgentFromContext.
+	// Powers the "#<title>" address resolver.
+	ResolveChannelByTitle(context.Context, *connect.Request[v1.ResolveChannelByTitleRequest]) (*connect.Response[v1.ResolveChannelByTitleResponse], error)
+	// GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent
+	// and a named end user. Agent-callable. The peer is resolved by principal
+	// display name; ambiguous or unknown names fail. Agent-callable twin of the
+	// user-only GetOrCreateConversation. Powers the "dm:@<user>" address resolver.
+	GetOrCreateUserDM(context.Context, *connect.Request[v1.GetOrCreateUserDMRequest]) (*connect.Response[v1.GetOrCreateUserDMResponse], error)
+	// GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent DM between
+	// the calling agent and a peer agent. Agent-callable. Self-address is rejected.
+	// The peer is resolved by agent resource name ("agents/<id>"); the pair is
+	// canonicalized by the store. Powers the "dm:@<agent>" address resolver.
+	GetOrCreateAgentDM(context.Context, *connect.Request[v1.GetOrCreateAgentDMRequest]) (*connect.Response[v1.GetOrCreateAgentDMResponse], error)
+	// ListPeerAgents returns every other agent (the caller excluded) with the
+	// display name, persona, and connection state an agent needs to decide whom
+	// to address. Agent-callable. Powers the "agent list" discovery tool.
+	ListPeerAgents(context.Context, *connect.Request[v1.ListPeerAgentsRequest]) (*connect.Response[v1.ListPeerAgentsResponse], error)
 	ListConversationMessages(context.Context, *connect.Request[v1.ListConversationMessagesRequest]) (*connect.Response[v1.ListConversationMessagesResponse], error)
 	ListThreadMessages(context.Context, *connect.Request[v1.ListThreadMessagesRequest]) (*connect.Response[v1.ListThreadMessagesResponse], error)
 	ListChannelThreads(context.Context, *connect.Request[v1.ListChannelThreadsRequest]) (*connect.Response[v1.ListChannelThreadsResponse], error)
@@ -351,6 +382,30 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			httpClient,
 			baseURL+CommandServiceGetOrCreateConversationProcedure,
 			connect.WithSchema(commandServiceMethods.ByName("GetOrCreateConversation")),
+			connect.WithClientOptions(opts...),
+		),
+		resolveChannelByTitle: connect.NewClient[v1.ResolveChannelByTitleRequest, v1.ResolveChannelByTitleResponse](
+			httpClient,
+			baseURL+CommandServiceResolveChannelByTitleProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ResolveChannelByTitle")),
+			connect.WithClientOptions(opts...),
+		),
+		getOrCreateUserDM: connect.NewClient[v1.GetOrCreateUserDMRequest, v1.GetOrCreateUserDMResponse](
+			httpClient,
+			baseURL+CommandServiceGetOrCreateUserDMProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("GetOrCreateUserDM")),
+			connect.WithClientOptions(opts...),
+		),
+		getOrCreateAgentDM: connect.NewClient[v1.GetOrCreateAgentDMRequest, v1.GetOrCreateAgentDMResponse](
+			httpClient,
+			baseURL+CommandServiceGetOrCreateAgentDMProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("GetOrCreateAgentDM")),
+			connect.WithClientOptions(opts...),
+		),
+		listPeerAgents: connect.NewClient[v1.ListPeerAgentsRequest, v1.ListPeerAgentsResponse](
+			httpClient,
+			baseURL+CommandServiceListPeerAgentsProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ListPeerAgents")),
 			connect.WithClientOptions(opts...),
 		),
 		listConversationMessages: connect.NewClient[v1.ListConversationMessagesRequest, v1.ListConversationMessagesResponse](
@@ -589,6 +644,10 @@ type commandServiceClient struct {
 	searchChatHistory         *connect.Client[v1.SearchChatHistoryRequest, v1.SearchChatHistoryResponse]
 	getCommandContext         *connect.Client[v1.GetCommandContextRequest, v1.GetCommandContextResponse]
 	getOrCreateConversation   *connect.Client[v1.GetOrCreateConversationRequest, v1.GetOrCreateConversationResponse]
+	resolveChannelByTitle     *connect.Client[v1.ResolveChannelByTitleRequest, v1.ResolveChannelByTitleResponse]
+	getOrCreateUserDM         *connect.Client[v1.GetOrCreateUserDMRequest, v1.GetOrCreateUserDMResponse]
+	getOrCreateAgentDM        *connect.Client[v1.GetOrCreateAgentDMRequest, v1.GetOrCreateAgentDMResponse]
+	listPeerAgents            *connect.Client[v1.ListPeerAgentsRequest, v1.ListPeerAgentsResponse]
 	listConversationMessages  *connect.Client[v1.ListConversationMessagesRequest, v1.ListConversationMessagesResponse]
 	listThreadMessages        *connect.Client[v1.ListThreadMessagesRequest, v1.ListThreadMessagesResponse]
 	listChannelThreads        *connect.Client[v1.ListChannelThreadsRequest, v1.ListChannelThreadsResponse]
@@ -671,6 +730,26 @@ func (c *commandServiceClient) GetCommandContext(ctx context.Context, req *conne
 // GetOrCreateConversation calls laelia.v1.CommandService.GetOrCreateConversation.
 func (c *commandServiceClient) GetOrCreateConversation(ctx context.Context, req *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error) {
 	return c.getOrCreateConversation.CallUnary(ctx, req)
+}
+
+// ResolveChannelByTitle calls laelia.v1.CommandService.ResolveChannelByTitle.
+func (c *commandServiceClient) ResolveChannelByTitle(ctx context.Context, req *connect.Request[v1.ResolveChannelByTitleRequest]) (*connect.Response[v1.ResolveChannelByTitleResponse], error) {
+	return c.resolveChannelByTitle.CallUnary(ctx, req)
+}
+
+// GetOrCreateUserDM calls laelia.v1.CommandService.GetOrCreateUserDM.
+func (c *commandServiceClient) GetOrCreateUserDM(ctx context.Context, req *connect.Request[v1.GetOrCreateUserDMRequest]) (*connect.Response[v1.GetOrCreateUserDMResponse], error) {
+	return c.getOrCreateUserDM.CallUnary(ctx, req)
+}
+
+// GetOrCreateAgentDM calls laelia.v1.CommandService.GetOrCreateAgentDM.
+func (c *commandServiceClient) GetOrCreateAgentDM(ctx context.Context, req *connect.Request[v1.GetOrCreateAgentDMRequest]) (*connect.Response[v1.GetOrCreateAgentDMResponse], error) {
+	return c.getOrCreateAgentDM.CallUnary(ctx, req)
+}
+
+// ListPeerAgents calls laelia.v1.CommandService.ListPeerAgents.
+func (c *commandServiceClient) ListPeerAgents(ctx context.Context, req *connect.Request[v1.ListPeerAgentsRequest]) (*connect.Response[v1.ListPeerAgentsResponse], error) {
+	return c.listPeerAgents.CallUnary(ctx, req)
 }
 
 // ListConversationMessages calls laelia.v1.CommandService.ListConversationMessages.
@@ -869,6 +948,25 @@ type CommandServiceHandler interface {
 	SearchChatHistory(context.Context, *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error)
 	GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error)
 	GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error)
+	// ResolveChannelByTitle looks up the unique channel (type 2) with the given
+	// title, returning NOT_FOUND when absent (it never creates one). Agent-
+	// callable: no auth_method annotation, identity from GetAgentFromContext.
+	// Powers the "#<title>" address resolver.
+	ResolveChannelByTitle(context.Context, *connect.Request[v1.ResolveChannelByTitleRequest]) (*connect.Response[v1.ResolveChannelByTitleResponse], error)
+	// GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent
+	// and a named end user. Agent-callable. The peer is resolved by principal
+	// display name; ambiguous or unknown names fail. Agent-callable twin of the
+	// user-only GetOrCreateConversation. Powers the "dm:@<user>" address resolver.
+	GetOrCreateUserDM(context.Context, *connect.Request[v1.GetOrCreateUserDMRequest]) (*connect.Response[v1.GetOrCreateUserDMResponse], error)
+	// GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent DM between
+	// the calling agent and a peer agent. Agent-callable. Self-address is rejected.
+	// The peer is resolved by agent resource name ("agents/<id>"); the pair is
+	// canonicalized by the store. Powers the "dm:@<agent>" address resolver.
+	GetOrCreateAgentDM(context.Context, *connect.Request[v1.GetOrCreateAgentDMRequest]) (*connect.Response[v1.GetOrCreateAgentDMResponse], error)
+	// ListPeerAgents returns every other agent (the caller excluded) with the
+	// display name, persona, and connection state an agent needs to decide whom
+	// to address. Agent-callable. Powers the "agent list" discovery tool.
+	ListPeerAgents(context.Context, *connect.Request[v1.ListPeerAgentsRequest]) (*connect.Response[v1.ListPeerAgentsResponse], error)
 	ListConversationMessages(context.Context, *connect.Request[v1.ListConversationMessagesRequest]) (*connect.Response[v1.ListConversationMessagesResponse], error)
 	ListThreadMessages(context.Context, *connect.Request[v1.ListThreadMessagesRequest]) (*connect.Response[v1.ListThreadMessagesResponse], error)
 	ListChannelThreads(context.Context, *connect.Request[v1.ListChannelThreadsRequest]) (*connect.Response[v1.ListChannelThreadsResponse], error)
@@ -1026,6 +1124,30 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		CommandServiceGetOrCreateConversationProcedure,
 		svc.GetOrCreateConversation,
 		connect.WithSchema(commandServiceMethods.ByName("GetOrCreateConversation")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceResolveChannelByTitleHandler := connect.NewUnaryHandler(
+		CommandServiceResolveChannelByTitleProcedure,
+		svc.ResolveChannelByTitle,
+		connect.WithSchema(commandServiceMethods.ByName("ResolveChannelByTitle")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceGetOrCreateUserDMHandler := connect.NewUnaryHandler(
+		CommandServiceGetOrCreateUserDMProcedure,
+		svc.GetOrCreateUserDM,
+		connect.WithSchema(commandServiceMethods.ByName("GetOrCreateUserDM")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceGetOrCreateAgentDMHandler := connect.NewUnaryHandler(
+		CommandServiceGetOrCreateAgentDMProcedure,
+		svc.GetOrCreateAgentDM,
+		connect.WithSchema(commandServiceMethods.ByName("GetOrCreateAgentDM")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceListPeerAgentsHandler := connect.NewUnaryHandler(
+		CommandServiceListPeerAgentsProcedure,
+		svc.ListPeerAgents,
+		connect.WithSchema(commandServiceMethods.ByName("ListPeerAgents")),
 		connect.WithHandlerOptions(opts...),
 	)
 	commandServiceListConversationMessagesHandler := connect.NewUnaryHandler(
@@ -1270,6 +1392,14 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceGetCommandContextHandler.ServeHTTP(w, r)
 		case CommandServiceGetOrCreateConversationProcedure:
 			commandServiceGetOrCreateConversationHandler.ServeHTTP(w, r)
+		case CommandServiceResolveChannelByTitleProcedure:
+			commandServiceResolveChannelByTitleHandler.ServeHTTP(w, r)
+		case CommandServiceGetOrCreateUserDMProcedure:
+			commandServiceGetOrCreateUserDMHandler.ServeHTTP(w, r)
+		case CommandServiceGetOrCreateAgentDMProcedure:
+			commandServiceGetOrCreateAgentDMHandler.ServeHTTP(w, r)
+		case CommandServiceListPeerAgentsProcedure:
+			commandServiceListPeerAgentsHandler.ServeHTTP(w, r)
 		case CommandServiceListConversationMessagesProcedure:
 			commandServiceListConversationMessagesHandler.ServeHTTP(w, r)
 		case CommandServiceListThreadMessagesProcedure:
@@ -1387,6 +1517,22 @@ func (UnimplementedCommandServiceHandler) GetCommandContext(context.Context, *co
 
 func (UnimplementedCommandServiceHandler) GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.GetOrCreateConversation is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ResolveChannelByTitle(context.Context, *connect.Request[v1.ResolveChannelByTitleRequest]) (*connect.Response[v1.ResolveChannelByTitleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ResolveChannelByTitle is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) GetOrCreateUserDM(context.Context, *connect.Request[v1.GetOrCreateUserDMRequest]) (*connect.Response[v1.GetOrCreateUserDMResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.GetOrCreateUserDM is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) GetOrCreateAgentDM(context.Context, *connect.Request[v1.GetOrCreateAgentDMRequest]) (*connect.Response[v1.GetOrCreateAgentDMResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.GetOrCreateAgentDM is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ListPeerAgents(context.Context, *connect.Request[v1.ListPeerAgentsRequest]) (*connect.Response[v1.ListPeerAgentsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListPeerAgents is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) ListConversationMessages(context.Context, *connect.Request[v1.ListConversationMessagesRequest]) (*connect.Response[v1.ListConversationMessagesResponse], error) {

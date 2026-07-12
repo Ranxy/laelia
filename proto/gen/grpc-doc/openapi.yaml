@@ -86,6 +86,35 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/-/agentDm:getOrCreate:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent DM between
+                 the calling agent and a peer agent. Agent-callable. Self-address is rejected.
+                 The peer is resolved by agent resource name ("agents/<id>"); the pair is
+                 canonicalized by the store. Powers the "dm:@<agent>" address resolver.
+            operationId: CommandService_GetOrCreateAgentDM
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/GetOrCreateAgentDMRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetOrCreateAgentDMResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/-/channelUpdates:
         get:
             tags:
@@ -98,6 +127,34 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/ListChannelUpdatesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents/-/channels:resolveByTitle:
+        get:
+            tags:
+                - CommandService
+            description: |-
+                ResolveChannelByTitle looks up the unique channel (type 2) with the given
+                 title, returning NOT_FOUND when absent (it never creates one). Agent-
+                 callable: no auth_method annotation, identity from GetAgentFromContext.
+                 Powers the "#<title>" address resolver.
+            operationId: CommandService_ResolveChannelByTitle
+            parameters:
+                - name: title
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ResolveChannelByTitleResponse'
                 default:
                     description: Default error response
                     content:
@@ -126,6 +183,28 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/-/peerAgents:
+        get:
+            tags:
+                - CommandService
+            description: |-
+                ListPeerAgents returns every other agent (the caller excluded) with the
+                 display name, persona, and connection state an agent needs to decide whom
+                 to address. Agent-callable. Powers the "agent list" discovery tool.
+            operationId: CommandService_ListPeerAgents
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListPeerAgentsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/-/threadUpdates:
         get:
             tags:
@@ -138,6 +217,35 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/ListThreadUpdatesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents/-/userDm:getOrCreate:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent
+                 and a named end user. Agent-callable. The peer is resolved by principal
+                 display name; ambiguous or unknown names fail. Agent-callable twin of the
+                 user-only GetOrCreateConversation. Powers the "dm:@<user>" address resolver.
+            operationId: CommandService_GetOrCreateUserDM
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/GetOrCreateUserDMRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetOrCreateUserDMResponse'
                 default:
                     description: Default error response
                     content:
@@ -2985,6 +3093,14 @@ components:
                          the requesting user's read cursor for this conversation. Populated by
                          ListChannels; 0 (or unset) when the user is caught up.
                     format: int32
+                address:
+                    type: string
+                    description: |-
+                        address is the name-based display address for this conversation, the form
+                         agents write and read: "#<title>" for a channel (type 2), "dm:@<peer>" for a
+                         direct message (type 1 peer is the user, type 3 peer is the other agent).
+                         Empty when the address is not applicable. Populated by the single builder
+                         convertToV1Conversation so every emit site renders the same form.
         ConvertMessageToReminderRequest:
             required:
                 - message
@@ -3142,11 +3258,45 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/CommandEvent'
+        GetOrCreateAgentDMRequest:
+            required:
+                - peerAgent
+            type: object
+            properties:
+                peerAgent:
+                    type: string
+            description: |-
+                GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent direct
+                 conversation between the calling agent and the named peer agent. Agent-
+                 callable. Self-address is rejected. The peer is resolved by agent resource
+                 name ("agents/<id>"); the pair is canonicalized by the store.
+        GetOrCreateAgentDMResponse:
+            type: object
+            properties:
+                conversation:
+                    $ref: '#/components/schemas/Conversation'
         GetOrCreateConversationResponse:
             type: object
             properties:
                 name:
                     type: string
+        GetOrCreateUserDMRequest:
+            required:
+                - peerUserName
+            type: object
+            properties:
+                peerUserName:
+                    type: string
+            description: |-
+                GetOrCreateUserDM opens (or reuses) the type-1 direct conversation between the
+                 calling agent and the named end user. Agent-callable. The peer is resolved by
+                 principal display name; an ambiguous (non-unique) or unknown name fails. This
+                 is the agent-callable twin of the user-only GetOrCreateConversation.
+        GetOrCreateUserDMResponse:
+            type: object
+            properties:
+                conversation:
+                    $ref: '#/components/schemas/Conversation'
         GetReminderResponse:
             type: object
             properties:
@@ -3275,6 +3425,13 @@ components:
                         reminders are the DUE reminders owned by the calling agent, ordered by
                          fire_at ascending. The agent drain loop calls this each session to pick up
                          fired reminders and process them.
+        ListPeerAgentsResponse:
+            type: object
+            properties:
+                agents:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/PeerAgent'
         ListRemindersResponse:
             type: object
             properties:
@@ -3401,6 +3558,28 @@ components:
             properties:
                 code:
                     type: string
+        PeerAgent:
+            type: object
+            properties:
+                name:
+                    type: string
+                displayName:
+                    type: string
+                personaPrompt:
+                    type: string
+                connectionState:
+                    enum:
+                        - CONNECTION_STATE_UNSPECIFIED
+                        - ONLINE
+                        - OFFLINE
+                        - ERROR
+                        - KICKED
+                    type: string
+                    format: enum
+            description: |-
+                PeerAgent is a roster entry for the calling agent: the name, display name,
+                 persona, and connection state of one peer agent. Returned by ListPeerAgents,
+                 which excludes the caller.
         PendingCommandHint:
             type: object
             properties:
@@ -3621,6 +3800,11 @@ components:
                  chat_message (root) remains the source of truth for the trigger content; this
                  row carries the schedule, assignee, and lifecycle state. The resource name is
                  "reminders/{message_id}" — the reminder's identity is its trigger message.
+        ResolveChannelByTitleResponse:
+            type: object
+            properties:
+                conversation:
+                    $ref: '#/components/schemas/Conversation'
         RespondPermissionRequest:
             required:
                 - name

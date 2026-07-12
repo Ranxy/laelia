@@ -369,6 +369,12 @@ message Conversation {
   // the requesting user's read cursor for this conversation. Populated by
   // ListChannels; 0 (or unset) when the user is caught up.
   int32 unread_count = 9;
+  // address is the name-based display address for this conversation, the form
+  // agents write and read: "#<title>" for a channel (type 2), "dm:@<peer>" for a
+  // direct message (type 1 peer is the user, type 3 peer is the other agent).
+  // Empty when the address is not applicable. Populated by the single builder
+  // convertToV1Conversation so every emit site renders the same form.
+  string address = 11;
 }
 
 message ChannelMember {
@@ -486,6 +492,64 @@ message GetOrCreateConversationRequest {
 
 message GetOrCreateConversationResponse {
   string name = 1;
+}
+
+// ResolveChannelByTitle looks up the unique channel (type 2) with the given
+// title. Agent-callable (no auth_method annotation; identity from
+// GetAgentFromContext). Returns NOT_FOUND when no such channel exists; it never
+// creates one. Powers the "#<title>" address resolver.
+message ResolveChannelByTitleRequest {
+  string title = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ResolveChannelByTitleResponse {
+  Conversation conversation = 1;
+}
+
+// GetOrCreateUserDM opens (or reuses) the type-1 direct conversation between the
+// calling agent and the named end user. Agent-callable. The peer is resolved by
+// principal display name; an ambiguous (non-unique) or unknown name fails. This
+// is the agent-callable twin of the user-only GetOrCreateConversation.
+message GetOrCreateUserDMRequest {
+  string peer_user_name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetOrCreateUserDMResponse {
+  Conversation conversation = 1;
+}
+
+// GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent direct
+// conversation between the calling agent and the named peer agent. Agent-
+// callable. Self-address is rejected. The peer is resolved by agent resource
+// name ("agents/<id>"); the pair is canonicalized by the store.
+message GetOrCreateAgentDMRequest {
+  string peer_agent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Agent"
+  ];
+}
+
+message GetOrCreateAgentDMResponse {
+  Conversation conversation = 1;
+}
+
+// PeerAgent is a roster entry for the calling agent: the name, display name,
+// persona, and connection state of one peer agent. Returned by ListPeerAgents,
+// which excludes the caller.
+message PeerAgent {
+  string name = 1;
+  string display_name = 2;
+  string persona_prompt = 3;
+  AgentStatus.ConnectionState connection_state = 4;
+}
+
+// ListPeerAgents returns every other agent (the caller excluded) with the
+// fields an agent needs to decide whom to address: display name, persona, and
+// connection state. Agent-callable. Powers the "agent list" discovery tool.
+message ListPeerAgentsRequest {}
+
+message ListPeerAgentsResponse {
+  repeated PeerAgent agents = 1;
 }
 
 message CreateChannelRequest {
@@ -1006,6 +1070,43 @@ service CommandService {
     option (google.api.http) = {post: "/v1/{agent=agents/*}/conversations"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.create";
+  }
+
+  // ResolveChannelByTitle looks up the unique channel (type 2) with the given
+  // title, returning NOT_FOUND when absent (it never creates one). Agent-
+  // callable: no auth_method annotation, identity from GetAgentFromContext.
+  // Powers the "#<title>" address resolver.
+  rpc ResolveChannelByTitle(ResolveChannelByTitleRequest) returns (ResolveChannelByTitleResponse) {
+    option (google.api.http) = {get: "/v1/agents/-/channels:resolveByTitle"};
+  }
+
+  // GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent
+  // and a named end user. Agent-callable. The peer is resolved by principal
+  // display name; ambiguous or unknown names fail. Agent-callable twin of the
+  // user-only GetOrCreateConversation. Powers the "dm:@<user>" address resolver.
+  rpc GetOrCreateUserDM(GetOrCreateUserDMRequest) returns (GetOrCreateUserDMResponse) {
+    option (google.api.http) = {
+      post: "/v1/agents/-/userDm:getOrCreate"
+      body: "*"
+    };
+  }
+
+  // GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent DM between
+  // the calling agent and a peer agent. Agent-callable. Self-address is rejected.
+  // The peer is resolved by agent resource name ("agents/<id>"); the pair is
+  // canonicalized by the store. Powers the "dm:@<agent>" address resolver.
+  rpc GetOrCreateAgentDM(GetOrCreateAgentDMRequest) returns (GetOrCreateAgentDMResponse) {
+    option (google.api.http) = {
+      post: "/v1/agents/-/agentDm:getOrCreate"
+      body: "*"
+    };
+  }
+
+  // ListPeerAgents returns every other agent (the caller excluded) with the
+  // display name, persona, and connection state an agent needs to decide whom
+  // to address. Agent-callable. Powers the "agent list" discovery tool.
+  rpc ListPeerAgents(ListPeerAgentsRequest) returns (ListPeerAgentsResponse) {
+    option (google.api.http) = {get: "/v1/agents/-/peerAgents"};
   }
 
   rpc ListConversationMessages(ListConversationMessagesRequest) returns (ListConversationMessagesResponse) {

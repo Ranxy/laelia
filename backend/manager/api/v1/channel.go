@@ -33,7 +33,7 @@ func (s *CommandService) CreateChannel(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create channel"))
 	}
 
-	return connect.NewResponse(convertToV1Conversation(conv, user.Name, 1, 0, conv.Title)), nil
+	return connect.NewResponse(convertToV1Conversation(conv, user.Name, "", 1, 0, conv.Title)), nil
 }
 
 func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[v1pb.ListChannelsRequest]) (*connect.Response[v1pb.ListChannelsResponse], error) {
@@ -73,14 +73,17 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 		}
 		// For direct conversations (type=1) the title is empty in the DB; surface
 		// the agent's display name instead so the left rail can render the DM row
-		// without an extra member fetch.
+		// without an extra member fetch. The same agent name is the DM peer for
+		// the user viewer, so it doubles as the address peerName.
 		title := conv.Title
+		peerName := ""
 		if conv.Type == 1 && conv.AgentID.Valid {
 			if agent, agentErr := s.store.GetAgent(ctx, int(conv.AgentID.Int32)); agentErr == nil && agent != nil && agent.Name != "" {
 				title = agent.Name
+				peerName = agent.Name
 			}
 		}
-		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, memberCount, uc.UnreadCount, title))
+		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, peerName, memberCount, uc.UnreadCount, title))
 	}
 
 	return connect.NewResponse(&v1pb.ListChannelsResponse{
@@ -125,15 +128,27 @@ func (s *CommandService) ListChannelsForAgent(ctx context.Context, req *connect.
 		conv := uc.Conversation
 		memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
 		ownerName := resolveUserName(ctx, s.store, conv.OwnerID)
-		// Direct conversations store no title; surface the agent's display name
-		// so the row renders without an extra member fetch, mirroring ListChannels.
+		// For type 1 (user DM) the peer is the user, whose name is ownerName
+		// (the DM's created_by/owner is the user); the viewed agent is the
+		// single agent participant (conv.AgentID == the agent named in the
+		// request), so the row must be labeled with the user, not the agent's
+		// own name. For type 3 (agent DM) the peer is the other agent; resolve
+		// it from the member roster. Type 2 channels have no peer.
+		peerName := ""
 		title := conv.Title
-		if conv.Type == 1 && conv.AgentID.Valid {
-			if agent, agentErr := s.store.GetAgent(ctx, int(conv.AgentID.Int32)); agentErr == nil && agent != nil && agent.Name != "" {
-				title = agent.Name
+		switch conv.Type {
+		case store.ConversationTypeDM:
+			peerName = ownerName
+			title = ownerName
+		case store.ConversationTypeAgentDM:
+			peerName = s.resolveAgentDMPeerName(ctx, conv.ID, resourceID)
+			if peerName != "" {
+				title = peerName
 			}
+		default:
+			// type 2 channels have no peer; title is already the channel title.
 		}
-		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, memberCount, uc.UnreadCount, title))
+		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, peerName, memberCount, uc.UnreadCount, title))
 	}
 
 	return connect.NewResponse(&v1pb.ListChannelsForAgentResponse{
@@ -155,8 +170,22 @@ func (s *CommandService) GetChannel(ctx context.Context, req *connect.Request[v1
 
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
 	ownerName := resolveUserName(ctx, s.store, conv.OwnerID)
+	// The DM peer depends on the viewer: the agent daemon calls GetChannel on
+	// its own DMs and must see the user (or other agent) as the peer, not
+	// itself. Detect the caller's agent identity and pass it down.
+	viewerAgentResourceID := ""
+	if caller, ok := GetAgentFromContext(ctx); ok && caller != nil {
+		viewerAgentResourceID = caller.ResourceID
+	}
+	peerName := s.resolvePeerNameForViewer(ctx, conv, viewerAgentResourceID)
+	title := conv.Title
+	if peerName != "" && conv.Type != store.ConversationTypeChannel {
+		// DMs store no title; surface the peer name so the row matches the
+		// list endpoints (which set title = peer for DMs).
+		title = peerName
+	}
 
-	return connect.NewResponse(convertToV1Conversation(conv, ownerName, memberCount, 0, conv.Title)), nil
+	return connect.NewResponse(convertToV1Conversation(conv, ownerName, peerName, memberCount, 0, title)), nil
 }
 
 func (s *CommandService) UpdateChannel(ctx context.Context, req *connect.Request[v1pb.UpdateChannelRequest]) (*connect.Response[v1pb.Conversation], error) {
@@ -186,7 +215,7 @@ func (s *CommandService) UpdateChannel(ctx context.Context, req *connect.Request
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, updated.ID)
 	ownerName := resolveUserName(ctx, s.store, updated.OwnerID)
 
-	return connect.NewResponse(convertToV1Conversation(updated, ownerName, memberCount, 0, updated.Title)), nil
+	return connect.NewResponse(convertToV1Conversation(updated, ownerName, "", memberCount, 0, updated.Title)), nil
 }
 
 func (s *CommandService) DeleteChannel(ctx context.Context, req *connect.Request[v1pb.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error) {
@@ -384,6 +413,17 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		return nil, err
 	}
 
+	// Agent-DM conversations (type 3) are agent-only. Users can view them in
+	// the agent detail page (via the admin bypass in requireConversationMember)
+	// but must never send into one.
+	conv, convErr := s.store.GetConversation(ctx, convID)
+	if convErr != nil {
+		return nil, connect.NewError(connect.CodeNotFound, convErr)
+	}
+	if conv.Type == store.ConversationTypeAgentDM {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("agent-DM conversations are agent-only; users can view but cannot send"))
+	}
+
 	// thread_root, when set, makes this message a reply in an existing thread
 	// rooted at the given message id. Validate the root belongs to this
 	// conversation and is itself a root (not a nested thread reply).
@@ -559,7 +599,30 @@ func (s *CommandService) notifyThreadParticipants(ctx context.Context, convID, r
 	}
 }
 
-func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, memberCount int, unreadCount int32, title string) *v1pb.Conversation {
+// convertToV1Conversation is the single builder for v1 Conversation. It
+// populates Address — the name-based form agents write and read — from the
+// conversation type and a caller-resolved peerName:
+//   - type 2 (channel): "#<title>"; peerName is unused.
+//   - type 1 (user DM): "dm:@<peerName>", where peerName is the DM peer from
+//     the viewer's perspective (the agent for a user viewer, the user for an
+//     agent viewer).
+//   - type 3 (agent DM): "dm:@<peerName>", where peerName is the other agent.
+//
+// Callers resolve peerName (they already resolve owner/title for their view)
+// so the builder stays free of lookups. Empty peerName leaves a DM address
+// empty rather than emitting a malformed "dm:@".
+func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, peerName string, memberCount int, unreadCount int32, title string) *v1pb.Conversation {
+	var address string
+	switch conv.Type {
+	case store.ConversationTypeChannel:
+		address = "#" + title
+	case store.ConversationTypeDM, store.ConversationTypeAgentDM:
+		if peerName != "" {
+			address = "dm:@" + peerName
+		}
+	default:
+		// no address for unknown types
+	}
 	return &v1pb.Conversation{
 		Name:        fmt.Sprintf("conversations/%s", conv.ID.String()),
 		Title:       title,
@@ -570,6 +633,7 @@ func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, 
 		CreatedAt:   timestamppb.New(conv.CreatedAt),
 		UpdatedAt:   timestamppb.New(conv.UpdatedAt),
 		UnreadCount: unreadCount,
+		Address:     address,
 	}
 }
 
@@ -583,6 +647,67 @@ func resolveUserName(ctx context.Context, s *store.Store, principalID int) strin
 		return fmt.Sprintf("%d", principalID)
 	}
 	return u.Name
+}
+
+// resolveAgentDMPeerName returns the display name of the other agent in a
+// type-3 agent DM — the first agent member whose resource_id is not
+// selfResourceID. When selfResourceID is empty (no caller-agent perspective,
+// e.g. an admin fetching a single type-3 conversation via GetChannel) the
+// first resolvable agent member is returned. Returns "" when there is no
+// resolvable non-self peer agent (well-formed type-3 DMs always have two
+// agent members, so this only happens on a degenerate roster); it never
+// returns the viewer's own name.
+func (s *CommandService) resolveAgentDMPeerName(ctx context.Context, convID uuid.UUID, selfResourceID string) string {
+	members, err := s.store.ListConversationMembers(ctx, convID)
+	if err != nil {
+		slog.Warn("failed to list members for agent-DM peer", "conversationID", convID, "error", err)
+		return ""
+	}
+	for _, m := range members {
+		if m.MemberType != store.MemberTypeAgent {
+			continue
+		}
+		if selfResourceID != "" && m.MemberID == selfResourceID {
+			continue
+		}
+		agent, err := s.store.GetAgentByResourceID(ctx, m.MemberID)
+		if err != nil || agent == nil || agent.Name == "" {
+			continue
+		}
+		return agent.Name
+	}
+	return ""
+}
+
+// resolvePeerNameForViewer resolves the DM peer display name for
+// convertToV1Conversation from the viewer's perspective:
+//   - type 1 (user DM): when the viewer is the agent participant, the peer is
+//     the user (owner); otherwise the peer is the agent (conv.AgentID).
+//   - type 3 (agent DM): the other agent (the agent member that is not the
+//     viewer; the first agent when the viewer is not an agent).
+//   - type 2 (channel): "" (channels have no peer).
+//
+// The viewer's agent resource id is "" when the caller is a user/admin. Used
+// by GetChannel; the list endpoints resolve the peer per-row from their own
+// viewer context.
+func (s *CommandService) resolvePeerNameForViewer(ctx context.Context, conv *store.ConversationMessage, viewerAgentResourceID string) string {
+	switch conv.Type {
+	case store.ConversationTypeDM:
+		if viewerAgentResourceID != "" {
+			return resolveUserName(ctx, s.store, conv.OwnerID)
+		}
+		if !conv.AgentID.Valid {
+			return ""
+		}
+		agent, err := s.store.GetAgent(ctx, int(conv.AgentID.Int32))
+		if err != nil || agent == nil {
+			return ""
+		}
+		return agent.Name
+	case store.ConversationTypeAgentDM:
+		return s.resolveAgentDMPeerName(ctx, conv.ID, viewerAgentResourceID)
+	}
+	return ""
 }
 
 // FetchConversationActivity returns the execution status of every agent in a

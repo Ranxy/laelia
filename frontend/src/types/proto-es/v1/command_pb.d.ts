@@ -5,7 +5,7 @@
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { JsonObject, Message } from "@bufbuild/protobuf";
 import type { EmptySchema, FieldMask, Timestamp } from "@bufbuild/protobuf/wkt";
-import type { AgentProviderInfo } from "./agent_pb";
+import type { AgentProviderInfo, AgentStatus_ConnectionState } from "./agent_pb";
 
 /**
  * Describes the file v1/command.proto.
@@ -1128,6 +1128,17 @@ export declare type Conversation = Message<"laelia.v1.Conversation"> & {
    * @generated from field: int32 unread_count = 9;
    */
   unreadCount: number;
+
+  /**
+   * address is the name-based display address for this conversation, the form
+   * agents write and read: "#<title>" for a channel (type 2), "dm:@<peer>" for a
+   * direct message (type 1 peer is the user, type 3 peer is the other agent).
+   * Empty when the address is not applicable. Populated by the single builder
+   * convertToV1Conversation so every emit site renders the same form.
+   *
+   * @generated from field: string address = 11;
+   */
+  address: string;
 };
 
 /**
@@ -1515,6 +1526,184 @@ export declare type GetOrCreateConversationResponse = Message<"laelia.v1.GetOrCr
  * Use `create(GetOrCreateConversationResponseSchema)` to create a new message.
  */
 export declare const GetOrCreateConversationResponseSchema: GenMessage<GetOrCreateConversationResponse>;
+
+/**
+ * ResolveChannelByTitle looks up the unique channel (type 2) with the given
+ * title. Agent-callable (no auth_method annotation; identity from
+ * GetAgentFromContext). Returns NOT_FOUND when no such channel exists; it never
+ * creates one. Powers the "#<title>" address resolver.
+ *
+ * @generated from message laelia.v1.ResolveChannelByTitleRequest
+ */
+export declare type ResolveChannelByTitleRequest = Message<"laelia.v1.ResolveChannelByTitleRequest"> & {
+  /**
+   * @generated from field: string title = 1;
+   */
+  title: string;
+};
+
+/**
+ * Describes the message laelia.v1.ResolveChannelByTitleRequest.
+ * Use `create(ResolveChannelByTitleRequestSchema)` to create a new message.
+ */
+export declare const ResolveChannelByTitleRequestSchema: GenMessage<ResolveChannelByTitleRequest>;
+
+/**
+ * @generated from message laelia.v1.ResolveChannelByTitleResponse
+ */
+export declare type ResolveChannelByTitleResponse = Message<"laelia.v1.ResolveChannelByTitleResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Conversation conversation = 1;
+   */
+  conversation?: Conversation | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.ResolveChannelByTitleResponse.
+ * Use `create(ResolveChannelByTitleResponseSchema)` to create a new message.
+ */
+export declare const ResolveChannelByTitleResponseSchema: GenMessage<ResolveChannelByTitleResponse>;
+
+/**
+ * GetOrCreateUserDM opens (or reuses) the type-1 direct conversation between the
+ * calling agent and the named end user. Agent-callable. The peer is resolved by
+ * principal display name; an ambiguous (non-unique) or unknown name fails. This
+ * is the agent-callable twin of the user-only GetOrCreateConversation.
+ *
+ * @generated from message laelia.v1.GetOrCreateUserDMRequest
+ */
+export declare type GetOrCreateUserDMRequest = Message<"laelia.v1.GetOrCreateUserDMRequest"> & {
+  /**
+   * @generated from field: string peer_user_name = 1;
+   */
+  peerUserName: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetOrCreateUserDMRequest.
+ * Use `create(GetOrCreateUserDMRequestSchema)` to create a new message.
+ */
+export declare const GetOrCreateUserDMRequestSchema: GenMessage<GetOrCreateUserDMRequest>;
+
+/**
+ * @generated from message laelia.v1.GetOrCreateUserDMResponse
+ */
+export declare type GetOrCreateUserDMResponse = Message<"laelia.v1.GetOrCreateUserDMResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Conversation conversation = 1;
+   */
+  conversation?: Conversation | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.GetOrCreateUserDMResponse.
+ * Use `create(GetOrCreateUserDMResponseSchema)` to create a new message.
+ */
+export declare const GetOrCreateUserDMResponseSchema: GenMessage<GetOrCreateUserDMResponse>;
+
+/**
+ * GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent direct
+ * conversation between the calling agent and the named peer agent. Agent-
+ * callable. Self-address is rejected. The peer is resolved by agent resource
+ * name ("agents/<id>"); the pair is canonicalized by the store.
+ *
+ * @generated from message laelia.v1.GetOrCreateAgentDMRequest
+ */
+export declare type GetOrCreateAgentDMRequest = Message<"laelia.v1.GetOrCreateAgentDMRequest"> & {
+  /**
+   * @generated from field: string peer_agent = 1;
+   */
+  peerAgent: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetOrCreateAgentDMRequest.
+ * Use `create(GetOrCreateAgentDMRequestSchema)` to create a new message.
+ */
+export declare const GetOrCreateAgentDMRequestSchema: GenMessage<GetOrCreateAgentDMRequest>;
+
+/**
+ * @generated from message laelia.v1.GetOrCreateAgentDMResponse
+ */
+export declare type GetOrCreateAgentDMResponse = Message<"laelia.v1.GetOrCreateAgentDMResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Conversation conversation = 1;
+   */
+  conversation?: Conversation | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.GetOrCreateAgentDMResponse.
+ * Use `create(GetOrCreateAgentDMResponseSchema)` to create a new message.
+ */
+export declare const GetOrCreateAgentDMResponseSchema: GenMessage<GetOrCreateAgentDMResponse>;
+
+/**
+ * PeerAgent is a roster entry for the calling agent: the name, display name,
+ * persona, and connection state of one peer agent. Returned by ListPeerAgents,
+ * which excludes the caller.
+ *
+ * @generated from message laelia.v1.PeerAgent
+ */
+export declare type PeerAgent = Message<"laelia.v1.PeerAgent"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string display_name = 2;
+   */
+  displayName: string;
+
+  /**
+   * @generated from field: string persona_prompt = 3;
+   */
+  personaPrompt: string;
+
+  /**
+   * @generated from field: laelia.v1.AgentStatus.ConnectionState connection_state = 4;
+   */
+  connectionState: AgentStatus_ConnectionState;
+};
+
+/**
+ * Describes the message laelia.v1.PeerAgent.
+ * Use `create(PeerAgentSchema)` to create a new message.
+ */
+export declare const PeerAgentSchema: GenMessage<PeerAgent>;
+
+/**
+ * ListPeerAgents returns every other agent (the caller excluded) with the
+ * fields an agent needs to decide whom to address: display name, persona, and
+ * connection state. Agent-callable. Powers the "agent list" discovery tool.
+ *
+ * @generated from message laelia.v1.ListPeerAgentsRequest
+ */
+export declare type ListPeerAgentsRequest = Message<"laelia.v1.ListPeerAgentsRequest"> & {
+};
+
+/**
+ * Describes the message laelia.v1.ListPeerAgentsRequest.
+ * Use `create(ListPeerAgentsRequestSchema)` to create a new message.
+ */
+export declare const ListPeerAgentsRequestSchema: GenMessage<ListPeerAgentsRequest>;
+
+/**
+ * @generated from message laelia.v1.ListPeerAgentsResponse
+ */
+export declare type ListPeerAgentsResponse = Message<"laelia.v1.ListPeerAgentsResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.PeerAgent agents = 1;
+   */
+  agents: PeerAgent[];
+};
+
+/**
+ * Describes the message laelia.v1.ListPeerAgentsResponse.
+ * Use `create(ListPeerAgentsResponseSchema)` to create a new message.
+ */
+export declare const ListPeerAgentsResponseSchema: GenMessage<ListPeerAgentsResponse>;
 
 /**
  * @generated from message laelia.v1.CreateChannelRequest
@@ -3921,6 +4110,57 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof GetOrCreateConversationRequestSchema;
     output: typeof GetOrCreateConversationResponseSchema;
+  },
+  /**
+   * ResolveChannelByTitle looks up the unique channel (type 2) with the given
+   * title, returning NOT_FOUND when absent (it never creates one). Agent-
+   * callable: no auth_method annotation, identity from GetAgentFromContext.
+   * Powers the "#<title>" address resolver.
+   *
+   * @generated from rpc laelia.v1.CommandService.ResolveChannelByTitle
+   */
+  resolveChannelByTitle: {
+    methodKind: "unary";
+    input: typeof ResolveChannelByTitleRequestSchema;
+    output: typeof ResolveChannelByTitleResponseSchema;
+  },
+  /**
+   * GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent
+   * and a named end user. Agent-callable. The peer is resolved by principal
+   * display name; ambiguous or unknown names fail. Agent-callable twin of the
+   * user-only GetOrCreateConversation. Powers the "dm:@<user>" address resolver.
+   *
+   * @generated from rpc laelia.v1.CommandService.GetOrCreateUserDM
+   */
+  getOrCreateUserDM: {
+    methodKind: "unary";
+    input: typeof GetOrCreateUserDMRequestSchema;
+    output: typeof GetOrCreateUserDMResponseSchema;
+  },
+  /**
+   * GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent DM between
+   * the calling agent and a peer agent. Agent-callable. Self-address is rejected.
+   * The peer is resolved by agent resource name ("agents/<id>"); the pair is
+   * canonicalized by the store. Powers the "dm:@<agent>" address resolver.
+   *
+   * @generated from rpc laelia.v1.CommandService.GetOrCreateAgentDM
+   */
+  getOrCreateAgentDM: {
+    methodKind: "unary";
+    input: typeof GetOrCreateAgentDMRequestSchema;
+    output: typeof GetOrCreateAgentDMResponseSchema;
+  },
+  /**
+   * ListPeerAgents returns every other agent (the caller excluded) with the
+   * display name, persona, and connection state an agent needs to decide whom
+   * to address. Agent-callable. Powers the "agent list" discovery tool.
+   *
+   * @generated from rpc laelia.v1.CommandService.ListPeerAgents
+   */
+  listPeerAgents: {
+    methodKind: "unary";
+    input: typeof ListPeerAgentsRequestSchema;
+    output: typeof ListPeerAgentsResponseSchema;
   },
   /**
    * @generated from rpc laelia.v1.CommandService.ListConversationMessages

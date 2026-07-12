@@ -143,8 +143,12 @@
     - [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest)
     - [GetCommandContextResponse](#laelia-v1-GetCommandContextResponse)
     - [GetCommandRequest](#laelia-v1-GetCommandRequest)
+    - [GetOrCreateAgentDMRequest](#laelia-v1-GetOrCreateAgentDMRequest)
+    - [GetOrCreateAgentDMResponse](#laelia-v1-GetOrCreateAgentDMResponse)
     - [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest)
     - [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse)
+    - [GetOrCreateUserDMRequest](#laelia-v1-GetOrCreateUserDMRequest)
+    - [GetOrCreateUserDMResponse](#laelia-v1-GetOrCreateUserDMResponse)
     - [GetReminderRequest](#laelia-v1-GetReminderRequest)
     - [GetReminderResponse](#laelia-v1-GetReminderResponse)
     - [LifecyclePayload](#laelia-v1-LifecyclePayload)
@@ -166,6 +170,8 @@
     - [ListDueRemindersResponse](#laelia-v1-ListDueRemindersResponse)
     - [ListFilesRequest](#laelia-v1-ListFilesRequest)
     - [ListFilesResponse](#laelia-v1-ListFilesResponse)
+    - [ListPeerAgentsRequest](#laelia-v1-ListPeerAgentsRequest)
+    - [ListPeerAgentsResponse](#laelia-v1-ListPeerAgentsResponse)
     - [ListRemindersRequest](#laelia-v1-ListRemindersRequest)
     - [ListRemindersResponse](#laelia-v1-ListRemindersResponse)
     - [ListTasksRequest](#laelia-v1-ListTasksRequest)
@@ -181,6 +187,7 @@
     - [MarkConversationReadResponse](#laelia-v1-MarkConversationReadResponse)
     - [Mention](#laelia-v1-Mention)
     - [NewMessagesAvailable](#laelia-v1-NewMessagesAvailable)
+    - [PeerAgent](#laelia-v1-PeerAgent)
     - [PermissionDecidedPayload](#laelia-v1-PermissionDecidedPayload)
     - [PermissionDecision](#laelia-v1-PermissionDecision)
     - [PermissionOptionPayload](#laelia-v1-PermissionOptionPayload)
@@ -194,6 +201,8 @@
     - [RawAcpPayload](#laelia-v1-RawAcpPayload)
     - [Reminder](#laelia-v1-Reminder)
     - [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest)
+    - [ResolveChannelByTitleRequest](#laelia-v1-ResolveChannelByTitleRequest)
+    - [ResolveChannelByTitleResponse](#laelia-v1-ResolveChannelByTitleResponse)
     - [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest)
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
     - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
@@ -2030,6 +2039,7 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | updated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | unread_count | [int32](#int32) |  | unread_count is the number of chat_message rows with room_version beyond the requesting user&#39;s read cursor for this conversation. Populated by ListChannels; 0 (or unset) when the user is caught up. |
+| address | [string](#string) |  | address is the name-based display address for this conversation, the form agents write and read: &#34;#&lt;title&gt;&#34; for a channel (type 2), &#34;dm:@&lt;peer&gt;&#34; for a direct message (type 1 peer is the user, type 3 peer is the other agent). Empty when the address is not applicable. Populated by the single builder convertToV1Conversation so every emit site renders the same form. |
 
 
 
@@ -2391,6 +2401,39 @@ File is the persisted metadata for an S3-backed object.
 
 
 
+<a name="laelia-v1-GetOrCreateAgentDMRequest"></a>
+
+### GetOrCreateAgentDMRequest
+GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent direct
+conversation between the calling agent and the named peer agent. Agent-
+callable. Self-address is rejected. The peer is resolved by agent resource
+name (&#34;agents/&lt;id&gt;&#34;); the pair is canonicalized by the store.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| peer_agent | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetOrCreateAgentDMResponse"></a>
+
+### GetOrCreateAgentDMResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [Conversation](#laelia-v1-Conversation) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-GetOrCreateConversationRequest"></a>
 
 ### GetOrCreateConversationRequest
@@ -2415,6 +2458,39 @@ File is the persisted metadata for an S3-backed object.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetOrCreateUserDMRequest"></a>
+
+### GetOrCreateUserDMRequest
+GetOrCreateUserDM opens (or reuses) the type-1 direct conversation between the
+calling agent and the named end user. Agent-callable. The peer is resolved by
+principal display name; an ambiguous (non-unique) or unknown name fails. This
+is the agent-callable twin of the user-only GetOrCreateConversation.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| peer_user_name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetOrCreateUserDMResponse"></a>
+
+### GetOrCreateUserDMResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [Conversation](#laelia-v1-Conversation) |  |  |
 
 
 
@@ -2752,6 +2828,33 @@ drain loop. The agent identity is resolved from the auth context.
 
 
 
+<a name="laelia-v1-ListPeerAgentsRequest"></a>
+
+### ListPeerAgentsRequest
+ListPeerAgents returns every other agent (the caller excluded) with the
+fields an agent needs to decide whom to address: display name, persona, and
+connection state. Agent-callable. Powers the &#34;agent list&#34; discovery tool.
+
+
+
+
+
+
+<a name="laelia-v1-ListPeerAgentsResponse"></a>
+
+### ListPeerAgentsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agents | [PeerAgent](#laelia-v1-PeerAgent) | repeated |  |
+
+
+
+
+
+
 <a name="laelia-v1-ListRemindersRequest"></a>
 
 ### ListRemindersRequest
@@ -3016,6 +3119,26 @@ calling ListChannelUpdates, which compares conversation.version to the cursor.
 
 
 
+<a name="laelia-v1-PeerAgent"></a>
+
+### PeerAgent
+PeerAgent is a roster entry for the calling agent: the name, display name,
+persona, and connection state of one peer agent. Returned by ListPeerAgents,
+which excludes the caller.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| display_name | [string](#string) |  |  |
+| persona_prompt | [string](#string) |  |  |
+| connection_state | [AgentStatus.ConnectionState](#laelia-v1-AgentStatus-ConnectionState) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-PermissionDecidedPayload"></a>
 
 ### PermissionDecidedPayload
@@ -3252,6 +3375,39 @@ row carries the schedule, assignee, and lifecycle state. The resource name is
 | conversation | [string](#string) |  |  |
 | member_id | [string](#string) |  |  |
 | member_type | [int32](#int32) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ResolveChannelByTitleRequest"></a>
+
+### ResolveChannelByTitleRequest
+ResolveChannelByTitle looks up the unique channel (type 2) with the given
+title. Agent-callable (no auth_method annotation; identity from
+GetAgentFromContext). Returns NOT_FOUND when no such channel exists; it never
+creates one. Powers the &#34;#&lt;title&gt;&#34; address resolver.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| title | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ResolveChannelByTitleResponse"></a>
+
+### ResolveChannelByTitleResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [Conversation](#laelia-v1-Conversation) |  |  |
 
 
 
@@ -3736,6 +3892,10 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | SearchChatHistory | [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest) | [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse) |  |
 | GetCommandContext | [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest) | [GetCommandContextResponse](#laelia-v1-GetCommandContextResponse) |  |
 | GetOrCreateConversation | [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest) | [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse) |  |
+| ResolveChannelByTitle | [ResolveChannelByTitleRequest](#laelia-v1-ResolveChannelByTitleRequest) | [ResolveChannelByTitleResponse](#laelia-v1-ResolveChannelByTitleResponse) | ResolveChannelByTitle looks up the unique channel (type 2) with the given title, returning NOT_FOUND when absent (it never creates one). Agent- callable: no auth_method annotation, identity from GetAgentFromContext. Powers the &#34;#&lt;title&gt;&#34; address resolver. |
+| GetOrCreateUserDM | [GetOrCreateUserDMRequest](#laelia-v1-GetOrCreateUserDMRequest) | [GetOrCreateUserDMResponse](#laelia-v1-GetOrCreateUserDMResponse) | GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent and a named end user. Agent-callable. The peer is resolved by principal display name; ambiguous or unknown names fail. Agent-callable twin of the user-only GetOrCreateConversation. Powers the &#34;dm:@&lt;user&gt;&#34; address resolver. |
+| GetOrCreateAgentDM | [GetOrCreateAgentDMRequest](#laelia-v1-GetOrCreateAgentDMRequest) | [GetOrCreateAgentDMResponse](#laelia-v1-GetOrCreateAgentDMResponse) | GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent DM between the calling agent and a peer agent. Agent-callable. Self-address is rejected. The peer is resolved by agent resource name (&#34;agents/&lt;id&gt;&#34;); the pair is canonicalized by the store. Powers the &#34;dm:@&lt;agent&gt;&#34; address resolver. |
+| ListPeerAgents | [ListPeerAgentsRequest](#laelia-v1-ListPeerAgentsRequest) | [ListPeerAgentsResponse](#laelia-v1-ListPeerAgentsResponse) | ListPeerAgents returns every other agent (the caller excluded) with the display name, persona, and connection state an agent needs to decide whom to address. Agent-callable. Powers the &#34;agent list&#34; discovery tool. |
 | ListConversationMessages | [ListConversationMessagesRequest](#laelia-v1-ListConversationMessagesRequest) | [ListConversationMessagesResponse](#laelia-v1-ListConversationMessagesResponse) |  |
 | ListThreadMessages | [ListThreadMessagesRequest](#laelia-v1-ListThreadMessagesRequest) | [ListThreadMessagesResponse](#laelia-v1-ListThreadMessagesResponse) |  |
 | ListChannelThreads | [ListChannelThreadsRequest](#laelia-v1-ListChannelThreadsRequest) | [ListChannelThreadsResponse](#laelia-v1-ListChannelThreadsResponse) |  |

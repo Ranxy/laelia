@@ -29,6 +29,10 @@ const (
 	CommandService_SearchChatHistory_FullMethodName         = "/laelia.v1.CommandService/SearchChatHistory"
 	CommandService_GetCommandContext_FullMethodName         = "/laelia.v1.CommandService/GetCommandContext"
 	CommandService_GetOrCreateConversation_FullMethodName   = "/laelia.v1.CommandService/GetOrCreateConversation"
+	CommandService_ResolveChannelByTitle_FullMethodName     = "/laelia.v1.CommandService/ResolveChannelByTitle"
+	CommandService_GetOrCreateUserDM_FullMethodName         = "/laelia.v1.CommandService/GetOrCreateUserDM"
+	CommandService_GetOrCreateAgentDM_FullMethodName        = "/laelia.v1.CommandService/GetOrCreateAgentDM"
+	CommandService_ListPeerAgents_FullMethodName            = "/laelia.v1.CommandService/ListPeerAgents"
 	CommandService_ListConversationMessages_FullMethodName  = "/laelia.v1.CommandService/ListConversationMessages"
 	CommandService_ListThreadMessages_FullMethodName        = "/laelia.v1.CommandService/ListThreadMessages"
 	CommandService_ListChannelThreads_FullMethodName        = "/laelia.v1.CommandService/ListChannelThreads"
@@ -81,6 +85,25 @@ type CommandServiceClient interface {
 	SearchChatHistory(ctx context.Context, in *SearchChatHistoryRequest, opts ...grpc.CallOption) (*SearchChatHistoryResponse, error)
 	GetCommandContext(ctx context.Context, in *GetCommandContextRequest, opts ...grpc.CallOption) (*GetCommandContextResponse, error)
 	GetOrCreateConversation(ctx context.Context, in *GetOrCreateConversationRequest, opts ...grpc.CallOption) (*GetOrCreateConversationResponse, error)
+	// ResolveChannelByTitle looks up the unique channel (type 2) with the given
+	// title, returning NOT_FOUND when absent (it never creates one). Agent-
+	// callable: no auth_method annotation, identity from GetAgentFromContext.
+	// Powers the "#<title>" address resolver.
+	ResolveChannelByTitle(ctx context.Context, in *ResolveChannelByTitleRequest, opts ...grpc.CallOption) (*ResolveChannelByTitleResponse, error)
+	// GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent
+	// and a named end user. Agent-callable. The peer is resolved by principal
+	// display name; ambiguous or unknown names fail. Agent-callable twin of the
+	// user-only GetOrCreateConversation. Powers the "dm:@<user>" address resolver.
+	GetOrCreateUserDM(ctx context.Context, in *GetOrCreateUserDMRequest, opts ...grpc.CallOption) (*GetOrCreateUserDMResponse, error)
+	// GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent DM between
+	// the calling agent and a peer agent. Agent-callable. Self-address is rejected.
+	// The peer is resolved by agent resource name ("agents/<id>"); the pair is
+	// canonicalized by the store. Powers the "dm:@<agent>" address resolver.
+	GetOrCreateAgentDM(ctx context.Context, in *GetOrCreateAgentDMRequest, opts ...grpc.CallOption) (*GetOrCreateAgentDMResponse, error)
+	// ListPeerAgents returns every other agent (the caller excluded) with the
+	// display name, persona, and connection state an agent needs to decide whom
+	// to address. Agent-callable. Powers the "agent list" discovery tool.
+	ListPeerAgents(ctx context.Context, in *ListPeerAgentsRequest, opts ...grpc.CallOption) (*ListPeerAgentsResponse, error)
 	ListConversationMessages(ctx context.Context, in *ListConversationMessagesRequest, opts ...grpc.CallOption) (*ListConversationMessagesResponse, error)
 	ListThreadMessages(ctx context.Context, in *ListThreadMessagesRequest, opts ...grpc.CallOption) (*ListThreadMessagesResponse, error)
 	ListChannelThreads(ctx context.Context, in *ListChannelThreadsRequest, opts ...grpc.CallOption) (*ListChannelThreadsResponse, error)
@@ -289,6 +312,46 @@ func (c *commandServiceClient) GetOrCreateConversation(ctx context.Context, in *
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetOrCreateConversationResponse)
 	err := c.cc.Invoke(ctx, CommandService_GetOrCreateConversation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) ResolveChannelByTitle(ctx context.Context, in *ResolveChannelByTitleRequest, opts ...grpc.CallOption) (*ResolveChannelByTitleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveChannelByTitleResponse)
+	err := c.cc.Invoke(ctx, CommandService_ResolveChannelByTitle_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) GetOrCreateUserDM(ctx context.Context, in *GetOrCreateUserDMRequest, opts ...grpc.CallOption) (*GetOrCreateUserDMResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOrCreateUserDMResponse)
+	err := c.cc.Invoke(ctx, CommandService_GetOrCreateUserDM_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) GetOrCreateAgentDM(ctx context.Context, in *GetOrCreateAgentDMRequest, opts ...grpc.CallOption) (*GetOrCreateAgentDMResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOrCreateAgentDMResponse)
+	err := c.cc.Invoke(ctx, CommandService_GetOrCreateAgentDM_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) ListPeerAgents(ctx context.Context, in *ListPeerAgentsRequest, opts ...grpc.CallOption) (*ListPeerAgentsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPeerAgentsResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListPeerAgents_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -678,6 +741,25 @@ type CommandServiceServer interface {
 	SearchChatHistory(context.Context, *SearchChatHistoryRequest) (*SearchChatHistoryResponse, error)
 	GetCommandContext(context.Context, *GetCommandContextRequest) (*GetCommandContextResponse, error)
 	GetOrCreateConversation(context.Context, *GetOrCreateConversationRequest) (*GetOrCreateConversationResponse, error)
+	// ResolveChannelByTitle looks up the unique channel (type 2) with the given
+	// title, returning NOT_FOUND when absent (it never creates one). Agent-
+	// callable: no auth_method annotation, identity from GetAgentFromContext.
+	// Powers the "#<title>" address resolver.
+	ResolveChannelByTitle(context.Context, *ResolveChannelByTitleRequest) (*ResolveChannelByTitleResponse, error)
+	// GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent
+	// and a named end user. Agent-callable. The peer is resolved by principal
+	// display name; ambiguous or unknown names fail. Agent-callable twin of the
+	// user-only GetOrCreateConversation. Powers the "dm:@<user>" address resolver.
+	GetOrCreateUserDM(context.Context, *GetOrCreateUserDMRequest) (*GetOrCreateUserDMResponse, error)
+	// GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent DM between
+	// the calling agent and a peer agent. Agent-callable. Self-address is rejected.
+	// The peer is resolved by agent resource name ("agents/<id>"); the pair is
+	// canonicalized by the store. Powers the "dm:@<agent>" address resolver.
+	GetOrCreateAgentDM(context.Context, *GetOrCreateAgentDMRequest) (*GetOrCreateAgentDMResponse, error)
+	// ListPeerAgents returns every other agent (the caller excluded) with the
+	// display name, persona, and connection state an agent needs to decide whom
+	// to address. Agent-callable. Powers the "agent list" discovery tool.
+	ListPeerAgents(context.Context, *ListPeerAgentsRequest) (*ListPeerAgentsResponse, error)
 	ListConversationMessages(context.Context, *ListConversationMessagesRequest) (*ListConversationMessagesResponse, error)
 	ListThreadMessages(context.Context, *ListThreadMessagesRequest) (*ListThreadMessagesResponse, error)
 	ListChannelThreads(context.Context, *ListChannelThreadsRequest) (*ListChannelThreadsResponse, error)
@@ -810,6 +892,18 @@ func (UnimplementedCommandServiceServer) GetCommandContext(context.Context, *Get
 }
 func (UnimplementedCommandServiceServer) GetOrCreateConversation(context.Context, *GetOrCreateConversationRequest) (*GetOrCreateConversationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetOrCreateConversation not implemented")
+}
+func (UnimplementedCommandServiceServer) ResolveChannelByTitle(context.Context, *ResolveChannelByTitleRequest) (*ResolveChannelByTitleResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveChannelByTitle not implemented")
+}
+func (UnimplementedCommandServiceServer) GetOrCreateUserDM(context.Context, *GetOrCreateUserDMRequest) (*GetOrCreateUserDMResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOrCreateUserDM not implemented")
+}
+func (UnimplementedCommandServiceServer) GetOrCreateAgentDM(context.Context, *GetOrCreateAgentDMRequest) (*GetOrCreateAgentDMResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOrCreateAgentDM not implemented")
+}
+func (UnimplementedCommandServiceServer) ListPeerAgents(context.Context, *ListPeerAgentsRequest) (*ListPeerAgentsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPeerAgents not implemented")
 }
 func (UnimplementedCommandServiceServer) ListConversationMessages(context.Context, *ListConversationMessagesRequest) (*ListConversationMessagesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListConversationMessages not implemented")
@@ -1087,6 +1181,78 @@ func _CommandService_GetOrCreateConversation_Handler(srv interface{}, ctx contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CommandServiceServer).GetOrCreateConversation(ctx, req.(*GetOrCreateConversationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_ResolveChannelByTitle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveChannelByTitleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ResolveChannelByTitle(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ResolveChannelByTitle_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ResolveChannelByTitle(ctx, req.(*ResolveChannelByTitleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_GetOrCreateUserDM_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrCreateUserDMRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).GetOrCreateUserDM(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_GetOrCreateUserDM_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).GetOrCreateUserDM(ctx, req.(*GetOrCreateUserDMRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_GetOrCreateAgentDM_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrCreateAgentDMRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).GetOrCreateAgentDM(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_GetOrCreateAgentDM_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).GetOrCreateAgentDM(ctx, req.(*GetOrCreateAgentDMRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_ListPeerAgents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPeerAgentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListPeerAgents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListPeerAgents_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListPeerAgents(ctx, req.(*ListPeerAgentsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1791,6 +1957,22 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetOrCreateConversation",
 			Handler:    _CommandService_GetOrCreateConversation_Handler,
+		},
+		{
+			MethodName: "ResolveChannelByTitle",
+			Handler:    _CommandService_ResolveChannelByTitle_Handler,
+		},
+		{
+			MethodName: "GetOrCreateUserDM",
+			Handler:    _CommandService_GetOrCreateUserDM_Handler,
+		},
+		{
+			MethodName: "GetOrCreateAgentDM",
+			Handler:    _CommandService_GetOrCreateAgentDM_Handler,
+		},
+		{
+			MethodName: "ListPeerAgents",
+			Handler:    _CommandService_ListPeerAgents_Handler,
 		},
 		{
 			MethodName: "ListConversationMessages",
