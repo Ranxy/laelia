@@ -59,6 +59,7 @@ import type {
   AgentActivity,
   Attachment,
   ChannelMember,
+  Conversation,
 } from "@/types/proto-es/v1/command_pb";
 import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
 
@@ -184,8 +185,19 @@ export function ChatConversationPage() {
     id: string;
     name: string;
   } | null>(null);
+  // Conversation metadata fetched on demand via GetChannel. The user's left-rail
+  // ListChannels excludes agent-DMs (type 3 — the user is not a member), so when
+  // an admin opens one directly `channels` has no entry and `channel` would be
+  // undefined. We fetch the single conversation so its type is known and the
+  // composer can be gated for agent-DMs. Null while unset or on fetch failure.
+  const [fetchedChannel, setFetchedChannel] = useState<Conversation | null>(
+    null
+  );
 
-  const channel = channels.find((c) => c.name === conversationName);
+  const channel =
+    channels.find((c) => c.name === conversationName) ??
+    fetchedChannel ??
+    undefined;
   const isDm = channel?.type === CONVERSATION_TYPE_DM;
   // Agent-to-agent DMs (type 3) are admin view-only: a user cannot send or
   // alter membership there. membershipFixed covers both DM shapes (user+agent
@@ -196,6 +208,30 @@ export function ChatConversationPage() {
     channel && currentUser
       ? channel.ownerId === currentUser.name.split("/").pop()
       : false;
+
+  // Fetch conversation metadata when the open conversation is absent from the
+  // user's left-rail `channels` (notably agent-DMs, which ListChannels excludes
+  // by membership). GetChannel's admin bypass lets an admin read it; a non-admin
+  // is denied and the fetch fails silently (they cannot view the DM at all).
+  useEffect(() => {
+    if (!channelId || !conversationName) return;
+    if (channels.some((c) => c.name === conversationName)) {
+      setFetchedChannel(null);
+      return;
+    }
+    let cancelled = false;
+    commandServiceClient
+      .getChannel({ name: conversationName })
+      .then((res) => {
+        if (!cancelled) setFetchedChannel(res);
+      })
+      .catch(() => {
+        if (!cancelled) setFetchedChannel(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [channelId, conversationName, channels]);
 
   // The thread panel is open only when it belongs to the currently-viewed
   // channel; switching channels closes it (see init()).
