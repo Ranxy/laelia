@@ -84,21 +84,6 @@ func normalizeConversationName(s string) string {
 	return fmt.Sprintf("conversations/%s", s)
 }
 
-// normalizeThreadRoot turns a thread-root reference into the bare message id
-// the manager expects for ThreadRoot. Accepts either a bare id or the full
-// "conversations/<c>/messages/<m>" resource name (as printed by `task list` /
-// `task claim`), so an agent can pass a task's full message name straight from
-// `task claim` to `thread send --root` without stripping the prefix by hand.
-func normalizeThreadRoot(s string) string {
-	if s == "" {
-		return ""
-	}
-	if idx := strings.LastIndex(s, "/"); idx >= 0 {
-		return s[idx+1:]
-	}
-	return s
-}
-
 func senderTypeString(t v1pb.SenderType) string {
 	switch t {
 	case v1pb.SenderType_SENDER_TYPE_USER:
@@ -236,7 +221,9 @@ func SearchChatHistory(ctx context.Context, d Deps, in SearchChatHistoryInput) (
 		Limit:     int32(limit),
 		PageToken: in.PageToken,
 	}
-	if name := normalizeConversationName(in.Conversation); name != "" {
+	if name, err := resolveConversationAddress(ctx, d, in.Conversation); err != nil {
+		return "", err
+	} else if name != "" {
 		reqMsg.Conversation = name
 	}
 	resp, err := d.Client.SearchChatHistory(ctx, connect.NewRequest(reqMsg))
@@ -295,7 +282,10 @@ func GetCommandContext(ctx context.Context, d Deps, in GetCommandContextInput) (
 // recovery. The returned text states current_version, which the caller needs as
 // base_version for PostMessage and processed_version for AckProcessedVersion.
 func GetConversationMessages(ctx context.Context, d Deps, in GetConversationMessagesInput) (string, error) {
-	name := normalizeConversationName(in.Conversation)
+	name, err := resolveConversationAddress(ctx, d, in.Conversation)
+	if err != nil {
+		return "", err
+	}
 	if name == "" {
 		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the conversation name from `laelia-agent message check`)", "")
 	}
@@ -353,7 +343,10 @@ func GetConversationMessages(ctx context.Context, d Deps, in GetConversationMess
 // thinking — this is NOT an error; the returned text lists the new messages and
 // tells the agent to re-read and retry with the updated base_version.
 func PostMessage(ctx context.Context, d Deps, in PostMessageInput) (string, error) {
-	name := normalizeConversationName(in.Conversation)
+	name, err := resolveConversationAddress(ctx, d, in.Conversation)
+	if err != nil {
+		return "", err
+	}
 	if name == "" {
 		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the conversation name from `laelia-agent message check`)", "")
 	}
@@ -429,7 +422,10 @@ func ListChannelUpdates(ctx context.Context, d Deps) (string, error) {
 // ListChannelUpdates no longer reports it. The session's command_id links the
 // session's command to the conversation for frontend visibility.
 func AckProcessedVersion(ctx context.Context, d Deps, in AckProcessedVersionInput) (string, error) {
-	name := normalizeConversationName(in.Conversation)
+	name, err := resolveConversationAddress(ctx, d, in.Conversation)
+	if err != nil {
+		return "", err
+	}
 	if name == "" {
 		return "", localError("MISSING_CONVERSATION", "conversation is required", "")
 	}
@@ -463,7 +459,9 @@ func UploadFile(ctx context.Context, d Deps, in UploadFileInput) (string, error)
 		MimeType:     in.MimeType,
 		Data:         in.Data,
 	}
-	if name := normalizeConversationName(in.Conversation); name != "" {
+	if name, err := resolveConversationAddress(ctx, d, in.Conversation); err != nil {
+		return "", err
+	} else if name != "" {
 		reqMsg.Conversation = name
 	}
 	resp, err := d.Client.UploadFile(ctx, connect.NewRequest(reqMsg))
@@ -501,7 +499,10 @@ func DownloadFile(ctx context.Context, d Deps, in DownloadFileInput) (*DownloadF
 // ListFiles lists the files attached to a conversation. The agent must be a
 // member.
 func ListFiles(ctx context.Context, d Deps, in ListFilesInput) (string, error) {
-	name := normalizeConversationName(in.Conversation)
+	name, err := resolveConversationAddress(ctx, d, in.Conversation)
+	if err != nil {
+		return "", err
+	}
 	if name == "" {
 		return "", localError("MISSING_CONVERSATION", "conversation is required", "")
 	}
@@ -576,14 +577,16 @@ func ListThreadUpdates(ctx context.Context, d Deps, _ ListThreadUpdatesInput) (s
 // current_version, which the caller needs as base_version for thread send and
 // (with the rest of the channel) processed_version for message ack.
 func GetThreadMessages(ctx context.Context, d Deps, in GetThreadMessagesInput) (string, error) {
-	name := normalizeConversationName(in.Conversation)
-	if name == "" {
-		return "", localError("MISSING_CONVERSATION", "conversation is required", "")
-	}
 	if in.Root == "" {
 		return "", localError("INVALID_ARGUMENT_FAILED", "root is required (the thread root message id from `thread check`)", "Pass --root <thread_root>.")
 	}
-	root := normalizeThreadRoot(in.Root)
+	name, root, err := resolveThreadRoot(ctx, d, in.Conversation, in.Root)
+	if err != nil {
+		return "", err
+	}
+	if name == "" {
+		return "", localError("MISSING_CONVERSATION", "conversation is required", "")
+	}
 
 	direction := in.Direction
 	if direction == "" {
@@ -643,14 +646,16 @@ func GetThreadMessages(ctx context.Context, d Deps, in GetThreadMessagesInput) (
 // committed=false conflict the returned text lists the new messages and tells
 // the agent to re-read and retry with the updated base_version.
 func PostThreadMessage(ctx context.Context, d Deps, in PostThreadMessageInput) (string, error) {
-	name := normalizeConversationName(in.Conversation)
-	if name == "" {
-		return "", localError("MISSING_CONVERSATION", "conversation is required", "")
-	}
 	if in.Root == "" {
 		return "", localError("INVALID_ARGUMENT_FAILED", "root is required (the thread root message id)", "Pass --root <thread_root>.")
 	}
-	root := normalizeThreadRoot(in.Root)
+	name, root, err := resolveThreadRoot(ctx, d, in.Conversation, in.Root)
+	if err != nil {
+		return "", err
+	}
+	if name == "" {
+		return "", localError("MISSING_CONVERSATION", "conversation is required", "")
+	}
 
 	var attachments []*v1pb.Attachment
 	for _, id := range in.AttachmentIDs {

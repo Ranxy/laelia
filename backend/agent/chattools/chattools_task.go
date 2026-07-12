@@ -95,7 +95,10 @@ func formatTaskLine(m *v1pb.ChatMessage) string {
 // discover TODO tasks the agent has already acked past (message read only
 // returns the cursor delta, so old tasks need an explicit listing).
 func ListTasks(ctx context.Context, d Deps, in ListTasksInput) (string, error) {
-	name := normalizeConversationName(in.Conversation)
+	name, err := resolveConversationAddress(ctx, d, in.Conversation)
+	if err != nil {
+		return "", err
+	}
 	if name == "" {
 		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the conversation name from `laelia-agent message check`)", "")
 	}
@@ -141,7 +144,11 @@ func ClaimTask(ctx context.Context, d Deps, in ClaimTaskInput) (string, error) {
 	if in.Message == "" {
 		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the task's conversations/{c}/messages/{m} name from `task list`)", "Pass the message name from `laelia-agent task list`.")
 	}
-	resp, err := d.Client.ClaimTask(ctx, connect.NewRequest(&v1pb.ClaimTaskRequest{Message: in.Message}))
+	message, err := resolveMessageName(ctx, d, in.Message)
+	if err != nil {
+		return "", err
+	}
+	resp, err := d.Client.ClaimTask(ctx, connect.NewRequest(&v1pb.ClaimTaskRequest{Message: message}))
 	if err != nil {
 		return "", wrapManagerError(err)
 	}
@@ -164,7 +171,11 @@ func UnclaimTask(ctx context.Context, d Deps, in UnclaimTaskInput) (string, erro
 	if in.Message == "" {
 		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the task's conversations/{c}/messages/{m} name)", "Pass the message name from `laelia-agent task list`.")
 	}
-	resp, err := d.Client.UnclaimTask(ctx, connect.NewRequest(&v1pb.UnclaimTaskRequest{Message: in.Message}))
+	message, err := resolveMessageName(ctx, d, in.Message)
+	if err != nil {
+		return "", err
+	}
+	resp, err := d.Client.UnclaimTask(ctx, connect.NewRequest(&v1pb.UnclaimTaskRequest{Message: message}))
 	if err != nil {
 		return "", wrapManagerError(err)
 	}
@@ -184,7 +195,11 @@ func UpdateTaskStatus(ctx context.Context, d Deps, in UpdateTaskStatusInput) (st
 	if !ok || target == v1pb.TaskStatus_TASK_STATUS_TODO || target == v1pb.TaskStatus_TASK_STATUS_UNSPECIFIED {
 		return "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("status must be in_review or done, got %q", in.Status), "Use `task review` for in_review or `task done` for done.")
 	}
-	resp, err := d.Client.UpdateTaskStatus(ctx, connect.NewRequest(&v1pb.UpdateTaskStatusRequest{Message: in.Message, Status: target}))
+	message, err := resolveMessageName(ctx, d, in.Message)
+	if err != nil {
+		return "", err
+	}
+	resp, err := d.Client.UpdateTaskStatus(ctx, connect.NewRequest(&v1pb.UpdateTaskStatusRequest{Message: message, Status: target}))
 	if err != nil {
 		return "", wrapManagerError(err)
 	}
@@ -197,7 +212,10 @@ func UpdateTaskStatus(ctx context.Context, d Deps, in UpdateTaskStatusInput) (st
 // the posting agent does NOT auto-claim it. Other agent members are woken so
 // they can claim it.
 func CreateTask(ctx context.Context, d Deps, in CreateTaskInput) (string, error) {
-	name := normalizeConversationName(in.Conversation)
+	name, err := resolveConversationAddress(ctx, d, in.Conversation)
+	if err != nil {
+		return "", err
+	}
 	if name == "" {
 		return "", localError("MISSING_CONVERSATION", "conversation is required", "")
 	}

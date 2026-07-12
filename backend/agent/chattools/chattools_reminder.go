@@ -132,8 +132,15 @@ func ConvertMessageToReminder(ctx context.Context, d Deps, in ConvertMessageToRe
 			"either --fire-at (one-shot) or --cron (recurring) is required",
 			"Pass --fire-at with an RFC3339 timestamp for a one-shot reminder, or --cron for a recurring reminder (the manager computes the first fire).")
 	}
+	// Resolve the trigger message AFTER the schedule is validated: resolving a
+	// "dm:@<peer>" message address creates the DM as a side effect, which must
+	// not leak on a request that is about to fail validation.
+	message, err := resolveMessageName(ctx, d, in.Message)
+	if err != nil {
+		return "", err
+	}
 	resp, err := d.Client.ConvertMessageToReminder(ctx, connect.NewRequest(&v1pb.ConvertMessageToReminderRequest{
-		Message:     in.Message,
+		Message:     message,
 		TaskContent: in.TaskContent,
 		FireAt:      fireAtPB,
 		CronExpr:    in.CronExpr,
@@ -184,7 +191,11 @@ func ListReminders(ctx context.Context, d Deps, in ListRemindersInput) (string, 
 	}
 	req := &v1pb.ListRemindersRequest{StatusFilter: filter}
 	if in.Conversation != "" {
-		req.Conversation = normalizeConversationName(in.Conversation)
+		name, err := resolveConversationAddress(ctx, d, in.Conversation)
+		if err != nil {
+			return "", err
+		}
+		req.Conversation = name
 	}
 	resp, err := d.Client.ListReminders(ctx, connect.NewRequest(req))
 	if err != nil {

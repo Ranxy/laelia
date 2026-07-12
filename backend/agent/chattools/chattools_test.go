@@ -12,6 +12,9 @@ import (
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
+// uuidStr is a valid UUID used by address-parser tests as a message-id suffix.
+const uuidStr = "550e8400-e29b-41d4-a716-446655440000"
+
 func TestNormalizeConversationName(t *testing.T) {
 	for in, want := range map[string]string{
 		"":                  "",
@@ -22,14 +25,20 @@ func TestNormalizeConversationName(t *testing.T) {
 	}
 }
 
-func TestNormalizeThreadRoot(t *testing.T) {
+func TestBareRootID(t *testing.T) {
 	for in, want := range map[string]string{
 		"":                                   "",
 		"abc-123":                            "abc-123",
 		"conversations/c-1/messages/m-2":     "m-2",
 		"conversations/abc-123/messages/456": "456",
+		// Address form "<addr>:<uuid>": the bare message id is the UUID suffix.
+		"#general:" + uuidStr:          uuidStr,
+		"dm:@alice:" + uuidStr:         uuidStr,
+		"conversations/c-1:" + uuidStr: uuidStr,
+		// ':' inside a title is tolerated; only a UUID suffix is split off.
+		"#plan:b:" + uuidStr: uuidStr,
 	} {
-		assert.Equal(t, want, normalizeThreadRoot(in), "input %q", in)
+		assert.Equal(t, want, bareRootID(in), "input %q", in)
 	}
 }
 

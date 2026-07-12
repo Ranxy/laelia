@@ -1,0 +1,229 @@
+package chattools
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"connectrpc.com/connect"
+	"github.com/google/uuid"
+
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
+)
+
+// This file implements the agent-side address resolver: it turns the human-
+// oriented conversation/message addresses the LLM is prompted to write
+// ("#<title>", "dm:@<peer>", and the legacy "conversations/<id>" / bare id)
+// into the canonical "conversations/<id>" / "conversations/<id>/messages/<m>"
+// resource names the manager expects, creating DMs if absent.
+//
+// The resolver is the input-side counterpart of turn_batch's address formatter
+// (resolveChannelTarget): output emits "<address>", input accepts "<address>".
+// Mid-refactor the agent still holds legacy "conversations/<id>" handles, so
+// any unrecognized form falls through to normalizeConversationName unchanged.
+
+// resolveConversationAddress turns a conversation address into the canonical
+// "conversations/<id>" resource name. "#<title>" resolves (never creates) a
+// channel; "dm:@<peer>" opens or reuses a DM with the named agent or user; any
+// other form is treated as a legacy id/name and passed through
+// normalizeConversationName. An empty address resolves to "" with no error so
+// optional callers (search, upload) can pass through unchanged.
+func resolveConversationAddress(ctx context.Context, d Deps, addr string) (string, error) {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		return "", nil
+	}
+	switch {
+	case strings.HasPrefix(addr, "#"):
+		return resolveChannelTitle(ctx, d, addr[1:])
+	case strings.HasPrefix(addr, "dm:"):
+		peer := strings.TrimSpace(strings.TrimPrefix(addr[3:], "@"))
+		if peer == "" {
+			return "", localError("INVALID_ARGUMENT_FAILED", "dm: requires a peer name (dm:@<agent-or-user>)", "Use dm:@<peer>.")
+		}
+		return resolveDMAddress(ctx, d, peer)
+	default:
+		return normalizeConversationName(addr), nil
+	}
+}
+
+// resolveChannelTitle looks up the unique channel with the given title. It never
+// creates one: an absent channel is a NOT_FOUND_FAILED, matching the design's
+// "channels are user-created; agents only address existing ones" rule.
+func resolveChannelTitle(ctx context.Context, d Deps, title string) (string, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return "", localError("INVALID_ARGUMENT_FAILED", "# requires a channel title (e.g. #general)", "Use #<title>.")
+	}
+	resp, err := d.Client.ResolveChannelByTitle(ctx, connect.NewRequest(&v1pb.ResolveChannelByTitleRequest{Title: title}))
+	if err != nil {
+		return "", wrapManagerError(err)
+	}
+	return conversationName(resp.Msg, fmt.Sprintf("channel %q", title))
+}
+
+// resolveDMAddress opens or reuses a DM with the named peer. A peer given as
+// "agents/<id>" addresses an agent directly; otherwise the peer is a display
+// name resolved to an agent first and, if no agent matches, to a user. Agent-
+// first means a shared name addresses the agent. When an agent DOES match, its
+// DM is opened and the result returned verbatim — a NotFound from that create
+// (e.g. the peer was deleted between the list and the create) must NOT fall
+// through to the user path, or a same-named user would silently receive agent
+// DMs. Only "no agent matched the name" falls through to the user path.
+func resolveDMAddress(ctx context.Context, d Deps, peer string) (string, error) {
+	if strings.HasPrefix(peer, "agents/") {
+		return createAgentDM(ctx, d, peer)
+	}
+	match, err := findPeerAgentByName(ctx, d, peer)
+	if err != nil {
+		return "", err
+	}
+	if match != nil {
+		return createAgentDM(ctx, d, match.GetName())
+	}
+	return createUserDM(ctx, d, peer)
+}
+
+// findPeerAgentByName returns the single peer agent whose display name matches
+// peer, or nil when no agent matches so the caller falls through to the user
+// path. More than one match is an ambiguous-name error; a ListPeerAgents
+// failure is propagated. Splitting the lookup from the DM create lets the caller
+// own the fall-through, so a create-time NotFound after a match is not mistaken
+// for "no agent matched".
+func findPeerAgentByName(ctx context.Context, d Deps, peer string) (*v1pb.PeerAgent, error) {
+	resp, err := d.Client.ListPeerAgents(ctx, connect.NewRequest(&v1pb.ListPeerAgentsRequest{}))
+	if err != nil {
+		return nil, wrapManagerError(err)
+	}
+	var match *v1pb.PeerAgent
+	for _, a := range resp.Msg.GetAgents() {
+		if a.GetDisplayName() == peer {
+			if match != nil {
+				return nil, localError("AMBIGUOUS_PEER", fmt.Sprintf("multiple agents named %q; address one as dm:@agents/<resource-id>", peer), "Run `agent list` and use dm:@agents/<resource-id>.")
+			}
+			match = a
+		}
+	}
+	return match, nil
+}
+
+// createAgentDM opens or reuses the type-3 agent DM with the peer given as the
+// "agents/<id>" resource name. The manager rejects self-address and unknown
+// agents; those reach the caller as wrapped manager errors.
+func createAgentDM(ctx context.Context, d Deps, peerAgent string) (string, error) {
+	resp, err := d.Client.GetOrCreateAgentDM(ctx, connect.NewRequest(&v1pb.GetOrCreateAgentDMRequest{PeerAgent: peerAgent}))
+	if err != nil {
+		return "", wrapManagerError(err)
+	}
+	return conversationName(resp.Msg, fmt.Sprintf("agent DM with %s", peerAgent))
+}
+
+// createUserDM opens or reuses the type-1 DM with the named end user. The
+// manager resolves the name (NOT_FOUND for an unknown user, FailedPrecondition
+// for an ambiguous one) and creates the DM if the user exists.
+func createUserDM(ctx context.Context, d Deps, peer string) (string, error) {
+	resp, err := d.Client.GetOrCreateUserDM(ctx, connect.NewRequest(&v1pb.GetOrCreateUserDMRequest{PeerUserName: peer}))
+	if err != nil {
+		return "", wrapManagerError(err)
+	}
+	return conversationName(resp.Msg, fmt.Sprintf("user DM with %q", peer))
+}
+
+// conversationName extracts the canonical "conversations/<id>" name from a
+// resolution response, returning NOT_FOUND_FAILED when the manager returned a
+// response carrying no resource name. The guard is shared by the channel/agent-
+// DM/user-DM resolvers so an empty name can never flow silently into a later
+// manager RPC that requires one.
+func conversationName[T interface{ GetConversation() *v1pb.Conversation }](resp T, what string) (string, error) {
+	name := strings.TrimSpace(resp.GetConversation().GetName())
+	if name == "" {
+		return "", localError("NOT_FOUND_FAILED", fmt.Sprintf("%s resolved without a resource name", what), "")
+	}
+	return name, nil
+}
+
+// splitMessageAddress splits a message address into its conversation address
+// and bare message id. It accepts three forms:
+//   - legacy full name "conversations/<c>/messages/<m>" → ("conversations/<c>", "<m>")
+//   - address form "<addr>:<message-uuid>" → ("<addr>", "<uuid>"), where <addr>
+//     is "#title", "dm:@peer", or "conversations/<id>"; ':' inside a title is
+//     tolerated because only a UUID suffix is split off
+//   - a bare token with no message id → (token, "")
+//
+// The message id is the suffix after the last ':' whose remainder parses as a
+// UUID, so a title containing ':' (e.g. "#plan:b") is not mis-split.
+func splitMessageAddress(addr string) (convAddr, msgID string) {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		return "", ""
+	}
+	// Legacy full name.
+	if i := strings.LastIndex(addr, "/messages/"); i >= 0 {
+		return strings.TrimSpace(addr[:i]), addr[i+len("/messages/"):]
+	}
+	// Address form "<addr>:<message-uuid>": split off the message id only when
+	// the suffix after the last ':' parses as a UUID. A UUID contains no ':',
+	// so if the last ':' does not yield one, no earlier ':' can either — its
+	// suffix would include the later ':' and trailing text. A single check
+	// therefore suffices and tolerates ':' inside a channel title (e.g.
+	// "#plan:b").
+	if i := strings.LastIndex(addr, ":"); i >= 0 {
+		if _, err := uuid.Parse(addr[i+1:]); err == nil {
+			return strings.TrimSpace(addr[:i]), addr[i+1:]
+		}
+	}
+	return addr, ""
+}
+
+// resolveThreadRoot resolves a thread operation's "--conversation" and
+// "--root" into the canonical conversation name and bare root message id the
+// manager expects. The conversation is taken from --conversation when present,
+// otherwise derived from a message-address --root; a bare root id with no
+// conversation is rejected.
+func resolveThreadRoot(ctx context.Context, d Deps, conv, root string) (convName, rootID string, err error) {
+	rootAddr, msgID := splitMessageAddress(root)
+	if msgID != "" {
+		rootID = msgID
+	} else {
+		rootID = strings.TrimSpace(rootAddr) // bare root id (e.g. from `thread check`)
+	}
+
+	switch {
+	case strings.TrimSpace(conv) != "":
+		convName, err = resolveConversationAddress(ctx, d, conv)
+	case msgID != "":
+		convName, err = resolveConversationAddress(ctx, d, rootAddr)
+	default:
+		return "", "", localError("MISSING_CONVERSATION", "conversation is required (pass --conversation or a --root message address)", "Pass --conversation #<channel> or dm:@<peer>.")
+	}
+	return convName, rootID, err
+}
+
+// resolveMessageName turns a message address into the full
+// "conversations/<c>/messages/<m>" resource name the manager's task/reminder
+// RPCs expect. A bare token with no message id is rejected: those RPCs need a
+// real message name, never a bare conversation id.
+func resolveMessageName(ctx context.Context, d Deps, addr string) (string, error) {
+	convAddr, msgID := splitMessageAddress(addr)
+	if msgID == "" {
+		return "", localError("INVALID_ARGUMENT_FAILED", "message is required as a full message name (conversations/<c>/messages/<m>) or address (<address>:<message-id>)", "Pass the message name from `task list` / `message read`.")
+	}
+	convName, err := resolveConversationAddress(ctx, d, convAddr)
+	if err != nil {
+		return "", err
+	}
+	return convName + "/messages/" + msgID, nil
+}
+
+// bareRootID extracts the bare thread-root message id from a root reference.
+// It accepts the same forms as splitMessageAddress: a legacy full name
+// "conversations/<c>/messages/<m>", an address "<addr>:<uuid>", or a bare id
+// (as printed by `thread check`). A root without a message suffix returns the
+// trimmed token unchanged so a bare id round-trips.
+func bareRootID(root string) string {
+	convAddr, msgID := splitMessageAddress(root)
+	if msgID != "" {
+		return msgID
+	}
+	return strings.TrimSpace(convAddr)
+}

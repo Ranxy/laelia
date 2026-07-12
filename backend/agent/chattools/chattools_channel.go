@@ -96,12 +96,15 @@ func formatMemberLine(m *v1pb.ChannelMember) string {
 // The agent only writes @<display_name> in its reply content; the manager
 // resolves the token to the member.
 func ListMembers(ctx context.Context, d Deps, in ListMembersInput) (string, error) {
-	name := normalizeConversationName(in.Conversation)
+	name, err := resolveConversationAddress(ctx, d, in.Conversation)
+	if err != nil {
+		return "", err
+	}
 	if name == "" {
 		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the conversation name from `laelia-agent message check`)", "")
 	}
 
-	if root := normalizeThreadRoot(in.Root); root != "" {
+	if root := bareRootID(in.Root); root != "" {
 		resp, err := d.Client.ListThreadParticipants(ctx, connect.NewRequest(&v1pb.ListThreadParticipantsRequest{
 			Conversation: name,
 			ThreadRoot:   root,
