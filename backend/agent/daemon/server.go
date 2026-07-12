@@ -183,6 +183,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/file/download", s.handleFileDownload)
 	mux.HandleFunc("/file/list", s.handleFileList)
 	mux.HandleFunc("/members", s.handleMembers)
+	mux.HandleFunc("/agent/list", s.handleAgentList)
 
 	s.httpServer = &http.Server{Handler: mux}
 	go func() {
@@ -707,6 +708,17 @@ func (s *Server) handleMembers(w http.ResponseWriter, r *http.Request) {
 			Conversation: req.Conversation,
 			Root:         req.Root,
 		})
+		return text, asChatError(err)
+	})
+}
+
+// handleAgentList serves the global peer-agent roster: every other agent with
+// its display name, agents/<id> handle, connection state, and full persona. It
+// is the discovery tool the agent uses before delegating to a peer via
+// `message send dm:@<peer>`.
+func (s *Server) handleAgentList(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.ListPeerAgents(r.Context(), s.deps(req), chattools.ListPeerAgentsInput{})
 		return text, asChatError(err)
 	})
 }
