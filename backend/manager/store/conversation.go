@@ -8,6 +8,17 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+
+	"github.com/Ranxy/laelia/backend/common"
+)
+
+// Conversation type values, mirrored by the laelia.v1.ConversationType enum.
+// 1 = DM (one user + one agent), 2 = channel (many members), 3 = AGENT_DM
+// (exactly two agents, no users; owner of record is the SYSTEM_BOT principal).
+const (
+	ConversationTypeDM      int32 = 1
+	ConversationTypeChannel int32 = 2
+	ConversationTypeAgentDM int32 = 3
 )
 
 type ConversationMessage struct {
@@ -100,6 +111,141 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 	}
 
 	return &newConv, nil
+}
+
+// insertAgentDMSQL creates a type-3 agent-DM, returning the row. The pair is
+// ordered (lo < hi) by the caller, and idx_conversation_agent_dm_unique
+// (partial WHERE type = 3) dedups races: when two callers race to open the same
+// agent-DM, only one INSERT returns a row; the other gets sql.ErrNoRows and
+// re-reads the winning row. Mirrors insertDirectConversationSQL for type-1 DMs.
+const insertAgentDMSQL = `
+	INSERT INTO conversation (agent_id, title, type, created_by, owner_id, agent_dm_a, agent_dm_b)
+	VALUES (NULL, '', 3, $1, $1, $2, $3)
+	ON CONFLICT (agent_dm_a, agent_dm_b) WHERE type = 3 DO NOTHING
+	RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+`
+
+// findAgentDM looks up an existing type-3 agent-DM by the ordered agent-id
+// pair via the dedup columns.
+func (s *Store) findAgentDM(ctx context.Context, lo, hi int) (*ConversationMessage, error) {
+	var conv ConversationMessage
+	err := s.GetDB().QueryRowContext(ctx, `
+		SELECT id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+		FROM conversation
+		WHERE type = 3 AND agent_dm_a = $1 AND agent_dm_b = $2
+	`, lo, hi).Scan(
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, errors.Wrap(err, "failed to find agent DM")
+	}
+	return &conv, nil
+}
+
+// GetOrCreateAgentDM returns the 1:1 DM between two agents, creating it if
+// absent. It is order-independent (the pair is canonicalized to lo < hi) and
+// race-free via idx_conversation_agent_dm_unique + ON CONFLICT DO NOTHING, then
+// re-reading the winning row. The conversation is owned by the SYSTEM_BOT
+// principal (no human owner); both agents are added as members and have their
+// per-channel cursors seeded so only future messages surface. Mirrors
+// GetOrCreateDirectConversation for type-1 user DMs.
+func (s *Store) GetOrCreateAgentDM(ctx context.Context, agentAID, agentBID int) (*ConversationMessage, error) {
+	if agentAID == agentBID {
+		return nil, errors.Errorf("agent-DM requires two distinct agents (got %d twice)", agentAID)
+	}
+
+	resA, err := s.GetAgentResourceIDByID(ctx, agentAID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get agent A resource ID")
+	}
+	resB, err := s.GetAgentResourceIDByID(ctx, agentBID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get agent B resource ID")
+	}
+	if resA == "" {
+		return nil, errors.Errorf("agent %d not found", agentAID)
+	}
+	if resB == "" {
+		return nil, errors.Errorf("agent %d not found", agentBID)
+	}
+
+	lo, hi := agentAID, agentBID
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+
+	if conv, err := s.findAgentDM(ctx, lo, hi); err != nil {
+		return nil, err
+	} else if conv != nil {
+		return conv, nil
+	}
+
+	tx, err := s.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var newConv ConversationMessage
+	err = tx.QueryRowContext(ctx, insertAgentDMSQL, common.SystemBotID, lo, hi).Scan(
+		&newConv.ID, &newConv.AgentID, &newConv.Title, &newConv.Type, &newConv.CreatedBy, &newConv.OwnerID, &newConv.CreatedAt, &newConv.UpdatedAt, &newConv.Version,
+	)
+	if err != nil {
+		// ON CONFLICT DO NOTHING returns no row when another caller won the
+		// race. Roll back the empty tx and return the winning row.
+		if errors.Is(err, sql.ErrNoRows) {
+			return s.findAgentDM(ctx, lo, hi)
+		}
+		return nil, errors.Wrap(err, "failed to insert agent DM")
+	}
+
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeAgent, resA, MemberRoleMember); err != nil {
+		return nil, err
+	}
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeAgent, resB, MemberRoleMember); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	// Seed both agents' cursors to the new conversation's version so they start
+	// caught up and only see future messages. Seeding only on the create path
+	// is intentional: returning an existing conversation must not re-seed.
+	if seedErr := s.SeedCursorOnJoin(ctx, agentAID, newConv.ID); seedErr != nil {
+		return nil, errors.Wrap(seedErr, "failed to seed agent A cursor for new agent DM")
+	}
+	if seedErr := s.SeedCursorOnJoin(ctx, agentBID, newConv.ID); seedErr != nil {
+		return nil, errors.Wrap(seedErr, "failed to seed agent B cursor for new agent DM")
+	}
+
+	return &newConv, nil
+}
+
+// FindChannelByTitle returns the unique type-2 channel with the given title
+// (enforced unique by idx_conversation_channel_title_unique). Returns
+// (nil, nil) when no such channel exists, so callers can map absence to a
+// NOT_FOUND error. Powers the "#<title>" address resolver.
+func (s *Store) FindChannelByTitle(ctx context.Context, title string) (*ConversationMessage, error) {
+	var conv ConversationMessage
+	err := s.GetDB().QueryRowContext(ctx, `
+		SELECT id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+		FROM conversation
+		WHERE type = 2 AND title = $1
+	`, title).Scan(
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, errors.Wrap(err, "failed to find channel by title")
+	}
+	return &conv, nil
 }
 
 func (s *Store) GetConversation(ctx context.Context, id uuid.UUID) (*ConversationMessage, error) {

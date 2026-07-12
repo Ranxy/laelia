@@ -577,3 +577,30 @@ CREATE INDEX IF NOT EXISTS idx_reminder_fire_at ON reminder(fire_at) WHERE statu
 -- DUE retry scan: the scheduler's retry tick selects DUE rows whose
 -- next_retry_at has passed.
 CREATE INDEX IF NOT EXISTS idx_reminder_retry ON reminder(next_retry_at) WHERE status = 2;
+
+-- === Agent-to-agent DM (conversation type 3 = AGENT_DM) ===
+-- A type-3 conversation is a private 1:1 DM between exactly two agents (no
+-- users). It is owned by the SYSTEM_BOT principal (id=1) so the NOT NULL
+-- created_by/owner_id FKs are satisfied; agent-sent messages in it borrow
+-- principal_id=1 (see PostMessage's fallback). agent_dm_a/agent_dm_b carry the
+-- ordered (a < b) pair of agent.id values for race-free dedup via a partial
+-- unique index, mirroring idx_conversation_dm_unique for type-1 user DMs.
+-- NULL for type 1/2. type: 1=DM(user+agent), 2=channel, 3=AGENT_DM.
+ALTER TABLE conversation ADD COLUMN IF NOT EXISTS agent_dm_a INTEGER REFERENCES agent(id) ON DELETE SET NULL;
+ALTER TABLE conversation ADD COLUMN IF NOT EXISTS agent_dm_b INTEGER REFERENCES agent(id) ON DELETE SET NULL;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'conversation_agent_dm_order_check') THEN
+        ALTER TABLE conversation ADD CONSTRAINT conversation_agent_dm_order_check
+            CHECK (agent_dm_a IS NULL OR agent_dm_b IS NULL OR agent_dm_a < agent_dm_b);
+    END IF;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_agent_dm_unique
+    ON conversation(agent_dm_a, agent_dm_b) WHERE type = 3;
+
+-- Channel titles are unique per channel (type=2) so a "#<title>" address
+-- resolves to exactly one conversation. Pre-launch, so no backfill is needed.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_channel_title_unique
+    ON conversation(title) WHERE type = 2;

@@ -116,3 +116,42 @@ func TestUserChannelCursorPresent(t *testing.T) {
 		}
 	}
 }
+
+// TestAgentDMUniqueIndexPresent locks in the agent-to-agent DM (conversation
+// type 3) dedup infrastructure: the ordered agent_dm_a/agent_dm_b columns, the
+// order CHECK, and the partial unique index that makes GetOrCreateAgentDM
+// race-free, mirroring idx_conversation_dm_unique for type-1 user DMs. All
+// declarations are idempotent (IF NOT EXISTS / DO-block guarded) so re-applying
+// the schema is safe.
+func TestAgentDMUniqueIndexPresent(t *testing.T) {
+	sql := latestSQL(t)
+
+	for _, want := range []string{
+		"ALTER TABLE conversation ADD COLUMN IF NOT EXISTS agent_dm_a INTEGER REFERENCES agent(id) ON DELETE SET NULL",
+		"ALTER TABLE conversation ADD COLUMN IF NOT EXISTS agent_dm_b INTEGER REFERENCES agent(id) ON DELETE SET NULL",
+		"conversation_agent_dm_order_check",
+		"agent_dm_a < agent_dm_b",
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_agent_dm_unique",
+		"ON conversation(agent_dm_a, agent_dm_b) WHERE type = 3",
+	} {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration missing agent-DM declaration: %q", want)
+		}
+	}
+}
+
+// TestChannelTitleUniqueIndexPresent locks in the unique partial index on
+// conversation.title for channels (type=2) so a "#<title>" address resolves to
+// exactly one conversation. Pre-launch, so no backfill is needed. Idempotent.
+func TestChannelTitleUniqueIndexPresent(t *testing.T) {
+	sql := latestSQL(t)
+
+	for _, want := range []string{
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_channel_title_unique",
+		"ON conversation(title) WHERE type = 2",
+	} {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration missing channel-title unique index declaration: %q", want)
+		}
+	}
+}

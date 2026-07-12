@@ -179,6 +179,38 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (*UserMessage,
 	return user, nil
 }
 
+// FindUsersByName returns active END_USER principals whose display name matches
+// `name` exactly. principal.name is not unique, so this returns a slice: the
+// caller (the "dm:@<peer>" address resolver) treats 0 matches as NOT_FOUND and
+// >1 as ambiguous. Only non-deleted end users are considered; system bots and
+// service accounts are excluded so they cannot be addressed as a DM peer.
+func (s *Store) FindUsersByName(ctx context.Context, name string) ([]*UserMessage, error) {
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT id, name, email, type, password_hash, deleted, description, phone, created_at
+		FROM principal
+		WHERE type = 'END_USER' AND deleted = FALSE AND name = $1
+		ORDER BY id ASC
+		LIMIT 5`, name)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to find users by name")
+	}
+	defer rows.Close()
+
+	var users []*UserMessage
+	for rows.Next() {
+		var u UserMessage
+		var t string
+		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &t, &u.PasswordHash, &u.MemberDeleted, &u.Description, &u.Phone, &u.CreatedAt); err != nil {
+			return nil, errors.Wrap(err, "failed to scan user by name")
+		}
+		users = append(users, &u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "failed to iterate users by name")
+	}
+	return users, nil
+}
+
 func (s *Store) StatUsers(ctx context.Context) ([]*UserStat, error) {
 	rows, err := s.GetDB().QueryContext(ctx, `
 	SELECT
