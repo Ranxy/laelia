@@ -999,6 +999,7 @@ export function ChatConversationPage() {
             onPreviewAttachment={handlePreviewAttachment}
             onJumpToSection={handleJumpToSection}
             onPreviewImage={handlePreviewImage}
+            readOnly={isAgentDm}
           />
         )}
         {tasksPanelOpen && channelId && (

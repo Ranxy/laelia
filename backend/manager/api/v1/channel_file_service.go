@@ -134,6 +134,18 @@ func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1
 		if err != nil {
 			return nil, err
 		}
+		// Agent-DM conversations (type 3) are agent-only. Agents exchange
+		// files in their own DMs; users — including workspace admins, who can
+		// view via the admin bypass — must not upload into one.
+		if user != nil {
+			conv, convErr := s.store.GetConversation(ctx, convID)
+			if convErr != nil {
+				return nil, connect.NewError(connect.CodeNotFound, convErr)
+			}
+			if conv.Type == store.ConversationTypeAgentDM {
+				return nil, connect.NewError(connect.CodePermissionDenied, errors.New("agent-DM conversations are agent-only; users can view but cannot upload"))
+			}
+		}
 		fileRow.ConversationID = toNullUUID(convID)
 	}
 
