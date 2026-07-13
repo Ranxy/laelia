@@ -42,7 +42,7 @@ service AgentService {
   rpc DeleteAgent(DeleteAgentRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/v1/{name=agents/*}"};
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.agents.delete";
+    option (laelia.v1.permission) = "laelia.agents.edit";
     option (laelia.v1.audit) = true;
   }
 
@@ -53,7 +53,7 @@ service AgentService {
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.agents.rotateToken";
+    option (laelia.v1.permission) = "laelia.agents.edit";
     option (laelia.v1.audit) = true;
   }
 
@@ -64,7 +64,7 @@ service AgentService {
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.agents.revokeToken";
+    option (laelia.v1.permission) = "laelia.agents.edit";
     option (laelia.v1.audit) = true;
   }
 
@@ -75,7 +75,7 @@ service AgentService {
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.agents.forceDisconnect";
+    option (laelia.v1.permission) = "laelia.agents.edit";
     option (laelia.v1.audit) = true;
   }
 
@@ -93,7 +93,7 @@ service AgentService {
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.agents.updateConfig";
+    option (laelia.v1.permission) = "laelia.agents.edit";
     option (laelia.v1.audit) = true;
   }
 
@@ -106,7 +106,7 @@ service AgentService {
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.agents.updateConfig";
+    option (laelia.v1.permission) = "laelia.agents.edit";
     option (laelia.v1.audit) = true;
   }
 
@@ -381,6 +381,9 @@ message Agent {
   map<string, string> labels = 8;
   google.protobuf.Timestamp last_token_rotated_at = 9;
   int32 token_version = 10;
+  // Creator's user resource name (users/{id}); empty for legacy agents with no
+  // recorded creator. Only the creator or a workspace admin may modify the agent.
+  string created_by = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message AgentInfo {

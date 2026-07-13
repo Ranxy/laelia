@@ -2435,6 +2435,12 @@ components:
                 tokenVersion:
                     type: integer
                     format: int32
+                createdBy:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        Creator's user resource name (users/{id}); empty for legacy agents with no
+                         recorded creator. Only the creator or a workspace admin may modify the agent.
         AgentACPConfig:
             type: object
             properties:

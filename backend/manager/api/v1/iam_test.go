@@ -13,24 +13,29 @@ import (
 
 func TestPermissionsForCaller(t *testing.T) {
 	admin := permissionsForCaller(true, false)
-	if !admin[PermAgentRotateToken] {
-		t.Errorf("admin should have admin-tier permission %q", PermAgentRotateToken)
+	if !admin[PermAgentCreate] {
+		t.Errorf("admin should have admin-tier permission %q", PermAgentCreate)
 	}
 	if !admin[PermConversationRead] {
 		t.Errorf("admin should have member-tier permission %q", PermConversationRead)
 	}
 
 	member := permissionsForCaller(false, false)
-	if member[PermAgentRotateToken] {
-		t.Errorf("non-admin user must not have admin-tier permission %q", PermAgentRotateToken)
+	if member[PermAgentCreate] {
+		t.Errorf("non-admin user must not have admin-tier permission %q", PermAgentCreate)
 	}
 	if !member[PermConversationRead] {
 		t.Errorf("non-admin user should have member-tier permission %q", PermConversationRead)
 	}
+	// Agent-edit RPCs are member-tier so a non-admin creator reaches the handler;
+	// the handler (requireAgentEditor) enforces creator-or-admin.
+	if !member[PermAgentEdit] {
+		t.Errorf("non-admin user should have member-tier permission %q", PermAgentEdit)
+	}
 
 	agent := permissionsForCaller(false, true)
-	if agent[PermAgentRotateToken] {
-		t.Errorf("agent must not have admin-tier permission %q", PermAgentRotateToken)
+	if agent[PermAgentCreate] {
+		t.Errorf("agent must not have admin-tier permission %q", PermAgentCreate)
 	}
 	if agent[PermUserUpdate] {
 		t.Errorf("agent must not have admin-tier permission %q", PermUserUpdate)
@@ -38,11 +43,16 @@ func TestPermissionsForCaller(t *testing.T) {
 	if !agent[PermConversationRead] {
 		t.Errorf("agent should have member-tier permission %q", PermConversationRead)
 	}
+	// Agents receive the agent-edit member-tier perm at the interceptor, but the
+	// handler denies them (user == nil) — the tier grants passage, not rights.
+	if !agent[PermAgentEdit] {
+		t.Errorf("agent should have member-tier permission %q", PermAgentEdit)
+	}
 
 	// An admin flag must not upgrade an agent to admin-tier (agents are never
 	// workspace admins); the isAgent branch takes precedence.
 	agentAdmin := permissionsForCaller(true, true)
-	if agentAdmin[PermAgentRotateToken] {
+	if agentAdmin[PermAgentCreate] {
 		t.Error("agent caller must never receive admin-tier permissions, even if isAdmin=true")
 	}
 }
@@ -87,7 +97,7 @@ func TestAuthorize(t *testing.T) {
 		},
 		{
 			name:    "allow_without_credential is not gated",
-			ctx:     iamCtx(common.AuthMethodIAM, PermAgentRotateToken, true),
+			ctx:     iamCtx(common.AuthMethodIAM, PermAgentCreate, true),
 			isAdmin: func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
 			wantErr: false,
 		},
@@ -105,23 +115,35 @@ func TestAuthorize(t *testing.T) {
 		},
 		{
 			name:    "admin perm + admin user passes",
-			ctx:     withUser(iamCtx(common.AuthMethodIAM, PermAgentRotateToken, false), adminUser),
+			ctx:     withUser(iamCtx(common.AuthMethodIAM, PermAgentCreate, false), adminUser),
 			isAdmin: func(context.Context, *store.UserMessage) (bool, error) { return true, nil },
 			wantErr: false,
 		},
 		{
 			name:     "admin perm + non-admin user denied",
-			ctx:      withUser(iamCtx(common.AuthMethodIAM, PermAgentRotateToken, false), plainUser),
+			ctx:      withUser(iamCtx(common.AuthMethodIAM, PermAgentCreate, false), plainUser),
 			isAdmin:  func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
 			wantErr:  true,
 			wantCode: connect.CodePermissionDenied,
 		},
 		{
 			name:     "admin perm + agent denied",
-			ctx:      withAgent(iamCtx(common.AuthMethodIAM, PermAgentRotateToken, false), agent),
+			ctx:      withAgent(iamCtx(common.AuthMethodIAM, PermAgentCreate, false), agent),
 			isAdmin:  func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
 			wantErr:  true,
 			wantCode: connect.CodePermissionDenied,
+		},
+		{
+			name:    "agent-edit member perm + non-admin user passes (handler enforces creator-or-admin)",
+			ctx:     withUser(iamCtx(common.AuthMethodIAM, PermAgentEdit, false), plainUser),
+			isAdmin: func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
+			wantErr: false,
+		},
+		{
+			name:    "agent-edit member perm + agent passes (handler denies)",
+			ctx:     withAgent(iamCtx(common.AuthMethodIAM, PermAgentEdit, false), agent),
+			isAdmin: func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
+			wantErr: false,
 		},
 		{
 			name:    "member perm + non-admin user passes",
@@ -144,7 +166,7 @@ func TestAuthorize(t *testing.T) {
 		},
 		{
 			name:     "admin check error surfaces as internal",
-			ctx:      withUser(iamCtx(common.AuthMethodIAM, PermAgentRotateToken, false), plainUser),
+			ctx:      withUser(iamCtx(common.AuthMethodIAM, PermAgentCreate, false), plainUser),
 			isAdmin:  func(context.Context, *store.UserMessage) (bool, error) { return false, errors.New("db down") },
 			wantErr:  true,
 			wantCode: connect.CodeInternal,

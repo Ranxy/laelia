@@ -25,20 +25,20 @@ import (
 // runs.
 const (
 	// admin-tier
-	PermAgentCreate          = "laelia.agents.create"
-	PermAgentDelete          = "laelia.agents.delete"
-	PermAgentRotateToken     = "laelia.agents.rotateToken"
-	PermAgentRevokeToken     = "laelia.agents.revokeToken"
-	PermAgentForceDisconnect = "laelia.agents.forceDisconnect"
-	PermAgentUpdateConfig    = "laelia.agents.updateConfig"
-	PermAgentListSessions    = "laelia.agents.listSessions"
-	PermUserUpdate           = "laelia.users.update"
-	PermUserDelete           = "laelia.users.delete"
-	PermSettingRead          = "laelia.settings.get"
-	PermSettingUpdate        = "laelia.settings.update"
+	PermAgentCreate       = "laelia.agents.create"
+	PermAgentListSessions = "laelia.agents.listSessions"
+	PermUserUpdate        = "laelia.users.update"
+	PermUserDelete        = "laelia.users.delete"
+	PermSettingRead       = "laelia.settings.get"
+	PermSettingUpdate     = "laelia.settings.update"
 
-	// member-tier (any authenticated user or agent)
+	// member-tier (any authenticated user or agent). The agent-edit RPCs (config,
+	// providers, token rotate/revoke, delete, force-disconnect) are member-tier
+	// here so the interceptor lets a non-admin creator reach the handler; the
+	// handler then enforces creator-or-admin via requireAgentEditor (agents are
+	// denied there, so an agent token never mutates an agent profile).
 	PermAgentRead          = "laelia.agents.get"
+	PermAgentEdit          = "laelia.agents.edit"
 	PermConversationRead   = "laelia.conversations.read"
 	PermConversationSend   = "laelia.conversations.send"
 	PermConversationManage = "laelia.conversations.manage"
@@ -49,21 +49,17 @@ const (
 )
 
 var adminPermissions = map[string]bool{
-	PermAgentCreate:          true,
-	PermAgentDelete:          true,
-	PermAgentRotateToken:     true,
-	PermAgentRevokeToken:     true,
-	PermAgentForceDisconnect: true,
-	PermAgentUpdateConfig:    true,
-	PermAgentListSessions:    true,
-	PermUserUpdate:           true,
-	PermUserDelete:           true,
-	PermSettingRead:          true,
-	PermSettingUpdate:        true,
+	PermAgentCreate:       true,
+	PermAgentListSessions: true,
+	PermUserUpdate:        true,
+	PermUserDelete:        true,
+	PermSettingRead:       true,
+	PermSettingUpdate:     true,
 }
 
 var memberPermissions = map[string]bool{
 	PermAgentRead:          true,
+	PermAgentEdit:          true,
 	PermConversationRead:   true,
 	PermConversationSend:   true,
 	PermConversationManage: true,
@@ -77,9 +73,11 @@ var memberPermissions = map[string]bool{
 //
 // Admins receive every permission. Every other authenticated principal (a user
 // without the workspace-admin role, or an agent) receives the member-tier set.
-// Agents never receive admin-tier permissions, so admin-only RPCs
-// (rotateToken, updateConfig, user/setting management) are denied to agent
-// tokens regardless of any future role grant.
+// Agents never receive admin-tier permissions, so admin-only RPCs (create,
+// listSessions, user/setting management) are denied to agent tokens regardless
+// of any future role grant. The agent-edit RPCs are member-tier, so a non-admin
+// creator passes the interceptor and requireAgentEditor enforces creator-or-admin
+// in the handler (agents are denied there).
 func permissionsForCaller(isAdmin, isAgent bool) map[string]bool {
 	if isAgent {
 		return copyPermSet(memberPermissions)

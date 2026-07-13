@@ -74,6 +74,14 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("agent title must be set"))
 	}
 
+	// Record the creator so later profile mutations can be gated to them or a
+	// workspace admin (see requireAgentEditor). CreateAgent is admin-tier, so a
+	// user is always present; guard defensively against a missing one.
+	creatorID := 0
+	if user, _ := GetUserFromContext(ctx); user != nil {
+		creatorID = user.ID
+	}
+
 	agentMessage := &store.AgentMessage{
 		Name:         req.Msg.Agent.Title,
 		TokenVersion: 1,
@@ -83,7 +91,8 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 				AllowEnv: executor.DefaultAllowEnv,
 			},
 		},
-		Status: &storepb.AgentStatus{},
+		Status:    &storepb.AgentStatus{},
+		CreatedBy: creatorID,
 	}
 
 	created, err := s.store.CreateAgent(ctx, agentMessage)
@@ -175,6 +184,16 @@ func (s *AgentService) DeleteAgent(ctx context.Context, req *connect.Request[v1p
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get agent, error: %v", err))
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+	if err := requireAgentEditor(ctx, s.store, agent); err != nil {
+		return nil, err
+	}
 	if err := s.store.DeleteAgent(ctx, resourceID); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to delete agent, error: %v", err))
 	}
@@ -192,6 +211,9 @@ func (s *AgentService) RotateAgentToken(ctx context.Context, req *connect.Reques
 	}
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+	if err := requireAgentEditor(ctx, s.store, agent); err != nil {
+		return nil, err
 	}
 
 	newTokenVersion := agent.TokenVersion + 1
@@ -260,6 +282,9 @@ func (s *AgentService) RevokeAgentToken(ctx context.Context, req *connect.Reques
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
 	}
+	if err := requireAgentEditor(ctx, s.store, agent); err != nil {
+		return nil, err
+	}
 
 	newTokenVersion := agent.TokenVersion + 1
 	nowRotated := time.Now()
@@ -296,6 +321,9 @@ func (s *AgentService) ForceDisconnectAgent(ctx context.Context, req *connect.Re
 	}
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+	if err := requireAgentEditor(ctx, s.store, agent); err != nil {
+		return nil, err
 	}
 
 	reason := "admin_forced"
@@ -866,6 +894,10 @@ func convertToAgent(agent *store.AgentMessage) *v1pb.Agent {
 	if !agent.LastTokenRotatedAt.IsZero() {
 		result.LastTokenRotatedAt = timestamppb.New(agent.LastTokenRotatedAt)
 	}
+	if agent.CreatedBy != 0 {
+		// Creator's user resource name (users/{id}); empty for legacy agents.
+		result.CreatedBy = common.FormatUserUID(agent.CreatedBy)
+	}
 	return result
 }
 
@@ -1164,6 +1196,9 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
 	}
+	if err := requireAgentEditor(ctx, s.store, agent); err != nil {
+		return nil, err
+	}
 
 	// Preserve the rest of AgentInfo (hostname/os/capability/available_providers/
 	// labels); only AcpConfig is admin-owned and replaced here. Previously this
@@ -1193,6 +1228,9 @@ func (s *AgentService) RefreshAgentProviders(ctx context.Context, req *connect.R
 	}
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+	if err := requireAgentEditor(ctx, s.store, agent); err != nil {
+		return nil, err
 	}
 	if !s.dispatcher.IsAgentConnected(agent.ID) {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent is not connected; cannot probe providers"))

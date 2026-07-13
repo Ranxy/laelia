@@ -26,6 +26,10 @@ type AgentMessage struct {
 	Info               *models.AgentInfo
 	Status             *models.AgentStatus
 	LastTokenRotatedAt time.Time
+	// CreatedBy is the principal id of the user who created the agent (0 =
+	// unknown/legacy). Used to gate agent profile mutations to the creator or a
+	// workspace admin. Immutable after creation.
+	CreatedBy int
 }
 
 // GetResourceID returns the agent's resource name, used to key context-derived
@@ -145,7 +149,8 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 		agent.deleted,
 		agent.info,
 		agent.status,
-		agent.last_token_rotated_at
+		agent.last_token_rotated_at,
+		agent.created_by
 	FROM agent
 	WHERE ` + strings.Join(where, " AND ") + ` ORDER BY agent.created_at ASC`
 
@@ -177,6 +182,7 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 			&infoBytes,
 			&statusBytes,
 			&lastTokenRotatedAt,
+			&agentMessage.CreatedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -233,9 +239,9 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 	var agentID int
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO agent (
-			resource_id, name, token_version, info, status
+			resource_id, name, token_version, info, status, created_by
 		)
-		VALUES ($1, $2, $3, $4, $5)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at
 	`,
 		resourceID,
@@ -243,6 +249,7 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 		create.TokenVersion,
 		infoBytes,
 		statusBytes,
+		create.CreatedBy,
 	).Scan(&agentID, &create.CreatedAt); err != nil {
 		return nil, err
 	}
@@ -259,6 +266,7 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 		CreatedAt:    create.CreatedAt,
 		Info:         create.Info,
 		Status:       create.Status,
+		CreatedBy:    create.CreatedBy,
 	}
 	s.agentIDCache.Add(agent.ID, agent)
 	s.agentResourceIDCache.Add(agent.ResourceID, agent)

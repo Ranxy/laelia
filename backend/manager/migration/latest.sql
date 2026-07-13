@@ -135,7 +135,10 @@ CREATE TABLE agent (
     -- Stored as AgentInfo (proto/store/store/agent.proto)
     info jsonb NOT NULL DEFAULT '{}',
     -- Stored as AgentStatus (proto/store/store/agent.proto)
-    status jsonb NOT NULL DEFAULT '{}'
+    status jsonb NOT NULL DEFAULT '{}',
+    -- Principal id of the user who created the agent (0 = unknown/legacy).
+    -- Only the creator or a workspace admin may modify the agent.
+    created_by int NOT NULL DEFAULT 0
 );
 
 CREATE UNIQUE INDEX idx_agent_unique_resource_id ON agent(resource_id);
@@ -184,6 +187,7 @@ CREATE INDEX idx_agent_token_family ON agent_token(token_family, state);
 CREATE INDEX idx_agent_token_agent ON agent_token(agent_id, token_type, state);
 
 ALTER TABLE agent ADD COLUMN last_token_rotated_at timestamptz;
+ALTER TABLE agent ADD COLUMN IF NOT EXISTS created_by int NOT NULL DEFAULT 0;
 
 CREATE TABLE audit_log (
     id bigserial PRIMARY KEY,

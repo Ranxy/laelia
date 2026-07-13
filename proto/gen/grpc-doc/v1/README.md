@@ -386,6 +386,7 @@ RiskLevel is the risk level.
 | labels | [Agent.LabelsEntry](#laelia-v1-Agent-LabelsEntry) | repeated |  |
 | last_token_rotated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | token_version | [int32](#int32) |  |  |
+| created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}); empty for legacy agents with no recorded creator. Only the creator or a workspace admin may modify the agent. |
 
 
 

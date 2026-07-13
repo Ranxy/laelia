@@ -749,6 +749,14 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
    * @generated from field: int32 token_version = 10;
    */
   tokenVersion: number;
+
+  /**
+   * Creator's user resource name (users/{id}); empty for legacy agents with no
+   * recorded creator. Only the creator or a workspace admin may modify the agent.
+   *
+   * @generated from field: string created_by = 11;
+   */
+  createdBy: string;
 };
 
 /**

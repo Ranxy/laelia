@@ -207,7 +207,8 @@
     "profile": {
       "section-identity": "Identity & Status",
       "section-token": "Bootstrap Token",
-      "get-connection-command": "Get connection command"
+      "get-connection-command": "Get connection command",
+      "edit-not-allowed": "Only the agent's creator or a workspace admin can edit this agent."
     },
     "lifecycle": {
       "ready": "Ready",

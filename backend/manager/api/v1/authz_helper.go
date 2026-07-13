@@ -62,6 +62,29 @@ func requireConversationMember(ctx context.Context, stores *store.Store, convNam
 	return convID, nil
 }
 
+// requireAgentEditor gates agent profile mutations (ACP config, providers, token
+// rotate/revoke, delete, force-disconnect): only the agent's creator or a
+// workspace admin may proceed. Agent callers are always denied (agents never
+// edit agent profiles). A legacy agent with no recorded creator (CreatedBy == 0)
+// is admin-only. Mirrors requireChannelOwner's owner-or-admin shape.
+func requireAgentEditor(ctx context.Context, stores *store.Store, agent *store.AgentMessage) error {
+	user, _ := GetUserFromContext(ctx)
+	if user == nil {
+		return connect.NewError(connect.CodePermissionDenied, errors.New("only the agent creator or a workspace admin may modify this agent"))
+	}
+	if agent.CreatedBy != 0 && user.ID == agent.CreatedBy {
+		return nil
+	}
+	admin, err := isUserWorkspaceAdmin(ctx, stores, user)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve workspace admin"))
+	}
+	if admin {
+		return nil
+	}
+	return connect.NewError(connect.CodePermissionDenied, errors.New("only the agent creator or a workspace admin may modify this agent"))
+}
+
 // requireChannelOwner ensures the caller is the owner of the channel or a
 // workspace admin. Channel owners are always users (agents are added as
 // members, never owners), so an agent caller is denied. This closes the

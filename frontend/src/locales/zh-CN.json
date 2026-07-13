@@ -207,7 +207,8 @@
     "profile": {
       "section-identity": "身份与状态",
       "section-token": "Bootstrap 令牌",
-      "get-connection-command": "获取连接命令"
+      "get-connection-command": "获取连接命令",
+      "edit-not-allowed": "只有该 agent 的创建者或工作区管理员可以修改此 agent。"
     },
     "lifecycle": {
       "ready": "就绪",
