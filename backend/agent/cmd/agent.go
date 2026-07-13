@@ -20,7 +20,7 @@ var agentCmd = &cobra.Command{
 // caller excluded) with its display name, agents/<id> handle, connection state,
 // and full persona_prompt, so one call is enough to pick a peer to delegate to
 // and understand how it works. Takes no argument: it spans every agent, not one
-// conversation (use `members <conversation>` for a channel's roster).
+// conversation (use `members <address>` for a channel's roster).
 var agentListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List every peer agent with display name, handle, connection state, and full persona",

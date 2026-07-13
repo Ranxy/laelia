@@ -16,13 +16,13 @@ var taskCmd = &cobra.Command{
 	Short: "List, claim, advance, and create channel tasks (LLM-facing, used during drain sessions)",
 }
 
-// task list <conversation> [--status S]... — the task board, optionally
+// task list <address> [--status S]... — the task board, optionally
 // filtered by status. Each line prints the full message resource name the
 // agent passes to claim/review/done.
 var taskListStatuses []string
 
 var taskListCmd = &cobra.Command{
-	Use:   "list <conversation>",
+	Use:   "list <address>",
 	Short: "List tasks in a conversation (the task board), optionally filtered by status",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 1, args) {
@@ -38,11 +38,11 @@ var taskListCmd = &cobra.Command{
 	},
 }
 
-// task claim <message-name> claims a TODO task (TODO→IN_PROGRESS) and assigns
-// it to the caller. The message name is the `conversations/{c}/messages/{m}`
-// form printed by `task list`.
+// task claim <message-handle> claims a TODO task (TODO→IN_PROGRESS) and assigns
+// it to the caller. The message handle is the `<address>:<message-id>` form
+// printed by `task list`.
 var taskClaimCmd = &cobra.Command{
-	Use:   "claim <message-name>",
+	Use:   "claim <message-handle>",
 	Short: "Claim a TODO task (TODO→IN_PROGRESS, assignee=you) and subscribe to its thread",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 1, args) {
@@ -55,9 +55,9 @@ var taskClaimCmd = &cobra.Command{
 	},
 }
 
-// task unclaim <message-name> releases the caller's claim (IN_PROGRESS→TODO).
+// task unclaim <message-handle> releases the caller's claim (IN_PROGRESS→TODO).
 var taskUnclaimCmd = &cobra.Command{
-	Use:   "unclaim <message-name>",
+	Use:   "unclaim <message-handle>",
 	Short: "Release your claim on a task (IN_PROGRESS→TODO) so another agent may claim it",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 1, args) {
@@ -70,10 +70,10 @@ var taskUnclaimCmd = &cobra.Command{
 	},
 }
 
-// task review <message-name> marks the caller's task ready for human review
+// task review <message-handle> marks the caller's task ready for human review
 // (IN_PROGRESS→IN_REVIEW).
 var taskReviewCmd = &cobra.Command{
-	Use:   "review <message-name>",
+	Use:   "review <message-handle>",
 	Short: "Mark your task ready for human review (IN_PROGRESS→IN_REVIEW)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 1, args) {
@@ -86,10 +86,10 @@ var taskReviewCmd = &cobra.Command{
 	},
 }
 
-// task done <message-name> marks the caller's task complete (IN_REVIEW→DONE)
+// task done <message-handle> marks the caller's task complete (IN_REVIEW→DONE)
 // after the human approved it in the task's thread.
 var taskDoneCmd = &cobra.Command{
-	Use:   "done <message-name>",
+	Use:   "done <message-handle>",
 	Short: "Mark your task complete (IN_REVIEW→DONE) after the human approved it in the thread",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 1, args) {
@@ -102,7 +102,7 @@ var taskDoneCmd = &cobra.Command{
 	},
 }
 
-// task create <conversation> --content <text|-> [--attach <file-id>...] posts a
+// task create <address> --content <text|-> [--attach <file-id>...] posts a
 // new unassigned TODO task for other agents to claim.
 var (
 	taskCreateContent     string
@@ -110,7 +110,7 @@ var (
 )
 
 var taskCreateCmd = &cobra.Command{
-	Use:   "create <conversation>",
+	Use:   "create <address>",
 	Short: "Post a new unassigned TODO task in a channel for other agents to claim",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 1, args) {

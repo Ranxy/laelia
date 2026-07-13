@@ -71,19 +71,6 @@ func localError(code, message, nextAction string) *Error {
 	return &Error{Code: code, Message: message, NextAction: nextAction}
 }
 
-// normalizeConversationName turns a raw conversation id into the
-// "conversations/<id>" form the manager expects. Names already in that form
-// pass through unchanged.
-func normalizeConversationName(s string) string {
-	if s == "" {
-		return ""
-	}
-	if strings.HasPrefix(s, "conversations/") {
-		return s
-	}
-	return fmt.Sprintf("conversations/%s", s)
-}
-
 func senderTypeString(t v1pb.SenderType) string {
 	switch t {
 	case v1pb.SenderType_SENDER_TYPE_USER:
@@ -140,10 +127,9 @@ func formatCommentAnchor(a *v1pb.Attachment) string {
 
 // formatMessageLine renders one message for the text output. Own messages are
 // tagged "(YOU)" so the agent can recognize its own past messages at a glance
-// and avoid replying to itself. The message handle ("<address>:<message-id>" or
-// the legacy "conversations/<c>/messages/<m>" when the address could not be
-// resolved) and its room version follow on an indented line so the agent can
-// pass the message straight to commands that need it (`reminder convert`, `task
+// and avoid replying to itself. The message handle ("<address>:<message-id>")
+// and its room version follow on an indented line so the agent can pass the
+// message straight to commands that need it (`reminder convert`, `task
 // claim`/`review`/`done`) without reconstructing it. Any attachments follow on
 // further indented lines. messageID empty (e.g. a synthetic listing) omits the
 // handle line.
@@ -332,7 +318,10 @@ func GetConversationMessages(ctx context.Context, d Deps, in GetConversationMess
 	if len(resp.Msg.Messages) == 0 {
 		text += "(no messages)\n"
 	} else {
-		addr := conversationAddress(ctx, d, name)
+		// Build handles from the address the agent supplied (already a name
+		// form, validated above) so "<addr>:<uuid>" always round-trips without
+		// a GetChannel round-trip and never falls back to an id form.
+		addr := strings.TrimSpace(in.Conversation)
 		for _, m := range resp.Msg.Messages {
 			text += formatMessageLine(
 				m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z"),
@@ -646,8 +635,15 @@ func GetThreadMessages(ctx context.Context, d Deps, in GetThreadMessagesInput) (
 	// The first message is the thread root (context); label it so the agent
 	// distinguishes the root from the replies it must respond to. All replies
 	// share the thread's conversation address; the root's own handle carries
-	// the root id.
-	addr := conversationAddress(ctx, d, name)
+	// the root id. Build handles from the name-form address the agent supplied
+	// (--conversation, or the "<addr>:" prefix of --root) so they round-trip
+	// without a GetChannel round-trip and never fall back to an id form.
+	displayAddr := strings.TrimSpace(in.Conversation)
+	if displayAddr == "" {
+		rootAddr, _ := splitMessageAddress(in.Root)
+		displayAddr = strings.TrimSpace(rootAddr)
+	}
+	addr := displayAddr
 	for i, m := range resp.Msg.Messages {
 		ts := m.CreatedAt.AsTime().Format("2006-01-02T15:04:05Z")
 		line := formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, addr, m.Name, m.RoomVersion, m.Content, m.Attachments)

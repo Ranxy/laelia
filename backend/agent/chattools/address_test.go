@@ -146,15 +146,19 @@ func TestResolveConversationAddress_AmbiguousAgentPeer(t *testing.T) {
 	assert.Equal(t, "AMBIGUOUS_PEER", e.Code)
 }
 
-func TestResolveConversationAddress_LegacyPassthrough(t *testing.T) {
-	for in, want := range map[string]string{
-		"":                  "",
-		"abc-123":           "conversations/abc-123",
-		"conversations/x-1": "conversations/x-1",
-	} {
-		name, err := resolveConversationAddress(context.Background(), addrDeps(newAddrClient()), in)
-		require.NoError(t, err, "input %q", in)
-		assert.Equal(t, want, name, "input %q", in)
+func TestResolveConversationAddress_EmptyPassesThrough(t *testing.T) {
+	name, err := resolveConversationAddress(context.Background(), addrDeps(newAddrClient()), "")
+	require.NoError(t, err)
+	assert.Equal(t, "", name)
+}
+
+func TestResolveConversationAddress_LegacyRejected(t *testing.T) {
+	for _, in := range []string{"abc-123", "conversations/x-1", uuidStr} {
+		_, err := resolveConversationAddress(context.Background(), addrDeps(newAddrClient()), in)
+		require.Error(t, err, "input %q", in)
+		e, ok := err.(*Error)
+		require.True(t, ok, "input %q", in)
+		assert.Equal(t, "INVALID_ARGUMENT_FAILED", e.Code, "input %q", in)
 	}
 }
 
@@ -173,7 +177,10 @@ func TestSplitMessageAddress(t *testing.T) {
 		msgID    string
 	}{
 		{"", "", ""},
-		{"conversations/c-1/messages/m-2", "conversations/c-1", "m-2"},
+		// A legacy "conversations/<c>/messages/<m>" token has no ':' and no UUID
+		// suffix, so it returns as a bare conversation token (no split); the
+		// rejection is owned by resolveConversationAddress downstream.
+		{"conversations/c-1/messages/m-2", "conversations/c-1/messages/m-2", ""},
 		{"#general:" + uuidStr, "#general", uuidStr},
 		{"dm:@alice:" + uuidStr, "dm:@alice", uuidStr},
 		{"conversations/c-1:" + uuidStr, "conversations/c-1", uuidStr},
@@ -197,10 +204,12 @@ func TestResolveMessageName_AddressForm(t *testing.T) {
 	assert.Equal(t, "conversations/c-general/messages/"+uuidStr, name)
 }
 
-func TestResolveMessageName_LegacyFullName(t *testing.T) {
-	name, err := resolveMessageName(context.Background(), addrDeps(newAddrClient()), "conversations/c-general/messages/m-9")
-	require.NoError(t, err)
-	assert.Equal(t, "conversations/c-general/messages/m-9", name)
+func TestResolveMessageName_LegacyFullNameRejected(t *testing.T) {
+	_, err := resolveMessageName(context.Background(), addrDeps(newAddrClient()), "conversations/c-general/messages/m-9")
+	require.Error(t, err)
+	e, ok := err.(*Error)
+	require.True(t, ok)
+	assert.Equal(t, "INVALID_ARGUMENT_FAILED", e.Code)
 }
 
 func TestResolveMessageName_RejectsBareID(t *testing.T) {
@@ -233,11 +242,12 @@ func TestResolveThreadRoot_BareRootRequiresConversation(t *testing.T) {
 	assert.Equal(t, "MISSING_CONVERSATION", e.Code)
 }
 
-func TestResolveThreadRoot_LegacyFullName(t *testing.T) {
-	conv, root, err := resolveThreadRoot(context.Background(), addrDeps(newAddrClient()), "", "conversations/c-general/messages/m-9")
-	require.NoError(t, err)
-	assert.Equal(t, "conversations/c-general", conv)
-	assert.Equal(t, "m-9", root)
+func TestResolveThreadRoot_LegacyFullNameRejected(t *testing.T) {
+	_, _, err := resolveThreadRoot(context.Background(), addrDeps(newAddrClient()), "", "conversations/c-general/messages/m-9")
+	require.Error(t, err)
+	e, ok := err.(*Error)
+	require.True(t, ok)
+	assert.Equal(t, "MISSING_CONVERSATION", e.Code)
 }
 
 func TestResolveThreadRoot_BareRootWithConversation(t *testing.T) {

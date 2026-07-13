@@ -11,23 +11,27 @@ import (
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
-// This file implements the agent-side address resolver: it turns the human-
-// oriented conversation/message addresses the LLM is prompted to write
-// ("#<title>", "dm:@<peer>", and the legacy "conversations/<id>" / bare id)
-// into the canonical "conversations/<id>" / "conversations/<id>/messages/<m>"
-// resource names the manager expects, creating DMs if absent.
+// This file implements the agent-side address resolver: it turns the
+// name-oriented conversation/message addresses the LLM is prompted to write
+// ("#<title>", "dm:@<peer>") into the canonical "conversations/<id>" /
+// "conversations/<id>/messages/<m>" resource names the manager expects,
+// creating DMs if absent.
+//
+// The grammar is name-based only: legacy "conversations/<id>", bare ids, and
+// "conversations/<c>/messages/<m>" are rejected as input (no compatibility
+// concerns — the project is pre-launch). Files (bare file id), reminders
+// ("reminders/<id>"), and thread roots (bare message id) stay id-based by
+// design — they have no human name.
 //
 // The resolver is the input-side counterpart of conversationAddress (also in
-// this file): output emits "<address>", input accepts "<address>". Mid-refactor
-// the agent still holds legacy "conversations/<id>" handles, so any
-// unrecognized form falls through to normalizeConversationName unchanged.
+// this file): output emits "<address>", input accepts "<address>".
 
 // resolveConversationAddress turns a conversation address into the canonical
 // "conversations/<id>" resource name. "#<title>" resolves (never creates) a
-// channel; "dm:@<peer>" opens or reuses a DM with the named agent or user; any
-// other form is treated as a legacy id/name and passed through
-// normalizeConversationName. An empty address resolves to "" with no error so
-// optional callers (search, upload) can pass through unchanged.
+// channel; "dm:@<peer>" opens or reuses a DM with the named agent or user;
+// anything else is an INVALID_ARGUMENT_FAILED — only the name grammar is
+// accepted. An empty address resolves to "" with no error so optional callers
+// (search, upload) can pass through unchanged.
 func resolveConversationAddress(ctx context.Context, d Deps, addr string) (string, error) {
 	addr = strings.TrimSpace(addr)
 	if addr == "" {
@@ -43,7 +47,7 @@ func resolveConversationAddress(ctx context.Context, d Deps, addr string) (strin
 		}
 		return resolveDMAddress(ctx, d, peer)
 	default:
-		return normalizeConversationName(addr), nil
+		return "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("unknown conversation address %q; use #<title> or dm:@<peer>", addr), "Run `message check` to see your channels, or `agent list` for a peer.")
 	}
 }
 
@@ -143,23 +147,21 @@ func conversationName[T interface{ GetConversation() *v1pb.Conversation }](resp 
 }
 
 // splitMessageAddress splits a message address into its conversation address
-// and bare message id. It accepts three forms:
-//   - legacy full name "conversations/<c>/messages/<m>" → ("conversations/<c>", "<m>")
+// and bare message id. It accepts two forms:
 //   - address form "<addr>:<message-uuid>" → ("<addr>", "<uuid>"), where <addr>
-//     is "#title", "dm:@peer", or "conversations/<id>"; ':' inside a title is
-//     tolerated because only a UUID suffix is split off
+//     is "#title" or "dm:@peer"; ':' inside a title is tolerated because only a
+//     UUID suffix is split off
 //   - a bare token with no message id → (token, "")
 //
 // The message id is the suffix after the last ':' whose remainder parses as a
-// UUID, so a title containing ':' (e.g. "#plan:b") is not mis-split.
+// UUID, so a title containing ':' (e.g. "#plan:b") is not mis-split. A legacy
+// "conversations/<c>/messages/<m>" token has no ':' and no UUID suffix, so it
+// returns as a bare conversation token and is rejected downstream by
+// resolveConversationAddress.
 func splitMessageAddress(addr string) (convAddr, msgID string) {
 	addr = strings.TrimSpace(addr)
 	if addr == "" {
 		return "", ""
-	}
-	// Legacy full name.
-	if i := strings.LastIndex(addr, "/messages/"); i >= 0 {
-		return strings.TrimSpace(addr[:i]), addr[i+len("/messages/"):]
 	}
 	// Address form "<addr>:<message-uuid>": split off the message id only when
 	// the suffix after the last ':' parses as a UUID. A UUID contains no ':',
@@ -178,8 +180,9 @@ func splitMessageAddress(addr string) (convAddr, msgID string) {
 // resolveThreadRoot resolves a thread operation's "--conversation" and
 // "--root" into the canonical conversation name and bare root message id the
 // manager expects. The conversation is taken from --conversation when present,
-// otherwise derived from a message-address --root; a bare root id with no
-// conversation is rejected.
+// otherwise derived from a "<addr>:<uuid>" --root; a bare root id with no
+// conversation is rejected (threads have no name, so a root is a bare message
+// id or a "<addr>:<uuid>" handle — never a legacy full name).
 func resolveThreadRoot(ctx context.Context, d Deps, conv, root string) (convName, rootID string, err error) {
 	rootAddr, msgID := splitMessageAddress(root)
 	if msgID != "" {
@@ -206,7 +209,7 @@ func resolveThreadRoot(ctx context.Context, d Deps, conv, root string) (convName
 func resolveMessageName(ctx context.Context, d Deps, addr string) (string, error) {
 	convAddr, msgID := splitMessageAddress(addr)
 	if msgID == "" {
-		return "", localError("INVALID_ARGUMENT_FAILED", "message is required as a full message name (conversations/<c>/messages/<m>) or address (<address>:<message-id>)", "Pass the message name from `task list` / `message read`.")
+		return "", localError("INVALID_ARGUMENT_FAILED", "message is required as an address (<address>:<message-id>)", "Pass the message handle from `task list` / `message read`.")
 	}
 	convName, err := resolveConversationAddress(ctx, d, convAddr)
 	if err != nil {
@@ -216,10 +219,9 @@ func resolveMessageName(ctx context.Context, d Deps, addr string) (string, error
 }
 
 // bareRootID extracts the bare thread-root message id from a root reference.
-// It accepts the same forms as splitMessageAddress: a legacy full name
-// "conversations/<c>/messages/<m>", an address "<addr>:<uuid>", or a bare id
-// (as printed by `thread check`). A root without a message suffix returns the
-// trimmed token unchanged so a bare id round-trips.
+// It accepts the same forms as splitMessageAddress: an address "<addr>:<uuid>",
+// or a bare id (as printed by `thread check`). A root without a message suffix
+// returns the trimmed token unchanged so a bare id round-trips.
 func bareRootID(root string) string {
 	convAddr, msgID := splitMessageAddress(root)
 	if msgID != "" {
@@ -234,10 +236,11 @@ func bareRootID(root string) string {
 // field (the single source of truth for the grammar — it already encodes the
 // type-3 agent-DM peer). It is the emit-side counterpart of
 // resolveConversationAddress. A lookup failure or an empty address falls back to
-// the resource name so an emit site never breaks the agent's ability to act on
-// the handle: the resolver accepts the legacy "conversations/<id>" form, and a
-// "<name>:<uuid>" message handle built from a fallback name round-trips through
-// splitMessageAddress because the message id is a UUID.
+// the resource name so a label-only emit site never breaks the agent's display.
+// This fallback is a display label, not a copyable message handle: callers that
+// build agent-usable handles (messageHandle) pass a name-form address obtained
+// from the agent's input, never this fallback, so no rejected id form ever
+// reaches the resolver as input.
 func conversationAddress(ctx context.Context, d Deps, name string) string {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -254,10 +257,11 @@ func conversationAddress(ctx context.Context, d Deps, name string) string {
 }
 
 // messageHandle renders the message handle an agent copies from output into
-// task/reminder/thread commands: "<address>:<message-id>" when addr is a real
-// address, or the legacy "<conversations/<id>>/messages/<message-id>" form when
-// addr fell back to a resource name (e.g. GetChannel failed). Either form
-// round-trips through the resolver. Returns "" when either part is empty.
+// task/reminder/thread commands: "<address>:<message-id>". The address must be a
+// real name form (callers obtain it from the agent's input, which is already
+// validated as a name); an unresolved "conversations/<id>" address yields "" so
+// no rejected id form is ever emitted as a copyable handle. Returns "" when
+// either part is empty.
 func messageHandle(addr, messageID string) string {
 	addr = strings.TrimSpace(addr)
 	messageID = strings.TrimSpace(messageID)
@@ -265,7 +269,7 @@ func messageHandle(addr, messageID string) string {
 		return ""
 	}
 	if strings.HasPrefix(addr, "conversations/") {
-		return addr + "/messages/" + messageID
+		return ""
 	}
 	return addr + ":" + messageID
 }

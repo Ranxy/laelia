@@ -29,7 +29,7 @@ var threadCheckCmd = &cobra.Command{
 	},
 }
 
-// thread read <conversation> --root <root-msg-id> [--version V] [--after|--before] [--limit N]
+// thread read <address> --root <thread-root> [--version V] [--after|--before] [--limit N]
 var (
 	threadReadRoot    string
 	threadReadVersion int64
@@ -38,7 +38,7 @@ var (
 )
 
 var threadReadCmd = &cobra.Command{
-	Use:   "read <conversation>",
+	Use:   "read <address>",
 	Short: "Read a thread (root message + replies) relative to a room version",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 1, args) {
@@ -65,7 +65,7 @@ var threadReadCmd = &cobra.Command{
 	},
 }
 
-// thread send <conversation> --root <root-msg-id> --content <text|-> --base-version V [--attach <file-id>...]
+// thread send <address> --root <thread-root> --content <text|-> --base-version V [--attach <file-id>...]
 var (
 	threadSendRoot        string
 	threadSendContent     string
@@ -74,7 +74,7 @@ var (
 )
 
 var threadSendCmd = &cobra.Command{
-	Use:   "send <conversation>",
+	Use:   "send <address>",
 	Short: "Post a reply into a thread (optimistic concurrency on base_version)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 1, args) {
@@ -102,12 +102,12 @@ var threadSendCmd = &cobra.Command{
 }
 
 func init() {
-	threadReadCmd.Flags().StringVar(&threadReadRoot, "root", "", "thread root message id (required, from `thread check`)")
+	threadReadCmd.Flags().StringVar(&threadReadRoot, "root", "", "thread root: bare message id or <address>:<message-id> handle (required, from `thread check`)")
 	threadReadCmd.Flags().Int64Var(&threadReadVersion, "version", 0, "room version to page relative to (defaults to reading from the start)")
 	threadReadCmd.Flags().BoolVar(&threadReadBefore, "before", false, "page to replies older than --version (oldest→newest); default reads replies newer than --version")
 	threadReadCmd.Flags().IntVar(&threadReadLimit, "limit", 0, "max replies to return (default 20, max 100)")
 
-	threadSendCmd.Flags().StringVar(&threadSendRoot, "root", "", "thread root message id (required)")
+	threadSendCmd.Flags().StringVar(&threadSendRoot, "root", "", "thread root: bare message id or <address>:<message-id> handle (required)")
 	threadSendCmd.Flags().StringVar(&threadSendContent, "content", "", "reply text; \"-\" reads from stdin")
 	threadSendCmd.Flags().Int64Var(&threadSendBaseVersion, "base-version", 0, "room version the reply is based on (from `thread read` current_version)")
 	threadSendCmd.Flags().StringArrayVar(&threadSendAttachments, "attach", nil, "file id to attach to this reply (repeatable); the file must already be uploaded to this conversation via `file upload --conversation`")

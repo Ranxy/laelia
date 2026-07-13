@@ -15,28 +15,20 @@ import (
 // uuidStr is a valid UUID used by address-parser tests as a message-id suffix.
 const uuidStr = "550e8400-e29b-41d4-a716-446655440000"
 
-func TestNormalizeConversationName(t *testing.T) {
-	for in, want := range map[string]string{
-		"":                  "",
-		"abc-123":           "conversations/abc-123",
-		"conversations/x-1": "conversations/x-1",
-	} {
-		assert.Equal(t, want, normalizeConversationName(in), "input %q", in)
-	}
-}
-
 func TestBareRootID(t *testing.T) {
 	for in, want := range map[string]string{
-		"":                                   "",
-		"abc-123":                            "abc-123",
-		"conversations/c-1/messages/m-2":     "m-2",
-		"conversations/abc-123/messages/456": "456",
+		"":        "",
+		"abc-123": "abc-123",
+		"m-9":     "m-9",
 		// Address form "<addr>:<uuid>": the bare message id is the UUID suffix.
 		"#general:" + uuidStr:          uuidStr,
 		"dm:@alice:" + uuidStr:         uuidStr,
 		"conversations/c-1:" + uuidStr: uuidStr,
 		// ':' inside a title is tolerated; only a UUID suffix is split off.
 		"#plan:b:" + uuidStr: uuidStr,
+		// A legacy "conversations/<c>/messages/<m>" token no longer splits; it
+		// returns unchanged (the rejection is owned by resolveThreadRoot).
+		"conversations/c-1/messages/m-2": "conversations/c-1/messages/m-2",
 	} {
 		assert.Equal(t, want, bareRootID(in), "input %q", in)
 	}
@@ -90,8 +82,8 @@ func TestGetConversationMessagesRequiresConversation(t *testing.T) {
 }
 
 func TestGetConversationMessagesBadDirection(t *testing.T) {
-	_, err := GetConversationMessages(context.Background(), Deps{}, GetConversationMessagesInput{
-		Conversation: "conversations/c",
+	_, err := GetConversationMessages(context.Background(), addrDeps(newAddrClient()), GetConversationMessagesInput{
+		Conversation: "#general",
 		Direction:    "sideways",
 	})
 	e, ok := err.(*Error)
@@ -100,8 +92,8 @@ func TestGetConversationMessagesBadDirection(t *testing.T) {
 }
 
 func TestAckProcessedVersionRequiresPositive(t *testing.T) {
-	_, err := AckProcessedVersion(context.Background(), Deps{}, AckProcessedVersionInput{
-		Conversation:     "conversations/c",
+	_, err := AckProcessedVersion(context.Background(), addrDeps(newAddrClient()), AckProcessedVersionInput{
+		Conversation:     "#general",
 		ProcessedVersion: 0,
 	})
 	e, ok := err.(*Error)
@@ -141,13 +133,13 @@ func TestFormatMessageLineAttachments(t *testing.T) {
 		"  message: #general:11111111-2222-3333-4444-555555555555  version: 58\n"
 	assert.Equal(t, want, got)
 
-	// A conversations/<id> address (the GetChannel-failed fallback) renders the
-	// legacy full-name handle so the agent still gets a resolver-acceptable name.
+	// An unresolved conversations/<id> address (e.g. a GetChannel failure at a
+	// label-only emit site) yields no copyable handle rather than emitting a
+	// rejected legacy form; the agent re-addresses the conversation by name.
 	got = formatMessageLine("2026-06-26T07:31:16Z", "admin", "USER", false,
 		"conversations/0d8856c0-ed2d-476b-9a86-33c0c333f5b9", "11111111-2222-3333-4444-555555555555", 58,
 		"legacy handle", nil)
-	want = "[2026-06-26T07:31:16Z] admin (USER): legacy handle\n" +
-		"  message: conversations/0d8856c0-ed2d-476b-9a86-33c0c333f5b9/messages/11111111-2222-3333-4444-555555555555  version: 58\n"
+	want = "[2026-06-26T07:31:16Z] admin (USER): legacy handle\n"
 	assert.Equal(t, want, got)
 
 	// With attachments: the id appears so `file download <id>` is callable, in

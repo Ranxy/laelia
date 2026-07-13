@@ -125,7 +125,9 @@ func ListTasks(ctx context.Context, d Deps, in ListTasksInput) (string, error) {
 		return "", wrapManagerError(err)
 	}
 
-	addr := conversationAddress(ctx, d, name)
+	// The address the agent supplied is already a name form; use it for handles
+	// and the header label so they round-trip without a GetChannel round-trip.
+	addr := strings.TrimSpace(in.Conversation)
 	text := fmt.Sprintf("Tasks in %s (%d):\n", addr, len(resp.Msg.Tasks))
 	if len(resp.Msg.Tasks) == 0 {
 		text += "(none)\n"
@@ -160,8 +162,10 @@ func ClaimTask(ctx context.Context, d Deps, in ClaimTaskInput) (string, error) {
 	// the exact thread-send command ready without reconstructing it, and tell
 	// it to post ALL work in the task's thread (not the main channel) — the root
 	// cause of agents posting task completion to the channel is that the path to
-	// the thread was not obvious right after claiming.
-	addr := conversationAddress(ctx, d, resp.Msg.Message.GetConversation())
+	// the thread was not obvious right after claiming. Derive the address from
+	// the handle the agent passed (its "<addr>:" prefix) so it round-trips.
+	rootAddr, _ := splitMessageAddress(in.Message)
+	addr := strings.TrimSpace(rootAddr)
 	rootID := resp.Msg.Message.GetName()
 	return fmt.Sprintf("Claimed task #%d (status=%s, assignee=you). The task's thread is now subscribed; the human's approval reply will wake you.\n"+
 		"Post ALL work on this task in its THREAD — not the main channel. Run `thread read %s --root %s --version <your processed_version>` to get the --base-version, then `thread send %s --root %s --content \"...\" --base-version <that version>`. Do NOT use `message send` for task progress or completion.",
@@ -243,5 +247,5 @@ func CreateTask(ctx context.Context, d Deps, in CreateTaskInput) (string, error)
 		return "", wrapManagerError(err)
 	}
 	t := resp.Msg.Message.GetTask()
-	return fmt.Sprintf("Created task #%d (status=%s) in %s; it is unassigned — other agents may claim it.", t.GetTaskNumber(), taskStatusString(t.GetStatus()), conversationAddress(ctx, d, name)), nil
+	return fmt.Sprintf("Created task #%d (status=%s) in %s; it is unassigned — other agents may claim it.", t.GetTaskNumber(), taskStatusString(t.GetStatus()), strings.TrimSpace(in.Conversation)), nil
 }

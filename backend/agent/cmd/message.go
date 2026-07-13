@@ -29,7 +29,7 @@ var messageCheckCmd = &cobra.Command{
 	},
 }
 
-// message read <conversation> [--version V] [--after|--before] [--limit N]
+// message read <address> [--version V] [--after|--before] [--limit N]
 var (
 	messageReadVersion int64
 	messageReadBefore  bool
@@ -37,7 +37,7 @@ var (
 )
 
 var messageReadCmd = &cobra.Command{
-	Use:   "read <conversation>",
+	Use:   "read <address>",
 	Short: "Read messages in a conversation relative to a room version",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 1, args) {
@@ -87,11 +87,11 @@ var messageSearchCmd = &cobra.Command{
 	},
 }
 
-// message ack <conversation> --processed-version V
+// message ack <address> --processed-version V
 var messageAckProcessedVersion int64
 
 var messageAckCmd = &cobra.Command{
-	Use:   "ack <conversation>",
+	Use:   "ack <address>",
 	Short: "Advance the durable per-channel cursor so the channel stops reporting unread",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 1, args) {
@@ -107,7 +107,7 @@ var messageAckCmd = &cobra.Command{
 	},
 }
 
-// message send <conversation> --content <text|- > --base-version V [--attach <file-id>...]
+// message send <address> --content <text|- > --base-version V [--attach <file-id>...]
 var (
 	messageSendContent     string
 	messageSendBaseVersion int64
@@ -115,7 +115,7 @@ var (
 )
 
 var messageSendCmd = &cobra.Command{
-	Use:   "send <conversation>",
+	Use:   "send <address>",
 	Short: "Post a reply to a conversation (optimistic concurrency on base_version)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 1, args) {

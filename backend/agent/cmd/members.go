@@ -8,10 +8,10 @@ import (
 
 func init() {
 	rootCmd.AddCommand(membersCmd)
-	membersCmd.Flags().StringVar(&membersRoot, "root", "", "thread root message id; when set, list the thread's participants instead of the channel's members")
+	membersCmd.Flags().StringVar(&membersRoot, "root", "", "thread root: bare message id or <address>:<message-id> handle; when set, list the thread's participants instead of the channel's members")
 }
 
-// members <conversation> [--root <root-msg-id>]
+// members <address> [--root <thread-root>]
 //
 // The single roster tool. Without --root it lists the channel's members; with
 // --root it lists the distinct senders of that thread. The conversation is a
@@ -23,7 +23,7 @@ func init() {
 var membersRoot string
 
 var membersCmd = &cobra.Command{
-	Use:   "members <conversation>",
+	Use:   "members <address>",
 	Short: "List the users and agents in a channel (or thread with --root) with their full descriptions",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 1, args) {

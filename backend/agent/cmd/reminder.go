@@ -26,7 +26,7 @@ var reminderCmd = &cobra.Command{
 	Short: "Convert messages to scheduled reminders, list due reminders, and complete/fail them (LLM-facing, used during drain sessions)",
 }
 
-// reminder convert <message-name> --content <text|-> [--fire-at <RFC3339>]
+// reminder convert <message-handle> --content <text|-> [--fire-at <RFC3339>]
 // [--cron <5-field>] [--tz <IANA>] atomically creates+claims a reminder owned by
 // the caller, rooted at the trigger message. One-shot needs --fire-at;
 // recurring needs --cron (+ optional --tz, default UTC) and --fire-at may be
@@ -40,7 +40,7 @@ var (
 )
 
 var reminderConvertCmd = &cobra.Command{
-	Use:   "convert <message-name>",
+	Use:   "convert <message-handle>",
 	Short: "Create+claim a reminder rooted at the trigger message (assignee=you) and subscribe to its thread",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 1, args) {
@@ -63,13 +63,13 @@ var reminderConvertCmd = &cobra.Command{
 	},
 }
 
-// reminder list <conversation> [--status S]... lists reminders, optionally
+// reminder list <address> [--status S]... lists reminders, optionally
 // filtered by conversation and status. Each line prints the reminder resource
 // name ("reminders/{message_id}") the agent passes to update/cancel/complete.
 var reminderListStatuses []string
 
 var reminderListCmd = &cobra.Command{
-	Use:   "list [<conversation>]",
+	Use:   "list [<address>]",
 	Short: "List reminders, optionally filtered by conversation and status",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) > 1 {
