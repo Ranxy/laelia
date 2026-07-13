@@ -410,7 +410,7 @@ func ListChannelUpdates(ctx context.Context, d Deps) (string, error) {
 	} else {
 		for _, u := range resp.Msg.Updates {
 			text += fmt.Sprintf("- %s: %d new (current_version=%d, your processed_version=%d)\n",
-				conversationAddress(ctx, d, u.GetConversation()), u.NewMessageCount, u.CurrentVersion, u.ProcessedVersion)
+				quoteAddress(conversationAddress(ctx, d, u.GetConversation())), u.NewMessageCount, u.CurrentVersion, u.ProcessedVersion)
 		}
 		text += "\nPick ONE channel. Call `laelia-agent message read <address> --version <processed_version>` to read the new messages.\n"
 	}
@@ -441,7 +441,7 @@ func AckProcessedVersion(ctx context.Context, d Deps, in AckProcessedVersionInpu
 	if err != nil {
 		return "", wrapManagerError(err)
 	}
-	return fmt.Sprintf("Cursor advanced to processed_version=%d for %s.", resp.Msg.ProcessedVersion, conversationAddress(ctx, d, name)), nil
+	return fmt.Sprintf("Cursor advanced to processed_version=%d for %s.", resp.Msg.ProcessedVersion, quoteAddress(conversationAddress(ctx, d, name))), nil
 }
 
 // UploadFile uploads a blob to S3 via the manager. Returns the canonical text
@@ -510,7 +510,7 @@ func ListFiles(ctx context.Context, d Deps, in ListFilesInput) (string, error) {
 	if err != nil {
 		return "", wrapManagerError(err)
 	}
-	text := fmt.Sprintf("Files in %s (%d):\n", conversationAddress(ctx, d, name), len(resp.Msg.Files))
+	text := fmt.Sprintf("Files in %s (%d):\n", quoteAddress(conversationAddress(ctx, d, name)), len(resp.Msg.Files))
 	if len(resp.Msg.Files) == 0 {
 		text += "(none)\n"
 		return text, nil
@@ -572,7 +572,7 @@ func ListThreadUpdates(ctx context.Context, d Deps, _ ListThreadUpdatesInput) (s
 			addrs[conv] = addr
 		}
 		text += fmt.Sprintf("- %s thread %s: %d new replies (latest_version=%d)\n",
-			addr, u.GetThreadRoot(), u.NewReplyCount, u.LatestVersion)
+			quoteAddress(addr), u.GetThreadRoot(), u.NewReplyCount, u.LatestVersion)
 	}
 	text += "\nFor each thread, call `laelia-agent thread read <address> --root <thread-root> --version <your processed_version for that conversation>` to read the new replies, then reply with `laelia-agent thread send <address> --root <thread-root>` if you should respond.\n"
 	return text, nil

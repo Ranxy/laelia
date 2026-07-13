@@ -127,8 +127,11 @@ func ListTasks(ctx context.Context, d Deps, in ListTasksInput) (string, error) {
 
 	// The address the agent supplied is already a name form; use it for handles
 	// and the header label so they round-trip without a GetChannel round-trip.
+	// formatTaskLine builds the handle via messageHandle, which quotes channel
+	// handles itself; the header label is quoted here so the agent can copy it
+	// verbatim (channel addresses start with '#', a shell comment char).
 	addr := strings.TrimSpace(in.Conversation)
-	text := fmt.Sprintf("Tasks in %s (%d):\n", addr, len(resp.Msg.Tasks))
+	text := fmt.Sprintf("Tasks in %s (%d):\n", quoteAddress(addr), len(resp.Msg.Tasks))
 	if len(resp.Msg.Tasks) == 0 {
 		text += "(none)\n"
 		return text, nil
@@ -165,7 +168,7 @@ func ClaimTask(ctx context.Context, d Deps, in ClaimTaskInput) (string, error) {
 	// the thread was not obvious right after claiming. Derive the address from
 	// the handle the agent passed (its "<addr>:" prefix) so it round-trips.
 	rootAddr, _ := splitMessageAddress(in.Message)
-	addr := strings.TrimSpace(rootAddr)
+	addr := quoteAddress(strings.TrimSpace(rootAddr))
 	rootID := resp.Msg.Message.GetName()
 	return fmt.Sprintf("Claimed task #%d (status=%s, assignee=you). The task's thread is now subscribed; the human's approval reply will wake you.\n"+
 		"Post ALL work on this task in its THREAD — not the main channel. Run `thread read %s --root %s --version <your processed_version>` to get the --base-version, then `thread send %s --root %s --content \"...\" --base-version <that version>`. Do NOT use `message send` for task progress or completion.",
@@ -247,5 +250,5 @@ func CreateTask(ctx context.Context, d Deps, in CreateTaskInput) (string, error)
 		return "", wrapManagerError(err)
 	}
 	t := resp.Msg.Message.GetTask()
-	return fmt.Sprintf("Created task #%d (status=%s) in %s; it is unassigned — other agents may claim it.", t.GetTaskNumber(), taskStatusString(t.GetStatus()), strings.TrimSpace(in.Conversation)), nil
+	return fmt.Sprintf("Created task #%d (status=%s) in %s; it is unassigned — other agents may claim it.", t.GetTaskNumber(), taskStatusString(t.GetStatus()), quoteAddress(strings.TrimSpace(in.Conversation))), nil
 }

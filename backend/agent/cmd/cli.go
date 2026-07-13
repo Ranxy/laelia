@@ -147,9 +147,19 @@ func readContentFlag(content string) (string, bool) {
 //nolint:unparam // n is intentionally parameterized for future commands needing other counts
 func requireArgs(cmd *cobra.Command, n int, args []string) bool {
 	if len(args) != n {
+		hint := fmt.Sprintf("Run `%s --help` for usage.", cmd.CommandPath())
+		// A dropped `#`-prefixed channel address is the most common cause of a
+		// short-arg run: `#` starts a shell comment, so `message read #TEAMS`
+		// reaches us with no positional arg at all. Tell the agent to single-quote
+		// channel addresses so the shell passes them through literally.
+		if n > 0 && len(args) < n {
+			hint = fmt.Sprintf(
+				"Got fewer arguments than expected. If an argument starts with `#` (a channel address such as #general), `#` begins a SHELL COMMENT and was stripped before the command ran — re-run it SINGLE-QUOTED, e.g. `%s '#general'`. %s",
+				cmd.CommandPath(), hint)
+		}
 		printError("INVALID_ARGUMENT_FAILED",
 			fmt.Sprintf("%s expects %d positional argument(s), got %d", cmd.CommandPath(), n, len(args)),
-			fmt.Sprintf("Run `%s --help` for usage.", cmd.CommandPath()))
+			hint)
 		return false
 	}
 	return true

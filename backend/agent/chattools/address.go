@@ -256,12 +256,28 @@ func conversationAddress(ctx context.Context, d Deps, name string) string {
 	return name
 }
 
+// quoteAddress wraps a conversation address (or message handle) in single
+// quotes when it begins with '#'. A bare unquoted "#general" is silently
+// treated as the start of a shell comment and dropped before the CLI sees it,
+// so every channel address an agent copies from output is shown quoted: the
+// agent pastes "'#general'" verbatim and the shell strips the quotes, leaving
+// the literal "#general" for the resolver. dm: addresses contain no '#' and
+// are returned unchanged.
+func quoteAddress(addr string) string {
+	if strings.HasPrefix(addr, "#") {
+		return "'" + addr + "'"
+	}
+	return addr
+}
+
 // messageHandle renders the message handle an agent copies from output into
 // task/reminder/thread commands: "<address>:<message-id>". The address must be a
 // real name form (callers obtain it from the agent's input, which is already
 // validated as a name); an unresolved "conversations/<id>" address yields "" so
-// no rejected id form is ever emitted as a copyable handle. Returns "" when
-// either part is empty.
+// no rejected id form is ever emitted as a copyable handle. A channel handle
+// (address begins with '#') is wrapped in single quotes via quoteAddress so the
+// agent can copy it into a shell command without the '#' being parsed as a
+// comment. Returns "" when either part is empty.
 func messageHandle(addr, messageID string) string {
 	addr = strings.TrimSpace(addr)
 	messageID = strings.TrimSpace(messageID)
@@ -271,5 +287,5 @@ func messageHandle(addr, messageID string) string {
 	if strings.HasPrefix(addr, "conversations/") {
 		return ""
 	}
-	return addr + ":" + messageID
+	return quoteAddress(addr + ":" + messageID)
 }

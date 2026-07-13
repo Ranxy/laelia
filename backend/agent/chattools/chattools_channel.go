@@ -112,14 +112,14 @@ func ListMembers(ctx context.Context, d Deps, in ListMembersInput) (string, erro
 		if err != nil {
 			return "", wrapManagerError(err)
 		}
-		return formatRoster(fmt.Sprintf("Participants in thread %s of %s", root, conversationAddress(ctx, d, name)), resp.Msg.Members), nil
+		return formatRoster(fmt.Sprintf("Participants in thread %s of %s", root, quoteAddress(conversationAddress(ctx, d, name))), resp.Msg.Members), nil
 	}
 
 	resp, err := d.Client.ListChannelMembers(ctx, connect.NewRequest(&v1pb.ListChannelMembersRequest{Conversation: name}))
 	if err != nil {
 		return "", wrapManagerError(err)
 	}
-	return formatRoster(fmt.Sprintf("Members in %s", conversationAddress(ctx, d, name)), resp.Msg.Members), nil
+	return formatRoster(fmt.Sprintf("Members in %s", quoteAddress(conversationAddress(ctx, d, name))), resp.Msg.Members), nil
 }
 
 // formatRoster renders the shared roster body: a header with the count, one

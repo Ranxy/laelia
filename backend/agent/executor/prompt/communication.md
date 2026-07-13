@@ -8,16 +8,18 @@ Your shell runs inside your agent workspace; each command prints canonical human
 
 You address conversations by **name**, not by raw id. Every place a command takes `<conversation>` below, pass a **conversation address**:
 
-- `#<title>` — a channel, by its title (e.g. `#general`). The channel must already exist; agents never create channels.
+- `#<title>` — a channel, by its title (e.g. `'#general'`). The channel must already exist; agents never create channels.
 - `dm:@<peer>` — a direct message with a peer, by the peer's display name (e.g. `dm:@alice`). The peer may be an agent or a user; the DM is opened or reused automatically when you send to it. To address an agent whose name is ambiguous (two agents share a display name), use `dm:@agents/<resource-id>` — run `agent list` (see Delegation) to find the id.
+
+**Quote channel addresses with single quotes.** A channel address starts with `#`, and `#` begins a **shell comment** — everything from `#` to end-of-line is stripped before your command reaches the tool, so an unquoted `#general` is silently dropped and the command runs with no argument (`message read` → "expects 1 positional argument(s), got 0"). Always write channel addresses and channel message handles **single-quoted**: `'#general'`, `'#general:550e8400-...'`. `dm:@...` addresses contain no `#` and need no quoting. When you copy an address or message handle from this tool's own output, **copy the single quotes too** — the output prints channel addresses already single-quoted (`'#TEAMS'`, `target='#image'`, `message: '#general:<uuid>'`) precisely so you can paste them verbatim. Never strip the quotes; never wrap `dm:` addresses in quotes.
 
 These are the **only** conversation address forms — raw `conversations/<id>` names and bare ids are rejected. Files use a bare file id (`file download <id>`, `--attach <file-id>`), reminders use `reminders/{message_id}`, and thread roots use a bare message id — these resources have no name and stay id-based by design.
 
-A **message address** is `<address>:<message-id>` — a conversation address followed by `:` and the message id (a UUID), e.g. `#general:550e8400-e29b-41d4-a716-446655440000` or `dm:@alice:550e8400-...`. This is what every command that acts on a single message (`task claim`, `reminder convert`, `thread send --root`) takes. The indented `message:` line under each message in `message read`/`thread read` output prints this handle — **copy it verbatim**; never construct it yourself.
+A **message address** is `<address>:<message-id>` — a conversation address followed by `:` and the message id (a UUID), e.g. `'#general:550e8400-e29b-41d4-a716-446655440000'` or `dm:@alice:550e8400-...`. Channel message handles start with `#` so they are single-quoted; DM handles do not. This is what every command that acts on a single message (`task claim`, `reminder convert`, `thread send --root`) takes. The indented `message:` line under each message in `message read`/`thread read` output prints this handle — **copy it verbatim, including the single quotes for channels**; never construct it yourself.
 
 Parsing rules the resolver follows (so you do not have to):
 
-- The message id is split off at the last `:` whose remainder is a UUID. A `:` inside a channel title is tolerated — `#plan:b:<uuid>` still resolves to channel `#plan:b`, message `<uuid>`. Do not worry about `:` in titles.
+- The message id is split off at the last `:` whose remainder is a UUID. A `:` inside a channel title is tolerated — `'#plan:b:<uuid>'` still resolves to channel `#plan:b`, message `<uuid>`. Do not worry about `:` in titles.
 - A thread root may be given as a bare message id or a `<address>:<message-id>` handle. Both are accepted by the `--root` flag of `thread read`/`thread send`, and the handle form is accepted as the positional message argument of `task claim`/`reminder convert` (those take a `<message-handle>`, not a conversation).
 
 ### Commands
@@ -52,7 +54,7 @@ Parsing rules the resolver follows (so you do not have to):
 | `laelia-agent reminder complete <name> --result <text\|->` | `complete_reminder` | Mark a DUE reminder completed and post the result to its thread. **The manager posts the message atomically — do NOT also post it to the thread yourself.** Recurring reminders reschedule to the next cron fire; one-shot are terminal. |
 | `laelia-agent reminder fail <name> --error <text\|->` | `fail_reminder` | Mark a DUE reminder failed and post the error to its thread. Recurring reschedule; one-shot terminal FAILED. |
 
-`<address>` is a conversation address (`#<title>` or `dm:@<peer>`) — see Addresses above. You get it from the "New messages received:" batch header, `message check`, or `message read`. `<message-handle>` (shown as `<message-id>` in the `message:` line) is the `<address>:<message-id>` form printed on the indented `message:` line under each message in `message read`/`thread read` (and by `task list`); copy it verbatim — never construct it from the conversation id or a version number. A reminder `<name>` is `reminders/{message_id}`, printed by `reminder list-due`/`reminder list`.
+`<address>` is a conversation address (`#<title>` or `dm:@<peer>`) — see Addresses above. You get it from the "New messages received:" batch header, `message check`, or `message read`; **write channel addresses single-quoted** (`'#general'`) and DM addresses unquoted (`dm:@alice`). `<message-handle>` (shown as `<message-id>` in the `message:` line) is the `<address>:<message-id>` form printed on the indented `message:` line under each message in `message read`/`thread read` (and by `task list`); copy it verbatim, **including the single quotes the output already wraps channel handles in** — never construct it from the conversation id or a version number. A reminder `<name>` is `reminders/{message_id}`, printed by `reminder list-due`/`reminder list`.
 
 ### Files
 

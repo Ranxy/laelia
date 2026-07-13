@@ -130,7 +130,7 @@ func TestFormatMessageLineAttachments(t *testing.T) {
 		"#general", "11111111-2222-3333-4444-555555555555", 58,
 		"每天3点分析github提交", nil)
 	want := "[2026-06-26T07:31:16Z] admin (USER): 每天3点分析github提交\n" +
-		"  message: #general:11111111-2222-3333-4444-555555555555  version: 58\n"
+		"  message: '#general:11111111-2222-3333-4444-555555555555'  version: 58\n"
 	assert.Equal(t, want, got)
 
 	// An unresolved conversations/<id> address (e.g. a GetChannel failure at a
@@ -149,7 +149,7 @@ func TestFormatMessageLineAttachments(t *testing.T) {
 		"#general", "11111111-2222-3333-4444-555555555555", 58, "test file",
 		[]*v1pb.Attachment{{Id: "f-1", Name: "report.pdf", MimeType: "application/pdf", SizeBytes: 123456}})
 	want = "[2026-06-26T07:31:16Z] admin (USER): test file\n" +
-		"  message: #general:11111111-2222-3333-4444-555555555555  version: 58\n" +
+		"  message: '#general:11111111-2222-3333-4444-555555555555'  version: 58\n" +
 		"  attachments:\n" +
 		"    - id=f-1  name=report.pdf  size=123456  mime=application/pdf\n"
 	assert.Equal(t, want, got)

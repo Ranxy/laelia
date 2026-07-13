@@ -61,7 +61,7 @@ func BuildTurnBatch(ctx context.Context, d Deps) (string, error) {
 	shown := 0
 	for _, u := range updates {
 		target := conversationAddress(ctx, d, u.GetConversation())
-		cursor := fmt.Sprintf("%s (your processed_version=%d)", target, u.GetProcessedVersion())
+		cursor := fmt.Sprintf("%s (your processed_version=%d)", quoteAddress(target), u.GetProcessedVersion())
 		if shown >= turnBatchMaxChannels {
 			overflow = append(overflow, fmt.Sprintf("- %s: %d unread", cursor, u.GetNewMessageCount()))
 			continue
@@ -146,7 +146,7 @@ func formatBatchLine(target string, m *v1pb.ChatMessage) string {
 	typeShort := batchTypeShort(m.GetSenderType())
 	sender := batchSenderLabel(m.GetSenderType(), m.GetSenderName())
 	content := strings.TrimSpace(m.GetContent())
-	return fmt.Sprintf("[target=%s msg=%s time=%s type=%s] %s: %s", target, msgID, ts, typeShort, sender, content)
+	return fmt.Sprintf("[target=%s msg=%s time=%s type=%s] %s: %s", quoteAddress(target), msgID, ts, typeShort, sender, content)
 }
 
 func batchTypeShort(t v1pb.SenderType) string {
