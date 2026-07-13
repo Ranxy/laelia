@@ -93,7 +93,8 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 }
 
 func (s *CommandService) ListChannelsForAgent(ctx context.Context, req *connect.Request[v1pb.ListChannelsForAgentRequest]) (*connect.Response[v1pb.ListChannelsForAgentResponse], error) {
-	if _, ok := GetUserFromContext(ctx); !ok {
+	user, ok := GetUserFromContext(ctx)
+	if !ok || user == nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
 
@@ -112,7 +113,18 @@ func (s *CommandService) ListChannelsForAgent(ctx context.Context, req *connect.
 	}
 	limitPlusOne := offset.limit + 1
 
-	convs, err := s.store.ListAgentConversations(ctx, resourceID, limitPlusOne, offset.offset)
+	// Non-admin users only see the agent's channels they are a member of;
+	// workspace admins see every channel the agent is in.
+	var viewer *store.ConversationMemberFilter
+	admin, err := isUserWorkspaceAdmin(ctx, s.store, user)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve workspace admin"))
+	}
+	if !admin {
+		viewer = &store.ConversationMemberFilter{MemberType: store.MemberTypeUser, MemberID: fmt.Sprintf("%d", user.ID)}
+	}
+
+	convs, err := s.store.ListAgentConversations(ctx, resourceID, viewer, limitPlusOne, offset.offset)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list channels for agent"))
 	}

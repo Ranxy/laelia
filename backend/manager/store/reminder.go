@@ -147,9 +147,12 @@ func (s *Store) GetReminder(ctx context.Context, msgID uuid.UUID) (*Reminder, er
 
 // ListReminders returns reminders filtered by owning agent and/or conversation
 // and/or status, ordered by next fire (soonest first) then most recently
-// updated. agentID==0 and convID==uuid.Nil mean "no filter". Pagination is
-// offset-based: pageToken is the decimal offset; pageSize caps the page.
-func (s *Store) ListReminders(ctx context.Context, agentID int, convID uuid.UUID, statusFilter []int16, pageSize int, pageToken string) ([]*Reminder, string, error) {
+// updated. agentID==0 and convID==uuid.Nil mean "no filter". When viewer is
+// non-nil, results are restricted to reminders whose conversation the viewer is
+// a member of, so a non-admin user only sees their own reminders (workspace
+// admins and agent callers pass nil). Pagination is offset-based: pageToken is
+// the decimal offset; pageSize caps the page.
+func (s *Store) ListReminders(ctx context.Context, agentID int, convID uuid.UUID, statusFilter []int16, viewer *ConversationMemberFilter, pageSize int, pageToken string) ([]*Reminder, string, error) {
 	if pageSize <= 0 || pageSize > 200 {
 		pageSize = 50
 	}
@@ -175,6 +178,11 @@ func (s *Store) ListReminders(ctx context.Context, agentID int, convID uuid.UUID
 		where += " AND r.status = ANY($" + itoa(idx) + ")"
 		args = append(args, statusFilter)
 		idx++
+	}
+	if viewer != nil {
+		where += " AND EXISTS (SELECT 1 FROM conversation_member cmv WHERE cmv.conversation_id = r.conversation_id AND cmv.member_type = $" + itoa(idx) + " AND cmv.member_id = $" + itoa(idx+1) + ")"
+		args = append(args, viewer.MemberType, viewer.MemberID)
+		idx += 2
 	}
 	args = append(args, pageSize, offset)
 	query := `SELECT ` + reminderColumns + `

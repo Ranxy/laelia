@@ -424,18 +424,28 @@ func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID
 // binds conversation_member to MemberTypeAgent + the agent's resource_id string
 // (which is how agent memberships are stored, see findDirectConversation).
 //
+// When viewer is non-nil, results are further restricted to conversations the
+// viewer is also a member of, so a non-admin user only sees the agent's
+// channels they participate in (workspace admins pass a nil viewer to see all).
+//
 // The unread count is intentionally 0: agent_channel_cursor tracks the agent's
 // own read position for its inbox, which is not meaningful to an admin viewing
 // the agent's channel roster from the agent detail page.
-func (s *Store) ListAgentConversations(ctx context.Context, agentResourceID string, limit, offset int) ([]*UserConversation, error) {
-	rows, err := s.GetDB().QueryContext(ctx, `
+func (s *Store) ListAgentConversations(ctx context.Context, agentResourceID string, viewer *ConversationMemberFilter, limit, offset int) ([]*UserConversation, error) {
+	args := []any{MemberTypeAgent, agentResourceID}
+	query := `
 		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version
 		FROM conversation c
 		JOIN conversation_member cm ON cm.conversation_id = c.id
-		WHERE cm.member_type = $1 AND cm.member_id = $2
-		ORDER BY c.updated_at DESC
-		LIMIT $3 OFFSET $4
-	`, MemberTypeAgent, agentResourceID, limit, offset)
+		WHERE cm.member_type = $1 AND cm.member_id = $2`
+	if viewer != nil {
+		query += ` AND EXISTS (SELECT 1 FROM conversation_member cmv WHERE cmv.conversation_id = c.id AND cmv.member_type = $3 AND cmv.member_id = $4)`
+		args = append(args, viewer.MemberType, viewer.MemberID)
+	}
+	args = append(args, limit, offset)
+	query += ` ORDER BY c.updated_at DESC LIMIT $` + itoa(len(args)-1) + ` OFFSET $` + itoa(len(args))
+
+	rows, err := s.GetDB().QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to list agent conversations")
 	}

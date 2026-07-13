@@ -26,6 +26,16 @@ type ConversationMember struct {
 	JoinedAt       time.Time
 }
 
+// ConversationMemberFilter identifies a caller whose conversation membership
+// restricts a list query: a non-admin user only sees conversations (and their
+// reminders) they belong to. A nil filter means "no membership restriction" and
+// is used for workspace admins and agent callers (an agent is inherently a
+// member of its own conversations).
+type ConversationMemberFilter struct {
+	MemberType int32
+	MemberID   string
+}
+
 func (s *Store) AddConversationMember(ctx context.Context, convID uuid.UUID, memberType int32, memberID string, role int32) error {
 	_, err := s.GetDB().ExecContext(ctx, `
 		INSERT INTO conversation_member (conversation_id, member_type, member_id, member_role)

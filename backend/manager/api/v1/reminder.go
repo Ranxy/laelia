@@ -178,7 +178,9 @@ func (s *CommandService) ConvertMessageToReminder(ctx context.Context, req *conn
 
 // ListReminders returns reminders filtered by owning agent and/or conversation
 // and/or status. Used by the agent-page Reminders tab (user) and the agent CLI
-// self-list.
+// self-list. A non-admin user only sees reminders whose conversation they are a
+// member of; workspace admins and agent callers see everything their other
+// filters match.
 func (s *CommandService) ListReminders(ctx context.Context, req *connect.Request[v1pb.ListRemindersRequest]) (*connect.Response[v1pb.ListRemindersResponse], error) {
 	var agentID int
 	if req.Msg.Agent != "" {
@@ -205,7 +207,21 @@ func (s *CommandService) ListReminders(ctx context.Context, req *connect.Request
 		statusFilter = append(statusFilter, int16(st))
 	}
 
-	reminders, nextToken, err := s.store.ListReminders(ctx, agentID, convID, statusFilter, int(req.Msg.PageSize), req.Msg.PageToken)
+	// Restrict a non-admin user to reminders in conversations they belong to.
+	// Agent callers (the CLI self-list) keep the unfiltered query; they are
+	// inherently members of their own conversations.
+	var viewer *store.ConversationMemberFilter
+	if user, _ := GetUserFromContext(ctx); user != nil {
+		admin, err := isUserWorkspaceAdmin(ctx, s.store, user)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve workspace admin"))
+		}
+		if !admin {
+			viewer = &store.ConversationMemberFilter{MemberType: store.MemberTypeUser, MemberID: fmt.Sprintf("%d", user.ID)}
+		}
+	}
+
+	reminders, nextToken, err := s.store.ListReminders(ctx, agentID, convID, statusFilter, viewer, int(req.Msg.PageSize), req.Msg.PageToken)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to list reminders"))
 	}
