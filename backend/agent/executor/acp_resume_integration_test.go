@@ -89,6 +89,35 @@ func TestACPExecutorColdThenWarmResumesSession(t *testing.T) {
 	combined := strings.ToUpper(compactText(joinOutput(warm.outputs)) + compactText(warm.result.FinalSummary))
 	assert.Contains(t, combined, secret,
 		"warm turn must recall the secret from the resumed session; outputs=%q summary=%q", joinOutput(warm.outputs), warm.result.FinalSummary)
+
+	// opencode v1.17.x replays the prior conversation as session/update
+	// notifications DURING session/resume. The executor must drop that replay so
+	// the warm turn does not inherit the cold turn's events — specifically the
+	// read tool call on secret.txt, which the warm prompt forbids and the now-
+	// deleted file makes impossible. Any event or output referencing the cold
+	// turn's filename is a leaked replay.
+	for _, ev := range warm.events {
+		blob := strings.ToLower(ev.Summary + " " + toolCallEventBlob(ev))
+		assert.NotContains(t, blob, "secret.txt",
+			"warm turn must not replay the cold turn's secret.txt tool call; event=%s", eventTypes([]Event{ev}))
+	}
+}
+
+// toolCallEventBlob renders a tool-call event's payload to a string for replay
+// inspection. Returns "" for non-tool-call events.
+func toolCallEventBlob(ev Event) string {
+	switch {
+	case ev.ToolCallStarted != nil:
+		return toJSONString(ev.ToolCallStarted)
+	case ev.ToolCallFinished != nil:
+		return toJSONString(ev.ToolCallFinished)
+	case ev.DiffEmitted != nil:
+		return toJSONString(ev.DiffEmitted)
+	case ev.RawAcp != nil:
+		return toJSONString(ev.RawAcp)
+	default:
+		return ""
+	}
 }
 
 // TestACPExecutorResumeFallbackToColdOnBadSession guards the dead-session

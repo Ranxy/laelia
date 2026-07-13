@@ -196,6 +196,17 @@ type ACPExecutor struct {
 	toolCallStates   map[string]*toolCallState
 	sessionID        string
 	initializedAgent string
+	// replayingHistory is set while a session/resume RPC is in flight. Some ACP
+	// agents (notably opencode v1.17.x) replay the entire prior conversation as
+	// session/update notifications DURING session/resume — before the resume
+	// response — so the client can reconstruct its UI. Our cursor is the source
+	// of truth and the history was already surfaced on the turn that produced
+	// it, so re-emitting it here would leak every prior turn's events into the
+	// current command (command B inheriting A's 1..8). The SDK's notification
+	// watermark guarantees every replay notification is processed before
+	// ResumeSession returns, so toggling this flag around the call races cleanly
+	// against the SessionUpdate handler on the notification goroutine.
+	replayingHistory atomic.Bool
 	// toolCallAdapter maps the agent's ACP ToolCall create/update frames to
 	// TOOL_CALL_STARTED/FINISHED events per its wire shape (e.g. opencode
 	// delivers the command in the first in_progress status update, not the
@@ -428,12 +439,16 @@ func (e *ACPExecutor) run() {
 	if existing, loadErr := loadACPSession(e.request.AgentID); loadErr != nil {
 		slog.Warn("failed to load persisted acp session state; cold-starting", "agent", e.request.AgentID, "error", loadErr)
 	} else if existing != nil && existing.SessionID != "" && existing.Fingerprint == fingerprint {
+		// opencode replays the prior conversation as session/update during this
+		// call; suppress forwarding that history into the current command.
+		e.replayingHistory.Store(true)
 		resumeResp, resumeErr := e.conn.ResumeSession(e.ctx, acp.ResumeSessionRequest{
 			SessionId:             acp.SessionId(existing.SessionID),
 			Cwd:                   e.workingDir,
 			AdditionalDirectories: extraDirs,
 			McpServers:            mcpServers,
 		})
+		e.replayingHistory.Store(false)
 		if resumeErr != nil {
 			// The provider lost the session (crash, eviction, config drift the
 			// fingerprint did not catch). Drop the stale id and cold-start so we
@@ -960,6 +975,12 @@ func (c *acpRuntimeClient) RequestPermission(_ context.Context, params acp.Reque
 }
 
 func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNotification) error {
+	// Drop replayed conversation history emitted during session/resume (e.g.
+	// opencode). It was already surfaced on the turn that produced it; echoing
+	// it here would attribute every prior turn's events to this command.
+	if c.executor.replayingHistory.Load() {
+		return nil
+	}
 	u := params.Update
 	switch {
 	case u.AgentMessageChunk != nil:

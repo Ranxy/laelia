@@ -125,6 +125,54 @@ func TestACPSessionUpdateBuffersConsecutiveMessageChunks(t *testing.T) {
 	assert.Equal(t, float64(5), ev.RawAcp.Data.AsMap()["batch_size"])
 }
 
+// TestACPSessionUpdateDropsReplayedHistory guards the opencode-replay fix.
+// opencode v1.17.x replays the prior conversation as session/update
+// notifications DURING session/resume (before the resume response). While
+// replayingHistory is set, every such notification — agent messages, tool
+// calls, diffs — must be dropped so the current command does not inherit the
+// prior turn's events. With the flag clear, the same notification flows through.
+func TestACPSessionUpdateDropsReplayedHistory(t *testing.T) {
+	exec := newTestBufferedExecutor()
+	exec.config.SupportsRawEvents = true
+	exec.config.SupportsDiff = true
+	exec.config.SupportsToolTraces = true
+	exec.request.AllowDiff = true
+	client := &acpRuntimeClient{executor: exec}
+
+	// A replayed agent message, tool call, and diff must all be dropped while
+	// replayingHistory is set: nothing lands on either channel.
+	exec.replayingHistory.Store(true)
+	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
+		Update: acp.SessionUpdate{AgentMessageChunk: &acp.SessionUpdateAgentMessageChunk{
+			Content: acp.TextBlock("replayed agent text"),
+		}},
+	}))
+	status := acp.ToolCallStatusCompleted
+	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
+		Update: acp.SessionUpdate{ToolCallUpdate: &acp.SessionToolCallUpdate{
+			Status: &status,
+			Content: []acp.ToolCallContent{
+				acp.ToolDiffContent("/tmp/replayed.txt", "new", "old"),
+			},
+		}},
+	}))
+	exec.buffer.flush(exec)
+	exec.rawEvents.flush(exec)
+	assert.Empty(t, exec.eventCh, "replayed history must not emit events")
+	assert.Empty(t, exec.outputCh, "replayed history must not emit output")
+	assert.Empty(t, exec.toolCallStates, "replayed tool calls must not register state")
+
+	// Once the resume RPC has returned (flag clear), the same notification flows.
+	exec.replayingHistory.Store(false)
+	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
+		Update: acp.SessionUpdate{AgentMessageChunk: &acp.SessionUpdateAgentMessageChunk{
+			Content: acp.TextBlock("live agent text"),
+		}},
+	}))
+	exec.buffer.flush(exec)
+	assert.NotEmpty(t, exec.outputCh, "live agent text must flow to output")
+}
+
 func TestACPSessionUpdateBatchesRawEventsAcrossBoundaries(t *testing.T) {
 	exec := newTestBufferedExecutor()
 	exec.config.SupportsRawEvents = true
