@@ -73,60 +73,72 @@ func getUserByIdentifier(ctx context.Context, stores *store.Store, identifier st
 	return user
 }
 
-// GetUserIAMPolicyBindings return the valid bindings for the user.
+// GetUserIAMPolicyBindings return the valid bindings for the user. It is the
+// user-only face of the agent-aware GetCallerIAMPolicyBindings; the two share
+// one binding-match implementation so user and agent callers cannot drift.
 func GetUserIAMPolicyBindings(ctx context.Context, stores *store.Store, user *store.UserMessage, policies ...*storepb.IamPolicy) []*storepb.Binding {
-	userIDFullName := common.FormatUserUID(user.ID)
+	return GetCallerIAMPolicyBindings(ctx, stores, user, nil, policies...)
+}
+
+// GetCallerIAMPolicyBindings returns the valid bindings for the caller, which
+// may be a user OR an agent. It is the agent-aware sibling of
+// GetUserIAMPolicyBindings: a user caller matches users/{uid} members (and
+// group-expanded members, and allUsers); an agent caller matches agents/{rid}
+// members (and allUsers). Group expansion only applies to users (groups contain
+// users, never agents). Returns nil when neither a user nor an agent is supplied.
+func GetCallerIAMPolicyBindings(ctx context.Context, stores *store.Store, user *store.UserMessage, agent *store.AgentMessage, policies ...*storepb.IamPolicy) []*storepb.Binding {
+	principal, isUser := callerPrincipalName(user, agent)
+	if principal == "" {
+		return nil
+	}
 
 	var bindings []*storepb.Binding
-
 	for _, policy := range policies {
 		for _, binding := range policy.Bindings {
 			if !validateIAMBinding(binding) {
 				continue
 			}
-
-			hasUser := false
-			for _, member := range binding.Members {
-				if member == common.AllUsers {
-					hasUser = true
-					break
-				}
-				if userIDFullName == member {
-					hasUser = true
-					break
-				}
-				if strings.HasPrefix(member, common.GroupPrefix) {
-					groupEmail, err := common.GetGroupEmail(member)
-					if err != nil {
-						slog.Error("failed to parse group email", slog.String("group", member), log.WithError(err))
-						continue
-					}
-					group, err := stores.GetGroup(ctx, groupEmail)
-					if err != nil {
-						slog.Error("failed to get group", slog.String("group", member), log.WithError(err))
-						continue
-					}
-					if group == nil {
-						slog.Error("cannot found group", slog.String("group", member))
-						continue
-					}
-					for _, member := range group.Payload.Members {
-						if userIDFullName == member.Member {
-							hasUser = true
-							break
-						}
-					}
-					if hasUser {
-						break
-					}
-				}
-			}
-			if hasUser {
+			if bindingContainsCaller(ctx, stores, binding, principal, isUser, user) {
 				bindings = append(bindings, binding)
 			}
 		}
 	}
 	return bindings
+}
+
+// callerPrincipalName returns the fully-qualified principal name for the caller
+// and whether that principal is a user. Returns ("", false) when the caller is
+// neither a user nor an agent.
+func callerPrincipalName(user *store.UserMessage, agent *store.AgentMessage) (string, bool) {
+	switch {
+	case user != nil:
+		return common.FormatUserUID(user.ID), true
+	case agent != nil:
+		return common.FormatAgentUID(agent.ResourceID), false
+	default:
+		return "", false
+	}
+}
+
+// bindingContainsCaller reports whether the binding's member set contains the
+// caller. A direct principal match or the allUsers pseudo-member always wins;
+// group members are expanded only for user callers (groups hold users, not
+// agents).
+func bindingContainsCaller(ctx context.Context, stores *store.Store, binding *storepb.Binding, principal string, isUser bool, user *store.UserMessage) bool {
+	for _, member := range binding.Members {
+		if member == common.AllUsers || member == principal {
+			return true
+		}
+	}
+	if !isUser || user == nil {
+		return false
+	}
+	for _, member := range binding.Members {
+		if strings.HasPrefix(member, common.GroupPrefix) && MemberContainsUser(ctx, stores, member, user) {
+			return true
+		}
+	}
+	return false
 }
 
 // MemberContainsUser checks if a member (user or group) contains the specified user.

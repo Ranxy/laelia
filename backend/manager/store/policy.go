@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -58,7 +59,9 @@ func (s *Store) GetAgentIamPolicy(ctx context.Context, agentName string) (*IamPo
 // applyIamPolicyPatch mutates policy in place: for each existing binding it adds
 // patch.Member when the binding's role is in patch.Roles and removes it
 // otherwise; then it creates a new binding for any role in patch.Roles that had
-// no existing binding. Shared by PatchWorkspaceIamPolicy and PatchResourceIamPolicy.
+// no existing binding. Bindings left with no members are reaped so repeated
+// add/remove cycles do not accumulate empty bindings. Shared by
+// PatchWorkspaceIamPolicy and PatchResourceIamPolicy.
 func applyIamPolicyPatch(policy *models.IamPolicy, patch *PatchIamPolicyMessage) {
 	roleMap := map[string]bool{}
 	for _, role := range patch.Roles {
@@ -83,6 +86,15 @@ func applyIamPolicyPatch(policy *models.IamPolicy, patch *PatchIamPolicyMessage)
 			Members: []string{patch.Member},
 		})
 	}
+
+	// Reap bindings that lost their last member.
+	kept := policy.Bindings[:0]
+	for _, binding := range policy.Bindings {
+		if len(binding.Members) > 0 {
+			kept = append(kept, binding)
+		}
+	}
+	policy.Bindings = kept
 }
 
 // upsertIamPolicy marshals policy and upserts it as the IAM policy for the given
@@ -106,9 +118,11 @@ func (s *Store) upsertIamPolicy(ctx context.Context, resourceType models.Policy_
 
 // PatchResourceIamPolicy sets or removes the member for a role on a per-resource
 // IAM policy (e.g. a conversation or agent policy). It shares the binding
-// mutation and upsert logic with PatchWorkspaceIamPolicy. The caller owns
-// concurrency for now; optimistic-concurrency (etag) hardening is deferred to
-// Phase 2 when conversation policies see concurrent member mutations.
+// mutation and upsert logic with PatchWorkspaceIamPolicy. The read-modify-write
+// has no etag/lock, so concurrent patches on the same resource race
+// (last-write-wins); this is benign while conversation_member remains the read
+// path (Phase 2) and is hardened with optimistic concurrency in Phase 3 when
+// the bindings become authoritative and see concurrent member mutations.
 func (s *Store) PatchResourceIamPolicy(ctx context.Context, resourceType models.Policy_Resource, resource string, patch *PatchIamPolicyMessage) (*IamPolicyMessage, error) {
 	current, err := s.getIamPolicy(ctx, &FindPolicyMessage{
 		ResourceType: &resourceType,
@@ -161,6 +175,52 @@ func seedAgentEditorBindingTx(ctx context.Context, tx *sql.Tx, agentResourceID s
 type PatchIamPolicyMessage struct {
 	Member string
 	Roles  []string
+}
+
+// conversationBinding pairs a role ID (e.g. ConversationOwnerRole) with the
+// fully-qualified principal name of the member it binds (users/{uid} or
+// agents/{rid}). seedConversationIamPolicyTx groups bindings by role so a role
+// shared by several members (e.g. two agents in an agent-DM both bound to
+// conversationMember) collapses to a single Binding.
+type conversationBinding struct {
+	Role   string
+	Member string
+}
+
+// seedConversationIamPolicyTx creates the initial IAM policy for a freshly
+// created conversation, binding the given (role, member) pairs. It runs in the
+// caller's transaction so the policy is atomic with the conversation row and
+// its conversation_member rows (Phase 2 dual-write). A no-op for no bindings.
+func seedConversationIamPolicyTx(ctx context.Context, tx *sql.Tx, convID uuid.UUID, bindings []conversationBinding) error {
+	if len(bindings) == 0 {
+		return nil
+	}
+	byRole := make(map[string]*models.Binding)
+	var pbBindings []*models.Binding
+	for _, b := range bindings {
+		binding, ok := byRole[b.Role]
+		if !ok {
+			binding = &models.Binding{Role: common.FormatRole(b.Role)}
+			byRole[b.Role] = binding
+			pbBindings = append(pbBindings, binding)
+		}
+		binding.Members = append(binding.Members, b.Member)
+	}
+
+	policy := &models.IamPolicy{Bindings: pbBindings}
+	payload, err := protojson.Marshal(policy)
+	if err != nil {
+		return err
+	}
+	_, err = upsertPolicyV2Impl(ctx, tx, &PolicyMessage{
+		ResourceType:      models.Policy_CONVERSATION,
+		Resource:          common.FormatConversationName(convID.String()),
+		Payload:           string(payload),
+		Type:              models.Policy_IAM,
+		InheritFromParent: false,
+		Enforce:           true,
+	})
+	return err
 }
 
 // PatchWorkspaceIamPolicy will set or remove the member for the workspace role.

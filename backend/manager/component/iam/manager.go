@@ -79,12 +79,47 @@ func (m *Manager) CheckPermission(ctx context.Context, perm permission.Permissio
 	}
 
 	if resource != nil {
-		// Phase 2: consult the resource's IAM policy. Left as a no-op for Phase 1
-		// so the engine is exercised end-to-end before per-resource bindings are
-		// introduced.
-		_ = resource
+		ok, err := m.checkResourcePermission(ctx, perm, user, agent, resource)
+		if err != nil {
+			return false, err
+		}
+		if ok {
+			return true, nil
+		}
 	}
 
+	return false, nil
+}
+
+// checkResourcePermission loads the resource's IAM policy and reports whether
+// the caller holds perm via any binding they match on that resource. Bindings
+// are resolved agent-aware (users/{uid} or agents/{rid} principals, group
+// expansion, CEL condition). A resource type without a backing policy store
+// (e.g. a command, handled in Phase 3) yields no permissions here.
+func (m *Manager) checkResourcePermission(ctx context.Context, perm permission.Permission, user *store.UserMessage, agent *store.AgentMessage, resource *ResourceRef) (bool, error) {
+	var policy *models.IamPolicy
+	switch resource.ResourceType {
+	case models.Policy_CONVERSATION:
+		p, err := m.store.GetConversationIamPolicy(ctx, resource.Name)
+		if err != nil {
+			return false, err
+		}
+		policy = p.Policy
+	case models.Policy_AGENT:
+		p, err := m.store.GetAgentIamPolicy(ctx, resource.Name)
+		if err != nil {
+			return false, err
+		}
+		policy = p.Policy
+	default:
+		return false, nil
+	}
+
+	for _, binding := range utils.GetCallerIAMPolicyBindings(ctx, m.store, user, agent, policy) {
+		if rolePerms := m.rolePermissions(ctx, binding.Role); rolePerms != nil && rolePerms[perm] {
+			return true, nil
+		}
+	}
 	return false, nil
 }
 

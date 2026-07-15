@@ -27,11 +27,16 @@ const (
 
 	// Commands
 	CommandsGet    Permission = "laelia.commands.get"
+	CommandsList   Permission = "laelia.commands.list"
 	CommandsWatch  Permission = "laelia.commands.watch"
 	CommandsCancel Permission = "laelia.commands.cancel"
 
-	// Conversations (channels are modeled as conversations)
+	// Conversations (channels are modeled as conversations). list is the
+	// workspace-scope discovery permission (any member can enumerate channels/
+	// commands); read/send/manage are per-conversation, granted by
+	// conversationMember/conversationOwner bindings on conversations/{id}.
 	ConversationsCreate Permission = "laelia.conversations.create"
+	ConversationsList   Permission = "laelia.conversations.list"
 	ConversationsRead   Permission = "laelia.conversations.read"
 	ConversationsSend   Permission = "laelia.conversations.send"
 	ConversationsManage Permission = "laelia.conversations.manage"
@@ -86,10 +91,12 @@ var allPermissions = []Permission{
 	AgentsListSessions,
 
 	CommandsGet,
+	CommandsList,
 	CommandsWatch,
 	CommandsCancel,
 
 	ConversationsCreate,
+	ConversationsList,
 	ConversationsRead,
 	ConversationsSend,
 	ConversationsManage,
@@ -154,4 +161,25 @@ func Exists(permissions ...string) bool {
 		}
 	}
 	return true
+}
+
+// resourceScopedPermissions are the permissions the IAM engine authorizes via a
+// per-resource IAM policy (conversationMember/conversationOwner/agentEditor
+// bindings) rather than the workspace baseline or handler-level helpers. The
+// interceptor resolves the request's resource only for these, so list/create
+// and handler-gated RPCs pay no resource-resolution cost and never hit a
+// per-resource policy lookup (which would otherwise turn a DB error into a 500
+// where the baseline path returned PermissionDenied). Phase 3 extends this set
+// when command-scoped RPCs move onto the engine.
+var resourceScopedPermissions = map[Permission]bool{
+	ConversationsRead:   true,
+	ConversationsSend:   true,
+	ConversationsManage: true,
+	AgentsEdit:          true,
+}
+
+// IsResourceScoped reports whether perm is authorized by a per-resource IAM
+// policy (and so the interceptor should resolve the request's resource).
+func IsResourceScoped(perm Permission) bool {
+	return resourceScopedPermissions[perm]
 }

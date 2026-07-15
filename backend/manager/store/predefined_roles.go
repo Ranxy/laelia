@@ -31,20 +31,28 @@ var allPermissionSet = func() map[permission.Permission]bool {
 	return m
 }()
 
-// memberBaselinePermissions is the permission set currently granted to any
-// authenticated principal (the former memberPermissions map in iam.go). It is
-// the Phase 1 contents of roles/workspaceMember so that switching the
-// interceptor to CheckPermission preserves today's behavior. Phase 2 narrows
-// it (moving resource-scoped perms to conversationMember/agentEditor) once
-// per-resource bindings are consulted.
+// memberBaselinePermissions is the permission set granted to any authenticated
+// principal (roles/workspaceMember). It carries the workspace-scope perms: the
+// discovery/list perms (conversations.list, commands.list — any member can
+// enumerate), creation perms, and the command perms still gated per-command by
+// requireCommandAccess until Phase 3. The per-resource perms
+// (conversations.read/send/manage, agents.edit) are also still present: the
+// interceptor does consult per-resource bindings for them, but in Phase 2 this
+// is inert because CheckPermission short-circuits at the baseline before the
+// resource consult runs (and resolveResource only runs for these resource-
+// scoped perms). Phase 3 removes them from the baseline so the
+// conversationMember/conversationOwner/agentEditor bindings become
+// authoritative.
 var memberBaselinePermissions = permissionSet(
 	permission.AgentsGet,
 	permission.AgentsEdit,
 	permission.ConversationsCreate,
+	permission.ConversationsList,
 	permission.ConversationsRead,
 	permission.ConversationsSend,
 	permission.ConversationsManage,
 	permission.CommandsGet,
+	permission.CommandsList,
 	permission.CommandsWatch,
 	permission.CommandsCancel,
 )

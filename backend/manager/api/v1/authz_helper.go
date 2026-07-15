@@ -3,11 +3,13 @@ package v1
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
+	"github.com/Ranxy/laelia/backend/common"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
@@ -22,6 +24,26 @@ func callerMemberInfo(user *store.UserMessage, agent *store.AgentMessage) (membe
 		return store.MemberTypeAgent, agent.ResourceID, true
 	}
 	return 0, "", false
+}
+
+// conversationMemberPrincipalName converts a conversation_member (memberType,
+// memberID) pair into the fully-qualified principal name used in conversation
+// IAM bindings: users/{uid} for a user member, agents/{rid} for an agent
+// member. memberID is the user principal id (numeric string) or the agent
+// resource id, mirroring what AddConversationMember stores. It routes through
+// the common formatters so the binding writer and the binding matcher
+// (utils.callerPrincipalName, which uses FormatUserUID(user.ID)) can never
+// drift on format.
+func conversationMemberPrincipalName(memberType int32, memberID string) string {
+	if memberType == store.MemberTypeAgent {
+		return common.FormatAgentUID(memberID)
+	}
+	if uid, err := strconv.Atoi(memberID); err == nil {
+		return common.FormatUserUID(uid)
+	}
+	// Unreachable for valid user members (AddChannelMember validates numeric),
+	// but keep a deterministic fallback rather than silently mismatching.
+	return common.UserNamePrefix + memberID
 }
 
 // requireConversationMember parses convName, resolves the caller, and ensures

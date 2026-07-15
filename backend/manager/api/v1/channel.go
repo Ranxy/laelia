@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/common"
+	models "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -267,6 +268,14 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 
 	memberType := req.Msg.MemberType
 	memberID := req.Msg.MemberId
+
+	// Refuse to re-add the channel owner as a plain member: AddConversationMember
+	// upserts member_role=Member (downgrading Owner) and the IAM dual-write would
+	// strip the owner's conversationOwner binding. The owner is already a member.
+	if memberType == store.MemberTypeUser && memberID == fmt.Sprintf("%d", conv.OwnerID) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("cannot add the channel owner as a member"))
+	}
+
 	var addedAgent *store.AgentMessage
 	if memberType == store.MemberTypeAgent {
 		agent, agentErr := s.store.GetAgentByResourceID(ctx, memberID)
@@ -283,6 +292,19 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 
 	if err := s.store.AddConversationMember(ctx, convID, memberType, memberID, store.MemberRoleMember); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to add member"))
+	}
+
+	// Dual-write a conversationMember binding on the conversation's IAM policy.
+	// conversation_member remains the read path in Phase 2; the binding becomes
+	// authoritative in Phase 3. Best-effort: a patch failure warns but does not
+	// fail the add, mirroring the cursor-seed policy (the read path already
+	// reflects the new member).
+	if _, patchErr := s.store.PatchResourceIamPolicy(ctx, models.Policy_CONVERSATION, common.FormatConversationName(convID.String()), &store.PatchIamPolicyMessage{
+		Member: conversationMemberPrincipalName(memberType, memberID),
+		Roles:  []string{common.FormatRole(store.ConversationMemberRole)},
+	}); patchErr != nil {
+		slog.Warn("failed to dual-write channel member IAM binding",
+			"conversationID", convID, "memberType", memberType, "memberID", memberID, "error", patchErr)
 	}
 
 	// Seed the agent's per-channel cursor to the current room version so a
@@ -329,6 +351,16 @@ func (s *CommandService) RemoveChannelMember(ctx context.Context, req *connect.R
 
 	if err := s.store.RemoveConversationMember(ctx, convID, memberType, memberID); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to remove member"))
+	}
+
+	// Dual-write: remove the member's bindings from the conversation's IAM
+	// policy (Roles=nil strips the member from every binding). Best-effort,
+	// matching the add path.
+	if _, patchErr := s.store.PatchResourceIamPolicy(ctx, models.Policy_CONVERSATION, common.FormatConversationName(convID.String()), &store.PatchIamPolicyMessage{
+		Member: conversationMemberPrincipalName(memberType, memberID),
+	}); patchErr != nil {
+		slog.Warn("failed to dual-write channel member IAM removal",
+			"conversationID", convID, "memberType", memberType, "memberID", memberID, "error", patchErr)
 	}
 
 	return connect.NewResponse(&emptypb.Empty{}), nil

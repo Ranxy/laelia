@@ -163,7 +163,7 @@ func TestAuthorize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			in := newIAMInterceptorWithChecker(tt.checker)
-			err := in.authorize(tt.ctx)
+			err := in.authorize(tt.ctx, nil)
 			if !tt.wantErr {
 				if err != nil {
 					t.Fatalf("expected no error, got %v", err)

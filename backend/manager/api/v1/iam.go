@@ -45,8 +45,10 @@ func newIAMInterceptorWithChecker(checker PermissionChecker) *IAMInterceptor {
 
 // authorize enforces the RPC's declared permission against the caller's
 // effective permission set. RPCs without an IAM auth method or without a
-// permission string are not gated here (the handler remains responsible).
-func (in *IAMInterceptor) authorize(ctx context.Context) error {
+// permission string are not gated here (the handler remains responsible). When
+// the request carries a recognizable resource (resolveResource), it is passed
+// to CheckPermission so per-resource IAM policies are consulted too.
+func (in *IAMInterceptor) authorize(ctx context.Context, req connect.AnyRequest) error {
 	authCtx, ok := common.GetAuthContextFromContext(ctx)
 	if !ok {
 		// No auth context: the request did not pass through the auth interceptor
@@ -68,7 +70,17 @@ func (in *IAMInterceptor) authorize(ctx context.Context) error {
 		return connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
 
-	ok, err := in.iam.CheckPermission(ctx, permission.Permission(authCtx.Permission), user, agent, nil)
+	var resource *iam.ResourceRef
+	// Resolve the request's resource only for permissions the IAM engine
+	// authorizes via a per-resource policy. For everything else (list/create,
+	// handler-gated command perms, workspace-scope perms) resolution is wasted
+	// work and — for non-baseline perms — a per-resource policy lookup could
+	// turn a transient DB error into a 500 where the baseline path returned
+	// PermissionDenied.
+	if req != nil && permission.IsResourceScoped(permission.Permission(authCtx.Permission)) {
+		resource = resolveResource(req)
+	}
+	ok, err := in.iam.CheckPermission(ctx, permission.Permission(authCtx.Permission), user, agent, resource)
 	if err != nil {
 		return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check permission"))
 	}
@@ -80,7 +92,7 @@ func (in *IAMInterceptor) authorize(ctx context.Context) error {
 
 func (in *IAMInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		if err := in.authorize(ctx); err != nil {
+		if err := in.authorize(ctx, req); err != nil {
 			return nil, err
 		}
 		return next(ctx, req)
@@ -95,7 +107,11 @@ func (*IAMInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) con
 
 func (in *IAMInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-		if err := in.authorize(ctx); err != nil {
+		// The streaming request body is not visible here (it arrives on the first
+		// Receive); per-resource authorization for streaming RPCs is deferred to
+		// Phase 3's first-Receive wrapper. Workspace-scoped authorization still
+		// applies.
+		if err := in.authorize(ctx, nil); err != nil {
 			return err
 		}
 		return next(ctx, conn)

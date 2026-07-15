@@ -91,6 +91,17 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 		return nil, err
 	}
 
+	// Dual-write the IAM bindings alongside the conversation_member rows: the
+	// user is the conversationOwner, the agent a conversationMember. Phase 3
+	// makes these authoritative; today conversation_member remains the read
+	// path.
+	if err := seedConversationIamPolicyTx(ctx, tx, newConv.ID, []conversationBinding{
+		{Role: ConversationOwnerRole, Member: common.FormatUserUID(principalID)},
+		{Role: ConversationMemberRole, Member: common.FormatAgentUID(agent)},
+	}); err != nil {
+		return nil, err
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -209,6 +220,15 @@ func (s *Store) GetOrCreateAgentDM(ctx context.Context, agentAID, agentBID int) 
 		return nil, err
 	}
 
+	// Dual-write: both agents are conversationMember on this agent-DM (neither
+	// owns the other's DM, so neither is conversationOwner).
+	if err := seedConversationIamPolicyTx(ctx, tx, newConv.ID, []conversationBinding{
+		{Role: ConversationMemberRole, Member: common.FormatAgentUID(resA)},
+		{Role: ConversationMemberRole, Member: common.FormatAgentUID(resB)},
+	}); err != nil {
+		return nil, err
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -286,6 +306,14 @@ func (s *Store) CreateChannel(ctx context.Context, title string, ownerID int) (*
 	}
 
 	if err := addConversationMemberTx(ctx, tx, conv.ID, MemberTypeUser, fmt.Sprintf("%d", ownerID), MemberRoleOwner); err != nil {
+		return nil, err
+	}
+
+	// Dual-write: the channel creator is the conversationOwner. Members added
+	// later via AddChannelMember get conversationMember bindings there.
+	if err := seedConversationIamPolicyTx(ctx, tx, conv.ID, []conversationBinding{
+		{Role: ConversationOwnerRole, Member: common.FormatUserUID(ownerID)},
+	}); err != nil {
 		return nil, err
 	}
 
