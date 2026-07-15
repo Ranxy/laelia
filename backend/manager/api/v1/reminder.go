@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/Ranxy/laelia/backend/common/permission"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/component/schedule"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -68,20 +69,21 @@ func storeToV1Reminder(r *store.Reminder) *v1pb.Reminder {
 }
 
 // requireReminderAccess gates object-level access to a reminder. Access is
-// granted to the owning agent (the assignee), a workspace admin, or any member
-// of the reminder's conversation (the reminder's trigger message lives there,
-// and its thread is the discussion channel). Mirrors requireCommandAccess.
+// granted to the owning agent (the assignee), a user holding
+// conversations.reviewAll (cross-conversation oversight), or any member of the
+// reminder's conversation (the reminder's trigger message lives there, and its
+// thread is the discussion channel). Mirrors requireCommandAccess.
 func (s *CommandService) requireReminderAccess(ctx context.Context, r *store.Reminder) error {
 	if agent, ok := GetAgentFromContext(ctx); ok && agent != nil && agent.ID == r.AssigneeAgentID {
 		return nil
 	}
 	user, _ := GetUserFromContext(ctx)
 	if user != nil {
-		admin, err := isUserWorkspaceAdmin(ctx, s.store, user)
+		reviewAll, err := s.iam.CheckPermission(ctx, permission.ConversationsReviewAll, user, nil, nil)
 		if err != nil {
-			return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve workspace admin"))
+			return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve reviewAll permission"))
 		}
-		if admin {
+		if reviewAll {
 			return nil
 		}
 	}
@@ -207,16 +209,16 @@ func (s *CommandService) ListReminders(ctx context.Context, req *connect.Request
 		statusFilter = append(statusFilter, int16(st))
 	}
 
-	// Restrict a non-admin user to reminders in conversations they belong to.
-	// Agent callers (the CLI self-list) keep the unfiltered query; they are
-	// inherently members of their own conversations.
+	// Restrict a user without conversations.reviewAll to reminders in
+	// conversations they belong to. Agent callers (the CLI self-list) keep the
+	// unfiltered query; they are inherently members of their own conversations.
 	var viewer *store.ConversationMemberFilter
 	if user, _ := GetUserFromContext(ctx); user != nil {
-		admin, err := isUserWorkspaceAdmin(ctx, s.store, user)
+		reviewAll, err := s.iam.CheckPermission(ctx, permission.ConversationsReviewAll, user, nil, nil)
 		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve workspace admin"))
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve reviewAll permission"))
 		}
-		if !admin {
+		if !reviewAll {
 			viewer = &store.ConversationMemberFilter{MemberType: store.MemberTypeUser, MemberID: fmt.Sprintf("%d", user.ID)}
 		}
 	}

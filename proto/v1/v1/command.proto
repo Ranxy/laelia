@@ -628,6 +628,43 @@ message ListChannelMembersResponse {
   repeated ChannelMember members = 1;
 }
 
+// TransferChannelOwnershipRequest names the channel and the member who will
+// become the new owner. The new owner must already be a member.
+message TransferChannelOwnershipRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+  int32 member_type = 2;
+  string member_id = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message TransferChannelOwnershipResponse {
+  Conversation conversation = 1;
+}
+
+// UpdateChannelMemberRoleRequest sets a member's chat role. target_role is the
+// conversation_member role value: 2 = Member, 3 = Admin. Owner (1) is not
+// settable here — ownership only moves via TransferChannelOwnership.
+message UpdateChannelMemberRoleRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+  string member_id = 2 [(google.api.field_behavior) = REQUIRED];
+  int32 member_type = 3;
+  int32 target_role = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+// LeaveChannelRequest names the channel the caller is leaving. The caller is
+// resolved from the auth context; no member_id is carried.
+message LeaveChannelRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+}
+
 // ListThreadParticipantsRequest lists the distinct senders (users and agents) that
 // have posted in a thread (the root message and its replies). Participants are derived
 // from message senders, not from a membership table, so this reflects who actually
@@ -1140,7 +1177,7 @@ service CommandService {
   rpc ListChannels(ListChannelsRequest) returns (ListChannelsResponse) {
     option (google.api.http) = {get: "/v1/channels"};
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.conversations.read";
+    option (laelia.v1.permission) = "laelia.conversations.list";
   }
 
   // ListChannelsForAgent returns every conversation the given agent is a member
@@ -1189,6 +1226,50 @@ service CommandService {
     option (google.api.http) = {delete: "/v1/{conversation=conversations/*}/members/{member_id}"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.manage";
+    option (laelia.v1.audit) = true;
+  }
+
+  // TransferChannelOwnership hands channel ownership from the calling owner to
+  // another member: the target is promoted to Owner and the caller demoted to
+  // Member, atomically. The interceptor gates the call with conversations.manage
+  // (Admin+Owner); the handler additionally enforces that the caller is the
+  // current Owner. Only channels (type 2) support ownership transfer.
+  rpc TransferChannelOwnership(TransferChannelOwnershipRequest) returns (TransferChannelOwnershipResponse) {
+    option (google.api.http) = {
+      post: "/v1/{conversation=conversations/*}:transferOwnership"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.manage";
+    option (laelia.v1.audit) = true;
+  }
+
+  // UpdateChannelMemberRole grants or revokes channel admin: the target member's
+  // role is set to the requested role (Member or Admin). The interceptor gates
+  // with conversations.manage (Admin+Owner); the handler enforces that the
+  // caller is the Owner and the target role is Member or Admin (never Owner —
+  // ownership only moves via TransferChannelOwnership).
+  rpc UpdateChannelMemberRole(UpdateChannelMemberRoleRequest) returns (ChannelMember) {
+    option (google.api.http) = {
+      post: "/v1/{conversation=conversations/*}/members/{member_id}:updateRole"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.manage";
+    option (laelia.v1.audit) = true;
+  }
+
+  // LeaveChannel removes the calling member from a channel. The interceptor
+  // gates with conversations.read (any member); the handler rejects the current
+  // Owner — an owner must transfer ownership or delete the channel first to
+  // avoid orphaning it. Only channels (type 2) support leaving.
+  rpc LeaveChannel(LeaveChannelRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/{conversation=conversations/*}:leave"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.read";
     option (laelia.v1.audit) = true;
   }
 
@@ -1306,14 +1387,14 @@ service CommandService {
   rpc ListReminders(ListRemindersRequest) returns (ListRemindersResponse) {
     option (google.api.http) = {get: "/v1/reminders"};
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.conversations.read";
+    option (laelia.v1.permission) = "laelia.reminders.list";
   }
 
   // GetReminder returns a single reminder by its resource name.
   rpc GetReminder(GetReminderRequest) returns (GetReminderResponse) {
     option (google.api.http) = {get: "/v1/{name=reminders/*}"};
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.conversations.read";
+    option (laelia.v1.permission) = "laelia.reminders.get";
   }
 
   // UpdateReminder edits the schedule (fire_at/cron_expr/tz) or task_content of
@@ -1325,7 +1406,7 @@ service CommandService {
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.conversations.send";
+    option (laelia.v1.permission) = "laelia.reminders.update";
     option (laelia.v1.audit) = true;
   }
 
@@ -1337,7 +1418,7 @@ service CommandService {
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.conversations.send";
+    option (laelia.v1.permission) = "laelia.reminders.cancel";
     option (laelia.v1.audit) = true;
   }
 
@@ -1405,7 +1486,7 @@ service CommandService {
   // from colliding with the browser download route.
   rpc UploadFile(UploadFileRequest) returns (File) {
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.conversations.read";
+    option (laelia.v1.permission) = "laelia.files.upload";
   }
 
   // DownloadFile fetches a file's bytes from S3. The caller must be a member of
@@ -1413,14 +1494,14 @@ service CommandService {
   // through the Echo route.
   rpc DownloadFile(DownloadFileRequest) returns (DownloadFileResponse) {
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.conversations.read";
+    option (laelia.v1.permission) = "laelia.files.download";
   }
 
   // ListFiles returns the files attached to a conversation. The caller must be
   // a member.
   rpc ListFiles(ListFilesRequest) returns (ListFilesResponse) {
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.conversations.read";
+    option (laelia.v1.permission) = "laelia.files.list";
   }
 }
 

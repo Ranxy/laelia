@@ -9,6 +9,7 @@ import {
   UserSchema,
   UserType,
 } from "@/types/proto-es/v1/user_service_pb";
+import { useAppStore } from "./index";
 import type { AppSliceCreator, AuthSlice } from "./types";
 
 export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
@@ -68,3 +69,23 @@ export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
     }
   },
 });
+
+// useHasPermission reports whether the current caller holds a workspace-scope
+// permission, sourced from the server-populated User.permissions set
+// (GetCurrentUser). Per-resource permissions such as laelia.agents.edit are not
+// represented here — agents.edit is surfaced per-agent as Agent.canEdit, since
+// the creator (agentEditor binding) and workspace admins resolve it per
+// resource. Subscribe via the hook so UI re-renders when the session loads.
+export function useHasPermission(perm: string): boolean {
+  return useAppStore(
+    (s) => s.currentUser?.permissions?.includes(perm) ?? false
+  );
+}
+
+// hasPermission is the non-reactive variant for use inside callbacks/effects
+// where subscribing to the store is undesirable.
+export function hasPermission(perm: string): boolean {
+  return (
+    useAppStore.getState().currentUser?.permissions?.includes(perm) ?? false
+  );
+}

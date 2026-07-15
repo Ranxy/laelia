@@ -238,7 +238,8 @@ message User {
   repeated string groups = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // workspace_admin is true when the user holds the roles/workspaceAdmin role.
-  // Only populated for the current caller (GetCurrentUser).
+  // Only populated for the current caller (GetCurrentUser). Retained as a
+  // computed shim during the IAM transition; prefer `permissions` for gating.
   bool workspace_admin = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // description is a short, user-authored self-description surfaced to agents and
@@ -246,6 +247,14 @@ message User {
   // "Backend engineer, focused on agent building" or "UI/UX expert, reviews come to
   // me". Editable via UpdateUser with update_mask "description".
   string description = 16;
+
+  // permissions is the caller's effective workspace-scope permission set
+  // (roles/workspaceMember baseline ∪ the permissions of every workspace role
+  // the user holds), populated only by GetCurrentUser. The frontend gates
+  // workspace actions on this (e.g. laelia.users.update). Per-resource
+  // permissions (conversations.read/send/manage, agents.edit) are resolved per
+  // resource and surfaced on the resource, not here.
+  repeated string permissions = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 enum UserType {

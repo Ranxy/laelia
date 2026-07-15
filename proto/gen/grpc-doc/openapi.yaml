@@ -1255,6 +1255,54 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/members/{member}:updateRole:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                UpdateChannelMemberRole grants or revokes channel admin: the target member's
+                 role is set to the requested role (Member or Admin). The interceptor gates
+                 with conversations.manage (Admin+Owner); the handler enforces that the
+                 caller is the Owner and the target role is Member or Admin (never Owner —
+                 ownership only moves via TransferChannelOwnership).
+            operationId: CommandService_UpdateChannelMemberRole
+            parameters:
+                - name: memberId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+                - name: member
+                  in: path
+                  description: The member id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UpdateChannelMemberRoleRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ChannelMember'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/conversations/{conversation}/messages:
         get:
             tags:
@@ -1722,6 +1770,39 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}:leave:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                LeaveChannel removes the calling member from a channel. The interceptor
+                 gates with conversations.read (any member); the handler rejects the current
+                 Owner — an owner must transfer ownership or delete the channel first to
+                 avoid orphaning it. Only channels (type 2) support leaving.
+            operationId: CommandService_LeaveChannel
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/LeaveChannelRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/conversations/{conversation}:listThreadParticipants:
         get:
             tags:
@@ -1814,6 +1895,43 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/PostMessageResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}:transferOwnership:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                TransferChannelOwnership hands channel ownership from the calling owner to
+                 another member: the target is promoted to Owner and the caller demoted to
+                 Member, atomically. The interceptor gates the call with conversations.manage
+                 (Admin+Owner); the handler additionally enforces that the caller is the
+                 current Owner. Only channels (type 2) support ownership transfer.
+            operationId: CommandService_TransferChannelOwnership
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/TransferChannelOwnershipRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/TransferChannelOwnershipResponse'
                 default:
                     description: Default error response
                     content:
@@ -2441,6 +2559,14 @@ components:
                     description: |-
                         Creator's user resource name (users/{id}); empty for legacy agents with no
                          recorded creator. Only the creator or a workspace admin may modify the agent.
+                canEdit:
+                    readOnly: true
+                    type: boolean
+                    description: |-
+                        can_edit reports whether the current caller may modify this agent
+                         (laelia.agents.edit): true for the creator (via the agentEditor IAM binding)
+                         and for workspace admins (via the all-permissions union), false otherwise.
+                         Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths.
         AgentACPConfig:
             type: object
             properties:
@@ -3336,6 +3462,16 @@ components:
             properties:
                 oauth2Context:
                     $ref: '#/components/schemas/OAuth2IdentityProviderContext'
+        LeaveChannelRequest:
+            required:
+                - conversation
+            type: object
+            properties:
+                conversation:
+                    type: string
+            description: |-
+                LeaveChannelRequest names the channel the caller is leaving. The caller is
+                 resolved from the auth context; no member_id is carried.
         LifecyclePayload:
             type: object
             properties:
@@ -4007,6 +4143,27 @@ components:
                     type: string
                 rawInput:
                     type: object
+        TransferChannelOwnershipRequest:
+            required:
+                - conversation
+                - memberId
+            type: object
+            properties:
+                conversation:
+                    type: string
+                memberType:
+                    type: integer
+                    format: int32
+                memberId:
+                    type: string
+            description: |-
+                TransferChannelOwnershipRequest names the channel and the member who will
+                 become the new owner. The new owner must already be a member.
+        TransferChannelOwnershipResponse:
+            type: object
+            properties:
+                conversation:
+                    $ref: '#/components/schemas/Conversation'
         UnclaimTaskRequest:
             required:
                 - message
@@ -4039,6 +4196,27 @@ components:
                     type: string
                 acpConfig:
                     $ref: '#/components/schemas/AgentACPConfig'
+        UpdateChannelMemberRoleRequest:
+            required:
+                - conversation
+                - memberId
+                - targetRole
+            type: object
+            properties:
+                conversation:
+                    type: string
+                memberId:
+                    type: string
+                memberType:
+                    type: integer
+                    format: int32
+                targetRole:
+                    type: integer
+                    format: int32
+            description: |-
+                UpdateChannelMemberRoleRequest sets a member's chat role. target_role is the
+                 conversation_member role value: 2 = Member, 3 = Admin. Owner (1) is not
+                 settable here — ownership only moves via TransferChannelOwnership.
         UpdateReminderRequest:
             required:
                 - name
@@ -4157,7 +4335,8 @@ components:
                     type: boolean
                     description: |-
                         workspace_admin is true when the user holds the roles/workspaceAdmin role.
-                         Only populated for the current caller (GetCurrentUser).
+                         Only populated for the current caller (GetCurrentUser). Retained as a
+                         computed shim during the IAM transition; prefer `permissions` for gating.
                 description:
                     type: string
                     description: |-
@@ -4165,6 +4344,18 @@ components:
                          other users so they know who this user is and what they focus on, e.g.
                          "Backend engineer, focused on agent building" or "UI/UX expert, reviews come to
                          me". Editable via UpdateUser with update_mask "description".
+                permissions:
+                    readOnly: true
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        permissions is the caller's effective workspace-scope permission set
+                         (roles/workspaceMember baseline ∪ the permissions of every workspace role
+                         the user holds), populated only by GetCurrentUser. The frontend gates
+                         workspace actions on this (e.g. laelia.users.update). Per-resource
+                         permissions (conversations.read/send/manage, agents.edit) are resolved per
+                         resource and surfaced on the resource, not here.
         UserProfile:
             type: object
             properties:

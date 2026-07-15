@@ -33,13 +33,20 @@ const (
 
 	// Conversations (channels are modeled as conversations). list is the
 	// workspace-scope discovery permission (any member can enumerate channels/
-	// commands); read/send/manage are per-conversation, granted by
-	// conversationMember/conversationOwner bindings on conversations/{id}.
-	ConversationsCreate Permission = "laelia.conversations.create"
-	ConversationsList   Permission = "laelia.conversations.list"
-	ConversationsRead   Permission = "laelia.conversations.read"
-	ConversationsSend   Permission = "laelia.conversations.send"
-	ConversationsManage Permission = "laelia.conversations.manage"
+	// commands); read/send/manage are per-conversation, granted by the caller's
+	// chat role (member/admin/owner) in conversation_member. reviewAgentDM and
+	// reviewAll are workspace-scope "review" permissions grantable to any user
+	// (admin or not): reviewAgentDM reads/lists agent-to-agent DMs; reviewAll is
+	// cross-conversation oversight (ListChannelsForAgent all, ListReminders
+	// across conversations, raw WatchCommandEvents). workspaceAdmin holds both
+	// via the all-permissions union.
+	ConversationsCreate        Permission = "laelia.conversations.create"
+	ConversationsList          Permission = "laelia.conversations.list"
+	ConversationsRead          Permission = "laelia.conversations.read"
+	ConversationsSend          Permission = "laelia.conversations.send"
+	ConversationsManage        Permission = "laelia.conversations.manage"
+	ConversationsReviewAgentDM Permission = "laelia.conversations.reviewAgentDM"
+	ConversationsReviewAll     Permission = "laelia.conversations.reviewAll"
 
 	// Reminders
 	RemindersGet    Permission = "laelia.reminders.get"
@@ -100,6 +107,8 @@ var allPermissions = []Permission{
 	ConversationsRead,
 	ConversationsSend,
 	ConversationsManage,
+	ConversationsReviewAgentDM,
+	ConversationsReviewAll,
 
 	RemindersGet,
 	RemindersList,
@@ -164,13 +173,15 @@ func Exists(permissions ...string) bool {
 }
 
 // resourceScopedPermissions are the permissions the IAM engine authorizes via a
-// per-resource IAM policy (conversationMember/conversationOwner/agentEditor
-// bindings) rather than the workspace baseline or handler-level helpers. The
-// interceptor resolves the request's resource only for these, so list/create
-// and handler-gated RPCs pay no resource-resolution cost and never hit a
-// per-resource policy lookup (which would otherwise turn a DB error into a 500
-// where the baseline path returned PermissionDenied). Phase 3 extends this set
-// when command-scoped RPCs move onto the engine.
+// per-resource lookup rather than the workspace baseline or handler-level
+// helpers. For conversations the lookup reads the caller's chat role
+// (member/admin/owner) from conversation_member; for agents it reads the
+// agentEditor IAM binding. The interceptor resolves the request's resource only
+// for these, so list/create, the review perms, and handler-gated RPCs pay no
+// resource-resolution cost and never hit a per-resource lookup (which would
+// otherwise turn a DB error into a 500 where the baseline path returned
+// PermissionDenied). The review perms (reviewAgentDM, reviewAll) are
+// workspace-scope and intentionally NOT in this set.
 var resourceScopedPermissions = map[Permission]bool{
 	ConversationsRead:   true,
 	ConversationsSend:   true,

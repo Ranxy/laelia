@@ -102,7 +102,6 @@ export function AgentProfilePage() {
   const getAgent = useAppStore((s) => s.getAgent);
   const agentCache = useAppStore((s) => s.agentCache);
   const fetchAgents = useAppStore((s) => s.fetchAgents);
-  const currentUser = useAppStore((s) => s.currentUser);
 
   const agentName = agentResourceName(agentId);
   const agent = agentCache[agentName];
@@ -165,13 +164,13 @@ export function AgentProfilePage() {
     );
   }
 
-  // Profile mutations are gated to the agent's creator or a workspace admin
-  // (enforced server-side by requireAgentEditor). Hide/disable the editors and
-  // token actions for everyone else so the UI never offers a 403.
-  const canEdit =
-    !!currentUser &&
-    (currentUser.workspaceAdmin ||
-      (agent.createdBy !== "" && agent.createdBy === currentUser.name));
+  // Profile mutations are gated to the agent's creator (via the agentEditor IAM
+  // binding) or a workspace admin (all-permissions union), enforced server-side
+  // by the agents.edit permission. The server resolves this per-agent and
+  // surfaces it as Agent.canEdit, so the UI does not need to re-derive it from
+  // the creator's name. Hide/disable the editors and token actions for everyone
+  // else so the UI never offers a 403.
+  const canEdit = agent.canEdit;
 
   async function handleRefreshProviders() {
     setRefreshing(true);

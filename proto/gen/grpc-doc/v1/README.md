@@ -151,6 +151,7 @@
     - [GetOrCreateUserDMResponse](#laelia-v1-GetOrCreateUserDMResponse)
     - [GetReminderRequest](#laelia-v1-GetReminderRequest)
     - [GetReminderResponse](#laelia-v1-GetReminderResponse)
+    - [LeaveChannelRequest](#laelia-v1-LeaveChannelRequest)
     - [LifecyclePayload](#laelia-v1-LifecyclePayload)
     - [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest)
     - [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse)
@@ -212,8 +213,11 @@
     - [ThreadUpdate](#laelia-v1-ThreadUpdate)
     - [ToolCallFinishedPayload](#laelia-v1-ToolCallFinishedPayload)
     - [ToolCallStartedPayload](#laelia-v1-ToolCallStartedPayload)
+    - [TransferChannelOwnershipRequest](#laelia-v1-TransferChannelOwnershipRequest)
+    - [TransferChannelOwnershipResponse](#laelia-v1-TransferChannelOwnershipResponse)
     - [UnclaimTaskRequest](#laelia-v1-UnclaimTaskRequest)
     - [UnclaimTaskResponse](#laelia-v1-UnclaimTaskResponse)
+    - [UpdateChannelMemberRoleRequest](#laelia-v1-UpdateChannelMemberRoleRequest)
     - [UpdateChannelRequest](#laelia-v1-UpdateChannelRequest)
     - [UpdateReminderRequest](#laelia-v1-UpdateReminderRequest)
     - [UpdateReminderResponse](#laelia-v1-UpdateReminderResponse)
@@ -387,6 +391,7 @@ RiskLevel is the risk level.
 | last_token_rotated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | token_version | [int32](#int32) |  |  |
 | created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}); empty for legacy agents with no recorded creator. Only the creator or a workspace admin may modify the agent. |
+| can_edit | [bool](#bool) |  | can_edit reports whether the current caller may modify this agent (laelia.agents.edit): true for the creator (via the agentEditor IAM binding) and for workspace admins (via the all-permissions union), false otherwise. Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths. |
 
 
 
@@ -1270,8 +1275,9 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | phone | [string](#string) |  | Should be a valid E.164 compliant phone number. Could be empty. |
 | profile | [UserProfile](#laelia-v1-UserProfile) |  |  |
 | groups | [string](#string) | repeated | The groups for the user. Format: groups/{email} |
-| workspace_admin | [bool](#bool) |  | workspace_admin is true when the user holds the roles/workspaceAdmin role. Only populated for the current caller (GetCurrentUser). |
+| workspace_admin | [bool](#bool) |  | workspace_admin is true when the user holds the roles/workspaceAdmin role. Only populated for the current caller (GetCurrentUser). Retained as a computed shim during the IAM transition; prefer `permissions` for gating. |
 | description | [string](#string) |  | description is a short, user-authored self-description surfaced to agents and other users so they know who this user is and what they focus on, e.g. &#34;Backend engineer, focused on agent building&#34; or &#34;UI/UX expert, reviews come to me&#34;. Editable via UpdateUser with update_mask &#34;description&#34;. |
+| permissions | [string](#string) | repeated | permissions is the caller&#39;s effective workspace-scope permission set (roles/workspaceMember baseline ∪ the permissions of every workspace role the user holds), populated only by GetCurrentUser. The frontend gates workspace actions on this (e.g. laelia.users.update). Per-resource permissions (conversations.read/send/manage, agents.edit) are resolved per resource and surfaced on the resource, not here. |
 
 
 
@@ -2528,6 +2534,22 @@ is the agent-callable twin of the user-only GetOrCreateConversation.
 
 
 
+<a name="laelia-v1-LeaveChannelRequest"></a>
+
+### LeaveChannelRequest
+LeaveChannelRequest names the channel the caller is leaving. The caller is
+resolved from the auth context; no member_id is carried.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-LifecyclePayload"></a>
 
 ### LifecyclePayload
@@ -3576,6 +3598,39 @@ ThreadUpdate describes one subscribed thread with unread replies.
 
 
 
+<a name="laelia-v1-TransferChannelOwnershipRequest"></a>
+
+### TransferChannelOwnershipRequest
+TransferChannelOwnershipRequest names the channel and the member who will
+become the new owner. The new owner must already be a member.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| member_type | [int32](#int32) |  |  |
+| member_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-TransferChannelOwnershipResponse"></a>
+
+### TransferChannelOwnershipResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [Conversation](#laelia-v1-Conversation) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-UnclaimTaskRequest"></a>
 
 ### UnclaimTaskRequest
@@ -3600,6 +3655,26 @@ ThreadUpdate describes one subscribed thread with unread replies.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | message | [ChatMessage](#laelia-v1-ChatMessage) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateChannelMemberRoleRequest"></a>
+
+### UpdateChannelMemberRoleRequest
+UpdateChannelMemberRoleRequest sets a member&#39;s chat role. target_role is the
+conversation_member role value: 2 = Member, 3 = Admin. Owner (1) is not
+settable here — ownership only moves via TransferChannelOwnership.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| member_id | [string](#string) |  |  |
+| member_type | [int32](#int32) |  |  |
+| target_role | [int32](#int32) |  |  |
 
 
 
@@ -3908,6 +3983,9 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | DeleteChannel | [DeleteChannelRequest](#laelia-v1-DeleteChannelRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 | AddChannelMember | [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest) | [ChannelMember](#laelia-v1-ChannelMember) |  |
 | RemoveChannelMember | [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+| TransferChannelOwnership | [TransferChannelOwnershipRequest](#laelia-v1-TransferChannelOwnershipRequest) | [TransferChannelOwnershipResponse](#laelia-v1-TransferChannelOwnershipResponse) | TransferChannelOwnership hands channel ownership from the calling owner to another member: the target is promoted to Owner and the caller demoted to Member, atomically. The interceptor gates the call with conversations.manage (Admin&#43;Owner); the handler additionally enforces that the caller is the current Owner. Only channels (type 2) support ownership transfer. |
+| UpdateChannelMemberRole | [UpdateChannelMemberRoleRequest](#laelia-v1-UpdateChannelMemberRoleRequest) | [ChannelMember](#laelia-v1-ChannelMember) | UpdateChannelMemberRole grants or revokes channel admin: the target member&#39;s role is set to the requested role (Member or Admin). The interceptor gates with conversations.manage (Admin&#43;Owner); the handler enforces that the caller is the Owner and the target role is Member or Admin (never Owner — ownership only moves via TransferChannelOwnership). |
+| LeaveChannel | [LeaveChannelRequest](#laelia-v1-LeaveChannelRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | LeaveChannel removes the calling member from a channel. The interceptor gates with conversations.read (any member); the handler rejects the current Owner — an owner must transfer ownership or delete the channel first to avoid orphaning it. Only channels (type 2) support leaving. |
 | ListChannelMembers | [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest) | [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse) |  |
 | ListThreadParticipants | [ListThreadParticipantsRequest](#laelia-v1-ListThreadParticipantsRequest) | [ListThreadParticipantsResponse](#laelia-v1-ListThreadParticipantsResponse) | ListThreadParticipants lists the distinct senders (users and agents) that posted in a thread. Intended for the agent daemon. The caller must be a member of the conversation. |
 | SendMessage | [SendMessageRequest](#laelia-v1-SendMessageRequest) | [ChatMessage](#laelia-v1-ChatMessage) |  |

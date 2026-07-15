@@ -108,6 +108,15 @@ const (
 	// CommandServiceRemoveChannelMemberProcedure is the fully-qualified name of the CommandService's
 	// RemoveChannelMember RPC.
 	CommandServiceRemoveChannelMemberProcedure = "/laelia.v1.CommandService/RemoveChannelMember"
+	// CommandServiceTransferChannelOwnershipProcedure is the fully-qualified name of the
+	// CommandService's TransferChannelOwnership RPC.
+	CommandServiceTransferChannelOwnershipProcedure = "/laelia.v1.CommandService/TransferChannelOwnership"
+	// CommandServiceUpdateChannelMemberRoleProcedure is the fully-qualified name of the
+	// CommandService's UpdateChannelMemberRole RPC.
+	CommandServiceUpdateChannelMemberRoleProcedure = "/laelia.v1.CommandService/UpdateChannelMemberRole"
+	// CommandServiceLeaveChannelProcedure is the fully-qualified name of the CommandService's
+	// LeaveChannel RPC.
+	CommandServiceLeaveChannelProcedure = "/laelia.v1.CommandService/LeaveChannel"
 	// CommandServiceListChannelMembersProcedure is the fully-qualified name of the CommandService's
 	// ListChannelMembers RPC.
 	CommandServiceListChannelMembersProcedure = "/laelia.v1.CommandService/ListChannelMembers"
@@ -235,6 +244,23 @@ type CommandServiceClient interface {
 	DeleteChannel(context.Context, *connect.Request[v1.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error)
 	AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.ChannelMember], error)
 	RemoveChannelMember(context.Context, *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error)
+	// TransferChannelOwnership hands channel ownership from the calling owner to
+	// another member: the target is promoted to Owner and the caller demoted to
+	// Member, atomically. The interceptor gates the call with conversations.manage
+	// (Admin+Owner); the handler additionally enforces that the caller is the
+	// current Owner. Only channels (type 2) support ownership transfer.
+	TransferChannelOwnership(context.Context, *connect.Request[v1.TransferChannelOwnershipRequest]) (*connect.Response[v1.TransferChannelOwnershipResponse], error)
+	// UpdateChannelMemberRole grants or revokes channel admin: the target member's
+	// role is set to the requested role (Member or Admin). The interceptor gates
+	// with conversations.manage (Admin+Owner); the handler enforces that the
+	// caller is the Owner and the target role is Member or Admin (never Owner —
+	// ownership only moves via TransferChannelOwnership).
+	UpdateChannelMemberRole(context.Context, *connect.Request[v1.UpdateChannelMemberRoleRequest]) (*connect.Response[v1.ChannelMember], error)
+	// LeaveChannel removes the calling member from a channel. The interceptor
+	// gates with conversations.read (any member); the handler rejects the current
+	// Owner — an owner must transfer ownership or delete the channel first to
+	// avoid orphaning it. Only channels (type 2) support leaving.
+	LeaveChannel(context.Context, *connect.Request[v1.LeaveChannelRequest]) (*connect.Response[emptypb.Empty], error)
 	ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error)
 	// ListThreadParticipants lists the distinct senders (users and agents) that posted
 	// in a thread. Intended for the agent daemon. The caller must be a member of the
@@ -474,6 +500,24 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("RemoveChannelMember")),
 			connect.WithClientOptions(opts...),
 		),
+		transferChannelOwnership: connect.NewClient[v1.TransferChannelOwnershipRequest, v1.TransferChannelOwnershipResponse](
+			httpClient,
+			baseURL+CommandServiceTransferChannelOwnershipProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("TransferChannelOwnership")),
+			connect.WithClientOptions(opts...),
+		),
+		updateChannelMemberRole: connect.NewClient[v1.UpdateChannelMemberRoleRequest, v1.ChannelMember](
+			httpClient,
+			baseURL+CommandServiceUpdateChannelMemberRoleProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("UpdateChannelMemberRole")),
+			connect.WithClientOptions(opts...),
+		),
+		leaveChannel: connect.NewClient[v1.LeaveChannelRequest, emptypb.Empty](
+			httpClient,
+			baseURL+CommandServiceLeaveChannelProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("LeaveChannel")),
+			connect.WithClientOptions(opts...),
+		),
 		listChannelMembers: connect.NewClient[v1.ListChannelMembersRequest, v1.ListChannelMembersResponse](
 			httpClient,
 			baseURL+CommandServiceListChannelMembersProcedure,
@@ -659,6 +703,9 @@ type commandServiceClient struct {
 	deleteChannel             *connect.Client[v1.DeleteChannelRequest, emptypb.Empty]
 	addChannelMember          *connect.Client[v1.AddChannelMemberRequest, v1.ChannelMember]
 	removeChannelMember       *connect.Client[v1.RemoveChannelMemberRequest, emptypb.Empty]
+	transferChannelOwnership  *connect.Client[v1.TransferChannelOwnershipRequest, v1.TransferChannelOwnershipResponse]
+	updateChannelMemberRole   *connect.Client[v1.UpdateChannelMemberRoleRequest, v1.ChannelMember]
+	leaveChannel              *connect.Client[v1.LeaveChannelRequest, emptypb.Empty]
 	listChannelMembers        *connect.Client[v1.ListChannelMembersRequest, v1.ListChannelMembersResponse]
 	listThreadParticipants    *connect.Client[v1.ListThreadParticipantsRequest, v1.ListThreadParticipantsResponse]
 	sendMessage               *connect.Client[v1.SendMessageRequest, v1.ChatMessage]
@@ -805,6 +852,21 @@ func (c *commandServiceClient) AddChannelMember(ctx context.Context, req *connec
 // RemoveChannelMember calls laelia.v1.CommandService.RemoveChannelMember.
 func (c *commandServiceClient) RemoveChannelMember(ctx context.Context, req *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error) {
 	return c.removeChannelMember.CallUnary(ctx, req)
+}
+
+// TransferChannelOwnership calls laelia.v1.CommandService.TransferChannelOwnership.
+func (c *commandServiceClient) TransferChannelOwnership(ctx context.Context, req *connect.Request[v1.TransferChannelOwnershipRequest]) (*connect.Response[v1.TransferChannelOwnershipResponse], error) {
+	return c.transferChannelOwnership.CallUnary(ctx, req)
+}
+
+// UpdateChannelMemberRole calls laelia.v1.CommandService.UpdateChannelMemberRole.
+func (c *commandServiceClient) UpdateChannelMemberRole(ctx context.Context, req *connect.Request[v1.UpdateChannelMemberRoleRequest]) (*connect.Response[v1.ChannelMember], error) {
+	return c.updateChannelMemberRole.CallUnary(ctx, req)
+}
+
+// LeaveChannel calls laelia.v1.CommandService.LeaveChannel.
+func (c *commandServiceClient) LeaveChannel(ctx context.Context, req *connect.Request[v1.LeaveChannelRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.leaveChannel.CallUnary(ctx, req)
 }
 
 // ListChannelMembers calls laelia.v1.CommandService.ListChannelMembers.
@@ -981,6 +1043,23 @@ type CommandServiceHandler interface {
 	DeleteChannel(context.Context, *connect.Request[v1.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error)
 	AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.ChannelMember], error)
 	RemoveChannelMember(context.Context, *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error)
+	// TransferChannelOwnership hands channel ownership from the calling owner to
+	// another member: the target is promoted to Owner and the caller demoted to
+	// Member, atomically. The interceptor gates the call with conversations.manage
+	// (Admin+Owner); the handler additionally enforces that the caller is the
+	// current Owner. Only channels (type 2) support ownership transfer.
+	TransferChannelOwnership(context.Context, *connect.Request[v1.TransferChannelOwnershipRequest]) (*connect.Response[v1.TransferChannelOwnershipResponse], error)
+	// UpdateChannelMemberRole grants or revokes channel admin: the target member's
+	// role is set to the requested role (Member or Admin). The interceptor gates
+	// with conversations.manage (Admin+Owner); the handler enforces that the
+	// caller is the Owner and the target role is Member or Admin (never Owner —
+	// ownership only moves via TransferChannelOwnership).
+	UpdateChannelMemberRole(context.Context, *connect.Request[v1.UpdateChannelMemberRoleRequest]) (*connect.Response[v1.ChannelMember], error)
+	// LeaveChannel removes the calling member from a channel. The interceptor
+	// gates with conversations.read (any member); the handler rejects the current
+	// Owner — an owner must transfer ownership or delete the channel first to
+	// avoid orphaning it. Only channels (type 2) support leaving.
+	LeaveChannel(context.Context, *connect.Request[v1.LeaveChannelRequest]) (*connect.Response[emptypb.Empty], error)
 	ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error)
 	// ListThreadParticipants lists the distinct senders (users and agents) that posted
 	// in a thread. Intended for the agent daemon. The caller must be a member of the
@@ -1216,6 +1295,24 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("RemoveChannelMember")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceTransferChannelOwnershipHandler := connect.NewUnaryHandler(
+		CommandServiceTransferChannelOwnershipProcedure,
+		svc.TransferChannelOwnership,
+		connect.WithSchema(commandServiceMethods.ByName("TransferChannelOwnership")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceUpdateChannelMemberRoleHandler := connect.NewUnaryHandler(
+		CommandServiceUpdateChannelMemberRoleProcedure,
+		svc.UpdateChannelMemberRole,
+		connect.WithSchema(commandServiceMethods.ByName("UpdateChannelMemberRole")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceLeaveChannelHandler := connect.NewUnaryHandler(
+		CommandServiceLeaveChannelProcedure,
+		svc.LeaveChannel,
+		connect.WithSchema(commandServiceMethods.ByName("LeaveChannel")),
+		connect.WithHandlerOptions(opts...),
+	)
 	commandServiceListChannelMembersHandler := connect.NewUnaryHandler(
 		CommandServiceListChannelMembersProcedure,
 		svc.ListChannelMembers,
@@ -1422,6 +1519,12 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceAddChannelMemberHandler.ServeHTTP(w, r)
 		case CommandServiceRemoveChannelMemberProcedure:
 			commandServiceRemoveChannelMemberHandler.ServeHTTP(w, r)
+		case CommandServiceTransferChannelOwnershipProcedure:
+			commandServiceTransferChannelOwnershipHandler.ServeHTTP(w, r)
+		case CommandServiceUpdateChannelMemberRoleProcedure:
+			commandServiceUpdateChannelMemberRoleHandler.ServeHTTP(w, r)
+		case CommandServiceLeaveChannelProcedure:
+			commandServiceLeaveChannelHandler.ServeHTTP(w, r)
 		case CommandServiceListChannelMembersProcedure:
 			commandServiceListChannelMembersHandler.ServeHTTP(w, r)
 		case CommandServiceListThreadParticipantsProcedure:
@@ -1577,6 +1680,18 @@ func (UnimplementedCommandServiceHandler) AddChannelMember(context.Context, *con
 
 func (UnimplementedCommandServiceHandler) RemoveChannelMember(context.Context, *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.RemoveChannelMember is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) TransferChannelOwnership(context.Context, *connect.Request[v1.TransferChannelOwnershipRequest]) (*connect.Response[v1.TransferChannelOwnershipResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.TransferChannelOwnership is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) UpdateChannelMemberRole(context.Context, *connect.Request[v1.UpdateChannelMemberRoleRequest]) (*connect.Response[v1.ChannelMember], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.UpdateChannelMemberRole is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) LeaveChannel(context.Context, *connect.Request[v1.LeaveChannelRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.LeaveChannel is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) ListChannelMembers(context.Context, *connect.Request[v1.ListChannelMembersRequest]) (*connect.Response[v1.ListChannelMembersResponse], error) {

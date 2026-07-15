@@ -595,13 +595,21 @@ type User struct {
 	// Format: groups/{email}
 	Groups []string `protobuf:"bytes,14,rep,name=groups,proto3" json:"groups,omitempty"`
 	// workspace_admin is true when the user holds the roles/workspaceAdmin role.
-	// Only populated for the current caller (GetCurrentUser).
+	// Only populated for the current caller (GetCurrentUser). Retained as a
+	// computed shim during the IAM transition; prefer `permissions` for gating.
 	WorkspaceAdmin bool `protobuf:"varint,15,opt,name=workspace_admin,json=workspaceAdmin,proto3" json:"workspace_admin,omitempty"`
 	// description is a short, user-authored self-description surfaced to agents and
 	// other users so they know who this user is and what they focus on, e.g.
 	// "Backend engineer, focused on agent building" or "UI/UX expert, reviews come to
 	// me". Editable via UpdateUser with update_mask "description".
-	Description   string `protobuf:"bytes,16,opt,name=description,proto3" json:"description,omitempty"`
+	Description string `protobuf:"bytes,16,opt,name=description,proto3" json:"description,omitempty"`
+	// permissions is the caller's effective workspace-scope permission set
+	// (roles/workspaceMember baseline ∪ the permissions of every workspace role
+	// the user holds), populated only by GetCurrentUser. The frontend gates
+	// workspace actions on this (e.g. laelia.users.update). Per-resource
+	// permissions (conversations.read/send/manage, agents.edit) are resolved per
+	// resource and surfaced on the resource, not here.
+	Permissions   []string `protobuf:"bytes,17,rep,name=permissions,proto3" json:"permissions,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -727,6 +735,13 @@ func (x *User) GetDescription() string {
 	return ""
 }
 
+func (x *User) GetPermissions() []string {
+	if x != nil {
+		return x.Permissions
+	}
+	return nil
+}
+
 type UserProfile struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	LastLoginTime          *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=last_login_time,json=lastLoginTime,proto3" json:"last_login_time,omitempty"`
@@ -822,7 +837,7 @@ const file_v1_user_service_proto_rawDesc = "" +
 	"\vlaelia/UserR\x04name\">\n" +
 	"\x13UndeleteUserRequest\x12'\n" +
 	"\x04name\x18\x01 \x01(\tB\x13\xe0A\x02\xfaA\r\n" +
-	"\vlaelia/UserR\x04name\"\xe8\x03\n" +
+	"\vlaelia/UserR\x04name\"\x8f\x04\n" +
 	"\x04User\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -837,7 +852,8 @@ const file_v1_user_service_proto_rawDesc = "" +
 	"\aprofile\x18\r \x01(\v2\x16.laelia.v1.UserProfileR\aprofile\x12\x1b\n" +
 	"\x06groups\x18\x0e \x03(\tB\x03\xe0A\x03R\x06groups\x12,\n" +
 	"\x0fworkspace_admin\x18\x0f \x01(\bB\x03\xe0A\x03R\x0eworkspaceAdmin\x12 \n" +
-	"\vdescription\x18\x10 \x01(\tR\vdescription:\x1e\xeaA\x1b\n" +
+	"\vdescription\x18\x10 \x01(\tR\vdescription\x12%\n" +
+	"\vpermissions\x18\x11 \x03(\tB\x03\xe0A\x03R\vpermissions:\x1e\xeaA\x1b\n" +
 	"\vlaelia/User\x12\fusers/{user}\"\xc0\x01\n" +
 	"\vUserProfile\x12B\n" +
 	"\x0flast_login_time\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\rlastLoginTime\x12U\n" +

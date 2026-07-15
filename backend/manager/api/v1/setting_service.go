@@ -17,8 +17,9 @@ import (
 // "unchanged") on Update.
 const secretMaskPrefix = "****"
 
-// SettingService exposes workspace-level configuration. Both RPCs are
-// admin-only: a non-admin receives PermissionDenied.
+// SettingService exposes workspace-level configuration. Both RPCs are gated by
+// the IAM interceptor (laelia.settings.get / laelia.settings.update), which only
+// the workspaceAdmin role holds, so they are admin-only in effect.
 type SettingService struct {
 	v1connect.UnimplementedSettingServiceHandler
 	store           *store.Store
@@ -30,9 +31,6 @@ func NewSettingService(s *store.Store, s3clientManager *s3client.Client) *Settin
 }
 
 func (s *SettingService) GetS3Config(ctx context.Context, _ *connect.Request[v1pb.GetS3ConfigRequest]) (*connect.Response[v1pb.GetS3ConfigResponse], error) {
-	if err := s.requireAdmin(ctx); err != nil {
-		return nil, err
-	}
 	cfg, err := s.store.GetS3ConfigSetting(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get s3 config"))
@@ -42,9 +40,6 @@ func (s *SettingService) GetS3Config(ctx context.Context, _ *connect.Request[v1p
 }
 
 func (s *SettingService) UpdateS3Config(ctx context.Context, req *connect.Request[v1pb.UpdateS3ConfigRequest]) (*connect.Response[v1pb.UpdateS3ConfigResponse], error) {
-	if err := s.requireAdmin(ctx); err != nil {
-		return nil, err
-	}
 	in := req.Msg.GetConfig()
 	if in == nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("config is required"))
@@ -69,21 +64,6 @@ func (s *SettingService) UpdateS3Config(ctx context.Context, req *connect.Reques
 
 	in.SecretKey = maskSecret(in.SecretKey)
 	return connect.NewResponse(&v1pb.UpdateS3ConfigResponse{Config: in}), nil
-}
-
-func (s *SettingService) requireAdmin(ctx context.Context) error {
-	user, ok := GetUserFromContext(ctx)
-	if !ok || user == nil {
-		return connect.NewError(connect.CodeUnauthenticated, errors.New("not authenticated"))
-	}
-	isAdmin, err := isUserWorkspaceAdmin(ctx, s.store, user)
-	if err != nil {
-		return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check workspace admin"))
-	}
-	if !isAdmin {
-		return connect.NewError(connect.CodePermissionDenied, errors.New("workspace admin only"))
-	}
-	return nil
 }
 
 // maskSecret returns a masked form of the secret for read-back. An empty secret

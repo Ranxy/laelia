@@ -14,8 +14,16 @@ const (
 	MemberTypeUser  int32 = 1
 	MemberTypeAgent int32 = 2
 
+	// Chat roles stored in conversation_member.member_role. conversation_member
+	// is the single source of truth for chat authorization: the IAM engine maps
+	// a caller's role here to its conversation permissions (see chatRolePermissions
+	// in component/iam). conversation.owner_id is a denormalized owner-of-record
+	// pointer (principal_id source for agent replies + API display + SystemBot for
+	// agent-DMs) kept in sync with MemberRoleOwner on create/transfer; it is not
+	// consulted for chat authorization.
 	MemberRoleOwner  int32 = 1
 	MemberRoleMember int32 = 2
+	MemberRoleAdmin  int32 = 3
 )
 
 type ConversationMember struct {
@@ -110,6 +118,100 @@ func (s *Store) IsConversationMember(ctx context.Context, convID uuid.UUID, memb
 		return false, errors.Wrapf(err, "failed to check conversation membership")
 	}
 	return exists, nil
+}
+
+// GetConversationMembership returns the caller's chat role for a conversation
+// (MemberRoleOwner/MemberRoleAdmin/MemberRoleMember, or 0 when not a member)
+// together with the conversation type, in a single query. The IAM engine uses
+// the role to map a caller's chat role to its conversation permissions and the
+// type to apply the agent-DM review override.
+func (s *Store) GetConversationMembership(ctx context.Context, convID uuid.UUID, memberType int32, memberID string) (role int32, convType int32, err error) {
+	err = s.GetDB().QueryRowContext(ctx, `
+		SELECT cm.member_role, c.type
+		FROM conversation c
+		LEFT JOIN conversation_member cm
+		       ON cm.conversation_id = c.id AND cm.member_type = $2 AND cm.member_id = $3
+		WHERE c.id = $1
+	`, convID, memberType, memberID).Scan(&role, &convType)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, 0, errors.Wrapf(err, "conversation %s not found", convID)
+		}
+		return 0, 0, errors.Wrapf(err, "failed to get conversation membership")
+	}
+	return role, convType, nil
+}
+
+// UpdateConversationMemberRole sets a member's chat role. It is the store
+// primitive behind grant/revoke-admin (Member<->Admin) and the role swap in
+// TransferChannelOwnership (the tx-scoped sibling updateConversationMemberRoleTx
+// runs inside the caller's transaction for atomicity). Returns
+// ErrConversationMemberNotFound when the target is not a member.
+var ErrConversationMemberNotFound = errors.New("conversation member not found")
+
+type execRunner interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+func execUpdateConversationMemberRole(ctx context.Context, runner execRunner, convID uuid.UUID, memberType int32, memberID string, role int32) error {
+	res, err := runner.ExecContext(ctx, `
+		UPDATE conversation_member SET member_role = $4
+		WHERE conversation_id = $1 AND member_type = $2 AND member_id = $3
+	`, convID, memberType, memberID, role)
+	if err != nil {
+		return errors.Wrapf(err, "failed to update conversation member role")
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return errors.Wrapf(err, "failed to read conversation member role update result")
+	}
+	if n == 0 {
+		return ErrConversationMemberNotFound
+	}
+	return nil
+}
+
+func (s *Store) UpdateConversationMemberRole(ctx context.Context, convID uuid.UUID, memberType int32, memberID string, role int32) error {
+	return execUpdateConversationMemberRole(ctx, s.GetDB(), convID, memberType, memberID, role)
+}
+
+// TransferChannelOwnership atomically hands channel ownership from the old
+// owner (a user, identified by principal id) to a new owner: it updates the
+// denormalized conversation.owner_id, demotes the old owner to Member, and
+// promotes the new owner to Owner, all in one transaction so a crash cannot
+// leave a channel with two owners or none. The new owner must already be a
+// member (verified by the caller); newOwnerID is its member_id string and
+// newOwnerPrincipalID is the user principal id written to owner_id.
+func (s *Store) TransferChannelOwnership(ctx context.Context, convID uuid.UUID, oldOwnerPrincipalID, newOwnerPrincipalID int, newOwnerID string) error {
+	tx, err := s.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to begin transfer ownership transaction")
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE conversation SET owner_id = $1, updated_at = now()
+		WHERE id = $2
+	`, newOwnerPrincipalID, convID); err != nil {
+		return errors.Wrap(err, "failed to update conversation owner_id")
+	}
+
+	oldOwnerID := fmt.Sprintf("%d", oldOwnerPrincipalID)
+	if err := updateConversationMemberRoleTx(ctx, tx, convID, MemberTypeUser, oldOwnerID, MemberRoleMember); err != nil {
+		return errors.Wrap(err, "failed to demote old owner")
+	}
+	if err := updateConversationMemberRoleTx(ctx, tx, convID, MemberTypeUser, newOwnerID, MemberRoleOwner); err != nil {
+		return errors.Wrap(err, "failed to promote new owner")
+	}
+
+	if err := tx.Commit(); err != nil {
+		return errors.Wrap(err, "failed to commit transfer ownership transaction")
+	}
+	return nil
+}
+
+func updateConversationMemberRoleTx(ctx context.Context, tx *sql.Tx, convID uuid.UUID, memberType int32, memberID string, role int32) error {
+	return execUpdateConversationMemberRole(ctx, tx, convID, memberType, memberID, role)
 }
 
 func (s *Store) findDirectConversation(ctx context.Context, userPrincipalID int, agentResourceID string) (*ConversationMessage, error) {

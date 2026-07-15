@@ -33,6 +33,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatTimestamp } from "@/lib/command-status";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
+import { useHasPermission } from "@/stores/auth";
 import { State } from "@/types/proto-es/v1/common_pb";
 import { type User, UserType } from "@/types/proto-es/v1/user_service_pb";
 
@@ -40,7 +41,11 @@ type Tab = "active" | "trash";
 
 export function UserListPage() {
   const { t } = useTranslation();
-  const isAdmin = useAppStore((s) => s.currentUser?.workspaceAdmin ?? false);
+  // User-management actions (create/update/delete/undelete) are gated by the
+  // laelia.users.update workspace permission. The variable is kept as `isAdmin`
+  // for minimal churn; workspaceAdmin holds both users.update and users.delete,
+  // so this matches the prior workspaceAdmin boolean in practice.
+  const isAdmin = useHasPermission("laelia.users.update");
   const currentUser = useAppStore((s) => s.currentUser);
   const users = useAppStore((s) => s.users);
   const usersLoading = useAppStore((s) => s.usersLoading);

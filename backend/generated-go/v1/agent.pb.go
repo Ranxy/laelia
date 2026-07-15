@@ -1625,7 +1625,12 @@ type Agent struct {
 	TokenVersion       int32                  `protobuf:"varint,10,opt,name=token_version,json=tokenVersion,proto3" json:"token_version,omitempty"`
 	// Creator's user resource name (users/{id}); empty for legacy agents with no
 	// recorded creator. Only the creator or a workspace admin may modify the agent.
-	CreatedBy     string `protobuf:"bytes,11,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	CreatedBy string `protobuf:"bytes,11,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	// can_edit reports whether the current caller may modify this agent
+	// (laelia.agents.edit): true for the creator (via the agentEditor IAM binding)
+	// and for workspace admins (via the all-permissions union), false otherwise.
+	// Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths.
+	CanEdit       bool `protobuf:"varint,12,opt,name=can_edit,json=canEdit,proto3" json:"can_edit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1728,6 +1733,13 @@ func (x *Agent) GetCreatedBy() string {
 		return x.CreatedBy
 	}
 	return ""
+}
+
+func (x *Agent) GetCanEdit() bool {
+	if x != nil {
+		return x.CanEdit
+	}
+	return false
 }
 
 type AgentInfo struct {
@@ -2492,7 +2504,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\fHelloRequest\"Y\n" +
 	"\rHelloResponse\x12!\n" +
 	"\fcurrent_time\x18\x01 \x01(\x03R\vcurrentTime\x12%\n" +
-	"\x0eserver_version\x18\x02 \x01(\tR\rserverVersion\"\xa7\x04\n" +
+	"\x0eserver_version\x18\x02 \x01(\tR\rserverVersion\"\xc7\x04\n" +
 	"\x05Agent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -2506,7 +2518,8 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\rtoken_version\x18\n" +
 	" \x01(\x05R\ftokenVersion\x12\"\n" +
 	"\n" +
-	"created_by\x18\v \x01(\tB\x03\xe0A\x03R\tcreatedBy\x1a9\n" +
+	"created_by\x18\v \x01(\tB\x03\xe0A\x03R\tcreatedBy\x12\x1e\n" +
+	"\bcan_edit\x18\f \x01(\bB\x03\xe0A\x03R\acanEdit\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:!\xeaA\x1e\n" +

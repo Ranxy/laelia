@@ -22,11 +22,13 @@ import (
 	"github.com/Ranxy/laelia/backend/agent/executor"
 	"github.com/Ranxy/laelia/backend/agent/provider"
 	"github.com/Ranxy/laelia/backend/common"
+	"github.com/Ranxy/laelia/backend/common/permission"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
+	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -51,17 +53,19 @@ type AgentService struct {
 	profile        *config.Profile
 	stateCfg       *state.State
 	dispatcher     *dispatcher.Dispatcher
+	iam            *iam.Manager
 	consumedTimers map[int]*time.Timer
 	consumedMu     sync.Mutex
 }
 
-func NewAgentService(store *store.Store, secret string, profile *config.Profile, stateCfg *state.State, d *dispatcher.Dispatcher) *AgentService {
+func NewAgentService(store *store.Store, secret string, profile *config.Profile, stateCfg *state.State, d *dispatcher.Dispatcher, iamManager *iam.Manager) *AgentService {
 	return &AgentService{
 		store:          store,
 		secret:         secret,
 		profile:        profile,
 		stateCfg:       stateCfg,
 		dispatcher:     d,
+		iam:            iamManager,
 		consumedTimers: make(map[int]*time.Timer),
 	}
 }
@@ -74,9 +78,10 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("agent title must be set"))
 	}
 
-	// Record the creator so later profile mutations can be gated to them or a
-	// workspace admin (see requireAgentEditor). CreateAgent is admin-tier, so a
-	// user is always present; guard defensively against a missing one.
+	// Record the creator so the agentEditor IAM binding can be seeded for them
+	// (seedAgentEditorBindingTx), granting agents.edit to the creator. CreateAgent
+	// is admin-tier, so a user is always present; guard defensively against a
+	// missing one.
 	creatorID := 0
 	if user, _ := GetUserFromContext(ctx); user != nil {
 		creatorID = user.ID
@@ -158,8 +163,11 @@ func (s *AgentService) ListAgents(ctx context.Context, req *connect.Request[v1pb
 	response := &v1pb.ListAgentsResponse{
 		NextPageToken: nextPageToken,
 	}
+	caller, _ := GetUserFromContext(ctx)
 	for _, agent := range agents {
-		response.Agents = append(response.Agents, convertToAgent(agent))
+		a := convertToAgent(agent)
+		a.CanEdit = s.canEditAgent(ctx, caller, a.Name)
+		response.Agents = append(response.Agents, a)
 	}
 	return connect.NewResponse(response), nil
 }
@@ -176,7 +184,30 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
 	}
-	return connect.NewResponse(convertToAgent(agent)), nil
+	out := convertToAgent(agent)
+	caller, _ := GetUserFromContext(ctx)
+	out.CanEdit = s.canEditAgent(ctx, caller, out.Name)
+	return connect.NewResponse(out), nil
+}
+
+// canEditAgent reports whether the caller holds laelia.agents.edit on the agent
+// (creator via the agentEditor binding, or any workspace admin via the
+// all-permissions union). A lookup failure is treated as not-editable
+// (fail-closed) so a stale can_edit never grants modification. Agent-daemon
+// callers and unauthenticated requests get false.
+func (s *AgentService) canEditAgent(ctx context.Context, user *store.UserMessage, agentName string) bool {
+	if user == nil || s.iam == nil {
+		return false
+	}
+	ok, err := s.iam.CheckPermission(ctx, permission.AgentsEdit, user, nil, &iam.ResourceRef{
+		ResourceType: storepb.Policy_AGENT,
+		Name:         agentName,
+	})
+	if err != nil {
+		slog.Error("failed to resolve agents.edit", slog.String("agent", agentName), slog.Any("err", err))
+		return false
+	}
+	return ok
 }
 
 func (s *AgentService) DeleteAgent(ctx context.Context, req *connect.Request[v1pb.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error) {
@@ -190,9 +221,6 @@ func (s *AgentService) DeleteAgent(ctx context.Context, req *connect.Request[v1p
 	}
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
-	}
-	if err := requireAgentEditor(ctx, s.store, agent); err != nil {
-		return nil, err
 	}
 	if err := s.store.DeleteAgent(ctx, resourceID); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to delete agent, error: %v", err))
@@ -211,9 +239,6 @@ func (s *AgentService) RotateAgentToken(ctx context.Context, req *connect.Reques
 	}
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
-	}
-	if err := requireAgentEditor(ctx, s.store, agent); err != nil {
-		return nil, err
 	}
 
 	newTokenVersion := agent.TokenVersion + 1
@@ -282,9 +307,6 @@ func (s *AgentService) RevokeAgentToken(ctx context.Context, req *connect.Reques
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
 	}
-	if err := requireAgentEditor(ctx, s.store, agent); err != nil {
-		return nil, err
-	}
 
 	newTokenVersion := agent.TokenVersion + 1
 	nowRotated := time.Now()
@@ -321,9 +343,6 @@ func (s *AgentService) ForceDisconnectAgent(ctx context.Context, req *connect.Re
 	}
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
-	}
-	if err := requireAgentEditor(ctx, s.store, agent); err != nil {
-		return nil, err
 	}
 
 	reason := "admin_forced"
@@ -1196,9 +1215,6 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
 	}
-	if err := requireAgentEditor(ctx, s.store, agent); err != nil {
-		return nil, err
-	}
 
 	// Preserve the rest of AgentInfo (hostname/os/capability/available_providers/
 	// labels); only AcpConfig is admin-owned and replaced here. Previously this
@@ -1228,9 +1244,6 @@ func (s *AgentService) RefreshAgentProviders(ctx context.Context, req *connect.R
 	}
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
-	}
-	if err := requireAgentEditor(ctx, s.store, agent); err != nil {
-		return nil, err
 	}
 	if !s.dispatcher.IsAgentConnected(agent.ID) {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent is not connected; cannot probe providers"))

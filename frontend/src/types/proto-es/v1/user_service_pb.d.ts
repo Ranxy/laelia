@@ -326,7 +326,8 @@ export declare type User = Message<"laelia.v1.User"> & {
 
   /**
    * workspace_admin is true when the user holds the roles/workspaceAdmin role.
-   * Only populated for the current caller (GetCurrentUser).
+   * Only populated for the current caller (GetCurrentUser). Retained as a
+   * computed shim during the IAM transition; prefer `permissions` for gating.
    *
    * @generated from field: bool workspace_admin = 15;
    */
@@ -341,6 +342,18 @@ export declare type User = Message<"laelia.v1.User"> & {
    * @generated from field: string description = 16;
    */
   description: string;
+
+  /**
+   * permissions is the caller's effective workspace-scope permission set
+   * (roles/workspaceMember baseline ∪ the permissions of every workspace role
+   * the user holds), populated only by GetCurrentUser. The frontend gates
+   * workspace actions on this (e.g. laelia.users.update). Per-resource
+   * permissions (conversations.read/send/manage, agents.edit) are resolved per
+   * resource and surfaced on the resource, not here.
+   *
+   * @generated from field: repeated string permissions = 17;
+   */
+  permissions: string[];
 };
 
 /**

@@ -17,9 +17,11 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/common"
+	"github.com/Ranxy/laelia/backend/common/permission"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
+	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -29,10 +31,11 @@ type CommandService struct {
 	store           *store.Store
 	dispatcher      *dispatcher.Dispatcher
 	s3clientManager *s3client.Client
+	iam             *iam.Manager
 }
 
-func NewCommandService(s *store.Store, d *dispatcher.Dispatcher, s3clientManager *s3client.Client) *CommandService {
-	return &CommandService{store: s, dispatcher: d, s3clientManager: s3clientManager}
+func NewCommandService(s *store.Store, d *dispatcher.Dispatcher, s3clientManager *s3client.Client, iamManager *iam.Manager) *CommandService {
+	return &CommandService{store: s, dispatcher: d, s3clientManager: s3clientManager, iam: iamManager}
 }
 
 func (s *CommandService) ListCommands(ctx context.Context, req *connect.Request[v1pb.ListCommandsRequest]) (*connect.Response[v1pb.ListCommandsResponse], error) {
@@ -94,7 +97,7 @@ func (s *CommandService) GetCommand(ctx context.Context, req *connect.Request[v1
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	if err := requireCommandAccess(ctx, s.store, cmd); err != nil {
+	if err := s.requireCommandAccess(ctx, cmd); err != nil {
 		return nil, err
 	}
 
@@ -106,7 +109,7 @@ func (s *CommandService) CancelCommand(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	if err := requireCommandAccess(ctx, s.store, cmd); err != nil {
+	if err := s.requireCommandAccess(ctx, cmd); err != nil {
 		return nil, err
 	}
 
@@ -133,7 +136,7 @@ func (s *CommandService) WatchCommand(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	if err := requireCommandAccess(ctx, s.store, cmd); err != nil {
+	if err := s.requireCommandAccess(ctx, cmd); err != nil {
 		return err
 	}
 
@@ -186,7 +189,7 @@ func (s *CommandService) WatchCommandEvents(ctx context.Context, req *connect.Re
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	if err := requireCommandAccess(ctx, s.store, cmd); err != nil {
+	if err := s.requireCommandAccess(ctx, cmd); err != nil {
 		return err
 	}
 
@@ -239,7 +242,7 @@ func (s *CommandService) RespondPermission(ctx context.Context, req *connect.Req
 	if cmd == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("command %s not found", req.Msg.Name))
 	}
-	if err := requireCommandAccess(ctx, s.store, cmd); err != nil {
+	if err := s.requireCommandAccess(ctx, cmd); err != nil {
 		return nil, err
 	}
 
@@ -416,23 +419,23 @@ func (s *CommandService) validateRawEventAccess(ctx context.Context, user *store
 		return nil
 	}
 
-	isAdmin, err := isUserWorkspaceAdmin(ctx, s.store, user)
+	ok, err := s.iam.CheckPermission(ctx, permission.ConversationsReviewAll, user, nil, nil)
 	if err != nil {
-		slog.Warn("failed to check workspace admin for raw events", "error", err, "user", user.Email)
+		slog.Warn("failed to check reviewAll for raw events", "error", err, "user", user.Email)
 		return connect.NewError(connect.CodeInternal, errors.New("failed to verify permissions"))
 	}
-	if !isAdmin {
+	if !ok {
 		return connect.NewError(connect.CodePermissionDenied,
-			errors.New("only workspace admins can view structured command events"))
+			errors.New("only users with conversations.reviewAll can view structured command events"))
 	}
 
 	return nil
 }
 
 func (s *CommandService) SearchChatHistory(ctx context.Context, req *connect.Request[v1pb.SearchChatHistoryRequest]) (*connect.Response[v1pb.SearchChatHistoryResponse], error) {
-	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
+	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
-		return nil, err
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 
 	var since, until *time.Time
@@ -485,7 +488,7 @@ func (s *CommandService) GetCommandContext(ctx context.Context, req *connect.Req
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	if err := requireCommandAccess(ctx, s.store, cmd); err != nil {
+	if err := s.requireCommandAccess(ctx, cmd); err != nil {
 		return nil, err
 	}
 
@@ -551,9 +554,9 @@ func (s *CommandService) GetOrCreateConversation(ctx context.Context, req *conne
 }
 
 func (s *CommandService) ListConversationMessages(ctx context.Context, req *connect.Request[v1pb.ListConversationMessagesRequest]) (*connect.Response[v1pb.ListConversationMessagesResponse], error) {
-	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
+	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
-		return nil, err
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 	if req.Msg.AfterVersion > 0 && req.Msg.BeforeVersion > 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("after_version and before_version are mutually exclusive"))
@@ -646,9 +649,9 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 // replies in room_version order, with the same cursor model as
 // ListConversationMessages. The caller must be a member of the conversation.
 func (s *CommandService) ListThreadMessages(ctx context.Context, req *connect.Request[v1pb.ListThreadMessagesRequest]) (*connect.Response[v1pb.ListThreadMessagesResponse], error) {
-	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
+	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
-		return nil, err
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 	if req.Msg.ThreadRoot == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("thread_root must not be empty"))
@@ -726,9 +729,9 @@ func (s *CommandService) ListThreadMessages(ctx context.Context, req *connect.Re
 // which the message watcher cannot observe because ListConversationMessages
 // excludes thread replies.
 func (s *CommandService) ListChannelThreads(ctx context.Context, req *connect.Request[v1pb.ListChannelThreadsRequest]) (*connect.Response[v1pb.ListChannelThreadsResponse], error) {
-	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
+	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
-		return nil, err
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 	threads, err := s.store.ListChannelThreads(ctx, convID)
 	if err != nil {

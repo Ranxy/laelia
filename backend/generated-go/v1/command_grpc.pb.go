@@ -44,6 +44,9 @@ const (
 	CommandService_DeleteChannel_FullMethodName             = "/laelia.v1.CommandService/DeleteChannel"
 	CommandService_AddChannelMember_FullMethodName          = "/laelia.v1.CommandService/AddChannelMember"
 	CommandService_RemoveChannelMember_FullMethodName       = "/laelia.v1.CommandService/RemoveChannelMember"
+	CommandService_TransferChannelOwnership_FullMethodName  = "/laelia.v1.CommandService/TransferChannelOwnership"
+	CommandService_UpdateChannelMemberRole_FullMethodName   = "/laelia.v1.CommandService/UpdateChannelMemberRole"
+	CommandService_LeaveChannel_FullMethodName              = "/laelia.v1.CommandService/LeaveChannel"
 	CommandService_ListChannelMembers_FullMethodName        = "/laelia.v1.CommandService/ListChannelMembers"
 	CommandService_ListThreadParticipants_FullMethodName    = "/laelia.v1.CommandService/ListThreadParticipants"
 	CommandService_SendMessage_FullMethodName               = "/laelia.v1.CommandService/SendMessage"
@@ -118,6 +121,23 @@ type CommandServiceClient interface {
 	DeleteChannel(ctx context.Context, in *DeleteChannelRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	AddChannelMember(ctx context.Context, in *AddChannelMemberRequest, opts ...grpc.CallOption) (*ChannelMember, error)
 	RemoveChannelMember(ctx context.Context, in *RemoveChannelMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// TransferChannelOwnership hands channel ownership from the calling owner to
+	// another member: the target is promoted to Owner and the caller demoted to
+	// Member, atomically. The interceptor gates the call with conversations.manage
+	// (Admin+Owner); the handler additionally enforces that the caller is the
+	// current Owner. Only channels (type 2) support ownership transfer.
+	TransferChannelOwnership(ctx context.Context, in *TransferChannelOwnershipRequest, opts ...grpc.CallOption) (*TransferChannelOwnershipResponse, error)
+	// UpdateChannelMemberRole grants or revokes channel admin: the target member's
+	// role is set to the requested role (Member or Admin). The interceptor gates
+	// with conversations.manage (Admin+Owner); the handler enforces that the
+	// caller is the Owner and the target role is Member or Admin (never Owner —
+	// ownership only moves via TransferChannelOwnership).
+	UpdateChannelMemberRole(ctx context.Context, in *UpdateChannelMemberRoleRequest, opts ...grpc.CallOption) (*ChannelMember, error)
+	// LeaveChannel removes the calling member from a channel. The interceptor
+	// gates with conversations.read (any member); the handler rejects the current
+	// Owner — an owner must transfer ownership or delete the channel first to
+	// avoid orphaning it. Only channels (type 2) support leaving.
+	LeaveChannel(ctx context.Context, in *LeaveChannelRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ListChannelMembers(ctx context.Context, in *ListChannelMembersRequest, opts ...grpc.CallOption) (*ListChannelMembersResponse, error)
 	// ListThreadParticipants lists the distinct senders (users and agents) that posted
 	// in a thread. Intended for the agent daemon. The caller must be a member of the
@@ -468,6 +488,36 @@ func (c *commandServiceClient) RemoveChannelMember(ctx context.Context, in *Remo
 	return out, nil
 }
 
+func (c *commandServiceClient) TransferChannelOwnership(ctx context.Context, in *TransferChannelOwnershipRequest, opts ...grpc.CallOption) (*TransferChannelOwnershipResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TransferChannelOwnershipResponse)
+	err := c.cc.Invoke(ctx, CommandService_TransferChannelOwnership_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) UpdateChannelMemberRole(ctx context.Context, in *UpdateChannelMemberRoleRequest, opts ...grpc.CallOption) (*ChannelMember, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChannelMember)
+	err := c.cc.Invoke(ctx, CommandService_UpdateChannelMemberRole_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) LeaveChannel(ctx context.Context, in *LeaveChannelRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, CommandService_LeaveChannel_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *commandServiceClient) ListChannelMembers(ctx context.Context, in *ListChannelMembersRequest, opts ...grpc.CallOption) (*ListChannelMembersResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListChannelMembersResponse)
@@ -774,6 +824,23 @@ type CommandServiceServer interface {
 	DeleteChannel(context.Context, *DeleteChannelRequest) (*emptypb.Empty, error)
 	AddChannelMember(context.Context, *AddChannelMemberRequest) (*ChannelMember, error)
 	RemoveChannelMember(context.Context, *RemoveChannelMemberRequest) (*emptypb.Empty, error)
+	// TransferChannelOwnership hands channel ownership from the calling owner to
+	// another member: the target is promoted to Owner and the caller demoted to
+	// Member, atomically. The interceptor gates the call with conversations.manage
+	// (Admin+Owner); the handler additionally enforces that the caller is the
+	// current Owner. Only channels (type 2) support ownership transfer.
+	TransferChannelOwnership(context.Context, *TransferChannelOwnershipRequest) (*TransferChannelOwnershipResponse, error)
+	// UpdateChannelMemberRole grants or revokes channel admin: the target member's
+	// role is set to the requested role (Member or Admin). The interceptor gates
+	// with conversations.manage (Admin+Owner); the handler enforces that the
+	// caller is the Owner and the target role is Member or Admin (never Owner —
+	// ownership only moves via TransferChannelOwnership).
+	UpdateChannelMemberRole(context.Context, *UpdateChannelMemberRoleRequest) (*ChannelMember, error)
+	// LeaveChannel removes the calling member from a channel. The interceptor
+	// gates with conversations.read (any member); the handler rejects the current
+	// Owner — an owner must transfer ownership or delete the channel first to
+	// avoid orphaning it. Only channels (type 2) support leaving.
+	LeaveChannel(context.Context, *LeaveChannelRequest) (*emptypb.Empty, error)
 	ListChannelMembers(context.Context, *ListChannelMembersRequest) (*ListChannelMembersResponse, error)
 	// ListThreadParticipants lists the distinct senders (users and agents) that posted
 	// in a thread. Intended for the agent daemon. The caller must be a member of the
@@ -937,6 +1004,15 @@ func (UnimplementedCommandServiceServer) AddChannelMember(context.Context, *AddC
 }
 func (UnimplementedCommandServiceServer) RemoveChannelMember(context.Context, *RemoveChannelMemberRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveChannelMember not implemented")
+}
+func (UnimplementedCommandServiceServer) TransferChannelOwnership(context.Context, *TransferChannelOwnershipRequest) (*TransferChannelOwnershipResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TransferChannelOwnership not implemented")
+}
+func (UnimplementedCommandServiceServer) UpdateChannelMemberRole(context.Context, *UpdateChannelMemberRoleRequest) (*ChannelMember, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateChannelMemberRole not implemented")
+}
+func (UnimplementedCommandServiceServer) LeaveChannel(context.Context, *LeaveChannelRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method LeaveChannel not implemented")
 }
 func (UnimplementedCommandServiceServer) ListChannelMembers(context.Context, *ListChannelMembersRequest) (*ListChannelMembersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListChannelMembers not implemented")
@@ -1451,6 +1527,60 @@ func _CommandService_RemoveChannelMember_Handler(srv interface{}, ctx context.Co
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CommandServiceServer).RemoveChannelMember(ctx, req.(*RemoveChannelMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_TransferChannelOwnership_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TransferChannelOwnershipRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).TransferChannelOwnership(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_TransferChannelOwnership_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).TransferChannelOwnership(ctx, req.(*TransferChannelOwnershipRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_UpdateChannelMemberRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateChannelMemberRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).UpdateChannelMemberRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_UpdateChannelMemberRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).UpdateChannelMemberRole(ctx, req.(*UpdateChannelMemberRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_LeaveChannel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LeaveChannelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).LeaveChannel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_LeaveChannel_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).LeaveChannel(ctx, req.(*LeaveChannelRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2017,6 +2147,18 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveChannelMember",
 			Handler:    _CommandService_RemoveChannelMember_Handler,
+		},
+		{
+			MethodName: "TransferChannelOwnership",
+			Handler:    _CommandService_TransferChannelOwnership_Handler,
+		},
+		{
+			MethodName: "UpdateChannelMemberRole",
+			Handler:    _CommandService_UpdateChannelMemberRole_Handler,
+		},
+		{
+			MethodName: "LeaveChannel",
+			Handler:    _CommandService_LeaveChannel_Handler,
 		},
 		{
 			MethodName: "ListChannelMembers",

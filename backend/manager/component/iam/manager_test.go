@@ -24,10 +24,25 @@ func TestCheckPermissionAgentBaseline(t *testing.T) {
 		perm permission.Permission
 		want bool
 	}{
-		{permission.ConversationsRead, true}, // baseline workspaceMember
-		{permission.ConversationsSend, true},
+		// Workspace-scope baseline perms (roles/workspaceMember) granted to any
+		// authenticated principal, including agents.
+		{permission.ConversationsList, true},
+		{permission.ConversationsCreate, true},
+		{permission.AgentsGet, true},
 		{permission.CommandsWatch, true},
-		{permission.AgentsEdit, true}, // baseline includes agents.edit (handler still gates)
+		{permission.CommandsCancel, true},
+		{permission.RemindersList, true},
+		{permission.FilesDownload, true},
+		// Per-resource perms are NOT in the baseline: conversations.read/send are
+		// granted by the caller's chat role on a specific conversation, and
+		// agents.edit by the per-agent agentEditor binding. With no resource ref
+		// they are denied.
+		{permission.ConversationsRead, false},
+		{permission.ConversationsSend, false},
+		{permission.AgentsEdit, false},
+		// Review perms are not baseline; only via reviewer/admin roles.
+		{permission.ConversationsReviewAll, false},
+		// Admin-tier workspace perms are not baseline.
 		{permission.AgentsCreate, false},
 		{permission.UsersUpdate, false},
 		{permission.SettingsUpdate, false},
@@ -51,8 +66,11 @@ func TestPredefinedRolesResolve(t *testing.T) {
 		store.WorkspaceAdminRole,
 		store.WorkspaceMemberRole,
 		store.ConversationMemberRole,
+		store.ConversationAdminRole,
 		store.ConversationOwnerRole,
 		store.AgentEditorRole,
+		store.AgentDMReviewerRole,
+		store.OversightReviewerRole,
 	} {
 		perms := m.rolePermissions(context.Background(), "roles/"+role)
 		if perms == nil {

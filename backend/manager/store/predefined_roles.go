@@ -8,8 +8,11 @@ const (
 	WorkspaceAdminRole     = "workspaceAdmin"
 	WorkspaceMemberRole    = "workspaceMember"
 	ConversationMemberRole = "conversationMember"
+	ConversationAdminRole  = "conversationAdmin"
 	ConversationOwnerRole  = "conversationOwner"
 	AgentEditorRole        = "agentEditor"
+	AgentDMReviewerRole    = "agentDMReviewer"
+	OversightReviewerRole  = "oversightReviewer"
 )
 
 func permissionSet(perms ...permission.Permission) map[permission.Permission]bool {
@@ -32,29 +35,35 @@ var allPermissionSet = func() map[permission.Permission]bool {
 }()
 
 // memberBaselinePermissions is the permission set granted to any authenticated
-// principal (roles/workspaceMember). It carries the workspace-scope perms: the
-// discovery/list perms (conversations.list, commands.list — any member can
-// enumerate), creation perms, and the command perms still gated per-command by
-// requireCommandAccess until Phase 3. The per-resource perms
-// (conversations.read/send/manage, agents.edit) are also still present: the
-// interceptor does consult per-resource bindings for them, but in Phase 2 this
-// is inert because CheckPermission short-circuits at the baseline before the
-// resource consult runs (and resolveResource only runs for these resource-
-// scoped perms). Phase 3 removes them from the baseline so the
-// conversationMember/conversationOwner/agentEditor bindings become
-// authoritative.
+// principal (roles/workspaceMember). It carries only workspace-scope perms: the
+// discovery/list perms (conversations.list, commands.list, reminders.list,
+// files.list), creation perms, and the perms whose RPCs carry no single
+// conversation resource and so cannot be authorized per-conversation in the
+// interceptor — reminders.get/update/cancel, files.upload/download, and the
+// command perms. Those are gated per-object by the handler instead
+// (requireReminderAccess reads the chat-membership table; requireFileMember
+// checks conversation membership; requireCommandAccess reads the chat table +
+// owning agent + reviewAll). The per-conversation perms (conversations.
+// read/send/manage) and agents.edit are deliberately absent: they are
+// authorized per-resource — by the caller's chat role (conversation_member) for
+// conversations and by the agentEditor IAM binding for agents. The review perms
+// (reviewAgentDM, reviewAll) are also absent: they are granted only via the
+// agentDMReviewer / oversightReviewer / workspaceAdmin roles.
 var memberBaselinePermissions = permissionSet(
 	permission.AgentsGet,
-	permission.AgentsEdit,
 	permission.ConversationsCreate,
 	permission.ConversationsList,
-	permission.ConversationsRead,
-	permission.ConversationsSend,
-	permission.ConversationsManage,
 	permission.CommandsGet,
 	permission.CommandsList,
 	permission.CommandsWatch,
 	permission.CommandsCancel,
+	permission.RemindersGet,
+	permission.RemindersList,
+	permission.RemindersUpdate,
+	permission.RemindersCancel,
+	permission.FilesUpload,
+	permission.FilesDownload,
+	permission.FilesList,
 )
 
 // PredefinedRoles contains all predefined roles. The list is the single source
@@ -72,6 +81,12 @@ var PredefinedRoles = []*RoleMessage{
 		Predefined:  true,
 		Permissions: memberBaselinePermissions,
 	},
+	// Conversation roles are the chat role→permission maps used by the IAM
+	// engine's conversation branch (chatRolePermissions in component/iam). They
+	// are NOT IAM bindings: a caller's chat role is read from conversation_member
+	// and mapped to one of these permission sets. Owner-only operations (delete
+	// channel, transfer ownership, grant/revoke admin) are gated by an in-handler
+	// role==Owner check, so they need no separate catalog permission.
 	{
 		ResourceID: ConversationMemberRole,
 		Name:       "Conversation member",
@@ -79,6 +94,18 @@ var PredefinedRoles = []*RoleMessage{
 		Permissions: permissionSet(
 			permission.ConversationsRead,
 			permission.ConversationsSend,
+			permission.CommandsGet,
+			permission.CommandsWatch,
+		),
+	},
+	{
+		ResourceID: ConversationAdminRole,
+		Name:       "Conversation admin",
+		Predefined: true,
+		Permissions: permissionSet(
+			permission.ConversationsRead,
+			permission.ConversationsSend,
+			permission.ConversationsManage,
 			permission.CommandsGet,
 			permission.CommandsWatch,
 		),
@@ -101,6 +128,26 @@ var PredefinedRoles = []*RoleMessage{
 		Predefined: true,
 		Permissions: permissionSet(
 			permission.AgentsEdit,
+		),
+	},
+	// Reviewer roles make the grantable review perms assignable to non-admins via
+	// the workspace IAM policy. workspaceAdmin already holds them through the
+	// all-permissions union.
+	{
+		ResourceID: AgentDMReviewerRole,
+		Name:       "Agent-DM reviewer",
+		Predefined: true,
+		Permissions: permissionSet(
+			permission.ConversationsReviewAgentDM,
+		),
+	},
+	{
+		ResourceID: OversightReviewerRole,
+		Name:       "Oversight reviewer",
+		Predefined: true,
+		Permissions: permissionSet(
+			permission.ConversationsReviewAgentDM,
+			permission.ConversationsReviewAll,
 		),
 	},
 }

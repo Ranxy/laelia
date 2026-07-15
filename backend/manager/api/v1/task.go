@@ -64,9 +64,6 @@ func (s *CommandService) ConvertMessageToTask(ctx context.Context, req *connect.
 	if err != nil {
 		return nil, err
 	}
-	if _, err := requireConversationMember(ctx, s.store, fmt.Sprintf("conversations/%s", convID)); err != nil {
-		return nil, err
-	}
 
 	isRoot, err := s.store.IsThreadRoot(ctx, convID, msgID)
 	if err != nil {
@@ -93,9 +90,9 @@ func (s *CommandService) ConvertMessageToTask(ctx context.Context, req *connect.
 // ListTasks returns the task board for a conversation: every task root message
 // with task metadata, optionally filtered by status, ordered by task number.
 func (s *CommandService) ListTasks(ctx context.Context, req *connect.Request[v1pb.ListTasksRequest]) (*connect.Response[v1pb.ListTasksResponse], error) {
-	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
+	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
-		return nil, err
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 	var filter []int16
 	for _, st := range req.Msg.StatusFilter {

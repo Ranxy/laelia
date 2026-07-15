@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/common"
-	models "github.com/Ranxy/laelia/backend/generated-go/store"
+	"github.com/Ranxy/laelia/backend/common/permission"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -114,14 +114,15 @@ func (s *CommandService) ListChannelsForAgent(ctx context.Context, req *connect.
 	}
 	limitPlusOne := offset.limit + 1
 
-	// Non-admin users only see the agent's channels they are a member of;
-	// workspace admins see every channel the agent is in.
+	// Non-reviewAll users only see the agent's channels they are a member of;
+	// a user holding conversations.reviewAll (e.g. oversightReviewer / workspace
+	// admin) sees every channel the agent is in.
 	var viewer *store.ConversationMemberFilter
-	admin, err := isUserWorkspaceAdmin(ctx, s.store, user)
+	reviewAll, err := s.iam.CheckPermission(ctx, permission.ConversationsReviewAll, user, nil, nil)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve workspace admin"))
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve reviewAll permission"))
 	}
-	if !admin {
+	if !reviewAll {
 		viewer = &store.ConversationMemberFilter{MemberType: store.MemberTypeUser, MemberID: fmt.Sprintf("%d", user.ID)}
 	}
 
@@ -171,9 +172,9 @@ func (s *CommandService) ListChannelsForAgent(ctx context.Context, req *connect.
 }
 
 func (s *CommandService) GetChannel(ctx context.Context, req *connect.Request[v1pb.GetChannelRequest]) (*connect.Response[v1pb.Conversation], error) {
-	convID, err := requireConversationMember(ctx, s.store, req.Msg.Name)
+	convID, err := parseConversationID(req.Msg.Name)
 	if err != nil {
-		return nil, err
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 
 	conv, err := s.store.GetConversation(ctx, convID)
@@ -208,14 +209,6 @@ func (s *CommandService) UpdateChannel(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid channel name"))
 	}
 
-	existing, err := s.store.GetConversation(ctx, convID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, err)
-	}
-	if err := requireChannelOwner(ctx, s.store, existing); err != nil {
-		return nil, err
-	}
-
 	if conv.Title == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("title must not be empty"))
 	}
@@ -241,7 +234,7 @@ func (s *CommandService) DeleteChannel(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	if err := requireChannelOwner(ctx, s.store, conv); err != nil {
+	if err := requireChannelOwner(ctx, conv); err != nil {
 		return nil, err
 	}
 
@@ -262,16 +255,13 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	if err := requireChannelOwner(ctx, s.store, conv); err != nil {
-		return nil, err
-	}
 
 	memberType := req.Msg.MemberType
 	memberID := req.Msg.MemberId
 
 	// Refuse to re-add the channel owner as a plain member: AddConversationMember
-	// upserts member_role=Member (downgrading Owner) and the IAM dual-write would
-	// strip the owner's conversationOwner binding. The owner is already a member.
+	// upserts member_role=Member (downgrading Owner). The owner is already a
+	// member; use TransferChannelOwnership to change ownership.
 	if memberType == store.MemberTypeUser && memberID == fmt.Sprintf("%d", conv.OwnerID) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("cannot add the channel owner as a member"))
 	}
@@ -292,19 +282,6 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 
 	if err := s.store.AddConversationMember(ctx, convID, memberType, memberID, store.MemberRoleMember); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to add member"))
-	}
-
-	// Dual-write a conversationMember binding on the conversation's IAM policy.
-	// conversation_member remains the read path in Phase 2; the binding becomes
-	// authoritative in Phase 3. Best-effort: a patch failure warns but does not
-	// fail the add, mirroring the cursor-seed policy (the read path already
-	// reflects the new member).
-	if _, patchErr := s.store.PatchResourceIamPolicy(ctx, models.Policy_CONVERSATION, common.FormatConversationName(convID.String()), &store.PatchIamPolicyMessage{
-		Member: conversationMemberPrincipalName(memberType, memberID),
-		Roles:  []string{common.FormatRole(store.ConversationMemberRole)},
-	}); patchErr != nil {
-		slog.Warn("failed to dual-write channel member IAM binding",
-			"conversationID", convID, "memberType", memberType, "memberID", memberID, "error", patchErr)
 	}
 
 	// Seed the agent's per-channel cursor to the current room version so a
@@ -337,9 +314,6 @@ func (s *CommandService) RemoveChannelMember(ctx context.Context, req *connect.R
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	if err := requireChannelOwner(ctx, s.store, conv); err != nil {
-		return nil, err
-	}
 
 	memberID := req.Msg.MemberId
 	memberType := req.Msg.MemberType
@@ -353,23 +327,162 @@ func (s *CommandService) RemoveChannelMember(ctx context.Context, req *connect.R
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to remove member"))
 	}
 
-	// Dual-write: remove the member's bindings from the conversation's IAM
-	// policy (Roles=nil strips the member from every binding). Best-effort,
-	// matching the add path.
-	if _, patchErr := s.store.PatchResourceIamPolicy(ctx, models.Policy_CONVERSATION, common.FormatConversationName(convID.String()), &store.PatchIamPolicyMessage{
-		Member: conversationMemberPrincipalName(memberType, memberID),
-	}); patchErr != nil {
-		slog.Warn("failed to dual-write channel member IAM removal",
-			"conversationID", convID, "memberType", memberType, "memberID", memberID, "error", patchErr)
+	return connect.NewResponse(&emptypb.Empty{}), nil
+}
+
+// TransferChannelOwnership hands channel ownership from the calling owner to
+// another user member. The interceptor grants conversations.manage (Admin+
+// Owner); this handler enforces that the caller is the current Owner and that
+// the target is an existing user member. Ownership only moves via this RPC —
+// UpdateChannelMemberRole cannot set Owner. Only channels (type 2) support
+// transfer (DMs/agent-DMs have no transferable owner).
+func (s *CommandService) TransferChannelOwnership(ctx context.Context, req *connect.Request[v1pb.TransferChannelOwnershipRequest]) (*connect.Response[v1pb.TransferChannelOwnershipResponse], error) {
+	convID, err := parseConversationID(req.Msg.Conversation)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 
+	conv, err := s.store.GetConversation(ctx, convID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	if conv.Type != store.ConversationTypeChannel {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("only channels support ownership transfer"))
+	}
+	if err := requireChannelOwner(ctx, conv); err != nil {
+		return nil, err
+	}
+
+	if req.Msg.MemberType != store.MemberTypeUser {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("only users can own a channel"))
+	}
+	newOwnerID := req.Msg.MemberId
+	if _, uidErr := strconv.Atoi(newOwnerID); uidErr != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user member_id, must be principal id"))
+	}
+	if newOwnerID == fmt.Sprintf("%d", conv.OwnerID) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("caller is already the owner"))
+	}
+
+	// The target must already be a member.
+	role, _, memErr := s.store.GetConversationMembership(ctx, convID, store.MemberTypeUser, newOwnerID)
+	if memErr != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(memErr, "failed to resolve target membership"))
+	}
+	if role == 0 {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("target is not a channel member"))
+	}
+
+	newOwnerPrincipalID, _ := strconv.Atoi(newOwnerID)
+	if err := s.store.TransferChannelOwnership(ctx, convID, conv.OwnerID, newOwnerPrincipalID, newOwnerID); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to transfer ownership"))
+	}
+
+	updated, err := s.store.GetConversation(ctx, convID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to reload conversation"))
+	}
+	memberCount, _ := s.store.GetConversationMemberCount(ctx, updated.ID)
+	ownerName := resolveUserName(ctx, s.store, updated.OwnerID)
+	return connect.NewResponse(&v1pb.TransferChannelOwnershipResponse{
+		Conversation: convertToV1Conversation(updated, ownerName, "", memberCount, 0, updated.Title),
+	}), nil
+}
+
+// UpdateChannelMemberRole grants or revokes channel admin. The interceptor
+// grants conversations.manage (Admin+Owner); this handler enforces that the
+// caller is the Owner and that the target role is Member or Admin (never Owner
+// — ownership only moves via TransferChannelOwnership).
+func (s *CommandService) UpdateChannelMemberRole(ctx context.Context, req *connect.Request[v1pb.UpdateChannelMemberRoleRequest]) (*connect.Response[v1pb.ChannelMember], error) {
+	convID, err := parseConversationID(req.Msg.Conversation)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
+	}
+
+	conv, err := s.store.GetConversation(ctx, convID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	if conv.Type != store.ConversationTypeChannel {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("only channels support member roles"))
+	}
+	if err := requireChannelOwner(ctx, conv); err != nil {
+		return nil, err
+	}
+
+	targetRole := req.Msg.TargetRole
+	if targetRole != store.MemberRoleMember && targetRole != store.MemberRoleAdmin {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("target_role must be member (2) or admin (3)"))
+	}
+	memberType := req.Msg.MemberType
+	memberID := req.Msg.MemberId
+	if memberType == store.MemberTypeUser && memberID == fmt.Sprintf("%d", conv.OwnerID) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("cannot change the owner's role; use transferOwnership instead"))
+	}
+
+	role, _, memErr := s.store.GetConversationMembership(ctx, convID, memberType, memberID)
+	if memErr != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(memErr, "failed to resolve target membership"))
+	}
+	if role == 0 {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("target is not a channel member"))
+	}
+
+	if err := s.store.UpdateConversationMemberRole(ctx, convID, memberType, memberID, targetRole); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update member role"))
+	}
+
+	return connect.NewResponse(buildChannelMember(ctx, s.store, memberType, memberID, targetRole, time.Time{})), nil
+}
+
+// LeaveChannel removes the calling member from a channel. The interceptor grants
+// conversations.read (any member); this handler rejects the current Owner — an
+// owner must transfer ownership or delete the channel first to avoid
+// orphaning it. Only channels (type 2) support leaving (a DM is left by
+// deleting it).
+func (s *CommandService) LeaveChannel(ctx context.Context, req *connect.Request[v1pb.LeaveChannelRequest]) (*connect.Response[emptypb.Empty], error) {
+	convID, err := parseConversationID(req.Msg.Conversation)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
+	}
+
+	conv, err := s.store.GetConversation(ctx, convID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	if conv.Type != store.ConversationTypeChannel {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("only channels support leaving"))
+	}
+
+	user, _ := GetUserFromContext(ctx)
+	agent, _ := GetAgentFromContext(ctx)
+	memberType, memberID, ok := callerMemberInfo(user, agent)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	// The owner cannot leave (would orphan the channel); transfer or delete first.
+	if user != nil && conv.OwnerID == user.ID {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("channel owner cannot leave; transfer ownership or delete the channel first"))
+	}
+
+	role, _, memErr := s.store.GetConversationMembership(ctx, convID, memberType, memberID)
+	if memErr != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(memErr, "failed to resolve membership"))
+	}
+	if role == 0 {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("not a channel member"))
+	}
+
+	if err := s.store.RemoveConversationMember(ctx, convID, memberType, memberID); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to leave channel"))
+	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
 func (s *CommandService) ListChannelMembers(ctx context.Context, req *connect.Request[v1pb.ListChannelMembersRequest]) (*connect.Response[v1pb.ListChannelMembersResponse], error) {
-	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
+	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
-		return nil, err
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 
 	members, err := s.store.ListConversationMembers(ctx, convID)
@@ -389,9 +502,9 @@ func (s *CommandService) ListChannelMembers(ctx context.Context, req *connect.Re
 // thread (the root message plus its replies), derived from message senders. The
 // caller must be a member of the conversation.
 func (s *CommandService) ListThreadParticipants(ctx context.Context, req *connect.Request[v1pb.ListThreadParticipantsRequest]) (*connect.Response[v1pb.ListThreadParticipantsResponse], error) {
-	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
+	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
-		return nil, err
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 
 	rootID, parseErr := uuid.Parse(req.Msg.ThreadRoot)
@@ -453,13 +566,9 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		// let an agent token post as principalID=1 "system").
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("SendMessage is for authenticated users; agents must use PostMessage"))
 	}
-	if _, err := requireConversationMember(ctx, s.store, req.Msg.Conversation); err != nil {
-		return nil, err
-	}
 
-	// Agent-DM conversations (type 3) are agent-only. Users can view them in
-	// the agent detail page (via the admin bypass in requireConversationMember)
-	// but must never send into one.
+	// Agent-DM conversations (type 3) are agent-only. Users with
+	// conversations.reviewAgentDM may read them but must never send into one.
 	conv, convErr := s.store.GetConversation(ctx, convID)
 	if convErr != nil {
 		return nil, connect.NewError(connect.CodeNotFound, convErr)
@@ -758,9 +867,9 @@ func (s *CommandService) resolvePeerNameForViewer(ctx context.Context, conv *sto
 // conversation. The frontend polls this to show real-time agent status in the
 // channel header.
 func (s *CommandService) FetchConversationActivity(ctx context.Context, req *connect.Request[v1pb.FetchConversationActivityRequest]) (*connect.Response[v1pb.FetchConversationActivityResponse], error) {
-	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
+	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
-		return nil, err
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 	activities, err := s.dispatcher.FetchConversationActivity(ctx, convID.String())
 	if err != nil {
@@ -773,9 +882,9 @@ func (s *CommandService) FetchConversationActivity(ctx context.Context, req *con
 // conversation to its current room_version, clearing the user-facing unread
 // badge. The caller must be a member of the conversation.
 func (s *CommandService) MarkConversationRead(ctx context.Context, req *connect.Request[v1pb.MarkConversationReadRequest]) (*connect.Response[v1pb.MarkConversationReadResponse], error) {
-	convID, err := requireConversationMember(ctx, s.store, req.Msg.Conversation)
+	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
-		return nil, err
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
 	}
 	user, ok := GetUserFromContext(ctx)
 	if !ok || user == nil {

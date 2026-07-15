@@ -23,6 +23,7 @@ import (
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
+	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -35,14 +36,16 @@ type UserService struct {
 	store    *store.Store
 	profile  *config.Profile
 	stateCfg *state.State
+	iam      *iam.Manager
 }
 
 // NewUserService creates a new UserService.
-func NewUserService(store *store.Store, profile *config.Profile, stateCfg *state.State) *UserService {
+func NewUserService(store *store.Store, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager) *UserService {
 	return &UserService{
 		store:    store,
 		profile:  profile,
 		stateCfg: stateCfg,
+		iam:      iamManager,
 	}
 }
 
@@ -93,9 +96,17 @@ func (s *UserService) GetCurrentUser(ctx context.Context, _ *connect.Request[emp
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.Errorf("authenticated user not found"))
 	}
 	out := convertToUser(user)
-	// Expose whether the caller holds the workspace-admin role so the frontend
-	// can gate user-management actions. A lookup failure is logged but does not
-	// fail the request; the field defaults to false.
+	// Expose the caller's effective workspace-scope permission set so the
+	// frontend can gate actions (laelia.users.update, laelia.agents.create, the
+	// review perms, etc.) without re-deriving roles client-side. workspace_admin
+	// is kept as a computed shim during the transition. A lookup failure is
+	// logged but does not fail the request; the fields default to empty/false.
+	perms, err := s.iam.EffectiveWorkspacePermissions(ctx, user)
+	if err != nil {
+		slog.Error("failed to resolve workspace permissions", log.WithError(err), slog.String("user", user.Email))
+	} else {
+		out.Permissions = perms
+	}
 	isAdmin, err := isUserWorkspaceAdmin(ctx, s.store, user)
 	if err != nil {
 		slog.Error("failed to resolve workspace admin", log.WithError(err), slog.String("user", user.Email))

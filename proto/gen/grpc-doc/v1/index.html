@@ -754,6 +754,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.LeaveChannelRequest"><span class="badge">M</span>LeaveChannelRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.LifecyclePayload"><span class="badge">M</span>LifecyclePayload</a>
                 </li>
               
@@ -998,11 +1002,23 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.TransferChannelOwnershipRequest"><span class="badge">M</span>TransferChannelOwnershipRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.TransferChannelOwnershipResponse"><span class="badge">M</span>TransferChannelOwnershipResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.UnclaimTaskRequest"><span class="badge">M</span>UnclaimTaskRequest</a>
                 </li>
               
                 <li>
                   <a href="#laelia.v1.UnclaimTaskResponse"><span class="badge">M</span>UnclaimTaskResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateChannelMemberRoleRequest"><span class="badge">M</span>UpdateChannelMemberRoleRequest</a>
                 </li>
               
                 <li>
@@ -1426,6 +1442,16 @@
                   <td></td>
                   <td><p>Creator&#39;s user resource name (users/{id}); empty for legacy agents with no
 recorded creator. Only the creator or a workspace admin may modify the agent. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>can_edit</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>can_edit reports whether the current caller may modify this agent
+(laelia.agents.edit): true for the creator (via the agentEditor IAM binding)
+and for workspace admins (via the all-permissions union), false otherwise.
+Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths. </p></td>
                 </tr>
               
             </tbody>
@@ -3669,7 +3695,8 @@ Format: groups/{email} </p></td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
                   <td><p>workspace_admin is true when the user holds the roles/workspaceAdmin role.
-Only populated for the current caller (GetCurrentUser). </p></td>
+Only populated for the current caller (GetCurrentUser). Retained as a
+computed shim during the IAM transition; prefer `permissions` for gating. </p></td>
                 </tr>
               
                 <tr>
@@ -3680,6 +3707,18 @@ Only populated for the current caller (GetCurrentUser). </p></td>
 other users so they know who this user is and what they focus on, e.g.
 &#34;Backend engineer, focused on agent building&#34; or &#34;UI/UX expert, reviews come to
 me&#34;. Editable via UpdateUser with update_mask &#34;description&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>permissions</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>permissions is the caller&#39;s effective workspace-scope permission set
+(roles/workspaceMember baseline ∪ the permissions of every workspace role
+the user holds), populated only by GetCurrentUser. The frontend gates
+workspace actions on this (e.g. laelia.users.update). Per-resource
+permissions (conversations.read/send/manage, agents.edit) are resolved per
+resource and surfaced on the resource, not here. </p></td>
                 </tr>
               
             </tbody>
@@ -6679,6 +6718,30 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
 
         
       
+        <h3 id="laelia.v1.LeaveChannelRequest">LeaveChannelRequest</h3>
+        <p>LeaveChannelRequest names the channel the caller is leaving. The caller is</p><p>resolved from the auth context; no member_id is carried.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.LifecyclePayload">LifecyclePayload</h3>
         <p></p>
 
@@ -8847,6 +8910,68 @@ the agent&#39;s processed_version for this conversation. </p></td>
 
         
       
+        <h3 id="laelia.v1.TransferChannelOwnershipRequest">TransferChannelOwnershipRequest</h3>
+        <p>TransferChannelOwnershipRequest names the channel and the member who will</p><p>become the new owner. The new owner must already be a member.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member_type</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.TransferChannelOwnershipResponse">TransferChannelOwnershipResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#laelia.v1.Conversation">Conversation</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.UnclaimTaskRequest">UnclaimTaskRequest</h3>
         <p></p>
 
@@ -8884,6 +9009,51 @@ the agent&#39;s processed_version for this conversation. </p></td>
                 <tr>
                   <td>message</td>
                   <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateChannelMemberRoleRequest">UpdateChannelMemberRoleRequest</h3>
+        <p>UpdateChannelMemberRoleRequest sets a member's chat role. target_role is the</p><p>conversation_member role value: 2 = Member, 3 = Admin. Owner (1) is not</p><p>settable here — ownership only moves via TransferChannelOwnership.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member_type</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>target_role</td>
+                  <td><a href="#int32">int32</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -9709,6 +9879,38 @@ detail page&#39;s &#34;Chat&#34; tab. Admin-scoped: gated by laelia.agents.get.<
               </tr>
             
               <tr>
+                <td>TransferChannelOwnership</td>
+                <td><a href="#laelia.v1.TransferChannelOwnershipRequest">TransferChannelOwnershipRequest</a></td>
+                <td><a href="#laelia.v1.TransferChannelOwnershipResponse">TransferChannelOwnershipResponse</a></td>
+                <td><p>TransferChannelOwnership hands channel ownership from the calling owner to
+another member: the target is promoted to Owner and the caller demoted to
+Member, atomically. The interceptor gates the call with conversations.manage
+(Admin&#43;Owner); the handler additionally enforces that the caller is the
+current Owner. Only channels (type 2) support ownership transfer.</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateChannelMemberRole</td>
+                <td><a href="#laelia.v1.UpdateChannelMemberRoleRequest">UpdateChannelMemberRoleRequest</a></td>
+                <td><a href="#laelia.v1.ChannelMember">ChannelMember</a></td>
+                <td><p>UpdateChannelMemberRole grants or revokes channel admin: the target member&#39;s
+role is set to the requested role (Member or Admin). The interceptor gates
+with conversations.manage (Admin&#43;Owner); the handler enforces that the
+caller is the Owner and the target role is Member or Admin (never Owner —
+ownership only moves via TransferChannelOwnership).</p></td>
+              </tr>
+            
+              <tr>
+                <td>LeaveChannel</td>
+                <td><a href="#laelia.v1.LeaveChannelRequest">LeaveChannelRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p>LeaveChannel removes the calling member from a channel. The interceptor
+gates with conversations.read (any member); the handler rejects the current
+Owner — an owner must transfer ownership or delete the channel first to
+avoid orphaning it. Only channels (type 2) support leaving.</p></td>
+              </tr>
+            
+              <tr>
                 <td>ListChannelMembers</td>
                 <td><a href="#laelia.v1.ListChannelMembersRequest">ListChannelMembersRequest</a></td>
                 <td><a href="#laelia.v1.ListChannelMembersResponse">ListChannelMembersResponse</a></td>
@@ -10183,6 +10385,36 @@ a member.</p></td>
                 <td>DELETE</td>
                 <td>/v1/{conversation=conversations/*}/members/{member_id}</td>
                 <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>TransferChannelOwnership</td>
+                <td>POST</td>
+                <td>/v1/{conversation=conversations/*}:transferOwnership</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateChannelMemberRole</td>
+                <td>POST</td>
+                <td>/v1/{conversation=conversations/*}/members/{member_id}:updateRole</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>LeaveChannel</td>
+                <td>POST</td>
+                <td>/v1/{conversation=conversations/*}:leave</td>
+                <td>*</td>
               </tr>
               
             

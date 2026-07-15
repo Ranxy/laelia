@@ -757,6 +757,16 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
    * @generated from field: string created_by = 11;
    */
   createdBy: string;
+
+  /**
+   * can_edit reports whether the current caller may modify this agent
+   * (laelia.agents.edit): true for the creator (via the agentEditor IAM binding)
+   * and for workspace admins (via the all-permissions union), false otherwise.
+   * Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths.
+   *
+   * @generated from field: bool can_edit = 12;
+   */
+  canEdit: boolean;
 };
 
 /**

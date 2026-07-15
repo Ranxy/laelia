@@ -1948,6 +1948,105 @@ export declare type ListChannelMembersResponse = Message<"laelia.v1.ListChannelM
 export declare const ListChannelMembersResponseSchema: GenMessage<ListChannelMembersResponse>;
 
 /**
+ * TransferChannelOwnershipRequest names the channel and the member who will
+ * become the new owner. The new owner must already be a member.
+ *
+ * @generated from message laelia.v1.TransferChannelOwnershipRequest
+ */
+export declare type TransferChannelOwnershipRequest = Message<"laelia.v1.TransferChannelOwnershipRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: int32 member_type = 2;
+   */
+  memberType: number;
+
+  /**
+   * @generated from field: string member_id = 3;
+   */
+  memberId: string;
+};
+
+/**
+ * Describes the message laelia.v1.TransferChannelOwnershipRequest.
+ * Use `create(TransferChannelOwnershipRequestSchema)` to create a new message.
+ */
+export declare const TransferChannelOwnershipRequestSchema: GenMessage<TransferChannelOwnershipRequest>;
+
+/**
+ * @generated from message laelia.v1.TransferChannelOwnershipResponse
+ */
+export declare type TransferChannelOwnershipResponse = Message<"laelia.v1.TransferChannelOwnershipResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Conversation conversation = 1;
+   */
+  conversation?: Conversation | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.TransferChannelOwnershipResponse.
+ * Use `create(TransferChannelOwnershipResponseSchema)` to create a new message.
+ */
+export declare const TransferChannelOwnershipResponseSchema: GenMessage<TransferChannelOwnershipResponse>;
+
+/**
+ * UpdateChannelMemberRoleRequest sets a member's chat role. target_role is the
+ * conversation_member role value: 2 = Member, 3 = Admin. Owner (1) is not
+ * settable here — ownership only moves via TransferChannelOwnership.
+ *
+ * @generated from message laelia.v1.UpdateChannelMemberRoleRequest
+ */
+export declare type UpdateChannelMemberRoleRequest = Message<"laelia.v1.UpdateChannelMemberRoleRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: string member_id = 2;
+   */
+  memberId: string;
+
+  /**
+   * @generated from field: int32 member_type = 3;
+   */
+  memberType: number;
+
+  /**
+   * @generated from field: int32 target_role = 4;
+   */
+  targetRole: number;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateChannelMemberRoleRequest.
+ * Use `create(UpdateChannelMemberRoleRequestSchema)` to create a new message.
+ */
+export declare const UpdateChannelMemberRoleRequestSchema: GenMessage<UpdateChannelMemberRoleRequest>;
+
+/**
+ * LeaveChannelRequest names the channel the caller is leaving. The caller is
+ * resolved from the auth context; no member_id is carried.
+ *
+ * @generated from message laelia.v1.LeaveChannelRequest
+ */
+export declare type LeaveChannelRequest = Message<"laelia.v1.LeaveChannelRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+};
+
+/**
+ * Describes the message laelia.v1.LeaveChannelRequest.
+ * Use `create(LeaveChannelRequestSchema)` to create a new message.
+ */
+export declare const LeaveChannelRequestSchema: GenMessage<LeaveChannelRequest>;
+
+/**
  * ListThreadParticipantsRequest lists the distinct senders (users and agents) that
  * have posted in a thread (the root message and its replies). Participants are derived
  * from message senders, not from a membership table, so this reflects who actually
@@ -4252,6 +4351,47 @@ export declare const CommandService: GenService<{
   removeChannelMember: {
     methodKind: "unary";
     input: typeof RemoveChannelMemberRequestSchema;
+    output: typeof EmptySchema;
+  },
+  /**
+   * TransferChannelOwnership hands channel ownership from the calling owner to
+   * another member: the target is promoted to Owner and the caller demoted to
+   * Member, atomically. The interceptor gates the call with conversations.manage
+   * (Admin+Owner); the handler additionally enforces that the caller is the
+   * current Owner. Only channels (type 2) support ownership transfer.
+   *
+   * @generated from rpc laelia.v1.CommandService.TransferChannelOwnership
+   */
+  transferChannelOwnership: {
+    methodKind: "unary";
+    input: typeof TransferChannelOwnershipRequestSchema;
+    output: typeof TransferChannelOwnershipResponseSchema;
+  },
+  /**
+   * UpdateChannelMemberRole grants or revokes channel admin: the target member's
+   * role is set to the requested role (Member or Admin). The interceptor gates
+   * with conversations.manage (Admin+Owner); the handler enforces that the
+   * caller is the Owner and the target role is Member or Admin (never Owner —
+   * ownership only moves via TransferChannelOwnership).
+   *
+   * @generated from rpc laelia.v1.CommandService.UpdateChannelMemberRole
+   */
+  updateChannelMemberRole: {
+    methodKind: "unary";
+    input: typeof UpdateChannelMemberRoleRequestSchema;
+    output: typeof ChannelMemberSchema;
+  },
+  /**
+   * LeaveChannel removes the calling member from a channel. The interceptor
+   * gates with conversations.read (any member); the handler rejects the current
+   * Owner — an owner must transfer ownership or delete the channel first to
+   * avoid orphaning it. Only channels (type 2) support leaving.
+   *
+   * @generated from rpc laelia.v1.CommandService.LeaveChannel
+   */
+  leaveChannel: {
+    methodKind: "unary";
+    input: typeof LeaveChannelRequestSchema;
     output: typeof EmptySchema;
   },
   /**
