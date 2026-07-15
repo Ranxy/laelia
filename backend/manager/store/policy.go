@@ -33,6 +33,131 @@ func (s *Store) GetWorkspaceIamPolicy(ctx context.Context) (*IamPolicyMessage, e
 	})
 }
 
+// GetConversationIamPolicy returns the IAM policy attached to a conversation
+// (resource name conversations/{id}). An absent policy (no bindings) is
+// returned as an empty IamPolicyMessage, not an error.
+func (s *Store) GetConversationIamPolicy(ctx context.Context, conversationName string) (*IamPolicyMessage, error) {
+	resourceType := models.Policy_CONVERSATION
+	return s.getIamPolicy(ctx, &FindPolicyMessage{
+		ResourceType: &resourceType,
+		Resource:     &conversationName,
+	})
+}
+
+// GetAgentIamPolicy returns the IAM policy attached to an agent (resource name
+// agents/{resource_id}). An absent policy is returned as an empty
+// IamPolicyMessage, not an error.
+func (s *Store) GetAgentIamPolicy(ctx context.Context, agentName string) (*IamPolicyMessage, error) {
+	resourceType := models.Policy_AGENT
+	return s.getIamPolicy(ctx, &FindPolicyMessage{
+		ResourceType: &resourceType,
+		Resource:     &agentName,
+	})
+}
+
+// applyIamPolicyPatch mutates policy in place: for each existing binding it adds
+// patch.Member when the binding's role is in patch.Roles and removes it
+// otherwise; then it creates a new binding for any role in patch.Roles that had
+// no existing binding. Shared by PatchWorkspaceIamPolicy and PatchResourceIamPolicy.
+func applyIamPolicyPatch(policy *models.IamPolicy, patch *PatchIamPolicyMessage) {
+	roleMap := map[string]bool{}
+	for _, role := range patch.Roles {
+		roleMap[role] = true
+	}
+
+	for _, binding := range policy.Bindings {
+		index := slices.Index(binding.Members, patch.Member)
+		if !roleMap[binding.Role] {
+			if index >= 0 {
+				binding.Members = slices.Delete(binding.Members, index, index+1)
+			}
+		} else if index < 0 {
+			binding.Members = append(binding.Members, patch.Member)
+		}
+		delete(roleMap, binding.Role)
+	}
+
+	for role := range roleMap {
+		policy.Bindings = append(policy.Bindings, &models.Binding{
+			Role:    role,
+			Members: []string{patch.Member},
+		})
+	}
+}
+
+// upsertIamPolicy marshals policy and upserts it as the IAM policy for the given
+// resource via CreatePolicyV2 (which invalidates the policy cache).
+func (s *Store) upsertIamPolicy(ctx context.Context, resourceType models.Policy_Resource, resource string, policy *models.IamPolicy) error {
+	policyPayload, err := protojson.Marshal(policy)
+	if err != nil {
+		return err
+	}
+	_, err = s.CreatePolicyV2(ctx, &PolicyMessage{
+		ResourceType:      resourceType,
+		Resource:          resource,
+		Payload:           string(policyPayload),
+		Type:              models.Policy_IAM,
+		InheritFromParent: false,
+		// Enforce cannot be false while creating a policy.
+		Enforce: true,
+	})
+	return err
+}
+
+// PatchResourceIamPolicy sets or removes the member for a role on a per-resource
+// IAM policy (e.g. a conversation or agent policy). It shares the binding
+// mutation and upsert logic with PatchWorkspaceIamPolicy. The caller owns
+// concurrency for now; optimistic-concurrency (etag) hardening is deferred to
+// Phase 2 when conversation policies see concurrent member mutations.
+func (s *Store) PatchResourceIamPolicy(ctx context.Context, resourceType models.Policy_Resource, resource string, patch *PatchIamPolicyMessage) (*IamPolicyMessage, error) {
+	current, err := s.getIamPolicy(ctx, &FindPolicyMessage{
+		ResourceType: &resourceType,
+		Resource:     &resource,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	applyIamPolicyPatch(current.Policy, patch)
+	if err := s.upsertIamPolicy(ctx, resourceType, resource, current.Policy); err != nil {
+		return nil, err
+	}
+
+	return s.getIamPolicy(ctx, &FindPolicyMessage{
+		ResourceType: &resourceType,
+		Resource:     &resource,
+	})
+}
+
+// seedAgentEditorBindingTx upserts the agent's IAM policy with a single
+// roles/agentEditor binding whose only member is the creator. It runs inside the
+// CreateAgent transaction so a crash cannot leave a creator-locked-out agent.
+// It is a no-op when creatorUID is zero (legacy/system-created agents).
+func seedAgentEditorBindingTx(ctx context.Context, tx *sql.Tx, agentResourceID string, creatorUID int) error {
+	if creatorUID == 0 {
+		return nil
+	}
+	policy := &models.IamPolicy{
+		Bindings: []*models.Binding{{
+			Role:    common.FormatRole(AgentEditorRole),
+			Members: []string{common.FormatUserUID(creatorUID)},
+		}},
+	}
+	payload, err := protojson.Marshal(policy)
+	if err != nil {
+		return err
+	}
+	_, err = upsertPolicyV2Impl(ctx, tx, &PolicyMessage{
+		ResourceType:      models.Policy_AGENT,
+		Resource:          common.FormatAgentUID(agentResourceID),
+		Payload:           string(payload),
+		Type:              models.Policy_IAM,
+		InheritFromParent: false,
+		Enforce:           true,
+	})
+	return err
+}
+
 type PatchIamPolicyMessage struct {
 	Member string
 	Roles  []string
@@ -45,48 +170,8 @@ func (s *Store) PatchWorkspaceIamPolicy(ctx context.Context, patch *PatchIamPoli
 		return nil, err
 	}
 
-	roleMap := map[string]bool{}
-	for _, role := range patch.Roles {
-		roleMap[role] = true
-	}
-
-	for _, binding := range workspaceIamPolicy.Policy.Bindings {
-		index := slices.Index(binding.Members, patch.Member)
-		if !roleMap[binding.Role] {
-			if index >= 0 {
-				binding.Members = slices.Delete(binding.Members, index, index+1)
-			}
-		} else {
-			if index < 0 {
-				binding.Members = append(binding.Members, patch.Member)
-			}
-		}
-
-		delete(roleMap, binding.Role)
-	}
-
-	for role := range roleMap {
-		workspaceIamPolicy.Policy.Bindings = append(workspaceIamPolicy.Policy.Bindings, &models.Binding{
-			Role: role,
-			Members: []string{
-				patch.Member,
-			},
-		})
-	}
-
-	policyPayload, err := protojson.Marshal(workspaceIamPolicy.Policy)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := s.CreatePolicyV2(ctx, &PolicyMessage{
-		ResourceType:      models.Policy_WORKSPACE,
-		Payload:           string(policyPayload),
-		Type:              models.Policy_IAM,
-		InheritFromParent: false,
-		// Enforce cannot be false while creating a policy.
-		Enforce: true,
-	}); err != nil {
+	applyIamPolicyPatch(workspaceIamPolicy.Policy, patch)
+	if err := s.upsertIamPolicy(ctx, models.Policy_WORKSPACE, "", workspaceIamPolicy.Policy); err != nil {
 		return nil, err
 	}
 

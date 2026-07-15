@@ -7,125 +7,40 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/Ranxy/laelia/backend/common"
+	"github.com/Ranxy/laelia/backend/common/permission"
+	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
-// Permission strings. Each is carried by a proto RPC via the
-// laelia.v1.permission option and resolved against the caller's effective
-// permission set by the IAM interceptor.
-//
-// Permissions are grouped into tiers:
-//   - admin-tier: workspace admin only (never granted to agent tokens)
-//   - member-tier: any authenticated principal (user or agent)
-//
-// Membership-scoped RPCs (read a conversation, watch a command) are granted at
-// member-tier by the interceptor; the handler still enforces that the caller is
-// a member of the specific conversation/command. Admin-tier RPCs are fully
-// gated here: an agent token or a non-admin user is rejected before the handler
-// runs.
-const (
-	// admin-tier
-	PermAgentCreate       = "laelia.agents.create"
-	PermAgentListSessions = "laelia.agents.listSessions"
-	PermUserUpdate        = "laelia.users.update"
-	PermUserDelete        = "laelia.users.delete"
-	PermSettingRead       = "laelia.settings.get"
-	PermSettingUpdate     = "laelia.settings.update"
-
-	// member-tier (any authenticated user or agent). The agent-edit RPCs (config,
-	// providers, token rotate/revoke, delete, force-disconnect) are member-tier
-	// here so the interceptor lets a non-admin creator reach the handler; the
-	// handler then enforces creator-or-admin via requireAgentEditor (agents are
-	// denied there, so an agent token never mutates an agent profile).
-	PermAgentRead          = "laelia.agents.get"
-	PermAgentEdit          = "laelia.agents.edit"
-	PermConversationRead   = "laelia.conversations.read"
-	PermConversationSend   = "laelia.conversations.send"
-	PermConversationManage = "laelia.conversations.manage"
-	PermConversationCreate = "laelia.conversations.create"
-	PermCommandRead        = "laelia.commands.get"
-	PermCommandWatch       = "laelia.commands.watch"
-	PermCommandCancel      = "laelia.commands.cancel"
-)
-
-var adminPermissions = map[string]bool{
-	PermAgentCreate:       true,
-	PermAgentListSessions: true,
-	PermUserUpdate:        true,
-	PermUserDelete:        true,
-	PermSettingRead:       true,
-	PermSettingUpdate:     true,
+// PermissionChecker resolves whether a caller holds a permission. *iam.Manager
+// is the production implementation; the interface lets the interceptor be
+// unit-tested with a fake checker.
+type PermissionChecker interface {
+	CheckPermission(ctx context.Context, perm permission.Permission, user *store.UserMessage, agent *store.AgentMessage, resource *iam.ResourceRef) (bool, error)
 }
-
-var memberPermissions = map[string]bool{
-	PermAgentRead:          true,
-	PermAgentEdit:          true,
-	PermConversationRead:   true,
-	PermConversationSend:   true,
-	PermConversationManage: true,
-	PermConversationCreate: true,
-	PermCommandRead:        true,
-	PermCommandWatch:       true,
-	PermCommandCancel:      true,
-}
-
-// permissionsForCaller returns the effective permission set for a caller.
-//
-// Admins receive every permission. Every other authenticated principal (a user
-// without the workspace-admin role, or an agent) receives the member-tier set.
-// Agents never receive admin-tier permissions, so admin-only RPCs (create,
-// listSessions, user/setting management) are denied to agent tokens regardless
-// of any future role grant. The agent-edit RPCs are member-tier, so a non-admin
-// creator passes the interceptor and requireAgentEditor enforces creator-or-admin
-// in the handler (agents are denied there).
-func permissionsForCaller(isAdmin, isAgent bool) map[string]bool {
-	if isAgent {
-		return copyPermSet(memberPermissions)
-	}
-	if isAdmin {
-		out := make(map[string]bool, len(adminPermissions)+len(memberPermissions))
-		for k := range adminPermissions {
-			out[k] = true
-		}
-		for k := range memberPermissions {
-			out[k] = true
-		}
-		return out
-	}
-	return copyPermSet(memberPermissions)
-}
-
-func copyPermSet(src map[string]bool) map[string]bool {
-	out := make(map[string]bool, len(src))
-	for k := range src {
-		out[k] = true
-	}
-	return out
-}
-
-// AdminCheckFunc resolves whether a user holds the workspace-admin role. It is
-// abstracted so the interceptor can be unit-tested without a database.
-type AdminCheckFunc func(ctx context.Context, user *store.UserMessage) (bool, error)
 
 // IAMInterceptor enforces the laelia.v1.permission annotation on RPCs annotated
 // with auth_method = IAM. It runs after the auth interceptor (which populates
 // the caller in the context) and before the audit interceptor.
+//
+// The interceptor delegates to a PermissionChecker (iam.Manager in production),
+// which resolves the caller's effective permission set from the IAM model
+// (roles + workspace IAM policy). Phase 1 passes a nil resource
+// (workspace-scoped checks only); the handler-level helpers in authz_helper.go
+// continue to enforce per-resource access (conversation membership, agent
+// ownership, channel ownership, command access) until Phase 2 routes those
+// through per-resource IAM policies.
 type IAMInterceptor struct {
-	isAdmin AdminCheckFunc
+	iam PermissionChecker
 }
 
-// NewIAMInterceptor builds an interceptor that resolves workspace-admin
-// membership against the given store.
-func NewIAMInterceptor(stores *store.Store) *IAMInterceptor {
-	return &IAMInterceptor{
-		isAdmin: func(ctx context.Context, u *store.UserMessage) (bool, error) {
-			return isUserWorkspaceAdmin(ctx, stores, u)
-		},
-	}
+// NewIAMInterceptor builds an interceptor backed by the given IAM manager.
+func NewIAMInterceptor(iamManager *iam.Manager) *IAMInterceptor {
+	return &IAMInterceptor{iam: iamManager}
 }
 
-func newIAMInterceptorWithAdminCheck(isAdmin AdminCheckFunc) *IAMInterceptor {
-	return &IAMInterceptor{isAdmin: isAdmin}
+func newIAMInterceptorWithChecker(checker PermissionChecker) *IAMInterceptor {
+	return &IAMInterceptor{iam: checker}
 }
 
 // authorize enforces the RPC's declared permission against the caller's
@@ -153,17 +68,11 @@ func (in *IAMInterceptor) authorize(ctx context.Context) error {
 		return connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
 
-	var isAdmin bool
-	if hasUser && user != nil {
-		var err error
-		isAdmin, err = in.isAdmin(ctx, user)
-		if err != nil {
-			return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve workspace admin"))
-		}
+	ok, err := in.iam.CheckPermission(ctx, permission.Permission(authCtx.Permission), user, agent, nil)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check permission"))
 	}
-
-	perms := permissionsForCaller(isAdmin, hasAgent && agent != nil)
-	if !perms[authCtx.Permission] {
+	if !ok {
 		return connect.NewError(connect.CodePermissionDenied, errors.Errorf("permission %q denied", authCtx.Permission))
 	}
 	return nil

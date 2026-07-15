@@ -8,53 +8,38 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/Ranxy/laelia/backend/common"
+	"github.com/Ranxy/laelia/backend/common/permission"
+	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
-func TestPermissionsForCaller(t *testing.T) {
-	admin := permissionsForCaller(true, false)
-	if !admin[PermAgentCreate] {
-		t.Errorf("admin should have admin-tier permission %q", PermAgentCreate)
-	}
-	if !admin[PermConversationRead] {
-		t.Errorf("admin should have member-tier permission %q", PermConversationRead)
-	}
+// fakeChecker is a PermissionChecker that reproduces the Phase 1 behavior of
+// iam.Manager without a database: any authenticated principal gets the
+// workspaceMember baseline (the implicit allUsers->workspaceMember binding),
+// and a user flagged as admin additionally gets every permission
+// (roles/workspaceAdmin). Agents never get admin-tier permissions. This lets
+// the interceptor's wiring (auth context handling, error codes, CUSTOM bypass)
+// be unit-tested in isolation from the IAM store.
+type fakeChecker struct {
+	adminIDs map[int]bool
+	err      error
+}
 
-	member := permissionsForCaller(false, false)
-	if member[PermAgentCreate] {
-		t.Errorf("non-admin user must not have admin-tier permission %q", PermAgentCreate)
+func (f *fakeChecker) CheckPermission(_ context.Context, p permission.Permission, user *store.UserMessage, _ *store.AgentMessage, _ *iam.ResourceRef) (bool, error) {
+	if f.err != nil {
+		return false, f.err
 	}
-	if !member[PermConversationRead] {
-		t.Errorf("non-admin user should have member-tier permission %q", PermConversationRead)
+	// Baseline: every authenticated principal gets the workspaceMember set.
+	baseline := store.GetPredefinedRole(store.WorkspaceMemberRole).Permissions
+	if baseline[p] {
+		return true, nil
 	}
-	// Agent-edit RPCs are member-tier so a non-admin creator reaches the handler;
-	// the handler (requireAgentEditor) enforces creator-or-admin.
-	if !member[PermAgentEdit] {
-		t.Errorf("non-admin user should have member-tier permission %q", PermAgentEdit)
+	// Admin users additionally get the workspaceAdmin (superuser) set.
+	if user != nil && f.adminIDs[user.ID] {
+		return store.GetPredefinedRole(store.WorkspaceAdminRole).Permissions[p], nil
 	}
-
-	agent := permissionsForCaller(false, true)
-	if agent[PermAgentCreate] {
-		t.Errorf("agent must not have admin-tier permission %q", PermAgentCreate)
-	}
-	if agent[PermUserUpdate] {
-		t.Errorf("agent must not have admin-tier permission %q", PermUserUpdate)
-	}
-	if !agent[PermConversationRead] {
-		t.Errorf("agent should have member-tier permission %q", PermConversationRead)
-	}
-	// Agents receive the agent-edit member-tier perm at the interceptor, but the
-	// handler denies them (user == nil) — the tier grants passage, not rights.
-	if !agent[PermAgentEdit] {
-		t.Errorf("agent should have member-tier permission %q", PermAgentEdit)
-	}
-
-	// An admin flag must not upgrade an agent to admin-tier (agents are never
-	// workspace admins); the isAgent branch takes precedence.
-	agentAdmin := permissionsForCaller(true, true)
-	if agentAdmin[PermAgentCreate] {
-		t.Error("agent caller must never receive admin-tier permissions, even if isAdmin=true")
-	}
+	// Agents never get anything beyond the baseline.
+	return false, nil
 }
 
 func withAuthContext(ctx context.Context, authCtx *common.AuthContext) context.Context {
@@ -69,10 +54,10 @@ func withAgent(ctx context.Context, a *store.AgentMessage) context.Context {
 	return context.WithValue(ctx, common.AgentContextKey, a)
 }
 
-func iamCtx(authMethod common.AuthMethod, permission string, allowNoCred bool) context.Context {
+func iamCtx(authMethod common.AuthMethod, perm string, allowNoCred bool) context.Context {
 	return withAuthContext(context.Background(), &common.AuthContext{
 		AuthMethod:             authMethod,
-		Permission:             permission,
+		Permission:             perm,
 		AllowWithoutCredential: allowNoCred,
 	})
 }
@@ -82,92 +67,94 @@ func TestAuthorize(t *testing.T) {
 	plainUser := &store.UserMessage{ID: 8, Email: "bob@example.com", Name: "bob"}
 	agent := &store.AgentMessage{ID: 9, ResourceID: "agents/agent-9", Name: "agent"}
 
+	adminChecker := &fakeChecker{adminIDs: map[int]bool{7: true}}
+
 	tests := []struct {
 		name     string
 		ctx      context.Context
-		isAdmin  AdminCheckFunc
+		checker  PermissionChecker
 		wantErr  bool
 		wantCode connect.Code
 	}{
 		{
 			name:    "no auth context is not gated",
 			ctx:     context.Background(),
-			isAdmin: func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
+			checker: adminChecker,
 			wantErr: false,
 		},
 		{
 			name:    "allow_without_credential is not gated",
-			ctx:     iamCtx(common.AuthMethodIAM, PermAgentCreate, true),
-			isAdmin: func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
+			ctx:     iamCtx(common.AuthMethodIAM, string(permission.AgentsCreate), true),
+			checker: adminChecker,
 			wantErr: false,
 		},
 		{
 			name:    "CUSTOM auth method is not gated",
 			ctx:     withUser(iamCtx(common.AuthMethodCustom, "", false), plainUser),
-			isAdmin: func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
+			checker: adminChecker,
 			wantErr: false,
 		},
 		{
 			name:    "IAM with empty permission is not gated",
 			ctx:     withUser(iamCtx(common.AuthMethodIAM, "", false), plainUser),
-			isAdmin: func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
+			checker: adminChecker,
 			wantErr: false,
 		},
 		{
 			name:    "admin perm + admin user passes",
-			ctx:     withUser(iamCtx(common.AuthMethodIAM, PermAgentCreate, false), adminUser),
-			isAdmin: func(context.Context, *store.UserMessage) (bool, error) { return true, nil },
+			ctx:     withUser(iamCtx(common.AuthMethodIAM, string(permission.AgentsCreate), false), adminUser),
+			checker: adminChecker,
 			wantErr: false,
 		},
 		{
 			name:     "admin perm + non-admin user denied",
-			ctx:      withUser(iamCtx(common.AuthMethodIAM, PermAgentCreate, false), plainUser),
-			isAdmin:  func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
+			ctx:      withUser(iamCtx(common.AuthMethodIAM, string(permission.AgentsCreate), false), plainUser),
+			checker:  adminChecker,
 			wantErr:  true,
 			wantCode: connect.CodePermissionDenied,
 		},
 		{
 			name:     "admin perm + agent denied",
-			ctx:      withAgent(iamCtx(common.AuthMethodIAM, PermAgentCreate, false), agent),
-			isAdmin:  func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
+			ctx:      withAgent(iamCtx(common.AuthMethodIAM, string(permission.AgentsCreate), false), agent),
+			checker:  adminChecker,
 			wantErr:  true,
 			wantCode: connect.CodePermissionDenied,
 		},
 		{
 			name:    "agent-edit member perm + non-admin user passes (handler enforces creator-or-admin)",
-			ctx:     withUser(iamCtx(common.AuthMethodIAM, PermAgentEdit, false), plainUser),
-			isAdmin: func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
+			ctx:     withUser(iamCtx(common.AuthMethodIAM, string(permission.AgentsEdit), false), plainUser),
+			checker: adminChecker,
 			wantErr: false,
 		},
 		{
 			name:    "agent-edit member perm + agent passes (handler denies)",
-			ctx:     withAgent(iamCtx(common.AuthMethodIAM, PermAgentEdit, false), agent),
-			isAdmin: func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
+			ctx:     withAgent(iamCtx(common.AuthMethodIAM, string(permission.AgentsEdit), false), agent),
+			checker: adminChecker,
 			wantErr: false,
 		},
 		{
 			name:    "member perm + non-admin user passes",
-			ctx:     withUser(iamCtx(common.AuthMethodIAM, PermConversationRead, false), plainUser),
-			isAdmin: func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
+			ctx:     withUser(iamCtx(common.AuthMethodIAM, string(permission.ConversationsRead), false), plainUser),
+			checker: adminChecker,
 			wantErr: false,
 		},
 		{
 			name:    "member perm + agent passes",
-			ctx:     withAgent(iamCtx(common.AuthMethodIAM, PermConversationRead, false), agent),
-			isAdmin: func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
+			ctx:     withAgent(iamCtx(common.AuthMethodIAM, string(permission.ConversationsRead), false), agent),
+			checker: adminChecker,
 			wantErr: false,
 		},
 		{
 			name:     "IAM perm + no caller unauthenticated",
-			ctx:      iamCtx(common.AuthMethodIAM, PermConversationRead, false),
-			isAdmin:  func(context.Context, *store.UserMessage) (bool, error) { return false, nil },
+			ctx:      iamCtx(common.AuthMethodIAM, string(permission.ConversationsRead), false),
+			checker:  adminChecker,
 			wantErr:  true,
 			wantCode: connect.CodeUnauthenticated,
 		},
 		{
-			name:     "admin check error surfaces as internal",
-			ctx:      withUser(iamCtx(common.AuthMethodIAM, PermAgentCreate, false), plainUser),
-			isAdmin:  func(context.Context, *store.UserMessage) (bool, error) { return false, errors.New("db down") },
+			name:     "checker error surfaces as internal",
+			ctx:      withUser(iamCtx(common.AuthMethodIAM, string(permission.AgentsCreate), false), plainUser),
+			checker:  &fakeChecker{err: errors.New("db down")},
 			wantErr:  true,
 			wantCode: connect.CodeInternal,
 		},
@@ -175,7 +162,7 @@ func TestAuthorize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			in := newIAMInterceptorWithAdminCheck(tt.isAdmin)
+			in := newIAMInterceptorWithChecker(tt.checker)
 			err := in.authorize(tt.ctx)
 			if !tt.wantErr {
 				if err != nil {
@@ -197,14 +184,16 @@ func TestAuthorize(t *testing.T) {
 	}
 }
 
-// TestAdminPermissionsCoverMemberTier is a guard against accidentally dropping
+// TestWorkspaceAdminCoversMemberTier guards against accidentally dropping
 // member-tier permissions from the admin set: admins must be able to do
-// everything a member can.
-func TestAdminPermissionsCoverMemberTier(t *testing.T) {
-	admin := permissionsForCaller(true, false)
-	for perm := range memberPermissions {
+// everything a member can. workspaceAdmin is the superuser role (union of all
+// permissions), so it must be a superset of workspaceMember.
+func TestWorkspaceAdminCoversMemberTier(t *testing.T) {
+	admin := store.GetPredefinedRole(store.WorkspaceAdminRole).Permissions
+	member := store.GetPredefinedRole(store.WorkspaceMemberRole).Permissions
+	for perm := range member {
 		if !admin[perm] {
-			t.Errorf("admin set missing member-tier permission %q", perm)
+			t.Errorf("workspaceAdmin missing member-tier permission %q", perm)
 		}
 	}
 }

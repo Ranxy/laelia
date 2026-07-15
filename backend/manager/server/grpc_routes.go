@@ -24,6 +24,7 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
 	apiv1 "github.com/Ranxy/laelia/backend/manager/api/v1"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
+	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/component/ratelimit"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
@@ -112,7 +113,7 @@ func configureGrpcRouters(
 			ipValidator,
 			auth.New(stores, secret, stateCfg, profile),
 			rateLimiter,
-			apiv1.NewIAMInterceptor(stores),
+			apiv1.NewIAMInterceptor(iam.NewManager(stores)),
 			apiv1.NewAuditInterceptor(stores),
 		),
 		// Cap unary request bodies so the bytes-based file upload RPC can't be
