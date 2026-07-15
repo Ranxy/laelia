@@ -19,6 +19,7 @@ const (
 	RolePrefix                 = "roles/"
 	GroupPrefix                = "groups/"
 	AgentNamePrefix            = "agents/"
+	ConversationNamePrefix     = "conversations/"
 )
 
 // GetUserID returns the user ID from a resource name.
@@ -155,4 +156,19 @@ func GetAgentResourceID(name string) (string, error) {
 
 func FormatAgentUID(uid string) string {
 	return fmt.Sprintf("%s%s", AgentNamePrefix, uid)
+}
+
+// FormatConversationName returns the conversation resource name for the given
+// conversation UUID.
+func FormatConversationName(id string) string {
+	return fmt.Sprintf("%s%s", ConversationNamePrefix, id)
+}
+
+// GetConversationResourceID returns the conversation UUID from a resource name.
+func GetConversationResourceID(name string) (string, error) {
+	tokens, err := GetNameParentTokens(name, ConversationNamePrefix)
+	if err != nil {
+		return "", err
+	}
+	return tokens[0], nil
 }

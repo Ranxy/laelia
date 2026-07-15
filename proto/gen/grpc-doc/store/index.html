@@ -1947,6 +1947,21 @@ for example, the environment resource can have the sql review config tag, like &
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>CONVERSATION</td>
+                <td>4</td>
+                <td><p>CONVERSATION is a per-conversation IAM policy. Members/owners are
+expressed as bindings (roles/conversationMember, roles/conversationOwner)
+on conversations/{id}.</p></td>
+              </tr>
+            
+              <tr>
+                <td>AGENT</td>
+                <td>5</td>
+                <td><p>AGENT is a per-agent IAM policy. The agent&#39;s creator is bound to
+roles/agentEditor on agents/{resource_id}.</p></td>
+              </tr>
+            
           </tbody>
         </table>
       

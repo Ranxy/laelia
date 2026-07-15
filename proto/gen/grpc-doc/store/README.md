@@ -720,6 +720,8 @@ EnvironmentTierPolicy is the tier of an environment.
 | WORKSPACE | 1 |  |
 | ENVIRONMENT | 2 |  |
 | PROJECT | 3 |  |
+| CONVERSATION | 4 | CONVERSATION is a per-conversation IAM policy. Members/owners are expressed as bindings (roles/conversationMember, roles/conversationOwner) on conversations/{id}. |
+| AGENT | 5 | AGENT is a per-agent IAM policy. The agent&#39;s creator is bound to roles/agentEditor on agents/{resource_id}. |
 
 
 

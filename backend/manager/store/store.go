@@ -23,6 +23,7 @@ type Store struct {
 	groupCache           *lru.Cache[string, *GroupMessage]
 	agentIDCache         *lru.Cache[int, *AgentMessage]
 	agentResourceIDCache *lru.Cache[string, *AgentMessage]
+	rolesCache           *lru.Cache[string, *RoleMessage]
 }
 
 func New(ctx context.Context, pgURL string, enableCache bool) (*Store, error) {
@@ -63,6 +64,10 @@ func New(ctx context.Context, pgURL string, enableCache bool) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	rolesCache, err := lru.New[string, *RoleMessage](512)
+	if err != nil {
+		return nil, err
+	}
 	s := &Store{
 		dbConnManager:        dbConnManager,
 		enableCache:          enableCache,
@@ -74,6 +79,7 @@ func New(ctx context.Context, pgURL string, enableCache bool) (*Store, error) {
 		groupCache:           groupCache,
 		agentIDCache:         agentIDCache,
 		agentResourceIDCache: agentResourceIDCache,
+		rolesCache:           rolesCache,
 	}
 
 	return s, nil

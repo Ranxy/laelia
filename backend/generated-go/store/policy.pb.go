@@ -78,6 +78,13 @@ const (
 	Policy_WORKSPACE            Policy_Resource = 1
 	Policy_ENVIRONMENT          Policy_Resource = 2
 	Policy_PROJECT              Policy_Resource = 3
+	// CONVERSATION is a per-conversation IAM policy. Members/owners are
+	// expressed as bindings (roles/conversationMember, roles/conversationOwner)
+	// on conversations/{id}.
+	Policy_CONVERSATION Policy_Resource = 4
+	// AGENT is a per-agent IAM policy. The agent's creator is bound to
+	// roles/agentEditor on agents/{resource_id}.
+	Policy_AGENT Policy_Resource = 5
 )
 
 // Enum value maps for Policy_Resource.
@@ -87,12 +94,16 @@ var (
 		1: "WORKSPACE",
 		2: "ENVIRONMENT",
 		3: "PROJECT",
+		4: "CONVERSATION",
+		5: "AGENT",
 	}
 	Policy_Resource_value = map[string]int32{
 		"RESOURCE_UNSPECIFIED": 0,
 		"WORKSPACE":            1,
 		"ENVIRONMENT":          2,
 		"PROJECT":              3,
+		"CONVERSATION":         4,
+		"AGENT":                5,
 	}
 )
 
@@ -425,17 +436,19 @@ var File_store_policy_proto protoreflect.FileDescriptor
 
 const file_store_policy_proto_rawDesc = "" +
 	"\n" +
-	"\x12store/policy.proto\x12\flaelia.store\x1a\x16google/type/expr.proto\"\x8b\x01\n" +
+	"\x12store/policy.proto\x12\flaelia.store\x1a\x16google/type/expr.proto\"\xa8\x01\n" +
 	"\x06Policy\".\n" +
 	"\x04Type\x12\x14\n" +
 	"\x10TYPE_UNSPECIFIED\x10\x00\x12\a\n" +
 	"\x03IAM\x10\x01\x12\a\n" +
-	"\x03TAG\x10\x02\"Q\n" +
+	"\x03TAG\x10\x02\"n\n" +
 	"\bResource\x12\x18\n" +
 	"\x14RESOURCE_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tWORKSPACE\x10\x01\x12\x0f\n" +
 	"\vENVIRONMENT\x10\x02\x12\v\n" +
-	"\aPROJECT\x10\x03\"{\n" +
+	"\aPROJECT\x10\x03\x12\x10\n" +
+	"\fCONVERSATION\x10\x04\x12\t\n" +
+	"\x05AGENT\x10\x05\"{\n" +
 	"\tTagPolicy\x125\n" +
 	"\x04tags\x18\x01 \x03(\v2!.laelia.store.TagPolicy.TagsEntryR\x04tags\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +
