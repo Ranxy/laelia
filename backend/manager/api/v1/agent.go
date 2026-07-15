@@ -163,11 +163,13 @@ func (s *AgentService) ListAgents(ctx context.Context, req *connect.Request[v1pb
 	response := &v1pb.ListAgentsResponse{
 		NextPageToken: nextPageToken,
 	}
-	caller, _ := GetUserFromContext(ctx)
+	// can_edit is intentionally NOT populated here: resolving it per agent would
+	// issue a GetAgentIamPolicy lookup per row (N+1) for non-admin callers. The
+	// list view does not gate affordances on can_edit (delete is enforced
+	// server-side via agents.edit), so it is left as the zero value; the agent
+	// profile page calls GetAgent, which does populate can_edit.
 	for _, agent := range agents {
-		a := convertToAgent(agent)
-		a.CanEdit = s.canEditAgent(ctx, caller, a.Name)
-		response.Agents = append(response.Agents, a)
+		response.Agents = append(response.Agents, convertToAgent(agent))
 	}
 	return connect.NewResponse(response), nil
 }

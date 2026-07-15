@@ -259,11 +259,21 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 	memberType := req.Msg.MemberType
 	memberID := req.Msg.MemberId
 
-	// Refuse to re-add the channel owner as a plain member: AddConversationMember
-	// upserts member_role=Member (downgrading Owner). The owner is already a
-	// member; use TransferChannelOwnership to change ownership.
+	// Refuse to re-add an existing member: AddConversationMember upserts
+	// member_role=Member, which would silently downgrade an Admin (or the Owner)
+	// to Member. The owner-of-record check below covers the Owner; the membership
+	// check covers Admins and plain members — re-inviting someone who is already
+	// in the channel is a no-op at best and a privilege strip at worst, so reject
+	// it and direct the caller to UpdateChannelMemberRole for a role change.
 	if memberType == store.MemberTypeUser && memberID == fmt.Sprintf("%d", conv.OwnerID) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("cannot add the channel owner as a member"))
+	}
+	existingRole, _, err := s.store.GetConversationMembership(ctx, convID, memberType, memberID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check existing membership"))
+	}
+	if existingRole != 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("user is already a member of this channel"))
 	}
 
 	var addedAgent *store.AgentMessage

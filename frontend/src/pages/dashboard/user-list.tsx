@@ -41,11 +41,16 @@ type Tab = "active" | "trash";
 
 export function UserListPage() {
   const { t } = useTranslation();
-  // User-management actions (create/update/delete/undelete) are gated by the
-  // laelia.users.update workspace permission. The variable is kept as `isAdmin`
-  // for minimal churn; workspaceAdmin holds both users.update and users.delete,
-  // so this matches the prior workspaceAdmin boolean in practice.
-  const isAdmin = useHasPermission("laelia.users.update");
+  // Gate each user-management affordance on the exact permission its RPC
+  // requires: laelia.users.create (CreateUser), laelia.users.update (UpdateUser
+  // / reset password), laelia.users.delete (DeleteUser / UndeleteUser). A
+  // custom role may hold any subset, so the UI must not offer an action the
+  // server will 403. canManageUsers drives the active-table actions column
+  // (which holds both update and delete controls).
+  const canCreateUsers = useHasPermission("laelia.users.create");
+  const canUpdateUsers = useHasPermission("laelia.users.update");
+  const canDeleteUsers = useHasPermission("laelia.users.delete");
+  const canManageUsers = canUpdateUsers || canDeleteUsers;
   const currentUser = useAppStore((s) => s.currentUser);
   const users = useAppStore((s) => s.users);
   const usersLoading = useAppStore((s) => s.usersLoading);
@@ -287,7 +292,7 @@ export function UserListPage() {
     <div className="h-full overflow-y-auto p-6 flex flex-col gap-4 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-main">{t("user.title")}</h1>
-        {isAdmin && (
+        {canCreateUsers && (
           <Button onClick={() => setCreateOpen(true)}>
             {t("user.create")}
           </Button>
@@ -312,14 +317,16 @@ export function UserListPage() {
                   <TableHead>{t("user.header-type")}</TableHead>
                   <TableHead>{t("user.header-state")}</TableHead>
                   <TableHead>{t("user.header-last-login")}</TableHead>
-                  {isAdmin && <TableHead>{t("common.actions")}</TableHead>}
+                  {canManageUsers && (
+                    <TableHead>{t("common.actions")}</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={isAdmin ? 6 : 5}
+                      colSpan={canManageUsers ? 6 : 5}
                       className="text-center text-control-light"
                     >
                       {t("user.no-data")}
@@ -337,10 +344,10 @@ export function UserListPage() {
                       <TableCell>
                         {formatTimestamp(user.profile?.lastLoginTime)}
                       </TableCell>
-                      {isAdmin && (
+                      {canManageUsers && (
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            {!isSpecialUser(user) && (
+                            {canUpdateUsers && !isSpecialUser(user) && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -349,7 +356,7 @@ export function UserListPage() {
                                 {t("user.edit")}
                               </Button>
                             )}
-                            {canResetPassword(user) && (
+                            {canUpdateUsers && canResetPassword(user) && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -358,7 +365,8 @@ export function UserListPage() {
                                 {t("user.reset-password")}
                               </Button>
                             )}
-                            {!isSpecialUser(user) &&
+                            {canDeleteUsers &&
+                              !isSpecialUser(user) &&
                               !isSelf(user, currentUser) && (
                                 <Button
                                   variant="outline"
@@ -393,14 +401,16 @@ export function UserListPage() {
                   <TableHead>{t("user.header-title")}</TableHead>
                   <TableHead>{t("user.header-type")}</TableHead>
                   <TableHead>{t("user.header-state")}</TableHead>
-                  {isAdmin && <TableHead>{t("common.actions")}</TableHead>}
+                  {canDeleteUsers && (
+                    <TableHead>{t("common.actions")}</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {deletedUsers.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={isAdmin ? 5 : 4}
+                      colSpan={canDeleteUsers ? 5 : 4}
                       className="text-center text-control-light"
                     >
                       {t("user.no-data")}
@@ -415,7 +425,7 @@ export function UserListPage() {
                       <TableCell>
                         <StateBadge state={user.state} t={t} />
                       </TableCell>
-                      {isAdmin && (
+                      {canDeleteUsers && (
                         <TableCell>
                           {!isSpecialUser(user) && (
                             <Button

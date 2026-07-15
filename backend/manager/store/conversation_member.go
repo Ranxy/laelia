@@ -125,21 +125,37 @@ func (s *Store) IsConversationMember(ctx context.Context, convID uuid.UUID, memb
 // together with the conversation type, in a single query. The IAM engine uses
 // the role to map a caller's chat role to its conversation permissions and the
 // type to apply the agent-DM review override.
+// getConversationMembershipSQL loads a caller's chat role (member_role) and the
+// conversation type in one query. It LEFT JOINs conversation_member so a
+// non-member caller still yields a row — with NULL member_role — rather than
+// ErrNoRows; GetConversationMembership scans that NULL into sql.NullInt32 (0
+// when not a member). An INNER JOIN here would make every non-member check
+// return ErrNoRows and surface a 404/500 instead of the intended 403.
+const getConversationMembershipSQL = `
+	SELECT cm.member_role, c.type
+	FROM conversation c
+	LEFT JOIN conversation_member cm
+	       ON cm.conversation_id = c.id AND cm.member_type = $2 AND cm.member_id = $3
+	WHERE c.id = $1
+`
+
 func (s *Store) GetConversationMembership(ctx context.Context, convID uuid.UUID, memberType int32, memberID string) (role int32, convType int32, err error) {
-	err = s.GetDB().QueryRowContext(ctx, `
-		SELECT cm.member_role, c.type
-		FROM conversation c
-		LEFT JOIN conversation_member cm
-		       ON cm.conversation_id = c.id AND cm.member_type = $2 AND cm.member_id = $3
-		WHERE c.id = $1
-	`, convID, memberType, memberID).Scan(&role, &convType)
+	// member_role is scanned into sql.NullInt32 because the LEFT JOIN yields NULL
+	// for a caller who is not a member of the conversation — scanning that NULL
+	// into a bare int32 returns "converting NULL to int32 is unsupported", which
+	// would surface as a 500 (and, worse, make the non-member reviewAgentDM
+	// override unreachable). NullInt32.Int32 is 0 when Invalid, matching the
+	// "0 when not a member" contract the engine relies on. c.type is NOT NULL, so
+	// it scans into int32 directly; a missing conversation surfaces as ErrNoRows.
+	var roleNull sql.NullInt32
+	err = s.GetDB().QueryRowContext(ctx, getConversationMembershipSQL, convID, memberType, memberID).Scan(&roleNull, &convType)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, 0, errors.Wrapf(err, "conversation %s not found", convID)
 		}
 		return 0, 0, errors.Wrapf(err, "failed to get conversation membership")
 	}
-	return role, convType, nil
+	return roleNull.Int32, convType, nil
 }
 
 // UpdateConversationMemberRole sets a member's chat role. It is the store

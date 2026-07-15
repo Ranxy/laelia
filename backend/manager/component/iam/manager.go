@@ -11,12 +11,14 @@ package iam
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 
 	"github.com/Ranxy/laelia/backend/common"
 	"github.com/Ranxy/laelia/backend/common/permission"
@@ -148,6 +150,13 @@ func (m *Manager) checkConversationPermission(ctx context.Context, perm permissi
 
 	role, convType, err := m.store.GetConversationMembership(ctx, convID, memberType, memberID)
 	if err != nil {
+		// A missing conversation (ErrNoRows) is a deny, not a 500: returning the
+		// error here would make the interceptor surface CodeInternal for a
+		// deleted/stale conversation ID. Fail-closed (403) avoids the 500 and does
+		// not leak the resource's existence.
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
 		return false, err
 	}
 	if rolePerms := chatRolePermissions(role); rolePerms != nil && rolePerms[perm] {
