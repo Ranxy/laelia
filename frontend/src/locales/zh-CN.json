@@ -140,8 +140,10 @@
       "assign-description": "设置用户在工作区持有的角色,其他成员不受影响。",
       "field-user": "用户",
       "field-user-placeholder": "选择用户",
+      "no-users": "暂无可选用户",
       "field-roles": "角色",
       "field-roles-hint": "仅修改所选用户的成员关系,其他成员保持其角色。",
+      "no-grantable-roles": "暂无可分配角色",
       "saved": "访问策略已保存",
       "etag-mismatch": "策略已被他人修改,已重新加载,请重试。"
     }

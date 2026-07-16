@@ -1,6 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
-import { Loader2 } from "lucide-react";
+import { Loader2, Shield, User as UserIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert } from "@/components/ui/alert";
@@ -20,6 +20,7 @@ import {
   SheetContent,
   SheetDescription,
   SheetFooter,
+  SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
@@ -125,6 +126,10 @@ export function SettingsIamPage() {
       return a.title.localeCompare(b.title);
     });
   }, [roles]);
+
+  const selectedUser = useMemo(() => {
+    return users.find((u) => u.name === selectedUserName) ?? null;
+  }, [users, selectedUserName]);
 
   // userEmailByMember resolves a `users/{uid}` member string to an email for the
   // binding table, falling back to the raw member.
@@ -252,19 +257,21 @@ export function SettingsIamPage() {
   const visibleBindings = policyState?.policy.bindings ?? [];
 
   return (
-    <div className="h-full overflow-y-auto p-6 flex flex-col gap-4 w-full">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-main">
-          {t("settings.iam.title")}
-        </h1>
+    <div className="h-full overflow-y-auto p-6 flex flex-col gap-5 w-full">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-semibold text-main flex items-center gap-2">
+            <Shield className="size-5 text-accent" />
+            {t("settings.iam.title")}
+          </h1>
+          <p className="text-sm text-control-light max-w-2xl">
+            {t("settings.iam.description")}
+          </p>
+        </div>
         {canSet && (
           <Button onClick={openAssign}>{t("settings.iam.assign")}</Button>
         )}
       </div>
-
-      <p className="text-sm text-control-light">
-        {t("settings.iam.description")}
-      </p>
 
       {loading ? (
         <div className="flex items-center justify-center gap-2 py-16 text-control-light text-sm">
@@ -272,55 +279,64 @@ export function SettingsIamPage() {
           {t("common.loading")}
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("settings.iam.header-role")}</TableHead>
-              <TableHead>{t("settings.iam.header-members")}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visibleBindings.length === 0 ? (
+        <div className="rounded-xs border border-control-border bg-background shadow-xs overflow-hidden">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell
-                  colSpan={2}
-                  className="text-center text-control-light"
-                >
-                  {t("common.no-data")}
-                </TableCell>
+                <TableHead className="w-[40%]">
+                  {t("settings.iam.header-role")}
+                </TableHead>
+                <TableHead>{t("settings.iam.header-members")}</TableHead>
               </TableRow>
-            ) : (
-              visibleBindings.map((binding) => {
-                const role = roles.find((r) => r.name === binding.role);
-                return (
-                  <TableRow key={binding.role}>
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col gap-0.5">
-                        <span>
-                          {role?.title ?? roleIDFromName(binding.role)}
-                        </span>
-                        {role?.predefined && (
-                          <Badge variant="success" className="w-fit">
-                            {t("settings.roles.type-predefined")}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1.5">
-                        {binding.members.map((m) => (
-                          <Badge key={m} variant="secondary">
-                            {memberLabel(m)}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {visibleBindings.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={2}
+                    className="text-center text-control-light py-12"
+                  >
+                    {t("common.no-data")}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                visibleBindings.map((binding) => {
+                  const role = roles.find((r) => r.name === binding.role);
+                  return (
+                    <TableRow key={binding.role}>
+                      <TableCell className="font-medium align-top">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-main">
+                            {role?.title ?? roleIDFromName(binding.role)}
+                          </span>
+                          {role?.predefined && (
+                            <Badge variant="success" className="w-fit">
+                              {t("settings.roles.type-predefined")}
+                            </Badge>
+                          )}
+                          {!role?.predefined && role && (
+                            <Badge variant="warning" className="w-fit">
+                              {t("settings.roles.type-custom")}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <div className="flex flex-wrap gap-1.5">
+                          {binding.members.map((m) => (
+                            <Badge key={m} variant="secondary">
+                              {memberLabel(m)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       {/* Assign roles to user */}
@@ -331,69 +347,125 @@ export function SettingsIamPage() {
           if (!next) setSelectedUserName("");
         }}
       >
-        <SheetContent width="standard">
-          <SheetTitle>{t("settings.iam.assign-title")}</SheetTitle>
-          <SheetDescription>
-            {t("settings.iam.assign-description")}
-          </SheetDescription>
+        <SheetContent width="medium">
+          <SheetHeader>
+            <SheetTitle>{t("settings.iam.assign-title")}</SheetTitle>
+            <SheetDescription>
+              {t("settings.iam.assign-description")}
+            </SheetDescription>
+          </SheetHeader>
           <SheetBody>
             {assignError && (
               <Alert
                 variant="error"
                 description={assignError}
-                className="mb-4"
+                className="mb-2"
               />
             )}
-            <div className="flex flex-col gap-4">
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-control">
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor="assign-user"
+                  className="text-xs font-semibold uppercase tracking-wide text-control"
+                >
                   {t("settings.iam.field-user")}
-                </span>
+                </label>
                 <Select
                   value={selectedUserName}
                   onValueChange={(v) => onUserChange(String(v ?? ""))}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="assign-user" className="w-full">
                     <SelectValue
                       placeholder={t("settings.iam.field-user-placeholder")}
-                    />
+                    >
+                      {(v: string | null) => {
+                        const u = users.find((x) => x.name === v);
+                        return u?.email ?? v ?? "";
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {users.map((u: User) => (
-                      <SelectItem key={u.name} value={u.name}>
-                        {u.email}
+                    {users.length === 0 ? (
+                      <SelectItem value="" disabled>
+                        {t("settings.iam.no-users")}
                       </SelectItem>
-                    ))}
+                    ) : (
+                      users.map((u: User) => (
+                        <SelectItem key={u.name} value={u.name}>
+                          {u.email}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
-              </label>
+              </div>
+
+              {selectedUser && (
+                <div className="flex items-center gap-3 rounded-xs border border-control-border bg-control-bg/50 p-3">
+                  <div className="flex size-9 items-center justify-center rounded-full bg-accent/10 text-accent">
+                    <UserIcon className="size-4.5" />
+                  </div>
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span className="text-sm font-medium text-main truncate">
+                      {selectedUser.email}
+                    </span>
+                    {selectedUser.title && (
+                      <span className="text-xs text-control-light truncate">
+                        {selectedUser.title}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {selectedUserName && (
                 <div className="flex flex-col gap-2">
-                  <span className="text-xs font-medium text-control">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-control">
                     {t("settings.iam.field-roles")}
                   </span>
-                  <div className="flex flex-col gap-1.5">
-                    {grantableRoles.map((role) => (
-                      <label
-                        key={role.name}
-                        className="flex items-center gap-2 text-sm text-main"
-                        title={role.description}
-                      >
-                        <Checkbox
-                          checked={selectedRoleIds.has(role.name)}
-                          onCheckedChange={() => toggleRole(role.name)}
-                          size="sm"
-                        />
-                        <span className="flex-1">{role.title}</span>
-                        {role.predefined && (
-                          <Badge variant="success">
-                            {t("settings.roles.type-predefined")}
-                          </Badge>
-                        )}
-                      </label>
-                    ))}
-                  </div>
+                  {grantableRoles.length === 0 ? (
+                    <p className="text-sm text-control-light">
+                      {t("settings.iam.no-grantable-roles")}
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {grantableRoles.map((role) => (
+                        <label
+                          key={role.name}
+                          className="flex cursor-pointer items-start gap-3 rounded-xs border border-control-border bg-background p-3 transition-colors hover:bg-control-bg/60 hover:border-accent/30 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
+                          title={role.description}
+                        >
+                          <Checkbox
+                            checked={selectedRoleIds.has(role.name)}
+                            onCheckedChange={() => toggleRole(role.name)}
+                            size="md"
+                            className="mt-0.5"
+                          />
+                          <div className="flex flex-1 flex-col gap-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-main">
+                                {role.title}
+                              </span>
+                              {role.predefined ? (
+                                <Badge variant="success" className="text-xs">
+                                  {t("settings.roles.type-predefined")}
+                                </Badge>
+                              ) : (
+                                <Badge variant="warning" className="text-xs">
+                                  {t("settings.roles.type-custom")}
+                                </Badge>
+                              )}
+                            </div>
+                            {role.description && (
+                              <p className="text-xs text-control-light leading-relaxed">
+                                {role.description}
+                              </p>
+                            )}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                   <p className="text-xs text-control-placeholder">
                     {t("settings.iam.field-roles-hint")}
                   </p>

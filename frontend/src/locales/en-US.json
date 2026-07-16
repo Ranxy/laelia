@@ -140,8 +140,10 @@
       "assign-description": "Set the roles a user holds on the workspace. Other members are left unchanged.",
       "field-user": "User",
       "field-user-placeholder": "Select a user",
+      "no-users": "No users available",
       "field-roles": "Roles",
       "field-roles-hint": "Only the selected user's membership is changed; other members keep their roles.",
+      "no-grantable-roles": "No assignable roles",
       "saved": "Access policy saved",
       "etag-mismatch": "The policy was changed by someone else. Reloaded — please retry."
     }
