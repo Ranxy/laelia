@@ -1,9 +1,13 @@
 import { create, equals } from "@bufbuild/protobuf";
 import { agentServiceClient } from "@/connect";
-import type { Agent, AgentProviderInfo } from "@/types/proto-es/v1/agent_pb";
+import type {
+  AgentProviderInfo,
+  AgentSummary,
+} from "@/types/proto-es/v1/agent_pb";
 import {
   AgentACPConfigSchema,
   AgentSchema,
+  AgentSummarySchema,
   CreateAgentRequestSchema,
   DeleteAgentRequestSchema,
   RefreshAgentProvidersRequestSchema,
@@ -16,7 +20,6 @@ import type { AgentSlice, AppSliceCreator } from "./types";
 export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
   agents: [],
   agentsLoading: false,
-  agentCache: {},
 
   async fetchAgents(params, opts) {
     const silent = opts?.silent;
@@ -33,13 +36,6 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
       if (silent && agentsEqual(get().agents, res.agents)) {
         return { nextPageToken: res.nextPageToken };
       }
-      // NOTE: ListAgents agents are intentionally NOT written into agentCache.
-      // ListAgents does not populate Agent.canEdit (only GetAgent does), so
-      // caching them here would let agent-profile's getAgent() return a stale
-      // canEdit=false entry without ever calling GetAgent — surfacing a false
-      // "not editable" banner to workspace admins. agentCache is reserved for
-      // full GetAgent objects; the agents list is the source of truth for
-      // list views and instant header display.
       set({
         agents: res.agents,
         agentsLoading: false,
@@ -53,17 +49,16 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     }
   },
 
-  async getAgent(name, opts) {
-    if (!opts?.force) {
-      const cached = get().agentCache[name];
-      if (cached) return cached;
-    }
+  // getAgent fetches the full Agent on every call. It is intentionally NOT
+  // cached: Agent.canEdit and acp_config are per-caller / mutable, so a
+  // persistent cache would survive a user switch (admin → normal user) and
+  // surface a stale canEdit to the profile page. Callers that need the agent
+  // (the profile page) hold it in local component state and re-fetch after
+  // mutations. The agent-detail layout does not call this at all — it reads
+  // the AgentSummary list.
+  async getAgent(name) {
     try {
-      const res = await agentServiceClient.getAgent({ name });
-      set((state) => ({
-        agentCache: { ...state.agentCache, [name]: res },
-      }));
-      return res;
+      return await agentServiceClient.getAgent({ name });
     } catch {
       return undefined;
     }
@@ -84,33 +79,19 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     );
     set((state) => ({
       agents: state.agents.filter((a) => a.name !== name),
-      agentCache: Object.fromEntries(
-        Object.entries(state.agentCache).filter(([k]) => k !== name)
-      ),
     }));
   },
 
   async rotateAgentToken(name: string, reason?: string) {
-    const res = await agentServiceClient.rotateAgentToken(
+    return agentServiceClient.rotateAgentToken(
       create(RotateAgentTokenRequestSchema, { name, reason: reason ?? "" })
     );
-    set((state) => ({
-      agentCache: Object.fromEntries(
-        Object.entries(state.agentCache).filter(([k]) => k !== name)
-      ),
-    }));
-    return res;
   },
 
   async revokeAgentToken(name: string, reason?: string) {
     await agentServiceClient.revokeAgentToken(
       create(RevokeAgentTokenRequestSchema, { name, reason: reason ?? "" })
     );
-    set((state) => ({
-      agentCache: Object.fromEntries(
-        Object.entries(state.agentCache).filter(([k]) => k !== name)
-      ),
-    }));
   },
 
   async updateAgentACPConfig(
@@ -137,20 +118,20 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     const res = await agentServiceClient.refreshAgentProviders(
       create(RefreshAgentProvidersRequestSchema, { name })
     );
-    // Force-refresh the cached agent so the new available_providers surface in
-    // the UI immediately, then return the freshly discovered list to the caller.
-    await get().getAgent(name, { force: true });
+    // The caller (agent-profile) re-fetches GetAgent so the new
+    // available_providers surface in the editor; this slice no longer holds a
+    // cached agent to refresh.
     return res.providers;
   },
 });
 
-// agentsEqual reports whether two agent lists are structurally identical, used
-// to skip redundant state updates during background polling.
-function agentsEqual(prev: Agent[], next: Agent[]): boolean {
+// agentsEqual reports whether two agent summary lists are structurally
+// identical, used to skip redundant state updates during background polling.
+function agentsEqual(prev: AgentSummary[], next: AgentSummary[]): boolean {
   if (prev.length !== next.length) return false;
   for (let i = 0; i < prev.length; i++) {
     if (prev[i].name !== next[i].name) return false;
-    if (!equals(AgentSchema, prev[i], next[i])) return false;
+    if (!equals(AgentSummarySchema, prev[i], next[i])) return false;
   }
   return true;
 }

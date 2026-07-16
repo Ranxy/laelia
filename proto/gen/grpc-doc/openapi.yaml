@@ -3035,6 +3035,39 @@ components:
                     type: string
                 activeSessionId:
                     type: string
+        AgentSummary:
+            type: object
+            properties:
+                name:
+                    type: string
+                state:
+                    enum:
+                        - STATE_UNSPECIFIED
+                        - ACTIVE
+                        - DELETED
+                    type: string
+                    format: enum
+                title:
+                    type: string
+                status:
+                    $ref: '#/components/schemas/AgentStatus'
+                provider:
+                    type: string
+                    description: |-
+                        provider/executable mirror acp_config.provider/executable on the full
+                         Agent, surfaced top-level so list consumers don't pull in AgentInfo.
+                executable:
+                    type: string
+            description: |-
+                AgentSummary is the lightweight list-view projection of an Agent returned by
+                 ListAgents. It carries only the fields list/header views need: identity,
+                 lifecycle state, connection status, and the provider/executable signal that
+                 agentLifecycle() reads to classify an agent as ready/pending/offline. The
+                 full Agent (available_providers, the rest of acp_config, capability, host
+                 info, token fields, created_by, can_edit) is returned only by GetAgent, so
+                 the two RPCs don't overlap. can_edit is intentionally omitted: resolving it
+                 per row would N+1 the IAM policy lookup for non-admin callers, and the list
+                 view does not gate affordances on it (delete is enforced server-side).
         Attachment:
             type: object
             properties:
@@ -3832,7 +3865,7 @@ components:
                 agents:
                     type: array
                     items:
-                        $ref: '#/components/schemas/Agent'
+                        $ref: '#/components/schemas/AgentSummary'
                 nextPageToken:
                     type: string
         ListChannelMembersResponse:

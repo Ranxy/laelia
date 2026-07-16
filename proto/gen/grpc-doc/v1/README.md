@@ -34,6 +34,7 @@
     - [AgentProviderInfo](#laelia-v1-AgentProviderInfo)
     - [AgentSession](#laelia-v1-AgentSession)
     - [AgentStatus](#laelia-v1-AgentStatus)
+    - [AgentSummary](#laelia-v1-AgentSummary)
     - [ConnectAgentRequest](#laelia-v1-ConnectAgentRequest)
     - [ConnectAgentResponse](#laelia-v1-ConnectAgentResponse)
     - [CreateAgentRequest](#laelia-v1-CreateAgentRequest)
@@ -693,6 +694,34 @@ the same way it preserves acp_config.
 
 
 
+<a name="laelia-v1-AgentSummary"></a>
+
+### AgentSummary
+AgentSummary is the lightweight list-view projection of an Agent returned by
+ListAgents. It carries only the fields list/header views need: identity,
+lifecycle state, connection status, and the provider/executable signal that
+agentLifecycle() reads to classify an agent as ready/pending/offline. The
+full Agent (available_providers, the rest of acp_config, capability, host
+info, token fields, created_by, can_edit) is returned only by GetAgent, so
+the two RPCs don&#39;t overlap. can_edit is intentionally omitted: resolving it
+per row would N&#43;1 the IAM policy lookup for non-admin callers, and the list
+view does not gate affordances on it (delete is enforced server-side).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| state | [State](#laelia-v1-State) |  |  |
+| title | [string](#string) |  |  |
+| status | [AgentStatus](#laelia-v1-AgentStatus) |  |  |
+| provider | [string](#string) |  | provider/executable mirror acp_config.provider/executable on the full Agent, surfaced top-level so list consumers don&#39;t pull in AgentInfo. |
+| executable | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-ConnectAgentRequest"></a>
 
 ### ConnectAgentRequest
@@ -893,7 +922,7 @@ the same way it preserves acp_config.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| agents | [Agent](#laelia-v1-Agent) | repeated |  |
+| agents | [AgentSummary](#laelia-v1-AgentSummary) | repeated |  |
 | next_page_token | [string](#string) |  |  |
 
 

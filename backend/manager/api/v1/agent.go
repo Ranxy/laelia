@@ -164,13 +164,16 @@ func (s *AgentService) ListAgents(ctx context.Context, req *connect.Request[v1pb
 	response := &v1pb.ListAgentsResponse{
 		NextPageToken: nextPageToken,
 	}
-	// can_edit is intentionally NOT populated here: resolving it per agent would
-	// issue a GetAgentIamPolicy lookup per row (N+1) for non-admin callers. The
-	// list view does not gate affordances on can_edit (delete is enforced
-	// server-side via agents.edit), so it is left as the zero value; the agent
-	// profile page calls GetAgent, which does populate can_edit.
+	// ListAgents returns a summary view (AgentSummary): identity, state,
+	// connection status, and the provider/executable lifecycle signal only. The
+	// full Agent — available_providers, the rest of acp_config, capability, host
+	// info, token fields, created_by, and can_edit — is returned by GetAgent, so
+	// the two RPCs don't overlap. can_edit is omitted here in particular because
+	// resolving it per row would N+1 the IAM policy lookup for non-admin
+	// callers, and the list view does not gate affordances on it (delete is
+	// enforced server-side via agents.edit).
 	for _, agent := range agents {
-		response.Agents = append(response.Agents, convertToAgent(agent))
+		response.Agents = append(response.Agents, convertToAgentSummary(agent))
 	}
 	return connect.NewResponse(response), nil
 }
@@ -923,6 +926,30 @@ func convertToAgent(agent *store.AgentMessage) *v1pb.Agent {
 		result.CreatedBy = common.FormatUserUID(agent.CreatedBy)
 	}
 	return result
+}
+
+// convertToAgentSummary builds the lightweight ListAgents projection of an
+// agent: identity, lifecycle state, connection status, and the
+// provider/executable signal that the frontend agentLifecycle() classifier
+// reads. Heavy per-agent data (available_providers, the rest of acp_config,
+// capability, host info, token fields, created_by, can_edit) is omitted — it
+// is only returned by GetAgent. See ListAgents for the contract rationale.
+func convertToAgentSummary(agent *store.AgentMessage) *v1pb.AgentSummary {
+	state := v1pb.State_ACTIVE
+	if agent.Deleted {
+		state = v1pb.State_DELETED
+	}
+	summary := &v1pb.AgentSummary{
+		Name:   common.FormatAgentUID(agent.ResourceID),
+		State:  state,
+		Title:  agent.Name,
+		Status: convertToV1AgentStatus(agent.Status, agent.Deleted),
+	}
+	if agent.Info != nil && agent.Info.AcpConfig != nil {
+		summary.Provider = agent.Info.AcpConfig.Provider
+		summary.Executable = agent.Info.AcpConfig.Executable
+	}
+	return summary
 }
 
 // cloneStoreAgentInfo returns a deep copy of info safe to mutate before a

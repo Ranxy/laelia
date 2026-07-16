@@ -567,9 +567,9 @@ export declare const ListAgentsRequestSchema: GenMessage<ListAgentsRequest>;
  */
 export declare type ListAgentsResponse = Message<"laelia.v1.ListAgentsResponse"> & {
   /**
-   * @generated from field: repeated laelia.v1.Agent agents = 1;
+   * @generated from field: repeated laelia.v1.AgentSummary agents = 1;
    */
-  agents: Agent[];
+  agents: AgentSummary[];
 
   /**
    * @generated from field: string next_page_token = 2;
@@ -774,6 +774,60 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
  * Use `create(AgentSchema)` to create a new message.
  */
 export declare const AgentSchema: GenMessage<Agent>;
+
+/**
+ * AgentSummary is the lightweight list-view projection of an Agent returned by
+ * ListAgents. It carries only the fields list/header views need: identity,
+ * lifecycle state, connection status, and the provider/executable signal that
+ * agentLifecycle() reads to classify an agent as ready/pending/offline. The
+ * full Agent (available_providers, the rest of acp_config, capability, host
+ * info, token fields, created_by, can_edit) is returned only by GetAgent, so
+ * the two RPCs don't overlap. can_edit is intentionally omitted: resolving it
+ * per row would N+1 the IAM policy lookup for non-admin callers, and the list
+ * view does not gate affordances on it (delete is enforced server-side).
+ *
+ * @generated from message laelia.v1.AgentSummary
+ */
+export declare type AgentSummary = Message<"laelia.v1.AgentSummary"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: laelia.v1.State state = 2;
+   */
+  state: State;
+
+  /**
+   * @generated from field: string title = 3;
+   */
+  title: string;
+
+  /**
+   * @generated from field: laelia.v1.AgentStatus status = 4;
+   */
+  status?: AgentStatus | undefined;
+
+  /**
+   * provider/executable mirror acp_config.provider/executable on the full
+   * Agent, surfaced top-level so list consumers don't pull in AgentInfo.
+   *
+   * @generated from field: string provider = 5;
+   */
+  provider: string;
+
+  /**
+   * @generated from field: string executable = 6;
+   */
+  executable: string;
+};
+
+/**
+ * Describes the message laelia.v1.AgentSummary.
+ * Use `create(AgentSummarySchema)` to create a new message.
+ */
+export declare const AgentSummarySchema: GenMessage<AgentSummary>;
 
 /**
  * @generated from message laelia.v1.AgentInfo

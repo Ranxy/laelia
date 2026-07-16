@@ -32,7 +32,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { buildAgentRunCommand } from "@/lib/agent-token";
 import { agentResourceName, formatTimestamp } from "@/lib/command-status";
 import { useAppStore } from "@/stores";
-import { type AgentProviderInfo } from "@/types/proto-es/v1/agent_pb";
+import {
+  type Agent,
+  type AgentProviderInfo,
+} from "@/types/proto-es/v1/agent_pb";
 import { agentLifecycle, lifecycleLabel } from "./agents";
 
 function providerDisplayName(p: AgentProviderInfo): string {
@@ -100,11 +103,14 @@ export function AgentProfilePage() {
   const { t } = useTranslation();
   const { agentId } = useParams<{ agentId: string }>();
   const getAgent = useAppStore((s) => s.getAgent);
-  const agentCache = useAppStore((s) => s.agentCache);
   const fetchAgents = useAppStore((s) => s.fetchAgents);
 
   const agentName = agentResourceName(agentId);
-  const agent = agentCache[agentName];
+  // Hold the full GetAgent result in local state, fetched fresh on entry and
+  // re-fetched after each mutation. canEdit/acp_config are per-caller and
+  // mutable, so they are never cached in the store — this avoids a stale
+  // canEdit surviving a user switch (admin → normal user).
+  const [agent, setAgent] = useState<Agent | undefined>(undefined);
 
   // ACP config editor local state, seeded from the agent's persisted config.
   const [executable, setExecutable] = useState("");
@@ -133,7 +139,7 @@ export function AgentProfilePage() {
 
   useEffect(() => {
     if (!agentId) return;
-    getAgent(agentName);
+    getAgent(agentName).then(setAgent);
   }, [agentId, agentName, getAgent]);
 
   // Re-seed the editor whenever the persisted config reference changes (e.g.
@@ -179,7 +185,7 @@ export function AgentProfilePage() {
       const refreshAgentProviders =
         useAppStore.getState().refreshAgentProviders;
       await refreshAgentProviders(agentName);
-      await getAgent(agentName, { force: true });
+      setAgent(await getAgent(agentName));
       fetchAgents({ pageSize: 100 }, { silent: true });
     } catch (err) {
       const msg =
@@ -214,7 +220,7 @@ export function AgentProfilePage() {
         personaPrompt: personaPrompt.trim(),
         customEnv,
       });
-      await getAgent(agentName, { force: true });
+      setAgent(await getAgent(agentName));
       fetchAgents({ pageSize: 100 }, { silent: true });
     } catch (err) {
       const msg =
@@ -237,6 +243,7 @@ export function AgentProfilePage() {
         setTokenOpen(true);
       }
       setRotateOpen(false);
+      setAgent(await getAgent(agentName));
       fetchAgents({ pageSize: 100 }, { silent: true });
     } catch (err) {
       const msg =
@@ -254,6 +261,7 @@ export function AgentProfilePage() {
       const revokeAgentToken = useAppStore.getState().revokeAgentToken;
       await revokeAgentToken(agentName);
       setRevokeOpen(false);
+      setAgent(await getAgent(agentName));
       fetchAgents({ pageSize: 100 }, { silent: true });
     } catch (err) {
       const msg =

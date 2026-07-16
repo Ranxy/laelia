@@ -28,10 +28,7 @@ import {
 import { buildAgentRunCommand } from "@/lib/agent-token";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
-import {
-  type Agent,
-  AgentStatus_ConnectionState,
-} from "@/types/proto-es/v1/agent_pb";
+import { AgentStatus_ConnectionState } from "@/types/proto-es/v1/agent_pb";
 
 type Lifecycle =
   | "waiting-connection"
@@ -39,16 +36,30 @@ type Lifecycle =
   | "ready"
   | "configured-offline";
 
+// AgentLifecycleLike is the structural input agentLifecycle reads. It is
+// satisfied by both AgentSummary (list view: top-level provider/executable)
+// and the full Agent (profile view: info.acpConfig.provider/executable), so the
+// same classifier serves both without branching on the concrete type.
+interface AgentLifecycleLike {
+  status?: { state?: AgentStatus_ConnectionState };
+  provider?: string;
+  executable?: string;
+  info?: { acpConfig?: { provider?: string; executable?: string } };
+}
+
 // agentLifecycle classifies an agent's operational state for both the left-rail
 // polling loop (we keep refreshing while any agent is non-ready) and the profile
 // tab's lifecycle label. Exported so agent-profile can render the same label.
-export function agentLifecycle(agent: Agent): Lifecycle {
+export function agentLifecycle(agent: AgentLifecycleLike): Lifecycle {
   const online = agent.status?.state === AgentStatus_ConnectionState.ONLINE;
-  const cfg = agent.info?.acpConfig;
   // An agent is "configured" when it has either a selected provider or a
   // custom executable. A built-in provider derives its command from the
-  // registry, so executable is empty for it.
-  const configured = !!cfg?.provider || !!cfg?.executable;
+  // registry, so executable is empty for it. AgentSummary surfaces these
+  // top-level; the full Agent nests them under info.acpConfig.
+  const provider = agent.provider ?? agent.info?.acpConfig?.provider ?? "";
+  const executable =
+    agent.executable ?? agent.info?.acpConfig?.executable ?? "";
+  const configured = !!provider || !!executable;
   if (online && configured) return "ready";
   if (online && !configured) return "pending-config";
   if (!online && configured) return "configured-offline";

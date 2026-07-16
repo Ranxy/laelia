@@ -10,7 +10,7 @@ import {
 import { SearchInput } from "@/components/ui/search-input";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
-import type { Agent } from "@/types/proto-es/v1/agent_pb";
+import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";
 
 // member_type values mirror ChannelMember.member_type: 1 = user, 2 = agent.
@@ -50,7 +50,7 @@ function userOption(u: User): Option {
   };
 }
 
-function agentOption(a: Agent): Option {
+function agentOption(a: AgentSummary): Option {
   const id = memberIdOf(a.name);
   return { memberId: id, label: a.title || id, sublabel: undefined };
 }

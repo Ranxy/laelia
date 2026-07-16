@@ -1,5 +1,5 @@
 import { Bell, ListChecks, MessageSquare, UserCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ConnectionBadge } from "@/components/connection-badge";
@@ -14,7 +14,6 @@ import {
 } from "@/router/handles";
 import { resolvePath } from "@/router/route-index";
 import { useAppStore } from "@/stores";
-import type { Agent } from "@/types/proto-es/v1/agent_pb";
 
 type TabKey = "profile" | "commands" | "reminders" | "chat";
 
@@ -23,22 +22,15 @@ export function AgentDetailLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { agentId } = useParams<{ agentId: string }>();
-  const getAgent = useAppStore((s) => s.getAgent);
   const agents = useAppStore((s) => s.agents);
-
-  const [agent, setAgent] = useState<Agent | undefined>(undefined);
 
   const agentName = agentResourceName(agentId);
 
-  useEffect(() => {
-    if (!agentId) return;
-    getAgent(agentName).then(setAgent);
-  }, [agentId, agentName, getAgent]);
-
-  // Show the list entry instantly (title/status are populated by ListAgents)
-  // while the full GetAgent object (with canEdit/acpConfig) resolves.
-  const listAgent = agents.find((a) => a.name === agentName);
-  const displayAgent = agent ?? listAgent;
+  // The header reads the AgentSummary list (loaded by the parent AgentsPage),
+  // not GetAgent — title/status/lifecycle are all present on the summary, and
+  // this avoids a per-navigation GetAgent round-trip. title falls back to the
+  // raw id while the list loads on a hard refresh.
+  const displayAgent = agents.find((a) => a.name === agentName);
 
   const title = displayAgent?.title ?? agentId ?? "";
 

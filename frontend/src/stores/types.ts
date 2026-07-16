@@ -2,6 +2,7 @@ import type { StateCreator } from "zustand";
 import type {
   Agent,
   AgentProviderInfo,
+  AgentSummary,
   CreateAgentResponse,
   RotateAgentTokenResponse,
 } from "@/types/proto-es/v1/agent_pb";
@@ -113,9 +114,8 @@ export interface UserSlice {
 }
 
 export interface AgentSlice {
-  agents: Agent[];
+  agents: AgentSummary[];
   agentsLoading: boolean;
-  agentCache: Record<string, Agent>;
 
   fetchAgents: (
     params?: {
@@ -124,10 +124,7 @@ export interface AgentSlice {
     },
     opts?: { silent?: boolean }
   ) => Promise<{ nextPageToken: string } | undefined>;
-  getAgent: (
-    name: string,
-    opts?: { force?: boolean }
-  ) => Promise<Agent | undefined>;
+  getAgent: (name: string) => Promise<Agent | undefined>;
   createAgent: (
     title: string,
     labels?: Record<string, string>
