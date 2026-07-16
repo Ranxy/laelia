@@ -24,7 +24,7 @@ export function AgentDetailLayout() {
   const location = useLocation();
   const { agentId } = useParams<{ agentId: string }>();
   const getAgent = useAppStore((s) => s.getAgent);
-  const agentCache = useAppStore((s) => s.agentCache);
+  const agents = useAppStore((s) => s.agents);
 
   const [agent, setAgent] = useState<Agent | undefined>(undefined);
 
@@ -35,8 +35,10 @@ export function AgentDetailLayout() {
     getAgent(agentName).then(setAgent);
   }, [agentId, agentName, getAgent]);
 
-  const cached = agentCache[agentName];
-  const displayAgent = agent ?? cached;
+  // Show the list entry instantly (title/status are populated by ListAgents)
+  // while the full GetAgent object (with canEdit/acpConfig) resolves.
+  const listAgent = agents.find((a) => a.name === agentName);
+  const displayAgent = agent ?? listAgent;
 
   const title = displayAgent?.title ?? agentId ?? "";
 

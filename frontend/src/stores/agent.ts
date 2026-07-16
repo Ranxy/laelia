@@ -33,15 +33,17 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
       if (silent && agentsEqual(get().agents, res.agents)) {
         return { nextPageToken: res.nextPageToken };
       }
-      const cache: Record<string, Agent> = {};
-      for (const a of res.agents) {
-        if (a.name) cache[a.name] = a;
-      }
-      set((state) => ({
+      // NOTE: ListAgents agents are intentionally NOT written into agentCache.
+      // ListAgents does not populate Agent.canEdit (only GetAgent does), so
+      // caching them here would let agent-profile's getAgent() return a stale
+      // canEdit=false entry without ever calling GetAgent — surfacing a false
+      // "not editable" banner to workspace admins. agentCache is reserved for
+      // full GetAgent objects; the agents list is the source of truth for
+      // list views and instant header display.
+      set({
         agents: res.agents,
         agentsLoading: false,
-        agentCache: { ...state.agentCache, ...cache },
-      }));
+      });
       return { nextPageToken: res.nextPageToken };
     } catch {
       // On a silent refresh, keep the existing list instead of wiping it on a
