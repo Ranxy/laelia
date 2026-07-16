@@ -20,6 +20,8 @@ import {
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
   SETTINGS_ROUTE,
+  SETTINGS_ROUTE_IAM,
+  SETTINGS_ROUTE_ROLES,
   SETTINGS_ROUTE_STORAGE,
   SETTINGS_ROUTE_USERS,
   WORKSPACE_ROUTE_LANDING,
@@ -102,6 +104,16 @@ function useSidebarItems(): SidebarItem[] {
           {
             title: t("sidebar.settings-users"),
             name: SETTINGS_ROUTE_USERS,
+            type: "route",
+          },
+          {
+            title: t("sidebar.settings-roles"),
+            name: SETTINGS_ROUTE_ROLES,
+            type: "route",
+          },
+          {
+            title: t("sidebar.settings-iam"),
+            name: SETTINGS_ROUTE_IAM,
             type: "route",
           },
         ],

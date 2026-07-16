@@ -238,6 +238,26 @@
     - [AgentStreamService](#laelia-v1-AgentStreamService)
     - [CommandService](#laelia-v1-CommandService)
   
+- [v1/iam_service.proto](#v1_iam_service-proto)
+    - [GetAgentIamPolicyRequest](#laelia-v1-GetAgentIamPolicyRequest)
+    - [GetWorkspaceIamPolicyRequest](#laelia-v1-GetWorkspaceIamPolicyRequest)
+    - [IamPolicyView](#laelia-v1-IamPolicyView)
+    - [SetAgentIamPolicyRequest](#laelia-v1-SetAgentIamPolicyRequest)
+    - [SetWorkspaceIamPolicyRequest](#laelia-v1-SetWorkspaceIamPolicyRequest)
+  
+    - [IamService](#laelia-v1-IamService)
+  
+- [v1/role_service.proto](#v1_role_service-proto)
+    - [CreateRoleRequest](#laelia-v1-CreateRoleRequest)
+    - [DeleteRoleRequest](#laelia-v1-DeleteRoleRequest)
+    - [GetRoleRequest](#laelia-v1-GetRoleRequest)
+    - [ListRolesRequest](#laelia-v1-ListRolesRequest)
+    - [ListRolesResponse](#laelia-v1-ListRolesResponse)
+    - [Role](#laelia-v1-Role)
+    - [UpdateRoleRequest](#laelia-v1-UpdateRoleRequest)
+  
+    - [RoleService](#laelia-v1-RoleService)
+  
 - [v1/setting.proto](#v1_setting-proto)
     - [GetS3ConfigRequest](#laelia-v1-GetS3ConfigRequest)
     - [GetS3ConfigResponse](#laelia-v1-GetS3ConfigResponse)
@@ -4012,6 +4032,263 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | UploadFile | [UploadFileRequest](#laelia-v1-UploadFileRequest) | [File](#laelia-v1-File) | UploadFile stores data in S3 and persists a file row. Intended for the agent daemon (browser uploads go through the Echo multipart route). No google.api.http annotation: the agent reaches it via Connect-JSON over the CommandServiceClient, and avoiding a /v1/files/{id} gateway entry keeps it from colliding with the browser download route. |
 | DownloadFile | [DownloadFileRequest](#laelia-v1-DownloadFileRequest) | [DownloadFileResponse](#laelia-v1-DownloadFileResponse) | DownloadFile fetches a file&#39;s bytes from S3. The caller must be a member of the file&#39;s conversation. Used by the agent daemon; browser downloads go through the Echo route. |
 | ListFiles | [ListFilesRequest](#laelia-v1-ListFilesRequest) | [ListFilesResponse](#laelia-v1-ListFilesResponse) | ListFiles returns the files attached to a conversation. The caller must be a member. |
+
+ 
+
+
+
+<a name="v1_iam_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/iam_service.proto
+
+
+
+<a name="laelia-v1-GetAgentIamPolicyRequest"></a>
+
+### GetAgentIamPolicyRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The agent resource name, in the form `agents/{agent}`. |
+
+
+
+
+
+
+<a name="laelia-v1-GetWorkspaceIamPolicyRequest"></a>
+
+### GetWorkspaceIamPolicyRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-IamPolicyView"></a>
+
+### IamPolicyView
+IamPolicyView is an IAM policy together with its etag. The etag is returned
+by Get and must be supplied on Set for optimistic concurrency: a Set whose
+etag does not match the stored policy&#39;s etag is rejected with
+connect.CodeAborted so the caller can re-fetch and retry.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| policy | [laelia.store.IamPolicy](#laelia-store-IamPolicy) |  |  |
+| etag | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SetAgentIamPolicyRequest"></a>
+
+### SetAgentIamPolicyRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The agent resource name, in the form `agents/{agent}`. |
+| policy | [laelia.store.IamPolicy](#laelia-store-IamPolicy) |  |  |
+| etag | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SetWorkspaceIamPolicyRequest"></a>
+
+### SetWorkspaceIamPolicyRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| policy | [laelia.store.IamPolicy](#laelia-store-IamPolicy) |  |  |
+| etag | [string](#string) |  |  |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="laelia-v1-IamService"></a>
+
+### IamService
+IamService exposes the workspace and per-agent IAM policies for management.
+Get reads the full policy; Set replaces it whole, guarded by an etag. Each
+RPC is gated by the IAM interceptor with laelia.iam.getPolicy / setPolicy.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetWorkspaceIamPolicy | [GetWorkspaceIamPolicyRequest](#laelia-v1-GetWorkspaceIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Get the workspace IAM policy. |
+| SetWorkspaceIamPolicy | [SetWorkspaceIamPolicyRequest](#laelia-v1-SetWorkspaceIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Set the workspace IAM policy (full replace, etag-guarded). |
+| GetAgentIamPolicy | [GetAgentIamPolicyRequest](#laelia-v1-GetAgentIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Get the IAM policy attached to an agent. |
+| SetAgentIamPolicy | [SetAgentIamPolicyRequest](#laelia-v1-SetAgentIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Set the IAM policy attached to an agent (full replace, etag-guarded). |
+
+ 
+
+
+
+<a name="v1_role_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/role_service.proto
+
+
+
+<a name="laelia-v1-CreateRoleRequest"></a>
+
+### CreateRoleRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| role | [Role](#laelia-v1-Role) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-DeleteRoleRequest"></a>
+
+### DeleteRoleRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetRoleRequest"></a>
+
+### GetRoleRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The resource name of the role, in the form `roles/{role}`. |
+
+
+
+
+
+
+<a name="laelia-v1-ListRolesRequest"></a>
+
+### ListRolesRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListRolesResponse"></a>
+
+### ListRolesResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| roles | [Role](#laelia-v1-Role) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-Role"></a>
+
+### Role
+Role is a named bundle of permissions. Predefined roles (workspaceAdmin,
+workspaceMember, conversationMember/Admin/Owner, agentEditor,
+agentDMReviewer, oversightReviewer) are defined in Go and never stored in
+the DB; custom roles live in the role table. Both resolve identically in the
+IAM engine. Predefined roles are read-only over this API.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The resource name of the role, in the form `roles/{resource_id}`. |
+| title | [string](#string) |  | Human-readable title. |
+| description | [string](#string) |  | Longer description of what the role grants. |
+| permissions | [string](#string) | repeated | Permissions bundled into the role, each a `laelia.&lt;resource&gt;.&lt;verb&gt;` string from the permission catalog. |
+| predefined | [bool](#bool) |  | Output only. Whether the role is predefined (defined in Go, read-only). |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateRoleRequest"></a>
+
+### UpdateRoleRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| role | [Role](#laelia-v1-Role) |  |  |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  |  |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="laelia-v1-RoleService"></a>
+
+### RoleService
+RoleService manages custom roles. Predefined roles are read-only over this
+API: create/update/delete refuse a resource id that collides with a
+predefined role. Each RPC is gated by the IAM interceptor with the
+laelia.roles.* permissions.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetRole | [GetRoleRequest](#laelia-v1-GetRoleRequest) | [Role](#laelia-v1-Role) | Get a role. |
+| ListRoles | [ListRolesRequest](#laelia-v1-ListRolesRequest) | [ListRolesResponse](#laelia-v1-ListRolesResponse) | List all roles (predefined and custom). |
+| CreateRole | [CreateRoleRequest](#laelia-v1-CreateRoleRequest) | [Role](#laelia-v1-Role) | Create a custom role. |
+| UpdateRole | [UpdateRoleRequest](#laelia-v1-UpdateRoleRequest) | [Role](#laelia-v1-Role) | Update a custom role. |
+| DeleteRole | [DeleteRoleRequest](#laelia-v1-DeleteRoleRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Delete a custom role. |
 
  
 

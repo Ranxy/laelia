@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "v1/annotation.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+// Role is a named bundle of permissions. Predefined roles (workspaceAdmin,
+// workspaceMember, conversationMember/Admin/Owner, agentEditor,
+// agentDMReviewer, oversightReviewer) are defined in Go and never stored in
+// the DB; custom roles live in the role table. Both resolve identically in the
+// IAM engine. Predefined roles are read-only over this API.
+message Role {
+  option (google.api.resource) = {
+    type: "laelia/Role"
+    pattern: "roles/{role}"
+  };
+
+  // The resource name of the role, in the form `roles/{resource_id}`.
+  string name = 1 [
+    (google.api.field_behavior) = IDENTIFIER,
+    (google.api.field_behavior) = REQUIRED
+  ];
+
+  // Human-readable title.
+  string title = 2;
+
+  // Longer description of what the role grants.
+  string description = 3;
+
+  // Permissions bundled into the role, each a `laelia.<resource>.<verb>`
+  // string from the permission catalog.
+  repeated string permissions = 4;
+
+  // Output only. Whether the role is predefined (defined in Go, read-only).
+  bool predefined = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message GetRoleRequest {
+  // The resource name of the role, in the form `roles/{role}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Role"}
+  ];
+}
+
+message ListRolesRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListRolesResponse {
+  repeated Role roles = 1;
+  string next_page_token = 2;
+}
+
+message CreateRoleRequest {
+  Role role = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateRoleRequest {
+  Role role = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteRoleRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Role"}
+  ];
+}
+
+// RoleService manages custom roles. Predefined roles are read-only over this
+// API: create/update/delete refuse a resource id that collides with a
+// predefined role. Each RPC is gated by the IAM interceptor with the
+// laelia.roles.* permissions.
+service RoleService {
+  // Get a role.
+  rpc GetRole(GetRoleRequest) returns (Role) {
+    option (google.api.http) = {get: "/v1/{name=roles/*}"};
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.roles.get";
+  }
+
+  // List all roles (predefined and custom).
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
+    option (google.api.http) = {get: "/v1/roles"};
+    option (google.api.method_signature) = "";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.roles.list";
+  }
+
+  // Create a custom role.
+  rpc CreateRole(CreateRoleRequest) returns (Role) {
+    option (google.api.http) = {
+      post: "/v1/roles"
+      body: "role"
+    };
+    option (google.api.method_signature) = "role";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.roles.create";
+    option (laelia.v1.audit) = true;
+  }
+
+  // Update a custom role.
+  rpc UpdateRole(UpdateRoleRequest) returns (Role) {
+    option (google.api.http) = {
+      patch: "/v1/{role.name=roles/*}"
+      body: "role"
+    };
+    option (google.api.method_signature) = "role,update_mask";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.roles.update";
+    option (laelia.v1.audit) = true;
+  }
+
+  // Delete a custom role.
+  rpc DeleteRole(DeleteRoleRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/{name=roles/*}"};
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.roles.delete";
+    option (laelia.v1.audit) = true;
+  }
+}

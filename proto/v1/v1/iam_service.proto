@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "store/policy.proto";
+import "v1/annotation.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+// IamPolicyView is an IAM policy together with its etag. The etag is returned
+// by Get and must be supplied on Set for optimistic concurrency: a Set whose
+// etag does not match the stored policy's etag is rejected with
+// connect.CodeAborted so the caller can re-fetch and retry.
+message IamPolicyView {
+  laelia.store.IamPolicy policy = 1;
+  string etag = 2;
+}
+
+message GetWorkspaceIamPolicyRequest {}
+
+message SetWorkspaceIamPolicyRequest {
+  laelia.store.IamPolicy policy = 1 [(google.api.field_behavior) = REQUIRED];
+  string etag = 2;
+}
+
+message GetAgentIamPolicyRequest {
+  // The agent resource name, in the form `agents/{agent}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+}
+
+message SetAgentIamPolicyRequest {
+  // The agent resource name, in the form `agents/{agent}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+  laelia.store.IamPolicy policy = 2 [(google.api.field_behavior) = REQUIRED];
+  string etag = 3;
+}
+
+// IamService exposes the workspace and per-agent IAM policies for management.
+// Get reads the full policy; Set replaces it whole, guarded by an etag. Each
+// RPC is gated by the IAM interceptor with laelia.iam.getPolicy / setPolicy.
+service IamService {
+  // Get the workspace IAM policy.
+  rpc GetWorkspaceIamPolicy(GetWorkspaceIamPolicyRequest) returns (IamPolicyView) {
+    option (google.api.http) = {get: "/v1/workspace:iamPolicy"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.iam.getPolicy";
+  }
+
+  // Set the workspace IAM policy (full replace, etag-guarded).
+  rpc SetWorkspaceIamPolicy(SetWorkspaceIamPolicyRequest) returns (IamPolicyView) {
+    option (google.api.http) = {
+      post: "/v1/workspace:iamPolicy"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.iam.setPolicy";
+    option (laelia.v1.audit) = true;
+  }
+
+  // Get the IAM policy attached to an agent.
+  rpc GetAgentIamPolicy(GetAgentIamPolicyRequest) returns (IamPolicyView) {
+    option (google.api.http) = {get: "/v1/{name=agents/*}:iamPolicy"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.iam.getPolicy";
+  }
+
+  // Set the IAM policy attached to an agent (full replace, etag-guarded).
+  rpc SetAgentIamPolicy(SetAgentIamPolicyRequest) returns (IamPolicyView) {
+    option (google.api.http) = {
+      post: "/v1/{name=agents/*}:iamPolicy"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.iam.setPolicy";
+    option (laelia.v1.audit) = true;
+  }
+}

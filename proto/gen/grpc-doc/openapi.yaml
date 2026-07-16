@@ -733,6 +733,63 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}:iamPolicy:
+        get:
+            tags:
+                - IamService
+            description: Get the IAM policy attached to an agent.
+            operationId: IamService_GetAgentIamPolicy
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/IamPolicyView'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - IamService
+            description: Set the IAM policy attached to an agent (full replace, etag-guarded).
+            operationId: IamService_SetAgentIamPolicy
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SetAgentIamPolicyRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/IamPolicyView'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}:refreshProviders:
         post:
             tags:
@@ -2164,6 +2221,143 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/roles:
+        get:
+            tags:
+                - RoleService
+            description: List all roles (predefined and custom).
+            operationId: RoleService_ListRoles
+            parameters:
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListRolesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - RoleService
+            description: Create a custom role.
+            operationId: RoleService_CreateRole
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/Role'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Role'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/roles/{role}:
+        get:
+            tags:
+                - RoleService
+            description: Get a role.
+            operationId: RoleService_GetRole
+            parameters:
+                - name: role
+                  in: path
+                  description: The role id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Role'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        delete:
+            tags:
+                - RoleService
+            description: Delete a custom role.
+            operationId: RoleService_DeleteRole
+            parameters:
+                - name: role
+                  in: path
+                  description: The role id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - RoleService
+            description: Update a custom role.
+            operationId: RoleService_UpdateRole
+            parameters:
+                - name: role
+                  in: path
+                  description: The role id.
+                  required: true
+                  schema:
+                    type: string
+                - name: updateMask
+                  in: query
+                  schema:
+                    type: string
+                    format: field-mask
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/Role'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Role'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/s3Config:
         get:
             tags:
@@ -2478,6 +2672,49 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/BatchGetUsersResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/workspace:iamPolicy:
+        get:
+            tags:
+                - IamService
+            description: Get the workspace IAM policy.
+            operationId: IamService_GetWorkspaceIamPolicy
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/IamPolicyView'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - IamService
+            description: Set the workspace IAM policy (full replace, etag-guarded).
+            operationId: IamService_SetWorkspaceIamPolicy
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SetWorkspaceIamPolicyRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/IamPolicyView'
                 default:
                     description: Default error response
                     content:
@@ -2838,6 +3075,29 @@ components:
                     items:
                         $ref: '#/components/schemas/User'
                     description: The users from the specified request.
+        Binding:
+            type: object
+            properties:
+                role:
+                    type: string
+                    description: |-
+                        The role that is assigned to the members.
+                         Format: roles/{role}
+                members:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        Specifies the principals requesting access for a resource.
+                         For users, the member should be: users/{userUID}
+                         For groups, the member should be: groups/{email}
+                condition:
+                    allOf:
+                        - $ref: '#/components/schemas/Expr'
+                    description: |-
+                        The condition that is associated with this binding.
+                         If the condition evaluates to true, then this binding applies to the current request.
+                         If the condition evaluates to false, then this binding does not apply to the current request. However, a different role binding might grant the same role to one or more of the principals in this binding.
         CancelCommandRequest:
             required:
                 - name
@@ -3338,6 +3598,62 @@ components:
                     type: string
                 newText:
                     type: string
+        Expr:
+            type: object
+            properties:
+                expression:
+                    type: string
+                    description: |-
+                        Textual representation of an expression in Common Expression Language
+                         syntax.
+                title:
+                    type: string
+                    description: |-
+                        Optional. Title for the expression, i.e. a short string describing
+                         its purpose. This can be used e.g. in UIs which allow to enter the
+                         expression.
+                description:
+                    type: string
+                    description: |-
+                        Optional. Description of the expression. This is a longer text which
+                         describes the expression, e.g. when hovered over it in a UI.
+                location:
+                    type: string
+                    description: |-
+                        Optional. String indicating the location of the expression for error
+                         reporting, e.g. a file name and a position in the file.
+            description: |-
+                Represents a textual expression in the Common Expression Language (CEL)
+                 syntax. CEL is a C-like expression language. The syntax and semantics of CEL
+                 are documented at https://github.com/google/cel-spec.
+
+                 Example (Comparison):
+
+                     title: "Summary size limit"
+                     description: "Determines if a summary is less than 100 chars"
+                     expression: "document.summary.size() < 100"
+
+                 Example (Equality):
+
+                     title: "Requestor is owner"
+                     description: "Determines if requestor is the document owner"
+                     expression: "document.owner == request.auth.claims.email"
+
+                 Example (Logic):
+
+                     title: "Public documents"
+                     description: "Determine whether the document should be publicly visible"
+                     expression: "document.type != 'private' && document.type != 'internal'"
+
+                 Example (Data Manipulation):
+
+                     title: "Notification string"
+                     description: "Create a notification string with a timestamp."
+                     expression: "'New message received at ' + string(document.create_time)"
+
+                 The exact variables and functions that may be referenced within an expression
+                 are determined by the service that evaluates it. See the service
+                 documentation for additional information.
         FailReminderRequest:
             required:
                 - name
@@ -3457,6 +3773,28 @@ components:
                     type: string
                 serverVersion:
                     type: string
+        IamPolicy:
+            type: object
+            properties:
+                bindings:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Binding'
+                    description: |-
+                        Collection of binding.
+                         A binding binds one or more members or groups to a single role.
+        IamPolicyView:
+            type: object
+            properties:
+                policy:
+                    $ref: '#/components/schemas/IamPolicy'
+                etag:
+                    type: string
+            description: |-
+                IamPolicyView is an IAM policy together with its etag. The etag is returned
+                 by Get and must be supplied on Set for optimistic concurrency: a Set whose
+                 etag does not match the stored policy's etag is rejected with
+                 connect.CodeAborted so the caller can re-fetch and retry.
         IdentityProviderContext:
             type: object
             properties:
@@ -3581,6 +3919,15 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/Reminder'
+                nextPageToken:
+                    type: string
+        ListRolesResponse:
+            type: object
+            properties:
+                roles:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Role'
                 nextPageToken:
                     type: string
         ListTasksResponse:
@@ -3968,6 +4315,37 @@ components:
         RevokeAgentTokenResponse:
             type: object
             properties: {}
+        Role:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: The resource name of the role, in the form `roles/{resource_id}`.
+                title:
+                    type: string
+                    description: Human-readable title.
+                description:
+                    type: string
+                    description: Longer description of what the role grants.
+                permissions:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        Permissions bundled into the role, each a `laelia.<resource>.<verb>`
+                         string from the permission catalog.
+                predefined:
+                    readOnly: true
+                    type: boolean
+                    description: Output only. Whether the role is predefined (defined in Go, read-only).
+            description: |-
+                Role is a named bundle of permissions. Predefined roles (workspaceAdmin,
+                 workspaceMember, conversationMember/Admin/Owner, agentEditor,
+                 agentDMReviewer, oversightReviewer) are defined in Go and never stored in
+                 the DB; custom roles live in the role table. Both resolve identically in the
+                 IAM engine. Predefined roles are read-only over this API.
         RotateAgentTokenRequest:
             required:
                 - name
@@ -4056,6 +4434,28 @@ components:
                         as_task, when true, creates this message as a task: a task row is inserted
                          in the same transaction with a per-conversation task number and status
                          TODO. Only valid for top-level messages (thread_root must be empty).
+        SetAgentIamPolicyRequest:
+            required:
+                - name
+                - policy
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: The agent resource name, in the form `agents/{agent}`.
+                policy:
+                    $ref: '#/components/schemas/IamPolicy'
+                etag:
+                    type: string
+        SetWorkspaceIamPolicyRequest:
+            required:
+                - policy
+            type: object
+            properties:
+                policy:
+                    $ref: '#/components/schemas/IamPolicy'
+                etag:
+                    type: string
         Status:
             type: object
             properties:
@@ -4377,6 +4777,17 @@ tags:
     - name: AgentService
     - name: AuthService
     - name: CommandService
+    - name: IamService
+      description: |-
+        IamService exposes the workspace and per-agent IAM policies for management.
+         Get reads the full policy; Set replaces it whole, guarded by an etag. Each
+         RPC is gated by the IAM interceptor with laelia.iam.getPolicy / setPolicy.
+    - name: RoleService
+      description: |-
+        RoleService manages custom roles. Predefined roles are read-only over this
+         API: create/update/delete refuse a resource id that collides with a
+         predefined role. Each RPC is gated by the IAM interceptor with the
+         laelia.roles.* permissions.
     - name: SettingService
       description: |-
         SettingService exposes workspace-level configuration. It is admin-only; the

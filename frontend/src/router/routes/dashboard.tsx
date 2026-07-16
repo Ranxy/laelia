@@ -11,7 +11,9 @@ import {
   COMMAND_ROUTE_LIST,
   REMINDER_ROUTE_DETAIL,
   REMINDER_ROUTE_LIST,
+  SETTINGS_ROUTE_IAM,
   SETTINGS_ROUTE_PROFILE,
+  SETTINGS_ROUTE_ROLES,
   SETTINGS_ROUTE_STORAGE,
   SETTINGS_ROUTE_USERS,
   WORKSPACE_ROUTE_LANDING,
@@ -156,6 +158,22 @@ export const dashboardRoutes: RouteObject[] = [
             lazy: () =>
               import("@/pages/dashboard/user-list").then((m) => ({
                 Component: m.UserListPage,
+              })),
+          },
+          {
+            path: "roles",
+            handle: { name: SETTINGS_ROUTE_ROLES },
+            lazy: () =>
+              import("@/pages/dashboard/settings-roles").then((m) => ({
+                Component: m.SettingsRolesPage,
+              })),
+          },
+          {
+            path: "iam",
+            handle: { name: SETTINGS_ROUTE_IAM },
+            lazy: () =>
+              import("@/pages/dashboard/settings-iam").then((m) => ({
+                Component: m.SettingsIamPage,
               })),
           },
         ],

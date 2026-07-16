@@ -1097,6 +1097,84 @@
         
           
           <li>
+            <a href="#v1%2fiam_service.proto">v1/iam_service.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.v1.GetAgentIamPolicyRequest"><span class="badge">M</span>GetAgentIamPolicyRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetWorkspaceIamPolicyRequest"><span class="badge">M</span>GetWorkspaceIamPolicyRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.IamPolicyView"><span class="badge">M</span>IamPolicyView</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SetAgentIamPolicyRequest"><span class="badge">M</span>SetAgentIamPolicyRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SetWorkspaceIamPolicyRequest"><span class="badge">M</span>SetWorkspaceIamPolicyRequest</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#laelia.v1.IamService"><span class="badge">S</span>IamService</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#v1%2frole_service.proto">v1/role_service.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.v1.CreateRoleRequest"><span class="badge">M</span>CreateRoleRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DeleteRoleRequest"><span class="badge">M</span>DeleteRoleRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetRoleRequest"><span class="badge">M</span>GetRoleRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListRolesRequest"><span class="badge">M</span>ListRolesRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListRolesResponse"><span class="badge">M</span>ListRolesResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.Role"><span class="badge">M</span>Role</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateRoleRequest"><span class="badge">M</span>UpdateRoleRequest</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#laelia.v1.RoleService"><span class="badge">S</span>RoleService</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
             <a href="#v1%2fsetting.proto">v1/setting.proto</a>
             <ul>
               
@@ -10645,6 +10723,596 @@ a member.</p></td>
                 <td>POST</td>
                 <td>/v1/{conversation=conversations/*}:markRead</td>
                 <td>*</td>
+              </tr>
+              
+            
+            </tbody>
+          </table>
+          
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="v1/iam_service.proto">v1/iam_service.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.v1.GetAgentIamPolicyRequest">GetAgentIamPolicyRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The agent resource name, in the form `agents/{agent}`. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetWorkspaceIamPolicyRequest">GetWorkspaceIamPolicyRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.IamPolicyView">IamPolicyView</h3>
+        <p>IamPolicyView is an IAM policy together with its etag. The etag is returned</p><p>by Get and must be supplied on Set for optimistic concurrency: a Set whose</p><p>etag does not match the stored policy's etag is rejected with</p><p>connect.CodeAborted so the caller can re-fetch and retry.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>policy</td>
+                  <td><a href="#laelia.store.IamPolicy">laelia.store.IamPolicy</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>etag</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SetAgentIamPolicyRequest">SetAgentIamPolicyRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The agent resource name, in the form `agents/{agent}`. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>policy</td>
+                  <td><a href="#laelia.store.IamPolicy">laelia.store.IamPolicy</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>etag</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SetWorkspaceIamPolicyRequest">SetWorkspaceIamPolicyRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>policy</td>
+                  <td><a href="#laelia.store.IamPolicy">laelia.store.IamPolicy</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>etag</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="laelia.v1.IamService">IamService</h3>
+        <p>IamService exposes the workspace and per-agent IAM policies for management.</p><p>Get reads the full policy; Set replaces it whole, guarded by an etag. Each</p><p>RPC is gated by the IAM interceptor with laelia.iam.getPolicy / setPolicy.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GetWorkspaceIamPolicy</td>
+                <td><a href="#laelia.v1.GetWorkspaceIamPolicyRequest">GetWorkspaceIamPolicyRequest</a></td>
+                <td><a href="#laelia.v1.IamPolicyView">IamPolicyView</a></td>
+                <td><p>Get the workspace IAM policy.</p></td>
+              </tr>
+            
+              <tr>
+                <td>SetWorkspaceIamPolicy</td>
+                <td><a href="#laelia.v1.SetWorkspaceIamPolicyRequest">SetWorkspaceIamPolicyRequest</a></td>
+                <td><a href="#laelia.v1.IamPolicyView">IamPolicyView</a></td>
+                <td><p>Set the workspace IAM policy (full replace, etag-guarded).</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetAgentIamPolicy</td>
+                <td><a href="#laelia.v1.GetAgentIamPolicyRequest">GetAgentIamPolicyRequest</a></td>
+                <td><a href="#laelia.v1.IamPolicyView">IamPolicyView</a></td>
+                <td><p>Get the IAM policy attached to an agent.</p></td>
+              </tr>
+            
+              <tr>
+                <td>SetAgentIamPolicy</td>
+                <td><a href="#laelia.v1.SetAgentIamPolicyRequest">SetAgentIamPolicyRequest</a></td>
+                <td><a href="#laelia.v1.IamPolicyView">IamPolicyView</a></td>
+                <td><p>Set the IAM policy attached to an agent (full replace, etag-guarded).</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+          
+          
+          <h4>Methods with HTTP bindings</h4>
+          <table>
+            <thead>
+              <tr>
+                <td>Method Name</td>
+                <td>Method</td>
+                <td>Pattern</td>
+                <td>Body</td>
+              </tr>
+            </thead>
+            <tbody>
+            
+              
+              
+              <tr>
+                <td>GetWorkspaceIamPolicy</td>
+                <td>GET</td>
+                <td>/v1/workspace:iamPolicy</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>SetWorkspaceIamPolicy</td>
+                <td>POST</td>
+                <td>/v1/workspace:iamPolicy</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetAgentIamPolicy</td>
+                <td>GET</td>
+                <td>/v1/{name=agents/*}:iamPolicy</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>SetAgentIamPolicy</td>
+                <td>POST</td>
+                <td>/v1/{name=agents/*}:iamPolicy</td>
+                <td>*</td>
+              </tr>
+              
+            
+            </tbody>
+          </table>
+          
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="v1/role_service.proto">v1/role_service.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.v1.CreateRoleRequest">CreateRoleRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>role</td>
+                  <td><a href="#laelia.v1.Role">Role</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DeleteRoleRequest">DeleteRoleRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetRoleRequest">GetRoleRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The resource name of the role, in the form `roles/{role}`. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListRolesRequest">ListRolesRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListRolesResponse">ListRolesResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>roles</td>
+                  <td><a href="#laelia.v1.Role">Role</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.Role">Role</h3>
+        <p>Role is a named bundle of permissions. Predefined roles (workspaceAdmin,</p><p>workspaceMember, conversationMember/Admin/Owner, agentEditor,</p><p>agentDMReviewer, oversightReviewer) are defined in Go and never stored in</p><p>the DB; custom roles live in the role table. Both resolve identically in the</p><p>IAM engine. Predefined roles are read-only over this API.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The resource name of the role, in the form `roles/{resource_id}`. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Human-readable title. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Longer description of what the role grants. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>permissions</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>Permissions bundled into the role, each a `laelia.&lt;resource&gt;.&lt;verb&gt;`
+string from the permission catalog. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>predefined</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Output only. Whether the role is predefined (defined in Go, read-only). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateRoleRequest">UpdateRoleRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>role</td>
+                  <td><a href="#laelia.v1.Role">Role</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>update_mask</td>
+                  <td><a href="#google.protobuf.FieldMask">google.protobuf.FieldMask</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="laelia.v1.RoleService">RoleService</h3>
+        <p>RoleService manages custom roles. Predefined roles are read-only over this</p><p>API: create/update/delete refuse a resource id that collides with a</p><p>predefined role. Each RPC is gated by the IAM interceptor with the</p><p>laelia.roles.* permissions.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GetRole</td>
+                <td><a href="#laelia.v1.GetRoleRequest">GetRoleRequest</a></td>
+                <td><a href="#laelia.v1.Role">Role</a></td>
+                <td><p>Get a role.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ListRoles</td>
+                <td><a href="#laelia.v1.ListRolesRequest">ListRolesRequest</a></td>
+                <td><a href="#laelia.v1.ListRolesResponse">ListRolesResponse</a></td>
+                <td><p>List all roles (predefined and custom).</p></td>
+              </tr>
+            
+              <tr>
+                <td>CreateRole</td>
+                <td><a href="#laelia.v1.CreateRoleRequest">CreateRoleRequest</a></td>
+                <td><a href="#laelia.v1.Role">Role</a></td>
+                <td><p>Create a custom role.</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateRole</td>
+                <td><a href="#laelia.v1.UpdateRoleRequest">UpdateRoleRequest</a></td>
+                <td><a href="#laelia.v1.Role">Role</a></td>
+                <td><p>Update a custom role.</p></td>
+              </tr>
+            
+              <tr>
+                <td>DeleteRole</td>
+                <td><a href="#laelia.v1.DeleteRoleRequest">DeleteRoleRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p>Delete a custom role.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+          
+          
+          <h4>Methods with HTTP bindings</h4>
+          <table>
+            <thead>
+              <tr>
+                <td>Method Name</td>
+                <td>Method</td>
+                <td>Pattern</td>
+                <td>Body</td>
+              </tr>
+            </thead>
+            <tbody>
+            
+              
+              
+              <tr>
+                <td>GetRole</td>
+                <td>GET</td>
+                <td>/v1/{name=roles/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListRoles</td>
+                <td>GET</td>
+                <td>/v1/roles</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>CreateRole</td>
+                <td>POST</td>
+                <td>/v1/roles</td>
+                <td>role</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateRole</td>
+                <td>PATCH</td>
+                <td>/v1/{role.name=roles/*}</td>
+                <td>role</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>DeleteRole</td>
+                <td>DELETE</td>
+                <td>/v1/{name=roles/*}</td>
+                <td></td>
               </tr>
               
             

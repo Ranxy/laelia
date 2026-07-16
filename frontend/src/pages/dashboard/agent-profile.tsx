@@ -33,6 +33,7 @@ import { buildAgentRunCommand } from "@/lib/agent-token";
 import { agentResourceName, formatTimestamp } from "@/lib/command-status";
 import { useAppStore } from "@/stores";
 import { type AgentProviderInfo } from "@/types/proto-es/v1/agent_pb";
+import { AgentEditorsCard } from "./agent-editors-card";
 import { agentLifecycle, lifecycleLabel } from "./agents";
 
 function providerDisplayName(p: AgentProviderInfo): string {
@@ -404,6 +405,11 @@ export function AgentProfilePage() {
                   </div>
                 )}
               </Card>
+            </div>
+
+            {/* Per-agent editors (agentEditor IAM binding) */}
+            <div className="mt-6">
+              <AgentEditorsCard agentName={agentName} canEdit={canEdit} />
             </div>
           </div>
 

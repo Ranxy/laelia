@@ -59,7 +59,9 @@
     "channels": "频道",
     "settings": "设置",
     "settings-storage": "存储配置",
-    "settings-users": "用户管理"
+    "settings-users": "用户管理",
+    "settings-roles": "角色",
+    "settings-iam": "访问控制"
   },
   "settings": {
     "title": "设置",
@@ -89,6 +91,58 @@
       "save-failed": "保存 S3 配置失败",
       "endpoint-placeholder": "https://s3.amazonaws.com",
       "region-placeholder": "us-east-1"
+    },
+    "roles": {
+      "title": "角色",
+      "description": "将权限打包为自定义角色。预定义角色只读。",
+      "load-failed": "加载角色失败",
+      "not-allowed": "你没有查看角色的权限。",
+      "header-title": "标题",
+      "header-description": "描述",
+      "header-permissions": "权限",
+      "header-type": "类型",
+      "type-predefined": "预定义",
+      "type-custom": "自定义",
+      "permission-count": "{{count}} 项权限",
+      "create-title": "创建角色",
+      "create-description": "将权限打包为新的自定义角色。",
+      "edit-title": "编辑角色：{{title}}",
+      "edit-description": "更新角色的标题、描述或权限。",
+      "field-title": "标题",
+      "field-title-placeholder": "例如 缺陷分诊员",
+      "field-id": "角色 ID",
+      "field-id-hint": "小写,创建后不可修改。留空时由标题自动生成。",
+      "field-id-placeholder": "bug-triager",
+      "field-description": "描述",
+      "field-description-placeholder": "该角色授予的能力",
+      "field-permissions": "权限",
+      "field-permissions-hint": "共 {{count}} 项可选权限,勾选该角色授予的能力。",
+      "id-required": "角色 ID 不能为空",
+      "title-required": "标题不能为空",
+      "created": "角色已创建",
+      "updated": "角色已更新",
+      "deleted": "角色已删除",
+      "delete-failed": "删除角色失败",
+      "delete-confirm-title": "删除角色",
+      "delete-confirm-description": "确定删除角色\"{{title}}\"?被分配该角色的用户将失去其权限。"
+    },
+    "iam": {
+      "title": "访问控制",
+      "description": "为用户分配工作区角色。此处授予的绑定将在用户下次登录时生效。",
+      "load-failed": "加载访问策略失败",
+      "not-allowed": "你没有查看访问策略的权限。",
+      "assign": "为用户分配角色",
+      "header-role": "角色",
+      "header-members": "成员",
+      "member-all-users": "所有用户",
+      "assign-title": "为用户分配角色",
+      "assign-description": "设置用户在工作区持有的角色,其他成员不受影响。",
+      "field-user": "用户",
+      "field-user-placeholder": "选择用户",
+      "field-roles": "角色",
+      "field-roles-hint": "仅修改所选用户的成员关系,其他成员保持其角色。",
+      "saved": "访问策略已保存",
+      "etag-mismatch": "策略已被他人修改,已重新加载,请重试。"
     }
   },
   "user": {
@@ -241,7 +295,14 @@
     "acp-config-save-failed": "保存 ACP 配置失败",
     "row-open-detail": "打开 Agent {{title}} 详情",
     "delete-confirm-title": "删除 Agent",
-    "delete-confirm-description": "确定要删除 Agent {{title}} 吗?此操作无法撤销。"
+    "delete-confirm-description": "确定要删除 Agent {{title}} 吗?此操作无法撤销。",
+    "editors": {
+      "title": "编辑者",
+      "empty": "暂无额外编辑者。仅创建者与工作区管理员可编辑此 agent。",
+      "add-placeholder": "添加用户为编辑者",
+      "added": "已添加编辑者",
+      "removed": "已移除编辑者"
+    }
   },
   "command": {
     "status-unknown": "未知",

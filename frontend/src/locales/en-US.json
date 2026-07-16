@@ -59,7 +59,9 @@
     "channels": "Channels",
     "settings": "Settings",
     "settings-storage": "Storage",
-    "settings-users": "Users"
+    "settings-users": "Users",
+    "settings-roles": "Roles",
+    "settings-iam": "Access"
   },
   "settings": {
     "title": "Settings",
@@ -89,6 +91,58 @@
       "save-failed": "Failed to save S3 configuration",
       "endpoint-placeholder": "https://s3.amazonaws.com",
       "region-placeholder": "us-east-1"
+    },
+    "roles": {
+      "title": "Roles",
+      "description": "Define custom bundles of permissions. Predefined roles are read-only.",
+      "load-failed": "Failed to load roles",
+      "not-allowed": "You do not have permission to view roles.",
+      "header-title": "Title",
+      "header-description": "Description",
+      "header-permissions": "Permissions",
+      "header-type": "Type",
+      "type-predefined": "Predefined",
+      "type-custom": "Custom",
+      "permission-count": "{{count}} permissions",
+      "create-title": "Create role",
+      "create-description": "Bundle permissions into a new custom role.",
+      "edit-title": "Edit role: {{title}}",
+      "edit-description": "Update the role's title, description, or permissions.",
+      "field-title": "Title",
+      "field-title-placeholder": "e.g. Bug triager",
+      "field-id": "Role ID",
+      "field-id-hint": "Lowercase, immutable after creation. Derived from the title unless edited.",
+      "field-id-placeholder": "bug-triager",
+      "field-description": "Description",
+      "field-description-placeholder": "What this role grants",
+      "field-permissions": "Permissions",
+      "field-permissions-hint": "{{count}} permissions available. Select the capabilities this role grants.",
+      "id-required": "Role ID is required",
+      "title-required": "Title is required",
+      "created": "Role created",
+      "updated": "Role updated",
+      "deleted": "Role deleted",
+      "delete-failed": "Failed to delete role",
+      "delete-confirm-title": "Delete role",
+      "delete-confirm-description": "Delete the role \"{{title}}\"? Users assigned this role will lose its permissions."
+    },
+    "iam": {
+      "title": "Access",
+      "description": "Assign roles to users on the workspace. Bindings granted here take effect when the user next signs in.",
+      "load-failed": "Failed to load access policy",
+      "not-allowed": "You do not have permission to view the access policy.",
+      "assign": "Assign roles to user",
+      "header-role": "Role",
+      "header-members": "Members",
+      "member-all-users": "All users",
+      "assign-title": "Assign roles to user",
+      "assign-description": "Set the roles a user holds on the workspace. Other members are left unchanged.",
+      "field-user": "User",
+      "field-user-placeholder": "Select a user",
+      "field-roles": "Roles",
+      "field-roles-hint": "Only the selected user's membership is changed; other members keep their roles.",
+      "saved": "Access policy saved",
+      "etag-mismatch": "The policy was changed by someone else. Reloaded — please retry."
     }
   },
   "user": {
@@ -241,7 +295,14 @@
     "acp-config-save-failed": "Failed to save ACP config",
     "row-open-detail": "Open agent {{title}} details",
     "delete-confirm-title": "Delete agent",
-    "delete-confirm-description": "Are you sure you want to delete agent {{title}}? This cannot be undone."
+    "delete-confirm-description": "Are you sure you want to delete agent {{title}}? This cannot be undone.",
+    "editors": {
+      "title": "Editors",
+      "empty": "No additional editors. Only the creator and workspace admins can edit this agent.",
+      "add-placeholder": "Add a user as editor",
+      "added": "Editor added",
+      "removed": "Editor removed"
+    }
   },
   "command": {
     "status-unknown": "Unknown",

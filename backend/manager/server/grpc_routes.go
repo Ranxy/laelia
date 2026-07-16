@@ -85,6 +85,8 @@ func configureGrpcRouters(
 	commandService := apiv1.NewCommandService(stores, cmdDispatcher, s3clientmanager, iamManager)
 	agentCommandService := apiv1.NewAgentCommandService(stores, cmdDispatcher)
 	settingService := apiv1.NewSettingService(stores, s3clientmanager)
+	roleService := apiv1.NewRoleService(stores)
+	iamService := apiv1.NewIamService(stores)
 
 	rateLimiterCfg := ratelimit.DefaultConfig()
 	rateLimiterCfg.TrustProxy = profile.TrustProxy
@@ -137,6 +139,10 @@ func configureGrpcRouters(
 	connectHandlers[agentCmdPath] = agentCmdHandler
 	settingPath, settingHandler := v1connect.NewSettingServiceHandler(settingService, handlerOpts)
 	connectHandlers[settingPath] = settingHandler
+	rolePath, roleHandler := v1connect.NewRoleServiceHandler(roleService, handlerOpts)
+	connectHandlers[rolePath] = roleHandler
+	iamPath, iamHandler := v1connect.NewIamServiceHandler(iamService, handlerOpts)
+	connectHandlers[iamPath] = iamHandler
 
 	reflector := grpcreflect.NewStaticReflector(
 		v1connect.UserServiceName,
@@ -145,6 +151,8 @@ func configureGrpcRouters(
 		v1connect.CommandServiceName,
 		v1connect.AgentStreamServiceName,
 		v1connect.SettingServiceName,
+		v1connect.RoleServiceName,
+		v1connect.IamServiceName,
 	)
 	reflectPath, reflectHandler := grpcreflect.NewHandlerV1(reflector)
 	connectHandlers[reflectPath] = reflectHandler
@@ -177,6 +185,12 @@ func configureGrpcRouters(
 		return err
 	}
 	if err := v1pb.RegisterSettingServiceHandler(ctx, mux, grpcConn); err != nil {
+		return err
+	}
+	if err := v1pb.RegisterRoleServiceHandler(ctx, mux, grpcConn); err != nil {
+		return err
+	}
+	if err := v1pb.RegisterIamServiceHandler(ctx, mux, grpcConn); err != nil {
 		return err
 	}
 

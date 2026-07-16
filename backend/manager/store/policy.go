@@ -138,6 +138,62 @@ type PatchIamPolicyMessage struct {
 	Roles  []string
 }
 
+// ErrPolicyEtagMismatch is returned by the SetIamPolicy setters when the
+// supplied etag does not match the stored policy's etag. Callers (the IAM
+// handler) translate it to connect.CodeAborted so the client can re-fetch and
+// retry — the full-replace SetIamPolicy is optimistic-concurrency-guarded to
+// prevent a stale read from silently clobbering a concurrent write.
+var ErrPolicyEtagMismatch = errors.New("iam policy etag mismatch")
+
+// SetWorkspaceIamPolicy replaces the workspace IAM policy wholesale. etag is
+// the value returned by a prior GetWorkspaceIamPolicy; when non-empty it must
+// match the stored policy's etag or the write is rejected with
+// ErrPolicyEtagMismatch. An empty etag skips the check (first write). Returns
+// the freshly-read policy and its new etag.
+func (s *Store) SetWorkspaceIamPolicy(ctx context.Context, policy *models.IamPolicy, etag string) (*IamPolicyMessage, error) {
+	return s.setIamPolicy(ctx, models.Policy_WORKSPACE, "", policy, etag)
+}
+
+// SetAgentIamPolicy replaces the IAM policy attached to an agent (resource name
+// agents/{resource_id}). See SetWorkspaceIamPolicy for etag semantics.
+func (s *Store) SetAgentIamPolicy(ctx context.Context, agentName string, policy *models.IamPolicy, etag string) (*IamPolicyMessage, error) {
+	return s.setIamPolicy(ctx, models.Policy_AGENT, agentName, policy, etag)
+}
+
+func (s *Store) setIamPolicy(ctx context.Context, resourceType models.Policy_Resource, resource string, policy *models.IamPolicy, etag string) (*IamPolicyMessage, error) {
+	if policy == nil {
+		policy = &models.IamPolicy{}
+	}
+	current, err := s.getIamPolicy(ctx, &FindPolicyMessage{ResourceType: &resourceType, Resource: ptr(resource)})
+	if err != nil {
+		return nil, err
+	}
+	if etagMismatch(current.Etag, etag) {
+		return nil, ErrPolicyEtagMismatch
+	}
+	if err := s.upsertIamPolicy(ctx, resourceType, resource, policy); err != nil {
+		return nil, err
+	}
+	return s.getIamPolicy(ctx, &FindPolicyMessage{ResourceType: &resourceType, Resource: ptr(resource)})
+}
+
+// etagMismatch reports whether a SetIamPolicy should be rejected as a stale
+// write. An empty provided etag means "no optimistic-concurrency check" (the
+// first write, or a caller that didn't round-trip a Get), so it never mismatches.
+// A non-empty provided etag must equal the policy's current etag.
+func etagMismatch(currentEtag, providedEtag string) bool {
+	return providedEtag != "" && currentEtag != providedEtag
+}
+
+// ptr returns a pointer to s, or nil when s is empty so FindPolicyMessage leaves
+// the resource filter unset (the workspace policy is keyed by empty resource).
+func ptr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
 // PatchWorkspaceIamPolicy will set or remove the member for the workspace role.
 func (s *Store) PatchWorkspaceIamPolicy(ctx context.Context, patch *PatchIamPolicyMessage) (*IamPolicyMessage, error) {
 	workspaceIamPolicy, err := s.GetWorkspaceIamPolicy(ctx)
