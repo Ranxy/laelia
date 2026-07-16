@@ -124,7 +124,8 @@
       "deleted": "角色已删除",
       "delete-failed": "删除角色失败",
       "delete-confirm-title": "删除角色",
-      "delete-confirm-description": "确定删除角色\"{{title}}\"?被分配该角色的用户将失去其权限。"
+      "delete-confirm-description": "确定删除角色\"{{title}}\"?被分配该角色的用户将失去其权限。",
+      "view-no-description": "暂无描述"
     },
     "iam": {
       "title": "访问控制",
@@ -295,14 +296,7 @@
     "acp-config-save-failed": "保存 ACP 配置失败",
     "row-open-detail": "打开 Agent {{title}} 详情",
     "delete-confirm-title": "删除 Agent",
-    "delete-confirm-description": "确定要删除 Agent {{title}} 吗?此操作无法撤销。",
-    "editors": {
-      "title": "编辑者",
-      "empty": "暂无额外编辑者。仅创建者与工作区管理员可编辑此 agent。",
-      "add-placeholder": "添加用户为编辑者",
-      "added": "已添加编辑者",
-      "removed": "已移除编辑者"
-    }
+    "delete-confirm-description": "确定要删除 Agent {{title}} 吗?此操作无法撤销。"
   },
   "command": {
     "status-unknown": "未知",

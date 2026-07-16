@@ -104,35 +104,6 @@ func (s *Store) upsertIamPolicy(ctx context.Context, resourceType models.Policy_
 	return err
 }
 
-// seedAgentEditorBindingTx upserts the agent's IAM policy with a single
-// roles/agentEditor binding whose only member is the creator. It runs inside the
-// CreateAgent transaction so a crash cannot leave a creator-locked-out agent.
-// It is a no-op when creatorUID is zero (legacy/system-created agents).
-func seedAgentEditorBindingTx(ctx context.Context, tx *sql.Tx, agentResourceID string, creatorUID int) error {
-	if creatorUID == 0 {
-		return nil
-	}
-	policy := &models.IamPolicy{
-		Bindings: []*models.Binding{{
-			Role:    common.FormatRole(AgentEditorRole),
-			Members: []string{common.FormatUserUID(creatorUID)},
-		}},
-	}
-	payload, err := protojson.Marshal(policy)
-	if err != nil {
-		return err
-	}
-	_, err = upsertPolicyV2Impl(ctx, tx, &PolicyMessage{
-		ResourceType:      models.Policy_AGENT,
-		Resource:          common.FormatAgentUID(agentResourceID),
-		Payload:           string(payload),
-		Type:              models.Policy_IAM,
-		InheritFromParent: false,
-		Enforce:           true,
-	})
-	return err
-}
-
 type PatchIamPolicyMessage struct {
 	Member string
 	Roles  []string

@@ -111,7 +111,7 @@ var workspaceOnlyRoles = map[string]bool{
 // validateIamPolicy checks every binding before a Set. agentScoped reports
 // whether the policy is attached to an agent (true) or the workspace (false).
 // It rejects unknown roles, chat-role labels (which are chat-membership
-// markers, never IAM bindings), roles scoped to the wrong policy type, and
+// markers, never IAM bindings), workspace-scoped roles bound on an agent, and
 // malformed member strings — so a management UI cannot corrupt the engine.
 func validateIamPolicy(ctx context.Context, s *store.Store, policy *storepb.IamPolicy, agentScoped bool) error {
 	if policy == nil {
@@ -127,9 +127,6 @@ func validateIamPolicy(ctx context.Context, s *store.Store, policy *storepb.IamP
 		}
 		if workspaceOnlyRoles[resourceID] && agentScoped {
 			return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("role %q is workspace-scoped and cannot be bound on an agent", binding.GetRole()))
-		}
-		if resourceID == store.AgentEditorRole && !agentScoped {
-			return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("role %q is agent-scoped and cannot be bound on the workspace", binding.GetRole()))
 		}
 		role, err := s.GetRoleSnapshot(ctx, resourceID)
 		if err != nil {

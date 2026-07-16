@@ -78,10 +78,11 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("agent title must be set"))
 	}
 
-	// Record the creator so the agentEditor IAM binding can be seeded for them
-	// (seedAgentEditorBindingTx), granting agents.edit to the creator. CreateAgent
-	// is admin-tier, so a user is always present; guard defensively against a
-	// missing one.
+	// Record the creator for display (Agent.created_by). CreateAgent is
+	// admin-tier (only workspaceAdmin holds laelia.agents.create), so a user is
+	// always present; guard defensively against a missing one. Editing the agent
+	// is authorized by the workspaceAdmin role (which holds agents.edit via the
+	// all-permissions union), not by a per-agent binding.
 	creatorID := 0
 	if user, _ := GetUserFromContext(ctx); user != nil {
 		creatorID = user.ID
@@ -192,11 +193,13 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 	return connect.NewResponse(out), nil
 }
 
-// canEditAgent reports whether the caller holds laelia.agents.edit on the agent
-// (creator via the agentEditor binding, or any workspace admin via the
-// all-permissions union). A lookup failure is treated as not-editable
-// (fail-closed) so a stale can_edit never grants modification. Agent-daemon
-// callers and unauthenticated requests get false.
+// canEditAgent reports whether the caller holds laelia.agents.edit on the
+// agent. With the per-agent editor role removed, agents.edit is granted only by
+// the workspaceAdmin role (via the all-permissions union) and by any custom
+// role bound on the agent's IAM policy that includes agents.edit. A lookup
+// failure is treated as not-editable (fail-closed) so a stale can_edit never
+// grants modification. Agent-daemon callers and unauthenticated requests get
+// false.
 func (s *AgentService) canEditAgent(ctx context.Context, user *store.UserMessage, agentName string) bool {
 	if user == nil || s.iam == nil {
 		return false

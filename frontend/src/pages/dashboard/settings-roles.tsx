@@ -74,7 +74,6 @@ export function SettingsRolesPage() {
   const canCreate = useHasPermission("laelia.roles.create");
   const canUpdate = useHasPermission("laelia.roles.update");
   const canDelete = useHasPermission("laelia.roles.delete");
-  const canManage = canUpdate || canDelete;
 
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,6 +92,9 @@ export function SettingsRolesPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Role | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewTarget, setViewTarget] = useState<Role | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -139,6 +141,25 @@ export function SettingsRolesPage() {
     setEditOpen(true);
   }
 
+  function openView(role: Role) {
+    setViewTarget(role);
+    setViewOpen(true);
+  }
+
+  function openEditFromView() {
+    if (!viewTarget) return;
+    const target = viewTarget;
+    setViewOpen(false);
+    openEdit(target);
+  }
+
+  function openDeleteFromView() {
+    if (!viewTarget) return;
+    setDeleteTarget(viewTarget);
+    setViewOpen(false);
+    setDeleteOpen(true);
+  }
+
   function togglePermission(
     form: RoleForm,
     perm: string
@@ -146,6 +167,15 @@ export function SettingsRolesPage() {
     const next = { ...form.permissions, [perm]: !form.permissions[perm] };
     if (!next[perm]) delete next[perm];
     return next;
+  }
+
+  // viewPermissions builds a permission map for the read-only view sheet from a
+  // role's permission list.
+  function viewPermissions(role: Role | null): Record<string, boolean> {
+    const perms: Record<string, boolean> = {};
+    if (!role) return perms;
+    for (const p of role.permissions) perms[p] = true;
+    return perms;
   }
 
   async function handleCreate() {
@@ -270,14 +300,13 @@ export function SettingsRolesPage() {
               <TableHead>{t("settings.roles.header-description")}</TableHead>
               <TableHead>{t("settings.roles.header-permissions")}</TableHead>
               <TableHead>{t("settings.roles.header-type")}</TableHead>
-              {canManage && <TableHead>{t("common.actions")}</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {roles.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={canManage ? 5 : 4}
+                  colSpan={4}
                   className="text-center text-control-light"
                 >
                   {t("common.no-data")}
@@ -285,7 +314,11 @@ export function SettingsRolesPage() {
               </TableRow>
             ) : (
               roles.map((role) => (
-                <TableRow key={role.name}>
+                <TableRow
+                  key={role.name}
+                  className="cursor-pointer hover:bg-control-hover/40"
+                  onClick={() => openView(role)}
+                >
                   <TableCell className="font-medium">{role.title}</TableCell>
                   <TableCell className="text-control-light">
                     {role.description || "-"}
@@ -308,39 +341,64 @@ export function SettingsRolesPage() {
                       </Badge>
                     )}
                   </TableCell>
-                  {canManage && (
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {canUpdate && !role.predefined && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openEdit(role)}
-                          >
-                            {t("common.edit")}
-                          </Button>
-                        )}
-                        {canDelete && !role.predefined && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setDeleteTarget(role);
-                              setDeleteOpen(true);
-                            }}
-                          >
-                            {t("common.delete")}
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  )}
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       )}
+
+      {/* View role (read-only permissions; edit/delete for custom roles) */}
+      <Sheet
+        open={viewOpen}
+        onOpenChange={(next) => {
+          setViewOpen(next);
+          if (!next) setViewTarget(null);
+        }}
+      >
+        <SheetContent width="standard">
+          <SheetTitle>{viewTarget?.title ?? ""}</SheetTitle>
+          <SheetDescription>
+            {viewTarget?.description || t("settings.roles.view-no-description")}
+          </SheetDescription>
+          <SheetBody>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                {viewTarget?.predefined ? (
+                  <Badge variant="success">
+                    {t("settings.roles.type-predefined")}
+                  </Badge>
+                ) : (
+                  <Badge variant="warning">
+                    {t("settings.roles.type-custom")}
+                  </Badge>
+                )}
+                <span className="font-mono text-xs text-control-light">
+                  {viewTarget ? roleIDFromName(viewTarget.name) : ""}
+                </span>
+              </div>
+              <PermissionGrid
+                permissions={viewPermissions(viewTarget)}
+                onToggle={() => {}}
+                disabled
+              />
+            </div>
+          </SheetBody>
+          <SheetFooter>
+            <Button variant="outline" onClick={() => setViewOpen(false)}>
+              {t("common.close")}
+            </Button>
+            {viewTarget && !viewTarget.predefined && canUpdate && (
+              <Button onClick={openEditFromView}>{t("common.edit")}</Button>
+            )}
+            {viewTarget && !viewTarget.predefined && canDelete && (
+              <Button variant="destructive" onClick={openDeleteFromView}>
+                {t("common.delete")}
+              </Button>
+            )}
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* Create role */}
       <Sheet
@@ -578,9 +636,11 @@ function FieldRow({
 function PermissionGrid({
   permissions,
   onToggle,
+  disabled = false,
 }: {
   permissions: Record<string, boolean>;
   onToggle: (perm: string) => void;
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -608,6 +668,7 @@ function PermissionGrid({
                     checked={!!permissions[perm]}
                     onCheckedChange={() => onToggle(perm)}
                     size="sm"
+                    disabled={disabled}
                   />
                   <span className="font-mono text-xs">
                     {permissionLabel(perm)}

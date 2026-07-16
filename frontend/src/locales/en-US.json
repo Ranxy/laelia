@@ -124,7 +124,8 @@
       "deleted": "Role deleted",
       "delete-failed": "Failed to delete role",
       "delete-confirm-title": "Delete role",
-      "delete-confirm-description": "Delete the role \"{{title}}\"? Users assigned this role will lose its permissions."
+      "delete-confirm-description": "Delete the role \"{{title}}\"? Users assigned this role will lose its permissions.",
+      "view-no-description": "No description"
     },
     "iam": {
       "title": "Access",
@@ -295,14 +296,7 @@
     "acp-config-save-failed": "Failed to save ACP config",
     "row-open-detail": "Open agent {{title}} details",
     "delete-confirm-title": "Delete agent",
-    "delete-confirm-description": "Are you sure you want to delete agent {{title}}? This cannot be undone.",
-    "editors": {
-      "title": "Editors",
-      "empty": "No additional editors. Only the creator and workspace admins can edit this agent.",
-      "add-placeholder": "Add a user as editor",
-      "added": "Editor added",
-      "removed": "Editor removed"
-    }
+    "delete-confirm-description": "Are you sure you want to delete agent {{title}}? This cannot be undone."
   },
   "command": {
     "status-unknown": "Unknown",

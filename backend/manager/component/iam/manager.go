@@ -98,9 +98,9 @@ func (m *Manager) CheckPermission(ctx context.Context, perm permission.Permissio
 }
 
 // checkResourcePermission authorizes a resource-scoped permission. For an
-// agent it loads the agentEditor IAM policy (creator binding). For a
-// conversation it does NOT use the IAM policy table — chat authorization is
-// membership-based: it reads the caller's chat role from conversation_member
+// agent it consults the agent's IAM policy (custom roles bound on the agent).
+// For a conversation it does NOT use the IAM policy table — chat authorization
+// is membership-based: it reads the caller's chat role from conversation_member
 // and maps it to conversation permissions (member/admin/owner). A non-member
 // user may still read an agent-DM (type 3) if they hold the workspace-scope
 // conversations.reviewAgentDM permission. A resource type without a handler
@@ -173,26 +173,63 @@ func (m *Manager) checkConversationPermission(ctx context.Context, perm permissi
 	return false, nil
 }
 
-// chatRolePermissions maps a conversation_member chat role to its predefined
-// role's permission set. MemberRoleMember→conversationMember,
-// MemberRoleAdmin→conversationAdmin, MemberRoleOwner→conversationOwner. Any
-// other value (including 0 = not a member) yields nil.
+// chatRolePermissions maps a conversation_member chat role to its permission
+// set. These are chat-membership markers, not IAM roles: a caller's chat role
+// is read from conversation_member and mapped to one of these sets by the
+// engine's conversation branch. They are deliberately not in
+// store.PredefinedRoles (so they never appear on the management Roles page)
+// and the iam_service handler rejects them as IAM bindings. Owner-only
+// operations (delete channel, transfer ownership, grant/revoke admin) are gated
+// by an in-handler role==Owner check, so they need no separate catalog
+// permission. Any value other than member/admin/owner (including 0 = not a
+// member) yields nil.
 func chatRolePermissions(role int32) map[permission.Permission]bool {
-	var roleID string
 	switch role {
 	case store.MemberRoleOwner:
-		roleID = store.ConversationOwnerRole
+		return chatOwnerPermissions
 	case store.MemberRoleAdmin:
-		roleID = store.ConversationAdminRole
+		return chatAdminPermissions
 	case store.MemberRoleMember:
-		roleID = store.ConversationMemberRole
+		return chatMemberPermissions
 	default:
 		return nil
 	}
-	if r := store.GetPredefinedRole(roleID); r != nil {
-		return r.Permissions
+}
+
+// chatMemberPermissions / chatAdminPermissions / chatOwnerPermissions are the
+// chat role→permission maps. Admin and owner share the same catalog perms;
+// owner's extra authority (delete/transfer/grant-admin) is enforced by direct
+// role==Owner checks in the handlers, not by catalog permissions.
+var (
+	chatMemberPermissions = permSet(
+		permission.ConversationsRead,
+		permission.ConversationsSend,
+		permission.CommandsGet,
+		permission.CommandsWatch,
+	)
+	chatAdminPermissions = permSet(
+		permission.ConversationsRead,
+		permission.ConversationsSend,
+		permission.ConversationsManage,
+		permission.CommandsGet,
+		permission.CommandsWatch,
+	)
+	chatOwnerPermissions = permSet(
+		permission.ConversationsRead,
+		permission.ConversationsSend,
+		permission.ConversationsManage,
+		permission.CommandsGet,
+		permission.CommandsWatch,
+	)
+)
+
+// permSet builds an immutable permission set from the given permissions.
+func permSet(perms ...permission.Permission) map[permission.Permission]bool {
+	m := make(map[permission.Permission]bool, len(perms))
+	for _, p := range perms {
+		m[p] = true
 	}
-	return nil
+	return m
 }
 
 // callerMemberInfo maps a caller to its conversation_member (memberType,
@@ -213,10 +250,10 @@ func callerMemberInfo(user *store.UserMessage, agent *store.AgentMessage) (membe
 // set: the roles/workspaceMember baseline (granted to every authenticated
 // principal) unioned with the permissions of every role the user holds in the
 // workspace IAM policy. Per-resource permissions (conversations.read/send/manage
-// on a specific conversation, agents.edit via an agentEditor binding) are NOT
-// represented here — they are resolved per resource by CheckPermission and
-// surfaced on the relevant resource (e.g. Agent.can_edit). For a workspaceAdmin
-// the union is the full catalog, so admin-tier workspace perms are included.
+// on a specific conversation) are NOT represented here — they are resolved per
+// resource by CheckPermission and surfaced on the relevant resource. For a
+// workspaceAdmin the union is the full catalog, so admin-tier workspace perms
+// (including agents.edit, reviewAgentDM, reviewAll) are included.
 //
 // Used by GetCurrentUser to populate User.permissions for frontend gating.
 func (m *Manager) EffectiveWorkspacePermissions(ctx context.Context, user *store.UserMessage) ([]permission.Permission, error) {

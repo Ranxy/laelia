@@ -254,15 +254,6 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 		return nil, err
 	}
 
-	// Seed a per-agent IAM policy granting roles/agentEditor to the creator so the
-	// interceptor's agents.edit check (Phase 2) recognizes the creator. Runs in
-	// the same tx so a crash cannot leave a creator-locked-out agent. A legacy or
-	// system-created agent (CreatedBy == 0) gets no binding; only workspaceAdmin
-	// may edit those (workspaceAdmin's permission set includes agents.edit).
-	if err := seedAgentEditorBindingTx(ctx, tx, resourceID, create.CreatedBy); err != nil {
-		return nil, err
-	}
-
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}

@@ -1,5 +1,5 @@
-import { Code, ConnectError } from "@connectrpc/connect";
 import { create } from "@bufbuild/protobuf";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -35,10 +35,10 @@ import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/auth";
 import {
-  BindingSchema,
   type Binding,
-  IamPolicySchema,
+  BindingSchema,
   type IamPolicy,
+  IamPolicySchema,
 } from "@/types/proto-es/store/policy_pb";
 import { type Role } from "@/types/proto-es/v1/role_service_pb";
 import { type User } from "@/types/proto-es/v1/user_service_pb";
@@ -49,19 +49,12 @@ function roleIDFromName(name: string | undefined): string {
   return name.startsWith("roles/") ? name.slice("roles/".length) : name;
 }
 
-// NON_GRANTABLE_WORKSPACE_ROLE_IDS lists predefined roles that must not be
-// offered on the workspace policy: workspaceMember is auto-granted to everyone,
-// the conversation* roles are chat-membership markers managed on the channel,
-// and agentEditor is agent-scoped (set per-agent, not on the workspace). The
-// backend handler rejects these on SetWorkspaceIamPolicy, so the UI must not
-// offer them.
-const NON_GRANTABLE_WORKSPACE_ROLE_IDS = new Set([
-  "workspaceMember",
-  "conversationMember",
-  "conversationAdmin",
-  "conversationOwner",
-  "agentEditor",
-]);
+// NON_GRANTABLE_WORKSPACE_ROLE_IDS lists roles that must not be offered on the
+// workspace policy. workspaceMember is the auto-granted authenticated-principal
+// baseline, so assigning it is a no-op. (The chat-membership markers and the
+// removed agentEditor/reviewer roles are no longer returned by listRoles at
+// all, so they do not need listing here.)
+const NON_GRANTABLE_WORKSPACE_ROLE_IDS = new Set(["workspaceMember"]);
 
 function isGrantableWorkspaceRole(role: Role): boolean {
   return !NON_GRANTABLE_WORKSPACE_ROLE_IDS.has(roleIDFromName(role.name));

@@ -2,8 +2,12 @@ package store
 
 import "github.com/Ranxy/laelia/backend/common/permission"
 
-// Predefined role IDs. Predefined roles are defined in Go (not seeded into the
-// role table) and cannot be overwritten by a DB row of the same resource_id.
+// Well-known role identifiers. Only WorkspaceAdminRole and WorkspaceMemberRole
+// are predefined roles (defined in Go, read-only over the API, resolvable
+// in-memory). The conversation* identifiers are chat-membership markers (not
+// IAM roles) used by component/iam.chatRolePermissions and rejected as IAM
+// bindings by the iam_service handler. The agentEditor / reviewer identifiers
+// are retained as constants for reference but are no longer predefined roles.
 const (
 	WorkspaceAdminRole     = "workspaceAdmin"
 	WorkspaceMemberRole    = "workspaceMember"
@@ -46,9 +50,9 @@ var allPermissionSet = func() map[permission.Permission]bool {
 // owning agent + reviewAll). The per-conversation perms (conversations.
 // read/send/manage) and agents.edit are deliberately absent: they are
 // authorized per-resource — by the caller's chat role (conversation_member) for
-// conversations and by the agentEditor IAM binding for agents. The review perms
-// (reviewAgentDM, reviewAll) are also absent: they are granted only via the
-// agentDMReviewer / oversightReviewer / workspaceAdmin roles.
+// conversations, and by the workspaceAdmin role (which holds agents.edit via the
+// all-permissions union) for agents. The review perms (reviewAgentDM, reviewAll)
+// are also absent: they are granted only via workspaceAdmin.
 var memberBaselinePermissions = permissionSet(
 	permission.AgentsGet,
 	permission.ConversationsCreate,
@@ -66,8 +70,15 @@ var memberBaselinePermissions = permissionSet(
 	permission.FilesList,
 )
 
-// PredefinedRoles contains all predefined roles. The list is the single source
-// of truth for the role->permission matrix of built-in roles.
+// PredefinedRoles are the read-only, Go-defined roles shown on the management
+// Roles page and resolvable in-memory by the engine. Only the two workspace
+// tiers are predefined: workspaceAdmin (the full catalog) and workspaceMember
+// (the authenticated-principal baseline). Conversation roles
+// (conversationMember/Admin/Owner) are not roles — they are chat-membership
+// markers whose permission sets live in component/iam.chatRolePermissions — and
+// agentEditor / the reviewer roles were removed, so their capabilities
+// (per-agent editing, agent-DM/oversight review) are now obtainable only via
+// workspaceAdmin.
 var PredefinedRoles = []*RoleMessage{
 	{
 		ResourceID:  WorkspaceAdminRole,
@@ -80,75 +91,6 @@ var PredefinedRoles = []*RoleMessage{
 		Name:        "Workspace member",
 		Predefined:  true,
 		Permissions: memberBaselinePermissions,
-	},
-	// Conversation roles are the chat role→permission maps used by the IAM
-	// engine's conversation branch (chatRolePermissions in component/iam). They
-	// are NOT IAM bindings: a caller's chat role is read from conversation_member
-	// and mapped to one of these permission sets. Owner-only operations (delete
-	// channel, transfer ownership, grant/revoke admin) are gated by an in-handler
-	// role==Owner check, so they need no separate catalog permission.
-	{
-		ResourceID: ConversationMemberRole,
-		Name:       "Conversation member",
-		Predefined: true,
-		Permissions: permissionSet(
-			permission.ConversationsRead,
-			permission.ConversationsSend,
-			permission.CommandsGet,
-			permission.CommandsWatch,
-		),
-	},
-	{
-		ResourceID: ConversationAdminRole,
-		Name:       "Conversation admin",
-		Predefined: true,
-		Permissions: permissionSet(
-			permission.ConversationsRead,
-			permission.ConversationsSend,
-			permission.ConversationsManage,
-			permission.CommandsGet,
-			permission.CommandsWatch,
-		),
-	},
-	{
-		ResourceID: ConversationOwnerRole,
-		Name:       "Conversation owner",
-		Predefined: true,
-		Permissions: permissionSet(
-			permission.ConversationsRead,
-			permission.ConversationsSend,
-			permission.ConversationsManage,
-			permission.CommandsGet,
-			permission.CommandsWatch,
-		),
-	},
-	{
-		ResourceID: AgentEditorRole,
-		Name:       "Agent editor",
-		Predefined: true,
-		Permissions: permissionSet(
-			permission.AgentsEdit,
-		),
-	},
-	// Reviewer roles make the grantable review perms assignable to non-admins via
-	// the workspace IAM policy. workspaceAdmin already holds them through the
-	// all-permissions union.
-	{
-		ResourceID: AgentDMReviewerRole,
-		Name:       "Agent-DM reviewer",
-		Predefined: true,
-		Permissions: permissionSet(
-			permission.ConversationsReviewAgentDM,
-		),
-	},
-	{
-		ResourceID: OversightReviewerRole,
-		Name:       "Oversight reviewer",
-		Predefined: true,
-		Permissions: permissionSet(
-			permission.ConversationsReviewAgentDM,
-			permission.ConversationsReviewAll,
-		),
 	},
 }
 
