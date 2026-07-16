@@ -1,6 +1,7 @@
 .vscode
 .reasonix
 reasonix.toml
+.mcp.json
 build/
 temp/
 docs/review

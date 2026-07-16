@@ -561,8 +561,8 @@ func (s *Store) MarkMissedAndPostNotification(ctx context.Context, msgID uuid.UU
 		if err := tx.QueryRowContext(ctx, `
 			UPDATE reminder
 			   SET last_attempt_at = now(), retry_count = 0, next_retry_at = NULL,
-			       status = $5, fire_at = $3, updated_at = now()
-			 WHERE message_id = $1 AND status = $4
+			       status = $4, fire_at = $2, updated_at = now()
+			 WHERE message_id = $1 AND status = $3
 			RETURNING conversation_id, retry_count
 		`, msgID, *nextFireAt, ReminderStatusDue, ReminderStatusPending).Scan(&convID, &retryCount); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
