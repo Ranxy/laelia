@@ -180,7 +180,7 @@ func (s *Server) Run(ctx context.Context, port int) error {
 	// port — and only when runtime debug is enabled and an address is set.
 	// Heap/goroutine/profile dumps are sensitive; binding to localhost keeps
 	// them off the network. The lifecycle mirrors the http server.
-	if s.profile.RuntimeDebug.Load() && s.profile.PprofAddr != "" {
+	if s.profile.PprofAddr != "" {
 		s.pprofServer = newPprofServer(s.profile.PprofAddr)
 		go func() {
 			slog.Info("starting pprof server", "addr", s.profile.PprofAddr)

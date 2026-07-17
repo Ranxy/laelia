@@ -22,10 +22,6 @@ type Profile struct {
 	TLSDataDir string
 	TLSHosts   []string
 
-	// DisableACP disables ACP task submission for non-admin users.
-	// When true, only workspace admins can send ACP tasks (controlled rollout).
-	DisableACP bool
-
 	// TrustProxy controls whether client-supplied forwarding headers
 	// (X-Forwarded-For / X-Real-IP) are trusted as the request source IP. Enable
 	// only when the server sits behind a trusted reverse proxy that overwrites
@@ -41,8 +37,7 @@ type Profile struct {
 
 	// PprofAddr is the bind address for the standalone pprof HTTP server, e.g.
 	// "127.0.0.1:6060". Empty disables pprof entirely. pprof is served on a
-	// separate listener (never the public port) and only when RuntimeDebug is
-	// enabled, so heap/goroutine dumps are not exposed unauthenticated on the
-	// network. Bind to localhost or an admin-only address.
+	// separate listener (never the public port) so heap/goroutine dumps are not exposed unauthenticated
+	// on the network. Bind to localhost or an admin-only address.
 	PprofAddr string
 }

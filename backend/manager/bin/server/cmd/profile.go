@@ -15,7 +15,6 @@ func getBaseProfile(_ string) *config.Profile {
 		PgURL:      os.Getenv("LAELIA_PG_URL"),
 		TLSCertDir: flags.tlsCertDir,
 		TLSDomain:  flags.tlsDomain,
-		DisableACP: flags.disableACP,
 		TrustProxy: flags.trustProxy,
 		PprofAddr:  flags.pprofAddr,
 	}
