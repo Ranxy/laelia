@@ -33,6 +33,7 @@ import { RemoteImage } from "@/components/chat/remote-image";
 import { EmptyState, LoadingState } from "@/components/chat/states";
 import { TasksPanel } from "@/components/chat/tasks-panel";
 import { ThreadPanel } from "@/components/chat/thread-panel";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -1053,7 +1054,7 @@ export function ChatConversationPage() {
         open={membersOpen}
         onOpenChange={(open) => !open && setMembersOpen(false)}
       >
-        <SheetContent width="narrow">
+        <SheetContent width="medium">
           <SheetHeader>
             <SheetTitle>
               {t("channel.members", { count: members.length })}
@@ -1062,27 +1063,29 @@ export function ChatConversationPage() {
           <SheetBody className="flex flex-col gap-0">
             {membersLoading && <LoadingState />}
             {!membersLoading && (
-              <div className="divide-y divide-control-border">
+              <div className="flex flex-col gap-2">
                 {members.map((m) => (
                   <div
                     key={`${m.memberType}-${m.memberId}`}
-                    className="flex items-center gap-3 px-1 py-3"
+                    className="flex items-center gap-3 rounded-xs border border-control-border bg-background p-3 transition-colors hover:bg-control-bg/60"
                   >
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-control-bg text-control text-xs font-medium">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent text-sm font-medium">
                       {(m.displayName || m.memberId).charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm text-main truncate">
+                      <p className="text-sm font-medium text-main truncate">
                         {m.displayName || m.memberId}
                       </p>
-                      <p className="text-xs text-control-placeholder flex items-center gap-1.5 mt-0.5">
-                        <span>{memberTypeLabel(t, m.memberType)}</span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs text-control-light">
+                          {memberTypeLabel(t, m.memberType)}
+                        </span>
                         {m.memberRole === 1 && (
-                          <span className="rounded bg-accent/10 text-accent px-1.5 py-0 text-[10px] font-medium">
+                          <Badge variant="success" className="text-xs">
                             Owner
-                          </span>
+                          </Badge>
                         )}
-                      </p>
+                      </div>
                     </div>
                     {/* DMs have fixed membership (user + agent); only channel
                         owners can remove members. */}
@@ -1107,47 +1110,57 @@ export function ChatConversationPage() {
             {/* Add member section — channels only (both DM shapes are fixed
                 1:1 rosters: user+agent and agent+agent). */}
             {!membershipFixed && isOwner && (
-              <div className="mt-auto border-t border-control-border pt-4 px-1">
+              <div className="mt-4 border-t border-control-border pt-5">
                 {addMemberOpen ? (
-                  <div className="space-y-3">
-                    <div className="flex gap-2">
-                      <Button
-                        variant={addMemberType === 1 ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setAddMemberType(1)}
-                        className="flex-1"
-                      >
-                        {t("channel.member-type-user")}
-                      </Button>
-                      <Button
-                        variant={addMemberType === 2 ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setAddMemberType(2)}
-                        className="flex-1"
-                      >
-                        {t("channel.member-type-agent")}
-                      </Button>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-control">
+                        {t("channel.member-type-label")}
+                      </span>
+                      <div className="flex gap-2">
+                        <Button
+                          variant={addMemberType === 1 ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setAddMemberType(1)}
+                          className="flex-1"
+                        >
+                          {t("channel.member-type-user")}
+                        </Button>
+                        <Button
+                          variant={addMemberType === 2 ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setAddMemberType(2)}
+                          className="flex-1"
+                        >
+                          {t("channel.member-type-agent")}
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <MemberPicker
-                        key={addMemberType}
-                        memberType={addMemberType}
-                        existingMemberIds={existingMemberIds}
-                        value={addMemberId}
-                        onPick={setAddMemberId}
-                        placeholder={t("channel.member-id-placeholder")}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setAddMemberOpen(false);
-                          setAddMemberId("");
-                        }}
-                        className="size-7 p-0"
-                      >
-                        <X className="size-3.5" />
-                      </Button>
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-control">
+                        {t("channel.member-id-label")}
+                      </span>
+                      <div className="flex gap-2">
+                        <MemberPicker
+                          key={addMemberType}
+                          memberType={addMemberType}
+                          existingMemberIds={existingMemberIds}
+                          value={addMemberId}
+                          onPick={setAddMemberId}
+                          placeholder={t("channel.member-id-placeholder")}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setAddMemberOpen(false);
+                            setAddMemberId("");
+                          }}
+                          className="size-7 p-0"
+                        >
+                          <X className="size-3.5" />
+                        </Button>
+                      </div>
                     </div>
                     <Button
                       onClick={handleAddMember}

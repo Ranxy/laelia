@@ -1,4 +1,4 @@
-import { Loader2, Save } from "lucide-react";
+import { Key, Loader2, Save } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert } from "@/components/ui/alert";
@@ -20,6 +20,7 @@ import {
   SheetContent,
   SheetDescription,
   SheetFooter,
+  SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
@@ -277,11 +278,14 @@ export function SettingsRolesPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6 flex flex-col gap-4 w-full">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-main">
-          {t("settings.roles.title")}
-        </h1>
+    <div className="h-full overflow-y-auto p-6 flex flex-col gap-5 w-full">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-semibold text-main flex items-center gap-2">
+            <Key className="size-5 text-accent" />
+            {t("settings.roles.title")}
+          </h1>
+        </div>
         {canCreate && (
           <Button onClick={openCreate}>{t("common.create")}</Button>
         )}
@@ -293,59 +297,69 @@ export function SettingsRolesPage() {
           {t("common.loading")}
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("settings.roles.header-title")}</TableHead>
-              <TableHead>{t("settings.roles.header-description")}</TableHead>
-              <TableHead>{t("settings.roles.header-permissions")}</TableHead>
-              <TableHead>{t("settings.roles.header-type")}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {roles.length === 0 ? (
+        <div className="rounded-xs border border-control-border bg-background shadow-xs overflow-hidden">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell
-                  colSpan={4}
-                  className="text-center text-control-light"
-                >
-                  {t("common.no-data")}
-                </TableCell>
+                <TableHead className="w-[25%]">
+                  {t("settings.roles.header-title")}
+                </TableHead>
+                <TableHead>{t("settings.roles.header-description")}</TableHead>
+                <TableHead className="w-[15%]">
+                  {t("settings.roles.header-permissions")}
+                </TableHead>
+                <TableHead className="w-[15%]">
+                  {t("settings.roles.header-type")}
+                </TableHead>
               </TableRow>
-            ) : (
-              roles.map((role) => (
-                <TableRow
-                  key={role.name}
-                  className="cursor-pointer hover:bg-control-hover/40"
-                  onClick={() => openView(role)}
-                >
-                  <TableCell className="font-medium">{role.title}</TableCell>
-                  <TableCell className="text-control-light">
-                    {role.description || "-"}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-control-light">
-                      {t("settings.roles.permission-count", {
-                        count: role.permissions.length,
-                      })}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {role.predefined ? (
-                      <Badge variant="success">
-                        {t("settings.roles.type-predefined")}
-                      </Badge>
-                    ) : (
-                      <Badge variant="warning">
-                        {t("settings.roles.type-custom")}
-                      </Badge>
-                    )}
+            </TableHeader>
+            <TableBody>
+              {roles.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={4}
+                    className="text-center text-control-light py-12"
+                  >
+                    {t("common.no-data")}
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                roles.map((role) => (
+                  <TableRow
+                    key={role.name}
+                    className="cursor-pointer hover:bg-control-hover/40"
+                    onClick={() => openView(role)}
+                  >
+                    <TableCell className="font-medium align-top">
+                      {role.title}
+                    </TableCell>
+                    <TableCell className="text-control-light align-top">
+                      {role.description || "-"}
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <span className="text-sm text-control-light">
+                        {t("settings.roles.permission-count", {
+                          count: role.permissions.length,
+                        })}
+                      </span>
+                    </TableCell>
+                    <TableCell className="align-top">
+                      {role.predefined ? (
+                        <Badge variant="success">
+                          {t("settings.roles.type-predefined")}
+                        </Badge>
+                      ) : (
+                        <Badge variant="warning">
+                          {t("settings.roles.type-custom")}
+                        </Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       {/* View role (read-only permissions; edit/delete for custom roles) */}
@@ -356,13 +370,16 @@ export function SettingsRolesPage() {
           if (!next) setViewTarget(null);
         }}
       >
-        <SheetContent width="standard">
-          <SheetTitle>{viewTarget?.title ?? ""}</SheetTitle>
-          <SheetDescription>
-            {viewTarget?.description || t("settings.roles.view-no-description")}
-          </SheetDescription>
+        <SheetContent width="medium">
+          <SheetHeader>
+            <SheetTitle>{viewTarget?.title ?? ""}</SheetTitle>
+            <SheetDescription>
+              {viewTarget?.description ||
+                t("settings.roles.view-no-description")}
+            </SheetDescription>
+          </SheetHeader>
           <SheetBody>
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-5">
               <div className="flex items-center gap-2">
                 {viewTarget?.predefined ? (
                   <Badge variant="success">
@@ -408,22 +425,28 @@ export function SettingsRolesPage() {
           if (!next) resetCreate();
         }}
       >
-        <SheetContent width="standard">
-          <SheetTitle>{t("settings.roles.create-title")}</SheetTitle>
-          <SheetDescription>
-            {t("settings.roles.create-description")}
-          </SheetDescription>
+        <SheetContent width="medium">
+          <SheetHeader>
+            <SheetTitle>{t("settings.roles.create-title")}</SheetTitle>
+            <SheetDescription>
+              {t("settings.roles.create-description")}
+            </SheetDescription>
+          </SheetHeader>
           <SheetBody>
             {createError && (
               <Alert
                 variant="error"
                 description={createError}
-                className="mb-4"
+                className="mb-2"
               />
             )}
-            <div className="flex flex-col gap-4">
-              <FieldRow label={t("settings.roles.field-title")}>
+            <div className="flex flex-col gap-5">
+              <FieldRow
+                label={t("settings.roles.field-title")}
+                htmlFor="role-title"
+              >
                 <Input
+                  id="role-title"
                   value={createForm.title}
                   placeholder={t("settings.roles.field-title-placeholder")}
                   onChange={(e) => {
@@ -439,8 +462,10 @@ export function SettingsRolesPage() {
               <FieldRow
                 label={t("settings.roles.field-id")}
                 hint={t("settings.roles.field-id-hint")}
+                htmlFor="role-id"
               >
                 <Input
+                  id="role-id"
                   value={createForm.resourceID}
                   placeholder={t("settings.roles.field-id-placeholder")}
                   onChange={(e) =>
@@ -451,8 +476,12 @@ export function SettingsRolesPage() {
                   }
                 />
               </FieldRow>
-              <FieldRow label={t("settings.roles.field-description")}>
+              <FieldRow
+                label={t("settings.roles.field-description")}
+                htmlFor="role-description"
+              >
                 <Textarea
+                  id="role-description"
                   className="min-h-[60px]"
                   value={createForm.description}
                   placeholder={t(
@@ -506,28 +535,40 @@ export function SettingsRolesPage() {
           if (!next) setEditTarget(null);
         }}
       >
-        <SheetContent width="standard">
-          <SheetTitle>
-            {t("settings.roles.edit-title", { title: editTarget?.title ?? "" })}
-          </SheetTitle>
-          <SheetDescription>
-            {t("settings.roles.edit-description")}
-          </SheetDescription>
+        <SheetContent width="medium">
+          <SheetHeader>
+            <SheetTitle>
+              {t("settings.roles.edit-title", {
+                title: editTarget?.title ?? "",
+              })}
+            </SheetTitle>
+            <SheetDescription>
+              {t("settings.roles.edit-description")}
+            </SheetDescription>
+          </SheetHeader>
           <SheetBody>
             {editError && (
-              <Alert variant="error" description={editError} className="mb-4" />
+              <Alert variant="error" description={editError} className="mb-2" />
             )}
-            <div className="flex flex-col gap-4">
-              <FieldRow label={t("settings.roles.field-title")}>
+            <div className="flex flex-col gap-5">
+              <FieldRow
+                label={t("settings.roles.field-title")}
+                htmlFor="edit-title"
+              >
                 <Input
+                  id="edit-title"
                   value={editForm.title}
                   onChange={(e) =>
                     setEditForm((prev) => ({ ...prev, title: e.target.value }))
                   }
                 />
               </FieldRow>
-              <FieldRow label={t("settings.roles.field-description")}>
+              <FieldRow
+                label={t("settings.roles.field-description")}
+                htmlFor="edit-description"
+              >
                 <Textarea
+                  id="edit-description"
                   className="min-h-[60px]"
                   value={editForm.description}
                   onChange={(e) =>
@@ -609,24 +650,25 @@ export function SettingsRolesPage() {
 function FieldRow({
   label,
   hint,
+  htmlFor,
   children,
 }: {
   label: string;
   hint?: string;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-control">
+    <div className="flex flex-col gap-1.5">
+      <label
+        htmlFor={htmlFor}
+        className="text-xs font-semibold uppercase tracking-wide text-control"
+      >
         {label}
-      </span>
+      </label>
       {children}
-      {hint && (
-        <span className="mt-1 block text-xs text-control-placeholder">
-          {hint}
-        </span>
-      )}
-    </label>
+      {hint && <span className="text-xs text-control-placeholder">{hint}</span>}
+    </div>
   );
 }
 
@@ -645,7 +687,7 @@ function PermissionGrid({
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-3">
-      <span className="text-xs font-medium text-control">
+      <span className="text-xs font-semibold uppercase tracking-wide text-control">
         {t("settings.roles.field-permissions")}
       </span>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

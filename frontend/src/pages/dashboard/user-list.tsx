@@ -1,3 +1,4 @@
+import { Loader2, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert } from "@/components/ui/alert";
@@ -18,6 +19,7 @@ import {
   SheetContent,
   SheetDescription,
   SheetFooter,
+  SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
@@ -289,9 +291,14 @@ export function UserListPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6 flex flex-col gap-4 w-full">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-main">{t("user.title")}</h1>
+    <div className="h-full overflow-y-auto p-6 flex flex-col gap-5 w-full">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-semibold text-main flex items-center gap-2">
+            <Users className="size-5 text-accent" />
+            {t("user.title")}
+          </h1>
+        </div>
         {canCreateUsers && (
           <Button onClick={() => setCreateOpen(true)}>
             {t("user.create")}
@@ -307,142 +314,186 @@ export function UserListPage() {
 
         <TabsPanel value="active">
           {usersLoading ? (
-            <p className="text-control-light">{t("common.loading")}</p>
+            <div className="flex items-center justify-center gap-2 py-16 text-control-light text-sm">
+              <Loader2 className="size-4 animate-spin" />
+              {t("common.loading")}
+            </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("user.header-email")}</TableHead>
-                  <TableHead>{t("user.header-title")}</TableHead>
-                  <TableHead>{t("user.header-type")}</TableHead>
-                  <TableHead>{t("user.header-state")}</TableHead>
-                  <TableHead>{t("user.header-last-login")}</TableHead>
-                  {canManageUsers && (
-                    <TableHead>{t("common.actions")}</TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.length === 0 ? (
+            <div className="rounded-xs border border-control-border bg-background shadow-xs overflow-hidden">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell
-                      colSpan={canManageUsers ? 6 : 5}
-                      className="text-center text-control-light"
-                    >
-                      {t("user.no-data")}
-                    </TableCell>
+                    <TableHead className="w-[25%]">
+                      {t("user.header-email")}
+                    </TableHead>
+                    <TableHead className="w-[15%]">
+                      {t("user.header-title")}
+                    </TableHead>
+                    <TableHead className="w-[10%]">
+                      {t("user.header-type")}
+                    </TableHead>
+                    <TableHead className="w-[10%]">
+                      {t("user.header-state")}
+                    </TableHead>
+                    <TableHead className="w-[20%]">
+                      {t("user.header-last-login")}
+                    </TableHead>
+                    {canManageUsers && (
+                      <TableHead className="w-[20%]">
+                        {t("common.actions")}
+                      </TableHead>
+                    )}
                   </TableRow>
-                ) : (
-                  users.map((user) => (
-                    <TableRow key={user.name}>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>{user.title || "-"}</TableCell>
-                      <TableCell>{userTypeLabel(t, user.userType)}</TableCell>
-                      <TableCell>
-                        <StateBadge state={user.state} t={t} />
+                </TableHeader>
+                <TableBody>
+                  {users.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={canManageUsers ? 6 : 5}
+                        className="text-center text-control-light py-12"
+                      >
+                        {t("user.no-data")}
                       </TableCell>
-                      <TableCell>
-                        {formatTimestamp(user.profile?.lastLoginTime)}
-                      </TableCell>
-                      {canManageUsers && (
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {canUpdateUsers && !isSpecialUser(user) && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openEdit(user)}
-                              >
-                                {t("user.edit")}
-                              </Button>
-                            )}
-                            {canUpdateUsers && canResetPassword(user) && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openReset(user)}
-                              >
-                                {t("user.reset-password")}
-                              </Button>
-                            )}
-                            {canDeleteUsers &&
-                              !isSpecialUser(user) &&
-                              !isSelf(user, currentUser) && (
+                    </TableRow>
+                  ) : (
+                    users.map((user) => (
+                      <TableRow key={user.name}>
+                        <TableCell className="align-top">
+                          {user.email}
+                        </TableCell>
+                        <TableCell className="align-top">
+                          {user.title || "-"}
+                        </TableCell>
+                        <TableCell className="align-top">
+                          {userTypeLabel(t, user.userType)}
+                        </TableCell>
+                        <TableCell className="align-top">
+                          <StateBadge state={user.state} t={t} />
+                        </TableCell>
+                        <TableCell className="align-top">
+                          {formatTimestamp(user.profile?.lastLoginTime)}
+                        </TableCell>
+                        {canManageUsers && (
+                          <TableCell className="align-top">
+                            <div className="flex items-center gap-2">
+                              {canUpdateUsers && !isSpecialUser(user) && (
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => {
-                                    setDeleteTarget(user);
-                                    setDeleteOpen(true);
-                                  }}
+                                  onClick={() => openEdit(user)}
                                 >
-                                  {t("common.delete")}
+                                  {t("user.edit")}
                                 </Button>
                               )}
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                              {canUpdateUsers && canResetPassword(user) && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openReset(user)}
+                                >
+                                  {t("user.reset-password")}
+                                </Button>
+                              )}
+                              {canDeleteUsers &&
+                                !isSpecialUser(user) &&
+                                !isSelf(user, currentUser) && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setDeleteTarget(user);
+                                      setDeleteOpen(true);
+                                    }}
+                                  >
+                                    {t("common.delete")}
+                                  </Button>
+                                )}
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </TabsPanel>
 
         <TabsPanel value="trash">
           {deletedUsersLoading ? (
-            <p className="text-control-light">{t("common.loading")}</p>
+            <div className="flex items-center justify-center gap-2 py-16 text-control-light text-sm">
+              <Loader2 className="size-4 animate-spin" />
+              {t("common.loading")}
+            </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("user.header-email")}</TableHead>
-                  <TableHead>{t("user.header-title")}</TableHead>
-                  <TableHead>{t("user.header-type")}</TableHead>
-                  <TableHead>{t("user.header-state")}</TableHead>
-                  {canDeleteUsers && (
-                    <TableHead>{t("common.actions")}</TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {deletedUsers.length === 0 ? (
+            <div className="rounded-xs border border-control-border bg-background shadow-xs overflow-hidden">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell
-                      colSpan={canDeleteUsers ? 5 : 4}
-                      className="text-center text-control-light"
-                    >
-                      {t("user.no-data")}
-                    </TableCell>
+                    <TableHead className="w-[25%]">
+                      {t("user.header-email")}
+                    </TableHead>
+                    <TableHead className="w-[15%]">
+                      {t("user.header-title")}
+                    </TableHead>
+                    <TableHead className="w-[10%]">
+                      {t("user.header-type")}
+                    </TableHead>
+                    <TableHead className="w-[10%]">
+                      {t("user.header-state")}
+                    </TableHead>
+                    {canDeleteUsers && (
+                      <TableHead className="w-[20%]">
+                        {t("common.actions")}
+                      </TableHead>
+                    )}
                   </TableRow>
-                ) : (
-                  deletedUsers.map((user) => (
-                    <TableRow key={user.name}>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>{user.title || "-"}</TableCell>
-                      <TableCell>{userTypeLabel(t, user.userType)}</TableCell>
-                      <TableCell>
-                        <StateBadge state={user.state} t={t} />
+                </TableHeader>
+                <TableBody>
+                  {deletedUsers.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={canDeleteUsers ? 5 : 4}
+                        className="text-center text-control-light py-12"
+                      >
+                        {t("user.no-data")}
                       </TableCell>
-                      {canDeleteUsers && (
-                        <TableCell>
-                          {!isSpecialUser(user) && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleRestore(user)}
-                            >
-                              {t("user.restore")}
-                            </Button>
-                          )}
-                        </TableCell>
-                      )}
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    deletedUsers.map((user) => (
+                      <TableRow key={user.name}>
+                        <TableCell className="align-top">
+                          {user.email}
+                        </TableCell>
+                        <TableCell className="align-top">
+                          {user.title || "-"}
+                        </TableCell>
+                        <TableCell className="align-top">
+                          {userTypeLabel(t, user.userType)}
+                        </TableCell>
+                        <TableCell className="align-top">
+                          <StateBadge state={user.state} t={t} />
+                        </TableCell>
+                        {canDeleteUsers && (
+                          <TableCell className="align-top">
+                            {!isSpecialUser(user) && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleRestore(user)}
+                              >
+                                {t("user.restore")}
+                              </Button>
+                            )}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </TabsPanel>
       </Tabs>
@@ -455,27 +506,31 @@ export function UserListPage() {
           if (!next) resetCreateForm();
         }}
       >
-        <SheetContent width="narrow">
-          <SheetTitle>{t("user.create-title")}</SheetTitle>
-          <SheetDescription>{t("user.create-description")}</SheetDescription>
+        <SheetContent width="medium">
+          <SheetHeader>
+            <SheetTitle>{t("user.create-title")}</SheetTitle>
+            <SheetDescription>{t("user.create-description")}</SheetDescription>
+          </SheetHeader>
           <SheetBody>
             {createError && (
               <Alert
                 variant="error"
                 description={createError}
-                className="mb-4"
+                className="mb-2"
               />
             )}
-            <div className="flex flex-col gap-4">
-              <FieldRow label={t("user.field-email")}>
+            <div className="flex flex-col gap-5">
+              <FieldRow label={t("user.field-email")} htmlFor="create-email">
                 <Input
+                  id="create-email"
                   value={email}
                   placeholder={t("user.field-email-placeholder")}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </FieldRow>
-              <FieldRow label={t("user.field-title")}>
+              <FieldRow label={t("user.field-title")} htmlFor="create-title">
                 <Input
+                  id="create-title"
                   value={title}
                   placeholder={t("user.field-title-placeholder")}
                   onChange={(e) => {
@@ -487,15 +542,21 @@ export function UserListPage() {
               <FieldRow
                 label={t("user.field-phone")}
                 hint={t("user.field-phone-hint")}
+                htmlFor="create-phone"
               >
                 <Input
+                  id="create-phone"
                   value={phone}
                   placeholder={t("user.field-phone-placeholder")}
                   onChange={(e) => setPhone(e.target.value)}
                 />
               </FieldRow>
-              <FieldRow label={t("user.field-password")}>
+              <FieldRow
+                label={t("user.field-password")}
+                htmlFor="create-password"
+              >
                 <Input
+                  id="create-password"
                   type="password"
                   value={password}
                   placeholder={t("user.field-password-placeholder")}
@@ -536,18 +597,21 @@ export function UserListPage() {
           if (!next) setEditTarget(null);
         }}
       >
-        <SheetContent width="narrow">
-          <SheetTitle>
-            {t("user.edit-title", { title: editTarget?.title ?? "" })}
-          </SheetTitle>
-          <SheetDescription>{t("user.edit-description")}</SheetDescription>
+        <SheetContent width="medium">
+          <SheetHeader>
+            <SheetTitle>
+              {t("user.edit-title", { title: editTarget?.title ?? "" })}
+            </SheetTitle>
+            <SheetDescription>{t("user.edit-description")}</SheetDescription>
+          </SheetHeader>
           <SheetBody>
             {editError && (
-              <Alert variant="error" description={editError} className="mb-4" />
+              <Alert variant="error" description={editError} className="mb-2" />
             )}
-            <div className="flex flex-col gap-4">
-              <FieldRow label={t("user.field-title")}>
+            <div className="flex flex-col gap-5">
+              <FieldRow label={t("user.field-title")} htmlFor="edit-title">
                 <Input
+                  id="edit-title"
                   value={editTitle}
                   onChange={(e) => {
                     setEditTitle(e.target.value);
@@ -555,8 +619,9 @@ export function UserListPage() {
                   }}
                 />
               </FieldRow>
-              <FieldRow label={t("user.field-email")}>
+              <FieldRow label={t("user.field-email")} htmlFor="edit-email">
                 <Input
+                  id="edit-email"
                   value={editEmail}
                   onChange={(e) => {
                     setEditEmail(e.target.value);
@@ -564,8 +629,9 @@ export function UserListPage() {
                   }}
                 />
               </FieldRow>
-              <FieldRow label={t("user.field-phone")}>
+              <FieldRow label={t("user.field-phone")} htmlFor="edit-phone">
                 <Input
+                  id="edit-phone"
                   value={editPhone}
                   onChange={(e) => {
                     setEditPhone(e.target.value);
@@ -576,8 +642,10 @@ export function UserListPage() {
               <FieldRow
                 label={t("user.field-description")}
                 hint={t("user.field-description-hint")}
+                htmlFor="edit-description"
               >
                 <Textarea
+                  id="edit-description"
                   className="min-h-[80px]"
                   placeholder={t("user.field-description-placeholder")}
                   value={editDescription}
@@ -696,24 +764,25 @@ export function UserListPage() {
 function FieldRow({
   label,
   hint,
+  htmlFor,
   children,
 }: {
   label: string;
   hint?: string;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-control">
+    <div className="flex flex-col gap-1.5">
+      <label
+        htmlFor={htmlFor}
+        className="text-xs font-semibold uppercase tracking-wide text-control"
+      >
         {label}
-      </span>
+      </label>
       {children}
-      {hint && (
-        <span className="mt-1 block text-xs text-control-placeholder">
-          {hint}
-        </span>
-      )}
-    </label>
+      {hint && <span className="text-xs text-control-placeholder">{hint}</span>}
+    </div>
   );
 }
 
