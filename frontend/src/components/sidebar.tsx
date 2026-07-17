@@ -5,7 +5,6 @@ import {
   Home,
   type LucideIcon,
   Menu,
-  MessageCircle,
   Settings,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -24,7 +23,6 @@ import {
   SETTINGS_ROUTE_ROLES,
   SETTINGS_ROUTE_STORAGE,
   SETTINGS_ROUTE_USERS,
-  WORKSPACE_ROUTE_LANDING,
 } from "@/router/handles";
 import { useCurrentRoute } from "@/router/use-current-route";
 
@@ -75,19 +73,13 @@ function useSidebarItems(): SidebarItem[] {
       {
         title: t("sidebar.home"),
         icon: Home,
-        name: WORKSPACE_ROUTE_LANDING,
+        name: CHAT_ROUTE,
         type: "route",
       },
       {
         title: t("sidebar.agents"),
         icon: Bot,
         name: AGENT_ROUTE_LIST,
-        type: "route",
-      },
-      {
-        title: t("sidebar.chat"),
-        icon: MessageCircle,
-        name: CHAT_ROUTE,
         type: "route",
       },
       {

@@ -51,7 +51,7 @@ export function ConversationList() {
       const ch = await createChannel(title);
       setCreateOpen(false);
       setNewTitle("");
-      navigate(`/chat/${ch.name.split("/").pop()}`);
+      navigate(`/${ch.name.split("/").pop()}`);
     } catch {
       // create failed
     } finally {
@@ -116,7 +116,7 @@ export function ConversationList() {
               isDm={isDm}
               active={active}
               unread={unread}
-              onClick={() => navigate(`/chat/${id}`)}
+              onClick={() => navigate(`/${id}`)}
             />
           );
         })}

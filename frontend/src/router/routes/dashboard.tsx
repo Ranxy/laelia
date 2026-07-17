@@ -16,7 +16,6 @@ import {
   SETTINGS_ROUTE_ROLES,
   SETTINGS_ROUTE_STORAGE,
   SETTINGS_ROUTE_USERS,
-  WORKSPACE_ROUTE_LANDING,
 } from "../handles";
 
 export const dashboardRoutes: RouteObject[] = [
@@ -24,12 +23,28 @@ export const dashboardRoutes: RouteObject[] = [
     element: <DashboardLayout />,
     children: [
       {
-        index: true,
-        handle: { name: WORKSPACE_ROUTE_LANDING },
         lazy: () =>
-          import("@/pages/dashboard/landing").then((m) => ({
-            Component: m.LandingPage,
+          import("@/pages/dashboard/chat-layout").then((m) => ({
+            Component: m.ChatLayout,
           })),
+        children: [
+          {
+            index: true,
+            handle: { name: CHAT_ROUTE },
+            lazy: () =>
+              import("@/pages/dashboard/chat-conversation").then((m) => ({
+                Component: m.ChatEmptyState,
+              })),
+          },
+          {
+            path: ":conversationId",
+            handle: { name: CHAT_ROUTE_DETAIL },
+            lazy: () =>
+              import("@/pages/dashboard/chat-conversation").then((m) => ({
+                Component: m.ChatConversationPage,
+              })),
+          },
+        ],
       },
       {
         path: "agents",
@@ -104,31 +119,6 @@ export const dashboardRoutes: RouteObject[] = [
                   })),
               },
             ],
-          },
-        ],
-      },
-      {
-        path: "chat",
-        lazy: () =>
-          import("@/pages/dashboard/chat-layout").then((m) => ({
-            Component: m.ChatLayout,
-          })),
-        children: [
-          {
-            index: true,
-            handle: { name: CHAT_ROUTE },
-            lazy: () =>
-              import("@/pages/dashboard/chat-conversation").then((m) => ({
-                Component: m.ChatEmptyState,
-              })),
-          },
-          {
-            path: ":conversationId",
-            handle: { name: CHAT_ROUTE_DETAIL },
-            lazy: () =>
-              import("@/pages/dashboard/chat-conversation").then((m) => ({
-                Component: m.ChatConversationPage,
-              })),
           },
         ],
       },

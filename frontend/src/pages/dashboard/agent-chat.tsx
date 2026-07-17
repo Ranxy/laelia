@@ -30,7 +30,7 @@ export function AgentChatPage() {
 
   function openConversation(conv: Conversation) {
     const convId = conv.name.split("/").pop();
-    if (convId) navigate(`/chat/${convId}`);
+    if (convId) navigate(`/${convId}`);
   }
 
   return (

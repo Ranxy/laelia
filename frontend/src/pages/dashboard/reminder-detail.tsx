@@ -348,7 +348,7 @@ export function ReminderDetailPage() {
                   // Jump to the trigger message's channel and open its thread
                   // there. The chat page reads ?thread= on mount.
                   closeThread();
-                  navigate(`/chat/${convId}?thread=${rootId}`);
+                  navigate(`/${convId}?thread=${rootId}`);
                 }}
               />
             </div>

@@ -1,6 +1,5 @@
 // Route-name constants — single source of truth for all named routes.
 
-export const WORKSPACE_ROUTE_LANDING = "workspace.landing";
 export const AGENT_ROUTE_LIST = "agent.list";
 export const AGENT_ROUTE_PROFILE = "agent.profile";
 export const AGENT_ROUTE_CHAT = "agent.chat";
