@@ -3329,6 +3329,12 @@ components:
                         task is set when this message is a task (a row exists in the task table for
                          this message id). Populated by ListConversationMessages / ListThreadMessages
                          for root messages; absent for non-task messages and thread replies.
+                agentId:
+                    type: string
+                    description: |-
+                        agent_id is the agent resource ID ("agents/{id}") that owns the command
+                         referenced by command_id. Populated when the sender is an agent so the
+                         frontend can construct command-detail URLs.
         ClaimTaskRequest:
             required:
                 - message
@@ -4847,6 +4853,13 @@ components:
                          workspace actions on this (e.g. laelia.users.update). Per-resource
                          permissions (conversations.read/send/manage, agents.edit) are resolved per
                          resource and surfaced on the resource, not here.
+                debugMode:
+                    readOnly: true
+                    type: boolean
+                    description: |-
+                        debug_mode is true when RuntimeDebug is enabled for the workspace.
+                         Populated only by GetCurrentUser so the frontend can gate debug-only UI
+                         without calling the admin-gated SettingService.GetDebugConfig.
         UserProfile:
             type: object
             properties:

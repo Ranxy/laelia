@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionPopup } from "@/components/chat/mention-popup";
 import {
@@ -82,6 +83,8 @@ export function ThreadPanel({
   const sendThreadMessage = useAppStore((s) => s.sendThreadMessage);
   const agents = useAppStore((s) => s.agents);
   const openImagePreview = useAppStore((s) => s.openImagePreview);
+  const currentUser = useAppStore((s) => s.currentUser);
+  const navigate = useNavigate();
 
   const messages = thread?.messages ?? EMPTY_THREAD;
   const loading = thread?.loading ?? false;
@@ -247,7 +250,12 @@ export function ThreadPanel({
     [input, cursorPos, mentionState]
   );
 
-  const noopViewDetails = useCallback((_: string) => {}, []);
+  const handleViewDetails = useCallback(
+    (commandId: string, agentId: string) => {
+      navigate(`/agents/${agentId}/commands/${commandId}`);
+    },
+    [navigate]
+  );
 
   if (loading && !rootMsg) {
     return (
@@ -293,12 +301,13 @@ export function ThreadPanel({
               agentTitle={agentTitleFor(rootMsg)}
               streamingContent=""
               streamingEvents={rootMsg.events ?? EMPTY_EVENTS}
-              onViewDetails={noopViewDetails}
+              onViewDetails={handleViewDetails}
               MentionBadge={MentionBadge}
               markdownCustomId="thread-chat"
               onPreviewAttachment={onPreviewAttachment}
               onJumpToSection={onJumpToSection}
               onPreviewImage={onPreviewImage}
+              debugMode={currentUser?.debugMode ?? false}
             />
           )}
 
@@ -330,12 +339,13 @@ export function ThreadPanel({
                 agentTitle={agentTitleFor(msg)}
                 streamingContent={rowProps.streamingContent}
                 streamingEvents={rowProps.streamingEvents}
-                onViewDetails={noopViewDetails}
+                onViewDetails={handleViewDetails}
                 MentionBadge={MentionBadge}
                 markdownCustomId="thread-chat"
                 onPreviewAttachment={onPreviewAttachment}
                 onJumpToSection={onJumpToSection}
                 onPreviewImage={onPreviewImage}
+                debugMode={currentUser?.debugMode ?? false}
               />
             );
           })}

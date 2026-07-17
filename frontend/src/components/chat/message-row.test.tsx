@@ -71,7 +71,7 @@ describe("formatTime", () => {
 
 describe("MessageRow shared render", () => {
   it("renders user content as pre-wrapped text", () => {
-    const onViewDetails = (id: string) => void id;
+    const onViewDetails = (_id: string, _agentId: string) => {};
     act(() => {
       root!.render(
         <MessageRow
@@ -82,6 +82,7 @@ describe("MessageRow shared render", () => {
           streamingEvents={[]}
           onViewDetails={onViewDetails}
           markdownCustomId="chat"
+          debugMode={false}
         />
       );
     });

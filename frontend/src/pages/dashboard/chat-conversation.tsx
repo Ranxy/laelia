@@ -584,7 +584,12 @@ export function ChatConversationPage() {
   // Channel rows are never in DM-style streaming mode (channel messages are
   // polled, not streamed token-by-token), so every row receives stable empty
   // streaming slices. The shared MessageRow still accepts them.
-  const noopViewDetails = useCallback((_: string) => {}, []);
+  const handleViewDetails = useCallback(
+    (commandId: string, agentId: string) => {
+      navigate(`/agents/${agentId}/commands/${commandId}`);
+    },
+    [navigate]
+  );
 
   const handleOpenThread = useCallback(
     (msg: ChatMessageUI) => {
@@ -752,7 +757,7 @@ export function ChatConversationPage() {
                       agentTitle={msg.senderName ?? ""}
                       streamingContent={rowProps.streamingContent}
                       streamingEvents={rowProps.streamingEvents}
-                      onViewDetails={noopViewDetails}
+                      onViewDetails={handleViewDetails}
                       onMentionClick={handleMentionClick}
                       MentionBadge={MentionBadge}
                       markdownCustomId="channel-chat"
@@ -760,6 +765,7 @@ export function ChatConversationPage() {
                       onPreviewAttachment={handlePreviewAttachment}
                       onJumpToSection={handleJumpToSection}
                       onPreviewImage={handlePreviewImage}
+                      debugMode={currentUser?.debugMode ?? false}
                     />
                   </div>
                 );

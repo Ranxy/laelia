@@ -911,6 +911,7 @@ func storeToV1ChatMessage(msg *store.ChatMessage) *v1pb.ChatMessage {
 	if msg.CommandID.Valid {
 		v1m.CommandId = msg.CommandID.UUID.String()
 	}
+	v1m.AgentId = msg.AgentResourceID
 	if msg.ThreadRootMessageID.Valid {
 		v1m.ThreadRoot = msg.ThreadRootMessageID.UUID.String()
 	}

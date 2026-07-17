@@ -112,6 +112,7 @@ func (s *UserService) GetCurrentUser(ctx context.Context, _ *connect.Request[emp
 		slog.Error("failed to resolve workspace admin", log.WithError(err), slog.String("user", user.Email))
 	}
 	out.WorkspaceAdmin = isAdmin
+	out.DebugMode = s.profile.RuntimeDebug.Load()
 	return connect.NewResponse(out), nil
 }
 

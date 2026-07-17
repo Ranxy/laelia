@@ -59,7 +59,7 @@ afterEach(() => {
 
 describe("MessageRow memo", () => {
   it("skips re-render when props are referentially unchanged", () => {
-    const onViewDetails = (commandId: string) => {
+    const onViewDetails = (commandId: string, _agentId: string) => {
       void commandId;
     };
     const msg = baseMsg();
@@ -71,6 +71,7 @@ describe("MessageRow memo", () => {
       streamingEvents: [] as never[],
       onViewDetails,
       markdownCustomId: "chat",
+      debugMode: false,
     };
 
     act(() => {

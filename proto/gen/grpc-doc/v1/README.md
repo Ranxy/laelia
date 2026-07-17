@@ -1331,6 +1331,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | workspace_admin | [bool](#bool) |  | workspace_admin is true when the user holds the roles/workspaceAdmin role. Only populated for the current caller (GetCurrentUser). Retained as a computed shim during the IAM transition; prefer `permissions` for gating. |
 | description | [string](#string) |  | description is a short, user-authored self-description surfaced to agents and other users so they know who this user is and what they focus on, e.g. &#34;Backend engineer, focused on agent building&#34; or &#34;UI/UX expert, reviews come to me&#34;. Editable via UpdateUser with update_mask &#34;description&#34;. |
 | permissions | [string](#string) | repeated | permissions is the caller&#39;s effective workspace-scope permission set (roles/workspaceMember baseline ∪ the permissions of every workspace role the user holds), populated only by GetCurrentUser. The frontend gates workspace actions on this (e.g. laelia.users.update). Per-resource permissions (conversations.read/send/manage, agents.edit) are resolved per resource and surfaced on the resource, not here. |
+| debug_mode | [bool](#bool) |  | debug_mode is true when RuntimeDebug is enabled for the workspace. Populated only by GetCurrentUser so the frontend can gate debug-only UI without calling the admin-gated SettingService.GetDebugConfig. |
 
 
 
@@ -1836,6 +1837,7 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | thread_root | [string](#string) |  | thread_root is the resource name of the root message of the thread this message belongs to (&#34;conversations/{c}/messages/{m}&#34;). Empty for a normal channel message (i.e. a root message itself, or a message outside any thread). Replies in a thread carry the root message&#39;s name here. |
 | thread_reply_count | [int32](#int32) |  | thread_reply_count is the number of replies in the thread rooted at this message. Only meaningful for root messages (thread_root empty); the frontend uses it to render the reply-count badge on the root message in the main channel list. Always 0 for thread replies. |
 | task | [TaskInfo](#laelia-v1-TaskInfo) |  | task is set when this message is a task (a row exists in the task table for this message id). Populated by ListConversationMessages / ListThreadMessages for root messages; absent for non-task messages and thread replies. |
+| agent_id | [string](#string) |  | agent_id is the agent resource ID (&#34;agents/{id}&#34;) that owns the command referenced by command_id. Populated when the sender is an agent so the frontend can construct command-detail URLs. |
 
 
 

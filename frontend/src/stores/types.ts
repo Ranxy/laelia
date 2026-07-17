@@ -27,6 +27,7 @@ export interface ChatMessageUI {
   timestamp: Date;
   commandName?: string;
   commandId?: string;
+  agentId?: string;
   status?: number;
   streaming?: boolean;
   events?: CommandEvent[];

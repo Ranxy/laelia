@@ -14,6 +14,7 @@ export function toUiMessage(msg: ChatMessage): ChatMessageUI {
     content: msg.content,
     timestamp: msg.createdAt ? timestampDate(msg.createdAt) : new Date(),
     commandId: msg.commandId || undefined,
+    agentId: msg.agentId || undefined,
     senderName: msg.senderName || undefined,
     senderType: msg.senderType || undefined,
     mentions: msg.mentions,

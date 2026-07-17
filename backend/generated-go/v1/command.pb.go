@@ -2448,7 +2448,11 @@ type ChatMessage struct {
 	// task is set when this message is a task (a row exists in the task table for
 	// this message id). Populated by ListConversationMessages / ListThreadMessages
 	// for root messages; absent for non-task messages and thread replies.
-	Task          *TaskInfo `protobuf:"bytes,16,opt,name=task,proto3" json:"task,omitempty"`
+	Task *TaskInfo `protobuf:"bytes,16,opt,name=task,proto3" json:"task,omitempty"`
+	// agent_id is the agent resource ID ("agents/{id}") that owns the command
+	// referenced by command_id. Populated when the sender is an agent so the
+	// frontend can construct command-detail URLs.
+	AgentId       string `protobuf:"bytes,17,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2593,6 +2597,13 @@ func (x *ChatMessage) GetTask() *TaskInfo {
 		return x.Task
 	}
 	return nil
+}
+
+func (x *ChatMessage) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
 }
 
 type Conversation struct {
@@ -9095,7 +9106,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\fconversation\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
 	"\x13laelia/ConversationR\fconversation\":\n" +
 	"\x11ListFilesResponse\x12%\n" +
-	"\x05files\x18\x01 \x03(\v2\x0f.laelia.v1.FileR\x05files\"\xe8\x04\n" +
+	"\x05files\x18\x01 \x03(\v2\x0f.laelia.v1.FileR\x05files\"\x83\x05\n" +
 	"\vChatMessage\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\"\n" +
 	"\fconversation\x18\x02 \x01(\tR\fconversation\x12%\n" +
@@ -9118,7 +9129,8 @@ const file_v1_command_proto_rawDesc = "" +
 	"\vthread_root\x18\x0e \x01(\tR\n" +
 	"threadRoot\x12,\n" +
 	"\x12thread_reply_count\x18\x0f \x01(\x05R\x10threadReplyCount\x12'\n" +
-	"\x04task\x18\x10 \x01(\v2\x13.laelia.v1.TaskInfoR\x04task\"\xb1\x03\n" +
+	"\x04task\x18\x10 \x01(\v2\x13.laelia.v1.TaskInfoR\x04task\x12\x19\n" +
+	"\bagent_id\x18\x11 \x01(\tR\aagentId\"\xb1\x03\n" +
 	"\fConversation\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +

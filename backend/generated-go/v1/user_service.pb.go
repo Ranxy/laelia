@@ -609,7 +609,11 @@ type User struct {
 	// workspace actions on this (e.g. laelia.users.update). Per-resource
 	// permissions (conversations.read/send/manage, agents.edit) are resolved per
 	// resource and surfaced on the resource, not here.
-	Permissions   []string `protobuf:"bytes,17,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	Permissions []string `protobuf:"bytes,17,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	// debug_mode is true when RuntimeDebug is enabled for the workspace.
+	// Populated only by GetCurrentUser so the frontend can gate debug-only UI
+	// without calling the admin-gated SettingService.GetDebugConfig.
+	DebugMode     bool `protobuf:"varint,18,opt,name=debug_mode,json=debugMode,proto3" json:"debug_mode,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -742,6 +746,13 @@ func (x *User) GetPermissions() []string {
 	return nil
 }
 
+func (x *User) GetDebugMode() bool {
+	if x != nil {
+		return x.DebugMode
+	}
+	return false
+}
+
 type UserProfile struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	LastLoginTime          *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=last_login_time,json=lastLoginTime,proto3" json:"last_login_time,omitempty"`
@@ -837,7 +848,7 @@ const file_v1_user_service_proto_rawDesc = "" +
 	"\vlaelia/UserR\x04name\">\n" +
 	"\x13UndeleteUserRequest\x12'\n" +
 	"\x04name\x18\x01 \x01(\tB\x13\xe0A\x02\xfaA\r\n" +
-	"\vlaelia/UserR\x04name\"\x8f\x04\n" +
+	"\vlaelia/UserR\x04name\"\xb3\x04\n" +
 	"\x04User\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -853,7 +864,9 @@ const file_v1_user_service_proto_rawDesc = "" +
 	"\x06groups\x18\x0e \x03(\tB\x03\xe0A\x03R\x06groups\x12,\n" +
 	"\x0fworkspace_admin\x18\x0f \x01(\bB\x03\xe0A\x03R\x0eworkspaceAdmin\x12 \n" +
 	"\vdescription\x18\x10 \x01(\tR\vdescription\x12%\n" +
-	"\vpermissions\x18\x11 \x03(\tB\x03\xe0A\x03R\vpermissions:\x1e\xeaA\x1b\n" +
+	"\vpermissions\x18\x11 \x03(\tB\x03\xe0A\x03R\vpermissions\x12\"\n" +
+	"\n" +
+	"debug_mode\x18\x12 \x01(\bB\x03\xe0A\x03R\tdebugMode:\x1e\xeaA\x1b\n" +
 	"\vlaelia/User\x12\fusers/{user}\"\xc0\x01\n" +
 	"\vUserProfile\x12B\n" +
 	"\x0flast_login_time\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\rlastLoginTime\x12U\n" +

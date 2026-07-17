@@ -354,6 +354,15 @@ export declare type User = Message<"laelia.v1.User"> & {
    * @generated from field: repeated string permissions = 17;
    */
   permissions: string[];
+
+  /**
+   * debug_mode is true when RuntimeDebug is enabled for the workspace.
+   * Populated only by GetCurrentUser so the frontend can gate debug-only UI
+   * without calling the admin-gated SettingService.GetDebugConfig.
+   *
+   * @generated from field: bool debug_mode = 18;
+   */
+  debugMode: boolean;
 };
 
 /**

@@ -62,7 +62,7 @@ export interface MessageRowProps {
   agentTitle: string;
   streamingContent: string;
   streamingEvents: CommandEvent[];
-  onViewDetails: (commandId: string) => void;
+  onViewDetails: (commandId: string, agentId: string) => void;
   // Optional mention-aware rendering (channel chat). When provided, the row
   // renders @mentions as badges and lets the caller react to clicks.
   onMentionClick?: (type: string, id: string, name: string) => void;
@@ -95,6 +95,7 @@ export interface MessageRowProps {
   // overlay. Unlike markdown, images render inline directly (scaled to fit);
   // this handler is the click-to-zoom affordance on that inline image.
   onPreviewImage?: (attachment: Attachment) => void;
+  debugMode: boolean;
 }
 
 export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
@@ -112,6 +113,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     onPreviewAttachment,
     onJumpToSection,
     onPreviewImage,
+    debugMode,
   } = props;
   const { t } = useTranslation();
   const isUser = msg.role === "user";
@@ -459,12 +461,13 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
         </div>
 
         {/* View details link */}
-        {!isUser && msg.commandId && !isStreaming && (
+        {!isUser && msg.commandId && !isStreaming && debugMode && (
           <button
             type="button"
             className="text-xs text-control-placeholder hover:text-accent px-0.5 cursor-pointer transition-colors"
             onClick={() => {
-              if (msg.commandId) onViewDetails(msg.commandId);
+              if (msg.commandId)
+                onViewDetails(msg.commandId, msg.agentId ?? "");
             }}
           >
             {t("chat.view-details")} &rarr;

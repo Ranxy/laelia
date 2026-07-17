@@ -347,6 +347,10 @@ message ChatMessage {
   // this message id). Populated by ListConversationMessages / ListThreadMessages
   // for root messages; absent for non-task messages and thread replies.
   TaskInfo task = 16;
+  // agent_id is the agent resource ID ("agents/{id}") that owns the command
+  // referenced by command_id. Populated when the sender is an agent so the
+  // frontend can construct command-detail URLs.
+  string agent_id = 17;
 }
 
 message Conversation {

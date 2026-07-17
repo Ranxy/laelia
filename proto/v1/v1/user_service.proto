@@ -255,6 +255,11 @@ message User {
   // permissions (conversations.read/send/manage, agents.edit) are resolved per
   // resource and surfaced on the resource, not here.
   repeated string permissions = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // debug_mode is true when RuntimeDebug is enabled for the workspace.
+  // Populated only by GetCurrentUser so the frontend can gate debug-only UI
+  // without calling the admin-gated SettingService.GetDebugConfig.
+  bool debug_mode = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 enum UserType {

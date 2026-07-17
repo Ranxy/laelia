@@ -1068,6 +1068,15 @@ export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
    * @generated from field: laelia.v1.TaskInfo task = 16;
    */
   task?: TaskInfo | undefined;
+
+  /**
+   * agent_id is the agent resource ID ("agents/{id}") that owns the command
+   * referenced by command_id. Populated when the sender is an agent so the
+   * frontend can construct command-detail URLs.
+   *
+   * @generated from field: string agent_id = 17;
+   */
+  agentId: string;
 };
 
 /**

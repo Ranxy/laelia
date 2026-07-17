@@ -3879,6 +3879,15 @@ permissions (conversations.read/send/manage, agents.edit) are resolved per
 resource and surfaced on the resource, not here. </p></td>
                 </tr>
               
+                <tr>
+                  <td>debug_mode</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>debug_mode is true when RuntimeDebug is enabled for the workspace.
+Populated only by GetCurrentUser so the frontend can gate debug-only UI
+without calling the admin-gated SettingService.GetDebugConfig. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -5183,6 +5192,15 @@ channel list. Always 0 for thread replies. </p></td>
                   <td><p>task is set when this message is a task (a row exists in the task table for
 this message id). Populated by ListConversationMessages / ListThreadMessages
 for root messages; absent for non-task messages and thread replies. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>agent_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>agent_id is the agent resource ID (&#34;agents/{id}&#34;) that owns the command
+referenced by command_id. Populated when the sender is an agent so the
+frontend can construct command-detail URLs. </p></td>
                 </tr>
               
             </tbody>
