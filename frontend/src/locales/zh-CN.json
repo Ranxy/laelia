@@ -25,6 +25,7 @@
     "remove": "移除",
     "toggle-password-visibility": "切换密码可见性",
     "dismiss": "关闭",
+    "discard": "放弃",
     "profile": "个人资料"
   },
   "auth": {
@@ -145,7 +146,17 @@
       "field-roles-hint": "仅修改所选用户的成员关系,其他成员保持其角色。",
       "no-grantable-roles": "暂无可分配角色",
       "saved": "访问策略已保存",
-      "etag-mismatch": "策略已被他人修改,已重新加载,请重试。"
+      "etag-mismatch": "策略已被他人修改,已重新加载,请重试。",
+      "role-sheet-title": "编辑角色: {{title}}",
+      "role-sheet-description": "管理分配到此角色的成员。",
+      "role-sheet-current-members": "当前成员",
+      "role-sheet-no-members": "该角色暂无分配成员",
+      "role-sheet-field-add-user": "添加用户",
+      "role-sheet-field-add-user-placeholder": "选择用户",
+      "role-sheet-remove-member": "移除 {{email}}",
+      "role-sheet-pending": "待保存",
+      "role-sheet-discard-title": "放弃更改？",
+      "role-sheet-discard-description": "你对此角色的成员有未保存的更改。确定放弃吗？"
     }
   },
   "user": {
