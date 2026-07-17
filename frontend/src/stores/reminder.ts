@@ -9,6 +9,29 @@ import {
 } from "@/types/proto-es/v1/command_pb";
 import type { AppSliceCreator, ReminderSlice } from "./types";
 
+// remindersEqual returns true when two reminder arrays have the same names in
+// the same order and each reminder is shallow-equal on its fields. Used to
+// avoid replacing state with identical data from polling refreshes.
+function remindersEqual(a: Reminder[], b: Reminder[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.name !== y.name ||
+      x.status !== y.status ||
+      x.cronExpr !== y.cronExpr ||
+      x.tz !== y.tz ||
+      x.taskContent !== y.taskContent ||
+      x.assigneeName !== y.assigneeName ||
+      x.fireAt !== y.fireAt
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // createReminderSlice owns the agent-page Reminders tab state: the list of
 // reminders for the viewed agent (filtered by status), and the mutations the
 // detail page uses (update schedule/content, cancel). Reminders mirror
@@ -18,7 +41,9 @@ export const createReminderSlice: AppSliceCreator<ReminderSlice> = (set) => ({
   remindersLoading: false,
 
   async listReminders(agent, params) {
-    set({ remindersLoading: true });
+    if (!params?.silent) {
+      set({ remindersLoading: true });
+    }
     try {
       const res = await commandServiceClient.listReminders(
         create(ListRemindersRequestSchema, {
@@ -30,7 +55,12 @@ export const createReminderSlice: AppSliceCreator<ReminderSlice> = (set) => ({
           ),
         })
       );
-      set({ reminders: res.reminders, remindersLoading: false });
+      set((state) => ({
+        reminders: remindersEqual(state.reminders, res.reminders)
+          ? state.reminders
+          : res.reminders,
+        remindersLoading: false,
+      }));
       return { reminders: res.reminders, nextPageToken: res.nextPageToken };
     } catch {
       set({ reminders: [], remindersLoading: false });

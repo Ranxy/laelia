@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { ReminderStatusBadge } from "@/components/reminder-status-badge";
@@ -78,21 +78,32 @@ export function ReminderListPage() {
   const canPrev = pageIndex > 0;
   const canNext = nextPageToken !== "";
 
-  const load = useCallback(async () => {
-    if (!agent) return;
-    const res = await listReminders(agent, {
-      pageSize: PAGE_SIZE,
-      pageToken,
-      statusFilter: statusFilterToValues[statusFilter],
-    });
-    setNextPageToken(res?.nextPageToken ?? "");
-  }, [agent, listReminders, pageToken, statusFilter]);
+  const load = useCallback(
+    async (silent = false) => {
+      if (!agent) return;
+      const res = await listReminders(agent, {
+        pageSize: PAGE_SIZE,
+        pageToken,
+        statusFilter: statusFilterToValues[statusFilter],
+        silent,
+      });
+      setNextPageToken(res?.nextPageToken ?? "");
+    },
+    [agent, listReminders, pageToken, statusFilter]
+  );
+
+  // Track whether the initial load has completed so background polls can be
+  // silent (no loading spinner flash).
+  const initialLoadDone = useRef(false);
 
   useEffect(() => {
-    load();
-    // Refresh on a 2s cadence (same as the channel watcher) so due/complete
-    // transitions surface live while the tab is open.
-    const handle = setInterval(load, 2000);
+    // Initial load and filter/page changes always show loading.
+    load(false).then(() => {
+      initialLoadDone.current = true;
+    });
+    // Background polls are silent — they don't toggle the loading flag,
+    // avoiding visual flicker when the data hasn't changed.
+    const handle = setInterval(() => load(true), 2000);
     return () => clearInterval(handle);
   }, [load]);
 

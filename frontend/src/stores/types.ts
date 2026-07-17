@@ -344,6 +344,7 @@ export interface ReminderSlice {
       pageSize?: number;
       pageToken?: string;
       statusFilter?: number[];
+      silent?: boolean;
     }
   ) => Promise<{ reminders: Reminder[]; nextPageToken: string } | undefined>;
   getReminder: (name: string) => Promise<Reminder | undefined>;
