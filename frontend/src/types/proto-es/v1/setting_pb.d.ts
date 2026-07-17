@@ -72,6 +72,66 @@ export declare type UpdateS3ConfigResponse = Message<"laelia.v1.UpdateS3ConfigRe
 export declare const UpdateS3ConfigResponseSchema: GenMessage<UpdateS3ConfigResponse>;
 
 /**
+ * @generated from message laelia.v1.GetDebugConfigRequest
+ */
+export declare type GetDebugConfigRequest = Message<"laelia.v1.GetDebugConfigRequest"> & {
+};
+
+/**
+ * Describes the message laelia.v1.GetDebugConfigRequest.
+ * Use `create(GetDebugConfigRequestSchema)` to create a new message.
+ */
+export declare const GetDebugConfigRequestSchema: GenMessage<GetDebugConfigRequest>;
+
+/**
+ * @generated from message laelia.v1.GetDebugConfigResponse
+ */
+export declare type GetDebugConfigResponse = Message<"laelia.v1.GetDebugConfigResponse"> & {
+  /**
+   * @generated from field: bool enabled = 1;
+   */
+  enabled: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.GetDebugConfigResponse.
+ * Use `create(GetDebugConfigResponseSchema)` to create a new message.
+ */
+export declare const GetDebugConfigResponseSchema: GenMessage<GetDebugConfigResponse>;
+
+/**
+ * @generated from message laelia.v1.UpdateDebugConfigRequest
+ */
+export declare type UpdateDebugConfigRequest = Message<"laelia.v1.UpdateDebugConfigRequest"> & {
+  /**
+   * @generated from field: bool enabled = 1;
+   */
+  enabled: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateDebugConfigRequest.
+ * Use `create(UpdateDebugConfigRequestSchema)` to create a new message.
+ */
+export declare const UpdateDebugConfigRequestSchema: GenMessage<UpdateDebugConfigRequest>;
+
+/**
+ * @generated from message laelia.v1.UpdateDebugConfigResponse
+ */
+export declare type UpdateDebugConfigResponse = Message<"laelia.v1.UpdateDebugConfigResponse"> & {
+  /**
+   * @generated from field: bool enabled = 1;
+   */
+  enabled: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateDebugConfigResponse.
+ * Use `create(UpdateDebugConfigResponseSchema)` to create a new message.
+ */
+export declare const UpdateDebugConfigResponseSchema: GenMessage<UpdateDebugConfigResponse>;
+
+/**
  * SettingService exposes workspace-level configuration. It is admin-only; the
  * handlers enforce workspace admin membership and return
  * connect.CodePermissionDenied otherwise. The S3 secret_key is masked on read;
@@ -95,6 +155,22 @@ export declare const SettingService: GenService<{
     methodKind: "unary";
     input: typeof UpdateS3ConfigRequestSchema;
     output: typeof UpdateS3ConfigResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.SettingService.GetDebugConfig
+   */
+  getDebugConfig: {
+    methodKind: "unary";
+    input: typeof GetDebugConfigRequestSchema;
+    output: typeof GetDebugConfigResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.SettingService.UpdateDebugConfig
+   */
+  updateDebugConfig: {
+    methodKind: "unary";
+    input: typeof UpdateDebugConfigRequestSchema;
+    output: typeof UpdateDebugConfigResponseSchema;
   },
 }>;
 

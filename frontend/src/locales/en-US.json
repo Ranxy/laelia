@@ -13,6 +13,7 @@
     "creating": "Creating...",
     "delete": "Delete",
     "copy": "Copy Command",
+    "debug-mode": "Debug mode",
     "loading": "Loading...",
     "actions": "Actions",
     "no-data": "No agents yet.",

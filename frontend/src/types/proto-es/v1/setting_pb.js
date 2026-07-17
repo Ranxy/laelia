@@ -12,7 +12,7 @@ import { file_v1_annotation } from "./annotation_pb";
  * Describes the file v1/setting.proto.
  */
 export const file_v1_setting = /*@__PURE__*/
-  fileDesc("ChB2MS9zZXR0aW5nLnByb3RvEglsYWVsaWEudjEiFAoSR2V0UzNDb25maWdSZXF1ZXN0IkQKE0dldFMzQ29uZmlnUmVzcG9uc2USLQoGY29uZmlnGAEgASgLMh0ubGFlbGlhLnN0b3JlLlMzQ29uZmlnU2V0dGluZyJLChVVcGRhdGVTM0NvbmZpZ1JlcXVlc3QSMgoGY29uZmlnGAEgASgLMh0ubGFlbGlhLnN0b3JlLlMzQ29uZmlnU2V0dGluZ0ID4EECIkcKFlVwZGF0ZVMzQ29uZmlnUmVzcG9uc2USLQoGY29uZmlnGAEgASgLMh0ubGFlbGlhLnN0b3JlLlMzQ29uZmlnU2V0dGluZzKnAgoOU2V0dGluZ1NlcnZpY2USfQoLR2V0UzNDb25maWcSHS5sYWVsaWEudjEuR2V0UzNDb25maWdSZXF1ZXN0Gh4ubGFlbGlhLnYxLkdldFMzQ29uZmlnUmVzcG9uc2UiL4rqMBNsYWVsaWEuc2V0dGluZ3MuZ2V0kOowAYLT5JMCDhIML3YxL3MzQ29uZmlnEpUBCg5VcGRhdGVTM0NvbmZpZxIgLmxhZWxpYS52MS5VcGRhdGVTM0NvbmZpZ1JlcXVlc3QaIS5sYWVsaWEudjEuVXBkYXRlUzNDb25maWdSZXNwb25zZSI+iuowFmxhZWxpYS5zZXR0aW5ncy51cGRhdGWQ6jABmOowAYLT5JMCFjoGY29uZmlnMgwvdjEvczNDb25maWdCMVovZ2l0aHViLmNvbS9SYW54eS9sYWVsaWEvYmFja2VuZC9nZW5lcmF0ZWQtZ28vdjFiBnByb3RvMw", [file_google_api_annotations, file_google_api_field_behavior, file_store_setting, file_v1_annotation]);
+  fileDesc("ChB2MS9zZXR0aW5nLnByb3RvEglsYWVsaWEudjEiFAoSR2V0UzNDb25maWdSZXF1ZXN0IkQKE0dldFMzQ29uZmlnUmVzcG9uc2USLQoGY29uZmlnGAEgASgLMh0ubGFlbGlhLnN0b3JlLlMzQ29uZmlnU2V0dGluZyJLChVVcGRhdGVTM0NvbmZpZ1JlcXVlc3QSMgoGY29uZmlnGAEgASgLMh0ubGFlbGlhLnN0b3JlLlMzQ29uZmlnU2V0dGluZ0ID4EECIkcKFlVwZGF0ZVMzQ29uZmlnUmVzcG9uc2USLQoGY29uZmlnGAEgASgLMh0ubGFlbGlhLnN0b3JlLlMzQ29uZmlnU2V0dGluZyIXChVHZXREZWJ1Z0NvbmZpZ1JlcXVlc3QiKQoWR2V0RGVidWdDb25maWdSZXNwb25zZRIPCgdlbmFibGVkGAEgASgIIjAKGFVwZGF0ZURlYnVnQ29uZmlnUmVxdWVzdBIUCgdlbmFibGVkGAEgASgIQgPgQQIiLAoZVXBkYXRlRGVidWdDb25maWdSZXNwb25zZRIPCgdlbmFibGVkGAEgASgIMtIECg5TZXR0aW5nU2VydmljZRJ9CgtHZXRTM0NvbmZpZxIdLmxhZWxpYS52MS5HZXRTM0NvbmZpZ1JlcXVlc3QaHi5sYWVsaWEudjEuR2V0UzNDb25maWdSZXNwb25zZSIviuowE2xhZWxpYS5zZXR0aW5ncy5nZXSQ6jABgtPkkwIOEgwvdjEvczNDb25maWcSlQEKDlVwZGF0ZVMzQ29uZmlnEiAubGFlbGlhLnYxLlVwZGF0ZVMzQ29uZmlnUmVxdWVzdBohLmxhZWxpYS52MS5VcGRhdGVTM0NvbmZpZ1Jlc3BvbnNlIj6K6jAWbGFlbGlhLnNldHRpbmdzLnVwZGF0ZZDqMAGY6jABgtPkkwIWOgZjb25maWcyDC92MS9zM0NvbmZpZxKJAQoOR2V0RGVidWdDb25maWcSIC5sYWVsaWEudjEuR2V0RGVidWdDb25maWdSZXF1ZXN0GiEubGFlbGlhLnYxLkdldERlYnVnQ29uZmlnUmVzcG9uc2UiMorqMBNsYWVsaWEuc2V0dGluZ3MuZ2V0kOowAYLT5JMCERIPL3YxL2RlYnVnQ29uZmlnEpwBChFVcGRhdGVEZWJ1Z0NvbmZpZxIjLmxhZWxpYS52MS5VcGRhdGVEZWJ1Z0NvbmZpZ1JlcXVlc3QaJC5sYWVsaWEudjEuVXBkYXRlRGVidWdDb25maWdSZXNwb25zZSI8iuowFmxhZWxpYS5zZXR0aW5ncy51cGRhdGWQ6jABmOowAYLT5JMCFDoBKjIPL3YxL2RlYnVnQ29uZmlnQjFaL2dpdGh1Yi5jb20vUmFueHkvbGFlbGlhL2JhY2tlbmQvZ2VuZXJhdGVkLWdvL3YxYgZwcm90bzM", [file_google_api_annotations, file_google_api_field_behavior, file_store_setting, file_v1_annotation]);
 
 /**
  * Describes the message laelia.v1.GetS3ConfigRequest.
@@ -41,6 +41,34 @@ export const UpdateS3ConfigRequestSchema = /*@__PURE__*/
  */
 export const UpdateS3ConfigResponseSchema = /*@__PURE__*/
   messageDesc(file_v1_setting, 3);
+
+/**
+ * Describes the message laelia.v1.GetDebugConfigRequest.
+ * Use `create(GetDebugConfigRequestSchema)` to create a new message.
+ */
+export const GetDebugConfigRequestSchema = /*@__PURE__*/
+  messageDesc(file_v1_setting, 4);
+
+/**
+ * Describes the message laelia.v1.GetDebugConfigResponse.
+ * Use `create(GetDebugConfigResponseSchema)` to create a new message.
+ */
+export const GetDebugConfigResponseSchema = /*@__PURE__*/
+  messageDesc(file_v1_setting, 5);
+
+/**
+ * Describes the message laelia.v1.UpdateDebugConfigRequest.
+ * Use `create(UpdateDebugConfigRequestSchema)` to create a new message.
+ */
+export const UpdateDebugConfigRequestSchema = /*@__PURE__*/
+  messageDesc(file_v1_setting, 6);
+
+/**
+ * Describes the message laelia.v1.UpdateDebugConfigResponse.
+ * Use `create(UpdateDebugConfigResponseSchema)` to create a new message.
+ */
+export const UpdateDebugConfigResponseSchema = /*@__PURE__*/
+  messageDesc(file_v1_setting, 7);
 
 /**
  * SettingService exposes workspace-level configuration. It is admin-only; the

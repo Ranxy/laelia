@@ -1995,6 +1995,47 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/debugConfig:
+        get:
+            tags:
+                - SettingService
+            operationId: SettingService_GetDebugConfig
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetDebugConfigResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - SettingService
+            operationId: SettingService_UpdateDebugConfig
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UpdateDebugConfigRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UpdateDebugConfigResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/reminders:
         get:
             tags:
@@ -3739,6 +3780,11 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/CommandEvent'
+        GetDebugConfigResponse:
+            type: object
+            properties:
+                enabled:
+                    type: boolean
         GetOrCreateAgentDMRequest:
             required:
                 - peerAgent
@@ -4650,6 +4696,18 @@ components:
                 UpdateChannelMemberRoleRequest sets a member's chat role. target_role is the
                  conversation_member role value: 2 = Member, 3 = Admin. Owner (1) is not
                  settable here — ownership only moves via TransferChannelOwnership.
+        UpdateDebugConfigRequest:
+            required:
+                - enabled
+            type: object
+            properties:
+                enabled:
+                    type: boolean
+        UpdateDebugConfigResponse:
+            type: object
+            properties:
+                enabled:
+                    type: boolean
         UpdateReminderRequest:
             required:
                 - name

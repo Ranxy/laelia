@@ -260,8 +260,12 @@
     - [RoleService](#laelia-v1-RoleService)
   
 - [v1/setting.proto](#v1_setting-proto)
+    - [GetDebugConfigRequest](#laelia-v1-GetDebugConfigRequest)
+    - [GetDebugConfigResponse](#laelia-v1-GetDebugConfigResponse)
     - [GetS3ConfigRequest](#laelia-v1-GetS3ConfigRequest)
     - [GetS3ConfigResponse](#laelia-v1-GetS3ConfigResponse)
+    - [UpdateDebugConfigRequest](#laelia-v1-UpdateDebugConfigRequest)
+    - [UpdateDebugConfigResponse](#laelia-v1-UpdateDebugConfigResponse)
     - [UpdateS3ConfigRequest](#laelia-v1-UpdateS3ConfigRequest)
     - [UpdateS3ConfigResponse](#laelia-v1-UpdateS3ConfigResponse)
   
@@ -4330,6 +4334,31 @@ laelia.roles.* permissions.
 
 
 
+<a name="laelia-v1-GetDebugConfigRequest"></a>
+
+### GetDebugConfigRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-GetDebugConfigResponse"></a>
+
+### GetDebugConfigResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| enabled | [bool](#bool) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-GetS3ConfigRequest"></a>
 
 ### GetS3ConfigRequest
@@ -4349,6 +4378,36 @@ laelia.roles.* permissions.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | config | [laelia.store.S3ConfigSetting](#laelia-store-S3ConfigSetting) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateDebugConfigRequest"></a>
+
+### UpdateDebugConfigRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| enabled | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateDebugConfigResponse"></a>
+
+### UpdateDebugConfigResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| enabled | [bool](#bool) |  |  |
 
 
 
@@ -4403,6 +4462,8 @@ an update carrying a masked secret preserves the stored value.
 | ----------- | ------------ | ------------- | ------------|
 | GetS3Config | [GetS3ConfigRequest](#laelia-v1-GetS3ConfigRequest) | [GetS3ConfigResponse](#laelia-v1-GetS3ConfigResponse) |  |
 | UpdateS3Config | [UpdateS3ConfigRequest](#laelia-v1-UpdateS3ConfigRequest) | [UpdateS3ConfigResponse](#laelia-v1-UpdateS3ConfigResponse) |  |
+| GetDebugConfig | [GetDebugConfigRequest](#laelia-v1-GetDebugConfigRequest) | [GetDebugConfigResponse](#laelia-v1-GetDebugConfigResponse) |  |
+| UpdateDebugConfig | [UpdateDebugConfigRequest](#laelia-v1-UpdateDebugConfigRequest) | [UpdateDebugConfigResponse](#laelia-v1-UpdateDebugConfigResponse) |  |
 
  
 

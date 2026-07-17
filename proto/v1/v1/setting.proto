@@ -23,6 +23,20 @@ message UpdateS3ConfigResponse {
   laelia.store.S3ConfigSetting config = 1;
 }
 
+message GetDebugConfigRequest {}
+
+message GetDebugConfigResponse {
+  bool enabled = 1;
+}
+
+message UpdateDebugConfigRequest {
+  bool enabled = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateDebugConfigResponse {
+  bool enabled = 1;
+}
+
 // SettingService exposes workspace-level configuration. It is admin-only; the
 // handlers enforce workspace admin membership and return
 // connect.CodePermissionDenied otherwise. The S3 secret_key is masked on read;
@@ -38,6 +52,22 @@ service SettingService {
     option (google.api.http) = {
       patch: "/v1/s3Config"
       body: "config"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.settings.update";
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc GetDebugConfig(GetDebugConfigRequest) returns (GetDebugConfigResponse) {
+    option (google.api.http) = {get: "/v1/debugConfig"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.settings.get";
+  }
+
+  rpc UpdateDebugConfig(UpdateDebugConfigRequest) returns (UpdateDebugConfigResponse) {
+    option (google.api.http) = {
+      patch: "/v1/debugConfig"
+      body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.update";

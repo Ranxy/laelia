@@ -1183,11 +1183,27 @@
             <ul>
               
                 <li>
+                  <a href="#laelia.v1.GetDebugConfigRequest"><span class="badge">M</span>GetDebugConfigRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetDebugConfigResponse"><span class="badge">M</span>GetDebugConfigResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.GetS3ConfigRequest"><span class="badge">M</span>GetS3ConfigRequest</a>
                 </li>
               
                 <li>
                   <a href="#laelia.v1.GetS3ConfigResponse"><span class="badge">M</span>GetS3ConfigResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateDebugConfigRequest"><span class="badge">M</span>UpdateDebugConfigRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateDebugConfigResponse"><span class="badge">M</span>UpdateDebugConfigResponse</a>
                 </li>
               
                 <li>
@@ -11392,6 +11408,37 @@ string from the permission catalog. </p></td>
       <p></p>
 
       
+        <h3 id="laelia.v1.GetDebugConfigRequest">GetDebugConfigRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.GetDebugConfigResponse">GetDebugConfigResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>enabled</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.GetS3ConfigRequest">GetS3ConfigRequest</h3>
         <p></p>
 
@@ -11412,6 +11459,54 @@ string from the permission catalog. </p></td>
                 <tr>
                   <td>config</td>
                   <td><a href="#laelia.store.S3ConfigSetting">laelia.store.S3ConfigSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateDebugConfigRequest">UpdateDebugConfigRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>enabled</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateDebugConfigResponse">UpdateDebugConfigResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>enabled</td>
+                  <td><a href="#bool">bool</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -11499,6 +11594,20 @@ string from the permission catalog. </p></td>
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>GetDebugConfig</td>
+                <td><a href="#laelia.v1.GetDebugConfigRequest">GetDebugConfigRequest</a></td>
+                <td><a href="#laelia.v1.GetDebugConfigResponse">GetDebugConfigResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateDebugConfig</td>
+                <td><a href="#laelia.v1.UpdateDebugConfigRequest">UpdateDebugConfigRequest</a></td>
+                <td><a href="#laelia.v1.UpdateDebugConfigResponse">UpdateDebugConfigResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
           </tbody>
         </table>
 
@@ -11534,6 +11643,26 @@ string from the permission catalog. </p></td>
                 <td>PATCH</td>
                 <td>/v1/s3Config</td>
                 <td>config</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetDebugConfig</td>
+                <td>GET</td>
+                <td>/v1/debugConfig</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateDebugConfig</td>
+                <td>PATCH</td>
+                <td>/v1/debugConfig</td>
+                <td>*</td>
               </tr>
               
             

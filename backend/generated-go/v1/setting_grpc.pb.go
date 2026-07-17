@@ -19,8 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SettingService_GetS3Config_FullMethodName    = "/laelia.v1.SettingService/GetS3Config"
-	SettingService_UpdateS3Config_FullMethodName = "/laelia.v1.SettingService/UpdateS3Config"
+	SettingService_GetS3Config_FullMethodName       = "/laelia.v1.SettingService/GetS3Config"
+	SettingService_UpdateS3Config_FullMethodName    = "/laelia.v1.SettingService/UpdateS3Config"
+	SettingService_GetDebugConfig_FullMethodName    = "/laelia.v1.SettingService/GetDebugConfig"
+	SettingService_UpdateDebugConfig_FullMethodName = "/laelia.v1.SettingService/UpdateDebugConfig"
 )
 
 // SettingServiceClient is the client API for SettingService service.
@@ -34,6 +36,8 @@ const (
 type SettingServiceClient interface {
 	GetS3Config(ctx context.Context, in *GetS3ConfigRequest, opts ...grpc.CallOption) (*GetS3ConfigResponse, error)
 	UpdateS3Config(ctx context.Context, in *UpdateS3ConfigRequest, opts ...grpc.CallOption) (*UpdateS3ConfigResponse, error)
+	GetDebugConfig(ctx context.Context, in *GetDebugConfigRequest, opts ...grpc.CallOption) (*GetDebugConfigResponse, error)
+	UpdateDebugConfig(ctx context.Context, in *UpdateDebugConfigRequest, opts ...grpc.CallOption) (*UpdateDebugConfigResponse, error)
 }
 
 type settingServiceClient struct {
@@ -64,6 +68,26 @@ func (c *settingServiceClient) UpdateS3Config(ctx context.Context, in *UpdateS3C
 	return out, nil
 }
 
+func (c *settingServiceClient) GetDebugConfig(ctx context.Context, in *GetDebugConfigRequest, opts ...grpc.CallOption) (*GetDebugConfigResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetDebugConfigResponse)
+	err := c.cc.Invoke(ctx, SettingService_GetDebugConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *settingServiceClient) UpdateDebugConfig(ctx context.Context, in *UpdateDebugConfigRequest, opts ...grpc.CallOption) (*UpdateDebugConfigResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateDebugConfigResponse)
+	err := c.cc.Invoke(ctx, SettingService_UpdateDebugConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SettingServiceServer is the server API for SettingService service.
 // All implementations must embed UnimplementedSettingServiceServer
 // for forward compatibility.
@@ -75,6 +99,8 @@ func (c *settingServiceClient) UpdateS3Config(ctx context.Context, in *UpdateS3C
 type SettingServiceServer interface {
 	GetS3Config(context.Context, *GetS3ConfigRequest) (*GetS3ConfigResponse, error)
 	UpdateS3Config(context.Context, *UpdateS3ConfigRequest) (*UpdateS3ConfigResponse, error)
+	GetDebugConfig(context.Context, *GetDebugConfigRequest) (*GetDebugConfigResponse, error)
+	UpdateDebugConfig(context.Context, *UpdateDebugConfigRequest) (*UpdateDebugConfigResponse, error)
 	mustEmbedUnimplementedSettingServiceServer()
 }
 
@@ -90,6 +116,12 @@ func (UnimplementedSettingServiceServer) GetS3Config(context.Context, *GetS3Conf
 }
 func (UnimplementedSettingServiceServer) UpdateS3Config(context.Context, *UpdateS3ConfigRequest) (*UpdateS3ConfigResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateS3Config not implemented")
+}
+func (UnimplementedSettingServiceServer) GetDebugConfig(context.Context, *GetDebugConfigRequest) (*GetDebugConfigResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetDebugConfig not implemented")
+}
+func (UnimplementedSettingServiceServer) UpdateDebugConfig(context.Context, *UpdateDebugConfigRequest) (*UpdateDebugConfigResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateDebugConfig not implemented")
 }
 func (UnimplementedSettingServiceServer) mustEmbedUnimplementedSettingServiceServer() {}
 func (UnimplementedSettingServiceServer) testEmbeddedByValue()                        {}
@@ -148,6 +180,42 @@ func _SettingService_UpdateS3Config_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SettingService_GetDebugConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDebugConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingServiceServer).GetDebugConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingService_GetDebugConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingServiceServer).GetDebugConfig(ctx, req.(*GetDebugConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SettingService_UpdateDebugConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateDebugConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingServiceServer).UpdateDebugConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingService_UpdateDebugConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingServiceServer).UpdateDebugConfig(ctx, req.(*UpdateDebugConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SettingService_ServiceDesc is the grpc.ServiceDesc for SettingService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -162,6 +230,14 @@ var SettingService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateS3Config",
 			Handler:    _SettingService_UpdateS3Config_Handler,
+		},
+		{
+			MethodName: "GetDebugConfig",
+			Handler:    _SettingService_GetDebugConfig_Handler,
+		},
+		{
+			MethodName: "UpdateDebugConfig",
+			Handler:    _SettingService_UpdateDebugConfig_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

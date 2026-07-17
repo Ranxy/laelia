@@ -84,7 +84,7 @@ func configureGrpcRouters(
 	agentService := apiv1.NewAgentService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager)
 	commandService := apiv1.NewCommandService(stores, cmdDispatcher, s3clientmanager, iamManager)
 	agentCommandService := apiv1.NewAgentCommandService(stores, cmdDispatcher)
-	settingService := apiv1.NewSettingService(stores, s3clientmanager)
+	settingService := apiv1.NewSettingService(stores, s3clientmanager, profile)
 	roleService := apiv1.NewRoleService(stores)
 	iamService := apiv1.NewIamService(stores)
 

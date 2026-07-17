@@ -13,6 +13,7 @@
     "creating": "创建中...",
     "delete": "删除",
     "copy": "复制命令",
+    "debug-mode": "调试模式",
     "loading": "加载中...",
     "actions": "操作",
     "no-data": "暂无 Agent。",

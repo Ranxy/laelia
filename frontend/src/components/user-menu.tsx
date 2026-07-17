@@ -1,5 +1,6 @@
+import { create } from "@bufbuild/protobuf";
 import { ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
@@ -12,8 +13,15 @@ import {
   DropdownMenuSubmenuTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
+import { settingServiceClient } from "@/connect";
 import { setLocale } from "@/lib/i18n";
 import { useAppStore } from "@/stores";
+import { useHasPermission } from "@/stores/auth";
+import {
+  GetDebugConfigRequestSchema,
+  UpdateDebugConfigRequestSchema,
+} from "@/types/proto-es/v1/setting_pb";
 
 type LocaleOption = {
   value: string;
@@ -31,6 +39,34 @@ export function UserMenu() {
   const currentUser = useAppStore((s) => s.currentUser);
   const logout = useAppStore((s) => s.logout);
   const [open, setOpen] = useState(false);
+
+  const isAdmin = useHasPermission("laelia.settings.get");
+  const [debugEnabled, setDebugEnabled] = useState(false);
+  const [debugLoaded, setDebugLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    settingServiceClient
+      .getDebugConfig(create(GetDebugConfigRequestSchema))
+      .then((res) => {
+        setDebugEnabled(res.enabled);
+        setDebugLoaded(true);
+      })
+      .catch(() => {
+        setDebugLoaded(true);
+      });
+  }, [isAdmin]);
+
+  const handleDebugToggle = useCallback(async (checked: boolean) => {
+    setDebugEnabled(checked);
+    try {
+      await settingServiceClient.updateDebugConfig(
+        create(UpdateDebugConfigRequestSchema, { enabled: checked })
+      );
+    } catch {
+      setDebugEnabled(!checked);
+    }
+  }, []);
 
   async function handleLogout() {
     setOpen(false);
@@ -92,6 +128,21 @@ export function UserMenu() {
             ))}
           </DropdownMenuSubmenuContent>
         </DropdownMenuSubmenu>
+
+        {isAdmin && (
+          <>
+            <DropdownMenuSeparator />
+            <div className="flex items-center justify-between px-3 py-2 text-sm">
+              <span className="text-control">{t("common.debug-mode")}</span>
+              <Switch
+                checked={debugEnabled}
+                onCheckedChange={handleDebugToggle}
+                disabled={!debugLoaded}
+                size="sm"
+              />
+            </div>
+          </>
+        )}
 
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>

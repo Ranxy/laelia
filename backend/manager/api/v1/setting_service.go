@@ -2,14 +2,17 @@ package v1
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
 	"connectrpc.com/connect"
 	"github.com/pkg/errors"
 
+	"github.com/Ranxy/laelia/backend/common/log"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
+	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
@@ -24,10 +27,11 @@ type SettingService struct {
 	v1connect.UnimplementedSettingServiceHandler
 	store           *store.Store
 	s3clientManager *s3client.Client
+	profile         *config.Profile
 }
 
-func NewSettingService(s *store.Store, s3clientManager *s3client.Client) *SettingService {
-	return &SettingService{store: s, s3clientManager: s3clientManager}
+func NewSettingService(s *store.Store, s3clientManager *s3client.Client, profile *config.Profile) *SettingService {
+	return &SettingService{store: s, s3clientManager: s3clientManager, profile: profile}
 }
 
 func (s *SettingService) GetS3Config(ctx context.Context, _ *connect.Request[v1pb.GetS3ConfigRequest]) (*connect.Response[v1pb.GetS3ConfigResponse], error) {
@@ -64,6 +68,24 @@ func (s *SettingService) UpdateS3Config(ctx context.Context, req *connect.Reques
 
 	in.SecretKey = maskSecret(in.SecretKey)
 	return connect.NewResponse(&v1pb.UpdateS3ConfigResponse{Config: in}), nil
+}
+
+func (s *SettingService) GetDebugConfig(_ context.Context, _ *connect.Request[v1pb.GetDebugConfigRequest]) (*connect.Response[v1pb.GetDebugConfigResponse], error) {
+	enabled := s.profile.RuntimeDebug.Load()
+	return connect.NewResponse(&v1pb.GetDebugConfigResponse{Enabled: enabled}), nil
+}
+
+func (s *SettingService) UpdateDebugConfig(_ context.Context, req *connect.Request[v1pb.UpdateDebugConfigRequest]) (*connect.Response[v1pb.UpdateDebugConfigResponse], error) {
+	enabled := req.Msg.GetEnabled()
+	s.profile.RuntimeDebug.Store(enabled)
+
+	if enabled {
+		log.LogLevel.Set(slog.LevelDebug)
+	} else {
+		log.LogLevel.Set(slog.LevelInfo)
+	}
+
+	return connect.NewResponse(&v1pb.UpdateDebugConfigResponse{Enabled: enabled}), nil
 }
 
 // maskSecret returns a masked form of the secret for read-back. An empty secret

@@ -39,12 +39,20 @@ const (
 	// SettingServiceUpdateS3ConfigProcedure is the fully-qualified name of the SettingService's
 	// UpdateS3Config RPC.
 	SettingServiceUpdateS3ConfigProcedure = "/laelia.v1.SettingService/UpdateS3Config"
+	// SettingServiceGetDebugConfigProcedure is the fully-qualified name of the SettingService's
+	// GetDebugConfig RPC.
+	SettingServiceGetDebugConfigProcedure = "/laelia.v1.SettingService/GetDebugConfig"
+	// SettingServiceUpdateDebugConfigProcedure is the fully-qualified name of the SettingService's
+	// UpdateDebugConfig RPC.
+	SettingServiceUpdateDebugConfigProcedure = "/laelia.v1.SettingService/UpdateDebugConfig"
 )
 
 // SettingServiceClient is a client for the laelia.v1.SettingService service.
 type SettingServiceClient interface {
 	GetS3Config(context.Context, *connect.Request[v1.GetS3ConfigRequest]) (*connect.Response[v1.GetS3ConfigResponse], error)
 	UpdateS3Config(context.Context, *connect.Request[v1.UpdateS3ConfigRequest]) (*connect.Response[v1.UpdateS3ConfigResponse], error)
+	GetDebugConfig(context.Context, *connect.Request[v1.GetDebugConfigRequest]) (*connect.Response[v1.GetDebugConfigResponse], error)
+	UpdateDebugConfig(context.Context, *connect.Request[v1.UpdateDebugConfigRequest]) (*connect.Response[v1.UpdateDebugConfigResponse], error)
 }
 
 // NewSettingServiceClient constructs a client for the laelia.v1.SettingService service. By default,
@@ -70,13 +78,27 @@ func NewSettingServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(settingServiceMethods.ByName("UpdateS3Config")),
 			connect.WithClientOptions(opts...),
 		),
+		getDebugConfig: connect.NewClient[v1.GetDebugConfigRequest, v1.GetDebugConfigResponse](
+			httpClient,
+			baseURL+SettingServiceGetDebugConfigProcedure,
+			connect.WithSchema(settingServiceMethods.ByName("GetDebugConfig")),
+			connect.WithClientOptions(opts...),
+		),
+		updateDebugConfig: connect.NewClient[v1.UpdateDebugConfigRequest, v1.UpdateDebugConfigResponse](
+			httpClient,
+			baseURL+SettingServiceUpdateDebugConfigProcedure,
+			connect.WithSchema(settingServiceMethods.ByName("UpdateDebugConfig")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // settingServiceClient implements SettingServiceClient.
 type settingServiceClient struct {
-	getS3Config    *connect.Client[v1.GetS3ConfigRequest, v1.GetS3ConfigResponse]
-	updateS3Config *connect.Client[v1.UpdateS3ConfigRequest, v1.UpdateS3ConfigResponse]
+	getS3Config       *connect.Client[v1.GetS3ConfigRequest, v1.GetS3ConfigResponse]
+	updateS3Config    *connect.Client[v1.UpdateS3ConfigRequest, v1.UpdateS3ConfigResponse]
+	getDebugConfig    *connect.Client[v1.GetDebugConfigRequest, v1.GetDebugConfigResponse]
+	updateDebugConfig *connect.Client[v1.UpdateDebugConfigRequest, v1.UpdateDebugConfigResponse]
 }
 
 // GetS3Config calls laelia.v1.SettingService.GetS3Config.
@@ -89,10 +111,22 @@ func (c *settingServiceClient) UpdateS3Config(ctx context.Context, req *connect.
 	return c.updateS3Config.CallUnary(ctx, req)
 }
 
+// GetDebugConfig calls laelia.v1.SettingService.GetDebugConfig.
+func (c *settingServiceClient) GetDebugConfig(ctx context.Context, req *connect.Request[v1.GetDebugConfigRequest]) (*connect.Response[v1.GetDebugConfigResponse], error) {
+	return c.getDebugConfig.CallUnary(ctx, req)
+}
+
+// UpdateDebugConfig calls laelia.v1.SettingService.UpdateDebugConfig.
+func (c *settingServiceClient) UpdateDebugConfig(ctx context.Context, req *connect.Request[v1.UpdateDebugConfigRequest]) (*connect.Response[v1.UpdateDebugConfigResponse], error) {
+	return c.updateDebugConfig.CallUnary(ctx, req)
+}
+
 // SettingServiceHandler is an implementation of the laelia.v1.SettingService service.
 type SettingServiceHandler interface {
 	GetS3Config(context.Context, *connect.Request[v1.GetS3ConfigRequest]) (*connect.Response[v1.GetS3ConfigResponse], error)
 	UpdateS3Config(context.Context, *connect.Request[v1.UpdateS3ConfigRequest]) (*connect.Response[v1.UpdateS3ConfigResponse], error)
+	GetDebugConfig(context.Context, *connect.Request[v1.GetDebugConfigRequest]) (*connect.Response[v1.GetDebugConfigResponse], error)
+	UpdateDebugConfig(context.Context, *connect.Request[v1.UpdateDebugConfigRequest]) (*connect.Response[v1.UpdateDebugConfigResponse], error)
 }
 
 // NewSettingServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -114,12 +148,28 @@ func NewSettingServiceHandler(svc SettingServiceHandler, opts ...connect.Handler
 		connect.WithSchema(settingServiceMethods.ByName("UpdateS3Config")),
 		connect.WithHandlerOptions(opts...),
 	)
+	settingServiceGetDebugConfigHandler := connect.NewUnaryHandler(
+		SettingServiceGetDebugConfigProcedure,
+		svc.GetDebugConfig,
+		connect.WithSchema(settingServiceMethods.ByName("GetDebugConfig")),
+		connect.WithHandlerOptions(opts...),
+	)
+	settingServiceUpdateDebugConfigHandler := connect.NewUnaryHandler(
+		SettingServiceUpdateDebugConfigProcedure,
+		svc.UpdateDebugConfig,
+		connect.WithSchema(settingServiceMethods.ByName("UpdateDebugConfig")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/laelia.v1.SettingService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SettingServiceGetS3ConfigProcedure:
 			settingServiceGetS3ConfigHandler.ServeHTTP(w, r)
 		case SettingServiceUpdateS3ConfigProcedure:
 			settingServiceUpdateS3ConfigHandler.ServeHTTP(w, r)
+		case SettingServiceGetDebugConfigProcedure:
+			settingServiceGetDebugConfigHandler.ServeHTTP(w, r)
+		case SettingServiceUpdateDebugConfigProcedure:
+			settingServiceUpdateDebugConfigHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -135,4 +185,12 @@ func (UnimplementedSettingServiceHandler) GetS3Config(context.Context, *connect.
 
 func (UnimplementedSettingServiceHandler) UpdateS3Config(context.Context, *connect.Request[v1.UpdateS3ConfigRequest]) (*connect.Response[v1.UpdateS3ConfigResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.UpdateS3Config is not implemented"))
+}
+
+func (UnimplementedSettingServiceHandler) GetDebugConfig(context.Context, *connect.Request[v1.GetDebugConfigRequest]) (*connect.Response[v1.GetDebugConfigResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.GetDebugConfig is not implemented"))
+}
+
+func (UnimplementedSettingServiceHandler) UpdateDebugConfig(context.Context, *connect.Request[v1.UpdateDebugConfigRequest]) (*connect.Response[v1.UpdateDebugConfigResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.UpdateDebugConfig is not implemented"))
 }
