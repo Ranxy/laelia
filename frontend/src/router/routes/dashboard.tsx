@@ -2,6 +2,8 @@ import type { RouteObject } from "react-router-dom";
 import { Navigate } from "react-router-dom";
 import { DashboardLayout } from "@/app/layouts/dashboard-layout";
 import {
+  ACTIVITY_ROUTE,
+  ACTIVITY_ROUTE_DETAIL,
   AGENT_ROUTE_CHAT,
   AGENT_ROUTE_LIST,
   AGENT_ROUTE_PROFILE,
@@ -42,6 +44,24 @@ export const dashboardRoutes: RouteObject[] = [
             lazy: () =>
               import("@/pages/dashboard/chat-conversation").then((m) => ({
                 Component: m.ChatConversationPage,
+              })),
+          },
+        ],
+      },
+      {
+        path: "activity",
+        handle: { name: ACTIVITY_ROUTE },
+        lazy: () =>
+          import("@/pages/dashboard/activity-layout").then((m) => ({
+            Component: m.ActivityLayout,
+          })),
+        children: [
+          {
+            path: ":messageId",
+            handle: { name: ACTIVITY_ROUTE_DETAIL },
+            lazy: () =>
+              import("@/pages/dashboard/activity-detail").then((m) => ({
+                Component: m.ActivityDetail,
               })),
           },
         ],

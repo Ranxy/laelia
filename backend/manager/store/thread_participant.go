@@ -95,6 +95,61 @@ func (s *Store) IsThreadParticipant(ctx context.Context, rootID uuid.UUID, agent
 	return exists, nil
 }
 
+// AddUserThreadParticipants subscribes the given users to a thread, mirroring
+// AddThreadParticipants (agent-only). Idempotent (ON CONFLICT DO NOTHING); an
+// empty list is a no-op. A user is subscribed when they are @mentioned in a
+// thread or they post a reply in it; thereafter every new reply in that thread
+// generates a THREAD activity for them (see GenerateActivityForMessage).
+func (s *Store) AddUserThreadParticipants(ctx context.Context, rootID uuid.UUID, principalIDs []int) error {
+	if len(principalIDs) == 0 {
+		return nil
+	}
+	args := make([]any, 0, len(principalIDs)+1)
+	args = append(args, rootID)
+	var placeholders strings.Builder
+	for i, id := range principalIDs {
+		if i > 0 {
+			_, _ = placeholders.WriteString(",")
+		}
+		_, _ = placeholders.WriteString("($1,$")
+		_, _ = placeholders.WriteString(itoa(i + 2))
+		_, _ = placeholders.WriteString(")")
+		args = append(args, id)
+	}
+	_, err := s.GetDB().ExecContext(ctx, `
+		INSERT INTO user_thread_participant (thread_root_message_id, principal_id)
+		VALUES `+placeholders.String()+`
+		ON CONFLICT (thread_root_message_id, principal_id) DO NOTHING
+	`, args...)
+	if err != nil {
+		return errors.Wrapf(err, "failed to add user thread participants")
+	}
+	return nil
+}
+
+// ListUserThreadParticipants returns the principal ids subscribed to a thread.
+func (s *Store) ListUserThreadParticipants(ctx context.Context, rootID uuid.UUID) ([]int, error) {
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT principal_id FROM user_thread_participant WHERE thread_root_message_id = $1
+	`, rootID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list user thread participants")
+	}
+	defer rows.Close()
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan user thread participant")
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate user thread participants")
+	}
+	return ids, nil
+}
+
 // ThreadSender is one distinct sender of a thread (the root message or any reply).
 // PrincipalID is always populated (it is the conversation owner for agent messages);
 // AgentID is valid only for agent senders (SenderType == SenderTypeAgent). The

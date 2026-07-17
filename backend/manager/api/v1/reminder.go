@@ -173,7 +173,9 @@ func (s *CommandService) ConvertMessageToReminder(ctx context.Context, req *conn
 	if err := s.store.AddThreadParticipants(ctx, msgID, []int{agent.ID}); err != nil {
 		slog.Warn("failed to subscribe agent to reminder thread", "rootID", msgID, "error", err)
 	}
-	s.postReminderSystemMessage(ctx, convID, msgID, fmt.Sprintf("⏰ %s scheduled a reminder for %s: %s", agent.Name, fireAt.In(time.UTC).Format(time.RFC3339), truncateContent(req.Msg.TaskContent)))
+	if msg := s.postReminderSystemMessage(ctx, convID, msgID, fmt.Sprintf("⏰ %s scheduled a reminder for %s: %s", agent.Name, fireAt.In(time.UTC).Format(time.RFC3339), truncateContent(req.Msg.TaskContent))); msg != nil {
+		s.store.GenerateActivityForMessage(ctx, msg, false, true)
+	}
 
 	return connect.NewResponse(&v1pb.ConvertMessageToReminderResponse{Reminder: storeToV1Reminder(reminder)}), nil
 }
@@ -320,7 +322,9 @@ func (s *CommandService) UpdateReminder(ctx context.Context, req *connect.Reques
 		}
 	}
 	actor := resolveActorName(ctx)
-	s.postReminderSystemMessage(ctx, updated.ConversationID, msgID, fmt.Sprintf("📝 %s updated the reminder schedule: %s", actor, fireAt.In(time.UTC).Format(time.RFC3339)))
+	if msg := s.postReminderSystemMessage(ctx, updated.ConversationID, msgID, fmt.Sprintf("📝 %s updated the reminder schedule: %s", actor, fireAt.In(time.UTC).Format(time.RFC3339))); msg != nil {
+		s.store.GenerateActivityForMessage(ctx, msg, false, true)
+	}
 	return connect.NewResponse(&v1pb.UpdateReminderResponse{Reminder: storeToV1Reminder(updated)}), nil
 }
 
@@ -349,7 +353,9 @@ func (s *CommandService) CancelReminder(ctx context.Context, req *connect.Reques
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to cancel reminder"))
 	}
 	if updated.Status == int16(v1pb.ReminderStatus_REMINDER_STATUS_CANCELLED) {
-		s.postReminderSystemMessage(ctx, updated.ConversationID, msgID, fmt.Sprintf("🚫 %s cancelled the reminder", resolveActorName(ctx)))
+		if msg := s.postReminderSystemMessage(ctx, updated.ConversationID, msgID, fmt.Sprintf("🚫 %s cancelled the reminder", resolveActorName(ctx))); msg != nil {
+			s.store.GenerateActivityForMessage(ctx, msg, false, true)
+		}
 	}
 	return connect.NewResponse(&v1pb.CancelReminderResponse{Reminder: storeToV1Reminder(updated)}), nil
 }
@@ -380,9 +386,14 @@ func (s *CommandService) CompleteReminder(ctx context.Context, req *connect.Requ
 	// readable in the thread while preserving the status event.
 	label := fmt.Sprintf("✅ %s completed the reminder", r.AssigneeName)
 	nextFireAt := s.nextFireOrNil(r)
-	updated, err := s.store.CompleteReminderAndPostNotification(ctx, msgID, req.Msg.Result, label, nextFireAt)
+	posted, updated, err := s.store.CompleteReminderAndPostNotification(ctx, msgID, req.Msg.Result, label, nextFireAt)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to complete reminder"))
+	}
+	// The reminder root is a reminder, so its thread replies carry the REMINDER
+	// category for every user member (plus THREAD for participants).
+	for _, m := range posted {
+		s.store.GenerateActivityForMessage(ctx, m, false, true)
 	}
 	return connect.NewResponse(&v1pb.CompleteReminderResponse{Reminder: storeToV1Reminder(updated)}), nil
 }
@@ -409,9 +420,12 @@ func (s *CommandService) FailReminder(ctx context.Context, req *connect.Request[
 	}
 	label := fmt.Sprintf("❌ %s failed the reminder", r.AssigneeName)
 	nextFireAt := s.nextFireOrNil(r)
-	updated, err := s.store.FailReminderAndPostNotification(ctx, msgID, req.Msg.Error, label, nextFireAt)
+	posted, updated, err := s.store.FailReminderAndPostNotification(ctx, msgID, req.Msg.Error, label, nextFireAt)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to fail reminder"))
+	}
+	for _, m := range posted {
+		s.store.GenerateActivityForMessage(ctx, m, false, true)
 	}
 	return connect.NewResponse(&v1pb.FailReminderResponse{Reminder: storeToV1Reminder(updated)}), nil
 }
@@ -477,19 +491,24 @@ func resolveFireAt(ts *timestamppb.Timestamp, cronExpr, tz string) (time.Time, e
 // the reminder's trigger message, bumping the conversation version so the user
 // poller and thread view surface it. It does NOT wake agents: system messages
 // are excluded from agentRelevantMessageCondition. Best-effort: failures are
-// logged, never fatal.
-func (s *CommandService) postReminderSystemMessage(ctx context.Context, convID, rootMsgID uuid.UUID, content string) {
+// logged, never fatal. Returns the inserted message so the caller can generate
+// REMINDER activity for it; returns nil on the empty-content fast path or on
+// insert failure (callers treat nil as "no activity to generate").
+func (s *CommandService) postReminderSystemMessage(ctx context.Context, convID, rootMsgID uuid.UUID, content string) *store.ChatMessage {
 	if content == "" {
-		return
+		return nil
 	}
-	if _, _, err := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
+	msg, _, err := s.store.CreateChatMessageBumpVersion(ctx, &store.ChatMessage{
 		ConversationID:      convID,
 		PrincipalID:         1, // system bot (seeded principal id 1)
 		Role:                1,
 		Content:             content,
 		SenderType:          store.SenderTypeSystem,
 		ThreadRootMessageID: uuid.NullUUID{UUID: rootMsgID, Valid: true},
-	}); err != nil {
+	})
+	if err != nil {
 		slog.Warn("failed to post reminder system message", "conversationID", convID, "rootID", rootMsgID, "error", err)
+		return nil
 	}
+	return msg
 }

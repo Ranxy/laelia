@@ -522,6 +522,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.Activity"><span class="badge">M</span>Activity</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.AddChannelMemberRequest"><span class="badge">M</span>AddChannelMemberRequest</a>
                 </li>
               
@@ -766,6 +770,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ListActivitiesRequest"><span class="badge">M</span>ListActivitiesRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListActivitiesResponse"><span class="badge">M</span>ListActivitiesResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ListChannelMembersRequest"><span class="badge">M</span>ListChannelMembersRequest</a>
                 </li>
               
@@ -887,6 +899,14 @@
               
                 <li>
                   <a href="#laelia.v1.ManagerStreamMessage"><span class="badge">M</span>ManagerStreamMessage</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.MarkActivityDoneRequest"><span class="badge">M</span>MarkActivityDoneRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.MarkActivityDoneResponse"><span class="badge">M</span>MarkActivityDoneResponse</a>
                 </li>
               
                 <li>
@@ -1061,6 +1081,14 @@
                   <a href="#laelia.v1.WatchCommandRequest"><span class="badge">M</span>WatchCommandRequest</a>
                 </li>
               
+              
+                <li>
+                  <a href="#laelia.v1.ActivityCategory"><span class="badge">E</span>ActivityCategory</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ActivityState"><span class="badge">E</span>ActivityState</a>
+                </li>
               
                 <li>
                   <a href="#laelia.v1.CommandEventType"><span class="badge">E</span>CommandEventType</a>
@@ -4439,6 +4467,118 @@ Format: idps/{idp} </p></td>
 
         
       
+        <h3 id="laelia.v1.Activity">Activity</h3>
+        <p>Activity is one item in a user's per-user activity feed. Each item corresponds</p><p>to a single chat_message relevant to the user, tagged with the category(ies)</p><p>that made it relevant. The message itself is the source of truth for</p><p>content/sender; this row carries the per-user read/done state and category</p><p>flags. The resource name is "users/{user}/activities/{message}".</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>conversation is the conversation the message belongs to. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>message is the chat message (&#34;conversations/{c}/messages/{m}&#34;). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>thread_root</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>thread_root, when non-empty, is the root message of the thread the message
+belongs to. Empty for a top-level message. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>categories</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>categories is the OR-ed set of ActivityCategory flags that made this message
+relevant to the user. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>state</td>
+                  <td><a href="#laelia.v1.ActivityState">ActivityState</a></td>
+                  <td></td>
+                  <td><p>state is the user-facing lifecycle (UNREAD/READ/DONE). Read is derived from
+the user_channel_cursor; DONE is an explicit action. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>room_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p>room_version is the message&#39;s room_version (for ordering and read-cursor
+comparison). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>read_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>done_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>summary</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>summary is a short preview of the message content for the left-list. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sender_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>sender_name is the display name of the message sender. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sender_type</td>
+                  <td><a href="#laelia.v1.SenderType">SenderType</a></td>
+                  <td></td>
+                  <td><p>sender_type is the SenderType of the message (USER/AGENT/SYSTEM). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.AddChannelMemberRequest">AddChannelMemberRequest</h3>
         <p></p>
 
@@ -6949,6 +7089,82 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
 
         
       
+        <h3 id="laelia.v1.ListActivitiesRequest">ListActivitiesRequest</h3>
+        <p>ListActivities returns the authenticated user's activity feed: chat messages</p><p>relevant to them, tagged with category flags. The caller's own id is the</p><p>implicit filter (no cross-user listing). filter selects items by category</p><p>(empty = all categories; set = items whose categories intersect the requested</p><p>set, ANY flag). read_state_filter scopes by lifecycle and defaults to UNREAD</p><p>when UNSPECIFIED.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>filter</td>
+                  <td><a href="#laelia.v1.ActivityCategory">ActivityCategory</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>read_state_filter</td>
+                  <td><a href="#laelia.v1.ActivityState">ActivityState</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListActivitiesResponse">ListActivitiesResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>activities</td>
+                  <td><a href="#laelia.v1.Activity">Activity</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ListChannelMembersRequest">ListChannelMembersRequest</h3>
         <p></p>
 
@@ -7863,6 +8079,54 @@ thread participation and is left 0. </p></td>
                   <td><a href="#laelia.v1.DiscoverProviders">DiscoverProviders</a></td>
                   <td></td>
                   <td><p>ask the agent daemon to re-probe installed LLM agent providers </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.MarkActivityDoneRequest">MarkActivityDoneRequest</h3>
+        <p>MarkActivityDone marks a single activity item DONE for the authenticated user,</p><p>hiding it from All and Unread. The caller's own id must own the row; the name</p><p>is "users/{user}/activities/{message}".</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.MarkActivityDoneResponse">MarkActivityDoneResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>activity</td>
+                  <td><a href="#laelia.v1.Activity">Activity</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -9542,6 +9806,82 @@ is performed by ClaimTask, not this RPC. </p></td>
       
 
       
+        <h3 id="laelia.v1.ActivityCategory">ActivityCategory</h3>
+        <p>ActivityCategory flags which kind of conversation event an Activity item</p><p>represents. A single Activity row may carry several categories OR-ed together</p><p>(a task-thread reply that @mentions a user is both TASK and MENTION). The</p><p>ListActivities filter selects items that have ANY of the requested categories</p><p>set. Values are bit flags so they compose in a single int column; the</p><p>ACTIVITY_CATEGORY prefix satisfies protobuf C++ scoping rules (sibling enums</p><p>cannot share value names), matching SenderType/TaskStatus.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>ACTIVITY_CATEGORY_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ACTIVITY_CATEGORY_MENTION</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ACTIVITY_CATEGORY_TASK</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ACTIVITY_CATEGORY_REMINDER</td>
+                <td>4</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ACTIVITY_CATEGORY_THREAD</td>
+                <td>8</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+        <h3 id="laelia.v1.ActivityState">ActivityState</h3>
+        <p>ActivityState is the user-facing lifecycle of an Activity item. UNREAD -> READ</p><p>happens when the user's per-channel read cursor advances past the message's</p><p>room_version (via MarkConversationRead); READ items stay visible under the All</p><p>filter. DONE is an explicit "Mark as Done" action that hides the item from All</p><p>and Unread. The ACTIVITY_STATE prefix satisfies protobuf C++ scoping rules.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>ACTIVITY_STATE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ACTIVITY_STATE_UNREAD</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ACTIVITY_STATE_READ</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ACTIVITY_STATE_DONE</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
         <h3 id="laelia.v1.CommandEventType">CommandEventType</h3>
         <p></p>
         <table class="enum-table">
@@ -10306,6 +10646,24 @@ through the Echo route.</p></td>
 a member.</p></td>
               </tr>
             
+              <tr>
+                <td>ListActivities</td>
+                <td><a href="#laelia.v1.ListActivitiesRequest">ListActivitiesRequest</a></td>
+                <td><a href="#laelia.v1.ListActivitiesResponse">ListActivitiesResponse</a></td>
+                <td><p>ListActivities returns the authenticated user&#39;s activity feed: chat messages
+relevant to them, tagged with category flags (mention/task/reminder/thread).
+The caller&#39;s own id is the implicit filter; default read_state_filter is
+UNREAD.</p></td>
+              </tr>
+            
+              <tr>
+                <td>MarkActivityDone</td>
+                <td><a href="#laelia.v1.MarkActivityDoneRequest">MarkActivityDoneRequest</a></td>
+                <td><a href="#laelia.v1.MarkActivityDoneResponse">MarkActivityDoneResponse</a></td>
+                <td><p>MarkActivityDone marks a single activity item DONE for the authenticated
+user, hiding it from All and Unread. The caller&#39;s own id must own the row.</p></td>
+              </tr>
+            
           </tbody>
         </table>
 
@@ -10820,6 +11178,26 @@ a member.</p></td>
                 <td>MarkConversationRead</td>
                 <td>POST</td>
                 <td>/v1/{conversation=conversations/*}:markRead</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListActivities</td>
+                <td>GET</td>
+                <td>/v1/activities</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>MarkActivityDone</td>
+                <td>POST</td>
+                <td>/v1/{name=users/*/activities/*}:markDone</td>
                 <td>*</td>
               </tr>
               

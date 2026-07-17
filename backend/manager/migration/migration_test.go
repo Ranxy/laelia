@@ -155,3 +155,27 @@ func TestChannelTitleUniqueIndexPresent(t *testing.T) {
 		}
 	}
 }
+
+// TestActivityFoldingSchemaPresent locks in the activity table's thread-folding
+// identity: the activity_key column and the (principal_id, activity_key) PK, plus
+// the idempotent upgrade path (ADD COLUMN IF NOT EXISTS, backfill, DO-block PK
+// swap) that brings pre-folding tables up to the new key. A MENTION row is keyed
+// by its message id; a TASK/REMINDER/THREAD row is keyed by the thread root so the
+// root and every reply fold into one row.
+func TestActivityFoldingSchemaPresent(t *testing.T) {
+	sql := latestSQL(t)
+
+	for _, want := range []string{
+		"activity_key UUID NOT NULL",
+		"PRIMARY KEY (principal_id, activity_key)",
+		"ALTER TABLE activity ADD COLUMN IF NOT EXISTS activity_key UUID",
+		"UPDATE activity SET activity_key = message_id WHERE activity_key IS NULL",
+		"ALTER TABLE activity ALTER COLUMN activity_key SET NOT NULL",
+		"ALTER TABLE activity DROP CONSTRAINT IF EXISTS activity_pkey",
+		"ALTER TABLE activity ADD PRIMARY KEY (principal_id, activity_key)",
+	} {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration missing activity folding declaration: %q", want)
+		}
+	}
+}

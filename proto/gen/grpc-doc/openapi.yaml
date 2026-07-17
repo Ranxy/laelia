@@ -6,6 +6,62 @@ info:
     title: ""
     version: 0.0.1
 paths:
+    /v1/activities:
+        get:
+            tags:
+                - CommandService
+            description: |-
+                ListActivities returns the authenticated user's activity feed: chat messages
+                 relevant to them, tagged with category flags (mention/task/reminder/thread).
+                 The caller's own id is the implicit filter; default read_state_filter is
+                 UNREAD.
+            operationId: CommandService_ListActivities
+            parameters:
+                - name: filter
+                  in: query
+                  schema:
+                    type: array
+                    items:
+                        enum:
+                            - ACTIVITY_CATEGORY_UNSPECIFIED
+                            - ACTIVITY_CATEGORY_MENTION
+                            - ACTIVITY_CATEGORY_TASK
+                            - ACTIVITY_CATEGORY_REMINDER
+                            - ACTIVITY_CATEGORY_THREAD
+                        type: string
+                        format: enum
+                - name: readStateFilter
+                  in: query
+                  schema:
+                    enum:
+                        - ACTIVITY_STATE_UNSPECIFIED
+                        - ACTIVITY_STATE_UNREAD
+                        - ACTIVITY_STATE_READ
+                        - ACTIVITY_STATE_DONE
+                    type: string
+                    format: enum
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListActivitiesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agent/hello:
         post:
             tags:
@@ -2656,6 +2712,46 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/users/{user}/activities/{activity}:markDone:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                MarkActivityDone marks a single activity item DONE for the authenticated
+                 user, hiding it from All and Unread. The caller's own id must own the row.
+            operationId: CommandService_MarkActivityDone
+            parameters:
+                - name: user
+                  in: path
+                  description: The user id.
+                  required: true
+                  schema:
+                    type: string
+                - name: activity
+                  in: path
+                  description: The activity id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MarkActivityDoneRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MarkActivityDoneResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/users/{user}:undelete:
         post:
             tags:
@@ -2787,6 +2883,74 @@ components:
             properties:
                 processedVersion:
                     type: string
+        Activity:
+            type: object
+            properties:
+                name:
+                    type: string
+                conversation:
+                    type: string
+                    description: conversation is the conversation the message belongs to.
+                message:
+                    type: string
+                    description: message is the chat message ("conversations/{c}/messages/{m}").
+                threadRoot:
+                    type: string
+                    description: |-
+                        thread_root, when non-empty, is the root message of the thread the message
+                         belongs to. Empty for a top-level message.
+                categories:
+                    type: integer
+                    description: |-
+                        categories is the OR-ed set of ActivityCategory flags that made this message
+                         relevant to the user.
+                    format: int32
+                state:
+                    enum:
+                        - ACTIVITY_STATE_UNSPECIFIED
+                        - ACTIVITY_STATE_UNREAD
+                        - ACTIVITY_STATE_READ
+                        - ACTIVITY_STATE_DONE
+                    type: string
+                    description: |-
+                        state is the user-facing lifecycle (UNREAD/READ/DONE). Read is derived from
+                         the user_channel_cursor; DONE is an explicit action.
+                    format: enum
+                roomVersion:
+                    type: string
+                    description: |-
+                        room_version is the message's room_version (for ordering and read-cursor
+                         comparison).
+                createdAt:
+                    type: string
+                    format: date-time
+                readAt:
+                    type: string
+                    format: date-time
+                doneAt:
+                    type: string
+                    format: date-time
+                summary:
+                    type: string
+                    description: summary is a short preview of the message content for the left-list.
+                senderName:
+                    type: string
+                    description: sender_name is the display name of the message sender.
+                senderType:
+                    enum:
+                        - SENDER_TYPE_UNSPECIFIED
+                        - SENDER_TYPE_USER
+                        - SENDER_TYPE_AGENT
+                        - SENDER_TYPE_SYSTEM
+                    type: string
+                    description: sender_type is the SenderType of the message (USER/AGENT/SYSTEM).
+                    format: enum
+            description: |-
+                Activity is one item in a user's per-user activity feed. Each item corresponds
+                 to a single chat_message relevant to the user, tagged with the category(ies)
+                 that made it relevant. The message itself is the source of truth for
+                 content/sender; this row carries the per-user read/done state and category
+                 flags. The resource name is "users/{user}/activities/{message}".
         AddChannelMemberRequest:
             required:
                 - conversation
@@ -3902,6 +4066,15 @@ components:
                     type: string
                 profile:
                     type: string
+        ListActivitiesResponse:
+            type: object
+            properties:
+                activities:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Activity'
+                nextPageToken:
+                    type: string
         ListAgentSessionsResponse:
             type: object
             properties:
@@ -4100,6 +4273,22 @@ components:
         LogoutRequest:
             type: object
             properties: {}
+        MarkActivityDoneRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+            description: |-
+                MarkActivityDone marks a single activity item DONE for the authenticated user,
+                 hiding it from All and Unread. The caller's own id must own the row; the name
+                 is "users/{user}/activities/{message}".
+        MarkActivityDoneResponse:
+            type: object
+            properties:
+                activity:
+                    $ref: '#/components/schemas/Activity'
         MarkConversationReadRequest:
             required:
                 - conversation

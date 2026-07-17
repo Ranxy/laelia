@@ -7,6 +7,9 @@ import type {
   RotateAgentTokenResponse,
 } from "@/types/proto-es/v1/agent_pb";
 import type {
+  Activity,
+  ActivityCategory,
+  ActivityState,
   AgentActivity,
   Attachment,
   ChannelMember,
@@ -361,6 +364,20 @@ export interface ReminderSlice {
   cancelReminder: (name: string) => Promise<Reminder | undefined>;
 }
 
+export interface ActivitySlice {
+  activities: Activity[];
+  activitiesLoading: boolean;
+
+  listActivities: (params?: {
+    filter?: ActivityCategory[];
+    readStateFilter?: ActivityState;
+    pageSize?: number;
+    pageToken?: string;
+    silent?: boolean;
+  }) => Promise<{ activities: Activity[]; nextPageToken: string } | undefined>;
+  markActivityDone: (name: string) => Promise<Activity | undefined>;
+}
+
 export type AppStoreState = AuthSlice &
   AgentSlice &
   CommandSlice &
@@ -369,6 +386,7 @@ export type AppStoreState = AuthSlice &
   ThreadSlice &
   TaskSlice &
   ReminderSlice &
+  ActivitySlice &
   UserSlice &
   PreviewSlice &
   ImagePreviewSlice;

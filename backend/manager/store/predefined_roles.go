@@ -65,6 +65,8 @@ var memberBaselinePermissions = permissionSet(
 	permission.RemindersList,
 	permission.RemindersUpdate,
 	permission.RemindersCancel,
+	permission.ActivitiesList,
+	permission.ActivitiesMarkDone,
 	permission.FilesUpload,
 	permission.FilesDownload,
 	permission.FilesList,

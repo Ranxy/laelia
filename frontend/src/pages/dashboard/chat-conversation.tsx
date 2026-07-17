@@ -3,6 +3,7 @@ import {
   ArrowDown,
   ArrowLeft,
   Bot,
+  ExternalLink,
   Hash,
   ListTodo,
   Loader2,
@@ -89,10 +90,26 @@ function memberTypeLabel(
     : t("channel.member-type-user");
 }
 
-export function ChatConversationPage() {
+// ChannelConversationViewProps lets this page be reused embedded (read-only)
+// in the Activity detail pane, in addition to its primary use as the chat
+// route. When `conversationId` is omitted the route param is used; `readOnly`
+// hides the composer (like an agent-to-agent DM); `scrollToMessageId` scrolls
+// the list to a specific message once loaded; `onViewInChannel` renders a
+// header "View in channel" affordance. All props are optional and default to
+// the route-driven behavior, so the existing chat page is unchanged.
+export interface ChannelConversationViewProps {
+  conversationId?: string;
+  readOnly?: boolean;
+  scrollToMessageId?: string;
+  onViewInChannel?: () => void;
+}
+
+export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { conversationId: channelId } = useParams<{ conversationId: string }>();
+  const params = useParams<{ conversationId: string }>();
+  // An explicit prop (embedded Activity view) overrides the route param.
+  const channelId = props?.conversationId ?? params.conversationId;
 
   const channels = useAppStore((s) => s.channels);
   const loadMessages = useAppStore((s) => s.loadMessages);
@@ -339,6 +356,24 @@ export function ChatConversationPage() {
     openThread,
     setSearchParams,
   ]);
+
+  // When embedded with a scrollToMessageId (the Activity detail pane pointing
+  // at the message an activity references), scroll the main list to that
+  // message once the channel's messages are mounted. Runs at most once per id
+  // so it does not fight the user's own scrolling. Mirrors the thread deep-link
+  // scroll above.
+  const scrollToMessageId = props?.scrollToMessageId ?? "";
+  const scrollToMessageRef = useRef<string>("");
+  useEffect(() => {
+    if (!scrollToMessageId || messages.length === 0) return;
+    if (scrollToMessageRef.current === scrollToMessageId) return;
+    scrollToMessageRef.current = scrollToMessageId;
+    requestAnimationFrame(() => {
+      scrollRef.current
+        ?.querySelector(`[data-msg-id="${scrollToMessageId}"]`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  }, [scrollToMessageId, messages.length]);
 
   // Restore the entering conversation's draft. Declared before the persist
   // effect so it reads the saved draft before any stale write lands.
@@ -722,6 +757,20 @@ export function ChatConversationPage() {
           <Users className="size-4" />
           <span className="hidden sm:inline">{members.length}</span>
         </Button>
+        {props?.onViewInChannel && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={props.onViewInChannel}
+            className="flex items-center gap-1.5 px-2.5 py-1.5"
+            title={t("activity.view-in-channel")}
+          >
+            <ExternalLink className="size-4" />
+            <span className="hidden sm:inline">
+              {t("activity.view-in-channel")}
+            </span>
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-1 min-h-0">
@@ -790,10 +839,11 @@ export function ChatConversationPage() {
             </button>
           )}
 
-          {/* Input area — hidden for agent-to-agent DMs (type 3), which are
-              admin view-only: a user can read but cannot send or intervene. */}
+          {/* Input area — hidden for agent-to-agent DMs (type 3) and for any
+              read-only embedded view (e.g. the Activity detail pane). A user
+              can read but cannot send or intervene. */}
           <div className="shrink-0 bg-background">
-            {isAgentDm ? (
+            {isAgentDm || props?.readOnly ? (
               <div className="mx-auto max-w-3xl px-6 py-4">
                 <div className="rounded-2xl border border-control-border bg-control-bg/40 px-4 py-3 text-center text-xs text-control-placeholder">
                   {t("chat.agent-dm-view-only")}
@@ -1218,3 +1268,10 @@ export function ChatEmptyState() {
     </div>
   );
 }
+
+// ChannelConversationView is the reusable form of this page, embedded read-only
+// in the Activity detail pane for top-level channel/DM activity items. It is the
+// same component with optional props (conversationId/readOnly/
+// scrollToMessageId/onViewInChannel) that default to the route-driven behavior,
+// so the chat route itself is unchanged.
+export const ChannelConversationView = ChatConversationPage;

@@ -195,6 +195,12 @@ const (
 	// CommandServiceListFilesProcedure is the fully-qualified name of the CommandService's ListFiles
 	// RPC.
 	CommandServiceListFilesProcedure = "/laelia.v1.CommandService/ListFiles"
+	// CommandServiceListActivitiesProcedure is the fully-qualified name of the CommandService's
+	// ListActivities RPC.
+	CommandServiceListActivitiesProcedure = "/laelia.v1.CommandService/ListActivities"
+	// CommandServiceMarkActivityDoneProcedure is the fully-qualified name of the CommandService's
+	// MarkActivityDone RPC.
+	CommandServiceMarkActivityDoneProcedure = "/laelia.v1.CommandService/MarkActivityDone"
 	// AgentStreamServiceAgentChannelProcedure is the fully-qualified name of the AgentStreamService's
 	// AgentChannel RPC.
 	AgentStreamServiceAgentChannelProcedure = "/laelia.v1.AgentStreamService/AgentChannel"
@@ -343,6 +349,14 @@ type CommandServiceClient interface {
 	// ListFiles returns the files attached to a conversation. The caller must be
 	// a member.
 	ListFiles(context.Context, *connect.Request[v1.ListFilesRequest]) (*connect.Response[v1.ListFilesResponse], error)
+	// ListActivities returns the authenticated user's activity feed: chat messages
+	// relevant to them, tagged with category flags (mention/task/reminder/thread).
+	// The caller's own id is the implicit filter; default read_state_filter is
+	// UNREAD.
+	ListActivities(context.Context, *connect.Request[v1.ListActivitiesRequest]) (*connect.Response[v1.ListActivitiesResponse], error)
+	// MarkActivityDone marks a single activity item DONE for the authenticated
+	// user, hiding it from All and Unread. The caller's own id must own the row.
+	MarkActivityDone(context.Context, *connect.Request[v1.MarkActivityDoneRequest]) (*connect.Response[v1.MarkActivityDoneResponse], error)
 }
 
 // NewCommandServiceClient constructs a client for the laelia.v1.CommandService service. By default,
@@ -674,6 +688,18 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("ListFiles")),
 			connect.WithClientOptions(opts...),
 		),
+		listActivities: connect.NewClient[v1.ListActivitiesRequest, v1.ListActivitiesResponse](
+			httpClient,
+			baseURL+CommandServiceListActivitiesProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ListActivities")),
+			connect.WithClientOptions(opts...),
+		),
+		markActivityDone: connect.NewClient[v1.MarkActivityDoneRequest, v1.MarkActivityDoneResponse](
+			httpClient,
+			baseURL+CommandServiceMarkActivityDoneProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("MarkActivityDone")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -732,6 +758,8 @@ type commandServiceClient struct {
 	uploadFile                *connect.Client[v1.UploadFileRequest, v1.File]
 	downloadFile              *connect.Client[v1.DownloadFileRequest, v1.DownloadFileResponse]
 	listFiles                 *connect.Client[v1.ListFilesRequest, v1.ListFilesResponse]
+	listActivities            *connect.Client[v1.ListActivitiesRequest, v1.ListActivitiesResponse]
+	markActivityDone          *connect.Client[v1.MarkActivityDoneRequest, v1.MarkActivityDoneResponse]
 }
 
 // ListCommands calls laelia.v1.CommandService.ListCommands.
@@ -999,6 +1027,16 @@ func (c *commandServiceClient) ListFiles(ctx context.Context, req *connect.Reque
 	return c.listFiles.CallUnary(ctx, req)
 }
 
+// ListActivities calls laelia.v1.CommandService.ListActivities.
+func (c *commandServiceClient) ListActivities(ctx context.Context, req *connect.Request[v1.ListActivitiesRequest]) (*connect.Response[v1.ListActivitiesResponse], error) {
+	return c.listActivities.CallUnary(ctx, req)
+}
+
+// MarkActivityDone calls laelia.v1.CommandService.MarkActivityDone.
+func (c *commandServiceClient) MarkActivityDone(ctx context.Context, req *connect.Request[v1.MarkActivityDoneRequest]) (*connect.Response[v1.MarkActivityDoneResponse], error) {
+	return c.markActivityDone.CallUnary(ctx, req)
+}
+
 // CommandServiceHandler is an implementation of the laelia.v1.CommandService service.
 type CommandServiceHandler interface {
 	ListCommands(context.Context, *connect.Request[v1.ListCommandsRequest]) (*connect.Response[v1.ListCommandsResponse], error)
@@ -1142,6 +1180,14 @@ type CommandServiceHandler interface {
 	// ListFiles returns the files attached to a conversation. The caller must be
 	// a member.
 	ListFiles(context.Context, *connect.Request[v1.ListFilesRequest]) (*connect.Response[v1.ListFilesResponse], error)
+	// ListActivities returns the authenticated user's activity feed: chat messages
+	// relevant to them, tagged with category flags (mention/task/reminder/thread).
+	// The caller's own id is the implicit filter; default read_state_filter is
+	// UNREAD.
+	ListActivities(context.Context, *connect.Request[v1.ListActivitiesRequest]) (*connect.Response[v1.ListActivitiesResponse], error)
+	// MarkActivityDone marks a single activity item DONE for the authenticated
+	// user, hiding it from All and Unread. The caller's own id must own the row.
+	MarkActivityDone(context.Context, *connect.Request[v1.MarkActivityDoneRequest]) (*connect.Response[v1.MarkActivityDoneResponse], error)
 }
 
 // NewCommandServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -1469,6 +1515,18 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("ListFiles")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceListActivitiesHandler := connect.NewUnaryHandler(
+		CommandServiceListActivitiesProcedure,
+		svc.ListActivities,
+		connect.WithSchema(commandServiceMethods.ByName("ListActivities")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceMarkActivityDoneHandler := connect.NewUnaryHandler(
+		CommandServiceMarkActivityDoneProcedure,
+		svc.MarkActivityDone,
+		connect.WithSchema(commandServiceMethods.ByName("MarkActivityDone")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/laelia.v1.CommandService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case CommandServiceListCommandsProcedure:
@@ -1577,6 +1635,10 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceDownloadFileHandler.ServeHTTP(w, r)
 		case CommandServiceListFilesProcedure:
 			commandServiceListFilesHandler.ServeHTTP(w, r)
+		case CommandServiceListActivitiesProcedure:
+			commandServiceListActivitiesHandler.ServeHTTP(w, r)
+		case CommandServiceMarkActivityDoneProcedure:
+			commandServiceMarkActivityDoneHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1796,6 +1858,14 @@ func (UnimplementedCommandServiceHandler) DownloadFile(context.Context, *connect
 
 func (UnimplementedCommandServiceHandler) ListFiles(context.Context, *connect.Request[v1.ListFilesRequest]) (*connect.Response[v1.ListFilesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListFiles is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ListActivities(context.Context, *connect.Request[v1.ListActivitiesRequest]) (*connect.Response[v1.ListActivitiesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListActivities is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) MarkActivityDone(context.Context, *connect.Request[v1.MarkActivityDoneRequest]) (*connect.Response[v1.MarkActivityDoneResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.MarkActivityDone is not implemented"))
 }
 
 // AgentStreamServiceClient is a client for the laelia.v1.AgentStreamService service.

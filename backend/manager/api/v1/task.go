@@ -164,6 +164,11 @@ func (s *CommandService) CreateTask(ctx context.Context, req *connect.Request[v1
 	s.notifyConversationAgents(ctx, convUUID, newVersion, nil)
 	s.postTaskSystemNotification(ctx, convUUID, fmt.Sprintf("📋 %s created task #%d %q", agent.Name, msg.TaskInfo.TaskNumber, truncateContent(msg.Content)))
 
+	// A created task is a top-level task root: every user member of the
+	// conversation gets a TASK activity (best-effort). Mentions on the message
+	// additionally tag MENTION.
+	s.store.GenerateActivityForMessage(ctx, msg, true, false)
+
 	return connect.NewResponse(&v1pb.CreateTaskResponse{Message: storeToV1ChatMessage(msg)}), nil
 }
 

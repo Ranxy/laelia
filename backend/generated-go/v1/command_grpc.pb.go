@@ -73,6 +73,8 @@ const (
 	CommandService_UploadFile_FullMethodName                = "/laelia.v1.CommandService/UploadFile"
 	CommandService_DownloadFile_FullMethodName              = "/laelia.v1.CommandService/DownloadFile"
 	CommandService_ListFiles_FullMethodName                 = "/laelia.v1.CommandService/ListFiles"
+	CommandService_ListActivities_FullMethodName            = "/laelia.v1.CommandService/ListActivities"
+	CommandService_MarkActivityDone_FullMethodName          = "/laelia.v1.CommandService/MarkActivityDone"
 )
 
 // CommandServiceClient is the client API for CommandService service.
@@ -220,6 +222,14 @@ type CommandServiceClient interface {
 	// ListFiles returns the files attached to a conversation. The caller must be
 	// a member.
 	ListFiles(ctx context.Context, in *ListFilesRequest, opts ...grpc.CallOption) (*ListFilesResponse, error)
+	// ListActivities returns the authenticated user's activity feed: chat messages
+	// relevant to them, tagged with category flags (mention/task/reminder/thread).
+	// The caller's own id is the implicit filter; default read_state_filter is
+	// UNREAD.
+	ListActivities(ctx context.Context, in *ListActivitiesRequest, opts ...grpc.CallOption) (*ListActivitiesResponse, error)
+	// MarkActivityDone marks a single activity item DONE for the authenticated
+	// user, hiding it from All and Unread. The caller's own id must own the row.
+	MarkActivityDone(ctx context.Context, in *MarkActivityDoneRequest, opts ...grpc.CallOption) (*MarkActivityDoneResponse, error)
 }
 
 type commandServiceClient struct {
@@ -778,6 +788,26 @@ func (c *commandServiceClient) ListFiles(ctx context.Context, in *ListFilesReque
 	return out, nil
 }
 
+func (c *commandServiceClient) ListActivities(ctx context.Context, in *ListActivitiesRequest, opts ...grpc.CallOption) (*ListActivitiesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListActivitiesResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListActivities_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) MarkActivityDone(ctx context.Context, in *MarkActivityDoneRequest, opts ...grpc.CallOption) (*MarkActivityDoneResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkActivityDoneResponse)
+	err := c.cc.Invoke(ctx, CommandService_MarkActivityDone_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CommandServiceServer is the server API for CommandService service.
 // All implementations must embed UnimplementedCommandServiceServer
 // for forward compatibility.
@@ -923,6 +953,14 @@ type CommandServiceServer interface {
 	// ListFiles returns the files attached to a conversation. The caller must be
 	// a member.
 	ListFiles(context.Context, *ListFilesRequest) (*ListFilesResponse, error)
+	// ListActivities returns the authenticated user's activity feed: chat messages
+	// relevant to them, tagged with category flags (mention/task/reminder/thread).
+	// The caller's own id is the implicit filter; default read_state_filter is
+	// UNREAD.
+	ListActivities(context.Context, *ListActivitiesRequest) (*ListActivitiesResponse, error)
+	// MarkActivityDone marks a single activity item DONE for the authenticated
+	// user, hiding it from All and Unread. The caller's own id must own the row.
+	MarkActivityDone(context.Context, *MarkActivityDoneRequest) (*MarkActivityDoneResponse, error)
 	mustEmbedUnimplementedCommandServiceServer()
 }
 
@@ -1091,6 +1129,12 @@ func (UnimplementedCommandServiceServer) DownloadFile(context.Context, *Download
 }
 func (UnimplementedCommandServiceServer) ListFiles(context.Context, *ListFilesRequest) (*ListFilesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListFiles not implemented")
+}
+func (UnimplementedCommandServiceServer) ListActivities(context.Context, *ListActivitiesRequest) (*ListActivitiesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListActivities not implemented")
+}
+func (UnimplementedCommandServiceServer) MarkActivityDone(context.Context, *MarkActivityDoneRequest) (*MarkActivityDoneResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MarkActivityDone not implemented")
 }
 func (UnimplementedCommandServiceServer) mustEmbedUnimplementedCommandServiceServer() {}
 func (UnimplementedCommandServiceServer) testEmbeddedByValue()                        {}
@@ -2053,6 +2097,42 @@ func _CommandService_ListFiles_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommandService_ListActivities_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListActivitiesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListActivities(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListActivities_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListActivities(ctx, req.(*ListActivitiesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_MarkActivityDone_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkActivityDoneRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).MarkActivityDone(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_MarkActivityDone_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).MarkActivityDone(ctx, req.(*MarkActivityDoneRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CommandService_ServiceDesc is the grpc.ServiceDesc for CommandService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -2263,6 +2343,14 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListFiles",
 			Handler:    _CommandService_ListFiles_Handler,
+		},
+		{
+			MethodName: "ListActivities",
+			Handler:    _CommandService_ListActivities_Handler,
+		},
+		{
+			MethodName: "MarkActivityDone",
+			Handler:    _CommandService_MarkActivityDone_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

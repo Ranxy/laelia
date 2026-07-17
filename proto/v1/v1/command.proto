@@ -1050,6 +1050,96 @@ message MarkConversationReadResponse {
   int64 read_version = 1;
 }
 
+// ActivityCategory flags which kind of conversation event an Activity item
+// represents. A single Activity row may carry several categories OR-ed together
+// (a task-thread reply that @mentions a user is both TASK and MENTION). The
+// ListActivities filter selects items that have ANY of the requested categories
+// set. Values are bit flags so they compose in a single int column; the
+// ACTIVITY_CATEGORY prefix satisfies protobuf C++ scoping rules (sibling enums
+// cannot share value names), matching SenderType/TaskStatus.
+enum ActivityCategory {
+  ACTIVITY_CATEGORY_UNSPECIFIED = 0;
+  ACTIVITY_CATEGORY_MENTION = 1;
+  ACTIVITY_CATEGORY_TASK = 2;
+  ACTIVITY_CATEGORY_REMINDER = 4;
+  ACTIVITY_CATEGORY_THREAD = 8;
+}
+
+// ActivityState is the user-facing lifecycle of an Activity item. UNREAD -> READ
+// happens when the user's per-channel read cursor advances past the message's
+// room_version (via MarkConversationRead); READ items stay visible under the All
+// filter. DONE is an explicit "Mark as Done" action that hides the item from All
+// and Unread. The ACTIVITY_STATE prefix satisfies protobuf C++ scoping rules.
+enum ActivityState {
+  ACTIVITY_STATE_UNSPECIFIED = 0;
+  ACTIVITY_STATE_UNREAD = 1;
+  ACTIVITY_STATE_READ = 2;
+  ACTIVITY_STATE_DONE = 3;
+}
+
+// Activity is one item in a user's per-user activity feed. Each item corresponds
+// to a single chat_message relevant to the user, tagged with the category(ies)
+// that made it relevant. The message itself is the source of truth for
+// content/sender; this row carries the per-user read/done state and category
+// flags. The resource name is "users/{user}/activities/{message}".
+message Activity {
+  string name = 1;
+  // conversation is the conversation the message belongs to.
+  string conversation = 2 [(google.api.resource_reference).type = "laelia/Conversation"];
+  // message is the chat message ("conversations/{c}/messages/{m}").
+  string message = 3;
+  // thread_root, when non-empty, is the root message of the thread the message
+  // belongs to. Empty for a top-level message.
+  string thread_root = 4;
+  // categories is the OR-ed set of ActivityCategory flags that made this message
+  // relevant to the user.
+  int32 categories = 5;
+  // state is the user-facing lifecycle (UNREAD/READ/DONE). Read is derived from
+  // the user_channel_cursor; DONE is an explicit action.
+  ActivityState state = 6;
+  // room_version is the message's room_version (for ordering and read-cursor
+  // comparison).
+  int64 room_version = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp read_at = 9;
+  google.protobuf.Timestamp done_at = 10;
+  // summary is a short preview of the message content for the left-list.
+  string summary = 11;
+  // sender_name is the display name of the message sender.
+  string sender_name = 12;
+  // sender_type is the SenderType of the message (USER/AGENT/SYSTEM).
+  SenderType sender_type = 13;
+}
+
+// ListActivities returns the authenticated user's activity feed: chat messages
+// relevant to them, tagged with category flags. The caller's own id is the
+// implicit filter (no cross-user listing). filter selects items by category
+// (empty = all categories; set = items whose categories intersect the requested
+// set, ANY flag). read_state_filter scopes by lifecycle and defaults to UNREAD
+// when UNSPECIFIED.
+message ListActivitiesRequest {
+  repeated ActivityCategory filter = 1;
+  ActivityState read_state_filter = 2;
+  int32 page_size = 3;
+  string page_token = 4;
+}
+
+message ListActivitiesResponse {
+  repeated Activity activities = 1;
+  string next_page_token = 2;
+}
+
+// MarkActivityDone marks a single activity item DONE for the authenticated user,
+// hiding it from All and Unread. The caller's own id must own the row; the name
+// is "users/{user}/activities/{message}".
+message MarkActivityDoneRequest {
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message MarkActivityDoneResponse {
+  Activity activity = 1;
+}
+
 service CommandService {
   rpc ListCommands(ListCommandsRequest) returns (ListCommandsResponse) {
     option (google.api.http) = {get: "/v1/{agent=agents/*}/commands"};
@@ -1506,6 +1596,28 @@ service CommandService {
   rpc ListFiles(ListFilesRequest) returns (ListFilesResponse) {
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.files.list";
+  }
+
+  // ListActivities returns the authenticated user's activity feed: chat messages
+  // relevant to them, tagged with category flags (mention/task/reminder/thread).
+  // The caller's own id is the implicit filter; default read_state_filter is
+  // UNREAD.
+  rpc ListActivities(ListActivitiesRequest) returns (ListActivitiesResponse) {
+    option (google.api.http) = {get: "/v1/activities"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.activities.list";
+  }
+
+  // MarkActivityDone marks a single activity item DONE for the authenticated
+  // user, hiding it from All and Unread. The caller's own id must own the row.
+  rpc MarkActivityDone(MarkActivityDoneRequest) returns (MarkActivityDoneResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=users/*/activities/*}:markDone"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.activities.markDone";
+    option (laelia.v1.audit) = true;
   }
 }
 

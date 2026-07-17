@@ -59,6 +59,11 @@ const (
 	TasksCreate Permission = "laelia.tasks.create"
 	TasksManage Permission = "laelia.tasks.manage"
 
+	// Activities (per-user activity feed). Workspace-scope: the caller's own
+	// principal id is the implicit filter, so these are NOT resource-scoped.
+	ActivitiesList     Permission = "laelia.activities.list"
+	ActivitiesMarkDone Permission = "laelia.activities.markDone"
+
 	// Files
 	FilesUpload   Permission = "laelia.files.upload"
 	FilesDownload Permission = "laelia.files.download"
@@ -118,6 +123,9 @@ var allPermissions = []Permission{
 	TasksList,
 	TasksCreate,
 	TasksManage,
+
+	ActivitiesList,
+	ActivitiesMarkDone,
 
 	FilesUpload,
 	FilesDownload,

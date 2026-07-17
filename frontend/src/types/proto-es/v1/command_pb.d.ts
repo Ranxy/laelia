@@ -3181,6 +3181,205 @@ export declare type MarkConversationReadResponse = Message<"laelia.v1.MarkConver
 export declare const MarkConversationReadResponseSchema: GenMessage<MarkConversationReadResponse>;
 
 /**
+ * Activity is one item in a user's per-user activity feed. Each item corresponds
+ * to a single chat_message relevant to the user, tagged with the category(ies)
+ * that made it relevant. The message itself is the source of truth for
+ * content/sender; this row carries the per-user read/done state and category
+ * flags. The resource name is "users/{user}/activities/{message}".
+ *
+ * @generated from message laelia.v1.Activity
+ */
+export declare type Activity = Message<"laelia.v1.Activity"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * conversation is the conversation the message belongs to.
+   *
+   * @generated from field: string conversation = 2;
+   */
+  conversation: string;
+
+  /**
+   * message is the chat message ("conversations/{c}/messages/{m}").
+   *
+   * @generated from field: string message = 3;
+   */
+  message: string;
+
+  /**
+   * thread_root, when non-empty, is the root message of the thread the message
+   * belongs to. Empty for a top-level message.
+   *
+   * @generated from field: string thread_root = 4;
+   */
+  threadRoot: string;
+
+  /**
+   * categories is the OR-ed set of ActivityCategory flags that made this message
+   * relevant to the user.
+   *
+   * @generated from field: int32 categories = 5;
+   */
+  categories: number;
+
+  /**
+   * state is the user-facing lifecycle (UNREAD/READ/DONE). Read is derived from
+   * the user_channel_cursor; DONE is an explicit action.
+   *
+   * @generated from field: laelia.v1.ActivityState state = 6;
+   */
+  state: ActivityState;
+
+  /**
+   * room_version is the message's room_version (for ordering and read-cursor
+   * comparison).
+   *
+   * @generated from field: int64 room_version = 7;
+   */
+  roomVersion: bigint;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 8;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp read_at = 9;
+   */
+  readAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp done_at = 10;
+   */
+  doneAt?: Timestamp | undefined;
+
+  /**
+   * summary is a short preview of the message content for the left-list.
+   *
+   * @generated from field: string summary = 11;
+   */
+  summary: string;
+
+  /**
+   * sender_name is the display name of the message sender.
+   *
+   * @generated from field: string sender_name = 12;
+   */
+  senderName: string;
+
+  /**
+   * sender_type is the SenderType of the message (USER/AGENT/SYSTEM).
+   *
+   * @generated from field: laelia.v1.SenderType sender_type = 13;
+   */
+  senderType: SenderType;
+};
+
+/**
+ * Describes the message laelia.v1.Activity.
+ * Use `create(ActivitySchema)` to create a new message.
+ */
+export declare const ActivitySchema: GenMessage<Activity>;
+
+/**
+ * ListActivities returns the authenticated user's activity feed: chat messages
+ * relevant to them, tagged with category flags. The caller's own id is the
+ * implicit filter (no cross-user listing). filter selects items by category
+ * (empty = all categories; set = items whose categories intersect the requested
+ * set, ANY flag). read_state_filter scopes by lifecycle and defaults to UNREAD
+ * when UNSPECIFIED.
+ *
+ * @generated from message laelia.v1.ListActivitiesRequest
+ */
+export declare type ListActivitiesRequest = Message<"laelia.v1.ListActivitiesRequest"> & {
+  /**
+   * @generated from field: repeated laelia.v1.ActivityCategory filter = 1;
+   */
+  filter: ActivityCategory[];
+
+  /**
+   * @generated from field: laelia.v1.ActivityState read_state_filter = 2;
+   */
+  readStateFilter: ActivityState;
+
+  /**
+   * @generated from field: int32 page_size = 3;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 4;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListActivitiesRequest.
+ * Use `create(ListActivitiesRequestSchema)` to create a new message.
+ */
+export declare const ListActivitiesRequestSchema: GenMessage<ListActivitiesRequest>;
+
+/**
+ * @generated from message laelia.v1.ListActivitiesResponse
+ */
+export declare type ListActivitiesResponse = Message<"laelia.v1.ListActivitiesResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.Activity activities = 1;
+   */
+  activities: Activity[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListActivitiesResponse.
+ * Use `create(ListActivitiesResponseSchema)` to create a new message.
+ */
+export declare const ListActivitiesResponseSchema: GenMessage<ListActivitiesResponse>;
+
+/**
+ * MarkActivityDone marks a single activity item DONE for the authenticated user,
+ * hiding it from All and Unread. The caller's own id must own the row; the name
+ * is "users/{user}/activities/{message}".
+ *
+ * @generated from message laelia.v1.MarkActivityDoneRequest
+ */
+export declare type MarkActivityDoneRequest = Message<"laelia.v1.MarkActivityDoneRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.MarkActivityDoneRequest.
+ * Use `create(MarkActivityDoneRequestSchema)` to create a new message.
+ */
+export declare const MarkActivityDoneRequestSchema: GenMessage<MarkActivityDoneRequest>;
+
+/**
+ * @generated from message laelia.v1.MarkActivityDoneResponse
+ */
+export declare type MarkActivityDoneResponse = Message<"laelia.v1.MarkActivityDoneResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Activity activity = 1;
+   */
+  activity?: Activity | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.MarkActivityDoneResponse.
+ * Use `create(MarkActivityDoneResponseSchema)` to create a new message.
+ */
+export declare const MarkActivityDoneResponseSchema: GenMessage<MarkActivityDoneResponse>;
+
+/**
  * @generated from message laelia.v1.AgentStreamMessage
  */
 export declare type AgentStreamMessage = Message<"laelia.v1.AgentStreamMessage"> & {
@@ -4144,6 +4343,85 @@ export enum ReminderStatus {
 export declare const ReminderStatusSchema: GenEnum<ReminderStatus>;
 
 /**
+ * ActivityCategory flags which kind of conversation event an Activity item
+ * represents. A single Activity row may carry several categories OR-ed together
+ * (a task-thread reply that @mentions a user is both TASK and MENTION). The
+ * ListActivities filter selects items that have ANY of the requested categories
+ * set. Values are bit flags so they compose in a single int column; the
+ * ACTIVITY_CATEGORY prefix satisfies protobuf C++ scoping rules (sibling enums
+ * cannot share value names), matching SenderType/TaskStatus.
+ *
+ * @generated from enum laelia.v1.ActivityCategory
+ */
+export enum ActivityCategory {
+  /**
+   * @generated from enum value: ACTIVITY_CATEGORY_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ACTIVITY_CATEGORY_MENTION = 1;
+   */
+  MENTION = 1,
+
+  /**
+   * @generated from enum value: ACTIVITY_CATEGORY_TASK = 2;
+   */
+  TASK = 2,
+
+  /**
+   * @generated from enum value: ACTIVITY_CATEGORY_REMINDER = 4;
+   */
+  REMINDER = 4,
+
+  /**
+   * @generated from enum value: ACTIVITY_CATEGORY_THREAD = 8;
+   */
+  THREAD = 8,
+}
+
+/**
+ * Describes the enum laelia.v1.ActivityCategory.
+ */
+export declare const ActivityCategorySchema: GenEnum<ActivityCategory>;
+
+/**
+ * ActivityState is the user-facing lifecycle of an Activity item. UNREAD -> READ
+ * happens when the user's per-channel read cursor advances past the message's
+ * room_version (via MarkConversationRead); READ items stay visible under the All
+ * filter. DONE is an explicit "Mark as Done" action that hides the item from All
+ * and Unread. The ACTIVITY_STATE prefix satisfies protobuf C++ scoping rules.
+ *
+ * @generated from enum laelia.v1.ActivityState
+ */
+export enum ActivityState {
+  /**
+   * @generated from enum value: ACTIVITY_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ACTIVITY_STATE_UNREAD = 1;
+   */
+  UNREAD = 1,
+
+  /**
+   * @generated from enum value: ACTIVITY_STATE_READ = 2;
+   */
+  READ = 2,
+
+  /**
+   * @generated from enum value: ACTIVITY_STATE_DONE = 3;
+   */
+  DONE = 3,
+}
+
+/**
+ * Describes the enum laelia.v1.ActivityState.
+ */
+export declare const ActivityStateSchema: GenEnum<ActivityState>;
+
+/**
  * @generated from service laelia.v1.CommandService
  */
 export declare const CommandService: GenService<{
@@ -4684,6 +4962,30 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof ListFilesRequestSchema;
     output: typeof ListFilesResponseSchema;
+  },
+  /**
+   * ListActivities returns the authenticated user's activity feed: chat messages
+   * relevant to them, tagged with category flags (mention/task/reminder/thread).
+   * The caller's own id is the implicit filter; default read_state_filter is
+   * UNREAD.
+   *
+   * @generated from rpc laelia.v1.CommandService.ListActivities
+   */
+  listActivities: {
+    methodKind: "unary";
+    input: typeof ListActivitiesRequestSchema;
+    output: typeof ListActivitiesResponseSchema;
+  },
+  /**
+   * MarkActivityDone marks a single activity item DONE for the authenticated
+   * user, hiding it from All and Unread. The caller's own id must own the row.
+   *
+   * @generated from rpc laelia.v1.CommandService.MarkActivityDone
+   */
+  markActivityDone: {
+    methodKind: "unary";
+    input: typeof MarkActivityDoneRequestSchema;
+    output: typeof MarkActivityDoneResponseSchema;
   },
 }>;
 

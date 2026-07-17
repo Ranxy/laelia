@@ -93,6 +93,7 @@
 - [v1/command.proto](#v1_command-proto)
     - [AckProcessedVersionRequest](#laelia-v1-AckProcessedVersionRequest)
     - [AckProcessedVersionResponse](#laelia-v1-AckProcessedVersionResponse)
+    - [Activity](#laelia-v1-Activity)
     - [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest)
     - [AgentActivity](#laelia-v1-AgentActivity)
     - [AgentReady](#laelia-v1-AgentReady)
@@ -154,6 +155,8 @@
     - [GetReminderResponse](#laelia-v1-GetReminderResponse)
     - [LeaveChannelRequest](#laelia-v1-LeaveChannelRequest)
     - [LifecyclePayload](#laelia-v1-LifecyclePayload)
+    - [ListActivitiesRequest](#laelia-v1-ListActivitiesRequest)
+    - [ListActivitiesResponse](#laelia-v1-ListActivitiesResponse)
     - [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest)
     - [ListChannelMembersResponse](#laelia-v1-ListChannelMembersResponse)
     - [ListChannelThreadsRequest](#laelia-v1-ListChannelThreadsRequest)
@@ -185,6 +188,8 @@
     - [ListThreadUpdatesRequest](#laelia-v1-ListThreadUpdatesRequest)
     - [ListThreadUpdatesResponse](#laelia-v1-ListThreadUpdatesResponse)
     - [ManagerStreamMessage](#laelia-v1-ManagerStreamMessage)
+    - [MarkActivityDoneRequest](#laelia-v1-MarkActivityDoneRequest)
+    - [MarkActivityDoneResponse](#laelia-v1-MarkActivityDoneResponse)
     - [MarkConversationReadRequest](#laelia-v1-MarkConversationReadRequest)
     - [MarkConversationReadResponse](#laelia-v1-MarkConversationReadResponse)
     - [Mention](#laelia-v1-Mention)
@@ -229,6 +234,8 @@
     - [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest)
     - [WatchCommandRequest](#laelia-v1-WatchCommandRequest)
   
+    - [ActivityCategory](#laelia-v1-ActivityCategory)
+    - [ActivityState](#laelia-v1-ActivityState)
     - [CommandEventType](#laelia-v1-CommandEventType)
     - [CommandOutput.StreamType](#laelia-v1-CommandOutput-StreamType)
     - [CommandStatus](#laelia-v1-CommandStatus)
@@ -1541,6 +1548,37 @@ frontend can associate execution events with the channel.
 
 
 
+<a name="laelia-v1-Activity"></a>
+
+### Activity
+Activity is one item in a user&#39;s per-user activity feed. Each item corresponds
+to a single chat_message relevant to the user, tagged with the category(ies)
+that made it relevant. The message itself is the source of truth for
+content/sender; this row carries the per-user read/done state and category
+flags. The resource name is &#34;users/{user}/activities/{message}&#34;.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| conversation | [string](#string) |  | conversation is the conversation the message belongs to. |
+| message | [string](#string) |  | message is the chat message (&#34;conversations/{c}/messages/{m}&#34;). |
+| thread_root | [string](#string) |  | thread_root, when non-empty, is the root message of the thread the message belongs to. Empty for a top-level message. |
+| categories | [int32](#int32) |  | categories is the OR-ed set of ActivityCategory flags that made this message relevant to the user. |
+| state | [ActivityState](#laelia-v1-ActivityState) |  | state is the user-facing lifecycle (UNREAD/READ/DONE). Read is derived from the user_channel_cursor; DONE is an explicit action. |
+| room_version | [int64](#int64) |  | room_version is the message&#39;s room_version (for ordering and read-cursor comparison). |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| read_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| done_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| summary | [string](#string) |  | summary is a short preview of the message content for the left-list. |
+| sender_name | [string](#string) |  | sender_name is the display name of the message sender. |
+| sender_type | [SenderType](#laelia-v1-SenderType) |  | sender_type is the SenderType of the message (USER/AGENT/SYSTEM). |
+
+
+
+
+
+
 <a name="laelia-v1-AddChannelMemberRequest"></a>
 
 ### AddChannelMemberRequest
@@ -2621,6 +2659,45 @@ resolved from the auth context; no member_id is carried.
 
 
 
+<a name="laelia-v1-ListActivitiesRequest"></a>
+
+### ListActivitiesRequest
+ListActivities returns the authenticated user&#39;s activity feed: chat messages
+relevant to them, tagged with category flags. The caller&#39;s own id is the
+implicit filter (no cross-user listing). filter selects items by category
+(empty = all categories; set = items whose categories intersect the requested
+set, ANY flag). read_state_filter scopes by lifecycle and defaults to UNREAD
+when UNSPECIFIED.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| filter | [ActivityCategory](#laelia-v1-ActivityCategory) | repeated |  |
+| read_state_filter | [ActivityState](#laelia-v1-ActivityState) |  |  |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListActivitiesResponse"></a>
+
+### ListActivitiesResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| activities | [Activity](#laelia-v1-Activity) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-ListChannelMembersRequest"></a>
 
 ### ListChannelMembersRequest
@@ -3118,6 +3195,38 @@ the drain loop, before acking the conversation cursor.
 | pong | [Pong](#laelia-v1-Pong) |  |  |
 | permission_decision | [PermissionDecision](#laelia-v1-PermissionDecision) |  |  |
 | discover_providers | [DiscoverProviders](#laelia-v1-DiscoverProviders) |  | ask the agent daemon to re-probe installed LLM agent providers |
+
+
+
+
+
+
+<a name="laelia-v1-MarkActivityDoneRequest"></a>
+
+### MarkActivityDoneRequest
+MarkActivityDone marks a single activity item DONE for the authenticated user,
+hiding it from All and Unread. The caller&#39;s own id must own the row; the name
+is &#34;users/{user}/activities/{message}&#34;.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-MarkActivityDoneResponse"></a>
+
+### MarkActivityDoneResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| activity | [Activity](#laelia-v1-Activity) |  |  |
 
 
 
@@ -3884,6 +3993,45 @@ settable here — ownership only moves via TransferChannelOwnership.
  
 
 
+<a name="laelia-v1-ActivityCategory"></a>
+
+### ActivityCategory
+ActivityCategory flags which kind of conversation event an Activity item
+represents. A single Activity row may carry several categories OR-ed together
+(a task-thread reply that @mentions a user is both TASK and MENTION). The
+ListActivities filter selects items that have ANY of the requested categories
+set. Values are bit flags so they compose in a single int column; the
+ACTIVITY_CATEGORY prefix satisfies protobuf C&#43;&#43; scoping rules (sibling enums
+cannot share value names), matching SenderType/TaskStatus.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| ACTIVITY_CATEGORY_UNSPECIFIED | 0 |  |
+| ACTIVITY_CATEGORY_MENTION | 1 |  |
+| ACTIVITY_CATEGORY_TASK | 2 |  |
+| ACTIVITY_CATEGORY_REMINDER | 4 |  |
+| ACTIVITY_CATEGORY_THREAD | 8 |  |
+
+
+
+<a name="laelia-v1-ActivityState"></a>
+
+### ActivityState
+ActivityState is the user-facing lifecycle of an Activity item. UNREAD -&gt; READ
+happens when the user&#39;s per-channel read cursor advances past the message&#39;s
+room_version (via MarkConversationRead); READ items stay visible under the All
+filter. DONE is an explicit &#34;Mark as Done&#34; action that hides the item from All
+and Unread. The ACTIVITY_STATE prefix satisfies protobuf C&#43;&#43; scoping rules.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| ACTIVITY_STATE_UNSPECIFIED | 0 |  |
+| ACTIVITY_STATE_UNREAD | 1 |  |
+| ACTIVITY_STATE_READ | 2 |  |
+| ACTIVITY_STATE_DONE | 3 |  |
+
+
+
 <a name="laelia-v1-CommandEventType"></a>
 
 ### CommandEventType
@@ -4067,6 +4215,8 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | UploadFile | [UploadFileRequest](#laelia-v1-UploadFileRequest) | [File](#laelia-v1-File) | UploadFile stores data in S3 and persists a file row. Intended for the agent daemon (browser uploads go through the Echo multipart route). No google.api.http annotation: the agent reaches it via Connect-JSON over the CommandServiceClient, and avoiding a /v1/files/{id} gateway entry keeps it from colliding with the browser download route. |
 | DownloadFile | [DownloadFileRequest](#laelia-v1-DownloadFileRequest) | [DownloadFileResponse](#laelia-v1-DownloadFileResponse) | DownloadFile fetches a file&#39;s bytes from S3. The caller must be a member of the file&#39;s conversation. Used by the agent daemon; browser downloads go through the Echo route. |
 | ListFiles | [ListFilesRequest](#laelia-v1-ListFilesRequest) | [ListFilesResponse](#laelia-v1-ListFilesResponse) | ListFiles returns the files attached to a conversation. The caller must be a member. |
+| ListActivities | [ListActivitiesRequest](#laelia-v1-ListActivitiesRequest) | [ListActivitiesResponse](#laelia-v1-ListActivitiesResponse) | ListActivities returns the authenticated user&#39;s activity feed: chat messages relevant to them, tagged with category flags (mention/task/reminder/thread). The caller&#39;s own id is the implicit filter; default read_state_filter is UNREAD. |
+| MarkActivityDone | [MarkActivityDoneRequest](#laelia-v1-MarkActivityDoneRequest) | [MarkActivityDoneResponse](#laelia-v1-MarkActivityDoneResponse) | MarkActivityDone marks a single activity item DONE for the authenticated user, hiding it from All and Unread. The caller&#39;s own id must own the row. |
 
  
 

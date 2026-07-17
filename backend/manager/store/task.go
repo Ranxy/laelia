@@ -47,6 +47,22 @@ type TaskInfo struct {
 	AssigneeResourceID string
 }
 
+// RootMessageKinds reports whether a message is the root of a task and/or a
+// reminder. Used by activity generation to decide whether a new message (or a
+// thread reply rooted at this message) carries the TASK / REMINDER category.
+// rootID is the message to check: for a thread reply it is the thread root, for
+// a top-level message it is the message itself.
+func (s *Store) RootMessageKinds(ctx context.Context, rootID uuid.UUID) (isTask, isReminder bool, err error) {
+	err = s.GetDB().QueryRowContext(ctx, `
+		SELECT EXISTS (SELECT 1 FROM task WHERE message_id = $1),
+		       EXISTS (SELECT 1 FROM reminder WHERE message_id = $1)
+	`, rootID).Scan(&isTask, &isReminder)
+	if err != nil {
+		return false, false, errors.Wrapf(err, "failed to check root message kinds")
+	}
+	return isTask, isReminder, nil
+}
+
 // CreateTaskMessageBumpVersion atomically bumps the conversation's room version
 // and per-conversation task number, inserts a top-level chat_message, and
 // inserts a task row (status TODO, no assignee) for it — all in one

@@ -608,3 +608,60 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_agent_dm_unique
 -- resolves to exactly one conversation. Pre-launch, so no backfill is needed.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_channel_title_unique
     ON conversation(title) WHERE type = 2;
+
+-- === Per-user Activity feed ===
+-- activity records, per user, each chat_message relevant to them with the
+-- category flags that made it relevant and the per-user read/done state. The
+-- row identity is (principal_id, activity_key), NOT the message id:
+--   - a MENTION is keyed by the mentioning message_id (each @mention is its own
+--     precise pointer — mentions are never folded across messages);
+--   - a TASK/REMINDER/THREAD activity is keyed by the thread root, so the root
+--     plus every later reply in that thread share ONE row that always points at
+--     the latest message (UpsertActivity's ON CONFLICT bumps message_id /
+--     room_version / created_at and re-surfaces the row as UNREAD when a newer
+--     reply arrives, including resurrecting a Marked-Done row).
+-- Categories are bit flags (1=MENTION, 2=TASK, 4=REMINDER, 8=THREAD). State model:
+-- UNREAD (read_at NULL, done false) -> READ (read_at set, done false; visible
+-- under All) -> DONE (done true; hidden from All/Unread). read_at is advanced by
+-- MarkConversationRead when the user's channel cursor passes the row's
+-- room_version. thread_root_message_id is the thread root for folded rows and
+-- for mentions inside a thread; NULL for top-level mentions.
+CREATE TABLE IF NOT EXISTS activity (
+    principal_id INTEGER NOT NULL REFERENCES principal(id) ON DELETE CASCADE,
+    activity_key UUID NOT NULL,
+    message_id UUID NOT NULL REFERENCES chat_message(id) ON DELETE CASCADE,
+    conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+    thread_root_message_id UUID,
+    categories INTEGER NOT NULL DEFAULT 0,
+    room_version BIGINT NOT NULL,
+    read_at TIMESTAMPTZ,
+    done BOOLEAN NOT NULL DEFAULT FALSE,
+    done_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (principal_id, activity_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_user_state_created
+    ON activity (principal_id, done, read_at, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_user_conv_version
+    ON activity (principal_id, conversation_id, room_version);
+
+-- user_thread_participant mirrors thread_participant (agent-only) for users. A
+-- user is subscribed to a thread when they are @mentioned in it or they post a
+-- reply in it; thereafter every new reply in that thread generates a THREAD
+-- activity for that user. Access control still uses conversation_member.
+CREATE TABLE IF NOT EXISTS user_thread_participant (
+    thread_root_message_id UUID NOT NULL REFERENCES chat_message(id) ON DELETE CASCADE,
+    principal_id INTEGER NOT NULL REFERENCES principal(id) ON DELETE CASCADE,
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (thread_root_message_id, principal_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_thread_participant_user
+    ON user_thread_participant (principal_id);
+
+-- GIN index on chat_message.mentions for mention-driven activity queries
+-- (finding all messages that mention a given user id). Generation writes
+-- activity inline, so this is mainly for any future backfill/debug.
+CREATE INDEX IF NOT EXISTS idx_chat_message_mentions_gin
+    ON chat_message USING GIN (mentions jsonb_path_ops);

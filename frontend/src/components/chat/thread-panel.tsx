@@ -59,6 +59,11 @@ export interface ThreadPanelProps {
   // agent-to-agent DMs (type 3), which are admin view-only: a user can read
   // the thread but must not reply in or upload into it.
   readOnly?: boolean;
+  // scrollToMessageId scrolls the thread to a specific message once loaded —
+  // used by the Activity detail pane to locate the exact message an activity
+  // references (a @mention reply, or the latest reply of a folded task/reminder
+  // thread). Runs at most once per id so it does not fight the user's scrolling.
+  scrollToMessageId?: string;
 }
 
 export function ThreadPanel({
@@ -72,6 +77,7 @@ export function ThreadPanel({
   onPreviewImage,
   fluid,
   readOnly,
+  scrollToMessageId,
 }: ThreadPanelProps) {
   const { t } = useTranslation();
   const conversationName = `conversations/${channelId}`;
@@ -133,6 +139,22 @@ export function ThreadPanel({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [replies.length]);
+
+  // Scroll to a specific message once the thread has loaded (Activity detail
+  // pane locating the exact message). Runs at most once per id and yields
+  // stick-to-bottom so a later arriving reply doesn't yank the view away.
+  const scrollToMessageRef = useRef<string>("");
+  useEffect(() => {
+    if (!scrollToMessageId || !rootMsg) return;
+    if (scrollToMessageRef.current === scrollToMessageId) return;
+    scrollToMessageRef.current = scrollToMessageId;
+    stickToBottomRef.current = false;
+    requestAnimationFrame(() => {
+      scrollRef.current
+        ?.querySelector(`[data-msg-id="${scrollToMessageId}"]`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  }, [scrollToMessageId, rootMsg]);
 
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
@@ -295,20 +317,22 @@ export function ThreadPanel({
               gets the same markdown/mention/attachment treatment as channel
               chat and thread replies (it previously rendered raw text). */}
           {rootMsg && (
-            <MessageRow
-              msg={rootMsg}
-              showAvatar
-              agentTitle={agentTitleFor(rootMsg)}
-              streamingContent=""
-              streamingEvents={rootMsg.events ?? EMPTY_EVENTS}
-              onViewDetails={handleViewDetails}
-              MentionBadge={MentionBadge}
-              markdownCustomId="thread-chat"
-              onPreviewAttachment={onPreviewAttachment}
-              onJumpToSection={onJumpToSection}
-              onPreviewImage={onPreviewImage}
-              debugMode={currentUser?.debugMode ?? false}
-            />
+            <div data-msg-id={rootMsg.id}>
+              <MessageRow
+                msg={rootMsg}
+                showAvatar
+                agentTitle={agentTitleFor(rootMsg)}
+                streamingContent=""
+                streamingEvents={rootMsg.events ?? EMPTY_EVENTS}
+                onViewDetails={handleViewDetails}
+                MentionBadge={MentionBadge}
+                markdownCustomId="thread-chat"
+                onPreviewAttachment={onPreviewAttachment}
+                onJumpToSection={onJumpToSection}
+                onPreviewImage={onPreviewImage}
+                debugMode={currentUser?.debugMode ?? false}
+              />
+            </div>
           )}
 
           {/* Beginning-of-replies divider. */}
@@ -332,21 +356,22 @@ export function ThreadPanel({
               prev.senderName !== msg.senderName;
             const rowProps = rowStreamingProps(msg, false, "", EMPTY_EVENTS);
             return (
-              <MessageRow
-                key={msg.id}
-                msg={msg}
-                showAvatar={showAvatar}
-                agentTitle={agentTitleFor(msg)}
-                streamingContent={rowProps.streamingContent}
-                streamingEvents={rowProps.streamingEvents}
-                onViewDetails={handleViewDetails}
-                MentionBadge={MentionBadge}
-                markdownCustomId="thread-chat"
-                onPreviewAttachment={onPreviewAttachment}
-                onJumpToSection={onJumpToSection}
-                onPreviewImage={onPreviewImage}
-                debugMode={currentUser?.debugMode ?? false}
-              />
+              <div key={msg.id} data-msg-id={msg.id}>
+                <MessageRow
+                  msg={msg}
+                  showAvatar={showAvatar}
+                  agentTitle={agentTitleFor(msg)}
+                  streamingContent={rowProps.streamingContent}
+                  streamingEvents={rowProps.streamingEvents}
+                  onViewDetails={handleViewDetails}
+                  MentionBadge={MentionBadge}
+                  markdownCustomId="thread-chat"
+                  onPreviewAttachment={onPreviewAttachment}
+                  onJumpToSection={onJumpToSection}
+                  onPreviewImage={onPreviewImage}
+                  debugMode={currentUser?.debugMode ?? false}
+                />
+              </div>
             );
           })}
         </div>

@@ -1,4 +1,5 @@
 import {
+  Activity as ActivityIcon,
   Bot,
   ChevronDown,
   ChevronRight,
@@ -14,6 +15,7 @@ import { RouterLink } from "@/components/router-link";
 import { getLayerRoot, LAYER_SURFACE_CLASS } from "@/components/ui/layer";
 import { cn } from "@/lib/utils";
 import {
+  ACTIVITY_ROUTE,
   AGENT_ROUTE_LIST,
   CHAT_ROUTE,
   COMMAND_ROUTE_DETAIL,
@@ -74,6 +76,12 @@ function useSidebarItems(): SidebarItem[] {
         title: t("sidebar.home"),
         icon: Home,
         name: CHAT_ROUTE,
+        type: "route",
+      },
+      {
+        title: t("sidebar.activity"),
+        icon: ActivityIcon,
+        name: ACTIVITY_ROUTE,
         type: "route",
       },
       {

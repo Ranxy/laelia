@@ -840,8 +840,10 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 		if threadRoot.Valid {
 			// Thread reply: subscribe the posting agent and any @mentioned
 			// agents, then wake every subscriber except the poster. The poster
-			// is excluded so its own reply does not re-wake itself.
-			s.subscribeAndNotifyThread(ctx, convUUID, threadRoot.UUID, newVersion, mentions, &agent.ID)
+			// is excluded so its own reply does not re-wake itself. There is no
+			// posting user here, so posterUserID is nil — user_thread_participant
+			// subscriptions come only from the parsed @mentions of users.
+			s.subscribeAndNotifyThread(ctx, convUUID, threadRoot.UUID, newVersion, mentions, &agent.ID, nil)
 		} else {
 			// Agent-first: wake every OTHER agent member of this conversation so
 			// they can pull this agent's reply. The posting agent is excluded (it
@@ -859,6 +861,18 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 		if _, err := s.store.UpsertCursor(ctx, agent.ID, convUUID, newVersion); err != nil {
 			slog.Warn("failed to advance posting agent cursor", "agentID", agent.ID, "conversationID", convUUID, "version", newVersion, "error", err)
 		}
+
+		// Generate per-user activity (mention/thread; agents carry no TASK/REMINDER
+		// root kind here — task/reminder root messages are created via their own
+		// handlers). A thread reply inherits the root's task/reminder kind.
+		rootIsTask, rootIsReminder := false, false
+		if threadRoot.Valid {
+			rootIsTask, rootIsReminder, err = s.store.RootMessageKinds(ctx, threadRoot.UUID)
+			if err != nil {
+				slog.Warn("failed to resolve thread root kinds for activity", "rootID", threadRoot.UUID, "error", err)
+			}
+		}
+		s.store.GenerateActivityForMessage(ctx, msg, rootIsTask, rootIsReminder)
 
 		return connect.NewResponse(&v1pb.PostMessageResponse{
 			Committed:      true,

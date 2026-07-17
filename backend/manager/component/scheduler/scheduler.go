@@ -169,7 +169,13 @@ func (s *Scheduler) miss(ctx context.Context, r *store.Reminder) {
 			nextFireAt = &next
 		}
 	}
-	if _, err := s.store.MarkMissedAndPostNotification(ctx, r.MessageID, nextFireAt); err != nil {
+	posted, _, err := s.store.MarkMissedAndPostNotification(ctx, r.MessageID, nextFireAt)
+	if err != nil {
 		slog.Warn("scheduler: failed to mark reminder missed", "messageID", r.MessageID, "error", err)
+		return
+	}
+	// Generate REMINDER activity for the miss notification (best-effort).
+	for _, m := range posted {
+		s.store.GenerateActivityForMessage(ctx, m, false, true)
 	}
 }

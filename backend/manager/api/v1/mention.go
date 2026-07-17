@@ -3,6 +3,7 @@ package v1
 import (
 	"context"
 	"log/slog"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -146,4 +147,40 @@ func mentionTypeString(memberType int32) string {
 		return "agent"
 	}
 	return "user"
+}
+
+// mergeMentions unions server-parsed mentions (from parseContentMentions) with
+// client-supplied mentions (e.g. from a mention picker), deduping by type:id and
+// preserving the first-seen display name. selfUserID, when non-zero, drops a
+// self-mention (type=="user" with the caller's own id) so a user never @mentions
+// themself into their own activity feed. The client set is appended last so its
+// names win on dedup collision only when the server did not resolve the same
+// member — in practice the server resolves display names itself, so the two sets
+// agree.
+func mergeMentions(parsed, client []*v1pb.Mention, selfUserID int) []*v1pb.Mention {
+	seen := make(map[string]bool, len(parsed)+len(client))
+	out := make([]*v1pb.Mention, 0, len(parsed)+len(client))
+	add := func(m *v1pb.Mention) {
+		if m == nil {
+			return
+		}
+		if selfUserID != 0 && m.Type == "user" {
+			if uid, err := strconv.Atoi(m.Id); err == nil && uid == selfUserID {
+				return
+			}
+		}
+		key := m.Type + ":" + m.Id
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		out = append(out, m)
+	}
+	for _, m := range parsed {
+		add(m)
+	}
+	for _, m := range client {
+		add(m)
+	}
+	return out
 }

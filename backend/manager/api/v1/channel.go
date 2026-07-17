@@ -623,6 +623,13 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		return nil, err
 	}
 
+	// Server-parse mentions from the content (mirrors the agent PostMessage path)
+	// and merge with client-supplied mentions so user→user/@agent mentions reliably
+	// drive thread subscription and activity generation even when the client does
+	// not construct Mention structs. Self-mention (the caller's own id) is dropped.
+	parsedMentions := s.parseContentMentions(ctx, convID, req.Msg.Content, "")
+	mentions := mergeMentions(parsedMentions, req.Msg.Mentions, user.ID)
+
 	// Atomically bump conversation.version and write the user message with that
 	// room_version. This is the single source of truth for the room cursor. When
 	// as_task is set, the same tx also inserts the task row (status TODO).
@@ -635,7 +642,7 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 			Role:           1, // USER
 			Content:        req.Msg.Content,
 			SenderType:     store.SenderTypeUser,
-			Mentions:       req.Msg.Mentions,
+			Mentions:       mentions,
 			Attachments:    attachments,
 		})
 	} else {
@@ -646,7 +653,7 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 			Role:                1, // USER
 			Content:             req.Msg.Content,
 			SenderType:          store.SenderTypeUser,
-			Mentions:            req.Msg.Mentions,
+			Mentions:            mentions,
 			Attachments:         attachments,
 			ThreadRootMessageID: threadRoot,
 		})
@@ -663,8 +670,10 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		// Thread reply: subscribe any @mentioned agents (idempotent) and wake
 		// every subscriber of this thread — subscription is persistent, so a
 		// subscriber is woken on every reply even without a fresh @mention. The
-		// user sender has no agent id, so all subscribers are woken.
-		s.subscribeAndNotifyThread(ctx, convID, threadRoot.UUID, msg.RoomVersion, req.Msg.Mentions, nil)
+		// user sender has no agent id, so all subscribers are woken. The posting
+		// user and any @mentioned users are subscribed via user_thread_participant
+		// so they get THREAD activity on subsequent replies.
+		s.subscribeAndNotifyThread(ctx, convID, threadRoot.UUID, msg.RoomVersion, mentions, nil, &user.ID)
 	} else {
 		// Agent-first: the manager never dispatches work on a user message. It
 		// only notifies every agent member of the conversation that new messages
@@ -673,6 +682,19 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		// direct conversations too, so this covers 1:1 chats.)
 		s.notifyConversationAgents(ctx, convID, msg.RoomVersion, nil)
 	}
+
+	// Generate per-user activity for this message (mention/task/reminder/thread).
+	// Best-effort: failures are logged, never fatal. A top-level as_task message
+	// is a task root; a thread reply rooted at a task/reminder carries that kind.
+	rootIsTask := req.Msg.AsTask
+	rootIsReminder := false
+	if threadRoot.Valid {
+		rootIsTask, rootIsReminder, err = s.store.RootMessageKinds(ctx, threadRoot.UUID)
+		if err != nil {
+			slog.Warn("failed to resolve thread root kinds for activity", "rootID", threadRoot.UUID, "error", err)
+		}
+	}
+	s.store.GenerateActivityForMessage(ctx, msg, rootIsTask, rootIsReminder)
 
 	return connect.NewResponse(storeToV1ChatMessage(msg)), nil
 }
@@ -707,13 +729,15 @@ func (s *CommandService) notifyConversationAgents(ctx context.Context, convID uu
 
 // subscribeAndNotifyThread handles a thread reply: it subscribes any agent
 // @mentioned in the reply (plus the posting agent, when posterAgentID is
-// non-nil) to the thread, then wakes every current subscriber except
-// posterAgentID that a new reply landed. Subscription is persistent — once an
-// agent is subscribed (via @mention or its own reply) it is woken on every
-// subsequent reply in the thread, even without a fresh @mention. Used by
-// SendMessage (user, posterAgentID=nil) and PostMessage (agent) for thread
-// replies.
-func (s *CommandService) subscribeAndNotifyThread(ctx context.Context, convID, rootID uuid.UUID, version int64, mentions []*v1pb.Mention, posterAgentID *int) {
+// non-nil) to the thread, and any user @mentioned (plus the posting user, when
+// posterUserID is non-nil) via user_thread_participant, then wakes every current
+// agent subscriber except posterAgentID that a new reply landed. Subscription is
+// persistent — once an agent is subscribed (via @mention or its own reply) it is
+// woken on every subsequent reply in the thread, even without a fresh @mention;
+// a user subscriber gets a THREAD activity on every subsequent reply. Used by
+// SendMessage (user, posterAgentID=nil, posterUserID=&user.ID) and PostMessage
+// (agent, posterUserID=nil) for thread replies.
+func (s *CommandService) subscribeAndNotifyThread(ctx context.Context, convID, rootID uuid.UUID, version int64, mentions []*v1pb.Mention, posterAgentID *int, posterUserID *int) {
 	var agentIDs []int
 	seen := make(map[int]bool)
 	addAgent := func(id int) {
@@ -722,23 +746,41 @@ func (s *CommandService) subscribeAndNotifyThread(ctx context.Context, convID, r
 			agentIDs = append(agentIDs, id)
 		}
 	}
+	var userIDs []int
+	userSeen := make(map[int]bool)
+	addUser := func(id int) {
+		if id > 0 && !userSeen[id] {
+			userSeen[id] = true
+			userIDs = append(userIDs, id)
+		}
+	}
 	for _, m := range mentions {
-		if m.Type != "agent" || m.Id == "" {
-			continue
+		if m.Type == "agent" && m.Id != "" {
+			agent, err := s.store.GetAgentByResourceID(ctx, m.Id)
+			if err != nil || agent == nil {
+				slog.Warn("failed to resolve mentioned agent for thread subscription", "resourceID", m.Id, "error", err)
+				continue
+			}
+			addAgent(agent.ID)
 		}
-		agent, err := s.store.GetAgentByResourceID(ctx, m.Id)
-		if err != nil || agent == nil {
-			slog.Warn("failed to resolve mentioned agent for thread subscription", "resourceID", m.Id, "error", err)
-			continue
+		if m.Type == "user" && m.Id != "" {
+			if uid, err := strconv.Atoi(m.Id); err == nil {
+				addUser(uid)
+			}
 		}
-		addAgent(agent.ID)
 	}
 	if posterAgentID != nil {
 		addAgent(*posterAgentID)
 	}
+	if posterUserID != nil {
+		addUser(*posterUserID)
+	}
 	if err := s.store.AddThreadParticipants(ctx, rootID, agentIDs); err != nil {
 		slog.Warn("failed to subscribe thread participants", "rootID", rootID, "error", err)
 		// Still notify existing subscribers below.
+	}
+	if err := s.store.AddUserThreadParticipants(ctx, rootID, userIDs); err != nil {
+		slog.Warn("failed to subscribe user thread participants", "rootID", rootID, "error", err)
 	}
 	s.notifyThreadParticipants(ctx, convID, rootID, version, posterAgentID)
 }
@@ -907,6 +949,14 @@ func (s *CommandService) MarkConversationRead(ctx context.Context, req *connect.
 	readVersion, err := s.store.UpsertUserReadCursor(ctx, user.ID, convID, conv.Version)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to mark conversation read"))
+	}
+	// Advance the user's unread activity rows in this conversation to READ.
+	// Threads share the conversation's room_version space, so reading the
+	// channel marks all thread activity in it read too. Best-effort: a failure
+	// only leaves an activity as UNREAD (still visible under Unread), never data
+	// corruption, so it is logged rather than failing the read itself.
+	if err := s.store.MarkConversationActivitiesRead(ctx, user.ID, convID, readVersion); err != nil {
+		slog.Warn("failed to mark conversation activities read", "conversationID", convID, "userID", user.ID, "error", err)
 	}
 	return connect.NewResponse(&v1pb.MarkConversationReadResponse{ReadVersion: readVersion}), nil
 }
