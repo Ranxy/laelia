@@ -97,11 +97,13 @@ export function CommandListPage() {
     if (!canNext) return;
     setPageTokens((t) => [...t, nextPageToken]);
     setPageIndex((i) => i + 1);
+    setNextPageToken(""); // reset until the new page loads
   };
 
   const onPrev = () => {
     if (!canPrev) return;
     setPageIndex((i) => Math.max(0, i - 1));
+    setNextPageToken(pageToken); // the page we're leaving becomes the "next" page
   };
 
   const handleSend = async () => {
