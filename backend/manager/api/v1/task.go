@@ -167,7 +167,7 @@ func (s *CommandService) CreateTask(ctx context.Context, req *connect.Request[v1
 	// A created task is a top-level task root: every user member of the
 	// conversation gets a TASK activity (best-effort). Mentions on the message
 	// additionally tag MENTION.
-	s.store.GenerateActivityForMessage(ctx, msg, true, false)
+	s.store.GenerateActivityForMessage(msg, true, false)
 
 	return connect.NewResponse(&v1pb.CreateTaskResponse{Message: storeToV1ChatMessage(msg)}), nil
 }

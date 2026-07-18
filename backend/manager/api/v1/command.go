@@ -872,7 +872,7 @@ func (s *CommandService) PostMessage(ctx context.Context, req *connect.Request[v
 				slog.Warn("failed to resolve thread root kinds for activity", "rootID", threadRoot.UUID, "error", err)
 			}
 		}
-		s.store.GenerateActivityForMessage(ctx, msg, rootIsTask, rootIsReminder)
+		s.store.GenerateActivityForMessage(msg, rootIsTask, rootIsReminder)
 
 		return connect.NewResponse(&v1pb.PostMessageResponse{
 			Committed:      true,

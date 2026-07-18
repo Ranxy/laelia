@@ -275,11 +275,29 @@ func (s *Store) MarkConversationActivitiesRead(ctx context.Context, principalID 
 }
 
 // GenerateActivityForMessage computes the target-user set and category flags for
-// a freshly inserted message and writes activity rows. It is the single entry
-// point shared by the API message handlers (SendMessage, PostMessage, CreateTask,
-// the reminder lifecycle handlers) and the scheduler (reminder miss), so activity
-// generation lives in the store layer to avoid a circular dependency from the
-// scheduler back into the API service.
+// a freshly inserted message and writes activity rows, fire-and-forget on a
+// background goroutine. It is the single entry point shared by the API message
+// handlers (SendMessage, PostMessage, CreateTask, the reminder lifecycle
+// handlers) and the scheduler (reminder miss), so activity generation lives in
+// the store layer to avoid a circular dependency from the scheduler back into
+// the API service.
+//
+// The work is best-effort: a missed activity row is a missed notification, not
+// data corruption, so it must NOT block the message-send critical path. It is
+// therefore dispatched on a background goroutine with a detached context
+// (context.Background), mirroring the audit interceptor's fire-and-forget write —
+// the caller's request ctx may be cancelled as soon as the handler returns, so
+// the request ctx cannot be used here. See generateActivityRows for the
+// targeting/folding contract.
+func (s *Store) GenerateActivityForMessage(msg *ChatMessage, rootIsTask, rootIsReminder bool) {
+	go func() {
+		s.generateActivityRows(context.Background(), msg, rootIsTask, rootIsReminder)
+	}()
+}
+
+// generateActivityRows is the synchronous body of GenerateActivityForMessage.
+// See GenerateActivityForMessage for the dispatch policy and the doc below for
+// the targeting/folding contract.
 //
 // Best-effort: every failure is logged and never propagates — a missed activity
 // row is a missed notification, not data corruption, mirroring the wake/notify
@@ -305,7 +323,7 @@ func (s *Store) MarkConversationActivitiesRead(ctx context.Context, principalID 
 //   - TASK:     every user member of the conversation, when rootIsTask
 //   - REMINDER: every user member of the conversation, when rootIsReminder
 //   - THREAD:  every user_thread_participant of the thread, when msg is a reply
-func (s *Store) GenerateActivityForMessage(ctx context.Context, msg *ChatMessage, rootIsTask, rootIsReminder bool) {
+func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, rootIsTask, rootIsReminder bool) {
 	members, err := s.ListConversationMembers(ctx, msg.ConversationID)
 	if err != nil {
 		slog.Warn("failed to list conversation members for activity",
@@ -359,11 +377,19 @@ func (s *Store) GenerateActivityForMessage(ctx context.Context, msg *ChatMessage
 			}
 		}
 	}
-	// Exclude the sender. For a user-sent message PrincipalID is the sender's
-	// principal id; for an agent/system message it is the conversation owner or the
-	// system bot, which is not in the user sets above — deleting is a safe no-op.
-	delete(mentionCats, msg.PrincipalID)
-	delete(threadCats, msg.PrincipalID)
+	// Exclude the sender so a user never gets activity for its own message. This
+	// applies only to USER-sent messages: their PrincipalID is the sender's own
+	// principal id. An AGENT/SYSTEM message carries the conversation owner (or the
+	// system bot) as PrincipalID — NOT the agent sender — and the owner IS a
+	// conversation_member, so deleting by PrincipalID there would wrongly drop the
+	// owner from TASK/REMINDER/THREAD activity for agent replies in their own
+	// conversations. The agent sender is never in the user sets above (only
+	// type=="user" mentions and user members/participants are), so there is nothing
+	// to exclude for agent/system messages.
+	if msg.SenderType == SenderTypeUser {
+		delete(mentionCats, msg.PrincipalID)
+		delete(threadCats, msg.PrincipalID)
+	}
 
 	// effectiveRoot is the thread this message belongs to, for folding and for the
 	// mention row's thread_root (so an in-thread mention opens the thread). A

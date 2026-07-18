@@ -176,6 +176,6 @@ func (s *Scheduler) miss(ctx context.Context, r *store.Reminder) {
 	}
 	// Generate REMINDER activity for the miss notification (best-effort).
 	for _, m := range posted {
-		s.store.GenerateActivityForMessage(ctx, m, false, true)
+		s.store.GenerateActivityForMessage(m, false, true)
 	}
 }

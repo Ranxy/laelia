@@ -62,11 +62,20 @@ export function ActivityList() {
   const markActivityDone = useAppStore((s) => s.markActivityDone);
 
   const [filter, setFilter] = useState<Filter>("unread");
-  const [pageTokens, setPageTokens] = useState<string[]>([]);
+  // pageTokens[i] is the page_token to ENTER page i; page 0 is "" (offset 0).
+  // Seeded with [""] so the off-by-one that broke Next is impossible: appending
+  // nextPageToken lands at index pageIndex+1, which is the page we navigate to.
+  const [pageTokens, setPageTokens] = useState<string[]>([""]);
   const [pageIndex, setPageIndex] = useState(0);
   const [nextPageToken, setNextPageToken] = useState("");
   const [markingDone, setMarkingDone] = useState<string>("");
   const initialLoadDone = useRef(false);
+  // requestSeq is a monotonic epoch for in-flight listActivities calls. Every
+  // load increments it; a response whose captured seq no longer matches the
+  // current value is from a stale request (an old filter or old page) and is
+  // dropped, so a slow poll can never overwrite the list after a filter/page
+  // change.
+  const requestSeq = useRef(0);
 
   const pageToken = pageTokens[pageIndex] ?? "";
   const canPrev = pageIndex > 0;
@@ -74,6 +83,7 @@ export function ActivityList() {
 
   const load = useCallback(
     async (silent?: boolean) => {
+      const seq = ++requestSeq.current;
       const { readStateFilter, categoryFilter } = filterToParams(filter);
       const res = await listActivities({
         filter: categoryFilter,
@@ -82,44 +92,44 @@ export function ActivityList() {
         pageToken,
         silent,
       });
+      // A newer load (filter/page change, or a later poll) has started since
+      // this one was issued — drop the stale result.
+      if (seq !== requestSeq.current) return;
       setNextPageToken(res?.nextPageToken ?? "");
     },
     [filter, pageToken, listActivities]
   );
 
-  // Initial load + reset pagination whenever the filter changes.
+  // Initial load + background polling. A single effect (mirroring ReminderList):
+  // filter/page changes recreate `load`, which re-runs this effect, reloading
+  // and restarting the interval. The pagination reset lives in
+  // handleFilterChange, not here, so a filter switch issues exactly one fetch.
   useEffect(() => {
     initialLoadDone.current = false;
-    setPageTokens([]);
-    setPageIndex(0);
-    setNextPageToken("");
     load(false).then(() => {
       initialLoadDone.current = true;
     });
-  }, [load]);
-
-  // Silent background polling once the first load completes.
-  useEffect(() => {
-    const handle = setInterval(() => {
-      load(true);
-    }, POLL_INTERVAL_MS);
+    const handle = setInterval(() => load(true), POLL_INTERVAL_MS);
     return () => clearInterval(handle);
   }, [load]);
 
   const handleFilterChange = (next: Filter) => {
     if (next === filter) return;
     setFilter(next);
+    setPageTokens([""]);
+    setPageIndex(0);
+    setNextPageToken("");
   };
 
   const gotoPage = (delta: number) => {
-    setPageTokens((prev) => {
-      if (delta > 0) {
-        if (!nextPageToken) return prev;
-        return [...prev, nextPageToken];
-      }
-      return prev.slice(0, -1);
-    });
-    setPageIndex((i) => Math.max(0, i + delta));
+    if (delta > 0) {
+      if (!nextPageToken) return;
+      setPageTokens((tok) => [...tok, nextPageToken]);
+      setPageIndex((i) => i + 1);
+    } else {
+      if (pageIndex <= 0) return;
+      setPageIndex((i) => Math.max(0, i - 1));
+    }
   };
 
   // A row's message id is the last path segment of its name

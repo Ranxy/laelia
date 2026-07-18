@@ -174,7 +174,7 @@ func (s *CommandService) ConvertMessageToReminder(ctx context.Context, req *conn
 		slog.Warn("failed to subscribe agent to reminder thread", "rootID", msgID, "error", err)
 	}
 	if msg := s.postReminderSystemMessage(ctx, convID, msgID, fmt.Sprintf("⏰ %s scheduled a reminder for %s: %s", agent.Name, fireAt.In(time.UTC).Format(time.RFC3339), truncateContent(req.Msg.TaskContent))); msg != nil {
-		s.store.GenerateActivityForMessage(ctx, msg, false, true)
+		s.store.GenerateActivityForMessage(msg, false, true)
 	}
 
 	return connect.NewResponse(&v1pb.ConvertMessageToReminderResponse{Reminder: storeToV1Reminder(reminder)}), nil
@@ -323,7 +323,7 @@ func (s *CommandService) UpdateReminder(ctx context.Context, req *connect.Reques
 	}
 	actor := resolveActorName(ctx)
 	if msg := s.postReminderSystemMessage(ctx, updated.ConversationID, msgID, fmt.Sprintf("📝 %s updated the reminder schedule: %s", actor, fireAt.In(time.UTC).Format(time.RFC3339))); msg != nil {
-		s.store.GenerateActivityForMessage(ctx, msg, false, true)
+		s.store.GenerateActivityForMessage(msg, false, true)
 	}
 	return connect.NewResponse(&v1pb.UpdateReminderResponse{Reminder: storeToV1Reminder(updated)}), nil
 }
@@ -354,7 +354,7 @@ func (s *CommandService) CancelReminder(ctx context.Context, req *connect.Reques
 	}
 	if updated.Status == int16(v1pb.ReminderStatus_REMINDER_STATUS_CANCELLED) {
 		if msg := s.postReminderSystemMessage(ctx, updated.ConversationID, msgID, fmt.Sprintf("🚫 %s cancelled the reminder", resolveActorName(ctx))); msg != nil {
-			s.store.GenerateActivityForMessage(ctx, msg, false, true)
+			s.store.GenerateActivityForMessage(msg, false, true)
 		}
 	}
 	return connect.NewResponse(&v1pb.CancelReminderResponse{Reminder: storeToV1Reminder(updated)}), nil
@@ -393,7 +393,7 @@ func (s *CommandService) CompleteReminder(ctx context.Context, req *connect.Requ
 	// The reminder root is a reminder, so its thread replies carry the REMINDER
 	// category for every user member (plus THREAD for participants).
 	for _, m := range posted {
-		s.store.GenerateActivityForMessage(ctx, m, false, true)
+		s.store.GenerateActivityForMessage(m, false, true)
 	}
 	return connect.NewResponse(&v1pb.CompleteReminderResponse{Reminder: storeToV1Reminder(updated)}), nil
 }
@@ -425,7 +425,7 @@ func (s *CommandService) FailReminder(ctx context.Context, req *connect.Request[
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to fail reminder"))
 	}
 	for _, m := range posted {
-		s.store.GenerateActivityForMessage(ctx, m, false, true)
+		s.store.GenerateActivityForMessage(m, false, true)
 	}
 	return connect.NewResponse(&v1pb.FailReminderResponse{Reminder: storeToV1Reminder(updated)}), nil
 }
