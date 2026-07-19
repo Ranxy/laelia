@@ -1,8 +1,15 @@
-import { Bell, ListChecks, MessageSquare, UserCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Bell,
+  ListChecks,
+  MessageSquare,
+  UserCircle,
+} from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ConnectionBadge } from "@/components/connection-badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { agentResourceName } from "@/lib/command-status";
 import { agentLifecycle, lifecycleLabel } from "@/pages/dashboard/agents";
@@ -47,7 +54,16 @@ export function AgentDetailLayout() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex items-center gap-3 border-b border-control-border px-6 py-3 shrink-0">
+      <div className="flex items-center gap-3 border-b border-control-border px-4 py-3 shrink-0 lg:px-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate("/agents")}
+          aria-label={t("agent.back")}
+          className="size-8 p-0 lg:hidden"
+        >
+          <ArrowLeft className="size-4" />
+        </Button>
         <h1 className="text-base font-semibold text-main truncate">{title}</h1>
         <ConnectionBadge state={displayAgent?.status?.state} />
         {displayAgent && (
@@ -58,8 +74,8 @@ export function AgentDetailLayout() {
       </div>
 
       <Tabs value={activeTab} className="flex h-full flex-col overflow-hidden">
-        <div className="px-6 border-b border-control-border shrink-0">
-          <TabsList className="gap-x-6">
+        <div className="px-4 border-b border-control-border shrink-0 lg:px-6">
+          <TabsList className="gap-x-6 overflow-x-auto">
             <TabsTrigger
               value="profile"
               className="px-1"

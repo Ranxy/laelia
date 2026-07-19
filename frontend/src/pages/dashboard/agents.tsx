@@ -150,8 +150,16 @@ export function AgentsPage() {
   }
 
   return (
-    <div className="flex h-full w-full">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-control-border overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden">
+      {/* Left rail: agent list.
+          Desktop: fixed narrow column.
+          Mobile: full-width when no agent is selected; hidden once one is open. */}
+      <aside
+        className={cn(
+          "shrink-0 flex-col border-r border-control-border overflow-hidden",
+          selectedAgentId ? "hidden lg:flex lg:w-56" : "flex w-full lg:w-56"
+        )}
+      >
         <div className="flex items-center justify-between gap-2 border-b border-control-border px-3 py-3 shrink-0">
           <h1 className="text-sm font-semibold text-main truncate">
             {t("agent.title")}
@@ -229,7 +237,14 @@ export function AgentsPage() {
         </div>
       </aside>
 
-      <div className="flex-1 overflow-hidden">
+      {/* Right pane: agent detail (or empty state).
+          Mobile: hidden until an agent is opened. */}
+      <div
+        className={cn(
+          "min-w-0 flex-1 overflow-hidden",
+          !selectedAgentId && "hidden lg:block"
+        )}
+      >
         <Outlet />
       </div>
 

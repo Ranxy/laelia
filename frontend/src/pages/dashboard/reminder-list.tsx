@@ -133,7 +133,7 @@ export function ReminderListPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="shrink-0 border-b border-control-border px-4 py-3">
-        <div className="mx-auto max-w-5xl flex items-center gap-1">
+        <div className="mx-auto max-w-5xl flex items-center gap-1 overflow-x-auto">
           {(
             [
               "all",
@@ -163,80 +163,82 @@ export function ReminderListPage() {
 
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 py-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-24 whitespace-nowrap">
-                  {t("reminders.header-status")}
-                </TableHead>
-                <TableHead>{t("reminders.header-task")}</TableHead>
-                <TableHead className="w-40 whitespace-nowrap">
-                  {t("reminders.header-schedule")}
-                </TableHead>
-                <TableHead className="w-44 whitespace-nowrap">
-                  {t("reminders.header-fire-at")}
-                </TableHead>
-                <TableHead className="w-32 whitespace-nowrap">
-                  {t("reminders.header-assignee")}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-center text-control-light py-8"
-                  >
-                    {t("common.loading")}
-                  </TableCell>
+                  <TableHead className="w-24 whitespace-nowrap">
+                    {t("reminders.header-status")}
+                  </TableHead>
+                  <TableHead>{t("reminders.header-task")}</TableHead>
+                  <TableHead className="w-40 whitespace-nowrap">
+                    {t("reminders.header-schedule")}
+                  </TableHead>
+                  <TableHead className="w-44 whitespace-nowrap">
+                    {t("reminders.header-fire-at")}
+                  </TableHead>
+                  <TableHead className="w-32 whitespace-nowrap">
+                    {t("reminders.header-assignee")}
+                  </TableHead>
                 </TableRow>
-              )}
-              {!loading && reminders.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12">
-                    <p className="text-control-light text-sm">
-                      {t("reminders.empty")}
-                    </p>
-                  </TableCell>
-                </TableRow>
-              )}
-              {!loading &&
-                reminders.map((r) => (
-                  <TableRow
-                    key={r.name}
-                    className="cursor-pointer"
-                    tabIndex={0}
-                    aria-label={t("reminders.row-open-detail")}
-                    onClick={() => handleRowClick(r)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleRowClick(r);
-                      }
-                    }}
-                  >
-                    <TableCell className="whitespace-nowrap">
-                      <ReminderStatusBadge status={r.status} />
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      <span className="line-clamp-2 max-w-md">
-                        {r.taskContent || "-"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-xs text-control-light font-mono">
-                      {scheduleSummary(r)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-control-light text-xs">
-                      {fireAtDate(r)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-control-light text-xs">
-                      {r.assigneeName || "-"}
+              </TableHeader>
+              <TableBody>
+                {loading && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="text-center text-control-light py-8"
+                    >
+                      {t("common.loading")}
                     </TableCell>
                   </TableRow>
-                ))}
-            </TableBody>
-          </Table>
+                )}
+                {!loading && reminders.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-12">
+                      <p className="text-control-light text-sm">
+                        {t("reminders.empty")}
+                      </p>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!loading &&
+                  reminders.map((r) => (
+                    <TableRow
+                      key={r.name}
+                      className="cursor-pointer"
+                      tabIndex={0}
+                      aria-label={t("reminders.row-open-detail")}
+                      onClick={() => handleRowClick(r)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleRowClick(r);
+                        }
+                      }}
+                    >
+                      <TableCell className="whitespace-nowrap">
+                        <ReminderStatusBadge status={r.status} />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <span className="line-clamp-2 max-w-md">
+                          {r.taskContent || "-"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-control-light font-mono">
+                        {scheduleSummary(r)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-control-light text-xs">
+                        {fireAtDate(r)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-control-light text-xs">
+                        {r.assigneeName || "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </div>
 

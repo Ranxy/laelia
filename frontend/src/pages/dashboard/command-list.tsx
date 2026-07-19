@@ -134,8 +134,8 @@ export function CommandListPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="shrink-0 border-b border-control-border px-4 py-3">
-        <div className="mx-auto max-w-5xl flex items-center gap-3">
-          <div className="flex items-center gap-1">
+        <div className="mx-auto max-w-5xl flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1 overflow-x-auto">
             {(
               ["all", "pending", "running", "done", "failed"] as StatusFilter[]
             ).map((f) => (
@@ -164,110 +164,112 @@ export function CommandListPage() {
 
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 py-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-20 whitespace-nowrap">
-                  {t("tasks.header-type")}
-                </TableHead>
-                <TableHead className="w-24 whitespace-nowrap">
-                  {t("tasks.header-status")}
-                </TableHead>
-                <TableHead>{t("tasks.header-final-summary")}</TableHead>
-                <TableHead className="w-24 whitespace-nowrap">
-                  {t("tasks.header-duration")}
-                </TableHead>
-                <TableHead className="w-44 whitespace-nowrap">
-                  {t("tasks.header-created")}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-center text-control-light py-8"
-                  >
-                    {t("common.loading")}
-                  </TableCell>
+                  <TableHead className="w-20 whitespace-nowrap">
+                    {t("tasks.header-type")}
+                  </TableHead>
+                  <TableHead className="w-24 whitespace-nowrap">
+                    {t("tasks.header-status")}
+                  </TableHead>
+                  <TableHead>{t("tasks.header-final-summary")}</TableHead>
+                  <TableHead className="w-24 whitespace-nowrap">
+                    {t("tasks.header-duration")}
+                  </TableHead>
+                  <TableHead className="w-44 whitespace-nowrap">
+                    {t("tasks.header-created")}
+                  </TableHead>
                 </TableRow>
-              )}
-              {!loading && commands.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12">
-                    <div className="flex flex-col items-center gap-3">
-                      <p className="text-control-light text-sm">
-                        {t("tasks.empty")}
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSendOpen(true)}
-                      >
-                        <Plus className="size-3.5" />
-                        {t("tasks.empty-cta")}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-              {!loading &&
-                commands.map((cmd) => (
-                  <TableRow
-                    key={cmd.name}
-                    className="cursor-pointer"
-                    tabIndex={0}
-                    aria-label={t("command.row-open-detail")}
-                    onClick={() => handleRowClick(cmd)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleRowClick(cmd);
-                      }
-                    }}
-                  >
-                    <TableCell className="whitespace-nowrap">
-                      <span className="text-xs text-control-light">
-                        {t("command.executor-acp")}
-                      </span>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      <CommandStatusBadge status={cmd.status} />
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {cmd.finalSummary ? (
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="truncate flex-1 min-w-0 max-w-md">
-                            {cmd.finalSummary}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="xs"
-                            className="shrink-0 px-1"
-                            aria-label={t("tasks.show-final-summary")}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setExpandedSummary(cmd);
-                            }}
-                          >
-                            <Expand className="size-3.5" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-control-light">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-control-light text-xs">
-                      {formatDuration(cmd.durationMs)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-control-light text-xs">
-                      {formatTimestamp(cmd.createdAt)}
+              </TableHeader>
+              <TableBody>
+                {loading && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="text-center text-control-light py-8"
+                    >
+                      {t("common.loading")}
                     </TableCell>
                   </TableRow>
-                ))}
-            </TableBody>
-          </Table>
+                )}
+                {!loading && commands.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <p className="text-control-light text-sm">
+                          {t("tasks.empty")}
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSendOpen(true)}
+                        >
+                          <Plus className="size-3.5" />
+                          {t("tasks.empty-cta")}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!loading &&
+                  commands.map((cmd) => (
+                    <TableRow
+                      key={cmd.name}
+                      className="cursor-pointer"
+                      tabIndex={0}
+                      aria-label={t("command.row-open-detail")}
+                      onClick={() => handleRowClick(cmd)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleRowClick(cmd);
+                        }
+                      }}
+                    >
+                      <TableCell className="whitespace-nowrap">
+                        <span className="text-xs text-control-light">
+                          {t("command.executor-acp")}
+                        </span>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <CommandStatusBadge status={cmd.status} />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {cmd.finalSummary ? (
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="truncate flex-1 min-w-0 max-w-md">
+                              {cmd.finalSummary}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              className="shrink-0 px-1"
+                              aria-label={t("tasks.show-final-summary")}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedSummary(cmd);
+                              }}
+                            >
+                              <Expand className="size-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-control-light">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-control-light text-xs">
+                        {formatDuration(cmd.durationMs)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-control-light text-xs">
+                        {formatTimestamp(cmd.createdAt)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </div>
 

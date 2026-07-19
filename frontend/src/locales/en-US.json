@@ -235,6 +235,7 @@
     "no-selection": "Select an agent to view its details.",
     "chat-empty": "This agent has not joined any channels yet.",
     "chat-agent-dm-row": "Agent-to-agent DM",
+    "back": "Back to agents",
     "create": "Create Agent",
     "create-title": "Create Agent",
     "create-description": "Enter a name for the new agent.",
