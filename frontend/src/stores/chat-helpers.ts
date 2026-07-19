@@ -1,5 +1,5 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
-import type { ChatMessage } from "@/types/proto-es/v1/command_pb";
+import { type ChatMessage, SenderType } from "@/types/proto-es/v1/command_pb";
 import type { ChatMessageUI } from "./types";
 
 // toUiMessage is the single mapper from a backend ChatMessage to the UI shape.
@@ -17,6 +17,7 @@ export function toUiMessage(msg: ChatMessage): ChatMessageUI {
     agentId: msg.agentId || undefined,
     senderName: msg.senderName || undefined,
     senderType: msg.senderType || undefined,
+    principalId: msg.principalId || undefined,
     mentions: msg.mentions,
     attachments: msg.attachments,
     threadRoot: msg.threadRoot || undefined,
@@ -30,6 +31,41 @@ export function toUiMessage(msg: ChatMessage): ChatMessageUI {
         }
       : undefined,
   };
+}
+
+// isOwnUserMessage reports whether a user-direction message was sent by the
+// current user, so the UI can render it as "You" and distinguish it from other
+// users' messages in shared channels. The current user's principal id is the
+// {user} segment of their "users/{user}" resource name (currentUser.name).
+//
+// Either id can be unknown in transient states: the optimistic placeholder a
+// row is built from at send time has no principalId (the committed echo carries
+// it), and rows predating the field lack it. In those cases we fall back to
+// "own" so a just-sent message keeps its "You" label instead of flipping to a
+// stranger's name mid-stream. A committed message from another user always
+// carries a distinct principalId, so the fallback never mislabels real others.
+export function isOwnUserMessage(
+  msg: ChatMessageUI,
+  currentPrincipalId?: string
+): boolean {
+  if (msg.role !== "user") return false;
+  if (!msg.principalId || !currentPrincipalId) return true;
+  return msg.principalId === currentPrincipalId;
+}
+
+// senderKeyForMessage returns a stable per-sender key for grouping consecutive
+// messages: the UI hides the avatar/header on continuation rows, so the key
+// must distinguish every sender that gets its own identity block. It keys
+// users by principal_id and agents by agent_id so that distinct senders who
+// share a display name are not merged into one block. The optimistic
+// placeholder created at send time carries no principalId, so it falls back to
+// senderName (and then role) — fine, since it is always the current user's and
+// dedups against the committed echo under the same id.
+export function senderKeyForMessage(msg: ChatMessageUI): string {
+  if (msg.senderType === SenderType.SYSTEM) return "system";
+  if (msg.role === "user")
+    return `u:${msg.principalId ?? msg.senderName ?? ""}`;
+  return `a:${msg.agentId ?? msg.senderName ?? ""}`;
 }
 
 // appendNewMessages appends the messages from `delta` whose id is not already

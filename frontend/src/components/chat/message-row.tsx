@@ -19,6 +19,7 @@ import {
   MAX_MARKDOWN_PREVIEW_BYTES,
 } from "@/lib/markdown-file";
 import { cn } from "@/lib/utils";
+import { isOwnUserMessage } from "@/stores/chat-helpers";
 import type { ChatMessageUI } from "@/stores/types";
 import type { Attachment, CommandEvent } from "@/types/proto-es/v1/command_pb";
 import { CommandEventType, SenderType } from "@/types/proto-es/v1/command_pb";
@@ -96,6 +97,12 @@ export interface MessageRowProps {
   // this handler is the click-to-zoom affordance on that inline image.
   onPreviewImage?: (attachment: Attachment) => void;
   debugMode: boolean;
+  // currentPrincipalId is the current user's principal id (the {user} segment
+  // of their "users/{user}" name), used to distinguish the current user's own
+  // messages from other users' messages in shared channels. Optional: when
+  // absent the row falls back to treating every user message as the current
+  // user's (the pre-existing behavior).
+  currentPrincipalId?: string;
 }
 
 export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
@@ -114,9 +121,15 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     onJumpToSection,
     onPreviewImage,
     debugMode,
+    currentPrincipalId,
   } = props;
   const { t } = useTranslation();
   const isUser = msg.role === "user";
+  // In a shared channel, user messages from other users must render with their
+  // own name rather than the current user's "You" label. isOwnUser falls back
+  // to true when either id is unknown (optimistic send / legacy rows) so the
+  // label never flips mid-stream.
+  const isOwnUser = isOwnUserMessage(msg, currentPrincipalId);
   const isStreaming = msg.streaming;
   const displayContent = isStreaming ? streamingContent : msg.content;
   const events = isStreaming ? streamingEvents : (msg.events ?? EMPTY_EVENTS);
@@ -224,13 +237,25 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     <div
       className={cn(
         "group flex gap-3",
-        isUser ? "flex-row-reverse" : "flex-row"
+        // Own messages align right; other users' messages align left next to
+        // the agents' (a shared channel reads top-to-bottom by sender, not with
+        // every other user mirrored to the right).
+        isOwnUser ? "flex-row-reverse" : "flex-row"
       )}
     >
       {/* Avatar */}
       <div className="flex shrink-0 flex-col items-center pt-0.5">
         {showAvatar ? (
-          <Avatar label={isUser ? "U" : agentTitle || "A"} />
+          <Avatar
+            label={
+              isUser
+                ? isOwnUser
+                  ? "U"
+                  : (msg.senderName ?? "U")
+                : agentTitle || "A"
+            }
+            accent={isUser ? isOwnUser : false}
+          />
         ) : (
           <div className="size-8 shrink-0" />
         )}
@@ -240,7 +265,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
       <div
         className={cn(
           "flex min-w-0 flex-1 flex-col gap-1.5",
-          isUser ? "items-end" : "items-start"
+          isOwnUser ? "items-end" : "items-start"
         )}
       >
         {/* Header */}
@@ -248,7 +273,9 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
           <div className="flex items-center gap-2 px-0.5">
             <span className="text-xs font-medium text-control">
               {isUser
-                ? t("chat.you")
+                ? isOwnUser
+                  ? t("chat.you")
+                  : msg.senderName || t("chat.you")
                 : agentTitle || msg.senderName || t("chat.agent")}
             </span>
             <span className="text-xs text-control-placeholder">
@@ -328,7 +355,10 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
         <div
           className={cn(
             "rounded-2xl text-sm leading-relaxed",
-            isUser
+            // Bubble corner points toward the sender's avatar: own messages
+            // sit on the right (top-right corner sharp), other users' and
+            // agents' sit on the left (top-left corner sharp).
+            isOwnUser
               ? "bg-control-bg/60 text-main rounded-tr-sm px-4 py-2.5 max-w-[80%]"
               : displayContent || isStreaming
                 ? "bg-control-bg/60 text-main rounded-tl-sm px-4 py-3 max-w-[80%]"

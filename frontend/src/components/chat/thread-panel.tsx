@@ -32,6 +32,7 @@ import { getCaretCoordinates } from "@/lib/caret-position";
 import { isImageAttachment } from "@/lib/image-file";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
+import { senderKeyForMessage } from "@/stores/chat-helpers";
 import type { ChatMessageUI } from "@/stores/types";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
 import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
@@ -331,6 +332,7 @@ export function ThreadPanel({
                 onJumpToSection={onJumpToSection}
                 onPreviewImage={onPreviewImage}
                 debugMode={currentUser?.debugMode ?? false}
+                currentPrincipalId={currentUser?.name.split("/").pop()}
               />
             </div>
           )}
@@ -351,9 +353,7 @@ export function ThreadPanel({
           {replies.map((msg, idx) => {
             const prev = idx > 0 ? replies[idx - 1] : null;
             const showAvatar =
-              !prev ||
-              prev.role !== msg.role ||
-              prev.senderName !== msg.senderName;
+              !prev || senderKeyForMessage(prev) !== senderKeyForMessage(msg);
             const rowProps = rowStreamingProps(msg, false, "", EMPTY_EVENTS);
             return (
               <div key={msg.id} data-msg-id={msg.id}>
@@ -370,6 +370,7 @@ export function ThreadPanel({
                   onJumpToSection={onJumpToSection}
                   onPreviewImage={onPreviewImage}
                   debugMode={currentUser?.debugMode ?? false}
+                  currentPrincipalId={currentUser?.name.split("/").pop()}
                 />
               </div>
             );

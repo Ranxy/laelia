@@ -1876,6 +1876,7 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | thread_reply_count | [int32](#int32) |  | thread_reply_count is the number of replies in the thread rooted at this message. Only meaningful for root messages (thread_root empty); the frontend uses it to render the reply-count badge on the root message in the main channel list. Always 0 for thread replies. |
 | task | [TaskInfo](#laelia-v1-TaskInfo) |  | task is set when this message is a task (a row exists in the task table for this message id). Populated by ListConversationMessages / ListThreadMessages for root messages; absent for non-task messages and thread replies. |
 | agent_id | [string](#string) |  | agent_id is the agent resource ID (&#34;agents/{id}&#34;) that owns the command referenced by command_id. Populated when the sender is an agent so the frontend can construct command-detail URLs. |
+| principal_id | [string](#string) |  | principal_id is the decimal id of the principal that authored this message (the chat_message.principal_id row). For a user message it is the sending user&#39;s principal id (matching the {user} segment of the &#34;users/{user}&#34; resource name); for an agent message it is the conversation owner&#39;s principal id; for a system message it is the system bot&#39;s id. The frontend uses it to tell the current user&#39;s own messages apart from other users&#39; messages in shared channels (sender_name alone is a display name and can collide across users). |
 
 
 

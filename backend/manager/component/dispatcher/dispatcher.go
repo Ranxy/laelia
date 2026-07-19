@@ -3,6 +3,7 @@ package dispatcher
 import (
 	"context"
 	"log/slog"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -967,6 +968,7 @@ func ConvertChatMessageToV1(m *store.ChatMessage) *v1pb.ChatMessage {
 		CreatedAt:     timestamppb.New(m.CreatedAt),
 		SenderName:    m.AgentName,
 		SenderType:    v1pb.SenderType(m.SenderType),
+		PrincipalId:   strconv.Itoa(m.PrincipalID),
 		RoomVersion:   m.RoomVersion,
 		Mentions:      m.Mentions,
 	}

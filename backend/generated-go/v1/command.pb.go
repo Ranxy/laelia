@@ -2571,7 +2571,16 @@ type ChatMessage struct {
 	// agent_id is the agent resource ID ("agents/{id}") that owns the command
 	// referenced by command_id. Populated when the sender is an agent so the
 	// frontend can construct command-detail URLs.
-	AgentId       string `protobuf:"bytes,17,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	AgentId string `protobuf:"bytes,17,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	// principal_id is the decimal id of the principal that authored this message
+	// (the chat_message.principal_id row). For a user message it is the sending
+	// user's principal id (matching the {user} segment of the "users/{user}"
+	// resource name); for an agent message it is the conversation owner's
+	// principal id; for a system message it is the system bot's id. The frontend
+	// uses it to tell the current user's own messages apart from other users'
+	// messages in shared channels (sender_name alone is a display name and can
+	// collide across users).
+	PrincipalId   string `protobuf:"bytes,18,opt,name=principal_id,json=principalId,proto3" json:"principal_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2721,6 +2730,13 @@ func (x *ChatMessage) GetTask() *TaskInfo {
 func (x *ChatMessage) GetAgentId() string {
 	if x != nil {
 		return x.AgentId
+	}
+	return ""
+}
+
+func (x *ChatMessage) GetPrincipalId() string {
+	if x != nil {
+		return x.PrincipalId
 	}
 	return ""
 }
@@ -9600,7 +9616,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\fconversation\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
 	"\x13laelia/ConversationR\fconversation\":\n" +
 	"\x11ListFilesResponse\x12%\n" +
-	"\x05files\x18\x01 \x03(\v2\x0f.laelia.v1.FileR\x05files\"\x83\x05\n" +
+	"\x05files\x18\x01 \x03(\v2\x0f.laelia.v1.FileR\x05files\"\xa6\x05\n" +
 	"\vChatMessage\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\"\n" +
 	"\fconversation\x18\x02 \x01(\tR\fconversation\x12%\n" +
@@ -9624,7 +9640,8 @@ const file_v1_command_proto_rawDesc = "" +
 	"threadRoot\x12,\n" +
 	"\x12thread_reply_count\x18\x0f \x01(\x05R\x10threadReplyCount\x12'\n" +
 	"\x04task\x18\x10 \x01(\v2\x13.laelia.v1.TaskInfoR\x04task\x12\x19\n" +
-	"\bagent_id\x18\x11 \x01(\tR\aagentId\"\xb1\x03\n" +
+	"\bagent_id\x18\x11 \x01(\tR\aagentId\x12!\n" +
+	"\fprincipal_id\x18\x12 \x01(\tR\vprincipalId\"\xb1\x03\n" +
 	"\fConversation\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +

@@ -916,6 +916,7 @@ func storeToV1ChatMessage(msg *store.ChatMessage) *v1pb.ChatMessage {
 		CreatedAt:        timestamppb.New(msg.CreatedAt),
 		SenderName:       senderName,
 		SenderType:       senderType,
+		PrincipalId:      formatPrincipalID(msg.PrincipalID),
 		RoomVersion:      msg.RoomVersion,
 		Mentions:         msg.Mentions,
 		Attachments:      msg.Attachments,

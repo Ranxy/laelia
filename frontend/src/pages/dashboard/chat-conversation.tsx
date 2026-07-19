@@ -56,6 +56,7 @@ import { isImageAttachment } from "@/lib/image-file";
 import "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
+import { senderKeyForMessage } from "@/stores/chat-helpers";
 import type { ChatMessageUI } from "@/stores/types";
 import type {
   AgentActivity,
@@ -790,8 +791,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                 const prevMsg = idx > 0 ? messages[idx - 1] : null;
                 const showAvatar =
                   !prevMsg ||
-                  prevMsg.role !== msg.role ||
-                  prevMsg.senderName !== msg.senderName;
+                  senderKeyForMessage(prevMsg) !== senderKeyForMessage(msg);
                 const rowProps = rowStreamingProps(
                   msg,
                   false,
@@ -815,6 +815,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                       onJumpToSection={handleJumpToSection}
                       onPreviewImage={handlePreviewImage}
                       debugMode={currentUser?.debugMode ?? false}
+                      currentPrincipalId={currentUser?.name.split("/").pop()}
                     />
                   </div>
                 );

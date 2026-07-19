@@ -11,6 +11,7 @@ import {
   type OutlineItem,
 } from "@/lib/markdown-file";
 import { useAppStore } from "@/stores";
+import { isOwnUserMessage } from "@/stores/chat-helpers";
 import type { ChatMessageUI } from "@/stores/types";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
 import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
@@ -41,6 +42,11 @@ export function CommentsAside({
   const thread = useAppStore((s) => s.threadByRoot[rootMessageId]);
   const loadThreadMessages = useAppStore((s) => s.loadThreadMessages);
   const sendThreadMessage = useAppStore((s) => s.sendThreadMessage);
+  // The {user} segment of the current user's "users/{user}" name is the
+  // principal id used to tell their own comments from other users' comments.
+  const currentPrincipalId = useAppStore((s) =>
+    s.currentUser?.name.split("/").pop()
+  );
 
   const [pendingAnchor, setPendingAnchor] = useState<CommentAnchor | null>(
     null
@@ -133,6 +139,7 @@ export function CommentsAside({
               key={m.id}
               msg={m}
               attachmentId={attachment.id}
+              currentPrincipalId={currentPrincipalId}
               onJumpToSection={onJumpToSection}
             />
           ))}
@@ -202,10 +209,12 @@ export function CommentsAside({
 function CommentRow({
   msg,
   attachmentId,
+  currentPrincipalId,
   onJumpToSection,
 }: {
   msg: ChatMessageUI;
   attachmentId: string;
+  currentPrincipalId?: string;
   onJumpToSection: (sectionId: string) => void;
 }) {
   const { t } = useTranslation();
@@ -214,12 +223,26 @@ function CommentRow({
   );
   if (!att) return null;
   const isUser = msg.role === "user";
+  const isOwnUser = isOwnUserMessage(msg, currentPrincipalId);
   return (
     <li className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5">
-        <Avatar label={isUser ? "U" : (msg.senderName ?? "A")} />
+        <Avatar
+          label={
+            isUser
+              ? isOwnUser
+                ? "U"
+                : (msg.senderName ?? "U")
+              : (msg.senderName ?? "A")
+          }
+          accent={isUser ? isOwnUser : false}
+        />
         <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-main">
-          {isUser ? t("chat.you") : (msg.senderName ?? t("chat.agent"))}
+          {isUser
+            ? isOwnUser
+              ? t("chat.you")
+              : (msg.senderName ?? t("chat.you"))
+            : (msg.senderName ?? t("chat.agent"))}
         </span>
         <span className="shrink-0 text-[10px] text-control-placeholder">
           {formatTime(msg.timestamp)}

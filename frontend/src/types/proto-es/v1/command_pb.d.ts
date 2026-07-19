@@ -1077,6 +1077,20 @@ export declare type ChatMessage = Message<"laelia.v1.ChatMessage"> & {
    * @generated from field: string agent_id = 17;
    */
   agentId: string;
+
+  /**
+   * principal_id is the decimal id of the principal that authored this message
+   * (the chat_message.principal_id row). For a user message it is the sending
+   * user's principal id (matching the {user} segment of the "users/{user}"
+   * resource name); for an agent message it is the conversation owner's
+   * principal id; for a system message it is the system bot's id. The frontend
+   * uses it to tell the current user's own messages apart from other users'
+   * messages in shared channels (sender_name alone is a display name and can
+   * collide across users).
+   *
+   * @generated from field: string principal_id = 18;
+   */
+  principalId: string;
 };
 
 /**

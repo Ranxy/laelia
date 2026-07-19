@@ -5343,6 +5343,20 @@ referenced by command_id. Populated when the sender is an agent so the
 frontend can construct command-detail URLs. </p></td>
                 </tr>
               
+                <tr>
+                  <td>principal_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>principal_id is the decimal id of the principal that authored this message
+(the chat_message.principal_id row). For a user message it is the sending
+user&#39;s principal id (matching the {user} segment of the &#34;users/{user}&#34;
+resource name); for an agent message it is the conversation owner&#39;s
+principal id; for a system message it is the system bot&#39;s id. The frontend
+uses it to tell the current user&#39;s own messages apart from other users&#39;
+messages in shared channels (sender_name alone is a display name and can
+collide across users). </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
