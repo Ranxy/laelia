@@ -1,9 +1,17 @@
 import { ArrowUp, ChevronRight, MessageCircleReply } from "lucide-react";
 import MarkdownRender from "markstream-react";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  type RefObject,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { Avatar, formatTime } from "@/components/chat/avatar";
 import { FileCard } from "@/components/chat/file-card";
+import { LazyMarkdown } from "@/components/chat/lazy-markdown";
 import { splitByMentions } from "@/components/chat/mentions";
 import { RemoteImage } from "@/components/chat/remote-image";
 import { TaskStatusBadge } from "@/components/chat/task-status-badge";
@@ -103,6 +111,11 @@ export interface MessageRowProps {
   // absent the row falls back to treating every user message as the current
   // user's (the pre-existing behavior).
   currentPrincipalId?: string;
+  // scrollRoot is the chat list's scroll container, forwarded to LazyMarkdown so
+  // its IntersectionObserver roots against the real scroll viewport without
+  // rediscovering it per row (which would thrash layout on a 100-row mount).
+  // Optional: when omitted LazyMarkdown walks the DOM to find the container.
+  scrollRoot?: RefObject<HTMLElement | null>;
 }
 
 export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
@@ -122,6 +135,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     onPreviewImage,
     debugMode,
     currentPrincipalId,
+    scrollRoot,
   } = props;
   const { t } = useTranslation();
   const isUser = msg.role === "user";
@@ -393,11 +407,22 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
               }
               return (
                 <span key={i} className="markstream-chat break-words inline">
-                  <MarkdownRender
-                    customId={markdownCustomId}
-                    content={seg.text}
-                    final
-                    fade
+                  <LazyMarkdown
+                    eager={isStreaming}
+                    scrollRoot={scrollRoot}
+                    fallback={
+                      <span className="whitespace-pre-wrap break-words">
+                        {seg.text}
+                      </span>
+                    }
+                    render={() => (
+                      <MarkdownRender
+                        customId={markdownCustomId}
+                        content={seg.text}
+                        final
+                        fade
+                      />
+                    )}
                   />
                 </span>
               );
@@ -408,14 +433,25 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
             </div>
           ) : displayContent ? (
             <div className="markstream-chat break-words">
-              <MarkdownRender
-                customId={markdownCustomId}
-                content={displayContent}
-                final={!isStreaming}
-                smoothStreaming={isStreaming ? "auto" : false}
-                fade={!isStreaming}
-                typewriter={isStreaming}
-                maxLiveNodes={isStreaming ? 0 : undefined}
+              <LazyMarkdown
+                eager={isStreaming}
+                scrollRoot={scrollRoot}
+                fallback={
+                  <span className="whitespace-pre-wrap break-words">
+                    {displayContent}
+                  </span>
+                }
+                render={() => (
+                  <MarkdownRender
+                    customId={markdownCustomId}
+                    content={displayContent}
+                    final={!isStreaming}
+                    smoothStreaming={isStreaming ? "auto" : false}
+                    fade={!isStreaming}
+                    typewriter={isStreaming}
+                    maxLiveNodes={isStreaming ? 0 : undefined}
+                  />
+                )}
               />
             </div>
           ) : isStreaming ? (

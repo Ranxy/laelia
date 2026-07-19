@@ -799,7 +799,11 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                   EMPTY_EVENTS
                 );
                 return (
-                  <div key={msg.id} data-msg-id={msg.id}>
+                  <div
+                    key={msg.id}
+                    data-msg-id={msg.id}
+                    className="chat-row-veil"
+                  >
                     <MessageRow
                       msg={msg}
                       showAvatar={showAvatar}
@@ -816,6 +820,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                       onPreviewImage={handlePreviewImage}
                       debugMode={currentUser?.debugMode ?? false}
                       currentPrincipalId={currentUser?.name.split("/").pop()}
+                      scrollRoot={scrollRef}
                     />
                   </div>
                 );
