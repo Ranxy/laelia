@@ -10,6 +10,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { agentServiceClient, userServiceClient } from "@/connect";
+import { agentResourceName } from "@/lib/command-status";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";
 
@@ -55,7 +56,7 @@ export function MentionDetailSheet({
     setLoading(true);
     if (type === "agent") {
       agentServiceClient
-        .getAgent({ name: id })
+        .getAgent({ name: agentResourceName(id) })
         .then(setAgent)
         .catch(() => setAgent(null))
         .finally(() => setLoading(false));
