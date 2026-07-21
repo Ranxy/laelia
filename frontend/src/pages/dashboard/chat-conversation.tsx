@@ -799,11 +799,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                   EMPTY_EVENTS
                 );
                 return (
-                  <div
-                    key={msg.id}
-                    data-msg-id={msg.id}
-                    className="chat-row-veil"
-                  >
+                  <div key={msg.id} data-msg-id={msg.id}>
                     <MessageRow
                       msg={msg}
                       showAvatar={showAvatar}

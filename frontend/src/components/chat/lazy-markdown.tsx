@@ -17,8 +17,8 @@ import {
 // forces a style recalc for each row during mount and causes layout thrashing.
 //
 // We do NOT require the ancestor to be currently scrolling (scrollHeight >
-// clientHeight): at the moment a row's effect runs, the content-visibility rows
-// may not yet have their intrinsic sizes applied, so the scroller is transiently
+// clientHeight): at the moment a row's effect runs the off-screen rows may not
+// yet have their real heights applied, so the scroller can be transiently
 // non-scrolling. Requiring scroll would make us fall back to the viewport root,
 // and since the (short) scroller sits entirely within the viewport plus the
 // 600px rootMargin, EVERY row would intersect and render immediately —
@@ -69,9 +69,16 @@ export interface LazyMarkdownProps {
 // highlight + DOM build), and doing that for all of them on entry is the single
 // biggest contributor to the channel's slow first paint. Rendering a cheap
 // raw-text placeholder until the row is visible cuts that to the handful of rows
-// actually on screen. `content-visibility: auto` on the row wrapper
-// (chat-row-veil) complements this by also skipping layout/paint/style for the
-// off-screen placeholders.
+// actually on screen.
+//
+// We deliberately do NOT layer `content-visibility: auto` on top of this any
+// more. It used to skip layout/paint for the off-screen placeholders, but it
+// also excluded those rows from the browser's scroll anchoring: when a row
+// scrolled into view and swapped its 160px intrinsic placeholder for the real
+// height (and again when the markdown replaced the raw-text fallback), scroll
+// anchoring could not compensate, so the viewport snapped back down while
+// scrolling up through history. With cv:auto gone, those height changes are
+// ordinary layout shifts that scroll anchoring absorbs cleanly.
 //
 // Observer setup is deferred one animation frame so it runs AFTER the page's
 // stick-to-bottom effect has scrolled the list to the latest message. React
