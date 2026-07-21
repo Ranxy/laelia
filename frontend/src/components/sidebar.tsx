@@ -27,6 +27,7 @@ import {
   SETTINGS_ROUTE_USERS,
 } from "@/router/handles";
 import { useCurrentRoute } from "@/router/use-current-route";
+import { useHasPermission } from "@/stores/auth";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -69,6 +70,17 @@ function getItemClass(item: SidebarItem, currentRouteName: string): string {
 
 function useSidebarItems(): SidebarItem[] {
   const { t } = useTranslation();
+  // Gate each Settings sub-item on the permission its page actually needs.
+  // An ordinary workspace member (roles/workspaceMember baseline) holds none of
+  // these, so every child is hidden for them and filterSidebarList then drops
+  // the now-empty Settings group entirely — leaving no settings affordance in
+  // the sidebar for non-admins. Per-resource perms are not considered here.
+  const canViewStorage =
+    useHasPermission("laelia.settings.get") ||
+    useHasPermission("laelia.settings.update");
+  const canViewUsers = useHasPermission("laelia.users.list");
+  const canViewRoles = useHasPermission("laelia.roles.list");
+  const canViewIam = useHasPermission("laelia.iam.getPolicy");
 
   return useMemo(
     (): SidebarItem[] => [
@@ -100,26 +112,30 @@ function useSidebarItems(): SidebarItem[] {
             title: t("sidebar.settings-storage"),
             name: SETTINGS_ROUTE_STORAGE,
             type: "route",
+            hide: !canViewStorage,
           },
           {
             title: t("sidebar.settings-users"),
             name: SETTINGS_ROUTE_USERS,
             type: "route",
+            hide: !canViewUsers,
           },
           {
             title: t("sidebar.settings-roles"),
             name: SETTINGS_ROUTE_ROLES,
             type: "route",
+            hide: !canViewRoles,
           },
           {
             title: t("sidebar.settings-iam"),
             name: SETTINGS_ROUTE_IAM,
             type: "route",
+            hide: !canViewIam,
           },
         ],
       },
     ],
-    [t]
+    [t, canViewStorage, canViewUsers, canViewRoles, canViewIam]
   );
 }
 
