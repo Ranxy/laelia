@@ -363,6 +363,15 @@ export declare type User = Message<"laelia.v1.User"> & {
    * @generated from field: bool debug_mode = 18;
    */
   debugMode: boolean;
+
+  /**
+   * avatar is the resource name of the user's uploaded avatar image, or empty
+   * when the user has not uploaded one (in which case the frontend renders a
+   * deterministic pixel identicon seeded by the user id). Format: users/{user}/avatar.
+   *
+   * @generated from field: string avatar = 19;
+   */
+  avatar: string;
 };
 
 /**
@@ -398,6 +407,96 @@ export declare type UserProfile = Message<"laelia.v1.UserProfile"> & {
  * Use `create(UserProfileSchema)` to create a new message.
  */
 export declare const UserProfileSchema: GenMessage<UserProfile>;
+
+/**
+ * @generated from message laelia.v1.UploadAvatarRequest
+ */
+export declare type UploadAvatarRequest = Message<"laelia.v1.UploadAvatarRequest"> & {
+  /**
+   * The avatar image bytes (png/jpeg/webp/gif). Clients should resize before
+   * uploading; the server enforces a hard byte cap regardless.
+   *
+   * @generated from field: bytes data = 1;
+   */
+  data: Uint8Array;
+
+  /**
+   * The mime type of data, e.g. "image/png".
+   *
+   * @generated from field: string mime_type = 2;
+   */
+  mimeType: string;
+};
+
+/**
+ * Describes the message laelia.v1.UploadAvatarRequest.
+ * Use `create(UploadAvatarRequestSchema)` to create a new message.
+ */
+export declare const UploadAvatarRequestSchema: GenMessage<UploadAvatarRequest>;
+
+/**
+ * @generated from message laelia.v1.DownloadAvatarRequest
+ */
+export declare type DownloadAvatarRequest = Message<"laelia.v1.DownloadAvatarRequest"> & {
+  /**
+   * The avatar resource name. Format: users/{user}/avatar.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.DownloadAvatarRequest.
+ * Use `create(DownloadAvatarRequestSchema)` to create a new message.
+ */
+export declare const DownloadAvatarRequestSchema: GenMessage<DownloadAvatarRequest>;
+
+/**
+ * @generated from message laelia.v1.DownloadAvatarResponse
+ */
+export declare type DownloadAvatarResponse = Message<"laelia.v1.DownloadAvatarResponse"> & {
+  /**
+   * @generated from field: bytes data = 1;
+   */
+  data: Uint8Array;
+
+  /**
+   * @generated from field: string mime_type = 2;
+   */
+  mimeType: string;
+
+  /**
+   * etag is a content hash of data, usable as a cache-busting token.
+   *
+   * @generated from field: string etag = 3;
+   */
+  etag: string;
+};
+
+/**
+ * Describes the message laelia.v1.DownloadAvatarResponse.
+ * Use `create(DownloadAvatarResponseSchema)` to create a new message.
+ */
+export declare const DownloadAvatarResponseSchema: GenMessage<DownloadAvatarResponse>;
+
+/**
+ * @generated from message laelia.v1.DeleteAvatarRequest
+ */
+export declare type DeleteAvatarRequest = Message<"laelia.v1.DeleteAvatarRequest"> & {
+  /**
+   * The avatar resource name. Format: users/{user}/avatar. Must be the caller's own.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.DeleteAvatarRequest.
+ * Use `create(DeleteAvatarRequestSchema)` to create a new message.
+ */
+export declare const DeleteAvatarRequestSchema: GenMessage<DeleteAvatarRequest>;
 
 /**
  * @generated from enum laelia.v1.UserType
@@ -516,6 +615,42 @@ export declare const UserService: GenService<{
   undeleteUser: {
     methodKind: "unary";
     input: typeof UndeleteUserRequestSchema;
+    output: typeof UserSchema;
+  },
+  /**
+   * UploadAvatar replaces the current user's avatar image. Self only: the
+   * caller must be the user named by the resource. The image bytes are
+   * re-encoded/stored server-side; clients should resize before uploading.
+   * No google.api.http annotation: bytes travel over Connect-JSON like
+   * CommandService.UploadFile.
+   *
+   * @generated from rpc laelia.v1.UserService.UploadAvatar
+   */
+  uploadAvatar: {
+    methodKind: "unary";
+    input: typeof UploadAvatarRequestSchema;
+    output: typeof UserSchema;
+  },
+  /**
+   * DownloadAvatar fetches a user's avatar image bytes. Any authenticated
+   * user can download any user's avatar (workspace-internal profile image).
+   *
+   * @generated from rpc laelia.v1.UserService.DownloadAvatar
+   */
+  downloadAvatar: {
+    methodKind: "unary";
+    input: typeof DownloadAvatarRequestSchema;
+    output: typeof DownloadAvatarResponseSchema;
+  },
+  /**
+   * DeleteAvatar clears the current user's avatar, reverting to the pixel
+   * default. Self only.
+   *
+   * @generated from rpc laelia.v1.UserService.DeleteAvatar
+   */
+  deleteAvatar: {
+    methodKind: "unary";
+    input: typeof DeleteAvatarRequestSchema;
     output: typeof UserSchema;
   },
 }>;

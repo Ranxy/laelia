@@ -401,6 +401,11 @@ message ChannelMember {
   // inline in the roster so an agent can perceive who is in a channel/thread — and
   // each co-agent's persona — in a single lookup, and decide whom to address.
   string description = 6;
+  // avatar is the member's avatar resource name (users/{user}/avatar or
+  // agents/{agent}/avatar) when the member has uploaded one, empty otherwise
+  // (in which case the frontend renders a deterministic pixel identicon). Surfaced
+  // inline so the frontend can render roster avatars without a per-member lookup.
+  string avatar = 7;
 }
 
 message ListConversationMessagesRequest {

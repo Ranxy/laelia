@@ -34,6 +34,9 @@ const (
 	AgentService_AgentHeartbeat_FullMethodName        = "/laelia.v1.AgentService/AgentHeartbeat"
 	AgentService_AgentDisconnect_FullMethodName       = "/laelia.v1.AgentService/AgentDisconnect"
 	AgentService_RefreshAgentToken_FullMethodName     = "/laelia.v1.AgentService/RefreshAgentToken"
+	AgentService_UploadAgentAvatar_FullMethodName     = "/laelia.v1.AgentService/UploadAgentAvatar"
+	AgentService_DownloadAgentAvatar_FullMethodName   = "/laelia.v1.AgentService/DownloadAgentAvatar"
+	AgentService_DeleteAgentAvatar_FullMethodName     = "/laelia.v1.AgentService/DeleteAgentAvatar"
 	AgentService_Hello_FullMethodName                 = "/laelia.v1.AgentService/Hello"
 )
 
@@ -67,6 +70,16 @@ type AgentServiceClient interface {
 	AgentDisconnect(ctx context.Context, in *AgentDisconnectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Agent refreshes access token
 	RefreshAgentToken(ctx context.Context, in *RefreshAgentTokenRequest, opts ...grpc.CallOption) (*RefreshAgentTokenResponse, error)
+	// UploadAgentAvatar replaces an agent's avatar image. Requires
+	// laelia.agents.edit on the agent; the caller must be the agent's creator or a
+	// workspace admin. No google.api.http annotation: bytes travel over Connect-JSON.
+	UploadAgentAvatar(ctx context.Context, in *UploadAgentAvatarRequest, opts ...grpc.CallOption) (*Agent, error)
+	// DownloadAgentAvatar fetches an agent's avatar image bytes. Any authenticated
+	// user may download any agent's avatar (workspace-internal profile image).
+	DownloadAgentAvatar(ctx context.Context, in *DownloadAgentAvatarRequest, opts ...grpc.CallOption) (*DownloadAgentAvatarResponse, error)
+	// DeleteAgentAvatar clears an agent's avatar, reverting to the pixel default.
+	// Requires laelia.agents.edit on the agent.
+	DeleteAgentAvatar(ctx context.Context, in *DeleteAgentAvatarRequest, opts ...grpc.CallOption) (*Agent, error)
 	// Health check (no auth required)
 	Hello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error)
 }
@@ -219,6 +232,36 @@ func (c *agentServiceClient) RefreshAgentToken(ctx context.Context, in *RefreshA
 	return out, nil
 }
 
+func (c *agentServiceClient) UploadAgentAvatar(ctx context.Context, in *UploadAgentAvatarRequest, opts ...grpc.CallOption) (*Agent, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Agent)
+	err := c.cc.Invoke(ctx, AgentService_UploadAgentAvatar_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentServiceClient) DownloadAgentAvatar(ctx context.Context, in *DownloadAgentAvatarRequest, opts ...grpc.CallOption) (*DownloadAgentAvatarResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DownloadAgentAvatarResponse)
+	err := c.cc.Invoke(ctx, AgentService_DownloadAgentAvatar_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentServiceClient) DeleteAgentAvatar(ctx context.Context, in *DeleteAgentAvatarRequest, opts ...grpc.CallOption) (*Agent, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Agent)
+	err := c.cc.Invoke(ctx, AgentService_DeleteAgentAvatar_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *agentServiceClient) Hello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(HelloResponse)
@@ -259,6 +302,16 @@ type AgentServiceServer interface {
 	AgentDisconnect(context.Context, *AgentDisconnectRequest) (*emptypb.Empty, error)
 	// Agent refreshes access token
 	RefreshAgentToken(context.Context, *RefreshAgentTokenRequest) (*RefreshAgentTokenResponse, error)
+	// UploadAgentAvatar replaces an agent's avatar image. Requires
+	// laelia.agents.edit on the agent; the caller must be the agent's creator or a
+	// workspace admin. No google.api.http annotation: bytes travel over Connect-JSON.
+	UploadAgentAvatar(context.Context, *UploadAgentAvatarRequest) (*Agent, error)
+	// DownloadAgentAvatar fetches an agent's avatar image bytes. Any authenticated
+	// user may download any agent's avatar (workspace-internal profile image).
+	DownloadAgentAvatar(context.Context, *DownloadAgentAvatarRequest) (*DownloadAgentAvatarResponse, error)
+	// DeleteAgentAvatar clears an agent's avatar, reverting to the pixel default.
+	// Requires laelia.agents.edit on the agent.
+	DeleteAgentAvatar(context.Context, *DeleteAgentAvatarRequest) (*Agent, error)
 	// Health check (no auth required)
 	Hello(context.Context, *HelloRequest) (*HelloResponse, error)
 	mustEmbedUnimplementedAgentServiceServer()
@@ -312,6 +365,15 @@ func (UnimplementedAgentServiceServer) AgentDisconnect(context.Context, *AgentDi
 }
 func (UnimplementedAgentServiceServer) RefreshAgentToken(context.Context, *RefreshAgentTokenRequest) (*RefreshAgentTokenResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RefreshAgentToken not implemented")
+}
+func (UnimplementedAgentServiceServer) UploadAgentAvatar(context.Context, *UploadAgentAvatarRequest) (*Agent, error) {
+	return nil, status.Error(codes.Unimplemented, "method UploadAgentAvatar not implemented")
+}
+func (UnimplementedAgentServiceServer) DownloadAgentAvatar(context.Context, *DownloadAgentAvatarRequest) (*DownloadAgentAvatarResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DownloadAgentAvatar not implemented")
+}
+func (UnimplementedAgentServiceServer) DeleteAgentAvatar(context.Context, *DeleteAgentAvatarRequest) (*Agent, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteAgentAvatar not implemented")
 }
 func (UnimplementedAgentServiceServer) Hello(context.Context, *HelloRequest) (*HelloResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Hello not implemented")
@@ -589,6 +651,60 @@ func _AgentService_RefreshAgentToken_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AgentService_UploadAgentAvatar_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UploadAgentAvatarRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).UploadAgentAvatar(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_UploadAgentAvatar_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).UploadAgentAvatar(ctx, req.(*UploadAgentAvatarRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AgentService_DownloadAgentAvatar_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DownloadAgentAvatarRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).DownloadAgentAvatar(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_DownloadAgentAvatar_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).DownloadAgentAvatar(ctx, req.(*DownloadAgentAvatarRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AgentService_DeleteAgentAvatar_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAgentAvatarRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).DeleteAgentAvatar(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_DeleteAgentAvatar_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).DeleteAgentAvatar(ctx, req.(*DeleteAgentAvatarRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AgentService_Hello_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(HelloRequest)
 	if err := dec(in); err != nil {
@@ -669,6 +785,18 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RefreshAgentToken",
 			Handler:    _AgentService_RefreshAgentToken_Handler,
+		},
+		{
+			MethodName: "UploadAgentAvatar",
+			Handler:    _AgentService_UploadAgentAvatar_Handler,
+		},
+		{
+			MethodName: "DownloadAgentAvatar",
+			Handler:    _AgentService_DownloadAgentAvatar_Handler,
+		},
+		{
+			MethodName: "DeleteAgentAvatar",
+			Handler:    _AgentService_DeleteAgentAvatar_Handler,
 		},
 		{
 			MethodName: "Hello",

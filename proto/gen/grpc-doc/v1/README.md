@@ -39,7 +39,10 @@
     - [ConnectAgentResponse](#laelia-v1-ConnectAgentResponse)
     - [CreateAgentRequest](#laelia-v1-CreateAgentRequest)
     - [CreateAgentResponse](#laelia-v1-CreateAgentResponse)
+    - [DeleteAgentAvatarRequest](#laelia-v1-DeleteAgentAvatarRequest)
     - [DeleteAgentRequest](#laelia-v1-DeleteAgentRequest)
+    - [DownloadAgentAvatarRequest](#laelia-v1-DownloadAgentAvatarRequest)
+    - [DownloadAgentAvatarResponse](#laelia-v1-DownloadAgentAvatarResponse)
     - [ForceDisconnectAgentRequest](#laelia-v1-ForceDisconnectAgentRequest)
     - [GetAgentRequest](#laelia-v1-GetAgentRequest)
     - [HelloRequest](#laelia-v1-HelloRequest)
@@ -59,6 +62,7 @@
     - [RotateAgentTokenRequest](#laelia-v1-RotateAgentTokenRequest)
     - [RotateAgentTokenResponse](#laelia-v1-RotateAgentTokenResponse)
     - [UpdateAgentACPConfigRequest](#laelia-v1-UpdateAgentACPConfigRequest)
+    - [UploadAgentAvatarRequest](#laelia-v1-UploadAgentAvatarRequest)
   
     - [AgentStatus.ConnectionState](#laelia-v1-AgentStatus-ConnectionState)
   
@@ -68,12 +72,16 @@
     - [BatchGetUsersRequest](#laelia-v1-BatchGetUsersRequest)
     - [BatchGetUsersResponse](#laelia-v1-BatchGetUsersResponse)
     - [CreateUserRequest](#laelia-v1-CreateUserRequest)
+    - [DeleteAvatarRequest](#laelia-v1-DeleteAvatarRequest)
     - [DeleteUserRequest](#laelia-v1-DeleteUserRequest)
+    - [DownloadAvatarRequest](#laelia-v1-DownloadAvatarRequest)
+    - [DownloadAvatarResponse](#laelia-v1-DownloadAvatarResponse)
     - [GetUserRequest](#laelia-v1-GetUserRequest)
     - [ListUsersRequest](#laelia-v1-ListUsersRequest)
     - [ListUsersResponse](#laelia-v1-ListUsersResponse)
     - [UndeleteUserRequest](#laelia-v1-UndeleteUserRequest)
     - [UpdateUserRequest](#laelia-v1-UpdateUserRequest)
+    - [UploadAvatarRequest](#laelia-v1-UploadAvatarRequest)
     - [User](#laelia-v1-User)
     - [UserProfile](#laelia-v1-UserProfile)
   
@@ -424,6 +432,7 @@ RiskLevel is the risk level.
 | token_version | [int32](#int32) |  |  |
 | created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}); empty for legacy agents with no recorded creator. Only the creator or a workspace admin may modify the agent. |
 | can_edit | [bool](#bool) |  | can_edit reports whether the current caller may modify this agent (laelia.agents.edit): true for the creator (via the agentEditor IAM binding) and for workspace admins (via the all-permissions union), false otherwise. Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths. |
+| avatar | [string](#string) |  | avatar is the resource name of the agent&#39;s uploaded avatar image, or empty when the agent has not uploaded one (frontend renders a deterministic pixel identicon seeded by the agent id). Format: agents/{agent}/avatar. |
 
 
 
@@ -802,6 +811,21 @@ view does not gate affordances on it (delete is enforced server-side).
 
 
 
+<a name="laelia-v1-DeleteAgentAvatarRequest"></a>
+
+### DeleteAgentAvatarRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-DeleteAgentRequest"></a>
 
 ### DeleteAgentRequest
@@ -811,6 +835,38 @@ view does not gate affordances on it (delete is enforced server-side).
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-DownloadAgentAvatarRequest"></a>
+
+### DownloadAgentAvatarRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-DownloadAgentAvatarResponse"></a>
+
+### DownloadAgentAvatarResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| data | [bytes](#bytes) |  |  |
+| mime_type | [string](#string) |  |  |
+| etag | [string](#string) |  |  |
 
 
 
@@ -1111,6 +1167,23 @@ view does not gate affordances on it (delete is enforced server-side).
 
 
 
+
+<a name="laelia-v1-UploadAgentAvatarRequest"></a>
+
+### UploadAgentAvatarRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| data | [bytes](#bytes) |  |  |
+| mime_type | [string](#string) |  |  |
+
+
+
+
+
  
 
 
@@ -1154,6 +1227,9 @@ view does not gate affordances on it (delete is enforced server-side).
 | AgentHeartbeat | [AgentHeartbeatRequest](#laelia-v1-AgentHeartbeatRequest) | [AgentHeartbeatResponse](#laelia-v1-AgentHeartbeatResponse) | Agent heartbeat |
 | AgentDisconnect | [AgentDisconnectRequest](#laelia-v1-AgentDisconnectRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Agent graceful disconnect |
 | RefreshAgentToken | [RefreshAgentTokenRequest](#laelia-v1-RefreshAgentTokenRequest) | [RefreshAgentTokenResponse](#laelia-v1-RefreshAgentTokenResponse) | Agent refreshes access token |
+| UploadAgentAvatar | [UploadAgentAvatarRequest](#laelia-v1-UploadAgentAvatarRequest) | [Agent](#laelia-v1-Agent) | UploadAgentAvatar replaces an agent&#39;s avatar image. Requires laelia.agents.edit on the agent; the caller must be the agent&#39;s creator or a workspace admin. No google.api.http annotation: bytes travel over Connect-JSON. |
+| DownloadAgentAvatar | [DownloadAgentAvatarRequest](#laelia-v1-DownloadAgentAvatarRequest) | [DownloadAgentAvatarResponse](#laelia-v1-DownloadAgentAvatarResponse) | DownloadAgentAvatar fetches an agent&#39;s avatar image bytes. Any authenticated user may download any agent&#39;s avatar (workspace-internal profile image). |
+| DeleteAgentAvatar | [DeleteAgentAvatarRequest](#laelia-v1-DeleteAgentAvatarRequest) | [Agent](#laelia-v1-Agent) | DeleteAgentAvatar clears an agent&#39;s avatar, reverting to the pixel default. Requires laelia.agents.edit on the agent. |
 | Hello | [HelloRequest](#laelia-v1-HelloRequest) | [HelloResponse](#laelia-v1-HelloResponse) | Health check (no auth required) |
 
  
@@ -1212,6 +1288,21 @@ view does not gate affordances on it (delete is enforced server-side).
 
 
 
+<a name="laelia-v1-DeleteAvatarRequest"></a>
+
+### DeleteAvatarRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The avatar resource name. Format: users/{user}/avatar. Must be the caller&#39;s own. |
+
+
+
+
+
+
 <a name="laelia-v1-DeleteUserRequest"></a>
 
 ### DeleteUserRequest
@@ -1221,6 +1312,38 @@ view does not gate affordances on it (delete is enforced server-side).
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The name of the user to delete. Format: users/{user} |
+
+
+
+
+
+
+<a name="laelia-v1-DownloadAvatarRequest"></a>
+
+### DownloadAvatarRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The avatar resource name. Format: users/{user}/avatar. |
+
+
+
+
+
+
+<a name="laelia-v1-DownloadAvatarResponse"></a>
+
+### DownloadAvatarResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| data | [bytes](#bytes) |  |  |
+| mime_type | [string](#string) |  |  |
+| etag | [string](#string) |  | etag is a content hash of data, usable as a cache-busting token. |
 
 
 
@@ -1316,6 +1439,22 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 
 
 
+<a name="laelia-v1-UploadAvatarRequest"></a>
+
+### UploadAvatarRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| data | [bytes](#bytes) |  | The avatar image bytes (png/jpeg/webp/gif). Clients should resize before uploading; the server enforces a hard byte cap regardless. |
+| mime_type | [string](#string) |  | The mime type of data, e.g. &#34;image/png&#34;. |
+
+
+
+
+
+
 <a name="laelia-v1-User"></a>
 
 ### User
@@ -1339,6 +1478,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | description | [string](#string) |  | description is a short, user-authored self-description surfaced to agents and other users so they know who this user is and what they focus on, e.g. &#34;Backend engineer, focused on agent building&#34; or &#34;UI/UX expert, reviews come to me&#34;. Editable via UpdateUser with update_mask &#34;description&#34;. |
 | permissions | [string](#string) | repeated | permissions is the caller&#39;s effective workspace-scope permission set (roles/workspaceMember baseline ∪ the permissions of every workspace role the user holds), populated only by GetCurrentUser. The frontend gates workspace actions on this (e.g. laelia.users.update). Per-resource permissions (conversations.read/send/manage, agents.edit) are resolved per resource and surfaced on the resource, not here. |
 | debug_mode | [bool](#bool) |  | debug_mode is true when RuntimeDebug is enabled for the workspace. Populated only by GetCurrentUser so the frontend can gate debug-only UI without calling the admin-gated SettingService.GetDebugConfig. |
+| avatar | [string](#string) |  | avatar is the resource name of the user&#39;s uploaded avatar image, or empty when the user has not uploaded one (in which case the frontend renders a deterministic pixel identicon seeded by the user id). Format: users/{user}/avatar. |
 
 
 
@@ -1397,6 +1537,9 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | UpdateUser | [UpdateUserRequest](#laelia-v1-UpdateUserRequest) | [User](#laelia-v1-User) | Only the user itself and the user with permission on the workspace can update the user. |
 | DeleteUser | [DeleteUserRequest](#laelia-v1-DeleteUserRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Only the user with permission on the workspace can delete the user. The last remaining workspace admin cannot be deleted. |
 | UndeleteUser | [UndeleteUserRequest](#laelia-v1-UndeleteUserRequest) | [User](#laelia-v1-User) | Only the user with permission on the workspace can undelete the user. |
+| UploadAvatar | [UploadAvatarRequest](#laelia-v1-UploadAvatarRequest) | [User](#laelia-v1-User) | UploadAvatar replaces the current user&#39;s avatar image. Self only: the caller must be the user named by the resource. The image bytes are re-encoded/stored server-side; clients should resize before uploading. No google.api.http annotation: bytes travel over Connect-JSON like CommandService.UploadFile. |
+| DownloadAvatar | [DownloadAvatarRequest](#laelia-v1-DownloadAvatarRequest) | [DownloadAvatarResponse](#laelia-v1-DownloadAvatarResponse) | DownloadAvatar fetches a user&#39;s avatar image bytes. Any authenticated user can download any user&#39;s avatar (workspace-internal profile image). |
+| DeleteAvatar | [DeleteAvatarRequest](#laelia-v1-DeleteAvatarRequest) | [User](#laelia-v1-User) | DeleteAvatar clears the current user&#39;s avatar, reverting to the pixel default. Self only. |
 
  
 
@@ -1787,6 +1930,7 @@ the agent uses to anchor its execution events and link any posted replies.
 | member_role | [int32](#int32) |  |  |
 | joined_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | description | [string](#string) |  | description is the member&#39;s self-description: for users it is User.description, for agents it is the agent&#39;s full persona_prompt (from AgentACPConfig). Surfaced inline in the roster so an agent can perceive who is in a channel/thread — and each co-agent&#39;s persona — in a single lookup, and decide whom to address. |
+| avatar | [string](#string) |  | avatar is the member&#39;s avatar resource name (users/{user}/avatar or agents/{agent}/avatar) when the member has uploaded one, empty otherwise (in which case the frontend renders a deterministic pixel identicon). Surfaced inline so the frontend can render roster avatars without a per-member lookup. |
 
 
 

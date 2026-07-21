@@ -75,7 +75,16 @@
       "field-description-placeholder": "e.g. Backend engineer, focused on building agents",
       "field-description-hint": "Shown to agents alongside your name in channel and thread rosters.",
       "saved": "Profile saved",
-      "save-failed": "Failed to save profile"
+      "save-failed": "Failed to save profile",
+      "avatar": "Avatar",
+      "avatar-hint": "Shown next to your messages in channels and threads. Images are resized to 256×256; max 2 MB.",
+      "avatar-upload": "Upload",
+      "avatar-remove": "Remove",
+      "avatar-uploading": "Uploading…",
+      "avatar-uploaded": "Avatar updated",
+      "avatar-upload-failed": "Failed to update avatar",
+      "avatar-removed": "Avatar removed",
+      "avatar-remove-failed": "Failed to remove avatar"
     },
     "s3": {
       "title": "Storage",
@@ -279,7 +288,16 @@
       "section-identity": "Identity & Status",
       "section-token": "Bootstrap Token",
       "get-connection-command": "Get connection command",
-      "edit-not-allowed": "Only the agent's creator or a workspace admin can edit this agent."
+      "edit-not-allowed": "Only the agent's creator or a workspace admin can edit this agent.",
+      "avatar": "Avatar",
+      "avatar-hint": "Shown next to the agent's messages in channels and threads. Images are resized to 256×256; max 2 MB.",
+      "avatar-upload": "Upload",
+      "avatar-remove": "Remove",
+      "avatar-uploading": "Uploading…",
+      "avatar-uploaded": "Agent avatar updated",
+      "avatar-upload-failed": "Failed to update agent avatar",
+      "avatar-removed": "Agent avatar removed",
+      "avatar-remove-failed": "Failed to remove agent avatar"
     },
     "lifecycle": {
       "ready": "Ready",

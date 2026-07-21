@@ -75,7 +75,16 @@
       "field-description-placeholder": "例如:后端工程师,专注于构建 agent",
       "field-description-hint": "会与你的名字一起显示在频道和会话的花名册中,供 agent 查看。",
       "saved": "个人资料已保存",
-      "save-failed": "保存个人资料失败"
+      "save-failed": "保存个人资料失败",
+      "avatar": "头像",
+      "avatar-hint": "会显示在频道和会话中你的消息旁边。图片会被缩放为 256×256,最大 2 MB。",
+      "avatar-upload": "上传",
+      "avatar-remove": "移除",
+      "avatar-uploading": "上传中…",
+      "avatar-uploaded": "头像已更新",
+      "avatar-upload-failed": "更新头像失败",
+      "avatar-removed": "头像已移除",
+      "avatar-remove-failed": "移除头像失败"
     },
     "s3": {
       "title": "存储配置",
@@ -279,7 +288,16 @@
       "section-identity": "身份与状态",
       "section-token": "Bootstrap 令牌",
       "get-connection-command": "获取连接命令",
-      "edit-not-allowed": "只有该 agent 的创建者或工作区管理员可以修改此 agent。"
+      "edit-not-allowed": "只有该 agent 的创建者或工作区管理员可以修改此 agent。",
+      "avatar": "头像",
+      "avatar-hint": "会显示在频道和会话中该 agent 的消息旁边。图片会被缩放为 256×256,最大 2 MB。",
+      "avatar-upload": "上传",
+      "avatar-remove": "移除",
+      "avatar-uploading": "上传中…",
+      "avatar-uploaded": "Agent 头像已更新",
+      "avatar-upload-failed": "更新 Agent 头像失败",
+      "avatar-removed": "Agent 头像已移除",
+      "avatar-remove-failed": "移除 Agent 头像失败"
     },
     "lifecycle": {
       "ready": "就绪",

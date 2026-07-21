@@ -305,11 +305,13 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 	}
 
 	displayName := resolveMemberDisplayName(ctx, s.store, memberType, memberID)
+	_, avatar := resolveMemberDescriptionAndAvatar(ctx, s.store, memberType, memberID)
 	return connect.NewResponse(&v1pb.ChannelMember{
 		MemberType:  memberType,
 		MemberId:    memberID,
 		DisplayName: displayName,
 		MemberRole:  store.MemberRoleMember,
+		Avatar:      avatar,
 		JoinedAt:    timestamppb.Now(),
 	}), nil
 }
@@ -979,42 +981,57 @@ func resolveMemberDisplayName(ctx context.Context, s *store.Store, memberType in
 	return memberID
 }
 
-// resolveMemberDescription returns a member's self-description: for users, the
-// user-authored User.description; for agents, the admin-authored persona_prompt
-// from AgentACPConfig. Surfaced in channel/thread rosters so an agent can perceive
-// who a member is and decide whom to address. Empty when unavailable.
-func resolveMemberDescription(ctx context.Context, s *store.Store, memberType int32, memberID string) string {
+// resolveMemberDescriptionAndAvatar returns a member's self-description and
+// avatar resource name from a single user/agent lookup. For users the
+// description is User.description and the avatar is users/{id}/avatar when the
+// user has uploaded one (empty otherwise); for agents the description is the
+// admin-authored persona_prompt and the avatar is agents/{agent}/avatar when
+// the agent has uploaded one (empty otherwise, frontend renders a pixel
+// identicon). Surfaced in channel/thread rosters so an agent can perceive who
+// a member is and the frontend can render avatars without a per-user lookup.
+// Both empty when unavailable.
+func resolveMemberDescriptionAndAvatar(ctx context.Context, s *store.Store, memberType int32, memberID string) (string, string) {
 	if memberType == store.MemberTypeUser {
 		uid, err := strconv.Atoi(memberID)
 		if err != nil {
-			return ""
+			return "", ""
 		}
 		u, err := s.GetUserByID(ctx, uid)
 		if err != nil || u == nil {
-			return ""
+			return "", ""
 		}
-		return u.Description
+		avatar := ""
+		if u.AvatarS3Key != "" {
+			avatar = common.FormatUserAvatar(u.ID)
+		}
+		return u.Description, avatar
 	}
 	if memberType == store.MemberTypeAgent {
 		agent, err := s.GetAgentByResourceID(ctx, memberID)
 		if err != nil || agent == nil {
-			return ""
+			return "", ""
 		}
-		return agent.Info.GetAcpConfig().GetPersonaPrompt()
+		avatar := ""
+		if agent.AvatarS3Key != "" {
+			avatar = common.FormatAgentAvatar(agent.ResourceID)
+		}
+		return agent.Info.GetAcpConfig().GetPersonaPrompt(), avatar
 	}
-	return ""
+	return "", ""
 }
 
 // buildChannelMember assembles a v1 ChannelMember from a membership row, resolving
 // the display name and self-description. Shared by ListChannelMembers and
 // ListThreadParticipants so both rosters render identity consistently.
 func buildChannelMember(ctx context.Context, s *store.Store, memberType int32, memberID string, role int32, joinedAt time.Time) *v1pb.ChannelMember {
+	description, avatar := resolveMemberDescriptionAndAvatar(ctx, s, memberType, memberID)
 	m := &v1pb.ChannelMember{
 		MemberType:  memberType,
 		MemberId:    memberID,
 		DisplayName: resolveMemberDisplayName(ctx, s, memberType, memberID),
 		MemberRole:  role,
-		Description: resolveMemberDescription(ctx, s, memberType, memberID),
+		Description: description,
+		Avatar:      avatar,
 	}
 	if !joinedAt.IsZero() {
 		m.JoinedAt = timestamppb.New(joinedAt)

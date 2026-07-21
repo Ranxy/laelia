@@ -29,6 +29,7 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
+	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -54,11 +55,12 @@ type AgentService struct {
 	stateCfg       *state.State
 	dispatcher     *dispatcher.Dispatcher
 	iam            *iam.Manager
+	s3client       *s3client.Client
 	consumedTimers map[int]*time.Timer
 	consumedMu     sync.Mutex
 }
 
-func NewAgentService(store *store.Store, secret string, profile *config.Profile, stateCfg *state.State, d *dispatcher.Dispatcher, iamManager *iam.Manager) *AgentService {
+func NewAgentService(store *store.Store, secret string, profile *config.Profile, stateCfg *state.State, d *dispatcher.Dispatcher, iamManager *iam.Manager, s3clientManager *s3client.Client) *AgentService {
 	return &AgentService{
 		store:          store,
 		secret:         secret,
@@ -66,6 +68,7 @@ func NewAgentService(store *store.Store, secret string, profile *config.Profile,
 		stateCfg:       stateCfg,
 		dispatcher:     d,
 		iam:            iamManager,
+		s3client:       s3clientManager,
 		consumedTimers: make(map[int]*time.Timer),
 	}
 }
@@ -924,6 +927,9 @@ func convertToAgent(agent *store.AgentMessage) *v1pb.Agent {
 	if agent.CreatedBy != 0 {
 		// Creator's user resource name (users/{id}); empty for legacy agents.
 		result.CreatedBy = common.FormatUserUID(agent.CreatedBy)
+	}
+	if agent.AvatarS3Key != "" {
+		result.Avatar = common.FormatAgentAvatar(agent.ResourceID)
 	}
 	return result
 }

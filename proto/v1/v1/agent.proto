@@ -151,6 +151,27 @@ service AgentService {
     option (laelia.v1.audit) = true;
   }
 
+  // UploadAgentAvatar replaces an agent's avatar image. Requires
+  // laelia.agents.edit on the agent; the caller must be the agent's creator or a
+  // workspace admin. No google.api.http annotation: bytes travel over Connect-JSON.
+  rpc UploadAgentAvatar(UploadAgentAvatarRequest) returns (Agent) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agents.edit";
+    option (laelia.v1.audit) = true;
+  }
+
+  // DownloadAgentAvatar fetches an agent's avatar image bytes. Any authenticated
+  // user may download any agent's avatar (workspace-internal profile image).
+  rpc DownloadAgentAvatar(DownloadAgentAvatarRequest) returns (DownloadAgentAvatarResponse);
+
+  // DeleteAgentAvatar clears an agent's avatar, reverting to the pixel default.
+  // Requires laelia.agents.edit on the agent.
+  rpc DeleteAgentAvatar(DeleteAgentAvatarRequest) returns (Agent) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agents.edit";
+    option (laelia.v1.audit) = true;
+  }
+
   // Health check (no auth required)
   rpc Hello(HelloRequest) returns (HelloResponse) {
     option (google.api.http) = {
@@ -351,6 +372,37 @@ message RefreshAgentProvidersResponse {
   repeated AgentProviderInfo providers = 1;
 }
 
+// --- Avatar ---
+
+message UploadAgentAvatarRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Agent"
+  ];
+  bytes data = 2 [(google.api.field_behavior) = REQUIRED];
+  string mime_type = 3;
+}
+
+message DownloadAgentAvatarRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Agent"
+  ];
+}
+
+message DownloadAgentAvatarResponse {
+  bytes data = 1;
+  string mime_type = 2;
+  string etag = 3;
+}
+
+message DeleteAgentAvatarRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Agent"
+  ];
+}
+
 // --- Hello ---
 
 message HelloRequest {}
@@ -390,6 +442,11 @@ message Agent {
   // and for workspace admins (via the all-permissions union), false otherwise.
   // Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths.
   bool can_edit = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // avatar is the resource name of the agent's uploaded avatar image, or empty
+  // when the agent has not uploaded one (frontend renders a deterministic pixel
+  // identicon seeded by the agent id). Format: agents/{agent}/avatar.
+  string avatar = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // AgentSummary is the lightweight list-view projection of an Agent returned by

@@ -30,6 +30,9 @@ type AgentMessage struct {
 	// unknown/legacy). Used to gate agent profile mutations to the creator or a
 	// workspace admin. Immutable after creation.
 	CreatedBy int
+	// AvatarS3Key is the S3 object key of the agent's uploaded avatar image,
+	// empty when the agent has not uploaded one.
+	AvatarS3Key string
 }
 
 // GetResourceID returns the agent's resource name, used to key context-derived
@@ -54,6 +57,7 @@ type UpdateAgentMessage struct {
 	TokenVersion       *int
 	LastTokenRotatedAt *time.Time
 	Delete             *bool
+	AvatarS3Key        *string
 }
 
 func (s *Store) GetAgent(ctx context.Context, id int) (*AgentMessage, error) {
@@ -150,7 +154,8 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 		agent.info,
 		agent.status,
 		agent.last_token_rotated_at,
-		agent.created_by
+		agent.created_by,
+		agent.avatar_s3_key
 	FROM agent
 	WHERE ` + strings.Join(where, " AND ") + ` ORDER BY agent.created_at ASC`
 
@@ -183,6 +188,7 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 			&statusBytes,
 			&lastTokenRotatedAt,
 			&agentMessage.CreatedBy,
+			&agentMessage.AvatarS3Key,
 		); err != nil {
 			return nil, err
 		}
@@ -303,6 +309,9 @@ func (s *Store) UpdateAgent(ctx context.Context, current *AgentMessage, patch *U
 	}
 	if v := patch.Delete; v != nil {
 		sets, args = append(sets, fmt.Sprintf("deleted = $%d", len(args)+1)), append(args, *v)
+	}
+	if v := patch.AvatarS3Key; v != nil {
+		sets, args = append(sets, fmt.Sprintf("avatar_s3_key = $%d", len(args)+1)), append(args, *v)
 	}
 
 	if len(sets) == 0 {

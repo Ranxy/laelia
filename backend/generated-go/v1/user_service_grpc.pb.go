@@ -28,6 +28,9 @@ const (
 	UserService_UpdateUser_FullMethodName     = "/laelia.v1.UserService/UpdateUser"
 	UserService_DeleteUser_FullMethodName     = "/laelia.v1.UserService/DeleteUser"
 	UserService_UndeleteUser_FullMethodName   = "/laelia.v1.UserService/UndeleteUser"
+	UserService_UploadAvatar_FullMethodName   = "/laelia.v1.UserService/UploadAvatar"
+	UserService_DownloadAvatar_FullMethodName = "/laelia.v1.UserService/DownloadAvatar"
+	UserService_DeleteAvatar_FullMethodName   = "/laelia.v1.UserService/DeleteAvatar"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -55,6 +58,18 @@ type UserServiceClient interface {
 	DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Only the user with permission on the workspace can undelete the user.
 	UndeleteUser(ctx context.Context, in *UndeleteUserRequest, opts ...grpc.CallOption) (*User, error)
+	// UploadAvatar replaces the current user's avatar image. Self only: the
+	// caller must be the user named by the resource. The image bytes are
+	// re-encoded/stored server-side; clients should resize before uploading.
+	// No google.api.http annotation: bytes travel over Connect-JSON like
+	// CommandService.UploadFile.
+	UploadAvatar(ctx context.Context, in *UploadAvatarRequest, opts ...grpc.CallOption) (*User, error)
+	// DownloadAvatar fetches a user's avatar image bytes. Any authenticated
+	// user can download any user's avatar (workspace-internal profile image).
+	DownloadAvatar(ctx context.Context, in *DownloadAvatarRequest, opts ...grpc.CallOption) (*DownloadAvatarResponse, error)
+	// DeleteAvatar clears the current user's avatar, reverting to the pixel
+	// default. Self only.
+	DeleteAvatar(ctx context.Context, in *DeleteAvatarRequest, opts ...grpc.CallOption) (*User, error)
 }
 
 type userServiceClient struct {
@@ -145,6 +160,36 @@ func (c *userServiceClient) UndeleteUser(ctx context.Context, in *UndeleteUserRe
 	return out, nil
 }
 
+func (c *userServiceClient) UploadAvatar(ctx context.Context, in *UploadAvatarRequest, opts ...grpc.CallOption) (*User, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(User)
+	err := c.cc.Invoke(ctx, UserService_UploadAvatar_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) DownloadAvatar(ctx context.Context, in *DownloadAvatarRequest, opts ...grpc.CallOption) (*DownloadAvatarResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DownloadAvatarResponse)
+	err := c.cc.Invoke(ctx, UserService_DownloadAvatar_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) DeleteAvatar(ctx context.Context, in *DeleteAvatarRequest, opts ...grpc.CallOption) (*User, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(User)
+	err := c.cc.Invoke(ctx, UserService_DeleteAvatar_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility.
@@ -170,6 +215,18 @@ type UserServiceServer interface {
 	DeleteUser(context.Context, *DeleteUserRequest) (*emptypb.Empty, error)
 	// Only the user with permission on the workspace can undelete the user.
 	UndeleteUser(context.Context, *UndeleteUserRequest) (*User, error)
+	// UploadAvatar replaces the current user's avatar image. Self only: the
+	// caller must be the user named by the resource. The image bytes are
+	// re-encoded/stored server-side; clients should resize before uploading.
+	// No google.api.http annotation: bytes travel over Connect-JSON like
+	// CommandService.UploadFile.
+	UploadAvatar(context.Context, *UploadAvatarRequest) (*User, error)
+	// DownloadAvatar fetches a user's avatar image bytes. Any authenticated
+	// user can download any user's avatar (workspace-internal profile image).
+	DownloadAvatar(context.Context, *DownloadAvatarRequest) (*DownloadAvatarResponse, error)
+	// DeleteAvatar clears the current user's avatar, reverting to the pixel
+	// default. Self only.
+	DeleteAvatar(context.Context, *DeleteAvatarRequest) (*User, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -203,6 +260,15 @@ func (UnimplementedUserServiceServer) DeleteUser(context.Context, *DeleteUserReq
 }
 func (UnimplementedUserServiceServer) UndeleteUser(context.Context, *UndeleteUserRequest) (*User, error) {
 	return nil, status.Error(codes.Unimplemented, "method UndeleteUser not implemented")
+}
+func (UnimplementedUserServiceServer) UploadAvatar(context.Context, *UploadAvatarRequest) (*User, error) {
+	return nil, status.Error(codes.Unimplemented, "method UploadAvatar not implemented")
+}
+func (UnimplementedUserServiceServer) DownloadAvatar(context.Context, *DownloadAvatarRequest) (*DownloadAvatarResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DownloadAvatar not implemented")
+}
+func (UnimplementedUserServiceServer) DeleteAvatar(context.Context, *DeleteAvatarRequest) (*User, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteAvatar not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 func (UnimplementedUserServiceServer) testEmbeddedByValue()                     {}
@@ -369,6 +435,60 @@ func _UserService_UndeleteUser_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_UploadAvatar_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UploadAvatarRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).UploadAvatar(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_UploadAvatar_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).UploadAvatar(ctx, req.(*UploadAvatarRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_DownloadAvatar_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DownloadAvatarRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).DownloadAvatar(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_DownloadAvatar_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).DownloadAvatar(ctx, req.(*DownloadAvatarRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_DeleteAvatar_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAvatarRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).DeleteAvatar(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_DeleteAvatar_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).DeleteAvatar(ctx, req.(*DeleteAvatarRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -407,6 +527,18 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UndeleteUser",
 			Handler:    _UserService_UndeleteUser_Handler,
+		},
+		{
+			MethodName: "UploadAvatar",
+			Handler:    _UserService_UploadAvatar_Handler,
+		},
+		{
+			MethodName: "DownloadAvatar",
+			Handler:    _UserService_DownloadAvatar_Handler,
+		},
+		{
+			MethodName: "DeleteAvatar",
+			Handler:    _UserService_DeleteAvatar_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -2876,7 +2876,12 @@ type ChannelMember struct {
 	// for agents it is the agent's full persona_prompt (from AgentACPConfig). Surfaced
 	// inline in the roster so an agent can perceive who is in a channel/thread — and
 	// each co-agent's persona — in a single lookup, and decide whom to address.
-	Description   string `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	Description string `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	// avatar is the member's avatar resource name (users/{user}/avatar or
+	// agents/{agent}/avatar) when the member has uploaded one, empty otherwise
+	// (in which case the frontend renders a deterministic pixel identicon). Surfaced
+	// inline so the frontend can render roster avatars without a per-member lookup.
+	Avatar        string `protobuf:"bytes,7,opt,name=avatar,proto3" json:"avatar,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2949,6 +2954,13 @@ func (x *ChannelMember) GetJoinedAt() *timestamppb.Timestamp {
 func (x *ChannelMember) GetDescription() string {
 	if x != nil {
 		return x.Description
+	}
+	return ""
+}
+
+func (x *ChannelMember) GetAvatar() string {
+	if x != nil {
+		return x.Avatar
 	}
 	return ""
 }
@@ -9656,7 +9668,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12!\n" +
 	"\funread_count\x18\t \x01(\x05R\vunreadCount\x12\x18\n" +
 	"\aaddress\x18\v \x01(\tR\aaddress:S\xeaAP\n" +
-	"\x13laelia/Conversation\x12\x1cconversations/{conversation}*\rconversations2\fconversation\"\xec\x01\n" +
+	"\x13laelia/Conversation\x12\x1cconversations/{conversation}*\rconversations2\fconversation\"\x84\x02\n" +
 	"\rChannelMember\x12\x1f\n" +
 	"\vmember_type\x18\x01 \x01(\x05R\n" +
 	"memberType\x12\x1b\n" +
@@ -9665,7 +9677,8 @@ const file_v1_command_proto_rawDesc = "" +
 	"\vmember_role\x18\x04 \x01(\x05R\n" +
 	"memberRole\x127\n" +
 	"\tjoined_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bjoinedAt\x12 \n" +
-	"\vdescription\x18\x06 \x01(\tR\vdescription\"\xd2\x01\n" +
+	"\vdescription\x18\x06 \x01(\tR\vdescription\x12\x16\n" +
+	"\x06avatar\x18\a \x01(\tR\x06avatar\"\xd2\x01\n" +
 	"\x1fListConversationMessagesRequest\x12'\n" +
 	"\fconversation\x18\x01 \x01(\tB\x03\xe0A\x02R\fconversation\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x1d\n" +

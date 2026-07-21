@@ -6,6 +6,11 @@ import { Avatar, formatTime } from "@/components/chat/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  avatarNameForAgentId,
+  avatarNameForUserId,
+  useAvatar,
+} from "@/lib/avatar-cache";
+import {
   anchorForSelection,
   type CommentAnchor,
   type OutlineItem,
@@ -224,17 +229,23 @@ function CommentRow({
   if (!att) return null;
   const isUser = msg.role === "user";
   const isOwnUser = isOwnUserMessage(msg, currentPrincipalId);
+  const avatarSeed = isUser
+    ? msg.principalId || currentPrincipalId || ""
+    : msg.agentId || msg.senderName || "agent";
+  const avatarName = isUser
+    ? msg.principalId || currentPrincipalId
+      ? avatarNameForUserId(msg.principalId || currentPrincipalId || "")
+      : undefined
+    : msg.agentId
+      ? avatarNameForAgentId(msg.agentId)
+      : undefined;
+  const avatarSrc = useAvatar(avatarName);
   return (
     <li className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5">
         <Avatar
-          label={
-            isUser
-              ? isOwnUser
-                ? "U"
-                : (msg.senderName ?? "U")
-              : (msg.senderName ?? "A")
-          }
+          seed={avatarSeed}
+          src={avatarSrc}
           accent={isUser ? isOwnUser : false}
         />
         <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-main">

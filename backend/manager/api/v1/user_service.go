@@ -24,6 +24,7 @@ import (
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
+	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -37,15 +38,17 @@ type UserService struct {
 	profile  *config.Profile
 	stateCfg *state.State
 	iam      *iam.Manager
+	s3client *s3client.Client
 }
 
 // NewUserService creates a new UserService.
-func NewUserService(store *store.Store, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager) *UserService {
+func NewUserService(store *store.Store, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager, s3clientManager *s3client.Client) *UserService {
 	return &UserService{
 		store:    store,
 		profile:  profile,
 		stateCfg: stateCfg,
 		iam:      iamManager,
+		s3client: s3clientManager,
 	}
 }
 
@@ -719,6 +722,9 @@ func convertToUser(user *store.UserMessage) *v1pb.User {
 			LastChangePasswordTime: user.Profile.LastChangePasswordTime,
 			Source:                 user.Profile.Source,
 		},
+	}
+	if user.AvatarS3Key != "" {
+		convertedUser.Avatar = common.FormatUserAvatar(user.ID)
 	}
 
 	for _, group := range user.Groups {

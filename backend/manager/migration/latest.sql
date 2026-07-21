@@ -30,12 +30,18 @@ CREATE TABLE principal (
     profile jsonb NOT NULL DEFAULT '{}',
     -- Short, user-authored self-description surfaced to agents/users in channel
     -- and thread rosters so an agent can perceive who a user is and what they focus on.
-    description text NOT NULL DEFAULT ''
+    description text NOT NULL DEFAULT '',
+    -- S3 object key of the user's uploaded avatar image, empty when the user has
+    -- not uploaded one (frontend renders a deterministic pixel identicon instead).
+    avatar_s3_key text NOT NULL DEFAULT ''
 );
 
 -- Idempotent ALTER so existing databases pick up the description column when the
 -- schema is re-applied (fresh installs already get it from CREATE TABLE above).
 ALTER TABLE principal ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';
+
+-- Idempotent ALTER for the avatar_s3_key column (see comment above).
+ALTER TABLE principal ADD COLUMN IF NOT EXISTS avatar_s3_key text NOT NULL DEFAULT '';
 
 -- Setting
 CREATE TABLE setting (
@@ -138,10 +144,17 @@ CREATE TABLE agent (
     status jsonb NOT NULL DEFAULT '{}',
     -- Principal id of the user who created the agent (0 = unknown/legacy).
     -- Only the creator or a workspace admin may modify the agent.
-    created_by int NOT NULL DEFAULT 0
+    created_by int NOT NULL DEFAULT 0,
+    -- S3 object key of the agent's uploaded avatar image, empty when the agent
+    -- has not uploaded one (frontend renders a deterministic pixel identicon instead).
+    avatar_s3_key text NOT NULL DEFAULT ''
 );
 
 CREATE UNIQUE INDEX idx_agent_unique_resource_id ON agent(resource_id);
+
+-- Idempotent ALTER for the agent avatar_s3_key column (fresh installs already get
+-- it from CREATE TABLE above).
+ALTER TABLE agent ADD COLUMN IF NOT EXISTS avatar_s3_key text NOT NULL DEFAULT '';
 
 ALTER SEQUENCE agent_id_seq RESTART WITH 101;
 

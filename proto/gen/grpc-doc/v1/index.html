@@ -317,7 +317,19 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.DeleteAgentAvatarRequest"><span class="badge">M</span>DeleteAgentAvatarRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.DeleteAgentRequest"><span class="badge">M</span>DeleteAgentRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DownloadAgentAvatarRequest"><span class="badge">M</span>DownloadAgentAvatarRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DownloadAgentAvatarResponse"><span class="badge">M</span>DownloadAgentAvatarResponse</a>
                 </li>
               
                 <li>
@@ -396,6 +408,10 @@
                   <a href="#laelia.v1.UpdateAgentACPConfigRequest"><span class="badge">M</span>UpdateAgentACPConfigRequest</a>
                 </li>
               
+                <li>
+                  <a href="#laelia.v1.UploadAgentAvatarRequest"><span class="badge">M</span>UploadAgentAvatarRequest</a>
+                </li>
+              
               
                 <li>
                   <a href="#laelia.v1.AgentStatus.ConnectionState"><span class="badge">E</span>AgentStatus.ConnectionState</a>
@@ -428,7 +444,19 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.DeleteAvatarRequest"><span class="badge">M</span>DeleteAvatarRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.DeleteUserRequest"><span class="badge">M</span>DeleteUserRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DownloadAvatarRequest"><span class="badge">M</span>DownloadAvatarRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DownloadAvatarResponse"><span class="badge">M</span>DownloadAvatarResponse</a>
                 </li>
               
                 <li>
@@ -449,6 +477,10 @@
               
                 <li>
                   <a href="#laelia.v1.UpdateUserRequest"><span class="badge">M</span>UpdateUserRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UploadAvatarRequest"><span class="badge">M</span>UploadAvatarRequest</a>
                 </li>
               
                 <li>
@@ -1580,6 +1612,15 @@ and for workspace admins (via the all-permissions union), false otherwise.
 Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths. </p></td>
                 </tr>
               
+                <tr>
+                  <td>avatar</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>avatar is the resource name of the agent&#39;s uploaded avatar image, or empty
+when the agent has not uploaded one (frontend renders a deterministic pixel
+identicon seeded by the agent id). Format: agents/{agent}/avatar. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -2562,6 +2603,30 @@ Agent, surfaced top-level so list consumers don&#39;t pull in AgentInfo. </p></t
 
         
       
+        <h3 id="laelia.v1.DeleteAgentAvatarRequest">DeleteAgentAvatarRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.DeleteAgentRequest">DeleteAgentRequest</h3>
         <p></p>
 
@@ -2574,6 +2639,68 @@ Agent, surfaced top-level so list consumers don&#39;t pull in AgentInfo. </p></t
               
                 <tr>
                   <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DownloadAgentAvatarRequest">DownloadAgentAvatarRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DownloadAgentAvatarResponse">DownloadAgentAvatarResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mime_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>etag</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -3148,6 +3275,44 @@ Agent, surfaced top-level so list consumers don&#39;t pull in AgentInfo. </p></t
 
         
       
+        <h3 id="laelia.v1.UploadAgentAvatarRequest">UploadAgentAvatarRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mime_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
 
       
         <h3 id="laelia.v1.AgentStatus.ConnectionState">AgentStatus.ConnectionState</h3>
@@ -3301,6 +3466,31 @@ persisted into agent.info.available_providers). Admin only.</p></td>
                 <td><a href="#laelia.v1.RefreshAgentTokenRequest">RefreshAgentTokenRequest</a></td>
                 <td><a href="#laelia.v1.RefreshAgentTokenResponse">RefreshAgentTokenResponse</a></td>
                 <td><p>Agent refreshes access token</p></td>
+              </tr>
+            
+              <tr>
+                <td>UploadAgentAvatar</td>
+                <td><a href="#laelia.v1.UploadAgentAvatarRequest">UploadAgentAvatarRequest</a></td>
+                <td><a href="#laelia.v1.Agent">Agent</a></td>
+                <td><p>UploadAgentAvatar replaces an agent&#39;s avatar image. Requires
+laelia.agents.edit on the agent; the caller must be the agent&#39;s creator or a
+workspace admin. No google.api.http annotation: bytes travel over Connect-JSON.</p></td>
+              </tr>
+            
+              <tr>
+                <td>DownloadAgentAvatar</td>
+                <td><a href="#laelia.v1.DownloadAgentAvatarRequest">DownloadAgentAvatarRequest</a></td>
+                <td><a href="#laelia.v1.DownloadAgentAvatarResponse">DownloadAgentAvatarResponse</a></td>
+                <td><p>DownloadAgentAvatar fetches an agent&#39;s avatar image bytes. Any authenticated
+user may download any agent&#39;s avatar (workspace-internal profile image).</p></td>
+              </tr>
+            
+              <tr>
+                <td>DeleteAgentAvatar</td>
+                <td><a href="#laelia.v1.DeleteAgentAvatarRequest">DeleteAgentAvatarRequest</a></td>
+                <td><a href="#laelia.v1.Agent">Agent</a></td>
+                <td><p>DeleteAgentAvatar clears an agent&#39;s avatar, reverting to the pixel default.
+Requires laelia.agents.edit on the agent.</p></td>
               </tr>
             
               <tr>
@@ -3563,6 +3753,30 @@ Format: users/{user uid or user email} </p></td>
 
         
       
+        <h3 id="laelia.v1.DeleteAvatarRequest">DeleteAvatarRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The avatar resource name. Format: users/{user}/avatar. Must be the caller&#39;s own. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.DeleteUserRequest">DeleteUserRequest</h3>
         <p></p>
 
@@ -3579,6 +3793,68 @@ Format: users/{user uid or user email} </p></td>
                   <td></td>
                   <td><p>The name of the user to delete.
 Format: users/{user} </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DownloadAvatarRequest">DownloadAvatarRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The avatar resource name. Format: users/{user}/avatar. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DownloadAvatarResponse">DownloadAvatarResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mime_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>etag</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>etag is a content hash of data, usable as a cache-busting token. </p></td>
                 </tr>
               
             </tbody>
@@ -3786,6 +4062,38 @@ In this situation, `update_mask` is ignored. </p></td>
 
         
       
+        <h3 id="laelia.v1.UploadAvatarRequest">UploadAvatarRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The avatar image bytes (png/jpeg/webp/gif). Clients should resize before
+uploading; the server enforces a hard byte cap regardless. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mime_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The mime type of data, e.g. &#34;image/png&#34;. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.User">User</h3>
         <p></p>
 
@@ -3914,6 +4222,15 @@ resource and surfaced on the resource, not here. </p></td>
                   <td><p>debug_mode is true when RuntimeDebug is enabled for the workspace.
 Populated only by GetCurrentUser so the frontend can gate debug-only UI
 without calling the admin-gated SettingService.GetDebugConfig. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>avatar</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>avatar is the resource name of the user&#39;s uploaded avatar image, or empty
+when the user has not uploaded one (in which case the frontend renders a
+deterministic pixel identicon seeded by the user id). Format: users/{user}/avatar. </p></td>
                 </tr>
               
             </tbody>
@@ -4069,6 +4386,33 @@ The last remaining workspace admin cannot be deleted.</p></td>
                 <td><a href="#laelia.v1.UndeleteUserRequest">UndeleteUserRequest</a></td>
                 <td><a href="#laelia.v1.User">User</a></td>
                 <td><p>Only the user with permission on the workspace can undelete the user.</p></td>
+              </tr>
+            
+              <tr>
+                <td>UploadAvatar</td>
+                <td><a href="#laelia.v1.UploadAvatarRequest">UploadAvatarRequest</a></td>
+                <td><a href="#laelia.v1.User">User</a></td>
+                <td><p>UploadAvatar replaces the current user&#39;s avatar image. Self only: the
+caller must be the user named by the resource. The image bytes are
+re-encoded/stored server-side; clients should resize before uploading.
+No google.api.http annotation: bytes travel over Connect-JSON like
+CommandService.UploadFile.</p></td>
+              </tr>
+            
+              <tr>
+                <td>DownloadAvatar</td>
+                <td><a href="#laelia.v1.DownloadAvatarRequest">DownloadAvatarRequest</a></td>
+                <td><a href="#laelia.v1.DownloadAvatarResponse">DownloadAvatarResponse</a></td>
+                <td><p>DownloadAvatar fetches a user&#39;s avatar image bytes. Any authenticated
+user can download any user&#39;s avatar (workspace-internal profile image).</p></td>
+              </tr>
+            
+              <tr>
+                <td>DeleteAvatar</td>
+                <td><a href="#laelia.v1.DeleteAvatarRequest">DeleteAvatarRequest</a></td>
+                <td><a href="#laelia.v1.User">User</a></td>
+                <td><p>DeleteAvatar clears the current user&#39;s avatar, reverting to the pixel
+default. Self only.</p></td>
               </tr>
             
           </tbody>
@@ -5045,6 +5389,16 @@ messages and @mentions of itself. </p></td>
 for agents it is the agent&#39;s full persona_prompt (from AgentACPConfig). Surfaced
 inline in the roster so an agent can perceive who is in a channel/thread — and
 each co-agent&#39;s persona — in a single lookup, and decide whom to address. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>avatar</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>avatar is the member&#39;s avatar resource name (users/{user}/avatar or
+agents/{agent}/avatar) when the member has uploaded one, empty otherwise
+(in which case the frontend renders a deterministic pixel identicon). Surfaced
+inline so the frontend can render roster avatars without a per-member lookup. </p></td>
                 </tr>
               
             </tbody>

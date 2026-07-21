@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { Loader2, Trash2, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { KeyValueEnvEditor } from "@/components/agent/key-value-env-editor";
 import { StringListEditor } from "@/components/agent/string-list-editor";
+import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { Alert } from "@/components/ui/alert";
 import {
@@ -30,7 +32,14 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { buildAgentRunCommand } from "@/lib/agent-token";
+import {
+  deleteAgentAvatar,
+  invalidateAvatar,
+  uploadAgentAvatar,
+  useAvatar,
+} from "@/lib/avatar-cache";
 import { agentResourceName, formatTimestamp } from "@/lib/command-status";
+import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
 import {
   type Agent,
@@ -136,6 +145,56 @@ export function AgentProfilePage() {
   const [token, setToken] = useState<string | null>(null);
   const [tokenOpen, setTokenOpen] = useState(false);
   const [tokenFromRotation, setTokenFromRotation] = useState(false);
+
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const agentAvatarName = agent?.avatar || undefined;
+  const avatarSrc = useAvatar(agentAvatarName);
+
+  async function handleAvatarChange(file: File | undefined) {
+    if (!file || !agentName) return;
+    setAvatarBusy(true);
+    try {
+      await uploadAgentAvatar(agentName, file);
+      if (agentAvatarName) invalidateAvatar(agentAvatarName);
+      setAgent(await getAgent(agentName));
+      toastManager.add({
+        type: "success",
+        title: t("agent.profile.avatar-uploaded"),
+      });
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("agent.profile.avatar-upload-failed"),
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
+  async function handleAvatarRemove() {
+    if (!agentName || !agentAvatarName) return;
+    setAvatarBusy(true);
+    try {
+      await deleteAgentAvatar(agentAvatarName);
+      invalidateAvatar(agentAvatarName);
+      setAgent(await getAgent(agentName));
+      toastManager.add({
+        type: "success",
+        title: t("agent.profile.avatar-removed"),
+      });
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("agent.profile.avatar-remove-failed"),
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!agentId) return;
@@ -364,6 +423,57 @@ export function AgentProfilePage() {
                   </Field>
                 )}
               </dl>
+
+              {/* Avatar */}
+              <div className="flex items-center gap-4 pt-2 border-t border-control-border">
+                <Avatar seed={agentId || agent.title} src={avatarSrc} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium text-control">
+                    {t("agent.profile.avatar")}
+                  </div>
+                  <p className="mt-0.5 text-xs text-control-placeholder">
+                    {t("agent.profile.avatar-hint")}
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={!canEdit || avatarBusy}
+                    >
+                      {avatarBusy ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="size-3.5" />
+                      )}
+                      {avatarBusy
+                        ? t("agent.profile.avatar-uploading")
+                        : t("agent.profile.avatar-upload")}
+                    </Button>
+                    {agent.avatar && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAvatarRemove}
+                        disabled={!canEdit || avatarBusy}
+                      >
+                        <Trash2 className="size-3.5" />
+                        {t("agent.profile.avatar-remove")}
+                      </Button>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      className="hidden"
+                      onChange={(e) => {
+                        void handleAvatarChange(e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             </Card>
 
             {/* Token actions */}

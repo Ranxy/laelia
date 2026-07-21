@@ -1208,6 +1208,16 @@ export declare type ChannelMember = Message<"laelia.v1.ChannelMember"> & {
    * @generated from field: string description = 6;
    */
   description: string;
+
+  /**
+   * avatar is the member's avatar resource name (users/{user}/avatar or
+   * agents/{agent}/avatar) when the member has uploaded one, empty otherwise
+   * (in which case the frontend renders a deterministic pixel identicon). Surfaced
+   * inline so the frontend can render roster avatars without a per-member lookup.
+   *
+   * @generated from field: string avatar = 7;
+   */
+  avatar: string;
 };
 
 /**

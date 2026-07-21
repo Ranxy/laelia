@@ -138,6 +138,41 @@ func FormatUserUID(uid int) string {
 	return fmt.Sprintf("%s%d", UserNamePrefix, uid)
 }
 
+// avatarNameSuffix is the trailing segment that turns a user resource name into
+// its avatar resource name: users/{id}/avatar.
+const avatarNameSuffix = "/avatar"
+
+// FormatUserAvatar returns the avatar resource name for a user: users/{id}/avatar.
+func FormatUserAvatar(uid int) string {
+	return fmt.Sprintf("%s%d%s", UserNamePrefix, uid, avatarNameSuffix)
+}
+
+// ParseUserAvatarName parses an avatar resource name (users/{id}/avatar) and
+// returns the user id.
+func ParseUserAvatarName(name string) (int, error) {
+	trimmed, err := TrimSuffix(name, avatarNameSuffix)
+	if err != nil {
+		return 0, err
+	}
+	return GetUserID(trimmed)
+}
+
+// FormatAgentAvatar returns the avatar resource name for an agent:
+// agents/{agent}/avatar.
+func FormatAgentAvatar(resourceID string) string {
+	return fmt.Sprintf("%s%s%s", AgentNamePrefix, resourceID, avatarNameSuffix)
+}
+
+// ParseAgentAvatarName parses an avatar resource name (agents/{agent}/avatar) and
+// returns the agent's resource id.
+func ParseAgentAvatarName(name string) (string, error) {
+	trimmed, err := TrimSuffix(name, avatarNameSuffix)
+	if err != nil {
+		return "", err
+	}
+	return GetAgentResourceID(trimmed)
+}
+
 func FormatRole(role string) string {
 	return fmt.Sprintf("%s%s", RolePrefix, role)
 }

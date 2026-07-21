@@ -3009,6 +3009,13 @@ components:
                          (laelia.agents.edit): true for the creator (via the agentEditor IAM binding)
                          and for workspace admins (via the all-permissions union), false otherwise.
                          Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths.
+                avatar:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        avatar is the resource name of the agent's uploaded avatar image, or empty
+                         when the agent has not uploaded one (frontend renders a deterministic pixel
+                         identicon seeded by the agent id). Format: agents/{agent}/avatar.
         AgentACPConfig:
             type: object
             properties:
@@ -3380,6 +3387,13 @@ components:
                          for agents it is the agent's full persona_prompt (from AgentACPConfig). Surfaced
                          inline in the roster so an agent can perceive who is in a channel/thread — and
                          each co-agent's persona — in a single lookup, and decide whom to address.
+                avatar:
+                    type: string
+                    description: |-
+                        avatar is the member's avatar resource name (users/{user}/avatar or
+                         agents/{agent}/avatar) when the member has uploaded one, empty otherwise
+                         (in which case the frontend renders a deterministic pixel identicon). Surfaced
+                         inline so the frontend can render roster avatars without a per-member lookup.
         ChannelThread:
             type: object
             properties:
@@ -5060,6 +5074,13 @@ components:
                         debug_mode is true when RuntimeDebug is enabled for the workspace.
                          Populated only by GetCurrentUser so the frontend can gate debug-only UI
                          without calling the admin-gated SettingService.GetDebugConfig.
+                avatar:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        avatar is the resource name of the user's uploaded avatar image, or empty
+                         when the user has not uploaded one (in which case the frontend renders a
+                         deterministic pixel identicon seeded by the user id). Format: users/{user}/avatar.
         UserProfile:
             type: object
             properties:

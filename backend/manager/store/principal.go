@@ -67,6 +67,9 @@ type UserMessage struct {
 	// Description is the user-authored self-description surfaced in channel/thread
 	// rosters so agents and other users can perceive who this user is.
 	Description string
+	// AvatarS3Key is the S3 object key of the user's uploaded avatar image, empty
+	// when the user has not uploaded one (the frontend renders a pixel identicon).
+	AvatarS3Key string
 }
 
 // GetResourceID returns the stable per-user resource name used to key
@@ -186,7 +189,7 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (*UserMessage,
 // service accounts are excluded so they cannot be addressed as a DM peer.
 func (s *Store) FindUsersByName(ctx context.Context, name string) ([]*UserMessage, error) {
 	rows, err := s.GetDB().QueryContext(ctx, `
-		SELECT id, name, email, type, password_hash, deleted, description, phone, created_at
+		SELECT id, name, email, type, password_hash, deleted, description, phone, created_at, avatar_s3_key
 		FROM principal
 		WHERE type = 'END_USER' AND deleted = FALSE AND name = $1
 		ORDER BY id ASC
@@ -200,7 +203,7 @@ func (s *Store) FindUsersByName(ctx context.Context, name string) ([]*UserMessag
 	for rows.Next() {
 		var u UserMessage
 		var t string
-		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &t, &u.PasswordHash, &u.MemberDeleted, &u.Description, &u.Phone, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &t, &u.PasswordHash, &u.MemberDeleted, &u.Description, &u.Phone, &u.CreatedAt, &u.AvatarS3Key); err != nil {
 			return nil, errors.Wrap(err, "failed to scan user by name")
 		}
 		users = append(users, &u)
@@ -352,7 +355,8 @@ func buildListUsersQuery(find *FindUserMessage) (string, []any) {
 		principal.profile,
 		principal.created_at,
 		user_groups.groups,
-		principal.description
+		principal.description,
+		principal.avatar_s3_key
 	FROM principal
 	INNER JOIN user_groups ON principal.id = user_groups.user_id
 	` + join + ` WHERE ` + strings.Join(where, " AND ") + ` ORDER BY type DESC, created_at ASC`
@@ -392,6 +396,7 @@ func listUserImpl(ctx context.Context, txn *sql.Tx, find *FindUserMessage) ([]*U
 			&userMessage.CreatedAt,
 			&groups,
 			&userMessage.Description,
+			&userMessage.AvatarS3Key,
 		); err != nil {
 			return nil, err
 		}
@@ -557,4 +562,22 @@ func (s *Store) UpdateUser(ctx context.Context, currentUser *UserMessage, patch 
 
 	s.cacheActiveUser(user)
 	return user, nil
+}
+
+// UpdateUserAvatarS3Key sets the user's avatar S3 object key. Pass an empty
+// key to clear the avatar. It invalidates the user cache so callers see the
+// change immediately.
+func (s *Store) UpdateUserAvatarS3Key(ctx context.Context, uid int, key string) error {
+	if _, err := s.GetDB().ExecContext(ctx, `
+		UPDATE principal
+		SET avatar_s3_key = $1
+		WHERE id = $2`, key, uid); err != nil {
+		return errors.Wrap(err, "failed to update user avatar s3 key")
+	}
+	if cached, ok := s.userIDCache.Get(uid); ok {
+		s.invalidateUserCache(uid, cached.Email)
+	} else {
+		s.userIDCache.Remove(uid)
+	}
+	return nil
 }

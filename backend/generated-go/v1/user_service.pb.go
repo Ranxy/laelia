@@ -613,7 +613,11 @@ type User struct {
 	// debug_mode is true when RuntimeDebug is enabled for the workspace.
 	// Populated only by GetCurrentUser so the frontend can gate debug-only UI
 	// without calling the admin-gated SettingService.GetDebugConfig.
-	DebugMode     bool `protobuf:"varint,18,opt,name=debug_mode,json=debugMode,proto3" json:"debug_mode,omitempty"`
+	DebugMode bool `protobuf:"varint,18,opt,name=debug_mode,json=debugMode,proto3" json:"debug_mode,omitempty"`
+	// avatar is the resource name of the user's uploaded avatar image, or empty
+	// when the user has not uploaded one (in which case the frontend renders a
+	// deterministic pixel identicon seeded by the user id). Format: users/{user}/avatar.
+	Avatar        string `protobuf:"bytes,19,opt,name=avatar,proto3" json:"avatar,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -753,6 +757,13 @@ func (x *User) GetDebugMode() bool {
 	return false
 }
 
+func (x *User) GetAvatar() string {
+	if x != nil {
+		return x.Avatar
+	}
+	return ""
+}
+
 type UserProfile struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	LastLoginTime          *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=last_login_time,json=lastLoginTime,proto3" json:"last_login_time,omitempty"`
@@ -814,6 +825,212 @@ func (x *UserProfile) GetSource() string {
 	return ""
 }
 
+type UploadAvatarRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The avatar image bytes (png/jpeg/webp/gif). Clients should resize before
+	// uploading; the server enforces a hard byte cap regardless.
+	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	// The mime type of data, e.g. "image/png".
+	MimeType      string `protobuf:"bytes,2,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UploadAvatarRequest) Reset() {
+	*x = UploadAvatarRequest{}
+	mi := &file_v1_user_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UploadAvatarRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UploadAvatarRequest) ProtoMessage() {}
+
+func (x *UploadAvatarRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_user_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UploadAvatarRequest.ProtoReflect.Descriptor instead.
+func (*UploadAvatarRequest) Descriptor() ([]byte, []int) {
+	return file_v1_user_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *UploadAvatarRequest) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *UploadAvatarRequest) GetMimeType() string {
+	if x != nil {
+		return x.MimeType
+	}
+	return ""
+}
+
+type DownloadAvatarRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The avatar resource name. Format: users/{user}/avatar.
+	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DownloadAvatarRequest) Reset() {
+	*x = DownloadAvatarRequest{}
+	mi := &file_v1_user_service_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DownloadAvatarRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DownloadAvatarRequest) ProtoMessage() {}
+
+func (x *DownloadAvatarRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_user_service_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DownloadAvatarRequest.ProtoReflect.Descriptor instead.
+func (*DownloadAvatarRequest) Descriptor() ([]byte, []int) {
+	return file_v1_user_service_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *DownloadAvatarRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type DownloadAvatarResponse struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Data     []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	MimeType string                 `protobuf:"bytes,2,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	// etag is a content hash of data, usable as a cache-busting token.
+	Etag          string `protobuf:"bytes,3,opt,name=etag,proto3" json:"etag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DownloadAvatarResponse) Reset() {
+	*x = DownloadAvatarResponse{}
+	mi := &file_v1_user_service_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DownloadAvatarResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DownloadAvatarResponse) ProtoMessage() {}
+
+func (x *DownloadAvatarResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_user_service_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DownloadAvatarResponse.ProtoReflect.Descriptor instead.
+func (*DownloadAvatarResponse) Descriptor() ([]byte, []int) {
+	return file_v1_user_service_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *DownloadAvatarResponse) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *DownloadAvatarResponse) GetMimeType() string {
+	if x != nil {
+		return x.MimeType
+	}
+	return ""
+}
+
+func (x *DownloadAvatarResponse) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
+}
+
+type DeleteAvatarRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The avatar resource name. Format: users/{user}/avatar. Must be the caller's own.
+	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAvatarRequest) Reset() {
+	*x = DeleteAvatarRequest{}
+	mi := &file_v1_user_service_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAvatarRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAvatarRequest) ProtoMessage() {}
+
+func (x *DeleteAvatarRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_user_service_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAvatarRequest.ProtoReflect.Descriptor instead.
+func (*DeleteAvatarRequest) Descriptor() ([]byte, []int) {
+	return file_v1_user_service_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *DeleteAvatarRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 var File_v1_user_service_proto protoreflect.FileDescriptor
 
 const file_v1_user_service_proto_rawDesc = "" +
@@ -848,7 +1065,7 @@ const file_v1_user_service_proto_rawDesc = "" +
 	"\vlaelia/UserR\x04name\">\n" +
 	"\x13UndeleteUserRequest\x12'\n" +
 	"\x04name\x18\x01 \x01(\tB\x13\xe0A\x02\xfaA\r\n" +
-	"\vlaelia/UserR\x04name\"\xb3\x04\n" +
+	"\vlaelia/UserR\x04name\"\xd0\x04\n" +
 	"\x04User\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -866,18 +1083,32 @@ const file_v1_user_service_proto_rawDesc = "" +
 	"\vdescription\x18\x10 \x01(\tR\vdescription\x12%\n" +
 	"\vpermissions\x18\x11 \x03(\tB\x03\xe0A\x03R\vpermissions\x12\"\n" +
 	"\n" +
-	"debug_mode\x18\x12 \x01(\bB\x03\xe0A\x03R\tdebugMode:\x1e\xeaA\x1b\n" +
+	"debug_mode\x18\x12 \x01(\bB\x03\xe0A\x03R\tdebugMode\x12\x1b\n" +
+	"\x06avatar\x18\x13 \x01(\tB\x03\xe0A\x03R\x06avatar:\x1e\xeaA\x1b\n" +
 	"\vlaelia/User\x12\fusers/{user}\"\xc0\x01\n" +
 	"\vUserProfile\x12B\n" +
 	"\x0flast_login_time\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\rlastLoginTime\x12U\n" +
 	"\x19last_change_password_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x16lastChangePasswordTime\x12\x16\n" +
-	"\x06source\x18\x03 \x01(\tR\x06source*T\n" +
+	"\x06source\x18\x03 \x01(\tR\x06source\"K\n" +
+	"\x13UploadAvatarRequest\x12\x17\n" +
+	"\x04data\x18\x01 \x01(\fB\x03\xe0A\x02R\x04data\x12\x1b\n" +
+	"\tmime_type\x18\x02 \x01(\tR\bmimeType\"@\n" +
+	"\x15DownloadAvatarRequest\x12'\n" +
+	"\x04name\x18\x01 \x01(\tB\x13\xe0A\x02\xfaA\r\n" +
+	"\vlaelia/UserR\x04name\"]\n" +
+	"\x16DownloadAvatarResponse\x12\x12\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data\x12\x1b\n" +
+	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +
+	"\x04etag\x18\x03 \x01(\tR\x04etag\">\n" +
+	"\x13DeleteAvatarRequest\x12'\n" +
+	"\x04name\x18\x01 \x01(\tB\x13\xe0A\x02\xfaA\r\n" +
+	"\vlaelia/UserR\x04name*T\n" +
 	"\bUserType\x12\x19\n" +
 	"\x15USER_TYPE_UNSPECIFIED\x10\x00\x12\b\n" +
 	"\x04USER\x10\x01\x12\x13\n" +
 	"\x0fSERVICE_ACCOUNT\x10\x02\x12\x0e\n" +
 	"\n" +
-	"SYSTEM_BOT\x10\x032\xa4\a\n" +
+	"SYSTEM_BOT\x10\x032\xfd\b\n" +
 	"\vUserService\x12X\n" +
 	"\aGetUser\x12\x19.laelia.v1.GetUserRequest\x1a\x0f.laelia.v1.User\"!\xdaA\x04name\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/{name=users/*}\x12n\n" +
 	"\rBatchGetUsers\x12\x1f.laelia.v1.BatchGetUsersRequest\x1a .laelia.v1.BatchGetUsersResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/users:batchGet\x12W\n" +
@@ -889,7 +1120,10 @@ const file_v1_user_service_proto_rawDesc = "" +
 	"UpdateUser\x12\x1c.laelia.v1.UpdateUserRequest\x1a\x0f.laelia.v1.User\"W\xdaA\x10user,update_mask\x8a\xea0\x13laelia.users.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1f:\x04user2\x17/v1/{user.name=users/*}\x12\x84\x01\n" +
 	"\n" +
 	"DeleteUser\x12\x1c.laelia.v1.DeleteUserRequest\x1a\x16.google.protobuf.Empty\"@\xdaA\x04name\x8a\xea0\x13laelia.users.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x14*\x12/v1/{name=users/*}\x12\x86\x01\n" +
-	"\fUndeleteUser\x12\x1e.laelia.v1.UndeleteUserRequest\x1a\x0f.laelia.v1.User\"E\x8a\xea0\x13laelia.users.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/v1/{name=users/*}:undeleteB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"\fUndeleteUser\x12\x1e.laelia.v1.UndeleteUserRequest\x1a\x0f.laelia.v1.User\"E\x8a\xea0\x13laelia.users.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/v1/{name=users/*}:undelete\x12?\n" +
+	"\fUploadAvatar\x12\x1e.laelia.v1.UploadAvatarRequest\x1a\x0f.laelia.v1.User\x12U\n" +
+	"\x0eDownloadAvatar\x12 .laelia.v1.DownloadAvatarRequest\x1a!.laelia.v1.DownloadAvatarResponse\x12?\n" +
+	"\fDeleteAvatar\x12\x1e.laelia.v1.DeleteAvatarRequest\x1a\x0f.laelia.v1.UserB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_user_service_proto_rawDescOnce sync.Once
@@ -904,54 +1138,64 @@ func file_v1_user_service_proto_rawDescGZIP() []byte {
 }
 
 var file_v1_user_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_v1_user_service_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_v1_user_service_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_v1_user_service_proto_goTypes = []any{
-	(UserType)(0),                 // 0: laelia.v1.UserType
-	(*GetUserRequest)(nil),        // 1: laelia.v1.GetUserRequest
-	(*BatchGetUsersRequest)(nil),  // 2: laelia.v1.BatchGetUsersRequest
-	(*BatchGetUsersResponse)(nil), // 3: laelia.v1.BatchGetUsersResponse
-	(*ListUsersRequest)(nil),      // 4: laelia.v1.ListUsersRequest
-	(*ListUsersResponse)(nil),     // 5: laelia.v1.ListUsersResponse
-	(*CreateUserRequest)(nil),     // 6: laelia.v1.CreateUserRequest
-	(*UpdateUserRequest)(nil),     // 7: laelia.v1.UpdateUserRequest
-	(*DeleteUserRequest)(nil),     // 8: laelia.v1.DeleteUserRequest
-	(*UndeleteUserRequest)(nil),   // 9: laelia.v1.UndeleteUserRequest
-	(*User)(nil),                  // 10: laelia.v1.User
-	(*UserProfile)(nil),           // 11: laelia.v1.UserProfile
-	(*fieldmaskpb.FieldMask)(nil), // 12: google.protobuf.FieldMask
-	(State)(0),                    // 13: laelia.v1.State
-	(*timestamppb.Timestamp)(nil), // 14: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),         // 15: google.protobuf.Empty
+	(UserType)(0),                  // 0: laelia.v1.UserType
+	(*GetUserRequest)(nil),         // 1: laelia.v1.GetUserRequest
+	(*BatchGetUsersRequest)(nil),   // 2: laelia.v1.BatchGetUsersRequest
+	(*BatchGetUsersResponse)(nil),  // 3: laelia.v1.BatchGetUsersResponse
+	(*ListUsersRequest)(nil),       // 4: laelia.v1.ListUsersRequest
+	(*ListUsersResponse)(nil),      // 5: laelia.v1.ListUsersResponse
+	(*CreateUserRequest)(nil),      // 6: laelia.v1.CreateUserRequest
+	(*UpdateUserRequest)(nil),      // 7: laelia.v1.UpdateUserRequest
+	(*DeleteUserRequest)(nil),      // 8: laelia.v1.DeleteUserRequest
+	(*UndeleteUserRequest)(nil),    // 9: laelia.v1.UndeleteUserRequest
+	(*User)(nil),                   // 10: laelia.v1.User
+	(*UserProfile)(nil),            // 11: laelia.v1.UserProfile
+	(*UploadAvatarRequest)(nil),    // 12: laelia.v1.UploadAvatarRequest
+	(*DownloadAvatarRequest)(nil),  // 13: laelia.v1.DownloadAvatarRequest
+	(*DownloadAvatarResponse)(nil), // 14: laelia.v1.DownloadAvatarResponse
+	(*DeleteAvatarRequest)(nil),    // 15: laelia.v1.DeleteAvatarRequest
+	(*fieldmaskpb.FieldMask)(nil),  // 16: google.protobuf.FieldMask
+	(State)(0),                     // 17: laelia.v1.State
+	(*timestamppb.Timestamp)(nil),  // 18: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),          // 19: google.protobuf.Empty
 }
 var file_v1_user_service_proto_depIdxs = []int32{
 	10, // 0: laelia.v1.BatchGetUsersResponse.users:type_name -> laelia.v1.User
 	10, // 1: laelia.v1.ListUsersResponse.users:type_name -> laelia.v1.User
 	10, // 2: laelia.v1.CreateUserRequest.user:type_name -> laelia.v1.User
 	10, // 3: laelia.v1.UpdateUserRequest.user:type_name -> laelia.v1.User
-	12, // 4: laelia.v1.UpdateUserRequest.update_mask:type_name -> google.protobuf.FieldMask
-	13, // 5: laelia.v1.User.state:type_name -> laelia.v1.State
+	16, // 4: laelia.v1.UpdateUserRequest.update_mask:type_name -> google.protobuf.FieldMask
+	17, // 5: laelia.v1.User.state:type_name -> laelia.v1.State
 	0,  // 6: laelia.v1.User.user_type:type_name -> laelia.v1.UserType
 	11, // 7: laelia.v1.User.profile:type_name -> laelia.v1.UserProfile
-	14, // 8: laelia.v1.UserProfile.last_login_time:type_name -> google.protobuf.Timestamp
-	14, // 9: laelia.v1.UserProfile.last_change_password_time:type_name -> google.protobuf.Timestamp
+	18, // 8: laelia.v1.UserProfile.last_login_time:type_name -> google.protobuf.Timestamp
+	18, // 9: laelia.v1.UserProfile.last_change_password_time:type_name -> google.protobuf.Timestamp
 	1,  // 10: laelia.v1.UserService.GetUser:input_type -> laelia.v1.GetUserRequest
 	2,  // 11: laelia.v1.UserService.BatchGetUsers:input_type -> laelia.v1.BatchGetUsersRequest
-	15, // 12: laelia.v1.UserService.GetCurrentUser:input_type -> google.protobuf.Empty
+	19, // 12: laelia.v1.UserService.GetCurrentUser:input_type -> google.protobuf.Empty
 	4,  // 13: laelia.v1.UserService.ListUsers:input_type -> laelia.v1.ListUsersRequest
 	6,  // 14: laelia.v1.UserService.CreateUser:input_type -> laelia.v1.CreateUserRequest
 	7,  // 15: laelia.v1.UserService.UpdateUser:input_type -> laelia.v1.UpdateUserRequest
 	8,  // 16: laelia.v1.UserService.DeleteUser:input_type -> laelia.v1.DeleteUserRequest
 	9,  // 17: laelia.v1.UserService.UndeleteUser:input_type -> laelia.v1.UndeleteUserRequest
-	10, // 18: laelia.v1.UserService.GetUser:output_type -> laelia.v1.User
-	3,  // 19: laelia.v1.UserService.BatchGetUsers:output_type -> laelia.v1.BatchGetUsersResponse
-	10, // 20: laelia.v1.UserService.GetCurrentUser:output_type -> laelia.v1.User
-	5,  // 21: laelia.v1.UserService.ListUsers:output_type -> laelia.v1.ListUsersResponse
-	10, // 22: laelia.v1.UserService.CreateUser:output_type -> laelia.v1.User
-	10, // 23: laelia.v1.UserService.UpdateUser:output_type -> laelia.v1.User
-	15, // 24: laelia.v1.UserService.DeleteUser:output_type -> google.protobuf.Empty
-	10, // 25: laelia.v1.UserService.UndeleteUser:output_type -> laelia.v1.User
-	18, // [18:26] is the sub-list for method output_type
-	10, // [10:18] is the sub-list for method input_type
+	12, // 18: laelia.v1.UserService.UploadAvatar:input_type -> laelia.v1.UploadAvatarRequest
+	13, // 19: laelia.v1.UserService.DownloadAvatar:input_type -> laelia.v1.DownloadAvatarRequest
+	15, // 20: laelia.v1.UserService.DeleteAvatar:input_type -> laelia.v1.DeleteAvatarRequest
+	10, // 21: laelia.v1.UserService.GetUser:output_type -> laelia.v1.User
+	3,  // 22: laelia.v1.UserService.BatchGetUsers:output_type -> laelia.v1.BatchGetUsersResponse
+	10, // 23: laelia.v1.UserService.GetCurrentUser:output_type -> laelia.v1.User
+	5,  // 24: laelia.v1.UserService.ListUsers:output_type -> laelia.v1.ListUsersResponse
+	10, // 25: laelia.v1.UserService.CreateUser:output_type -> laelia.v1.User
+	10, // 26: laelia.v1.UserService.UpdateUser:output_type -> laelia.v1.User
+	19, // 27: laelia.v1.UserService.DeleteUser:output_type -> google.protobuf.Empty
+	10, // 28: laelia.v1.UserService.UndeleteUser:output_type -> laelia.v1.User
+	10, // 29: laelia.v1.UserService.UploadAvatar:output_type -> laelia.v1.User
+	14, // 30: laelia.v1.UserService.DownloadAvatar:output_type -> laelia.v1.DownloadAvatarResponse
+	10, // 31: laelia.v1.UserService.DeleteAvatar:output_type -> laelia.v1.User
+	21, // [21:32] is the sub-list for method output_type
+	10, // [10:21] is the sub-list for method input_type
 	10, // [10:10] is the sub-list for extension type_name
 	10, // [10:10] is the sub-list for extension extendee
 	0,  // [0:10] is the sub-list for field type_name
@@ -970,7 +1214,7 @@ func file_v1_user_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_user_service_proto_rawDesc), len(file_v1_user_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   11,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

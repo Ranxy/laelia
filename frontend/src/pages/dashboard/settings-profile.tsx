@@ -1,11 +1,20 @@
-import { Loader2, Save } from "lucide-react";
-import { useEffect, useState } from "react";
+import { create } from "@bufbuild/protobuf";
+import { Loader2, Save, Trash2, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Avatar } from "@/components/chat/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { userServiceClient } from "@/connect";
+import { invalidateAvatar, useAvatar } from "@/lib/avatar-cache";
+import { resizeImageFile } from "@/lib/image-resize";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
+import {
+  DeleteAvatarRequestSchema,
+  UploadAvatarRequestSchema,
+} from "@/types/proto-es/v1/user_service_pb";
 
 // ProfileForm mirrors the editable fields of the current user. The server is
 // the source of truth; this seeds from `currentUser` and writes back only the
@@ -29,6 +38,66 @@ export function SettingsProfilePage() {
     description: "",
   });
   const [saving, setSaving] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // The current user's principal id (the {user} segment of "users/{user}"),
+  // used both as the pixel-avatar seed and to build the avatar resource name.
+  const userId = currentUser?.name
+    ? (currentUser.name.split("/")[1] ?? "")
+    : "";
+  const avatarName =
+    currentUser?.avatar || (userId ? `users/${userId}/avatar` : undefined);
+  const avatarSrc = useAvatar(avatarName);
+
+  async function handleAvatarChange(file: File | undefined) {
+    if (!file || !userId) return;
+    setAvatarBusy(true);
+    try {
+      const { data, mimeType } = await resizeImageFile(file, 256, 0.9);
+      await userServiceClient.uploadAvatar(
+        create(UploadAvatarRequestSchema, { data, mimeType })
+      );
+      invalidateAvatar(`users/${userId}/avatar`);
+      await fetchCurrentUser();
+      toastManager.add({
+        type: "success",
+        title: t("settings.profile.avatar-uploaded"),
+      });
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("settings.profile.avatar-upload-failed"),
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
+  async function handleAvatarRemove() {
+    if (!userId) return;
+    setAvatarBusy(true);
+    try {
+      await userServiceClient.deleteAvatar(
+        create(DeleteAvatarRequestSchema, { name: `users/${userId}/avatar` })
+      );
+      invalidateAvatar(`users/${userId}/avatar`);
+      await fetchCurrentUser();
+      toastManager.add({
+        type: "success",
+        title: t("settings.profile.avatar-removed"),
+      });
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("settings.profile.avatar-remove-failed"),
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
 
   // Seed from currentUser once it is available. Re-seeding on currentUser
   // change (e.g. after a save-driven refetch) keeps the form in sync without
@@ -113,6 +182,56 @@ export function SettingsProfilePage() {
         </p>
 
         <div className="mt-6 space-y-4">
+          <div className="flex items-center gap-4">
+            <Avatar seed={userId} src={avatarSrc} />
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium text-control">
+                {t("settings.profile.avatar")}
+              </div>
+              <p className="mt-0.5 text-xs text-control-placeholder">
+                {t("settings.profile.avatar-hint")}
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={avatarBusy}
+                >
+                  {avatarBusy ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="size-3.5" />
+                  )}
+                  {avatarBusy
+                    ? t("settings.profile.avatar-uploading")
+                    : t("settings.profile.avatar-upload")}
+                </Button>
+                {currentUser.avatar && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAvatarRemove}
+                    disabled={avatarBusy}
+                  >
+                    <Trash2 className="size-3.5" />
+                    {t("settings.profile.avatar-remove")}
+                  </Button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(e) => {
+                    void handleAvatarChange(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
           <Field label={t("user.field-title")}>
             <Input
               value={form.title}

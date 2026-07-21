@@ -53,6 +53,15 @@ const (
 	// UserServiceUndeleteUserProcedure is the fully-qualified name of the UserService's UndeleteUser
 	// RPC.
 	UserServiceUndeleteUserProcedure = "/laelia.v1.UserService/UndeleteUser"
+	// UserServiceUploadAvatarProcedure is the fully-qualified name of the UserService's UploadAvatar
+	// RPC.
+	UserServiceUploadAvatarProcedure = "/laelia.v1.UserService/UploadAvatar"
+	// UserServiceDownloadAvatarProcedure is the fully-qualified name of the UserService's
+	// DownloadAvatar RPC.
+	UserServiceDownloadAvatarProcedure = "/laelia.v1.UserService/DownloadAvatar"
+	// UserServiceDeleteAvatarProcedure is the fully-qualified name of the UserService's DeleteAvatar
+	// RPC.
+	UserServiceDeleteAvatarProcedure = "/laelia.v1.UserService/DeleteAvatar"
 )
 
 // UserServiceClient is a client for the laelia.v1.UserService service.
@@ -78,6 +87,18 @@ type UserServiceClient interface {
 	DeleteUser(context.Context, *connect.Request[v1.DeleteUserRequest]) (*connect.Response[emptypb.Empty], error)
 	// Only the user with permission on the workspace can undelete the user.
 	UndeleteUser(context.Context, *connect.Request[v1.UndeleteUserRequest]) (*connect.Response[v1.User], error)
+	// UploadAvatar replaces the current user's avatar image. Self only: the
+	// caller must be the user named by the resource. The image bytes are
+	// re-encoded/stored server-side; clients should resize before uploading.
+	// No google.api.http annotation: bytes travel over Connect-JSON like
+	// CommandService.UploadFile.
+	UploadAvatar(context.Context, *connect.Request[v1.UploadAvatarRequest]) (*connect.Response[v1.User], error)
+	// DownloadAvatar fetches a user's avatar image bytes. Any authenticated
+	// user can download any user's avatar (workspace-internal profile image).
+	DownloadAvatar(context.Context, *connect.Request[v1.DownloadAvatarRequest]) (*connect.Response[v1.DownloadAvatarResponse], error)
+	// DeleteAvatar clears the current user's avatar, reverting to the pixel
+	// default. Self only.
+	DeleteAvatar(context.Context, *connect.Request[v1.DeleteAvatarRequest]) (*connect.Response[v1.User], error)
 }
 
 // NewUserServiceClient constructs a client for the laelia.v1.UserService service. By default, it
@@ -139,6 +160,24 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceMethods.ByName("UndeleteUser")),
 			connect.WithClientOptions(opts...),
 		),
+		uploadAvatar: connect.NewClient[v1.UploadAvatarRequest, v1.User](
+			httpClient,
+			baseURL+UserServiceUploadAvatarProcedure,
+			connect.WithSchema(userServiceMethods.ByName("UploadAvatar")),
+			connect.WithClientOptions(opts...),
+		),
+		downloadAvatar: connect.NewClient[v1.DownloadAvatarRequest, v1.DownloadAvatarResponse](
+			httpClient,
+			baseURL+UserServiceDownloadAvatarProcedure,
+			connect.WithSchema(userServiceMethods.ByName("DownloadAvatar")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteAvatar: connect.NewClient[v1.DeleteAvatarRequest, v1.User](
+			httpClient,
+			baseURL+UserServiceDeleteAvatarProcedure,
+			connect.WithSchema(userServiceMethods.ByName("DeleteAvatar")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -152,6 +191,9 @@ type userServiceClient struct {
 	updateUser     *connect.Client[v1.UpdateUserRequest, v1.User]
 	deleteUser     *connect.Client[v1.DeleteUserRequest, emptypb.Empty]
 	undeleteUser   *connect.Client[v1.UndeleteUserRequest, v1.User]
+	uploadAvatar   *connect.Client[v1.UploadAvatarRequest, v1.User]
+	downloadAvatar *connect.Client[v1.DownloadAvatarRequest, v1.DownloadAvatarResponse]
+	deleteAvatar   *connect.Client[v1.DeleteAvatarRequest, v1.User]
 }
 
 // GetUser calls laelia.v1.UserService.GetUser.
@@ -194,6 +236,21 @@ func (c *userServiceClient) UndeleteUser(ctx context.Context, req *connect.Reque
 	return c.undeleteUser.CallUnary(ctx, req)
 }
 
+// UploadAvatar calls laelia.v1.UserService.UploadAvatar.
+func (c *userServiceClient) UploadAvatar(ctx context.Context, req *connect.Request[v1.UploadAvatarRequest]) (*connect.Response[v1.User], error) {
+	return c.uploadAvatar.CallUnary(ctx, req)
+}
+
+// DownloadAvatar calls laelia.v1.UserService.DownloadAvatar.
+func (c *userServiceClient) DownloadAvatar(ctx context.Context, req *connect.Request[v1.DownloadAvatarRequest]) (*connect.Response[v1.DownloadAvatarResponse], error) {
+	return c.downloadAvatar.CallUnary(ctx, req)
+}
+
+// DeleteAvatar calls laelia.v1.UserService.DeleteAvatar.
+func (c *userServiceClient) DeleteAvatar(ctx context.Context, req *connect.Request[v1.DeleteAvatarRequest]) (*connect.Response[v1.User], error) {
+	return c.deleteAvatar.CallUnary(ctx, req)
+}
+
 // UserServiceHandler is an implementation of the laelia.v1.UserService service.
 type UserServiceHandler interface {
 	// Get the user.
@@ -217,6 +274,18 @@ type UserServiceHandler interface {
 	DeleteUser(context.Context, *connect.Request[v1.DeleteUserRequest]) (*connect.Response[emptypb.Empty], error)
 	// Only the user with permission on the workspace can undelete the user.
 	UndeleteUser(context.Context, *connect.Request[v1.UndeleteUserRequest]) (*connect.Response[v1.User], error)
+	// UploadAvatar replaces the current user's avatar image. Self only: the
+	// caller must be the user named by the resource. The image bytes are
+	// re-encoded/stored server-side; clients should resize before uploading.
+	// No google.api.http annotation: bytes travel over Connect-JSON like
+	// CommandService.UploadFile.
+	UploadAvatar(context.Context, *connect.Request[v1.UploadAvatarRequest]) (*connect.Response[v1.User], error)
+	// DownloadAvatar fetches a user's avatar image bytes. Any authenticated
+	// user can download any user's avatar (workspace-internal profile image).
+	DownloadAvatar(context.Context, *connect.Request[v1.DownloadAvatarRequest]) (*connect.Response[v1.DownloadAvatarResponse], error)
+	// DeleteAvatar clears the current user's avatar, reverting to the pixel
+	// default. Self only.
+	DeleteAvatar(context.Context, *connect.Request[v1.DeleteAvatarRequest]) (*connect.Response[v1.User], error)
 }
 
 // NewUserServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -274,6 +343,24 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceMethods.ByName("UndeleteUser")),
 		connect.WithHandlerOptions(opts...),
 	)
+	userServiceUploadAvatarHandler := connect.NewUnaryHandler(
+		UserServiceUploadAvatarProcedure,
+		svc.UploadAvatar,
+		connect.WithSchema(userServiceMethods.ByName("UploadAvatar")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceDownloadAvatarHandler := connect.NewUnaryHandler(
+		UserServiceDownloadAvatarProcedure,
+		svc.DownloadAvatar,
+		connect.WithSchema(userServiceMethods.ByName("DownloadAvatar")),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceDeleteAvatarHandler := connect.NewUnaryHandler(
+		UserServiceDeleteAvatarProcedure,
+		svc.DeleteAvatar,
+		connect.WithSchema(userServiceMethods.ByName("DeleteAvatar")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/laelia.v1.UserService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UserServiceGetUserProcedure:
@@ -292,6 +379,12 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceDeleteUserHandler.ServeHTTP(w, r)
 		case UserServiceUndeleteUserProcedure:
 			userServiceUndeleteUserHandler.ServeHTTP(w, r)
+		case UserServiceUploadAvatarProcedure:
+			userServiceUploadAvatarHandler.ServeHTTP(w, r)
+		case UserServiceDownloadAvatarProcedure:
+			userServiceDownloadAvatarHandler.ServeHTTP(w, r)
+		case UserServiceDeleteAvatarProcedure:
+			userServiceDeleteAvatarHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -331,4 +424,16 @@ func (UnimplementedUserServiceHandler) DeleteUser(context.Context, *connect.Requ
 
 func (UnimplementedUserServiceHandler) UndeleteUser(context.Context, *connect.Request[v1.UndeleteUserRequest]) (*connect.Response[v1.User], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.UserService.UndeleteUser is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) UploadAvatar(context.Context, *connect.Request[v1.UploadAvatarRequest]) (*connect.Response[v1.User], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.UserService.UploadAvatar is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) DownloadAvatar(context.Context, *connect.Request[v1.DownloadAvatarRequest]) (*connect.Response[v1.DownloadAvatarResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.UserService.DownloadAvatar is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) DeleteAvatar(context.Context, *connect.Request[v1.DeleteAvatarRequest]) (*connect.Response[v1.User], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.UserService.DeleteAvatar is not implemented"))
 }

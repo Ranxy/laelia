@@ -669,6 +669,90 @@ export declare type RefreshAgentProvidersResponse = Message<"laelia.v1.RefreshAg
 export declare const RefreshAgentProvidersResponseSchema: GenMessage<RefreshAgentProvidersResponse>;
 
 /**
+ * @generated from message laelia.v1.UploadAgentAvatarRequest
+ */
+export declare type UploadAgentAvatarRequest = Message<"laelia.v1.UploadAgentAvatarRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: bytes data = 2;
+   */
+  data: Uint8Array;
+
+  /**
+   * @generated from field: string mime_type = 3;
+   */
+  mimeType: string;
+};
+
+/**
+ * Describes the message laelia.v1.UploadAgentAvatarRequest.
+ * Use `create(UploadAgentAvatarRequestSchema)` to create a new message.
+ */
+export declare const UploadAgentAvatarRequestSchema: GenMessage<UploadAgentAvatarRequest>;
+
+/**
+ * @generated from message laelia.v1.DownloadAgentAvatarRequest
+ */
+export declare type DownloadAgentAvatarRequest = Message<"laelia.v1.DownloadAgentAvatarRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.DownloadAgentAvatarRequest.
+ * Use `create(DownloadAgentAvatarRequestSchema)` to create a new message.
+ */
+export declare const DownloadAgentAvatarRequestSchema: GenMessage<DownloadAgentAvatarRequest>;
+
+/**
+ * @generated from message laelia.v1.DownloadAgentAvatarResponse
+ */
+export declare type DownloadAgentAvatarResponse = Message<"laelia.v1.DownloadAgentAvatarResponse"> & {
+  /**
+   * @generated from field: bytes data = 1;
+   */
+  data: Uint8Array;
+
+  /**
+   * @generated from field: string mime_type = 2;
+   */
+  mimeType: string;
+
+  /**
+   * @generated from field: string etag = 3;
+   */
+  etag: string;
+};
+
+/**
+ * Describes the message laelia.v1.DownloadAgentAvatarResponse.
+ * Use `create(DownloadAgentAvatarResponseSchema)` to create a new message.
+ */
+export declare const DownloadAgentAvatarResponseSchema: GenMessage<DownloadAgentAvatarResponse>;
+
+/**
+ * @generated from message laelia.v1.DeleteAgentAvatarRequest
+ */
+export declare type DeleteAgentAvatarRequest = Message<"laelia.v1.DeleteAgentAvatarRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.DeleteAgentAvatarRequest.
+ * Use `create(DeleteAgentAvatarRequestSchema)` to create a new message.
+ */
+export declare const DeleteAgentAvatarRequestSchema: GenMessage<DeleteAgentAvatarRequest>;
+
+/**
  * @generated from message laelia.v1.HelloRequest
  */
 export declare type HelloRequest = Message<"laelia.v1.HelloRequest"> & {
@@ -767,6 +851,15 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
    * @generated from field: bool can_edit = 12;
    */
   canEdit: boolean;
+
+  /**
+   * avatar is the resource name of the agent's uploaded avatar image, or empty
+   * when the agent has not uploaded one (frontend renders a deterministic pixel
+   * identicon seeded by the agent id). Format: agents/{agent}/avatar.
+   *
+   * @generated from field: string avatar = 13;
+   */
+  avatar: string;
 };
 
 /**
@@ -1352,6 +1445,40 @@ export declare const AgentService: GenService<{
     methodKind: "unary";
     input: typeof RefreshAgentTokenRequestSchema;
     output: typeof RefreshAgentTokenResponseSchema;
+  },
+  /**
+   * UploadAgentAvatar replaces an agent's avatar image. Requires
+   * laelia.agents.edit on the agent; the caller must be the agent's creator or a
+   * workspace admin. No google.api.http annotation: bytes travel over Connect-JSON.
+   *
+   * @generated from rpc laelia.v1.AgentService.UploadAgentAvatar
+   */
+  uploadAgentAvatar: {
+    methodKind: "unary";
+    input: typeof UploadAgentAvatarRequestSchema;
+    output: typeof AgentSchema;
+  },
+  /**
+   * DownloadAgentAvatar fetches an agent's avatar image bytes. Any authenticated
+   * user may download any agent's avatar (workspace-internal profile image).
+   *
+   * @generated from rpc laelia.v1.AgentService.DownloadAgentAvatar
+   */
+  downloadAgentAvatar: {
+    methodKind: "unary";
+    input: typeof DownloadAgentAvatarRequestSchema;
+    output: typeof DownloadAgentAvatarResponseSchema;
+  },
+  /**
+   * DeleteAgentAvatar clears an agent's avatar, reverting to the pixel default.
+   * Requires laelia.agents.edit on the agent.
+   *
+   * @generated from rpc laelia.v1.AgentService.DeleteAgentAvatar
+   */
+  deleteAgentAvatar: {
+    methodKind: "unary";
+    input: typeof DeleteAgentAvatarRequestSchema;
+    output: typeof AgentSchema;
   },
   /**
    * Health check (no auth required)

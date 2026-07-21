@@ -74,6 +74,15 @@ const (
 	// AgentServiceRefreshAgentTokenProcedure is the fully-qualified name of the AgentService's
 	// RefreshAgentToken RPC.
 	AgentServiceRefreshAgentTokenProcedure = "/laelia.v1.AgentService/RefreshAgentToken"
+	// AgentServiceUploadAgentAvatarProcedure is the fully-qualified name of the AgentService's
+	// UploadAgentAvatar RPC.
+	AgentServiceUploadAgentAvatarProcedure = "/laelia.v1.AgentService/UploadAgentAvatar"
+	// AgentServiceDownloadAgentAvatarProcedure is the fully-qualified name of the AgentService's
+	// DownloadAgentAvatar RPC.
+	AgentServiceDownloadAgentAvatarProcedure = "/laelia.v1.AgentService/DownloadAgentAvatar"
+	// AgentServiceDeleteAgentAvatarProcedure is the fully-qualified name of the AgentService's
+	// DeleteAgentAvatar RPC.
+	AgentServiceDeleteAgentAvatarProcedure = "/laelia.v1.AgentService/DeleteAgentAvatar"
 	// AgentServiceHelloProcedure is the fully-qualified name of the AgentService's Hello RPC.
 	AgentServiceHelloProcedure = "/laelia.v1.AgentService/Hello"
 )
@@ -106,6 +115,16 @@ type AgentServiceClient interface {
 	AgentDisconnect(context.Context, *connect.Request[v1.AgentDisconnectRequest]) (*connect.Response[emptypb.Empty], error)
 	// Agent refreshes access token
 	RefreshAgentToken(context.Context, *connect.Request[v1.RefreshAgentTokenRequest]) (*connect.Response[v1.RefreshAgentTokenResponse], error)
+	// UploadAgentAvatar replaces an agent's avatar image. Requires
+	// laelia.agents.edit on the agent; the caller must be the agent's creator or a
+	// workspace admin. No google.api.http annotation: bytes travel over Connect-JSON.
+	UploadAgentAvatar(context.Context, *connect.Request[v1.UploadAgentAvatarRequest]) (*connect.Response[v1.Agent], error)
+	// DownloadAgentAvatar fetches an agent's avatar image bytes. Any authenticated
+	// user may download any agent's avatar (workspace-internal profile image).
+	DownloadAgentAvatar(context.Context, *connect.Request[v1.DownloadAgentAvatarRequest]) (*connect.Response[v1.DownloadAgentAvatarResponse], error)
+	// DeleteAgentAvatar clears an agent's avatar, reverting to the pixel default.
+	// Requires laelia.agents.edit on the agent.
+	DeleteAgentAvatar(context.Context, *connect.Request[v1.DeleteAgentAvatarRequest]) (*connect.Response[v1.Agent], error)
 	// Health check (no auth required)
 	Hello(context.Context, *connect.Request[v1.HelloRequest]) (*connect.Response[v1.HelloResponse], error)
 }
@@ -205,6 +224,24 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(agentServiceMethods.ByName("RefreshAgentToken")),
 			connect.WithClientOptions(opts...),
 		),
+		uploadAgentAvatar: connect.NewClient[v1.UploadAgentAvatarRequest, v1.Agent](
+			httpClient,
+			baseURL+AgentServiceUploadAgentAvatarProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("UploadAgentAvatar")),
+			connect.WithClientOptions(opts...),
+		),
+		downloadAgentAvatar: connect.NewClient[v1.DownloadAgentAvatarRequest, v1.DownloadAgentAvatarResponse](
+			httpClient,
+			baseURL+AgentServiceDownloadAgentAvatarProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("DownloadAgentAvatar")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteAgentAvatar: connect.NewClient[v1.DeleteAgentAvatarRequest, v1.Agent](
+			httpClient,
+			baseURL+AgentServiceDeleteAgentAvatarProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("DeleteAgentAvatar")),
+			connect.WithClientOptions(opts...),
+		),
 		hello: connect.NewClient[v1.HelloRequest, v1.HelloResponse](
 			httpClient,
 			baseURL+AgentServiceHelloProcedure,
@@ -230,6 +267,9 @@ type agentServiceClient struct {
 	agentHeartbeat        *connect.Client[v1.AgentHeartbeatRequest, v1.AgentHeartbeatResponse]
 	agentDisconnect       *connect.Client[v1.AgentDisconnectRequest, emptypb.Empty]
 	refreshAgentToken     *connect.Client[v1.RefreshAgentTokenRequest, v1.RefreshAgentTokenResponse]
+	uploadAgentAvatar     *connect.Client[v1.UploadAgentAvatarRequest, v1.Agent]
+	downloadAgentAvatar   *connect.Client[v1.DownloadAgentAvatarRequest, v1.DownloadAgentAvatarResponse]
+	deleteAgentAvatar     *connect.Client[v1.DeleteAgentAvatarRequest, v1.Agent]
 	hello                 *connect.Client[v1.HelloRequest, v1.HelloResponse]
 }
 
@@ -303,6 +343,21 @@ func (c *agentServiceClient) RefreshAgentToken(ctx context.Context, req *connect
 	return c.refreshAgentToken.CallUnary(ctx, req)
 }
 
+// UploadAgentAvatar calls laelia.v1.AgentService.UploadAgentAvatar.
+func (c *agentServiceClient) UploadAgentAvatar(ctx context.Context, req *connect.Request[v1.UploadAgentAvatarRequest]) (*connect.Response[v1.Agent], error) {
+	return c.uploadAgentAvatar.CallUnary(ctx, req)
+}
+
+// DownloadAgentAvatar calls laelia.v1.AgentService.DownloadAgentAvatar.
+func (c *agentServiceClient) DownloadAgentAvatar(ctx context.Context, req *connect.Request[v1.DownloadAgentAvatarRequest]) (*connect.Response[v1.DownloadAgentAvatarResponse], error) {
+	return c.downloadAgentAvatar.CallUnary(ctx, req)
+}
+
+// DeleteAgentAvatar calls laelia.v1.AgentService.DeleteAgentAvatar.
+func (c *agentServiceClient) DeleteAgentAvatar(ctx context.Context, req *connect.Request[v1.DeleteAgentAvatarRequest]) (*connect.Response[v1.Agent], error) {
+	return c.deleteAgentAvatar.CallUnary(ctx, req)
+}
+
 // Hello calls laelia.v1.AgentService.Hello.
 func (c *agentServiceClient) Hello(ctx context.Context, req *connect.Request[v1.HelloRequest]) (*connect.Response[v1.HelloResponse], error) {
 	return c.hello.CallUnary(ctx, req)
@@ -336,6 +391,16 @@ type AgentServiceHandler interface {
 	AgentDisconnect(context.Context, *connect.Request[v1.AgentDisconnectRequest]) (*connect.Response[emptypb.Empty], error)
 	// Agent refreshes access token
 	RefreshAgentToken(context.Context, *connect.Request[v1.RefreshAgentTokenRequest]) (*connect.Response[v1.RefreshAgentTokenResponse], error)
+	// UploadAgentAvatar replaces an agent's avatar image. Requires
+	// laelia.agents.edit on the agent; the caller must be the agent's creator or a
+	// workspace admin. No google.api.http annotation: bytes travel over Connect-JSON.
+	UploadAgentAvatar(context.Context, *connect.Request[v1.UploadAgentAvatarRequest]) (*connect.Response[v1.Agent], error)
+	// DownloadAgentAvatar fetches an agent's avatar image bytes. Any authenticated
+	// user may download any agent's avatar (workspace-internal profile image).
+	DownloadAgentAvatar(context.Context, *connect.Request[v1.DownloadAgentAvatarRequest]) (*connect.Response[v1.DownloadAgentAvatarResponse], error)
+	// DeleteAgentAvatar clears an agent's avatar, reverting to the pixel default.
+	// Requires laelia.agents.edit on the agent.
+	DeleteAgentAvatar(context.Context, *connect.Request[v1.DeleteAgentAvatarRequest]) (*connect.Response[v1.Agent], error)
 	// Health check (no auth required)
 	Hello(context.Context, *connect.Request[v1.HelloRequest]) (*connect.Response[v1.HelloResponse], error)
 }
@@ -431,6 +496,24 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(agentServiceMethods.ByName("RefreshAgentToken")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentServiceUploadAgentAvatarHandler := connect.NewUnaryHandler(
+		AgentServiceUploadAgentAvatarProcedure,
+		svc.UploadAgentAvatar,
+		connect.WithSchema(agentServiceMethods.ByName("UploadAgentAvatar")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceDownloadAgentAvatarHandler := connect.NewUnaryHandler(
+		AgentServiceDownloadAgentAvatarProcedure,
+		svc.DownloadAgentAvatar,
+		connect.WithSchema(agentServiceMethods.ByName("DownloadAgentAvatar")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceDeleteAgentAvatarHandler := connect.NewUnaryHandler(
+		AgentServiceDeleteAgentAvatarProcedure,
+		svc.DeleteAgentAvatar,
+		connect.WithSchema(agentServiceMethods.ByName("DeleteAgentAvatar")),
+		connect.WithHandlerOptions(opts...),
+	)
 	agentServiceHelloHandler := connect.NewUnaryHandler(
 		AgentServiceHelloProcedure,
 		svc.Hello,
@@ -467,6 +550,12 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 			agentServiceAgentDisconnectHandler.ServeHTTP(w, r)
 		case AgentServiceRefreshAgentTokenProcedure:
 			agentServiceRefreshAgentTokenHandler.ServeHTTP(w, r)
+		case AgentServiceUploadAgentAvatarProcedure:
+			agentServiceUploadAgentAvatarHandler.ServeHTTP(w, r)
+		case AgentServiceDownloadAgentAvatarProcedure:
+			agentServiceDownloadAgentAvatarHandler.ServeHTTP(w, r)
+		case AgentServiceDeleteAgentAvatarProcedure:
+			agentServiceDeleteAgentAvatarHandler.ServeHTTP(w, r)
 		case AgentServiceHelloProcedure:
 			agentServiceHelloHandler.ServeHTTP(w, r)
 		default:
@@ -532,6 +621,18 @@ func (UnimplementedAgentServiceHandler) AgentDisconnect(context.Context, *connec
 
 func (UnimplementedAgentServiceHandler) RefreshAgentToken(context.Context, *connect.Request[v1.RefreshAgentTokenRequest]) (*connect.Response[v1.RefreshAgentTokenResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.RefreshAgentToken is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) UploadAgentAvatar(context.Context, *connect.Request[v1.UploadAgentAvatarRequest]) (*connect.Response[v1.Agent], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.UploadAgentAvatar is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) DownloadAgentAvatar(context.Context, *connect.Request[v1.DownloadAgentAvatarRequest]) (*connect.Response[v1.DownloadAgentAvatarResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.DownloadAgentAvatar is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) DeleteAgentAvatar(context.Context, *connect.Request[v1.DeleteAgentAvatarRequest]) (*connect.Response[v1.Agent], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.DeleteAgentAvatar is not implemented"))
 }
 
 func (UnimplementedAgentServiceHandler) Hello(context.Context, *connect.Request[v1.HelloRequest]) (*connect.Response[v1.HelloResponse], error) {

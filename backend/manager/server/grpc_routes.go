@@ -79,9 +79,9 @@ func configureGrpcRouters(
 	cmdDispatcher.StartPingMonitor()
 
 	iamManager := iam.NewManager(stores)
-	userService := apiv1.NewUserService(stores, profile, stateCfg, iamManager)
+	userService := apiv1.NewUserService(stores, profile, stateCfg, iamManager, s3clientmanager)
 	authService := apiv1.NewAuthService(stores, secret, profile, stateCfg)
-	agentService := apiv1.NewAgentService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager)
+	agentService := apiv1.NewAgentService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager, s3clientmanager)
 	commandService := apiv1.NewCommandService(stores, cmdDispatcher, s3clientmanager, iamManager)
 	agentCommandService := apiv1.NewAgentCommandService(stores, cmdDispatcher)
 	settingService := apiv1.NewSettingService(stores, s3clientmanager, profile)

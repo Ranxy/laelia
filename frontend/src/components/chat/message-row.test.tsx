@@ -47,18 +47,18 @@ function baseMsg(overrides: Partial<ChatMessageUI> = {}): ChatMessageUI {
 }
 
 describe("Avatar", () => {
-  it("renders the first character uppercase", () => {
+  it("renders a pixel identicon (svg) for a seed", () => {
     act(() => {
-      root!.render(<Avatar label="agent" />);
+      root!.render(<Avatar seed="42" />);
     });
-    expect(container?.textContent).toBe("A");
+    expect(container?.querySelector("svg")).not.toBeNull();
   });
 
-  it("renders U for the current user", () => {
+  it("falls back to the label initial when no seed is given", () => {
     act(() => {
-      root!.render(<Avatar label="U" />);
+      root!.render(<Avatar seed="" label="agent" />);
     });
-    expect(container?.textContent).toBe("U");
+    expect(container?.textContent).toBe("A");
   });
 });
 

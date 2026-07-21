@@ -21,6 +21,11 @@ import { ChatToolCall } from "@/components/chat-events/tool-call";
 import { ChatWarning } from "@/components/chat-events/warning";
 import { CommandStatusBadge } from "@/components/command-status-badge";
 import { AttachmentCommentCard } from "@/components/preview/attachment-comment-card";
+import {
+  avatarNameForAgentId,
+  avatarNameForUserId,
+  useAvatar,
+} from "@/lib/avatar-cache";
 import { isImageAttachment } from "@/lib/image-file";
 import {
   isMarkdownAttachment,
@@ -144,6 +149,23 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
   // to true when either id is unknown (optimistic send / legacy rows) so the
   // label never flips mid-stream.
   const isOwnUser = isOwnUserMessage(msg, currentPrincipalId);
+
+  // Avatar: the pixel identicon is seeded by a stable id (the user's principal
+  // id, or the agent's resource id). When the sender has an uploaded avatar,
+  // useAvatar fetches its blob URL (cached per session); otherwise fall back to
+  // the pixel identicon.
+  const avatarSeed = isUser
+    ? msg.principalId || currentPrincipalId || ""
+    : msg.agentId || agentTitle || "agent";
+  const avatarName = isUser
+    ? msg.principalId || currentPrincipalId
+      ? avatarNameForUserId(msg.principalId || currentPrincipalId || "")
+      : undefined
+    : msg.agentId
+      ? avatarNameForAgentId(msg.agentId)
+      : undefined;
+  const avatarSrc = useAvatar(avatarName);
+
   const isStreaming = msg.streaming;
   const displayContent = isStreaming ? streamingContent : msg.content;
   const events = isStreaming ? streamingEvents : (msg.events ?? EMPTY_EVENTS);
@@ -261,13 +283,8 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
       <div className="flex shrink-0 flex-col items-center pt-0.5">
         {showAvatar ? (
           <Avatar
-            label={
-              isUser
-                ? isOwnUser
-                  ? "U"
-                  : (msg.senderName ?? "U")
-                : agentTitle || "A"
-            }
+            seed={avatarSeed}
+            src={avatarSrc}
             accent={isUser ? isOwnUser : false}
           />
         ) : (

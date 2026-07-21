@@ -87,6 +87,21 @@ service UserService {
     option (laelia.v1.permission) = "laelia.users.delete";
     option (laelia.v1.audit) = true;
   }
+
+  // UploadAvatar replaces the current user's avatar image. Self only: the
+  // caller must be the user named by the resource. The image bytes are
+  // re-encoded/stored server-side; clients should resize before uploading.
+  // No google.api.http annotation: bytes travel over Connect-JSON like
+  // CommandService.UploadFile.
+  rpc UploadAvatar(UploadAvatarRequest) returns (User);
+
+  // DownloadAvatar fetches a user's avatar image bytes. Any authenticated
+  // user can download any user's avatar (workspace-internal profile image).
+  rpc DownloadAvatar(DownloadAvatarRequest) returns (DownloadAvatarResponse);
+
+  // DeleteAvatar clears the current user's avatar, reverting to the pixel
+  // default. Self only.
+  rpc DeleteAvatar(DeleteAvatarRequest) returns (User);
 }
 
 message GetUserRequest {
@@ -260,6 +275,11 @@ message User {
   // Populated only by GetCurrentUser so the frontend can gate debug-only UI
   // without calling the admin-gated SettingService.GetDebugConfig.
   bool debug_mode = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // avatar is the resource name of the user's uploaded avatar image, or empty
+  // when the user has not uploaded one (in which case the frontend renders a
+  // deterministic pixel identicon seeded by the user id). Format: users/{user}/avatar.
+  string avatar = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 enum UserType {
@@ -274,4 +294,35 @@ message UserProfile {
   google.protobuf.Timestamp last_change_password_time = 2;
   // source means where the user comes from. For now we support Entra ID SCIM sync, so the source could be Entra ID.
   string source = 3;
+}
+
+message UploadAvatarRequest {
+  // The avatar image bytes (png/jpeg/webp/gif). Clients should resize before
+  // uploading; the server enforces a hard byte cap regardless.
+  bytes data = 1 [(google.api.field_behavior) = REQUIRED];
+  // The mime type of data, e.g. "image/png".
+  string mime_type = 2;
+}
+
+message DownloadAvatarRequest {
+  // The avatar resource name. Format: users/{user}/avatar.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/User"
+  ];
+}
+
+message DownloadAvatarResponse {
+  bytes data = 1;
+  string mime_type = 2;
+  // etag is a content hash of data, usable as a cache-busting token.
+  string etag = 3;
+}
+
+message DeleteAvatarRequest {
+  // The avatar resource name. Format: users/{user}/avatar. Must be the caller's own.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/User"
+  ];
 }
