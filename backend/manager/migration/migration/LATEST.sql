@@ -678,3 +678,14 @@ CREATE INDEX IF NOT EXISTS idx_user_thread_participant_user
 -- activity inline, so this is mainly for any future backfill/debug.
 CREATE INDEX IF NOT EXISTS idx_chat_message_mentions_gin
     ON chat_message USING GIN (mentions jsonb_path_ops);
+
+-- Schema migration history (bytebase-style version tracking). The migrator
+-- records each applied schema version here; the UNIQUE(version) index guards
+-- against double-application. Created by LATEST.sql on fresh installs.
+CREATE TABLE IF NOT EXISTS schema_migration_history (
+    id bigserial PRIMARY KEY,
+    version text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_schema_migration_history_unique_version
+    ON schema_migration_history (version);

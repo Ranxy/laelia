@@ -6,18 +6,33 @@ import (
 	"testing"
 )
 
-// latestSQL loads the canonical schema file. It is applied externally (a
-// migration framework is T23's remit), so the tests here guard the file's
-// contents directly rather than executing it against a live database.
+// latestSQL loads the canonical cumulative schema file. It is the baseline
+// applied to fresh installs by the migrator; the tests here guard its contents
+// directly rather than executing it against a live database.
 func latestSQL(t *testing.T) string {
 	t.Helper()
-	// This test file lives in backend/manager/migration/, so latest.sql is a
-	// sibling. go test runs with the package directory as the working directory.
-	bytes, err := os.ReadFile("latest.sql")
+	// This test file lives in backend/manager/migration/, so migration/LATEST.sql
+	// is a relative path under it. go test runs with the package directory as the
+	// working directory.
+	bytes, err := os.ReadFile("migration/LATEST.sql")
 	if err != nil {
-		t.Fatalf("read latest.sql: %v", err)
+		t.Fatalf("read migration/LATEST.sql: %v", err)
 	}
 	return string(bytes)
+}
+
+// TestSchemaMigrationHistoryPresent locks in the version-tracking table the
+// migrator records applied versions in. It is created by LATEST.sql on fresh
+// installs.
+func TestSchemaMigrationHistoryPresent(t *testing.T) {
+	sql := latestSQL(t)
+
+	if !strings.Contains(sql, "CREATE TABLE IF NOT EXISTS schema_migration_history") {
+		t.Error("LATEST.sql missing schema_migration_history table definition")
+	}
+	if !strings.Contains(sql, "idx_schema_migration_history_unique_version") {
+		t.Error("LATEST.sql missing unique version index on schema_migration_history")
+	}
 }
 
 // TestSearchChatHistoryTrgmIndexPresent locks in the pg_trgm GIN index that

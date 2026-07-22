@@ -19,6 +19,7 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/component/scheduler"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/config"
+	"github.com/Ranxy/laelia/backend/manager/migration"
 	"github.com/Ranxy/laelia/backend/manager/store"
 
 	"github.com/pkg/errors"
@@ -82,6 +83,14 @@ func NewServer(ctx context.Context, profile *config.Profile) (*Server, error) {
 	stores, err := store.New(ctx, profile.PgURL, false)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to new store")
+	}
+	// Migrate the metadata schema to the latest embedded version before any
+	// subsystem reads from it. On failure, close the store and abort startup.
+	// s.store is assigned only after migration succeeds so the serverStarted
+	// defer does not double-close the store.
+	if err := migration.MigrateSchema(ctx, stores.GetDB()); err != nil {
+		_ = stores.Close()
+		return nil, errors.Wrap(err, "failed to migrate database schema")
 	}
 	s.store = stores
 	s.runnerCtx, s.runnerCancel = context.WithCancel(ctx)
