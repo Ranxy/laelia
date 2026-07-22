@@ -22,10 +22,23 @@ export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
       create(LoginRequestSchema, { email, password, web: true })
     );
 
+    // Seed the session from the login response so navigation can proceed.
+    // The login response's User omits caller-scoped fields (permissions,
+    // workspace_admin, debug_mode) which GetCurrentUser is the only endpoint
+    // that populates. Re-fetch the current user to fill them in — otherwise
+    // permission-gated UI such as the Settings sidebar group stays hidden
+    // until a full page refresh triggers loadSession -> GetCurrentUser.
     set({
       currentUser: res.user ?? null,
       isLoggedIn: true,
     });
+    try {
+      const user = await userServiceClient.getCurrentUser({});
+      set({ currentUser: user });
+    } catch {
+      // Keep the login-response user; the session cookie is already set, so
+      // the caller stays logged in even if the enrichment fetch fails.
+    }
   },
 
   async logout() {
