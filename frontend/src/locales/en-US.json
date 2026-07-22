@@ -346,7 +346,9 @@
     "acp-config-save-failed": "Failed to save ACP config",
     "row-open-detail": "Open agent {{title}} details",
     "delete-confirm-title": "Delete agent",
-    "delete-confirm-description": "Are you sure you want to delete agent {{title}}? This cannot be undone."
+    "delete-confirm-description": "Are you sure you want to delete agent {{title}}? This cannot be undone.",
+    "field-name": "Agent name",
+    "create-name-required": "Please enter an agent name."
   },
   "command": {
     "status-unknown": "Unknown",

@@ -346,7 +346,9 @@
     "acp-config-save-failed": "保存 ACP 配置失败",
     "row-open-detail": "打开 Agent {{title}} 详情",
     "delete-confirm-title": "删除 Agent",
-    "delete-confirm-description": "确定要删除 Agent {{title}} 吗?此操作无法撤销。"
+    "delete-confirm-description": "确定要删除 Agent {{title}} 吗?此操作无法撤销。",
+    "field-name": "Agent 名称",
+    "create-name-required": "请输入 Agent 名称。"
   },
   "command": {
     "status-unknown": "未知",

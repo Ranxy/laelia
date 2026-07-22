@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { FieldRow } from "@/components/ui/field-row";
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
@@ -643,31 +644,6 @@ export function SettingsRolesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
-  );
-}
-
-function FieldRow({
-  label,
-  hint,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  htmlFor?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label
-        htmlFor={htmlFor}
-        className="text-xs font-semibold uppercase tracking-wide text-control"
-      >
-        {label}
-      </label>
-      {children}
-      {hint && <span className="text-xs text-control-placeholder">{hint}</span>}
     </div>
   );
 }

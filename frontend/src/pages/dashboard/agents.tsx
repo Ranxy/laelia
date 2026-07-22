@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useNavigate, useParams } from "react-router-dom";
 import { ConnectionBadge } from "@/components/connection-badge";
+import { Alert } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -18,11 +19,15 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FieldRow } from "@/components/ui/field-row";
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
+  SheetBody,
   SheetContent,
   SheetDescription,
+  SheetFooter,
+  SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
 import { buildAgentRunCommand } from "@/lib/agent-token";
@@ -86,6 +91,7 @@ export function AgentsPage() {
   const [tokenOpen, setTokenOpen] = useState(false);
   const [tokenFromRotation, setTokenFromRotation] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{
     name: string;
@@ -117,7 +123,11 @@ export function AgentsPage() {
   }, [anyNonReady, fetchAgents]);
 
   async function handleCreate() {
-    if (!name.trim()) return;
+    setCreateError("");
+    if (!name.trim()) {
+      setCreateError(t("agent.create-name-required"));
+      return;
+    }
     setCreating(true);
     try {
       const createAgent = useAppStore.getState().createAgent;
@@ -130,6 +140,8 @@ export function AgentsPage() {
       setName("");
       setCreateOpen(false);
       load();
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : String(err));
     } finally {
       setCreating(false);
     }
@@ -250,21 +262,53 @@ export function AgentsPage() {
 
       <Sheet
         open={createOpen}
-        onOpenChange={(next) => !next && setCreateOpen(false)}
+        onOpenChange={(next) => {
+          setCreateOpen(next);
+          if (!next) setCreateError("");
+        }}
       >
-        <SheetContent width="narrow">
-          <SheetTitle>{t("agent.create-title")}</SheetTitle>
-          <SheetDescription>{t("agent.create-description")}</SheetDescription>
-          <div className="flex flex-col gap-4 pt-4">
-            <Input
-              placeholder={t("agent.create-name-placeholder")}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+        <SheetContent width="medium">
+          <SheetHeader>
+            <SheetTitle>{t("agent.create-title")}</SheetTitle>
+            <SheetDescription>{t("agent.create-description")}</SheetDescription>
+          </SheetHeader>
+          <SheetBody>
+            {createError && (
+              <Alert
+                variant="error"
+                description={createError}
+                className="mb-2"
+              />
+            )}
+            <div className="flex flex-col gap-5">
+              <FieldRow
+                label={t("agent.field-name")}
+                htmlFor="create-agent-name"
+              >
+                <Input
+                  id="create-agent-name"
+                  value={name}
+                  placeholder={t("agent.create-name-placeholder")}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setCreateError("");
+                  }}
+                />
+              </FieldRow>
+            </div>
+          </SheetBody>
+          <SheetFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCreateOpen(false)}
+              disabled={creating}
+            >
+              {t("common.cancel")}
+            </Button>
             <Button disabled={creating || !name.trim()} onClick={handleCreate}>
               {creating ? t("common.creating") : t("common.create")}
             </Button>
-          </div>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
 
