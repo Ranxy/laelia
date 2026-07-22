@@ -174,7 +174,11 @@ export function SettingsStoragePage() {
                   value={form.secretKey}
                   placeholder={t("settings.s3.secret-placeholder")}
                   onChange={(e) => set("secretKey", e.target.value)}
-                  autoComplete="off"
+                  // "new-password" tells the browser this is a credential
+                  // creation form, not a login form, so it won't autofill saved
+                  // passwords — and won't treat the Access Key field above as a
+                  // username. Chrome ignores autoComplete="off".
+                  autoComplete="new-password"
                 />
               </Field>
             </div>

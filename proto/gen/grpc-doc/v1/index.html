@@ -1259,6 +1259,18 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.GetSetupStatusRequest"><span class="badge">M</span>GetSetupStatusRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetSetupStatusResponse"><span class="badge">M</span>GetSetupStatusResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SetupItem"><span class="badge">M</span>SetupItem</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.UpdateDebugConfigRequest"><span class="badge">M</span>UpdateDebugConfigRequest</a>
                 </li>
               
@@ -12234,6 +12246,68 @@ string from the permission catalog. </p></td>
 
         
       
+        <h3 id="laelia.v1.GetSetupStatusRequest">GetSetupStatusRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.GetSetupStatusResponse">GetSetupStatusResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>items</td>
+                  <td><a href="#laelia.v1.SetupItem">SetupItem</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SetupItem">SetupItem</h3>
+        <p>SetupItem describes one required-config item the admin onboarding overlay</p><p>surfaces. The backend is the source of truth for `configured`; the frontend</p><p>owns presentation (title/description/route) keyed by `id`.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>configured</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.UpdateDebugConfigRequest">UpdateDebugConfigRequest</h3>
         <p></p>
 
@@ -12359,6 +12433,14 @@ string from the permission catalog. </p></td>
               </tr>
             
               <tr>
+                <td>GetSetupStatus</td>
+                <td><a href="#laelia.v1.GetSetupStatusRequest">GetSetupStatusRequest</a></td>
+                <td><a href="#laelia.v1.GetSetupStatusResponse">GetSetupStatusResponse</a></td>
+                <td><p>GetSetupStatus reports which required-config items are not yet configured,
+so the frontend can guide an admin to finish setting up the workspace.</p></td>
+              </tr>
+            
+              <tr>
                 <td>GetDebugConfig</td>
                 <td><a href="#laelia.v1.GetDebugConfigRequest">GetDebugConfigRequest</a></td>
                 <td><a href="#laelia.v1.GetDebugConfigResponse">GetDebugConfigResponse</a></td>
@@ -12407,6 +12489,16 @@ string from the permission catalog. </p></td>
                 <td>PATCH</td>
                 <td>/v1/s3Config</td>
                 <td>config</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetSetupStatus</td>
+                <td>GET</td>
+                <td>/v1/setupStatus</td>
+                <td></td>
               </tr>
               
             

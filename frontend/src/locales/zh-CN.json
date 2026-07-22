@@ -170,6 +170,22 @@
       "role-sheet-discard-description": "你对此角色的成员有未保存的更改。确定放弃吗？"
     }
   },
+  "setup": {
+    "dialog": {
+      "title": "完成工作区配置",
+      "description": "部分必需配置尚未完成，配置后才能启用全部功能。"
+    },
+    "item": {
+      "s3": {
+        "title": "对象存储 (S3)",
+        "description": "未配置 S3 前，上传与下载不可用。"
+      }
+    },
+    "action": {
+      "configure": "去配置",
+      "remind-later": "稍后提醒"
+    }
+  },
   "user": {
     "title": "用户管理",
     "tab-active": "活跃用户",

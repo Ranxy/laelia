@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { ImagePreviewOverlay } from "@/components/preview/image-preview-overlay";
 import { MarkdownPreviewOverlay } from "@/components/preview/markdown-preview-overlay";
+import { SetupChecklistDialog } from "@/components/setup-checklist-dialog";
 import { DesktopSidebar, MobileSidebar } from "@/components/sidebar";
 import { UserMenu } from "@/components/user-menu";
 
@@ -64,6 +65,8 @@ export function DashboardLayout() {
       {/* Store-driven preview overlays (render only when active). */}
       <MarkdownPreviewOverlay />
       <ImagePreviewOverlay />
+      {/* Admin onboarding: prompts admins to finish required config. */}
+      <SetupChecklistDialog />
     </div>
   );
 }

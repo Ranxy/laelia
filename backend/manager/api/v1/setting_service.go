@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/Ranxy/laelia/backend/common/log"
+	models "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
@@ -68,6 +69,55 @@ func (s *SettingService) UpdateS3Config(ctx context.Context, req *connect.Reques
 
 	in.SecretKey = maskSecret(in.SecretKey)
 	return connect.NewResponse(&v1pb.UpdateS3ConfigResponse{Config: in}), nil
+}
+
+// setupCheck reports whether one required-config item is fully configured.
+type setupCheck func(ctx context.Context) (bool, error)
+
+// setupChecks is the registry of required-config items the admin onboarding
+// overlay surfaces. Add an entry here (plus a predicate) to extend the overlay;
+// the frontend mirrors each id with its presentation (title/description/route).
+func (s *SettingService) setupChecks() []struct {
+	id    string
+	check setupCheck
+} {
+	return []struct {
+		id    string
+		check setupCheck
+	}{
+		{"s3", s.checkS3Configured},
+	}
+}
+
+// checkS3Configured reports whether S3 is fully usable: both endpoint and
+// bucket must be set. This is stricter than the s3client "both empty" sentinel
+// (component/s3client), which only catches the completely-unset case; for a
+// "you still need to act" checklist a half-filled config must still count as
+// unconfigured.
+func (s *SettingService) checkS3Configured(ctx context.Context) (bool, error) {
+	cfg, err := s.store.GetS3ConfigSetting(ctx)
+	if err != nil {
+		return false, err
+	}
+	return s3Configured(cfg), nil
+}
+
+// s3Configured is the pure predicate behind checkS3Configured, extracted so the
+// "both fields required" contract can be unit-tested without a database.
+func s3Configured(cfg *models.S3ConfigSetting) bool {
+	return cfg.Endpoint != "" && cfg.Bucket != ""
+}
+
+func (s *SettingService) GetSetupStatus(ctx context.Context, _ *connect.Request[v1pb.GetSetupStatusRequest]) (*connect.Response[v1pb.GetSetupStatusResponse], error) {
+	items := make([]*v1pb.SetupItem, 0, len(s.setupChecks()))
+	for _, c := range s.setupChecks() {
+		ok, err := c.check(ctx)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to check setup item %q", c.id))
+		}
+		items = append(items, &v1pb.SetupItem{Id: c.id, Configured: ok})
+	}
+	return connect.NewResponse(&v1pb.GetSetupStatusResponse{Items: items}), nil
 }
 
 func (s *SettingService) GetDebugConfig(_ context.Context, _ *connect.Request[v1pb.GetDebugConfigRequest]) (*connect.Response[v1pb.GetDebugConfigResponse], error) {

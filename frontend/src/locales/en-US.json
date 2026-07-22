@@ -170,6 +170,22 @@
       "role-sheet-discard-description": "You have unsaved changes to this role's members. Discard them?"
     }
   },
+  "setup": {
+    "dialog": {
+      "title": "Finish setting up your workspace",
+      "description": "Some required configuration is not ready yet. Set it up to enable all features."
+    },
+    "item": {
+      "s3": {
+        "title": "Object storage (S3)",
+        "description": "Uploads and downloads are disabled until S3 is configured."
+      }
+    },
+    "action": {
+      "configure": "Configure",
+      "remind-later": "Remind me later"
+    }
+  },
   "user": {
     "title": "Users",
     "tab-active": "Active",

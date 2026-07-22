@@ -72,6 +72,59 @@ export declare type UpdateS3ConfigResponse = Message<"laelia.v1.UpdateS3ConfigRe
 export declare const UpdateS3ConfigResponseSchema: GenMessage<UpdateS3ConfigResponse>;
 
 /**
+ * @generated from message laelia.v1.GetSetupStatusRequest
+ */
+export declare type GetSetupStatusRequest = Message<"laelia.v1.GetSetupStatusRequest"> & {
+};
+
+/**
+ * Describes the message laelia.v1.GetSetupStatusRequest.
+ * Use `create(GetSetupStatusRequestSchema)` to create a new message.
+ */
+export declare const GetSetupStatusRequestSchema: GenMessage<GetSetupStatusRequest>;
+
+/**
+ * SetupItem describes one required-config item the admin onboarding overlay
+ * surfaces. The backend is the source of truth for `configured`; the frontend
+ * owns presentation (title/description/route) keyed by `id`.
+ *
+ * @generated from message laelia.v1.SetupItem
+ */
+export declare type SetupItem = Message<"laelia.v1.SetupItem"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: bool configured = 2;
+   */
+  configured: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.SetupItem.
+ * Use `create(SetupItemSchema)` to create a new message.
+ */
+export declare const SetupItemSchema: GenMessage<SetupItem>;
+
+/**
+ * @generated from message laelia.v1.GetSetupStatusResponse
+ */
+export declare type GetSetupStatusResponse = Message<"laelia.v1.GetSetupStatusResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.SetupItem items = 1;
+   */
+  items: SetupItem[];
+};
+
+/**
+ * Describes the message laelia.v1.GetSetupStatusResponse.
+ * Use `create(GetSetupStatusResponseSchema)` to create a new message.
+ */
+export declare const GetSetupStatusResponseSchema: GenMessage<GetSetupStatusResponse>;
+
+/**
  * @generated from message laelia.v1.GetDebugConfigRequest
  */
 export declare type GetDebugConfigRequest = Message<"laelia.v1.GetDebugConfigRequest"> & {
@@ -155,6 +208,17 @@ export declare const SettingService: GenService<{
     methodKind: "unary";
     input: typeof UpdateS3ConfigRequestSchema;
     output: typeof UpdateS3ConfigResponseSchema;
+  },
+  /**
+   * GetSetupStatus reports which required-config items are not yet configured,
+   * so the frontend can guide an admin to finish setting up the workspace.
+   *
+   * @generated from rpc laelia.v1.SettingService.GetSetupStatus
+   */
+  getSetupStatus: {
+    methodKind: "unary";
+    input: typeof GetSetupStatusRequestSchema;
+    output: typeof GetSetupStatusResponseSchema;
   },
   /**
    * @generated from rpc laelia.v1.SettingService.GetDebugConfig

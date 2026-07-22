@@ -23,6 +23,20 @@ message UpdateS3ConfigResponse {
   laelia.store.S3ConfigSetting config = 1;
 }
 
+message GetSetupStatusRequest {}
+
+// SetupItem describes one required-config item the admin onboarding overlay
+// surfaces. The backend is the source of truth for `configured`; the frontend
+// owns presentation (title/description/route) keyed by `id`.
+message SetupItem {
+  string id = 1;
+  bool configured = 2;
+}
+
+message GetSetupStatusResponse {
+  repeated SetupItem items = 1;
+}
+
 message GetDebugConfigRequest {}
 
 message GetDebugConfigResponse {
@@ -56,6 +70,14 @@ service SettingService {
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.update";
     option (laelia.v1.audit) = true;
+  }
+
+  // GetSetupStatus reports which required-config items are not yet configured,
+  // so the frontend can guide an admin to finish setting up the workspace.
+  rpc GetSetupStatus(GetSetupStatusRequest) returns (GetSetupStatusResponse) {
+    option (google.api.http) = {get: "/v1/setupStatus"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.settings.get";
   }
 
   rpc GetDebugConfig(GetDebugConfigRequest) returns (GetDebugConfigResponse) {

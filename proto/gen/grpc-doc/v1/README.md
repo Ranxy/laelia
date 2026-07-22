@@ -279,6 +279,9 @@
     - [GetDebugConfigResponse](#laelia-v1-GetDebugConfigResponse)
     - [GetS3ConfigRequest](#laelia-v1-GetS3ConfigRequest)
     - [GetS3ConfigResponse](#laelia-v1-GetS3ConfigResponse)
+    - [GetSetupStatusRequest](#laelia-v1-GetSetupStatusRequest)
+    - [GetSetupStatusResponse](#laelia-v1-GetSetupStatusResponse)
+    - [SetupItem](#laelia-v1-SetupItem)
     - [UpdateDebugConfigRequest](#laelia-v1-UpdateDebugConfigRequest)
     - [UpdateDebugConfigResponse](#laelia-v1-UpdateDebugConfigResponse)
     - [UpdateS3ConfigRequest](#laelia-v1-UpdateS3ConfigRequest)
@@ -4681,6 +4684,49 @@ laelia.roles.* permissions.
 
 
 
+<a name="laelia-v1-GetSetupStatusRequest"></a>
+
+### GetSetupStatusRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-GetSetupStatusResponse"></a>
+
+### GetSetupStatusResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| items | [SetupItem](#laelia-v1-SetupItem) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-SetupItem"></a>
+
+### SetupItem
+SetupItem describes one required-config item the admin onboarding overlay
+surfaces. The backend is the source of truth for `configured`; the frontend
+owns presentation (title/description/route) keyed by `id`.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| id | [string](#string) |  |  |
+| configured | [bool](#bool) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-UpdateDebugConfigRequest"></a>
 
 ### UpdateDebugConfigRequest
@@ -4759,6 +4805,7 @@ an update carrying a masked secret preserves the stored value.
 | ----------- | ------------ | ------------- | ------------|
 | GetS3Config | [GetS3ConfigRequest](#laelia-v1-GetS3ConfigRequest) | [GetS3ConfigResponse](#laelia-v1-GetS3ConfigResponse) |  |
 | UpdateS3Config | [UpdateS3ConfigRequest](#laelia-v1-UpdateS3ConfigRequest) | [UpdateS3ConfigResponse](#laelia-v1-UpdateS3ConfigResponse) |  |
+| GetSetupStatus | [GetSetupStatusRequest](#laelia-v1-GetSetupStatusRequest) | [GetSetupStatusResponse](#laelia-v1-GetSetupStatusResponse) | GetSetupStatus reports which required-config items are not yet configured, so the frontend can guide an admin to finish setting up the workspace. |
 | GetDebugConfig | [GetDebugConfigRequest](#laelia-v1-GetDebugConfigRequest) | [GetDebugConfigResponse](#laelia-v1-GetDebugConfigResponse) |  |
 | UpdateDebugConfig | [UpdateDebugConfigRequest](#laelia-v1-UpdateDebugConfigRequest) | [UpdateDebugConfigResponse](#laelia-v1-UpdateDebugConfigResponse) |  |
 

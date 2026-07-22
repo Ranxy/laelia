@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	SettingService_GetS3Config_FullMethodName       = "/laelia.v1.SettingService/GetS3Config"
 	SettingService_UpdateS3Config_FullMethodName    = "/laelia.v1.SettingService/UpdateS3Config"
+	SettingService_GetSetupStatus_FullMethodName    = "/laelia.v1.SettingService/GetSetupStatus"
 	SettingService_GetDebugConfig_FullMethodName    = "/laelia.v1.SettingService/GetDebugConfig"
 	SettingService_UpdateDebugConfig_FullMethodName = "/laelia.v1.SettingService/UpdateDebugConfig"
 )
@@ -36,6 +37,9 @@ const (
 type SettingServiceClient interface {
 	GetS3Config(ctx context.Context, in *GetS3ConfigRequest, opts ...grpc.CallOption) (*GetS3ConfigResponse, error)
 	UpdateS3Config(ctx context.Context, in *UpdateS3ConfigRequest, opts ...grpc.CallOption) (*UpdateS3ConfigResponse, error)
+	// GetSetupStatus reports which required-config items are not yet configured,
+	// so the frontend can guide an admin to finish setting up the workspace.
+	GetSetupStatus(ctx context.Context, in *GetSetupStatusRequest, opts ...grpc.CallOption) (*GetSetupStatusResponse, error)
 	GetDebugConfig(ctx context.Context, in *GetDebugConfigRequest, opts ...grpc.CallOption) (*GetDebugConfigResponse, error)
 	UpdateDebugConfig(ctx context.Context, in *UpdateDebugConfigRequest, opts ...grpc.CallOption) (*UpdateDebugConfigResponse, error)
 }
@@ -62,6 +66,16 @@ func (c *settingServiceClient) UpdateS3Config(ctx context.Context, in *UpdateS3C
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateS3ConfigResponse)
 	err := c.cc.Invoke(ctx, SettingService_UpdateS3Config_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *settingServiceClient) GetSetupStatus(ctx context.Context, in *GetSetupStatusRequest, opts ...grpc.CallOption) (*GetSetupStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSetupStatusResponse)
+	err := c.cc.Invoke(ctx, SettingService_GetSetupStatus_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +113,9 @@ func (c *settingServiceClient) UpdateDebugConfig(ctx context.Context, in *Update
 type SettingServiceServer interface {
 	GetS3Config(context.Context, *GetS3ConfigRequest) (*GetS3ConfigResponse, error)
 	UpdateS3Config(context.Context, *UpdateS3ConfigRequest) (*UpdateS3ConfigResponse, error)
+	// GetSetupStatus reports which required-config items are not yet configured,
+	// so the frontend can guide an admin to finish setting up the workspace.
+	GetSetupStatus(context.Context, *GetSetupStatusRequest) (*GetSetupStatusResponse, error)
 	GetDebugConfig(context.Context, *GetDebugConfigRequest) (*GetDebugConfigResponse, error)
 	UpdateDebugConfig(context.Context, *UpdateDebugConfigRequest) (*UpdateDebugConfigResponse, error)
 	mustEmbedUnimplementedSettingServiceServer()
@@ -116,6 +133,9 @@ func (UnimplementedSettingServiceServer) GetS3Config(context.Context, *GetS3Conf
 }
 func (UnimplementedSettingServiceServer) UpdateS3Config(context.Context, *UpdateS3ConfigRequest) (*UpdateS3ConfigResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateS3Config not implemented")
+}
+func (UnimplementedSettingServiceServer) GetSetupStatus(context.Context, *GetSetupStatusRequest) (*GetSetupStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSetupStatus not implemented")
 }
 func (UnimplementedSettingServiceServer) GetDebugConfig(context.Context, *GetDebugConfigRequest) (*GetDebugConfigResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetDebugConfig not implemented")
@@ -180,6 +200,24 @@ func _SettingService_UpdateS3Config_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SettingService_GetSetupStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSetupStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingServiceServer).GetSetupStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingService_GetSetupStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingServiceServer).GetSetupStatus(ctx, req.(*GetSetupStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SettingService_GetDebugConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetDebugConfigRequest)
 	if err := dec(in); err != nil {
@@ -230,6 +268,10 @@ var SettingService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateS3Config",
 			Handler:    _SettingService_UpdateS3Config_Handler,
+		},
+		{
+			MethodName: "GetSetupStatus",
+			Handler:    _SettingService_GetSetupStatus_Handler,
 		},
 		{
 			MethodName: "GetDebugConfig",

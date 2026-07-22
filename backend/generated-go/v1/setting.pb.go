@@ -191,6 +191,141 @@ func (x *UpdateS3ConfigResponse) GetConfig() *store.S3ConfigSetting {
 	return nil
 }
 
+type GetSetupStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSetupStatusRequest) Reset() {
+	*x = GetSetupStatusRequest{}
+	mi := &file_v1_setting_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSetupStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSetupStatusRequest) ProtoMessage() {}
+
+func (x *GetSetupStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_setting_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSetupStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetSetupStatusRequest) Descriptor() ([]byte, []int) {
+	return file_v1_setting_proto_rawDescGZIP(), []int{4}
+}
+
+// SetupItem describes one required-config item the admin onboarding overlay
+// surfaces. The backend is the source of truth for `configured`; the frontend
+// owns presentation (title/description/route) keyed by `id`.
+type SetupItem struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Configured    bool                   `protobuf:"varint,2,opt,name=configured,proto3" json:"configured,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetupItem) Reset() {
+	*x = SetupItem{}
+	mi := &file_v1_setting_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupItem) ProtoMessage() {}
+
+func (x *SetupItem) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_setting_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupItem.ProtoReflect.Descriptor instead.
+func (*SetupItem) Descriptor() ([]byte, []int) {
+	return file_v1_setting_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *SetupItem) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SetupItem) GetConfigured() bool {
+	if x != nil {
+		return x.Configured
+	}
+	return false
+}
+
+type GetSetupStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*SetupItem           `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSetupStatusResponse) Reset() {
+	*x = GetSetupStatusResponse{}
+	mi := &file_v1_setting_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSetupStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSetupStatusResponse) ProtoMessage() {}
+
+func (x *GetSetupStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_setting_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSetupStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetSetupStatusResponse) Descriptor() ([]byte, []int) {
+	return file_v1_setting_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetSetupStatusResponse) GetItems() []*SetupItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
 type GetDebugConfigRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -199,7 +334,7 @@ type GetDebugConfigRequest struct {
 
 func (x *GetDebugConfigRequest) Reset() {
 	*x = GetDebugConfigRequest{}
-	mi := &file_v1_setting_proto_msgTypes[4]
+	mi := &file_v1_setting_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -211,7 +346,7 @@ func (x *GetDebugConfigRequest) String() string {
 func (*GetDebugConfigRequest) ProtoMessage() {}
 
 func (x *GetDebugConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_setting_proto_msgTypes[4]
+	mi := &file_v1_setting_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -224,7 +359,7 @@ func (x *GetDebugConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDebugConfigRequest.ProtoReflect.Descriptor instead.
 func (*GetDebugConfigRequest) Descriptor() ([]byte, []int) {
-	return file_v1_setting_proto_rawDescGZIP(), []int{4}
+	return file_v1_setting_proto_rawDescGZIP(), []int{7}
 }
 
 type GetDebugConfigResponse struct {
@@ -236,7 +371,7 @@ type GetDebugConfigResponse struct {
 
 func (x *GetDebugConfigResponse) Reset() {
 	*x = GetDebugConfigResponse{}
-	mi := &file_v1_setting_proto_msgTypes[5]
+	mi := &file_v1_setting_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -248,7 +383,7 @@ func (x *GetDebugConfigResponse) String() string {
 func (*GetDebugConfigResponse) ProtoMessage() {}
 
 func (x *GetDebugConfigResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_setting_proto_msgTypes[5]
+	mi := &file_v1_setting_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -261,7 +396,7 @@ func (x *GetDebugConfigResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDebugConfigResponse.ProtoReflect.Descriptor instead.
 func (*GetDebugConfigResponse) Descriptor() ([]byte, []int) {
-	return file_v1_setting_proto_rawDescGZIP(), []int{5}
+	return file_v1_setting_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetDebugConfigResponse) GetEnabled() bool {
@@ -280,7 +415,7 @@ type UpdateDebugConfigRequest struct {
 
 func (x *UpdateDebugConfigRequest) Reset() {
 	*x = UpdateDebugConfigRequest{}
-	mi := &file_v1_setting_proto_msgTypes[6]
+	mi := &file_v1_setting_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -292,7 +427,7 @@ func (x *UpdateDebugConfigRequest) String() string {
 func (*UpdateDebugConfigRequest) ProtoMessage() {}
 
 func (x *UpdateDebugConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_setting_proto_msgTypes[6]
+	mi := &file_v1_setting_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -305,7 +440,7 @@ func (x *UpdateDebugConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDebugConfigRequest.ProtoReflect.Descriptor instead.
 func (*UpdateDebugConfigRequest) Descriptor() ([]byte, []int) {
-	return file_v1_setting_proto_rawDescGZIP(), []int{6}
+	return file_v1_setting_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UpdateDebugConfigRequest) GetEnabled() bool {
@@ -324,7 +459,7 @@ type UpdateDebugConfigResponse struct {
 
 func (x *UpdateDebugConfigResponse) Reset() {
 	*x = UpdateDebugConfigResponse{}
-	mi := &file_v1_setting_proto_msgTypes[7]
+	mi := &file_v1_setting_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -336,7 +471,7 @@ func (x *UpdateDebugConfigResponse) String() string {
 func (*UpdateDebugConfigResponse) ProtoMessage() {}
 
 func (x *UpdateDebugConfigResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_setting_proto_msgTypes[7]
+	mi := &file_v1_setting_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -349,7 +484,7 @@ func (x *UpdateDebugConfigResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDebugConfigResponse.ProtoReflect.Descriptor instead.
 func (*UpdateDebugConfigResponse) Descriptor() ([]byte, []int) {
-	return file_v1_setting_proto_rawDescGZIP(), []int{7}
+	return file_v1_setting_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UpdateDebugConfigResponse) GetEnabled() bool {
@@ -371,16 +506,25 @@ const file_v1_setting_proto_rawDesc = "" +
 	"\x06config\x18\x01 \x01(\v2\x1d.laelia.store.S3ConfigSettingB\x03\xe0A\x02R\x06config\"O\n" +
 	"\x16UpdateS3ConfigResponse\x125\n" +
 	"\x06config\x18\x01 \x01(\v2\x1d.laelia.store.S3ConfigSettingR\x06config\"\x17\n" +
+	"\x15GetSetupStatusRequest\";\n" +
+	"\tSetupItem\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1e\n" +
+	"\n" +
+	"configured\x18\x02 \x01(\bR\n" +
+	"configured\"D\n" +
+	"\x16GetSetupStatusResponse\x12*\n" +
+	"\x05items\x18\x01 \x03(\v2\x14.laelia.v1.SetupItemR\x05items\"\x17\n" +
 	"\x15GetDebugConfigRequest\"2\n" +
 	"\x16GetDebugConfigResponse\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\"9\n" +
 	"\x18UpdateDebugConfigRequest\x12\x1d\n" +
 	"\aenabled\x18\x01 \x01(\bB\x03\xe0A\x02R\aenabled\"5\n" +
 	"\x19UpdateDebugConfigResponse\x12\x18\n" +
-	"\aenabled\x18\x01 \x01(\bR\aenabled2\xd2\x04\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled2\xde\x05\n" +
 	"\x0eSettingService\x12}\n" +
 	"\vGetS3Config\x12\x1d.laelia.v1.GetS3ConfigRequest\x1a\x1e.laelia.v1.GetS3ConfigResponse\"/\x8a\xea0\x13laelia.settings.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/s3Config\x12\x95\x01\n" +
 	"\x0eUpdateS3Config\x12 .laelia.v1.UpdateS3ConfigRequest\x1a!.laelia.v1.UpdateS3ConfigResponse\">\x8a\xea0\x16laelia.settings.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x16:\x06config2\f/v1/s3Config\x12\x89\x01\n" +
+	"\x0eGetSetupStatus\x12 .laelia.v1.GetSetupStatusRequest\x1a!.laelia.v1.GetSetupStatusResponse\"2\x8a\xea0\x13laelia.settings.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/setupStatus\x12\x89\x01\n" +
 	"\x0eGetDebugConfig\x12 .laelia.v1.GetDebugConfigRequest\x1a!.laelia.v1.GetDebugConfigResponse\"2\x8a\xea0\x13laelia.settings.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/debugConfig\x12\x9c\x01\n" +
 	"\x11UpdateDebugConfig\x12#.laelia.v1.UpdateDebugConfigRequest\x1a$.laelia.v1.UpdateDebugConfigResponse\"<\x8a\xea0\x16laelia.settings.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x14:\x01*2\x0f/v1/debugConfigB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
@@ -396,35 +540,41 @@ func file_v1_setting_proto_rawDescGZIP() []byte {
 	return file_v1_setting_proto_rawDescData
 }
 
-var file_v1_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_v1_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_v1_setting_proto_goTypes = []any{
 	(*GetS3ConfigRequest)(nil),        // 0: laelia.v1.GetS3ConfigRequest
 	(*GetS3ConfigResponse)(nil),       // 1: laelia.v1.GetS3ConfigResponse
 	(*UpdateS3ConfigRequest)(nil),     // 2: laelia.v1.UpdateS3ConfigRequest
 	(*UpdateS3ConfigResponse)(nil),    // 3: laelia.v1.UpdateS3ConfigResponse
-	(*GetDebugConfigRequest)(nil),     // 4: laelia.v1.GetDebugConfigRequest
-	(*GetDebugConfigResponse)(nil),    // 5: laelia.v1.GetDebugConfigResponse
-	(*UpdateDebugConfigRequest)(nil),  // 6: laelia.v1.UpdateDebugConfigRequest
-	(*UpdateDebugConfigResponse)(nil), // 7: laelia.v1.UpdateDebugConfigResponse
-	(*store.S3ConfigSetting)(nil),     // 8: laelia.store.S3ConfigSetting
+	(*GetSetupStatusRequest)(nil),     // 4: laelia.v1.GetSetupStatusRequest
+	(*SetupItem)(nil),                 // 5: laelia.v1.SetupItem
+	(*GetSetupStatusResponse)(nil),    // 6: laelia.v1.GetSetupStatusResponse
+	(*GetDebugConfigRequest)(nil),     // 7: laelia.v1.GetDebugConfigRequest
+	(*GetDebugConfigResponse)(nil),    // 8: laelia.v1.GetDebugConfigResponse
+	(*UpdateDebugConfigRequest)(nil),  // 9: laelia.v1.UpdateDebugConfigRequest
+	(*UpdateDebugConfigResponse)(nil), // 10: laelia.v1.UpdateDebugConfigResponse
+	(*store.S3ConfigSetting)(nil),     // 11: laelia.store.S3ConfigSetting
 }
 var file_v1_setting_proto_depIdxs = []int32{
-	8, // 0: laelia.v1.GetS3ConfigResponse.config:type_name -> laelia.store.S3ConfigSetting
-	8, // 1: laelia.v1.UpdateS3ConfigRequest.config:type_name -> laelia.store.S3ConfigSetting
-	8, // 2: laelia.v1.UpdateS3ConfigResponse.config:type_name -> laelia.store.S3ConfigSetting
-	0, // 3: laelia.v1.SettingService.GetS3Config:input_type -> laelia.v1.GetS3ConfigRequest
-	2, // 4: laelia.v1.SettingService.UpdateS3Config:input_type -> laelia.v1.UpdateS3ConfigRequest
-	4, // 5: laelia.v1.SettingService.GetDebugConfig:input_type -> laelia.v1.GetDebugConfigRequest
-	6, // 6: laelia.v1.SettingService.UpdateDebugConfig:input_type -> laelia.v1.UpdateDebugConfigRequest
-	1, // 7: laelia.v1.SettingService.GetS3Config:output_type -> laelia.v1.GetS3ConfigResponse
-	3, // 8: laelia.v1.SettingService.UpdateS3Config:output_type -> laelia.v1.UpdateS3ConfigResponse
-	5, // 9: laelia.v1.SettingService.GetDebugConfig:output_type -> laelia.v1.GetDebugConfigResponse
-	7, // 10: laelia.v1.SettingService.UpdateDebugConfig:output_type -> laelia.v1.UpdateDebugConfigResponse
-	7, // [7:11] is the sub-list for method output_type
-	3, // [3:7] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	11, // 0: laelia.v1.GetS3ConfigResponse.config:type_name -> laelia.store.S3ConfigSetting
+	11, // 1: laelia.v1.UpdateS3ConfigRequest.config:type_name -> laelia.store.S3ConfigSetting
+	11, // 2: laelia.v1.UpdateS3ConfigResponse.config:type_name -> laelia.store.S3ConfigSetting
+	5,  // 3: laelia.v1.GetSetupStatusResponse.items:type_name -> laelia.v1.SetupItem
+	0,  // 4: laelia.v1.SettingService.GetS3Config:input_type -> laelia.v1.GetS3ConfigRequest
+	2,  // 5: laelia.v1.SettingService.UpdateS3Config:input_type -> laelia.v1.UpdateS3ConfigRequest
+	4,  // 6: laelia.v1.SettingService.GetSetupStatus:input_type -> laelia.v1.GetSetupStatusRequest
+	7,  // 7: laelia.v1.SettingService.GetDebugConfig:input_type -> laelia.v1.GetDebugConfigRequest
+	9,  // 8: laelia.v1.SettingService.UpdateDebugConfig:input_type -> laelia.v1.UpdateDebugConfigRequest
+	1,  // 9: laelia.v1.SettingService.GetS3Config:output_type -> laelia.v1.GetS3ConfigResponse
+	3,  // 10: laelia.v1.SettingService.UpdateS3Config:output_type -> laelia.v1.UpdateS3ConfigResponse
+	6,  // 11: laelia.v1.SettingService.GetSetupStatus:output_type -> laelia.v1.GetSetupStatusResponse
+	8,  // 12: laelia.v1.SettingService.GetDebugConfig:output_type -> laelia.v1.GetDebugConfigResponse
+	10, // 13: laelia.v1.SettingService.UpdateDebugConfig:output_type -> laelia.v1.UpdateDebugConfigResponse
+	9,  // [9:14] is the sub-list for method output_type
+	4,  // [4:9] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_v1_setting_proto_init() }
@@ -439,7 +589,7 @@ func file_v1_setting_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_setting_proto_rawDesc), len(file_v1_setting_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

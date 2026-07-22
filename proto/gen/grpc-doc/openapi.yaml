@@ -2496,6 +2496,27 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/setupStatus:
+        get:
+            tags:
+                - SettingService
+            description: |-
+                GetSetupStatus reports which required-config items are not yet configured,
+                 so the frontend can guide an admin to finish setting up the workspace.
+            operationId: SettingService_GetSetupStatus
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetSetupStatusResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/users:
         get:
             tags:
@@ -4029,6 +4050,13 @@ components:
             properties:
                 config:
                     $ref: '#/components/schemas/S3ConfigSetting'
+        GetSetupStatusResponse:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/SetupItem'
         GoogleProtobufAny:
             type: object
             properties:
@@ -4755,6 +4783,17 @@ components:
                     $ref: '#/components/schemas/IamPolicy'
                 etag:
                     type: string
+        SetupItem:
+            type: object
+            properties:
+                id:
+                    type: string
+                configured:
+                    type: boolean
+            description: |-
+                SetupItem describes one required-config item the admin onboarding overlay
+                 surfaces. The backend is the source of truth for `configured`; the frontend
+                 owns presentation (title/description/route) keyed by `id`.
         Status:
             type: object
             properties:
