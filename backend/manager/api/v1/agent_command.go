@@ -38,7 +38,7 @@ func (s *AgentStreamService) AgentChannel(
 		return stream.Send(msg)
 	}
 
-	sess := s.dispatcher.RegisterAgent(ctx, agent.ID, agent.ResourceID, sendFunc)
+	sess := s.dispatcher.RegisterAgent(ctx, agent.ID, agent.MachineID, agent.ResourceID, sendFunc)
 	defer s.dispatcher.UnregisterAgent(agent.ID)
 
 	for {

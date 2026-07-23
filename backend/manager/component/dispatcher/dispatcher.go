@@ -25,10 +25,18 @@ const (
 
 type SendFunc func(*v1pb.ManagerStreamMessage) error
 
+// MachineSendFunc is the raw send function for a machine's MachineChannel
+// control stream (manager→machine direction).
+type MachineSendFunc func(*v1pb.ManagerMachineStreamMessage) error
+
 type AgentSession struct {
 	agentID         int
 	agentResourceID string
-	currentCmdID    string
+	// machineID is the id of the machine this agent's AgentChannel belongs to.
+	// Set at RegisterAgent; 0 for legacy/unbound agents. Used by UnregisterMachine
+	// to invalidate every agent session owned by a disconnecting machine.
+	machineID    int
+	currentCmdID string
 	// send is the raw bidi-stream send function. It is nil once the session is
 	// invalidated (agent disconnected or replaced). Stored in an atomic pointer
 	// so RegisterAgent/UnregisterAgent (writers) and deliver (reader) never race
@@ -39,6 +47,36 @@ type AgentSession struct {
 	lastPingAt  time.Time
 	connectedAt time.Time
 	mu          sync.Mutex // guards currentCmdID, lastPingAt, connectedAt
+}
+
+// MachineSession is the manager-side handle on a connected machine's
+// MachineChannel control stream. Mirrors AgentSession: the machine app
+// authenticates once and holds this stream for its lifetime; per-agent
+// AgentChannels register separately (keyed by agentID) but carry the machineID
+// so a machine disconnect invalidates all of them.
+type MachineSession struct {
+	machineID         int
+	machineResourceID string
+	send              atomic.Pointer[MachineSendFunc]
+	sendMu            sync.Mutex
+	lastPingAt        time.Time
+	connectedAt       time.Time
+	mu                sync.Mutex // guards lastPingAt, connectedAt
+}
+
+func (s *MachineSession) deliver(msg *v1pb.ManagerMachineStreamMessage) error {
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
+	fn := s.send.Load()
+	if fn == nil {
+		return errors.New("machine session invalidated")
+	}
+	return (*fn)(msg)
+}
+
+// Send sends a control message to the machine over its MachineChannel.
+func (s *MachineSession) Send(msg *v1pb.ManagerMachineStreamMessage) error {
+	return s.deliver(msg)
 }
 
 // deliver sends msg to the agent, serializing concurrent sends on the stream
@@ -75,6 +113,7 @@ type Dispatcher struct {
 	store         *store.Store
 	mu            sync.RWMutex
 	sessions      map[int]*AgentSession
+	machines      map[int]*MachineSession
 	watchers      map[string]map[chan *v1pb.CommandOutput]struct{}
 	eventWatchers map[string]map[chan *v1pb.CommandEvent]struct{}
 	pingInterval  time.Duration
@@ -109,6 +148,7 @@ func New(s *store.Store) *Dispatcher {
 	return &Dispatcher{
 		store:            s,
 		sessions:         make(map[int]*AgentSession),
+		machines:         make(map[int]*MachineSession),
 		watchers:         make(map[string]map[chan *v1pb.CommandOutput]struct{}),
 		eventWatchers:    make(map[string]map[chan *v1pb.CommandEvent]struct{}),
 		pingInterval:     15 * time.Second,
@@ -120,7 +160,7 @@ func New(s *store.Store) *Dispatcher {
 	}
 }
 
-func (d *Dispatcher) RegisterAgent(_ context.Context, agentID int, agentResourceID string, send SendFunc) *AgentSession {
+func (d *Dispatcher) RegisterAgent(_ context.Context, agentID int, machineID int, agentResourceID string, send SendFunc) *AgentSession {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -141,6 +181,7 @@ func (d *Dispatcher) RegisterAgent(_ context.Context, agentID int, agentResource
 	sess := &AgentSession{
 		agentID:         agentID,
 		agentResourceID: agentResourceID,
+		machineID:       machineID,
 		connectedAt:     time.Now(),
 		lastPingAt:      time.Now(),
 	}
@@ -148,7 +189,7 @@ func (d *Dispatcher) RegisterAgent(_ context.Context, agentID int, agentResource
 	sess.send.Store(&fn)
 
 	d.sessions[agentID] = sess
-	slog.Info("agent registered for command dispatch", "agentID", agentID)
+	slog.Info("agent registered for command dispatch", "agentID", agentID, "machineID", machineID)
 
 	// The agent drives its own work via BeginSession; the manager no longer
 	// pushes commands on connect. The agent sends AgentReady (handled in the
@@ -185,6 +226,191 @@ func (d *Dispatcher) IsAgentConnected(agentID int) bool {
 	defer d.mu.RUnlock()
 	_, ok := d.sessions[agentID]
 	return ok
+}
+
+// RegisterMachine registers a machine's MachineChannel control stream. A
+// machine authenticates once and holds this stream for its lifetime; each of
+// its agents opens a separate AgentChannel (registered via RegisterAgent with
+// the matching machineID). Returns the session so the stream handler can wire
+// up its receive loop.
+func (d *Dispatcher) RegisterMachine(machineID int, machineResourceID string, send MachineSendFunc) *MachineSession {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if old, ok := d.machines[machineID]; ok {
+		slog.Info("replacing existing machine session", "machineID", machineID)
+		old.send.Store(nil)
+	}
+
+	sess := &MachineSession{
+		machineID:         machineID,
+		machineResourceID: machineResourceID,
+		connectedAt:       time.Now(),
+		lastPingAt:        time.Now(),
+	}
+	fn := send
+	sess.send.Store(&fn)
+
+	d.machines[machineID] = sess
+	slog.Info("machine registered for control dispatch", "machineID", machineID)
+	return sess
+}
+
+// UnregisterMachine tears down a machine's control stream AND every agent
+// session owned by it. Each owned agent with an in-flight command gets a 60s
+// grace period (→ FAILED if the agent does not reconnect). Machine reconnect
+// re-registers every agent via RegisterAgent, which cancels each agent's grace
+// timer — so no machine-scoped grace tracking is needed.
+func (d *Dispatcher) UnregisterMachine(machineID int) {
+	d.mu.Lock()
+	machine, ok := d.machines[machineID]
+	if !ok {
+		d.mu.Unlock()
+		return
+	}
+	delete(d.machines, machineID)
+
+	owned := make([]*AgentSession, 0)
+	for _, sess := range d.sessions {
+		if sess.machineID == machineID {
+			owned = append(owned, sess)
+			delete(d.sessions, sess.agentID)
+		}
+	}
+	d.mu.Unlock()
+
+	machine.send.Store(nil)
+
+	for _, sess := range owned {
+		sess.mu.Lock()
+		cmdID := sess.currentCmdID
+		sess.mu.Unlock()
+		sess.send.Store(nil)
+		if cmdID != "" {
+			d.startGracePeriod(sess.agentID, cmdID)
+		}
+	}
+	slog.Info("machine unregistered from control dispatch", "machineID", machineID, "agents", len(owned))
+}
+
+func (d *Dispatcher) IsMachineConnected(machineID int) bool {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	_, ok := d.machines[machineID]
+	return ok
+}
+
+// SendAgentAssignment pushes a new agent assignment to the machine so it opens
+// an AgentChannel for that agent. Best-effort: if the machine is offline the
+// agent is picked up from the assigned_agents list on the next ConnectMachine.
+func (d *Dispatcher) SendAgentAssignment(machineID int, assignment *v1pb.AgentAssignment) error {
+	d.mu.RLock()
+	sess, ok := d.machines[machineID]
+	d.mu.RUnlock()
+	if !ok {
+		return errors.New("machine is not connected")
+	}
+	return sess.Send(&v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_AgentAssignment{
+			AgentAssignment: assignment,
+		},
+	})
+}
+
+// SendAgentConfigUpdate hot-reloads an agent's ACP config on its runner without
+// restarting it (picked up at the next BeginSession).
+func (d *Dispatcher) SendAgentConfigUpdate(machineID int, agentName string, cfg *v1pb.AgentACPConfig) error {
+	d.mu.RLock()
+	sess, ok := d.machines[machineID]
+	d.mu.RUnlock()
+	if !ok {
+		return errors.New("machine is not connected")
+	}
+	return sess.Send(&v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_AgentConfigUpdate{
+			AgentConfigUpdate: &v1pb.AgentConfigUpdate{
+				AgentName: agentName,
+				AcpConfig: cfg,
+			},
+		},
+	})
+}
+
+// SendRemoveAgent tears down an agent's runner on the machine (used on
+// DeleteAgent).
+func (d *Dispatcher) SendRemoveAgent(machineID int, agentName string) error {
+	d.mu.RLock()
+	sess, ok := d.machines[machineID]
+	d.mu.RUnlock()
+	if !ok {
+		return errors.New("machine is not connected")
+	}
+	return sess.Send(&v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_RemoveAgent{
+			RemoveAgent: &v1pb.RemoveAgent{AgentName: agentName},
+		},
+	})
+}
+
+// SendReloadAgentAssignment re-syncs a single agent's full assignment (used
+// after a display-name or config change to re-establish a runner).
+func (d *Dispatcher) SendReloadAgentAssignment(machineID int, reload *v1pb.ReloadAgentAssignment) error {
+	d.mu.RLock()
+	sess, ok := d.machines[machineID]
+	d.mu.RUnlock()
+	if !ok {
+		return errors.New("machine is not connected")
+	}
+	return sess.Send(&v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_ReloadAgentAssignment{
+			ReloadAgentAssignment: reload,
+		},
+	})
+}
+
+// SendDiscoverProvidersToMachine asks a connected machine to re-probe its host
+// providers and reply with ProvidersDiscovered. The reply resolves a pending
+// discover registered via RegisterPendingDiscover (requestID is globally
+// unique, so the existing agent-scoped pending map is reused).
+func (d *Dispatcher) SendDiscoverProvidersToMachine(machineID int, requestID string) error {
+	d.mu.RLock()
+	sess, ok := d.machines[machineID]
+	d.mu.RUnlock()
+	if !ok {
+		return errors.New("machine is not connected")
+	}
+	return sess.Send(&v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_DiscoverProviders{
+			DiscoverProviders: &v1pb.DiscoverProviders{RequestId: requestID},
+		},
+	})
+}
+
+// HandleMachinePing records a machine heartbeat ping.
+func (d *Dispatcher) HandleMachinePing(machineID int, _ *v1pb.Ping) {
+	d.mu.RLock()
+	sess, ok := d.machines[machineID]
+	d.mu.RUnlock()
+	if ok {
+		sess.mu.Lock()
+		sess.lastPingAt = time.Now()
+		sess.mu.Unlock()
+	}
+}
+
+// SendPongToMachine replies to a machine Ping on its control stream.
+func (d *Dispatcher) SendPongToMachine(machineID int) error {
+	d.mu.RLock()
+	sess, ok := d.machines[machineID]
+	d.mu.RUnlock()
+	if !ok {
+		return errors.New("machine is not connected")
+	}
+	return sess.Send(&v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_Pong{
+			Pong: &v1pb.Pong{},
+		},
+	})
 }
 
 // RegisterPendingDiscover creates a response channel keyed by requestID for an
@@ -820,6 +1046,10 @@ func (d *Dispatcher) checkSessionLiveness() {
 	for _, sess := range d.sessions {
 		sessions = append(sessions, sess)
 	}
+	machines := make([]*MachineSession, 0, len(d.machines))
+	for _, m := range d.machines {
+		machines = append(machines, m)
+	}
 	d.mu.RUnlock()
 
 	now := time.Now()
@@ -841,6 +1071,25 @@ func (d *Dispatcher) checkSessionLiveness() {
 				"idle", idle,
 				"timeout", d.pingTimeout)
 			d.UnregisterAgent(agentID)
+		}
+	}
+
+	for _, m := range machines {
+		m.mu.Lock()
+		idle := now.Sub(m.lastPingAt)
+		machineID := m.machineID
+		m.mu.Unlock()
+
+		if m.send.Load() == nil {
+			continue
+		}
+
+		if idle > d.pingTimeout {
+			slog.Warn("machine ping timeout, unregistering",
+				"machineID", machineID,
+				"idle", idle,
+				"timeout", d.pingTimeout)
+			d.UnregisterMachine(machineID)
 		}
 	}
 }

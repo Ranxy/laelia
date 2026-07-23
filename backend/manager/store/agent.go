@@ -33,6 +33,10 @@ type AgentMessage struct {
 	// AvatarS3Key is the S3 object key of the agent's uploaded avatar image,
 	// empty when the agent has not uploaded one.
 	AvatarS3Key string
+	// MachineID is the id of the machine this agent is bound to. 0 = unbound
+	// (legacy agents created before the machine refactor). Immutable after
+	// creation; set by CreateAgent.
+	MachineID int
 }
 
 // GetResourceID returns the agent's resource name, used to key context-derived
@@ -44,6 +48,7 @@ func (m *AgentMessage) GetResourceID() string {
 type FindAgentMessage struct {
 	ID          *int
 	ResourceID  *string
+	MachineID   *int
 	ShowDeleted bool
 	Limit       *int
 	Offset      *int
@@ -140,6 +145,9 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 	if v := find.ResourceID; v != nil {
 		where, args = append(where, fmt.Sprintf("agent.resource_id = $%d", len(args)+1)), append(args, *v)
 	}
+	if v := find.MachineID; v != nil {
+		where, args = append(where, fmt.Sprintf("agent.machine_id = $%d", len(args)+1)), append(args, *v)
+	}
 	if !find.ShowDeleted {
 		where, args = append(where, fmt.Sprintf("agent.deleted = $%d", len(args)+1)), append(args, false)
 	}
@@ -155,7 +163,8 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 		agent.status,
 		agent.last_token_rotated_at,
 		agent.created_by,
-		agent.avatar_s3_key
+		agent.avatar_s3_key,
+		agent.machine_id
 	FROM agent
 	WHERE ` + strings.Join(where, " AND ") + ` ORDER BY agent.created_at ASC`
 
@@ -177,6 +186,7 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 		var infoBytes []byte
 		var statusBytes []byte
 		var lastTokenRotatedAt sql.NullTime
+		var machineID sql.NullInt64
 		if err := rows.Scan(
 			&agentMessage.ID,
 			&agentMessage.ResourceID,
@@ -189,11 +199,15 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 			&lastTokenRotatedAt,
 			&agentMessage.CreatedBy,
 			&agentMessage.AvatarS3Key,
+			&machineID,
 		); err != nil {
 			return nil, err
 		}
 		if lastTokenRotatedAt.Valid {
 			agentMessage.LastTokenRotatedAt = lastTokenRotatedAt.Time
+		}
+		if machineID.Valid {
+			agentMessage.MachineID = int(machineID.Int64)
 		}
 
 		info := &models.AgentInfo{}
@@ -242,12 +256,19 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 
 	resourceID := uuid.New().String()
 
+	// machine_id is a nullable FK; insert NULL when the agent is unbound (0)
+	// so the FK constraint is satisfied for legacy/unbound agents.
+	var machineIDArg any
+	if create.MachineID > 0 {
+		machineIDArg = create.MachineID
+	}
+
 	var agentID int
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO agent (
-			resource_id, name, token_version, info, status, created_by
+			resource_id, name, token_version, info, status, created_by, machine_id
 		)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at
 	`,
 		resourceID,
@@ -256,6 +277,7 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 		infoBytes,
 		statusBytes,
 		create.CreatedBy,
+		machineIDArg,
 	).Scan(&agentID, &create.CreatedAt); err != nil {
 		return nil, err
 	}
@@ -273,6 +295,7 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 		Info:         create.Info,
 		Status:       create.Status,
 		CreatedBy:    create.CreatedBy,
+		MachineID:    create.MachineID,
 	}
 	s.agentIDCache.Add(agent.ID, agent)
 	s.agentResourceIDCache.Add(agent.ResourceID, agent)

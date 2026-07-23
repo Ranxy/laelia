@@ -250,6 +250,15 @@ func GetAgentFromContext(ctx context.Context) (*store.AgentMessage, bool) {
 	return agent, ok
 }
 
+// GetMachineFromContext returns the machine authenticated by a machine access
+// token. A machine in context means the caller is the machine app acting on
+// behalf of one of its agents (declared per-request); ResolveAgentCaller binds
+// the request to a specific agent.
+func GetMachineFromContext(ctx context.Context) (*store.MachineMessage, bool) {
+	machine, ok := ctx.Value(common.MachineContextKey).(*store.MachineMessage)
+	return machine, ok
+}
+
 func getSubConditionFromExpr(expr celast.Expr, getFilter func(expr celast.Expr) (string, error), join string) (string, error) {
 	var args []string
 	for _, arg := range expr.AsCall().Args() {

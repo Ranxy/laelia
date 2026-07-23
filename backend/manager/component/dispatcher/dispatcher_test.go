@@ -396,7 +396,7 @@ func TestDispatcher_Send_NoDataRace(_ *testing.T) {
 		resourceID := fmt.Sprintf("agents/a%d", agentID)
 		wg.Go(func() {
 			for j := 0; j < iters; j++ {
-				sess := d.RegisterAgent(context.Background(), agentID, resourceID, noopSend)
+				sess := d.RegisterAgent(context.Background(), agentID, 0, resourceID, noopSend)
 
 				var swg sync.WaitGroup
 				for k := 0; k < 4; k++ {
@@ -423,7 +423,7 @@ func TestDispatcher_GracePeriodCanceledOnReconnect(t *testing.T) {
 	d := New(nil)
 	defer d.Stop()
 
-	sess := d.RegisterAgent(context.Background(), 1, "agents/a1", noopSend)
+	sess := d.RegisterAgent(context.Background(), 1, 0, "agents/a1", noopSend)
 	cmd := uuid.NewString()
 	sess.mu.Lock()
 	sess.currentCmdID = cmd
@@ -437,7 +437,7 @@ func TestDispatcher_GracePeriodCanceledOnReconnect(t *testing.T) {
 	require.True(t, hasGrace, "grace timer should be armed after unregister")
 
 	// Reconnect: RegisterAgent cancels the pending grace for this agent.
-	d.RegisterAgent(context.Background(), 1, "agents/a1", noopSend)
+	d.RegisterAgent(context.Background(), 1, 0, "agents/a1", noopSend)
 
 	waited := make(chan struct{})
 	go func() {
@@ -467,7 +467,7 @@ func TestDispatcher_ShutdownJoinsGoroutines(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		agentID := i + 1
 		resourceID := fmt.Sprintf("agents/a%d", agentID)
-		sess := d.RegisterAgent(context.Background(), agentID, resourceID, noopSend)
+		sess := d.RegisterAgent(context.Background(), agentID, 0, resourceID, noopSend)
 		sess.mu.Lock()
 		sess.currentCmdID = uuid.NewString()
 		sess.mu.Unlock()

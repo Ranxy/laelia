@@ -12,6 +12,7 @@ const (
 	AuthContextKey
 	ServiceDataKey
 	AgentContextKey
+	MachineContextKey
 	SessionContextKey
 	SourceIPContextKey
 	AccessTokenExpiresAtContextKey

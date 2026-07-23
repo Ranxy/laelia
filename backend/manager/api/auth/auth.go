@@ -33,12 +33,16 @@ const (
 	issuer = "laelia"
 	keyID  = "v1"
 
-	AccessTokenAudienceFmt      = "ll.user.access.%s"
-	AgentAccessTokenAudienceFmt = "ll.agent.access.%s"
+	AccessTokenAudienceFmt        = "ll.user.access.%s"
+	AgentAccessTokenAudienceFmt   = "ll.agent.access.%s"
+	MachineAccessTokenAudienceFmt = "ll.machine.access.%s"
 
 	apiTokenDuration          = 1 * time.Hour
 	DefaultTokenDuration      = 7 * 24 * time.Hour
 	DefaultAgentTokenDuration = 365 * 24 * time.Hour
+	// DefaultMachineTokenDuration matches the agent app: a long-lived machine
+	// access token so the machine app stays connected without frequent reconnects.
+	DefaultMachineTokenDuration = 365 * 24 * time.Hour
 
 	AccessTokenCookieName = "access-token"
 
@@ -76,6 +80,7 @@ func New(
 type authResult struct {
 	user                 *store.UserMessage
 	agent                *store.AgentMessage
+	machine              *store.MachineMessage
 	accessTokenExpiresAt int64
 }
 
@@ -109,6 +114,9 @@ func (in *APIAuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFun
 		}
 		if result.agent != nil {
 			ctx = context.WithValue(ctx, common.AgentContextKey, result.agent)
+		}
+		if result.machine != nil {
+			ctx = context.WithValue(ctx, common.MachineContextKey, result.machine)
 		}
 		if result.accessTokenExpiresAt > 0 {
 			ctx = context.WithValue(ctx, common.AccessTokenExpiresAtContextKey, result.accessTokenExpiresAt)
@@ -155,6 +163,9 @@ func (in *APIAuthInterceptor) WrapStreamingHandler(next connect.StreamingHandler
 		if result.agent != nil {
 			ctx = context.WithValue(ctx, common.AgentContextKey, result.agent)
 		}
+		if result.machine != nil {
+			ctx = context.WithValue(ctx, common.MachineContextKey, result.machine)
+		}
 		if result.accessTokenExpiresAt > 0 {
 			ctx = context.WithValue(ctx, common.AccessTokenExpiresAtContextKey, result.accessTokenExpiresAt)
 		}
@@ -189,6 +200,9 @@ func (in *APIAuthInterceptor) getUserOrAgentConnect(ctx context.Context, accessT
 	userClaims := &claimsMessage{}
 	userToken, userErr := jwt.ParseWithClaims(accessTokenStr, userClaims, keyFunc)
 
+	machineClaims := &machineClaimsMessage{}
+	machineToken, machineErr := jwt.ParseWithClaims(accessTokenStr, machineClaims, keyFunc)
+
 	if agentErr == nil && agentToken != nil && agentToken.Valid {
 		if audienceContains(agentClaims.Audience, fmt.Sprintf(AgentAccessTokenAudienceFmt, in.profile.Mode)) {
 			agent, err := in.authenticateAgentByClaims(ctx, agentClaims)
@@ -196,6 +210,16 @@ func (in *APIAuthInterceptor) getUserOrAgentConnect(ctx context.Context, accessT
 				return nil, err
 			}
 			return &authResult{agent: agent, accessTokenExpiresAt: agentClaims.ExpiresAt.Unix()}, nil
+		}
+	}
+
+	if machineErr == nil && machineToken != nil && machineToken.Valid {
+		if audienceContains(machineClaims.Audience, fmt.Sprintf(MachineAccessTokenAudienceFmt, in.profile.Mode)) {
+			machine, err := in.authenticateMachineByClaims(ctx, machineClaims)
+			if err != nil {
+				return nil, err
+			}
+			return &authResult{machine: machine, accessTokenExpiresAt: machineClaims.ExpiresAt.Unix()}, nil
 		}
 	}
 
@@ -209,14 +233,15 @@ func (in *APIAuthInterceptor) getUserOrAgentConnect(ctx context.Context, accessT
 		}
 	}
 
-	if agentErr != nil && userErr != nil {
-		if errors.Is(agentErr, jwt.ErrTokenExpired) || errors.Is(userErr, jwt.ErrTokenExpired) {
+	if agentErr != nil && userErr != nil && machineErr != nil {
+		if errors.Is(agentErr, jwt.ErrTokenExpired) || errors.Is(userErr, jwt.ErrTokenExpired) || errors.Is(machineErr, jwt.ErrTokenExpired) {
 			return nil, connect.NewError(connect.CodeUnauthenticated, errs.New("access token expired"))
 		}
 	}
-	return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("invalid access token, audience mismatch, expected %q or %q",
+	return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("invalid access token, audience mismatch, expected %q, %q or %q",
 		fmt.Sprintf(AccessTokenAudienceFmt, in.profile.Mode),
 		fmt.Sprintf(AgentAccessTokenAudienceFmt, in.profile.Mode),
+		fmt.Sprintf(MachineAccessTokenAudienceFmt, in.profile.Mode),
 	))
 }
 
@@ -257,6 +282,25 @@ func (in *APIAuthInterceptor) authenticateAgentByClaims(ctx context.Context, cla
 
 	in.profile.LastActiveTS.Store(time.Now().Unix())
 	return agent, nil
+}
+
+func (in *APIAuthInterceptor) authenticateMachineByClaims(ctx context.Context, claims *machineClaimsMessage) (*store.MachineMessage, error) {
+	machine, err := in.store.GetMachineByResourceID(ctx, claims.Subject)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("failed to find machine %s", claims.Subject))
+	}
+	if machine == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("machine %s not exists", claims.Subject))
+	}
+	if machine.Deleted {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("machine %s has been deactivated", claims.Subject))
+	}
+	if machine.TokenVersion != claims.TokenVersion {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("machine token version mismatch"))
+	}
+
+	in.profile.LastActiveTS.Store(time.Now().Unix())
+	return machine, nil
 }
 
 func GetTokenFromMetadata(md metadata.MD) (string, error) {
@@ -371,6 +415,19 @@ type agentClaimsMessage struct {
 	jwt.RegisteredClaims
 }
 
+// machineClaimsMessage mirrors agentClaimsMessage for machine tokens. A machine
+// authenticates once with its access token; per-agent identity is declared
+// in-stream (AgentChannel's AgentReady.agent_name), validated against
+// agent.machine_id.
+type machineClaimsMessage struct {
+	Name         string `json:"name"`
+	TokenVersion int    `json:"token_version"`
+	TokenType    string `json:"token_type"`
+	SessionID    string `json:"session_id,omitempty"`
+	TokenFamily  string `json:"token_family,omitempty"`
+	jwt.RegisteredClaims
+}
+
 // AgentClaims is the verified, exported view of an agent token's claims. It is
 // returned by ParseAgentToken so callers outside the auth package (e.g. the
 // refresh-token handler) can bind token_version / token_type to the operation
@@ -418,6 +475,48 @@ func ParseAgentToken(tokenStr string, secret string) (*AgentClaims, error) {
 	}, nil
 }
 
+// MachineClaims is the verified, exported view of a machine token's claims,
+// parallel to AgentClaims. Returned by ParseMachineToken for the machine-side
+// auth handlers (ConnectMachine / RefreshMachineToken).
+type MachineClaims struct {
+	Name         string
+	Subject      string
+	TokenVersion int
+	TokenType    string
+	SessionID    string
+	TokenFamily  string
+}
+
+// ParseMachineToken parses a machine JWT and verifies its HS256 signature
+// against secret. Like ParseAgentToken it does not enforce token_type or
+// token_version — callers bind those to the operation.
+func ParseMachineToken(tokenStr string, secret string) (*MachineClaims, error) {
+	claims := &machineClaimsMessage{}
+	parsed, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
+		if t.Method.Alg() != jwt.SigningMethodHS256.Name {
+			return nil, errs.Errorf("unexpected signing method %v", t.Header["alg"])
+		}
+		if kid, ok := t.Header["kid"].(string); ok && kid == keyID {
+			return []byte(secret), nil
+		}
+		return nil, errs.Errorf("unexpected kid %v", t.Header["kid"])
+	})
+	if err != nil {
+		return nil, errs.Wrap(err, "invalid machine token")
+	}
+	if !parsed.Valid {
+		return nil, errs.New("machine token is invalid")
+	}
+	return &MachineClaims{
+		Name:         claims.Name,
+		Subject:      claims.Subject,
+		TokenVersion: claims.TokenVersion,
+		TokenType:    claims.TokenType,
+		SessionID:    claims.SessionID,
+		TokenFamily:  claims.TokenFamily,
+	}, nil
+}
+
 // GenerateAPIToken generates an API token.
 func GenerateAPIToken(userName string, userID int, mode common.ReleaseMode, secret string) (string, error) {
 	expirationTime := time.Now().Add(apiTokenDuration)
@@ -448,6 +547,24 @@ func GenerateAgentTokenWithSession(agentName string, resourceID string, tokenVer
 	return signAgentToken(agentName, resourceID, tokenVersion, tokenType, sessionID, resourceID, fmt.Sprintf(AgentAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
 }
 
+// GenerateMachineToken generates a machine token with the specified type and duration.
+func GenerateMachineToken(machineName string, resourceID string, tokenVersion int, tokenType string, mode common.ReleaseMode, secret string, duration time.Duration) (string, error) {
+	expirationTime := time.Now().Add(duration)
+	return signMachineToken(machineName, resourceID, tokenVersion, tokenType, "", resourceID, fmt.Sprintf(MachineAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
+}
+
+// GenerateMachineTokenWithFamily generates a machine token with a custom token family.
+func GenerateMachineTokenWithFamily(machineName string, resourceID string, tokenVersion int, tokenType string, tokenFamily string, mode common.ReleaseMode, secret string, duration time.Duration) (string, error) {
+	expirationTime := time.Now().Add(duration)
+	return signMachineToken(machineName, resourceID, tokenVersion, tokenType, "", tokenFamily, fmt.Sprintf(MachineAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
+}
+
+// GenerateMachineTokenWithSession generates a machine token with session ID.
+func GenerateMachineTokenWithSession(machineName string, resourceID string, tokenVersion int, tokenType string, sessionID string, mode common.ReleaseMode, secret string, duration time.Duration) (string, error) {
+	expirationTime := time.Now().Add(duration)
+	return signMachineToken(machineName, resourceID, tokenVersion, tokenType, sessionID, resourceID, fmt.Sprintf(MachineAccessTokenAudienceFmt, mode), expirationTime, []byte(secret))
+}
+
 func signAgentToken(agentName string, resourceID string, tokenVersion int, tokenType string, sessionID string, tokenFamily string, aud string, expirationTime time.Time, secret []byte) (string, error) {
 	claims := &agentClaimsMessage{
 		Name:         agentName,
@@ -461,6 +578,35 @@ func signAgentToken(agentName string, resourceID string, tokenVersion int, token
 			// followed immediately by a connect) are byte-identical, hash to
 			// the same idx_agent_token_hash, and violate the unique
 			// constraint on insert.
+			ID:        uuid.NewString(),
+			Audience:  jwt.ClaimStrings{aud},
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    issuer,
+			Subject:   resourceID,
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token.Header["kid"] = keyID
+
+	tokenString, err := token.SignedString(secret)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
+func signMachineToken(machineName string, resourceID string, tokenVersion int, tokenType string, sessionID string, tokenFamily string, aud string, expirationTime time.Time, secret []byte) (string, error) {
+	claims := &machineClaimsMessage{
+		Name:         machineName,
+		TokenVersion: tokenVersion,
+		TokenType:    tokenType,
+		SessionID:    sessionID,
+		TokenFamily:  tokenFamily,
+		RegisteredClaims: jwt.RegisteredClaims{
+			// jti makes every minted token unique; see signAgentToken for why.
 			ID:        uuid.NewString(),
 			Audience:  jwt.ClaimStrings{aud},
 			ExpiresAt: jwt.NewNumericDate(expirationTime),

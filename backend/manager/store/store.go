@@ -15,15 +15,17 @@ type Store struct {
 	dbConnManager *DBConnectionManager
 	enableCache   bool
 
-	userIDCache          *lru.Cache[int, *UserMessage]
-	userEmailCache       *lru.Cache[string, *UserMessage]
-	settingCache         *lru.Cache[models.SettingName, *SettingMessage]
-	policyCache          *lru.Cache[string, *PolicyMessage]
-	idpCache             *lru.Cache[string, *IdentityProviderMessage]
-	groupCache           *lru.Cache[string, *GroupMessage]
-	agentIDCache         *lru.Cache[int, *AgentMessage]
-	agentResourceIDCache *lru.Cache[string, *AgentMessage]
-	rolesCache           *lru.Cache[string, *RoleMessage]
+	userIDCache            *lru.Cache[int, *UserMessage]
+	userEmailCache         *lru.Cache[string, *UserMessage]
+	settingCache           *lru.Cache[models.SettingName, *SettingMessage]
+	policyCache            *lru.Cache[string, *PolicyMessage]
+	idpCache               *lru.Cache[string, *IdentityProviderMessage]
+	groupCache             *lru.Cache[string, *GroupMessage]
+	agentIDCache           *lru.Cache[int, *AgentMessage]
+	agentResourceIDCache   *lru.Cache[string, *AgentMessage]
+	machineIDCache         *lru.Cache[int, *MachineMessage]
+	machineResourceIDCache *lru.Cache[string, *MachineMessage]
+	rolesCache             *lru.Cache[string, *RoleMessage]
 }
 
 func New(ctx context.Context, pgURL string, enableCache bool) (*Store, error) {
@@ -64,22 +66,32 @@ func New(ctx context.Context, pgURL string, enableCache bool) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	machineIDCache, err := lru.New[int, *MachineMessage](32768)
+	if err != nil {
+		return nil, err
+	}
+	machineResourceIDCache, err := lru.New[string, *MachineMessage](32768)
+	if err != nil {
+		return nil, err
+	}
 	rolesCache, err := lru.New[string, *RoleMessage](512)
 	if err != nil {
 		return nil, err
 	}
 	s := &Store{
-		dbConnManager:        dbConnManager,
-		enableCache:          enableCache,
-		userIDCache:          userIDCache,
-		userEmailCache:       userEmailCache,
-		settingCache:         settingCache,
-		policyCache:          policyCache,
-		idpCache:             idpCache,
-		groupCache:           groupCache,
-		agentIDCache:         agentIDCache,
-		agentResourceIDCache: agentResourceIDCache,
-		rolesCache:           rolesCache,
+		dbConnManager:          dbConnManager,
+		enableCache:            enableCache,
+		userIDCache:            userIDCache,
+		userEmailCache:         userEmailCache,
+		settingCache:           settingCache,
+		policyCache:            policyCache,
+		idpCache:               idpCache,
+		groupCache:             groupCache,
+		agentIDCache:           agentIDCache,
+		agentResourceIDCache:   agentResourceIDCache,
+		machineIDCache:         machineIDCache,
+		machineResourceIDCache: machineResourceIDCache,
+		rolesCache:             rolesCache,
 	}
 
 	return s, nil
