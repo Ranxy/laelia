@@ -5,7 +5,7 @@ import {
   MessageSquare,
   UserCircle,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ConnectionBadge } from "@/components/connection-badge";
@@ -30,13 +30,21 @@ export function AgentDetailLayout() {
   const location = useLocation();
   const { agentId } = useParams<{ agentId: string }>();
   const agents = useAppStore((s) => s.agents);
+  const fetchAgents = useAppStore((s) => s.fetchAgents);
 
   const agentName = agentResourceName(agentId);
 
-  // The header reads the AgentSummary list (loaded by the parent AgentsPage),
-  // not GetAgent — title/status/lifecycle are all present on the summary, and
-  // this avoids a per-navigation GetAgent round-trip. title falls back to the
-  // raw id while the list loads on a hard refresh.
+  // The header reads the AgentSummary list, not GetAgent — title/status/lifecycle
+  // are all present on the summary, and this avoids a per-navigation GetAgent
+  // round-trip. The Agents list page is gone (replaced by Members + Machines), so
+  // ensure the roster is loaded on a deep link / hard refresh; title falls back to
+  // the raw id until the list arrives.
+  useEffect(() => {
+    if (agents.length === 0) {
+      void fetchAgents({ pageSize: 100 });
+    }
+  }, [agents.length, fetchAgents]);
+
   const displayAgent = agents.find((a) => a.name === agentName);
 
   const title = displayAgent?.title ?? agentId ?? "";
@@ -58,7 +66,7 @@ export function AgentDetailLayout() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate("/agents")}
+          onClick={() => navigate("/members")}
           aria-label={t("agent.back")}
           className="size-8 p-0 lg:hidden"
         >

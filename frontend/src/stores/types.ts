@@ -2,6 +2,7 @@ import type { StateCreator } from "zustand";
 import type {
   Agent,
   AgentProviderInfo,
+  AgentStatus_ConnectionState,
   AgentSummary,
   CreateAgentResponse,
   RotateAgentTokenResponse,
@@ -21,6 +22,11 @@ import type {
   Mention,
   Reminder,
 } from "@/types/proto-es/v1/command_pb";
+import type {
+  Machine,
+  MachineSummary,
+  RotateMachineTokenResponse,
+} from "@/types/proto-es/v1/machine_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";
 
 export interface ChatMessageUI {
@@ -134,8 +140,13 @@ export interface AgentSlice {
     opts?: { silent?: boolean }
   ) => Promise<{ nextPageToken: string } | undefined>;
   getAgent: (name: string) => Promise<Agent | undefined>;
+  // createAgent binds a new agent to a machine. The machine app picks the agent
+  // up automatically over its MachineChannel — no bootstrap token is returned
+  // (CreateAgentResponse.bootstrapToken is empty under the machine-hosts-many
+  // model).
   createAgent: (
     title: string,
+    machine: string,
     labels?: Record<string, string>
   ) => Promise<CreateAgentResponse>;
   deleteAgent: (name: string) => Promise<void>;
@@ -157,6 +168,63 @@ export interface AgentSlice {
     }
   ) => Promise<void>;
   refreshAgentProviders: (name: string) => Promise<AgentProviderInfo[]>;
+}
+
+// MachineSlice owns the machine roster and the machine-management mutations.
+// A machine authenticates once (registration token) and hosts every agent bound
+// to it; token rotate/revoke and provider discovery are machine-scoped.
+export interface MachineSlice {
+  machines: MachineSummary[];
+  machinesLoading: boolean;
+
+  fetchMachines: (
+    params?: {
+      pageSize?: number;
+      pageToken?: string;
+      showDeleted?: boolean;
+    },
+    opts?: { silent?: boolean }
+  ) => Promise<{ nextPageToken: string } | undefined>;
+  getMachine: (name: string) => Promise<Machine | undefined>;
+  createMachine: (
+    title: string,
+    labels?: Record<string, string>
+  ) => Promise<{ machine?: Machine; registrationToken: string }>;
+  deleteMachine: (name: string) => Promise<void>;
+  rotateMachineToken: (
+    name: string,
+    reason?: string
+  ) => Promise<RotateMachineTokenResponse>;
+  revokeMachineToken: (name: string, reason?: string) => Promise<void>;
+  forceDisconnectMachine: (name: string, reason?: string) => Promise<void>;
+  refreshMachineProviders: (name: string) => Promise<AgentProviderInfo[]>;
+  listMachineAgents: (name: string) => Promise<AgentSummary[]>;
+}
+
+// MemberSummary is one row in the flat Members directory: a human user or an
+// agent. Agents carry their connection state for a status dot; the subtitle is
+// the agent's owning machine resource name (or a user's email).
+export interface MemberSummary {
+  kind: "user" | "agent";
+  name: string;
+  title: string;
+  subtitle: string;
+  connectionState?: AgentStatus_ConnectionState;
+}
+
+// MembersSlice owns the flat workspace directory that merges the user roster
+// and the agent roster into a single contacts list (not grouped by machine).
+export interface MembersSlice {
+  members: MemberSummary[];
+  membersLoading: boolean;
+
+  fetchMembers: () => Promise<
+    | {
+        usersNextPageToken: string;
+        agentsNextPageToken: string;
+      }
+    | undefined
+  >;
 }
 
 export interface CommandSlice {
@@ -385,6 +453,8 @@ export interface ActivitySlice {
 
 export type AppStoreState = AuthSlice &
   AgentSlice &
+  MachineSlice &
+  MembersSlice &
   CommandSlice &
   ChatSlice &
   ChannelSlice &

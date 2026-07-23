@@ -8,20 +8,13 @@ export function formatToken(token: string): string {
   return `${token.slice(0, 10)}${"*".repeat(20)}${token.slice(-6)}`;
 }
 
-// getManagerURL returns the base URL agents should connect back to, derived
-// from the Vite API base or the current origin. Trailing slashes are stripped
-// so the assembled `laelia-agent run --manager <url> --token <token>` command
-// is valid.
+// getManagerURL returns the base URL agents/machines should connect back to,
+// derived from the Vite API base or the current origin. Trailing slashes are
+// stripped so the assembled `laelia-machine run --manager <url> --token <token>`
+// command is valid.
 export function getManagerURL(): string {
   return (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(
     /\/+$/,
     ""
   );
-}
-
-// buildAgentRunCommand assembles the full bootstrap command for copy-to-clipboard.
-export function buildAgentRunCommand(token: string, masked = true): string {
-  return `laelia-agent run --manager ${getManagerURL()} --token ${
-    masked ? formatToken(token) : token
-  }`;
 }

@@ -64,10 +64,14 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     }
   },
 
-  async createAgent(title: string, labels?: Record<string, string>) {
+  async createAgent(
+    title: string,
+    machine: string,
+    labels?: Record<string, string>
+  ) {
     const res = await agentServiceClient.createAgent(
       create(CreateAgentRequestSchema, {
-        agent: create(AgentSchema, { title, labels }),
+        agent: create(AgentSchema, { title, machine, labels }),
       })
     );
     return res;

@@ -1,16 +1,18 @@
 import type { RouteObject } from "react-router-dom";
-import { Navigate } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 import { DashboardLayout } from "@/app/layouts/dashboard-layout";
 import {
   ACTIVITY_ROUTE,
   ACTIVITY_ROUTE_DETAIL,
   AGENT_ROUTE_CHAT,
-  AGENT_ROUTE_LIST,
   AGENT_ROUTE_PROFILE,
   CHAT_ROUTE,
   CHAT_ROUTE_DETAIL,
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
+  MACHINE_ROUTE_LIST,
+  MACHINE_ROUTE_PROFILE,
+  MEMBERS_ROUTE,
   REMINDER_ROUTE_DETAIL,
   REMINDER_ROUTE_LIST,
   SETTINGS_ROUTE_IAM,
@@ -68,20 +70,14 @@ export const dashboardRoutes: RouteObject[] = [
       },
       {
         path: "agents",
-        lazy: () =>
-          import("@/pages/dashboard/agents").then((m) => ({
-            Component: m.AgentsPage,
-          })),
+        // The Agents list page is gone (replaced by Members + Machines). This
+        // route now exists only to host per-agent detail pages reached from a
+        // member row or a machine roster link; the index redirects to Members.
+        element: <Outlet />,
         children: [
           {
             index: true,
-            handle: { name: AGENT_ROUTE_LIST },
-            lazy: () =>
-              import("@/pages/dashboard/agent-detail-empty-state").then(
-                (m) => ({
-                  Component: m.AgentDetailEmptyState,
-                })
-              ),
+            element: <Navigate to="/members" replace />,
           },
           {
             path: ":agentId",
@@ -141,6 +137,50 @@ export const dashboardRoutes: RouteObject[] = [
             ],
           },
         ],
+      },
+      {
+        path: "machines",
+        lazy: () =>
+          import("@/pages/dashboard/machines").then((m) => ({
+            Component: m.MachinesPage,
+          })),
+        children: [
+          {
+            index: true,
+            handle: { name: MACHINE_ROUTE_LIST },
+            lazy: () =>
+              import("@/pages/dashboard/machine-detail-empty-state").then(
+                (m) => ({
+                  Component: m.MachineDetailEmptyState,
+                })
+              ),
+          },
+          {
+            path: ":machineId",
+            lazy: () =>
+              import("@/app/layouts/machine-detail-layout").then((m) => ({
+                Component: m.MachineDetailLayout,
+              })),
+            children: [
+              {
+                index: true,
+                handle: { name: MACHINE_ROUTE_PROFILE },
+                lazy: () =>
+                  import("@/pages/dashboard/machine-profile").then((m) => ({
+                    Component: m.MachineProfilePage,
+                  })),
+              },
+            ],
+          },
+        ],
+      },
+      {
+        path: "members",
+        handle: { name: MEMBERS_ROUTE },
+        lazy: () =>
+          import("@/pages/dashboard/members").then((m) => ({
+            Component: m.MembersPage,
+          })),
       },
       {
         path: "settings",

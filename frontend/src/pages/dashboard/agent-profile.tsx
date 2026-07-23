@@ -1,27 +1,13 @@
 import { Loader2, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { KeyValueEnvEditor } from "@/components/agent/key-value-env-editor";
 import { StringListEditor } from "@/components/agent/string-list-editor";
 import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { Alert } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogClose,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -31,7 +17,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { buildAgentRunCommand } from "@/lib/agent-token";
 import {
   deleteAgentAvatar,
   invalidateAvatar,
@@ -110,8 +95,10 @@ function Card({
 
 export function AgentProfilePage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { agentId } = useParams<{ agentId: string }>();
   const getAgent = useAppStore((s) => s.getAgent);
+  const getMachine = useAppStore((s) => s.getMachine);
   const fetchAgents = useAppStore((s) => s.fetchAgents);
 
   const agentName = agentResourceName(agentId);
@@ -133,18 +120,14 @@ export function AgentProfilePage() {
   >([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState("");
 
-  // Token action state.
-  const [rotateOpen, setRotateOpen] = useState(false);
-  const [revokeOpen, setRevokeOpen] = useState(false);
-  const [rotating, setRotating] = useState(false);
-  const [revoking, setRevoking] = useState(false);
-  const [actionError, setActionError] = useState("");
-  const [token, setToken] = useState<string | null>(null);
-  const [tokenOpen, setTokenOpen] = useState(false);
-  const [tokenFromRotation, setTokenFromRotation] = useState(false);
+  // Available providers are machine-scoped: the owning machine probes its host
+  // and exposes them on Machine.info.availableProviders. We fetch the machine
+  // (by agent.machine) so the provider/model selectors here read the same list
+  // the machine profile page manages. Refresh happens on the machine profile.
+  const [machineProviders, setMachineProviders] = useState<AgentProviderInfo[]>(
+    []
+  );
 
   const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -201,9 +184,23 @@ export function AgentProfilePage() {
     getAgent(agentName).then(setAgent);
   }, [agentId, agentName, getAgent]);
 
+  // Load the owning machine's available providers whenever the agent's machine
+  // binding is known. Providers are machine-scoped (the machine probes its host);
+  // the agent profile reads them from the machine rather than the agent.
+  useEffect(() => {
+    const machineName = agent?.machine;
+    if (!machineName) {
+      setMachineProviders([]);
+      return;
+    }
+    getMachine(machineName).then((m) =>
+      setMachineProviders(m?.info?.availableProviders ?? [])
+    );
+  }, [agent?.machine, getMachine]);
+
   // Re-seed the editor whenever the persisted config reference changes (e.g.
-  // after refresh-providers or a save round-trip), so the form reflects the
-  // latest server state instead of stale local edits.
+  // after a save round-trip), so the form reflects the latest server state
+  // instead of stale local edits.
   useEffect(() => {
     const cfg = agent?.info?.acpConfig;
     setExecutable(cfg?.executable ?? "");
@@ -218,7 +215,6 @@ export function AgentProfilePage() {
         : []
     );
     setSaveError("");
-    setRefreshError("");
   }, [agent?.name, agent?.info?.acpConfig]);
 
   if (!agent) {
@@ -233,29 +229,9 @@ export function AgentProfilePage() {
   // binding) or a workspace admin (all-permissions union), enforced server-side
   // by the agents.edit permission. The server resolves this per-agent and
   // surfaces it as Agent.canEdit, so the UI does not need to re-derive it from
-  // the creator's name. Hide/disable the editors and token actions for everyone
-  // else so the UI never offers a 403.
+  // the creator's name. Hide/disable the editors for everyone else so the UI
+  // never offers a 403.
   const canEdit = agent.canEdit;
-
-  async function handleRefreshProviders() {
-    setRefreshing(true);
-    setRefreshError("");
-    try {
-      const refreshAgentProviders =
-        useAppStore.getState().refreshAgentProviders;
-      await refreshAgentProviders(agentName);
-      setAgent(await getAgent(agentName));
-      fetchAgents({ pageSize: 100 }, { silent: true });
-    } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : t("agent.acp-config-refresh-failed");
-      setRefreshError(msg);
-    } finally {
-      setRefreshing(false);
-    }
-  }
 
   async function handleSaveACPConfig() {
     setSaving(true);
@@ -290,52 +266,11 @@ export function AgentProfilePage() {
     }
   }
 
-  async function handleRotateToken() {
-    setRotating(true);
-    setActionError("");
-    try {
-      const rotateAgentToken = useAppStore.getState().rotateAgentToken;
-      const res = await rotateAgentToken(agentName);
-      if (res.bootstrapToken) {
-        setToken(res.bootstrapToken);
-        setTokenFromRotation(true);
-        setTokenOpen(true);
-      }
-      setRotateOpen(false);
-      setAgent(await getAgent(agentName));
-      fetchAgents({ pageSize: 100 }, { silent: true });
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : t("agent.rotate-token-error");
-      setActionError(msg);
-    } finally {
-      setRotating(false);
-    }
-  }
-
-  async function handleRevokeToken() {
-    setRevoking(true);
-    setActionError("");
-    try {
-      const revokeAgentToken = useAppStore.getState().revokeAgentToken;
-      await revokeAgentToken(agentName);
-      setRevokeOpen(false);
-      setAgent(await getAgent(agentName));
-      fetchAgents({ pageSize: 100 }, { silent: true });
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : t("agent.revoke-token-error");
-      setActionError(msg);
-    } finally {
-      setRevoking(false);
-    }
-  }
-
-  // Available providers are agent-reported (agent.info.availableProviders).
-  // The "custom" escape hatch lets an admin hand-type a command for any
-  // provider the daemon doesn't know about.
-  const availableProviders: AgentProviderInfo[] =
-    agent.info?.availableProviders ?? [];
+  // Available providers are machine-scoped: the owning machine probes its host
+  // and exposes them on Machine.info.availableProviders. The "custom" escape
+  // hatch lets an admin hand-type a command for any provider the machine does
+  // not know about.
+  const availableProviders: AgentProviderInfo[] = machineProviders;
   const isCustomProvider = provider === "custom";
   const selectedProviderInfo = availableProviders.find(
     (p) => p.providerId === provider
@@ -349,6 +284,10 @@ export function AgentProfilePage() {
   const canSave = isCustomProvider ? executable.trim() !== "" : provider !== "";
 
   const lifecycle = agentLifecycle(agent);
+
+  const machineResourceID = agent.machine
+    ? agent.machine.replace(/^machines\//, "")
+    : "";
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -381,22 +320,18 @@ export function AgentProfilePage() {
                 <Field label={t("agent.detail-configuration")}>
                   {lifecycleLabel(t, lifecycle)}
                 </Field>
-                {agent.info?.hostname && (
-                  <Field label={t("agent.detail-hostname")}>
-                    {agent.info.hostname}
-                  </Field>
-                )}
-                {agent.info?.os && (
-                  <Field label={t("agent.detail-os")}>
-                    {agent.info.os}/{agent.info.arch ?? ""}
-                  </Field>
-                )}
-                {agent.info?.ip && (
-                  <Field label={t("agent.detail-ip")}>{agent.info.ip}</Field>
-                )}
-                {agent.info?.version && (
-                  <Field label={t("agent.detail-version")}>
-                    {agent.info.version}
+                {agent.machine && (
+                  <Field label={t("agent.detail-machine")}>
+                    <button
+                      type="button"
+                      className="text-sm text-link hover:underline"
+                      onClick={() =>
+                        machineResourceID &&
+                        navigate(`/machines/${machineResourceID}`)
+                      }
+                    >
+                      {agent.machine}
+                    </button>
                   </Field>
                 )}
                 {agent.status?.connectedTime && (
@@ -412,14 +347,6 @@ export function AgentProfilePage() {
                 {agent.createdAt && (
                   <Field label={t("agent.detail-created")}>
                     {formatTimestamp(agent.createdAt)}
-                  </Field>
-                )}
-                <Field label={t("agent.detail-token-version")}>
-                  {agent.tokenVersion ?? "-"}
-                </Field>
-                {agent.lastTokenRotatedAt && (
-                  <Field label={t("agent.detail-last-rotated")}>
-                    {formatTimestamp(agent.lastTokenRotatedAt)}
                   </Field>
                 )}
               </dl>
@@ -475,54 +402,6 @@ export function AgentProfilePage() {
                 </div>
               </div>
             </Card>
-
-            {/* Token actions */}
-            <div className="mt-6">
-              <Card title={t("agent.profile.section-token")}>
-                {actionError && (
-                  <Alert variant="error" description={actionError} />
-                )}
-                {!canEdit ? (
-                  <p className="text-xs text-control-light">
-                    {t("agent.profile.edit-not-allowed")}
-                  </p>
-                ) : lifecycle === "waiting-connection" ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={rotating}
-                    onClick={handleRotateToken}
-                  >
-                    {rotating
-                      ? t("common.loading")
-                      : t("agent.profile.get-connection-command")}
-                  </Button>
-                ) : (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setActionError("");
-                        setRotateOpen(true);
-                      }}
-                    >
-                      {t("agent.rotate-token")}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setActionError("");
-                        setRevokeOpen(true);
-                      }}
-                    >
-                      {t("agent.revoke-token")}
-                    </Button>
-                  </div>
-                )}
-              </Card>
-            </div>
           </div>
 
           {/* ACP config */}
@@ -544,31 +423,14 @@ export function AgentProfilePage() {
               <fieldset disabled={!canEdit} className="contents">
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium">
-                        {t("agent.acp-config-provider")}
-                      </label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={refreshing}
-                        onClick={handleRefreshProviders}
-                      >
-                        {refreshing
-                          ? t("common.loading")
-                          : t("agent.acp-config-refresh-providers")}
-                      </Button>
-                    </div>
-                    {refreshError && (
-                      <Alert
-                        variant="error"
-                        description={refreshError}
-                        className="mt-1"
-                      />
-                    )}
+                    <label className="text-sm font-medium">
+                      {t("agent.acp-config-provider")}
+                    </label>
                     {availableProviders.length === 0 ? (
                       <p className="text-xs text-control-light">
-                        {t("agent.acp-config-no-providers")}
+                        {machineResourceID
+                          ? t("agent.acp-config-no-providers-machine")
+                          : t("agent.acp-config-no-providers")}
                       </p>
                     ) : (
                       <Select
@@ -599,6 +461,19 @@ export function AgentProfilePage() {
                           </SelectItem>
                         </SelectContent>
                       </Select>
+                    )}
+                    {machineResourceID && (
+                      <p className="text-xs text-control-light">
+                        <button
+                          type="button"
+                          className="text-link hover:underline"
+                          onClick={() =>
+                            navigate(`/machines/${machineResourceID}`)
+                          }
+                        >
+                          {t("agent.acp-config-manage-providers")}
+                        </button>
+                      </p>
                     )}
                   </div>
 
@@ -715,99 +590,6 @@ export function AgentProfilePage() {
           </div>
         </div>
       </div>
-
-      <Dialog
-        open={tokenOpen}
-        onOpenChange={(next) => !next && setTokenOpen(false)}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogTitle>
-            {tokenFromRotation
-              ? t("agent.rotate-token-success-title")
-              : t("agent.created-title")}
-          </DialogTitle>
-          <DialogDescription>
-            {tokenFromRotation
-              ? t("agent.rotate-token-success-description")
-              : t("agent.created-description")}
-          </DialogDescription>
-          <div className="mt-4 space-y-3">
-            <p className="text-sm text-control-light">
-              {t("agent.created-run-hint")}
-            </p>
-            <div className="rounded bg-white border border-control-border p-3 font-mono text-xs break-all text-black dark:bg-zinc-900 dark:text-white">
-              {token && buildAgentRunCommand(token, true)}
-            </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                if (token) {
-                  navigator.clipboard
-                    .writeText(buildAgentRunCommand(token, false))
-                    .catch(() => {});
-                }
-              }}
-            >
-              {t("common.copy")}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog
-        open={rotateOpen}
-        onOpenChange={(next) => !next && setRotateOpen(false)}
-      >
-        <AlertDialogContent>
-          <AlertDialogTitle>
-            {t("agent.rotate-token-confirm-title")}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {t("agent.rotate-token-confirm-description")}
-          </AlertDialogDescription>
-          {actionError && (
-            <Alert variant="error" description={actionError} className="mt-2" />
-          )}
-          <AlertDialogFooter>
-            <AlertDialogClose>
-              <Button variant="outline" disabled={rotating}>
-                {t("common.cancel")}
-              </Button>
-            </AlertDialogClose>
-            <Button disabled={rotating} onClick={handleRotateToken}>
-              {rotating ? t("common.creating") : t("agent.rotate-token")}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={revokeOpen}
-        onOpenChange={(next) => !next && setRevokeOpen(false)}
-      >
-        <AlertDialogContent>
-          <AlertDialogTitle>
-            {t("agent.revoke-token-confirm-title")}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {t("agent.revoke-token-confirm-description")}
-          </AlertDialogDescription>
-          {actionError && (
-            <Alert variant="error" description={actionError} className="mt-2" />
-          )}
-          <AlertDialogFooter>
-            <AlertDialogClose>
-              <Button variant="outline" disabled={revoking}>
-                {t("common.cancel")}
-              </Button>
-            </AlertDialogClose>
-            <Button disabled={revoking} onClick={handleRevokeToken}>
-              {revoking ? t("common.creating") : t("agent.revoke-token")}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

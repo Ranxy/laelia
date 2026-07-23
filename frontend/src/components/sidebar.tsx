@@ -1,12 +1,13 @@
 import {
   Activity as ActivityIcon,
-  Bot,
   ChevronDown,
   ChevronRight,
   Home,
   type LucideIcon,
   Menu,
+  Monitor,
   Settings,
+  Users,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -16,10 +17,11 @@ import { getLayerRoot, LAYER_SURFACE_CLASS } from "@/components/ui/layer";
 import { cn } from "@/lib/utils";
 import {
   ACTIVITY_ROUTE,
-  AGENT_ROUTE_LIST,
   CHAT_ROUTE,
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
+  MACHINE_ROUTE_LIST,
+  MEMBERS_ROUTE,
   SETTINGS_ROUTE,
   SETTINGS_ROUTE_IAM,
   SETTINGS_ROUTE_ROLES,
@@ -53,9 +55,11 @@ function getItemClass(item: SidebarItem, currentRouteName: string): string {
   if (isActive) {
     return cn("router-link-active", "bg-link-hover");
   }
-  // Opening an agent's tasks/commands view highlights the Agents nav item.
+  // Opening an agent's commands view (reached from a member row or a machine
+  // roster) highlights the Members nav item — Members is the flat contacts page
+  // that replaced the old Agents list.
   if (
-    item.name === AGENT_ROUTE_LIST &&
+    item.name === MEMBERS_ROUTE &&
     (currentRouteName === COMMAND_ROUTE_LIST ||
       currentRouteName === COMMAND_ROUTE_DETAIL)
   ) {
@@ -97,9 +101,15 @@ function useSidebarItems(): SidebarItem[] {
         type: "route",
       },
       {
-        title: t("sidebar.agents"),
-        icon: Bot,
-        name: AGENT_ROUTE_LIST,
+        title: t("sidebar.machines"),
+        icon: Monitor,
+        name: MACHINE_ROUTE_LIST,
+        type: "route",
+      },
+      {
+        title: t("sidebar.members"),
+        icon: Users,
+        name: MEMBERS_ROUTE,
         type: "route",
       },
       {

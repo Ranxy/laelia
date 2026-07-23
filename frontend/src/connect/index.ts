@@ -1,6 +1,7 @@
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { AgentService } from "@/types/proto-es/v1/agent_pb";
+import { MachineService } from "@/types/proto-es/v1/machine_pb";
 import { AuthService } from "@/types/proto-es/v1/auth_service_pb";
 import { UserService } from "@/types/proto-es/v1/user_service_pb";
 import { CommandService } from "@/types/proto-es/v1/command_pb";
@@ -52,6 +53,7 @@ const transport = createConnectTransport({
 });
 
 export const agentServiceClient = createClient(AgentService, transport);
+export const machineServiceClient = createClient(MachineService, transport);
 export const authServiceClient = createClient(AuthService, transport);
 export const userServiceClient = createClient(UserService, transport);
 export const commandServiceClient = createClient(CommandService, transport);
