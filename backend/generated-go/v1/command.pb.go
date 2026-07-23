@@ -8078,6 +8078,10 @@ type AgentReady struct {
 	LastCommandId string                 `protobuf:"bytes,2,opt,name=last_command_id,json=lastCommandId,proto3" json:"last_command_id,omitempty"`
 	LastAckSeq    int32                  `protobuf:"varint,3,opt,name=last_ack_seq,json=lastAckSeq,proto3" json:"last_ack_seq,omitempty"`
 	LastEventSeq  int32                  `protobuf:"varint,4,opt,name=last_event_seq,json=lastEventSeq,proto3" json:"last_event_seq,omitempty"`
+	// agent_name declares which agent (agents/{agent}) this AgentChannel runs. The
+	// manager validates the authenticated machine owns this agent. Set by the
+	// machine app's per-agent runner; required on the first message.
+	AgentName     string `protobuf:"bytes,5,opt,name=agent_name,json=agentName,proto3" json:"agent_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -8138,6 +8142,13 @@ func (x *AgentReady) GetLastEventSeq() int32 {
 		return x.LastEventSeq
 	}
 	return 0
+}
+
+func (x *AgentReady) GetAgentName() string {
+	if x != nil {
+		return x.AgentName
+	}
+	return ""
 }
 
 // DiscoverProviders asks the agent daemon to re-probe its host for installed
@@ -10034,7 +10045,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x04pong\x18\x06 \x01(\v2\x0f.laelia.v1.PongH\x00R\x04pong\x12P\n" +
 	"\x13permission_decision\x18\a \x01(\v2\x1d.laelia.v1.PermissionDecisionH\x00R\x12permissionDecision\x12M\n" +
 	"\x12discover_providers\x18\t \x01(\v2\x1c.laelia.v1.DiscoverProvidersH\x00R\x11discoverProvidersB\t\n" +
-	"\amessage\"\x9b\x01\n" +
+	"\amessage\"\xba\x01\n" +
 	"\n" +
 	"AgentReady\x12\x1d\n" +
 	"\n" +
@@ -10042,7 +10053,9 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x0flast_command_id\x18\x02 \x01(\tR\rlastCommandId\x12 \n" +
 	"\flast_ack_seq\x18\x03 \x01(\x05R\n" +
 	"lastAckSeq\x12$\n" +
-	"\x0elast_event_seq\x18\x04 \x01(\x05R\flastEventSeq\"2\n" +
+	"\x0elast_event_seq\x18\x04 \x01(\x05R\flastEventSeq\x12\x1d\n" +
+	"\n" +
+	"agent_name\x18\x05 \x01(\tR\tagentName\"2\n" +
 	"\x11DiscoverProviders\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\"p\n" +

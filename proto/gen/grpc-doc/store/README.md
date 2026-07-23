@@ -40,6 +40,16 @@
     - [LDAPIdentityProviderConfig.SecurityProtocol](#laelia-store-LDAPIdentityProviderConfig-SecurityProtocol)
     - [OAuth2AuthStyle](#laelia-store-OAuth2AuthStyle)
   
+- [store/machine.proto](#store_machine-proto)
+    - [MachineInfo](#laelia-store-MachineInfo)
+    - [MachineInfo.LabelsEntry](#laelia-store-MachineInfo-LabelsEntry)
+    - [MachineSession](#laelia-store-MachineSession)
+    - [MachineStatus](#laelia-store-MachineStatus)
+  
+    - [MachineStatus.ConnectionState](#laelia-store-MachineStatus-ConnectionState)
+    - [MachineTokenState](#laelia-store-MachineTokenState)
+    - [MachineTokenType](#laelia-store-MachineTokenType)
+  
 - [store/policy.proto](#store_policy-proto)
     - [Binding](#laelia-store-Binding)
     - [EnvironmentTierPolicy](#laelia-store-EnvironmentTierPolicy)
@@ -588,6 +598,150 @@ OIDCIdentityProviderConfig is the structure for OIDC identity provider config.
 | OAUTH2_AUTH_STYLE_UNSPECIFIED | 0 |  |
 | IN_PARAMS | 1 | IN_PARAMS sends the &#34;client_id&#34; and &#34;client_secret&#34; in the POST body as application/x-www-form-urlencoded parameters. |
 | IN_HEADER | 2 | IN_HEADER sends the client_id and client_password using HTTP Basic Authorization. This is an optional style described in the OAuth2 RFC 6749 section 2.3.1. |
+
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="store_machine-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## store/machine.proto
+
+
+
+<a name="laelia-store-MachineInfo"></a>
+
+### MachineInfo
+MachineInfo is the storage-layer mirror of laelia.v1.MachineInfo. It captures
+the host metadata the machine app reports on connect and the machine-scoped
+provider list.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| hostname | [string](#string) |  |  |
+| os | [string](#string) |  |  |
+| arch | [string](#string) |  |  |
+| ip | [string](#string) |  |  |
+| version | [string](#string) |  |  |
+| labels | [MachineInfo.LabelsEntry](#laelia-store-MachineInfo-LabelsEntry) | repeated |  |
+| capability | [AgentCapability](#laelia-store-AgentCapability) |  |  |
+| available_providers | [AgentProviderInfo](#laelia-store-AgentProviderInfo) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-store-MachineInfo-LabelsEntry"></a>
+
+### MachineInfo.LabelsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-store-MachineSession"></a>
+
+### MachineSession
+MachineSession is the storage-layer mirror of a live machine connection
+(liveness row), parallel to the legacy agent_session.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| session_id | [string](#string) |  |  |
+| machine_id | [int64](#int64) |  |  |
+| token_family | [string](#string) |  |  |
+| state | [string](#string) |  | ACTIVE / KICKED / TERMINATED |
+| source_ip | [string](#string) |  |  |
+| fingerprint | [string](#string) |  |  |
+| agent_version | [string](#string) |  |  |
+| connected_at | [int64](#int64) |  |  |
+| last_heartbeat_at | [int64](#int64) |  |  |
+| disconnected_at | [int64](#int64) |  |  |
+| disconnect_reason | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-store-MachineStatus"></a>
+
+### MachineStatus
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| state | [MachineStatus.ConnectionState](#laelia-store-MachineStatus-ConnectionState) |  |  |
+| last_heartbeat_at | [int64](#int64) |  |  |
+| connected_at | [int64](#int64) |  |  |
+| error_message | [string](#string) |  |  |
+| active_session_id | [string](#string) |  |  |
+
+
+
+
+
+ 
+
+
+<a name="laelia-store-MachineStatus-ConnectionState"></a>
+
+### MachineStatus.ConnectionState
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| CONNECTION_STATE_UNSPECIFIED | 0 |  |
+| ONLINE | 1 |  |
+| OFFLINE | 2 |  |
+| ERROR | 3 |  |
+| KICKED | 4 |  |
+
+
+
+<a name="laelia-store-MachineTokenState"></a>
+
+### MachineTokenState
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| MACHINE_TOKEN_STATE_UNSPECIFIED | 0 |  |
+| MACHINE_TOKEN_ACTIVE | 1 |  |
+| MACHINE_TOKEN_CONSUMED | 2 |  |
+| MACHINE_TOKEN_REVOKED | 3 |  |
+
+
+
+<a name="laelia-store-MachineTokenType"></a>
+
+### MachineTokenType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| MACHINE_TOKEN_TYPE_UNSPECIFIED | 0 |  |
+| MACHINE_BOOTSTRAP | 1 |  |
+| MACHINE_ACCESS | 2 |  |
+| MACHINE_REFRESH | 3 |  |
 
 
  

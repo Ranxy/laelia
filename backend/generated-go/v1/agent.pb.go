@@ -1185,10 +1185,13 @@ func (x *RefreshAgentTokenResponse) GetAccessTokenExpiresAt() *timestamppb.Times
 }
 
 type ListAgentsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PageSize      int32                  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
-	ShowDeleted   bool                   `protobuf:"varint,3,opt,name=show_deleted,json=showDeleted,proto3" json:"show_deleted,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	PageSize    int32                  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken   string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	ShowDeleted bool                   `protobuf:"varint,3,opt,name=show_deleted,json=showDeleted,proto3" json:"show_deleted,omitempty"`
+	// parent, when set to a machine resource name (machines/{machine}), filters
+	// the list to agents bound to that machine. Empty lists all agents.
+	Parent        string `protobuf:"bytes,4,opt,name=parent,proto3" json:"parent,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1242,6 +1245,13 @@ func (x *ListAgentsRequest) GetShowDeleted() bool {
 		return x.ShowDeleted
 	}
 	return false
+}
+
+func (x *ListAgentsRequest) GetParent() string {
+	if x != nil {
+		return x.Parent
+	}
+	return ""
 }
 
 type ListAgentsResponse struct {
@@ -1842,7 +1852,12 @@ type Agent struct {
 	// avatar is the resource name of the agent's uploaded avatar image, or empty
 	// when the agent has not uploaded one (frontend renders a deterministic pixel
 	// identicon seeded by the agent id). Format: agents/{agent}/avatar.
-	Avatar        string `protobuf:"bytes,13,opt,name=avatar,proto3" json:"avatar,omitempty"`
+	Avatar string `protobuf:"bytes,13,opt,name=avatar,proto3" json:"avatar,omitempty"`
+	// machine is the resource name of the machine this agent is bound to
+	// (machines/{machine}). Immutable after creation; set by CreateAgent. An agent
+	// runs on exactly one machine; the machine app picks it up via the
+	// MachineChannel control stream.
+	Machine       string `protobuf:"bytes,14,opt,name=machine,proto3" json:"machine,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1961,6 +1976,13 @@ func (x *Agent) GetAvatar() string {
 	return ""
 }
 
+func (x *Agent) GetMachine() string {
+	if x != nil {
+		return x.Machine
+	}
+	return ""
+}
+
 // AgentSummary is the lightweight list-view projection of an Agent returned by
 // ListAgents. It carries only the fields list/header views need: identity,
 // lifecycle state, connection status, and the provider/executable signal that
@@ -1978,8 +2000,11 @@ type AgentSummary struct {
 	Status *AgentStatus           `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
 	// provider/executable mirror acp_config.provider/executable on the full
 	// Agent, surfaced top-level so list consumers don't pull in AgentInfo.
-	Provider      string `protobuf:"bytes,5,opt,name=provider,proto3" json:"provider,omitempty"`
-	Executable    string `protobuf:"bytes,6,opt,name=executable,proto3" json:"executable,omitempty"`
+	Provider   string `protobuf:"bytes,5,opt,name=provider,proto3" json:"provider,omitempty"`
+	Executable string `protobuf:"bytes,6,opt,name=executable,proto3" json:"executable,omitempty"`
+	// machine is the resource name of the machine this agent is bound to
+	// (machines/{machine}).
+	Machine       string `protobuf:"bytes,7,opt,name=machine,proto3" json:"machine,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2052,6 +2077,13 @@ func (x *AgentSummary) GetProvider() string {
 func (x *AgentSummary) GetExecutable() string {
 	if x != nil {
 		return x.Executable
+	}
+	return ""
+}
+
+func (x *AgentSummary) GetMachine() string {
+	if x != nil {
+		return x.Machine
 	}
 	return ""
 }
@@ -2790,12 +2822,13 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x19RefreshAgentTokenResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12Q\n" +
-	"\x17access_token_expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x14accessTokenExpiresAt\"r\n" +
+	"\x17access_token_expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x14accessTokenExpiresAt\"\x8a\x01\n" +
 	"\x11ListAgentsRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\x12!\n" +
-	"\fshow_deleted\x18\x03 \x01(\bR\vshowDeleted\"m\n" +
+	"\fshow_deleted\x18\x03 \x01(\bR\vshowDeleted\x12\x16\n" +
+	"\x06parent\x18\x04 \x01(\tR\x06parent\"m\n" +
 	"\x12ListAgentsResponse\x12/\n" +
 	"\x06agents\x18\x01 \x03(\v2\x17.laelia.v1.AgentSummaryR\x06agents\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\";\n" +
@@ -2833,7 +2866,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\fHelloRequest\"Y\n" +
 	"\rHelloResponse\x12!\n" +
 	"\fcurrent_time\x18\x01 \x01(\x03R\vcurrentTime\x12%\n" +
-	"\x0eserver_version\x18\x02 \x01(\tR\rserverVersion\"\xe4\x04\n" +
+	"\x0eserver_version\x18\x02 \x01(\tR\rserverVersion\"\x83\x05\n" +
 	"\x05Agent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -2849,11 +2882,12 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\n" +
 	"created_by\x18\v \x01(\tB\x03\xe0A\x03R\tcreatedBy\x12\x1e\n" +
 	"\bcan_edit\x18\f \x01(\bB\x03\xe0A\x03R\acanEdit\x12\x1b\n" +
-	"\x06avatar\x18\r \x01(\tB\x03\xe0A\x03R\x06avatar\x1a9\n" +
+	"\x06avatar\x18\r \x01(\tB\x03\xe0A\x03R\x06avatar\x12\x1d\n" +
+	"\amachine\x18\x0e \x01(\tB\x03\xe0A\x03R\amachine\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:!\xeaA\x1e\n" +
-	"\flaelia/Agent\x12\x0eagents/{agent}J\x04\b\x04\x10\x05R\x05token\"\xcc\x01\n" +
+	"\flaelia/Agent\x12\x0eagents/{agent}J\x04\b\x04\x10\x05R\x05token\"\xe6\x01\n" +
 	"\fAgentSummary\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -2862,7 +2896,8 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\bprovider\x18\x05 \x01(\tR\bprovider\x12\x1e\n" +
 	"\n" +
 	"executable\x18\x06 \x01(\tR\n" +
-	"executable\"\xce\x03\n" +
+	"executable\x12\x18\n" +
+	"\amachine\x18\a \x01(\tR\amachine\"\xce\x03\n" +
 	"\tAgentInfo\x12\x1d\n" +
 	"\n" +
 	"agent_type\x18\x01 \x01(\tR\tagentType\x12\x1a\n" +

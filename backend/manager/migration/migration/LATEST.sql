@@ -202,6 +202,72 @@ CREATE INDEX idx_agent_token_agent ON agent_token(agent_id, token_type, state);
 ALTER TABLE agent ADD COLUMN last_token_rotated_at timestamptz;
 ALTER TABLE agent ADD COLUMN IF NOT EXISTS created_by int NOT NULL DEFAULT 0;
 
+-- Machine
+CREATE TABLE machine (
+    id serial PRIMARY KEY,
+    resource_id text NOT NULL,
+    name text NOT NULL,
+    token_version int NOT NULL DEFAULT 1,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    deleted boolean NOT NULL DEFAULT FALSE,
+    -- Stored as MachineInfo (proto/store/store/machine.proto)
+    info jsonb NOT NULL DEFAULT '{}',
+    -- Stored as MachineStatus (proto/store/store/machine.proto)
+    status jsonb NOT NULL DEFAULT '{}',
+    created_by int NOT NULL DEFAULT 0,
+    avatar_s3_key text NOT NULL DEFAULT '',
+    last_token_rotated_at timestamptz
+);
+
+CREATE UNIQUE INDEX idx_machine_unique_resource_id ON machine(resource_id);
+ALTER SEQUENCE machine_id_seq RESTART WITH 101;
+
+-- Bind agents to machines (nullable; the application enforces the binding at
+-- CreateAgent time).
+ALTER TABLE agent ADD COLUMN machine_id INTEGER REFERENCES machine(id) ON DELETE RESTRICT;
+CREATE INDEX idx_agent_machine ON agent(machine_id) WHERE machine_id IS NOT NULL;
+
+CREATE TABLE machine_session (
+    id bigserial PRIMARY KEY,
+    session_id text NOT NULL UNIQUE,
+    machine_id int NOT NULL REFERENCES machine(id) ON DELETE CASCADE,
+    token_family text NOT NULL,
+    state text NOT NULL DEFAULT 'ACTIVE',
+    source_ip text NOT NULL DEFAULT '',
+    fingerprint text NOT NULL DEFAULT '',
+    agent_version text NOT NULL DEFAULT '',
+    connected_at timestamptz NOT NULL DEFAULT now(),
+    disconnected_at timestamptz,
+    last_heartbeat_at timestamptz NOT NULL DEFAULT now(),
+    disconnect_reason text,
+    metadata jsonb NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX idx_machine_session_machine ON machine_session(machine_id, state);
+CREATE INDEX idx_machine_session_session ON machine_session(session_id);
+CREATE INDEX idx_machine_session_active ON machine_session(state, last_heartbeat_at);
+
+CREATE TABLE machine_token (
+    id bigserial PRIMARY KEY,
+    machine_id int NOT NULL REFERENCES machine(id) ON DELETE CASCADE,
+    token_hash text NOT NULL,
+    token_type text NOT NULL DEFAULT 'BOOTSTRAP',
+    token_family text NOT NULL,
+    state text NOT NULL DEFAULT 'ACTIVE',
+    fingerprint text NOT NULL DEFAULT '',
+    source_ip text NOT NULL DEFAULT '',
+    issued_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL,
+    consumed_at timestamptz,
+    revoked_at timestamptz,
+    last_used_at timestamptz,
+    created_by text NOT NULL DEFAULT ''
+);
+
+CREATE UNIQUE INDEX idx_machine_token_hash ON machine_token(token_hash);
+CREATE INDEX idx_machine_token_family ON machine_token(token_family, state);
+CREATE INDEX idx_machine_token_machine ON machine_token(machine_id, token_type, state);
+
 CREATE TABLE audit_log (
     id bigserial PRIMARY KEY,
     method text NOT NULL,
@@ -221,6 +287,9 @@ CREATE INDEX idx_audit_log_created_at ON audit_log(created_at);
 CREATE TABLE command (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     agent_id INTEGER NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
+    -- Denormalized machine id for "fail all commands for a machine" queries.
+    -- Nullable: only session-created commands after the machine refactor set it.
+    machine_id INTEGER REFERENCES machine(id) ON DELETE SET NULL,
     principal_id INTEGER NOT NULL REFERENCES principal(id),
     command TEXT NOT NULL,
     instruction TEXT NOT NULL DEFAULT '',
@@ -246,6 +315,7 @@ CREATE TABLE command (
 CREATE INDEX idx_command_agent_status ON command(agent_id, status);
 CREATE INDEX idx_command_created_at ON command(created_at DESC);
 CREATE INDEX idx_command_agent_pending ON command(agent_id, created_at) WHERE status = 1;
+CREATE INDEX idx_command_machine ON command(machine_id) WHERE machine_id IS NOT NULL;
 
 -- Real-time output chunks (streaming progress)
 CREATE TABLE command_output (

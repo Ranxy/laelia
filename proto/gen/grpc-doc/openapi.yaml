@@ -106,6 +106,13 @@ paths:
                   in: query
                   schema:
                     type: boolean
+                - name: parent
+                  in: query
+                  description: |-
+                    parent, when set to a machine resource name (machines/{machine}), filters
+                     the list to agents bound to that machine. Empty lists all agents.
+                  schema:
+                    type: string
             responses:
                 "200":
                     description: OK
@@ -2092,6 +2099,371 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/machines:
+        get:
+            tags:
+                - MachineService
+            operationId: MachineService_ListMachines
+            parameters:
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+                - name: showDeleted
+                  in: query
+                  schema:
+                    type: boolean
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListMachinesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - MachineService
+            operationId: MachineService_CreateMachine
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/Machine'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/CreateMachineResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/machines/{machine}:
+        get:
+            tags:
+                - MachineService
+            operationId: MachineService_GetMachine
+            parameters:
+                - name: machine
+                  in: path
+                  description: The machine id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Machine'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        delete:
+            tags:
+                - MachineService
+            operationId: MachineService_DeleteMachine
+            parameters:
+                - name: machine
+                  in: path
+                  description: The machine id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/machines/{machine}/agents:
+        get:
+            tags:
+                - MachineService
+            description: List the agents hosted on a machine.
+            operationId: MachineService_ListMachineAgents
+            parameters:
+                - name: machine
+                  in: path
+                  description: The machine id.
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListMachineAgentsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/machines/{machine}:forceDisconnect:
+        post:
+            tags:
+                - MachineService
+            description: |-
+                Admin force-disconnects a machine: terminate all its sessions and fail all
+                 in-flight commands for every agent hosted on it.
+            operationId: MachineService_ForceDisconnectMachine
+            parameters:
+                - name: machine
+                  in: path
+                  description: The machine id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ForceDisconnectMachineRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/machines/{machine}:refreshProviders:
+        post:
+            tags:
+                - MachineService
+            description: |-
+                Ask the machine app to re-probe its host for installed LLM agent providers
+                 and their models. Returns the freshly discovered provider list (also
+                 persisted into machine.info.available_providers). Admin only.
+            operationId: MachineService_RefreshMachineProviders
+            parameters:
+                - name: machine
+                  in: path
+                  description: The machine id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/RefreshMachineProvidersRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/RefreshMachineProvidersResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/machines/{machine}:revokeToken:
+        post:
+            tags:
+                - MachineService
+            description: 'Token revocation: revoke all tokens for the machine.'
+            operationId: MachineService_RevokeMachineToken
+            parameters:
+                - name: machine
+                  in: path
+                  description: The machine id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/RevokeMachineTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/RevokeMachineTokenResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/machines/{machine}:rotateToken:
+        post:
+            tags:
+                - MachineService
+            description: |-
+                Token rotation: generate a new registration token; the machine app must
+                 re-ConnectMachine with it. Old tokens are revoked and all sessions dropped.
+            operationId: MachineService_RotateMachineToken
+            parameters:
+                - name: machine
+                  in: path
+                  description: The machine id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/RotateMachineTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/RotateMachineTokenResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/machines:connect:
+        post:
+            tags:
+                - MachineService
+            description: |-
+                Machine initial connection using a registration token. Returns access +
+                 refresh tokens, the machine session id, and the full list of agents the
+                 machine must host (so the machine app can open an AgentChannel for each).
+            operationId: MachineService_ConnectMachine
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ConnectMachineRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ConnectMachineResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/machines:disconnect:
+        post:
+            tags:
+                - MachineService
+            operationId: MachineService_MachineDisconnect
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MachineDisconnectRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/machines:heartbeat:
+        post:
+            tags:
+                - MachineService
+            operationId: MachineService_MachineHeartbeat
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MachineHeartbeatRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MachineHeartbeatResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/machines:refreshToken:
+        post:
+            tags:
+                - MachineService
+            operationId: MachineService_RefreshMachineToken
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/RefreshMachineTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/RefreshMachineTokenResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/reminders:
         get:
             tags:
@@ -3037,6 +3409,14 @@ components:
                         avatar is the resource name of the agent's uploaded avatar image, or empty
                          when the agent has not uploaded one (frontend renders a deterministic pixel
                          identicon seeded by the agent id). Format: agents/{agent}/avatar.
+                machine:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        machine is the resource name of the machine this agent is bound to
+                         (machines/{machine}). Immutable after creation; set by CreateAgent. An agent
+                         runs on exactly one machine; the machine app picks it up via the
+                         MachineChannel control stream.
         AgentACPConfig:
             type: object
             properties:
@@ -3074,6 +3454,19 @@ components:
                     type: string
                 toolName:
                     type: string
+        AgentAssignment:
+            type: object
+            properties:
+                agentName:
+                    type: string
+                agentDisplayName:
+                    type: string
+                acpConfig:
+                    $ref: '#/components/schemas/AgentACPConfig'
+            description: |-
+                AgentAssignment is the per-agent configuration the machine app needs to run an
+                 agent's drain loop. Pushed over the MachineChannel on CreateAgent, and sent
+                 in full in ConnectMachineResponse.assigned_agents on (re)connect.
         AgentCapability:
             type: object
             properties:
@@ -3291,6 +3684,11 @@ components:
                          Agent, surfaced top-level so list consumers don't pull in AgentInfo.
                 executable:
                     type: string
+                machine:
+                    type: string
+                    description: |-
+                        machine is the resource name of the machine this agent is bound to
+                         (machines/{machine}).
             description: |-
                 AgentSummary is the lightweight list-view projection of an Agent returned by
                  ListAgents. It carries only the fields list/header views need: identity,
@@ -3745,6 +4143,36 @@ components:
                     $ref: '#/components/schemas/AgentStatus'
                 acpConfig:
                     $ref: '#/components/schemas/AgentACPConfig'
+        ConnectMachineRequest:
+            type: object
+            properties:
+                registrationToken:
+                    type: string
+                info:
+                    $ref: '#/components/schemas/MachineInfo'
+                fingerprint:
+                    type: string
+        ConnectMachineResponse:
+            type: object
+            properties:
+                accessToken:
+                    type: string
+                refreshToken:
+                    type: string
+                sessionId:
+                    type: string
+                accessTokenExpiresAt:
+                    type: string
+                    format: date-time
+                initialStatus:
+                    $ref: '#/components/schemas/MachineStatus'
+                assignedAgents:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AgentAssignment'
+                    description: |-
+                        The full set of agents this machine must host. The machine app opens one
+                         AgentChannel per entry immediately after connect (and on every reconnect).
         Conversation:
             type: object
             properties:
@@ -3850,6 +4278,13 @@ components:
             type: object
             properties:
                 title:
+                    type: string
+        CreateMachineResponse:
+            type: object
+            properties:
+                machine:
+                    $ref: '#/components/schemas/Machine'
+                registrationToken:
                     type: string
         CreateTaskRequest:
             required:
@@ -3975,6 +4410,15 @@ components:
                 sessionId:
                     type: string
         ForceDisconnectAgentRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                reason:
+                    type: string
+        ForceDisconnectMachineRequest:
             required:
                 - name
             type: object
@@ -4216,6 +4660,24 @@ components:
                         reminders are the DUE reminders owned by the calling agent, ordered by
                          fire_at ascending. The agent drain loop calls this each session to pick up
                          fired reminders and process them.
+        ListMachineAgentsResponse:
+            type: object
+            properties:
+                agents:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AgentSummary'
+                nextPageToken:
+                    type: string
+        ListMachinesResponse:
+            type: object
+            properties:
+                machines:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/MachineSummary'
+                nextPageToken:
+                    type: string
         ListPeerAgentsResponse:
             type: object
             properties:
@@ -4326,6 +4788,139 @@ components:
         LogoutRequest:
             type: object
             properties: {}
+        Machine:
+            type: object
+            properties:
+                name:
+                    type: string
+                state:
+                    enum:
+                        - STATE_UNSPECIFIED
+                        - ACTIVE
+                        - DELETED
+                    type: string
+                    format: enum
+                title:
+                    type: string
+                info:
+                    $ref: '#/components/schemas/MachineInfo'
+                status:
+                    $ref: '#/components/schemas/MachineStatus'
+                createdAt:
+                    type: string
+                    format: date-time
+                labels:
+                    type: object
+                    additionalProperties:
+                        type: string
+                createdBy:
+                    readOnly: true
+                    type: string
+                    description: Creator's user resource name (users/{id}).
+                canEdit:
+                    readOnly: true
+                    type: boolean
+                    description: |-
+                        can_edit reports whether the current caller may modify this machine
+                         (laelia.machines.edit).
+        MachineDisconnectRequest:
+            type: object
+            properties:
+                sessionId:
+                    type: string
+                reason:
+                    type: string
+        MachineHeartbeatRequest:
+            type: object
+            properties:
+                sessionId:
+                    type: string
+                previousNonce:
+                    type: string
+        MachineHeartbeatResponse:
+            type: object
+            properties:
+                nextNonce:
+                    type: string
+                nextHeartbeatAt:
+                    type: string
+                    format: date-time
+                accessToken:
+                    type: string
+                accessTokenExpiresAt:
+                    type: string
+                    format: date-time
+        MachineInfo:
+            type: object
+            properties:
+                hostname:
+                    type: string
+                os:
+                    type: string
+                arch:
+                    type: string
+                ip:
+                    type: string
+                version:
+                    type: string
+                labels:
+                    type: object
+                    additionalProperties:
+                        type: string
+                capability:
+                    $ref: '#/components/schemas/AgentCapability'
+                availableProviders:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AgentProviderInfo'
+                    description: |-
+                        LLM agent providers auto-discovered by the machine app on its host.
+                         Machine-scoped: every agent hosted on this machine selects from this list.
+        MachineStatus:
+            type: object
+            properties:
+                state:
+                    enum:
+                        - CONNECTION_STATE_UNSPECIFIED
+                        - ONLINE
+                        - OFFLINE
+                        - ERROR
+                        - KICKED
+                    type: string
+                    format: enum
+                lastHeartbeatTime:
+                    type: string
+                    format: date-time
+                connectedTime:
+                    type: string
+                    format: date-time
+                errorMessage:
+                    type: string
+                activeSessionId:
+                    type: string
+        MachineSummary:
+            type: object
+            properties:
+                name:
+                    type: string
+                state:
+                    enum:
+                        - STATE_UNSPECIFIED
+                        - ACTIVE
+                        - DELETED
+                    type: string
+                    format: enum
+                title:
+                    type: string
+                status:
+                    $ref: '#/components/schemas/MachineStatus'
+                agentCount:
+                    type: integer
+                    format: int32
+            description: |-
+                MachineSummary is the lightweight list-view projection of a Machine returned
+                 by ListMachines. It carries identity, lifecycle state, connection status, and
+                 the count of agents bound to the machine.
         MarkActivityDoneRequest:
             required:
                 - name
@@ -4529,6 +5124,37 @@ components:
                 accessTokenExpiresAt:
                     type: string
                     format: date-time
+        RefreshMachineProvidersRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+        RefreshMachineProvidersResponse:
+            type: object
+            properties:
+                providers:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AgentProviderInfo'
+        RefreshMachineTokenRequest:
+            type: object
+            properties:
+                refreshToken:
+                    type: string
+                fingerprint:
+                    type: string
+        RefreshMachineTokenResponse:
+            type: object
+            properties:
+                accessToken:
+                    type: string
+                refreshToken:
+                    type: string
+                accessTokenExpiresAt:
+                    type: string
+                    format: date-time
         Reminder:
             type: object
             properties:
@@ -4642,6 +5268,18 @@ components:
         RevokeAgentTokenResponse:
             type: object
             properties: {}
+        RevokeMachineTokenRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                reason:
+                    type: string
+        RevokeMachineTokenResponse:
+            type: object
+            properties: {}
         Role:
             required:
                 - name
@@ -4686,6 +5324,20 @@ components:
             type: object
             properties:
                 bootstrapToken:
+                    type: string
+        RotateMachineTokenRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                reason:
+                    type: string
+        RotateMachineTokenResponse:
+            type: object
+            properties:
+                registrationToken:
                     type: string
         S3ConfigSetting:
             type: object
@@ -5146,6 +5798,13 @@ tags:
         IamService exposes the workspace and per-agent IAM policies for management.
          Get reads the full policy; Set replaces it whole, guarded by an etag. Each
          RPC is gated by the IAM interceptor with laelia.iam.getPolicy / setPolicy.
+    - name: MachineService
+      description: |-
+        MachineService manages machines (a long-lived agent-application process a
+         user runs once on a host) and serves the machine-side authentication RPCs the
+         machine app calls to register itself. A machine authenticates once with a
+         registration token and then hosts one or more agents, each running its own
+         AgentChannel over the machine's access token.
     - name: RoleService
       description: |-
         RoleService manages custom roles. Predefined roles are read-only over this

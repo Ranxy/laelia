@@ -554,6 +554,14 @@ export declare type ListAgentsRequest = Message<"laelia.v1.ListAgentsRequest"> &
    * @generated from field: bool show_deleted = 3;
    */
   showDeleted: boolean;
+
+  /**
+   * parent, when set to a machine resource name (machines/{machine}), filters
+   * the list to agents bound to that machine. Empty lists all agents.
+   *
+   * @generated from field: string parent = 4;
+   */
+  parent: string;
 };
 
 /**
@@ -860,6 +868,16 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
    * @generated from field: string avatar = 13;
    */
   avatar: string;
+
+  /**
+   * machine is the resource name of the machine this agent is bound to
+   * (machines/{machine}). Immutable after creation; set by CreateAgent. An agent
+   * runs on exactly one machine; the machine app picks it up via the
+   * MachineChannel control stream.
+   *
+   * @generated from field: string machine = 14;
+   */
+  machine: string;
 };
 
 /**
@@ -914,6 +932,14 @@ export declare type AgentSummary = Message<"laelia.v1.AgentSummary"> & {
    * @generated from field: string executable = 6;
    */
   executable: string;
+
+  /**
+   * machine is the resource name of the machine this agent is bound to
+   * (machines/{machine}).
+   *
+   * @generated from field: string machine = 7;
+   */
+  machine: string;
 };
 
 /**

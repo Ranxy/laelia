@@ -1,0 +1,439 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "v1/agent.proto";
+import "v1/annotation.proto";
+import "v1/command.proto";
+import "v1/common.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+// MachineService manages machines (a long-lived agent-application process a
+// user runs once on a host) and serves the machine-side authentication RPCs the
+// machine app calls to register itself. A machine authenticates once with a
+// registration token and then hosts one or more agents, each running its own
+// AgentChannel over the machine's access token.
+service MachineService {
+  // ========== Management APIs (IAM auth, admin only) ==========
+
+  rpc CreateMachine(CreateMachineRequest) returns (CreateMachineResponse) {
+    option (google.api.http) = {
+      post: "/v1/machines"
+      body: "machine"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.machines.create";
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc ListMachines(ListMachinesRequest) returns (ListMachinesResponse) {
+    option (google.api.http) = {get: "/v1/machines"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.machines.get";
+  }
+
+  rpc GetMachine(GetMachineRequest) returns (Machine) {
+    option (google.api.http) = {get: "/v1/{name=machines/*}"};
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.machines.get";
+  }
+
+  rpc DeleteMachine(DeleteMachineRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/{name=machines/*}"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.machines.delete";
+    option (laelia.v1.audit) = true;
+  }
+
+  // Token rotation: generate a new registration token; the machine app must
+  // re-ConnectMachine with it. Old tokens are revoked and all sessions dropped.
+  rpc RotateMachineToken(RotateMachineTokenRequest) returns (RotateMachineTokenResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=machines/*}:rotateToken"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.machines.edit";
+    option (laelia.v1.audit) = true;
+  }
+
+  // Token revocation: revoke all tokens for the machine.
+  rpc RevokeMachineToken(RevokeMachineTokenRequest) returns (RevokeMachineTokenResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=machines/*}:revokeToken"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.machines.edit";
+    option (laelia.v1.audit) = true;
+  }
+
+  // Admin force-disconnects a machine: terminate all its sessions and fail all
+  // in-flight commands for every agent hosted on it.
+  rpc ForceDisconnectMachine(ForceDisconnectMachineRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/{name=machines/*}:forceDisconnect"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.machines.edit";
+    option (laelia.v1.audit) = true;
+  }
+
+  // List the agents hosted on a machine.
+  rpc ListMachineAgents(ListMachineAgentsRequest) returns (ListMachineAgentsResponse) {
+    option (google.api.http) = {get: "/v1/{name=machines/*}/agents"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.machines.get";
+  }
+
+  // Ask the machine app to re-probe its host for installed LLM agent providers
+  // and their models. Returns the freshly discovered provider list (also
+  // persisted into machine.info.available_providers). Admin only.
+  rpc RefreshMachineProviders(RefreshMachineProvidersRequest) returns (RefreshMachineProvidersResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=machines/*}:refreshProviders"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.machines.edit";
+    option (laelia.v1.audit) = true;
+  }
+
+  // ========== Machine Connection APIs (CUSTOM auth, machine tokens) ==========
+
+  // Machine initial connection using a registration token. Returns access +
+  // refresh tokens, the machine session id, and the full list of agents the
+  // machine must host (so the machine app can open an AgentChannel for each).
+  rpc ConnectMachine(ConnectMachineRequest) returns (ConnectMachineResponse) {
+    option (google.api.http) = {
+      post: "/v1/machines:connect"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = CUSTOM;
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc MachineHeartbeat(MachineHeartbeatRequest) returns (MachineHeartbeatResponse) {
+    option (google.api.http) = {
+      post: "/v1/machines:heartbeat"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = CUSTOM;
+  }
+
+  rpc MachineDisconnect(MachineDisconnectRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/machines:disconnect"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = CUSTOM;
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc RefreshMachineToken(RefreshMachineTokenRequest) returns (RefreshMachineTokenResponse) {
+    option (google.api.http) = {
+      post: "/v1/machines:refreshToken"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = CUSTOM;
+    option (laelia.v1.audit) = true;
+  }
+}
+
+// MachineStreamService is the machine-level control channel. It is separate
+// from the per-agent AgentStreamService.AgentChannel data plane: the
+// MachineChannel carries agent assignment (add/remove/config-update), provider
+// discovery, and liveness ping/pong, while each agent's drain loop runs over
+// its own AgentChannel.
+service MachineStreamService {
+  rpc MachineChannel(stream MachineStreamMessage) returns (stream ManagerMachineStreamMessage);
+}
+
+// ========== Request/Response Messages ==========
+
+// --- Create Machine ---
+
+message CreateMachineRequest {
+  Machine machine = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreateMachineResponse {
+  Machine machine = 1;
+  string registration_token = 2; // 7-day validity, single-use on first connect
+}
+
+// --- Token Management ---
+
+message RotateMachineTokenRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Machine"}
+  ];
+  string reason = 2;
+}
+
+message RotateMachineTokenResponse {
+  string registration_token = 1;
+}
+
+message RevokeMachineTokenRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Machine"}
+  ];
+  string reason = 2;
+}
+
+message RevokeMachineTokenResponse {}
+
+// --- Force Disconnect ---
+
+message ForceDisconnectMachineRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Machine"}
+  ];
+  string reason = 2;
+}
+
+// --- List Machine Agents ---
+
+message ListMachineAgentsRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Machine"}
+  ];
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListMachineAgentsResponse {
+  repeated AgentSummary agents = 1;
+  string next_page_token = 2;
+}
+
+// --- Refresh Providers ---
+
+message RefreshMachineProvidersRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Machine"}
+  ];
+}
+
+message RefreshMachineProvidersResponse {
+  repeated AgentProviderInfo providers = 1;
+}
+
+// --- Machine Connection ---
+
+message ConnectMachineRequest {
+  string registration_token = 1; // first connection or after refresh failure
+  MachineInfo info = 2;
+  string fingerprint = 3; // client-generated connection fingerprint (hostname:os:arch)
+}
+
+message ConnectMachineResponse {
+  string access_token = 1; // 15-minute validity
+  string refresh_token = 2; // 24-hour validity, single-use rotation
+  string session_id = 3;
+  google.protobuf.Timestamp access_token_expires_at = 4;
+  MachineStatus initial_status = 5;
+  // The full set of agents this machine must host. The machine app opens one
+  // AgentChannel per entry immediately after connect (and on every reconnect).
+  repeated AgentAssignment assigned_agents = 6;
+}
+
+// --- Machine Heartbeat ---
+
+message MachineHeartbeatRequest {
+  string session_id = 1;
+  string previous_nonce = 2; // nonce from previous response (replay protection)
+}
+
+message MachineHeartbeatResponse {
+  string next_nonce = 1;
+  google.protobuf.Timestamp next_heartbeat_at = 2;
+  string access_token = 3; // new access token (only if expiring soon)
+  google.protobuf.Timestamp access_token_expires_at = 4;
+}
+
+// --- Machine Disconnect ---
+
+message MachineDisconnectRequest {
+  string session_id = 1;
+  string reason = 2; // "shutdown", "upgrade" etc.
+}
+
+// --- Token Refresh ---
+
+message RefreshMachineTokenRequest {
+  string refresh_token = 1;
+  string fingerprint = 2;
+}
+
+message RefreshMachineTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2; // new refresh token (rotation)
+  google.protobuf.Timestamp access_token_expires_at = 3;
+}
+
+// --- List/Query ---
+
+message ListMachinesRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+  bool show_deleted = 3;
+}
+
+message ListMachinesResponse {
+  repeated MachineSummary machines = 1;
+  string next_page_token = 2;
+}
+
+message GetMachineRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Machine"}
+  ];
+}
+
+message DeleteMachineRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Machine"}
+  ];
+}
+
+// --- Machine Definition ---
+
+message Machine {
+  option (google.api.resource) = {
+    type: "laelia/Machine"
+    pattern: "machines/{machine}"
+  };
+
+  string name = 1;
+  State state = 2;
+  string title = 3;
+  MachineInfo info = 5;
+  MachineStatus status = 6;
+  google.protobuf.Timestamp created_at = 7;
+  map<string, string> labels = 8;
+  // Creator's user resource name (users/{id}).
+  string created_by = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // can_edit reports whether the current caller may modify this machine
+  // (laelia.machines.edit).
+  bool can_edit = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  reserved 4; // "token"
+}
+
+// MachineSummary is the lightweight list-view projection of a Machine returned
+// by ListMachines. It carries identity, lifecycle state, connection status, and
+// the count of agents bound to the machine.
+message MachineSummary {
+  string name = 1;
+  State state = 2;
+  string title = 3;
+  MachineStatus status = 4;
+  int32 agent_count = 5;
+}
+
+message MachineInfo {
+  string hostname = 2;
+  string os = 3;
+  string arch = 4;
+  string ip = 5;
+  string version = 6;
+  map<string, string> labels = 7;
+  AgentCapability capability = 8;
+  // LLM agent providers auto-discovered by the machine app on its host.
+  // Machine-scoped: every agent hosted on this machine selects from this list.
+  repeated AgentProviderInfo available_providers = 9;
+}
+
+message MachineStatus {
+  enum ConnectionState {
+    CONNECTION_STATE_UNSPECIFIED = 0;
+    ONLINE = 1;
+    OFFLINE = 2;
+    ERROR = 3;
+    KICKED = 4;
+  }
+  ConnectionState state = 1;
+  google.protobuf.Timestamp last_heartbeat_time = 2;
+  google.protobuf.Timestamp connected_time = 3;
+  string error_message = 4;
+  string active_session_id = 5;
+}
+
+// AgentAssignment is the per-agent configuration the machine app needs to run an
+// agent's drain loop. Pushed over the MachineChannel on CreateAgent, and sent
+// in full in ConnectMachineResponse.assigned_agents on (re)connect.
+message AgentAssignment {
+  string agent_name = 1; // agents/{agent}
+  string agent_display_name = 2; // used in the init prompt
+  AgentACPConfig acp_config = 3; // server-owned per-agent ACP config
+}
+
+// --- Machine Control Channel messages ---
+
+message MachineStreamMessage {
+  oneof message {
+    MachineReady machine_ready = 1; // first message, carries the machine session id
+    Ping ping = 2;
+    ProvidersDiscovered providers_discovered = 3; // response to DiscoverProviders
+    MachineDisconnectNotice disconnect_notice = 4; // graceful shutdown
+  }
+}
+
+message ManagerMachineStreamMessage {
+  oneof message {
+    AgentAssignment agent_assignment = 1; // host a new agent
+    RemoveAgent remove_agent = 2; // tear down an agent's runner
+    AgentConfigUpdate agent_config_update = 3; // hot-reload an agent's ACP config
+    DiscoverProviders discover_providers = 4; // ask the machine to re-probe
+    Pong pong = 5;
+    ReloadAgentAssignment reload_agent_assignment = 6; // full re-sync of one agent
+  }
+}
+
+message MachineReady {
+  string session_id = 1;
+}
+
+message RemoveAgent {
+  string agent_name = 1;
+}
+
+message AgentConfigUpdate {
+  string agent_name = 1;
+  AgentACPConfig acp_config = 2;
+}
+
+message MachineDisconnectNotice {
+  string reason = 1;
+}
+
+// ReloadAgentAssignment is a full re-sync of a single agent's assignment (used
+// after a config or display-name change, or to re-establish a runner).
+message ReloadAgentAssignment {
+  string agent_name = 1;
+  AgentAssignment assignment = 2;
+}
+
+// DiscoverProviders / ProvidersDiscovered are reused from command.proto
+// (same laelia.v1 package). They carry a request_id correlation id and the
+// discovered provider list; on the machine control channel the manager sends
+// DiscoverProviders and the machine app replies with ProvidersDiscovered.

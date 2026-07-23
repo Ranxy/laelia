@@ -263,6 +263,49 @@
   
     - [IamService](#laelia-v1-IamService)
   
+- [v1/machine.proto](#v1_machine-proto)
+    - [AgentAssignment](#laelia-v1-AgentAssignment)
+    - [AgentConfigUpdate](#laelia-v1-AgentConfigUpdate)
+    - [ConnectMachineRequest](#laelia-v1-ConnectMachineRequest)
+    - [ConnectMachineResponse](#laelia-v1-ConnectMachineResponse)
+    - [CreateMachineRequest](#laelia-v1-CreateMachineRequest)
+    - [CreateMachineResponse](#laelia-v1-CreateMachineResponse)
+    - [DeleteMachineRequest](#laelia-v1-DeleteMachineRequest)
+    - [ForceDisconnectMachineRequest](#laelia-v1-ForceDisconnectMachineRequest)
+    - [GetMachineRequest](#laelia-v1-GetMachineRequest)
+    - [ListMachineAgentsRequest](#laelia-v1-ListMachineAgentsRequest)
+    - [ListMachineAgentsResponse](#laelia-v1-ListMachineAgentsResponse)
+    - [ListMachinesRequest](#laelia-v1-ListMachinesRequest)
+    - [ListMachinesResponse](#laelia-v1-ListMachinesResponse)
+    - [Machine](#laelia-v1-Machine)
+    - [Machine.LabelsEntry](#laelia-v1-Machine-LabelsEntry)
+    - [MachineDisconnectNotice](#laelia-v1-MachineDisconnectNotice)
+    - [MachineDisconnectRequest](#laelia-v1-MachineDisconnectRequest)
+    - [MachineHeartbeatRequest](#laelia-v1-MachineHeartbeatRequest)
+    - [MachineHeartbeatResponse](#laelia-v1-MachineHeartbeatResponse)
+    - [MachineInfo](#laelia-v1-MachineInfo)
+    - [MachineInfo.LabelsEntry](#laelia-v1-MachineInfo-LabelsEntry)
+    - [MachineReady](#laelia-v1-MachineReady)
+    - [MachineStatus](#laelia-v1-MachineStatus)
+    - [MachineStreamMessage](#laelia-v1-MachineStreamMessage)
+    - [MachineSummary](#laelia-v1-MachineSummary)
+    - [ManagerMachineStreamMessage](#laelia-v1-ManagerMachineStreamMessage)
+    - [RefreshMachineProvidersRequest](#laelia-v1-RefreshMachineProvidersRequest)
+    - [RefreshMachineProvidersResponse](#laelia-v1-RefreshMachineProvidersResponse)
+    - [RefreshMachineTokenRequest](#laelia-v1-RefreshMachineTokenRequest)
+    - [RefreshMachineTokenResponse](#laelia-v1-RefreshMachineTokenResponse)
+    - [ReloadAgentAssignment](#laelia-v1-ReloadAgentAssignment)
+    - [RemoveAgent](#laelia-v1-RemoveAgent)
+    - [RevokeMachineTokenRequest](#laelia-v1-RevokeMachineTokenRequest)
+    - [RevokeMachineTokenResponse](#laelia-v1-RevokeMachineTokenResponse)
+    - [RotateMachineTokenRequest](#laelia-v1-RotateMachineTokenRequest)
+    - [RotateMachineTokenResponse](#laelia-v1-RotateMachineTokenResponse)
+  
+    - [MachineStatus.ConnectionState](#laelia-v1-MachineStatus-ConnectionState)
+  
+    - [MachineService](#laelia-v1-MachineService)
+    - [MachineStreamService](#laelia-v1-MachineStreamService)
+  
 - [v1/role_service.proto](#v1_role_service-proto)
     - [CreateRoleRequest](#laelia-v1-CreateRoleRequest)
     - [DeleteRoleRequest](#laelia-v1-DeleteRoleRequest)
@@ -436,6 +479,7 @@ RiskLevel is the risk level.
 | created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}); empty for legacy agents with no recorded creator. Only the creator or a workspace admin may modify the agent. |
 | can_edit | [bool](#bool) |  | can_edit reports whether the current caller may modify this agent (laelia.agents.edit): true for the creator (via the agentEditor IAM binding) and for workspace admins (via the all-permissions union), false otherwise. Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths. |
 | avatar | [string](#string) |  | avatar is the resource name of the agent&#39;s uploaded avatar image, or empty when the agent has not uploaded one (frontend renders a deterministic pixel identicon seeded by the agent id). Format: agents/{agent}/avatar. |
+| machine | [string](#string) |  | machine is the resource name of the machine this agent is bound to (machines/{machine}). Immutable after creation; set by CreateAgent. An agent runs on exactly one machine; the machine app picks it up via the MachineChannel control stream. |
 
 
 
@@ -739,6 +783,7 @@ view does not gate affordances on it (delete is enforced server-side).
 | status | [AgentStatus](#laelia-v1-AgentStatus) |  |  |
 | provider | [string](#string) |  | provider/executable mirror acp_config.provider/executable on the full Agent, surfaced top-level so list consumers don&#39;t pull in AgentInfo. |
 | executable | [string](#string) |  |  |
+| machine | [string](#string) |  | machine is the resource name of the machine this agent is bound to (machines/{machine}). |
 
 
 
@@ -978,6 +1023,7 @@ view does not gate affordances on it (delete is enforced server-side).
 | page_size | [int32](#int32) |  |  |
 | page_token | [string](#string) |  |  |
 | show_deleted | [bool](#bool) |  |  |
+| parent | [string](#string) |  | parent, when set to a machine resource name (machines/{machine}), filters the list to agents bound to that machine. Empty lists all agents. |
 
 
 
@@ -1772,6 +1818,7 @@ flags. The resource name is &#34;users/{user}/activities/{message}&#34;.
 | last_command_id | [string](#string) |  |  |
 | last_ack_seq | [int32](#int32) |  |  |
 | last_event_seq | [int32](#int32) |  |  |
+| agent_name | [string](#string) |  | agent_name declares which agent (agents/{agent}) this AgentChannel runs. The manager validates the authenticated machine owns this agent. Set by the machine app&#39;s per-agent runner; required on the first message. |
 
 
 
@@ -4473,6 +4520,681 @@ RPC is gated by the IAM interceptor with laelia.iam.getPolicy / setPolicy.
 | SetWorkspaceIamPolicy | [SetWorkspaceIamPolicyRequest](#laelia-v1-SetWorkspaceIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Set the workspace IAM policy (full replace, etag-guarded). |
 | GetAgentIamPolicy | [GetAgentIamPolicyRequest](#laelia-v1-GetAgentIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Get the IAM policy attached to an agent. |
 | SetAgentIamPolicy | [SetAgentIamPolicyRequest](#laelia-v1-SetAgentIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Set the IAM policy attached to an agent (full replace, etag-guarded). |
+
+ 
+
+
+
+<a name="v1_machine-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/machine.proto
+
+
+
+<a name="laelia-v1-AgentAssignment"></a>
+
+### AgentAssignment
+AgentAssignment is the per-agent configuration the machine app needs to run an
+agent&#39;s drain loop. Pushed over the MachineChannel on CreateAgent, and sent
+in full in ConnectMachineResponse.assigned_agents on (re)connect.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_name | [string](#string) |  | agents/{agent} |
+| agent_display_name | [string](#string) |  | used in the init prompt |
+| acp_config | [AgentACPConfig](#laelia-v1-AgentACPConfig) |  | server-owned per-agent ACP config |
+
+
+
+
+
+
+<a name="laelia-v1-AgentConfigUpdate"></a>
+
+### AgentConfigUpdate
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_name | [string](#string) |  |  |
+| acp_config | [AgentACPConfig](#laelia-v1-AgentACPConfig) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ConnectMachineRequest"></a>
+
+### ConnectMachineRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| registration_token | [string](#string) |  | first connection or after refresh failure |
+| info | [MachineInfo](#laelia-v1-MachineInfo) |  |  |
+| fingerprint | [string](#string) |  | client-generated connection fingerprint (hostname:os:arch) |
+
+
+
+
+
+
+<a name="laelia-v1-ConnectMachineResponse"></a>
+
+### ConnectMachineResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| access_token | [string](#string) |  | 15-minute validity |
+| refresh_token | [string](#string) |  | 24-hour validity, single-use rotation |
+| session_id | [string](#string) |  |  |
+| access_token_expires_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| initial_status | [MachineStatus](#laelia-v1-MachineStatus) |  |  |
+| assigned_agents | [AgentAssignment](#laelia-v1-AgentAssignment) | repeated | The full set of agents this machine must host. The machine app opens one AgentChannel per entry immediately after connect (and on every reconnect). |
+
+
+
+
+
+
+<a name="laelia-v1-CreateMachineRequest"></a>
+
+### CreateMachineRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| machine | [Machine](#laelia-v1-Machine) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-CreateMachineResponse"></a>
+
+### CreateMachineResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| machine | [Machine](#laelia-v1-Machine) |  |  |
+| registration_token | [string](#string) |  | 7-day validity, single-use on first connect |
+
+
+
+
+
+
+<a name="laelia-v1-DeleteMachineRequest"></a>
+
+### DeleteMachineRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ForceDisconnectMachineRequest"></a>
+
+### ForceDisconnectMachineRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| reason | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetMachineRequest"></a>
+
+### GetMachineRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListMachineAgentsRequest"></a>
+
+### ListMachineAgentsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListMachineAgentsResponse"></a>
+
+### ListMachineAgentsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agents | [AgentSummary](#laelia-v1-AgentSummary) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListMachinesRequest"></a>
+
+### ListMachinesRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+| show_deleted | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListMachinesResponse"></a>
+
+### ListMachinesResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| machines | [MachineSummary](#laelia-v1-MachineSummary) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-Machine"></a>
+
+### Machine
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| state | [State](#laelia-v1-State) |  |  |
+| title | [string](#string) |  |  |
+| info | [MachineInfo](#laelia-v1-MachineInfo) |  |  |
+| status | [MachineStatus](#laelia-v1-MachineStatus) |  |  |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| labels | [Machine.LabelsEntry](#laelia-v1-Machine-LabelsEntry) | repeated |  |
+| created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}). |
+| can_edit | [bool](#bool) |  | can_edit reports whether the current caller may modify this machine (laelia.machines.edit). |
+
+
+
+
+
+
+<a name="laelia-v1-Machine-LabelsEntry"></a>
+
+### Machine.LabelsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-MachineDisconnectNotice"></a>
+
+### MachineDisconnectNotice
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reason | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-MachineDisconnectRequest"></a>
+
+### MachineDisconnectRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| session_id | [string](#string) |  |  |
+| reason | [string](#string) |  | &#34;shutdown&#34;, &#34;upgrade&#34; etc. |
+
+
+
+
+
+
+<a name="laelia-v1-MachineHeartbeatRequest"></a>
+
+### MachineHeartbeatRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| session_id | [string](#string) |  |  |
+| previous_nonce | [string](#string) |  | nonce from previous response (replay protection) |
+
+
+
+
+
+
+<a name="laelia-v1-MachineHeartbeatResponse"></a>
+
+### MachineHeartbeatResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| next_nonce | [string](#string) |  |  |
+| next_heartbeat_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| access_token | [string](#string) |  | new access token (only if expiring soon) |
+| access_token_expires_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-MachineInfo"></a>
+
+### MachineInfo
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| hostname | [string](#string) |  |  |
+| os | [string](#string) |  |  |
+| arch | [string](#string) |  |  |
+| ip | [string](#string) |  |  |
+| version | [string](#string) |  |  |
+| labels | [MachineInfo.LabelsEntry](#laelia-v1-MachineInfo-LabelsEntry) | repeated |  |
+| capability | [AgentCapability](#laelia-v1-AgentCapability) |  |  |
+| available_providers | [AgentProviderInfo](#laelia-v1-AgentProviderInfo) | repeated | LLM agent providers auto-discovered by the machine app on its host. Machine-scoped: every agent hosted on this machine selects from this list. |
+
+
+
+
+
+
+<a name="laelia-v1-MachineInfo-LabelsEntry"></a>
+
+### MachineInfo.LabelsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-MachineReady"></a>
+
+### MachineReady
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| session_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-MachineStatus"></a>
+
+### MachineStatus
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| state | [MachineStatus.ConnectionState](#laelia-v1-MachineStatus-ConnectionState) |  |  |
+| last_heartbeat_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| connected_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| error_message | [string](#string) |  |  |
+| active_session_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-MachineStreamMessage"></a>
+
+### MachineStreamMessage
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| machine_ready | [MachineReady](#laelia-v1-MachineReady) |  | first message, carries the machine session id |
+| ping | [Ping](#laelia-v1-Ping) |  |  |
+| providers_discovered | [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered) |  | response to DiscoverProviders |
+| disconnect_notice | [MachineDisconnectNotice](#laelia-v1-MachineDisconnectNotice) |  | graceful shutdown |
+
+
+
+
+
+
+<a name="laelia-v1-MachineSummary"></a>
+
+### MachineSummary
+MachineSummary is the lightweight list-view projection of a Machine returned
+by ListMachines. It carries identity, lifecycle state, connection status, and
+the count of agents bound to the machine.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| state | [State](#laelia-v1-State) |  |  |
+| title | [string](#string) |  |  |
+| status | [MachineStatus](#laelia-v1-MachineStatus) |  |  |
+| agent_count | [int32](#int32) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ManagerMachineStreamMessage"></a>
+
+### ManagerMachineStreamMessage
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_assignment | [AgentAssignment](#laelia-v1-AgentAssignment) |  | host a new agent |
+| remove_agent | [RemoveAgent](#laelia-v1-RemoveAgent) |  | tear down an agent&#39;s runner |
+| agent_config_update | [AgentConfigUpdate](#laelia-v1-AgentConfigUpdate) |  | hot-reload an agent&#39;s ACP config |
+| discover_providers | [DiscoverProviders](#laelia-v1-DiscoverProviders) |  | ask the machine to re-probe |
+| pong | [Pong](#laelia-v1-Pong) |  |  |
+| reload_agent_assignment | [ReloadAgentAssignment](#laelia-v1-ReloadAgentAssignment) |  | full re-sync of one agent |
+
+
+
+
+
+
+<a name="laelia-v1-RefreshMachineProvidersRequest"></a>
+
+### RefreshMachineProvidersRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RefreshMachineProvidersResponse"></a>
+
+### RefreshMachineProvidersResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| providers | [AgentProviderInfo](#laelia-v1-AgentProviderInfo) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-RefreshMachineTokenRequest"></a>
+
+### RefreshMachineTokenRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| refresh_token | [string](#string) |  |  |
+| fingerprint | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RefreshMachineTokenResponse"></a>
+
+### RefreshMachineTokenResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| access_token | [string](#string) |  |  |
+| refresh_token | [string](#string) |  | new refresh token (rotation) |
+| access_token_expires_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ReloadAgentAssignment"></a>
+
+### ReloadAgentAssignment
+ReloadAgentAssignment is a full re-sync of a single agent&#39;s assignment (used
+after a config or display-name change, or to re-establish a runner).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_name | [string](#string) |  |  |
+| assignment | [AgentAssignment](#laelia-v1-AgentAssignment) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RemoveAgent"></a>
+
+### RemoveAgent
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent_name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RevokeMachineTokenRequest"></a>
+
+### RevokeMachineTokenRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| reason | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RevokeMachineTokenResponse"></a>
+
+### RevokeMachineTokenResponse
+
+
+
+
+
+
+
+<a name="laelia-v1-RotateMachineTokenRequest"></a>
+
+### RotateMachineTokenRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| reason | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-RotateMachineTokenResponse"></a>
+
+### RotateMachineTokenResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| registration_token | [string](#string) |  |  |
+
+
+
+
+
+ 
+
+
+<a name="laelia-v1-MachineStatus-ConnectionState"></a>
+
+### MachineStatus.ConnectionState
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| CONNECTION_STATE_UNSPECIFIED | 0 |  |
+| ONLINE | 1 |  |
+| OFFLINE | 2 |  |
+| ERROR | 3 |  |
+| KICKED | 4 |  |
+
+
+ 
+
+ 
+
+
+<a name="laelia-v1-MachineService"></a>
+
+### MachineService
+MachineService manages machines (a long-lived agent-application process a
+user runs once on a host) and serves the machine-side authentication RPCs the
+machine app calls to register itself. A machine authenticates once with a
+registration token and then hosts one or more agents, each running its own
+AgentChannel over the machine&#39;s access token.
+
+========== Management APIs (IAM auth, admin only) ==========
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| CreateMachine | [CreateMachineRequest](#laelia-v1-CreateMachineRequest) | [CreateMachineResponse](#laelia-v1-CreateMachineResponse) |  |
+| ListMachines | [ListMachinesRequest](#laelia-v1-ListMachinesRequest) | [ListMachinesResponse](#laelia-v1-ListMachinesResponse) |  |
+| GetMachine | [GetMachineRequest](#laelia-v1-GetMachineRequest) | [Machine](#laelia-v1-Machine) |  |
+| DeleteMachine | [DeleteMachineRequest](#laelia-v1-DeleteMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+| RotateMachineToken | [RotateMachineTokenRequest](#laelia-v1-RotateMachineTokenRequest) | [RotateMachineTokenResponse](#laelia-v1-RotateMachineTokenResponse) | Token rotation: generate a new registration token; the machine app must re-ConnectMachine with it. Old tokens are revoked and all sessions dropped. |
+| RevokeMachineToken | [RevokeMachineTokenRequest](#laelia-v1-RevokeMachineTokenRequest) | [RevokeMachineTokenResponse](#laelia-v1-RevokeMachineTokenResponse) | Token revocation: revoke all tokens for the machine. |
+| ForceDisconnectMachine | [ForceDisconnectMachineRequest](#laelia-v1-ForceDisconnectMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Admin force-disconnects a machine: terminate all its sessions and fail all in-flight commands for every agent hosted on it. |
+| ListMachineAgents | [ListMachineAgentsRequest](#laelia-v1-ListMachineAgentsRequest) | [ListMachineAgentsResponse](#laelia-v1-ListMachineAgentsResponse) | List the agents hosted on a machine. |
+| RefreshMachineProviders | [RefreshMachineProvidersRequest](#laelia-v1-RefreshMachineProvidersRequest) | [RefreshMachineProvidersResponse](#laelia-v1-RefreshMachineProvidersResponse) | Ask the machine app to re-probe its host for installed LLM agent providers and their models. Returns the freshly discovered provider list (also persisted into machine.info.available_providers). Admin only. |
+| ConnectMachine | [ConnectMachineRequest](#laelia-v1-ConnectMachineRequest) | [ConnectMachineResponse](#laelia-v1-ConnectMachineResponse) | Machine initial connection using a registration token. Returns access &#43; refresh tokens, the machine session id, and the full list of agents the machine must host (so the machine app can open an AgentChannel for each). |
+| MachineHeartbeat | [MachineHeartbeatRequest](#laelia-v1-MachineHeartbeatRequest) | [MachineHeartbeatResponse](#laelia-v1-MachineHeartbeatResponse) |  |
+| MachineDisconnect | [MachineDisconnectRequest](#laelia-v1-MachineDisconnectRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+| RefreshMachineToken | [RefreshMachineTokenRequest](#laelia-v1-RefreshMachineTokenRequest) | [RefreshMachineTokenResponse](#laelia-v1-RefreshMachineTokenResponse) |  |
+
+
+<a name="laelia-v1-MachineStreamService"></a>
+
+### MachineStreamService
+MachineStreamService is the machine-level control channel. It is separate
+from the per-agent AgentStreamService.AgentChannel data plane: the
+MachineChannel carries agent assignment (add/remove/config-update), provider
+discovery, and liveness ping/pong, while each agent&#39;s drain loop runs over
+its own AgentChannel.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| MachineChannel | [MachineStreamMessage](#laelia-v1-MachineStreamMessage) stream | [ManagerMachineStreamMessage](#laelia-v1-ManagerMachineStreamMessage) stream |  |
 
  
 

@@ -3540,6 +3540,15 @@ export declare type AgentReady = Message<"laelia.v1.AgentReady"> & {
    * @generated from field: int32 last_event_seq = 4;
    */
   lastEventSeq: number;
+
+  /**
+   * agent_name declares which agent (agents/{agent}) this AgentChannel runs. The
+   * manager validates the authenticated machine owns this agent. Set by the
+   * machine app's per-agent runner; required on the first message.
+   *
+   * @generated from field: string agent_name = 5;
+   */
+  agentName: string;
 };
 
 /**

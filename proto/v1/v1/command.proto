@@ -1667,6 +1667,10 @@ message AgentReady {
   string last_command_id = 2;
   int32 last_ack_seq = 3;
   int32 last_event_seq = 4;
+  // agent_name declares which agent (agents/{agent}) this AgentChannel runs. The
+  // manager validates the authenticated machine owns this agent. Set by the
+  // machine app's per-agent runner; required on the first message.
+  string agent_name = 5;
 }
 
 // DiscoverProviders asks the agent daemon to re-probe its host for installed

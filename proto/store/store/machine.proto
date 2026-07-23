@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package laelia.store;
+
+import "store/agent.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/store";
+
+enum MachineTokenType {
+  MACHINE_TOKEN_TYPE_UNSPECIFIED = 0;
+  MACHINE_BOOTSTRAP = 1;
+  MACHINE_ACCESS = 2;
+  MACHINE_REFRESH = 3;
+}
+
+enum MachineTokenState {
+  MACHINE_TOKEN_STATE_UNSPECIFIED = 0;
+  MACHINE_TOKEN_ACTIVE = 1;
+  MACHINE_TOKEN_CONSUMED = 2;
+  MACHINE_TOKEN_REVOKED = 3;
+}
+
+// MachineInfo is the storage-layer mirror of laelia.v1.MachineInfo. It captures
+// the host metadata the machine app reports on connect and the machine-scoped
+// provider list.
+message MachineInfo {
+  string hostname = 2;
+  string os = 3;
+  string arch = 4;
+  string ip = 5;
+  string version = 6;
+  map<string, string> labels = 7;
+  AgentCapability capability = 8;
+  repeated AgentProviderInfo available_providers = 9;
+}
+
+message MachineStatus {
+  enum ConnectionState {
+    CONNECTION_STATE_UNSPECIFIED = 0;
+    ONLINE = 1;
+    OFFLINE = 2;
+    ERROR = 3;
+    KICKED = 4;
+  }
+  ConnectionState state = 1;
+  int64 last_heartbeat_at = 2;
+  int64 connected_at = 3;
+  string error_message = 4;
+  string active_session_id = 5;
+}
+
+// MachineSession is the storage-layer mirror of a live machine connection
+// (liveness row), parallel to the legacy agent_session.
+message MachineSession {
+  string session_id = 1;
+  int64 machine_id = 2;
+  string token_family = 3;
+  string state = 4; // ACTIVE / KICKED / TERMINATED
+  string source_ip = 5;
+  string fingerprint = 6;
+  string agent_version = 7;
+  int64 connected_at = 8;
+  int64 last_heartbeat_at = 9;
+  int64 disconnected_at = 10;
+  string disconnect_reason = 11;
+}
