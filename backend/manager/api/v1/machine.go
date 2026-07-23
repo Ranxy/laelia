@@ -129,10 +129,20 @@ func (s *MachineService) ListMachines(ctx context.Context, req *connect.Request[
 		}
 	}
 
+	// One batched count query for the whole page instead of a ListAgents query
+	// per row, so a page of N machines costs 2 queries, not N+1.
+	machineIDs := make([]int, 0, len(machines))
+	for _, m := range machines {
+		machineIDs = append(machineIDs, m.ID)
+	}
+	agentCounts, err := s.store.CountAgentsByMachine(ctx, machineIDs)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to count machine agents, error: %v", err))
+	}
+
 	resp := &v1pb.ListMachinesResponse{NextPageToken: nextPageToken}
 	for _, m := range machines {
-		summary := convertToMachineSummary(ctx, s, m)
-		resp.Machines = append(resp.Machines, summary)
+		resp.Machines = append(resp.Machines, convertToMachineSummary(m, agentCounts[m.ID]))
 	}
 	return connect.NewResponse(resp), nil
 }
@@ -175,27 +185,25 @@ func (s *MachineService) DeleteMachine(ctx context.Context, req *connect.Request
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	machine, err := s.store.GetMachineByResourceID(ctx, resourceID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get machine, error: %v", err))
-	}
-	if machine == nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
-	}
 
-	// Forbid deleting a machine that still hosts agents: agents are immutably
-	// bound to a machine (agent.machine_id ON DELETE RESTRICT), so the admin
-	// must delete (or re-create on another machine) the agents first.
-	agents, err := s.store.ListAgents(ctx, &store.FindAgentMessage{MachineID: &machine.ID})
+	// Atomically soft-delete iff the machine hosts no live agents, so a
+	// concurrent CreateAgent cannot slip into the gap between the agent-count
+	// check and the soft-delete (agents are bound by machine_id and a soft
+	// delete would otherwise orphan them). ok=false means the machine was not
+	// found, already deleted, or still hosts agents; re-fetch to distinguish.
+	ok, err := s.store.DeleteMachineIfNoAgents(ctx, resourceID)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to list machine agents, error: %v", err))
-	}
-	if len(agents) > 0 {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Errorf("machine %s still hosts %d agent(s); delete them first", resourceID, len(agents)))
-	}
-
-	if err := s.store.DeleteMachine(ctx, resourceID); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to delete machine, error: %v", err))
+	}
+	if !ok {
+		current, err := s.store.GetMachineByResourceID(ctx, resourceID)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get machine, error: %v", err))
+		}
+		if current == nil {
+			return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
+		}
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Errorf("machine %s still hosts agent(s); delete them first", resourceID))
 	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
@@ -845,18 +853,17 @@ func convertToMachine(m *store.MachineMessage) *v1pb.Machine {
 	return out
 }
 
-func convertToMachineSummary(ctx context.Context, s *MachineService, m *store.MachineMessage) *v1pb.MachineSummary {
+func convertToMachineSummary(m *store.MachineMessage, agentCount int) *v1pb.MachineSummary {
 	state := v1pb.State_ACTIVE
 	if m.Deleted {
 		state = v1pb.State_DELETED
 	}
-	count, _ := s.store.ListAgents(ctx, &store.FindAgentMessage{MachineID: &m.ID})
 	return &v1pb.MachineSummary{
 		Name:       common.FormatMachineUID(m.ResourceID),
 		State:      state,
 		Title:      m.Name,
 		Status:     convertToV1MachineStatus(m.Status, m.Deleted),
-		AgentCount: int32(len(count)),
+		AgentCount: int32(agentCount),
 	}
 }
 

@@ -95,6 +95,13 @@ type MachineClient struct {
 	// RemoveAgent / ReloadAgentAssignment. Guarded by runnersMu.
 	runnersMu sync.Mutex
 	runners   map[string]*agentRunner
+
+	// streamSendMu serializes sends on the MachineChannel bidi stream. The
+	// ping loop, the graceful-disconnect notice, and the DiscoverProviders
+	// reply (sent from the receive pump's goroutine) all call stream.Send;
+	// connect's bidi client is not safe for concurrent Send, so they go
+	// through sendStream.
+	streamSendMu sync.Mutex
 }
 
 type ExponentialBackoff struct {
@@ -186,6 +193,23 @@ func New(managerURL, token string, insecure bool, allowHTTP bool) (*MachineClien
 // token (machine access token), falling back to the single-use registration
 // token. On success it stores the new credentials and spawns a runner for
 // every agent in the response's assigned_agents list.
+// isPermanentAuthFailure reports whether err is a connect error whose code
+// means the machine's credentials are permanently rejected (revoked/rotated
+// token, consumed bootstrap, wrong machine). Such failures will not succeed
+// on retry; the caller should stop rather than hammer the manager. Transient
+// network or server errors return false so the normal backoff retry continues.
+func isPermanentAuthFailure(err error) bool {
+	var ce *connect.Error
+	if !errors.As(err, &ce) {
+		return false
+	}
+	switch ce.Code() {
+	case connect.CodeUnauthenticated, connect.CodePermissionDenied:
+		return true
+	}
+	return false
+}
+
 func (c *MachineClient) Connect(ctx context.Context, info *v1pb.MachineInfo) error {
 	c.mu.Lock()
 	c.connState = StateConnecting
@@ -399,6 +423,15 @@ func (c *MachineClient) Run(ctx context.Context) error {
 		info := c.collectMachineInfo()
 
 		if err := c.Connect(ctx, info); err != nil {
+			// A permanent credential failure (revoked/rotated token, consumed
+			// bootstrap, wrong machine) will never succeed by retrying — the
+			// admin must rotate the token and restart the machine app with the
+			// new registration token. Stop hammering the manager and exit so the
+			// operator sees a clear failure instead of an infinite retry loop.
+			if isPermanentAuthFailure(err) {
+				slog.Error("machine credentials are no longer valid; an admin must rotate the token and restart with the new registration token", "error", err)
+				return errors.Wrap(err, "machine credentials rejected by manager; stopping (rotate token and restart)")
+			}
 			slog.Error("connect failed", "error", err)
 			if err := c.backoff.Wait(ctx); err != nil {
 				return err

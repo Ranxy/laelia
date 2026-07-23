@@ -14,11 +14,12 @@ import (
 // the LLM conversation — and the init prompt sent once at cold start — is
 // inherited. This file is what makes the session survive between turns.
 //
-// It lives at ~/.laelia/<agentID>/acp-session.json, a sibling of the per-command
-// command-state.json (see state.go). Fingerprint invalidates it when the admin
-// changes the provider/model/working dir, so a config change drops back to a
-// cold NewSession + fresh init prompt rather than resuming a session the
-// provider no longer recognizes.
+// It lives at ~/.laelia/<machineID>/<agentID>/acp-session.json, a sibling of
+// the per-command command-state.json (see state.go) under the same machine +
+// agent directory. Fingerprint invalidates it when the admin changes the
+// provider/model/working dir, so a config change drops back to a cold
+// NewSession + fresh init prompt rather than resuming a session the provider
+// no longer recognizes.
 type acpSessionState struct {
 	SessionID   string `json:"session_id"`
 	Fingerprint string `json:"fingerprint"`

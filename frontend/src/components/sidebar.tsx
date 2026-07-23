@@ -55,6 +55,18 @@ function getItemClass(item: SidebarItem, currentRouteName: string): string {
   if (isActive) {
     return cn("router-link-active", "bg-link-hover");
   }
+  // A section's list nav (e.g. machine.list) stays highlighted on that
+  // section's detail/profile routes (machine.profile), since the list page is
+  // the entry point for those sub-pages. We match the first path segment, so
+  // only "*.list" items do this — leaf routes like settings.users are matched
+  // exactly above and are not over-highlighted against their siblings.
+  if (
+    item.type === "route" &&
+    item.name?.endsWith(".list") &&
+    item.name.split(".")[0] === currentRouteName.split(".")[0]
+  ) {
+    return cn("router-link-active", "bg-link-hover");
+  }
   // Opening an agent's commands view (reached from a member row or a machine
   // roster) highlights the Members nav item — Members is the flat contacts page
   // that replaced the old Agents list.

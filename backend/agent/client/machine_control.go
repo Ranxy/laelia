@@ -6,8 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"connectrpc.com/connect"
-
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
@@ -31,7 +29,15 @@ func (c *MachineClient) runControlStream(ctx context.Context, _ *daemonsrv.Serve
 	stream := streamClient.MachineChannel(ctx)
 	stream.RequestHeader().Set("Authorization", "Bearer "+token)
 
-	if err := stream.Send(&v1pb.MachineStreamMessage{
+	// sendStream serializes sends on the bidi stream (see streamSendMu) so the
+	// ping loop, disconnect notice, and DiscoverProviders reply do not race.
+	sendStream := func(msg *v1pb.MachineStreamMessage) error {
+		c.streamSendMu.Lock()
+		defer c.streamSendMu.Unlock()
+		return stream.Send(msg)
+	}
+
+	if err := sendStream(&v1pb.MachineStreamMessage{
 		Message: &v1pb.MachineStreamMessage_MachineReady{
 			MachineReady: &v1pb.MachineReady{SessionId: sessionID},
 		},
@@ -80,7 +86,11 @@ func (c *MachineClient) runControlStream(ctx context.Context, _ *daemonsrv.Serve
 				c.hotReloadAgentConfig(m.AgentConfigUpdate)
 
 			case *v1pb.ManagerMachineStreamMessage_DiscoverProviders:
-				c.handleDiscoverProviders(ctx, stream, m.DiscoverProviders.GetRequestId())
+				// Probe the host on its own goroutine: a provider scan can take
+				// tens of seconds, and running it inline would block the receive
+				// pump, delaying AgentAssignment / RemoveAgent / AgentConfigUpdate
+				// for the whole probe window.
+				go c.handleDiscoverProviders(ctx, sendStream, m.DiscoverProviders.GetRequestId())
 
 			case *v1pb.ManagerMachineStreamMessage_Pong:
 				// pong received, link acknowledged
@@ -95,7 +105,7 @@ func (c *MachineClient) runControlStream(ctx context.Context, _ *daemonsrv.Serve
 		select {
 		case <-ctx.Done():
 			// Announce a graceful disconnect before tearing the stream down.
-			_ = stream.Send(&v1pb.MachineStreamMessage{
+			_ = sendStream(&v1pb.MachineStreamMessage{
 				Message: &v1pb.MachineStreamMessage_DisconnectNotice{
 					DisconnectNotice: &v1pb.MachineDisconnectNotice{Reason: "shutdown"},
 				},
@@ -107,7 +117,7 @@ func (c *MachineClient) runControlStream(ctx context.Context, _ *daemonsrv.Serve
 			return err
 		case <-pingTicker.C:
 			pingSeq++
-			if err := stream.Send(&v1pb.MachineStreamMessage{
+			if err := sendStream(&v1pb.MachineStreamMessage{
 				Message: &v1pb.MachineStreamMessage_Ping{
 					Ping: &v1pb.Ping{
 						Seq:    pingSeq,
@@ -148,12 +158,14 @@ func (c *MachineClient) hotReloadAgentConfig(update *v1pb.AgentConfigUpdate) {
 }
 
 // handleDiscoverProviders re-probes the host and replies with the fresh
-// provider list, correlated by the manager's request_id.
-func (c *MachineClient) handleDiscoverProviders(ctx context.Context, stream *connect.BidiStreamForClient[v1pb.MachineStreamMessage, v1pb.ManagerMachineStreamMessage], requestID string) {
+// provider list, correlated by the manager's request_id. It runs on its own
+// goroutine from the receive pump; `send` is the shared, mutex-guarded stream
+// sender so the reply does not race the ping loop's sends.
+func (c *MachineClient) handleDiscoverProviders(ctx context.Context, send func(*v1pb.MachineStreamMessage) error, requestID string) {
 	probeCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	discovered := c.refreshProviders(probeCtx)
 	cancel()
-	if err := stream.Send(&v1pb.MachineStreamMessage{
+	if err := send(&v1pb.MachineStreamMessage{
 		Message: &v1pb.MachineStreamMessage_ProvidersDiscovered{
 			ProvidersDiscovered: &v1pb.ProvidersDiscovered{
 				RequestId: requestID,

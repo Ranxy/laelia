@@ -574,6 +574,7 @@ func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb
 
 	cmd, err := d.store.CreateCommand(ctx, &store.CommandMessage{
 		AgentID:     agentID,
+		MachineID:   agent.MachineID,
 		PrincipalID: 1,  // system bot; the session is agent-initiated, not user-scoped
 		Instruction: "", // the agent-first prompt is supplied by the agent client
 		Status:      int32(v1pb.CommandStatus_RUNNING),

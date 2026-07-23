@@ -367,3 +367,63 @@ func (s *Store) DeleteMachine(ctx context.Context, resourceID string) error {
 	}
 	return nil
 }
+
+// DeleteMachineIfNoAgents soft-deletes the machine iff it currently hosts no
+// live agents, as a single atomic statement so a CreateAgent racing the delete
+// cannot slip into the gap between the agent-count check and the soft-delete
+// (the NOT EXISTS guard and the UPDATE evaluate together). Returns ok=false
+// when the machine was not found, already deleted, or still hosts agents —
+// the caller re-fetches to tell the last two apart. Unlike DeleteMachine this
+// is race-free against concurrent agent creation on the same machine.
+func (s *Store) DeleteMachineIfNoAgents(ctx context.Context, resourceID string) (bool, error) {
+	res, err := s.GetDB().ExecContext(ctx, `
+		UPDATE machine SET deleted = TRUE
+		WHERE resource_id = $1 AND deleted = FALSE
+			AND NOT EXISTS (
+				SELECT 1 FROM agent
+				WHERE agent.machine_id = machine.id AND agent.deleted = FALSE
+			)
+	`, resourceID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+// CountAgentsByMachine returns a live-agent count per machine id for the given
+// machines in a single query, so ListMachines can populate AgentCount for a
+// page of machines without an N+1 (one ListAgents query per row).
+func (s *Store) CountAgentsByMachine(ctx context.Context, machineIDs []int) (map[int]int, error) {
+	counts := make(map[int]int, len(machineIDs))
+	if len(machineIDs) == 0 {
+		return counts, nil
+	}
+	args := make([]any, 0, len(machineIDs))
+	placeholders := make([]string, 0, len(machineIDs))
+	for i, id := range machineIDs {
+		args = append(args, id)
+		placeholders = append(placeholders, fmt.Sprintf("$%d", i+1))
+	}
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT machine_id, COUNT(*)
+		FROM agent
+		WHERE machine_id IN (`+strings.Join(placeholders, ",")+`) AND deleted = FALSE
+		GROUP BY machine_id
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, count int
+		if err := rows.Scan(&id, &count); err != nil {
+			return nil, err
+		}
+		counts[id] = count
+	}
+	return counts, rows.Err()
+}

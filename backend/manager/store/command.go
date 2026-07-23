@@ -15,26 +15,31 @@ type CommandMessage struct {
 	ID              uuid.UUID
 	AgentID         int
 	AgentResourceID string
-	PrincipalID     int
-	PrincipalName   string
-	Command         string
-	Instruction     string
-	Profile         string
-	AllowDiff       bool
-	Status          int32
-	ExitCode        sql.NullInt32
-	DurationMs      sql.NullInt64
-	CreatedAt       time.Time
-	StartedAt       sql.NullTime
-	CompletedAt     sql.NullTime
-	ErrorMessage    string
-	FinalSummary    string
-	ResultJSON      string
-	Env             string
-	WorkingDir      string
-	TimeoutSeconds  int32
-	LastAckSeq      int32
-	ConversationID  *uuid.UUID
+	// MachineID denormalizes agent.machine_id onto the command so "fail all
+	// commands for a machine" queries (ForceDisconnectMachine) can be served
+	// without joining through agent. 0 means unknown (a legacy agent with no
+	// machine binding); the column is stored NULL in that case.
+	MachineID      int
+	PrincipalID    int
+	PrincipalName  string
+	Command        string
+	Instruction    string
+	Profile        string
+	AllowDiff      bool
+	Status         int32
+	ExitCode       sql.NullInt32
+	DurationMs     sql.NullInt64
+	CreatedAt      time.Time
+	StartedAt      sql.NullTime
+	CompletedAt    sql.NullTime
+	ErrorMessage   string
+	FinalSummary   string
+	ResultJSON     string
+	Env            string
+	WorkingDir     string
+	TimeoutSeconds int32
+	LastAckSeq     int32
+	ConversationID *uuid.UUID
 }
 
 type CommandOutputMessage struct {
@@ -83,15 +88,20 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 
 	env := coerceEnvJSON(cmd.Env)
 
+	// machine_id is nullable: a legacy agent with no machine binding (MachineID
+	// == 0) stores NULL so the partial index idx_command_machine stays accurate.
+	machineID := sql.NullInt64{Int64: int64(cmd.MachineID), Valid: cmd.MachineID > 0}
+
 	var commandID uuid.UUID
 	var createdAt time.Time
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO command (
-			agent_id, principal_id, command, instruction, profile, allow_diff, status, env, working_dir, timeout_seconds, conversation_id
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			agent_id, machine_id, principal_id, command, instruction, profile, allow_diff, status, env, working_dir, timeout_seconds, conversation_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id, created_at
 	`,
 		cmd.AgentID,
+		machineID,
 		cmd.PrincipalID,
 		cmd.Command,
 		cmd.Instruction,
@@ -113,6 +123,7 @@ func (s *Store) CreateCommand(ctx context.Context, cmd *CommandMessage) (*Comman
 	created := &CommandMessage{
 		ID:             commandID,
 		AgentID:        cmd.AgentID,
+		MachineID:      cmd.MachineID,
 		PrincipalID:    cmd.PrincipalID,
 		Command:        cmd.Command,
 		Instruction:    cmd.Instruction,
