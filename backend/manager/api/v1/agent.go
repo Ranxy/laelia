@@ -149,7 +149,7 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 	}
 
 	response := &v1pb.CreateAgentResponse{
-		Agent: convertToAgent(created),
+		Agent: convertToAgent(created, agentReachable(s.dispatcher, created.ID, created.MachineID)),
 	}
 	return connect.NewResponse(response), nil
 }
@@ -196,7 +196,7 @@ func (s *AgentService) ListAgents(ctx context.Context, req *connect.Request[v1pb
 	// callers, and the list view does not gate affordances on it (delete is
 	// enforced server-side via agents.edit).
 	for _, agent := range agents {
-		response.Agents = append(response.Agents, convertToAgentSummary(agent))
+		response.Agents = append(response.Agents, convertToAgentSummary(agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID)))
 	}
 	return connect.NewResponse(response), nil
 }
@@ -213,7 +213,7 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
 	}
-	out := convertToAgent(agent)
+	out := convertToAgent(agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
 	caller, _ := GetUserFromContext(ctx)
 	out.CanEdit = s.canEditAgent(ctx, caller, out.Name)
 	return connect.NewResponse(out), nil
@@ -564,7 +564,7 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 	resp := &v1pb.ConnectAgentResponse{
 		SessionId:     sessionID,
 		NextNonce:     nonce,
-		InitialStatus: convertToV1AgentStatus(updated.Status, updated.Deleted),
+		InitialStatus: convertToV1AgentStatus(updated.Status, updated.Deleted, true),
 		AcpConfig:     convertToV1AgentACPConfig(storedAcpConfig),
 	}
 	if accessToken != "" {
@@ -932,14 +932,33 @@ func (s *AgentService) authenticateBootstrapToken(tokenStr string) (*bootstrapAu
 	return &bootstrapAuthResult{agent: agent, tokenFamily: tokenFamily, tokenID: storedToken.ID}, nil
 }
 
-func convertToAgent(agent *store.AgentMessage) *v1pb.Agent {
+// agentReachable reports whether an agent should present as online. Under the
+// machine-hosts-many model the machine — not the agent — heartbeats, so an
+// agent's liveness is NOT derived from a per-agent heartbeat timestamp
+// (which is no longer written and would always read as offline). An agent is
+// online when its own runner has a live AgentChannel (the precise signal) OR
+// the machine it is bound to is connected (the machine app hosts the agent and
+// will pick it up over its MachineChannel). The second clause matches the
+// product model — "a connected machine's agents are online" — and covers the
+// brief window before a freshly created agent's runner opens its stream, so
+// the agent is online the moment it is created on a connected machine. Both
+// go false when the machine disconnects (UnregisterMachine detaches every
+// owned agent session), so the agent reports offline with its machine.
+func agentReachable(d *dispatcher.Dispatcher, agentID, machineID int) bool {
+	if d == nil {
+		return false
+	}
+	return d.IsAgentConnected(agentID) || d.IsMachineConnected(machineID)
+}
+
+func convertToAgent(agent *store.AgentMessage, connected bool) *v1pb.Agent {
 	name := common.FormatAgentUID(agent.ResourceID)
 	state := v1pb.State_ACTIVE
 	if agent.Deleted {
 		state = v1pb.State_DELETED
 	}
 
-	status := convertToV1AgentStatus(agent.Status, agent.Deleted)
+	status := convertToV1AgentStatus(agent.Status, agent.Deleted, connected)
 
 	result := &v1pb.Agent{
 		Name:         name,
@@ -970,7 +989,7 @@ func convertToAgent(agent *store.AgentMessage) *v1pb.Agent {
 // reads. Heavy per-agent data (available_providers, the rest of acp_config,
 // capability, host info, token fields, created_by, can_edit) is omitted — it
 // is only returned by GetAgent. See ListAgents for the contract rationale.
-func convertToAgentSummary(agent *store.AgentMessage) *v1pb.AgentSummary {
+func convertToAgentSummary(agent *store.AgentMessage, connected bool) *v1pb.AgentSummary {
 	state := v1pb.State_ACTIVE
 	if agent.Deleted {
 		state = v1pb.State_DELETED
@@ -979,7 +998,7 @@ func convertToAgentSummary(agent *store.AgentMessage) *v1pb.AgentSummary {
 		Name:    common.FormatAgentUID(agent.ResourceID),
 		State:   state,
 		Title:   agent.Name,
-		Status:  convertToV1AgentStatus(agent.Status, agent.Deleted),
+		Status:  convertToV1AgentStatus(agent.Status, agent.Deleted, connected),
 		Machine: common.FormatMachineUID(agent.MachineResourceID),
 	}
 	if agent.Info != nil && agent.Info.AcpConfig != nil {
@@ -1172,11 +1191,11 @@ func convertToStoreAgentCapability(capability *v1pb.AgentCapability) *storepb.Ag
 	}
 }
 
-func convertToV1AgentStatus(status *storepb.AgentStatus, deleted bool) *v1pb.AgentStatus {
+func convertToV1AgentStatus(status *storepb.AgentStatus, deleted bool, connected bool) *v1pb.AgentStatus {
 	if status == nil {
 		return nil
 	}
-	state := computeConnectionState(status, deleted)
+	state := computeConnectionState(status, deleted, connected)
 
 	var lastHeartbeatTime *timestamppb.Timestamp
 	if status.LastHeartbeatAt > 0 {
@@ -1196,7 +1215,13 @@ func convertToV1AgentStatus(status *storepb.AgentStatus, deleted bool) *v1pb.Age
 	}
 }
 
-func computeConnectionState(status *storepb.AgentStatus, deleted bool) v1pb.AgentStatus_ConnectionState {
+// computeConnectionState derives an agent's connection state. Under the
+// machine-hosts-many model the machine heartbeats, not the agent, so liveness
+// is taken from `connected` (the agent's live AgentChannel in the dispatcher),
+// not from status.LastHeartbeatAt (which is no longer written and would always
+// read as offline). Explicit ERROR/KICKED terminal states and deletion take
+// precedence over the live-stream signal.
+func computeConnectionState(status *storepb.AgentStatus, deleted bool, connected bool) v1pb.AgentStatus_ConnectionState {
 	if status.State == storepb.AgentStatus_ERROR {
 		return v1pb.AgentStatus_ERROR
 	}
@@ -1206,12 +1231,8 @@ func computeConnectionState(status *storepb.AgentStatus, deleted bool) v1pb.Agen
 	if deleted {
 		return v1pb.AgentStatus_OFFLINE
 	}
-	threshold := time.Now().Unix() - agentOfflineThresholdSeconds
-	if status.LastHeartbeatAt >= threshold {
+	if connected {
 		return v1pb.AgentStatus_ONLINE
-	}
-	if status.LastHeartbeatAt > 0 {
-		return v1pb.AgentStatus_OFFLINE
 	}
 	return v1pb.AgentStatus_OFFLINE
 }

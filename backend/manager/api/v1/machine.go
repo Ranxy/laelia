@@ -368,7 +368,7 @@ func (s *MachineService) ListMachineAgents(ctx context.Context, req *connect.Req
 
 	resp := &v1pb.ListMachineAgentsResponse{}
 	for _, agent := range agents {
-		resp.Agents = append(resp.Agents, convertToAgentSummary(agent))
+		resp.Agents = append(resp.Agents, convertToAgentSummary(agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID)))
 	}
 	return connect.NewResponse(resp), nil
 }

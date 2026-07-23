@@ -323,9 +323,9 @@
       "ready": "Ready",
       "pending-config": "Connected — pending configuration",
       "configured-offline": "Configured (offline)",
-      "waiting-connection": "Waiting for connection"
+      "waiting-connection": "Waiting for machine"
     },
-    "waiting-connection-hint": "Run the bootstrap command on the host to connect this agent, then configure its executable.",
+    "waiting-connection-hint": "This agent is picked up automatically by its machine — no per-agent command is needed. If it stays offline, make sure the machine is connected.",
     "pending-config-hint": "Agent is connected. Set its executable to make it usable.",
     "acp-config": "ACP Config",
     "acp-config-provider": "Provider",

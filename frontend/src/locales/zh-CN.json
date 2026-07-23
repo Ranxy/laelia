@@ -323,9 +323,9 @@
       "ready": "就绪",
       "pending-config": "已连接 — 待配置",
       "configured-offline": "已配置（离线）",
-      "waiting-connection": "等待连接"
+      "waiting-connection": "等待机器"
     },
-    "waiting-connection-hint": "在主机上运行 bootstrap 命令以连接该 Agent,然后配置其可执行程序。",
+    "waiting-connection-hint": "该 Agent 会被其所属机器自动接管,无需为单个 Agent 运行命令。若一直离线,请确认机器已连接。",
     "pending-config-hint": "Agent 已连接。设置其可执行程序以启用。",
     "acp-config": "ACP 配置",
     "acp-config-provider": "Provider",

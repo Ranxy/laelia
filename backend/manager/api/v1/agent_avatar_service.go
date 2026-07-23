@@ -93,7 +93,7 @@ func (s *AgentService) UploadAgentAvatar(ctx context.Context, req *connect.Reque
 		}
 	}
 
-	return connect.NewResponse(convertToAgent(updated)), nil
+	return connect.NewResponse(convertToAgent(updated, agentReachable(s.dispatcher, updated.ID, updated.MachineID))), nil
 }
 
 // DownloadAgentAvatar fetches an agent's avatar image bytes. Any authenticated user
@@ -159,7 +159,7 @@ func (s *AgentService) DeleteAgentAvatar(ctx context.Context, req *connect.Reque
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
 	}
 	if agent.AvatarS3Key == "" {
-		return connect.NewResponse(convertToAgent(agent)), nil
+		return connect.NewResponse(convertToAgent(agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))), nil
 	}
 
 	s3Cli, cfg, err := s.s3client.Get(ctx)
@@ -180,5 +180,5 @@ func (s *AgentService) DeleteAgentAvatar(ctx context.Context, req *connect.Reque
 		slog.Warn("failed to delete agent avatar object", "key", prevKey, log.WithError(err))
 	}
 
-	return connect.NewResponse(convertToAgent(updated)), nil
+	return connect.NewResponse(convertToAgent(updated, agentReachable(s.dispatcher, updated.ID, updated.MachineID))), nil
 }
