@@ -128,6 +128,19 @@ export interface UserSlice {
   undeleteUser: (name: string) => Promise<User>;
 }
 
+// AgentACPConfigInput is the user-configurable ACP config shared by
+// createAgent (optional, sets the config at creation time) and
+// updateAgentACPConfig (replaces the config). Mirrors AgentACPConfig.
+export interface AgentACPConfigInput {
+  executable: string;
+  args: string[];
+  allowEnv: string[];
+  provider: string;
+  model: string;
+  customEnv: Record<string, string>;
+  personaPrompt: string;
+}
+
 export interface AgentSlice {
   agents: AgentSummary[];
   agentsLoading: boolean;
@@ -143,10 +156,13 @@ export interface AgentSlice {
   // createAgent binds a new agent to a machine. The machine app picks the agent
   // up automatically over its MachineChannel — no bootstrap token is returned
   // (CreateAgentResponse.bootstrapToken is empty under the machine-hosts-many
-  // model).
+  // model). acpConfig optionally sets the agent's provider/model/persona/env at
+  // creation time so the agent is fully configured without a second visit to the
+  // agent profile; when omitted the agent is created with the server default.
   createAgent: (
     title: string,
     machine: string,
+    acpConfig?: AgentACPConfigInput,
     labels?: Record<string, string>
   ) => Promise<CreateAgentResponse>;
   deleteAgent: (name: string) => Promise<void>;
@@ -157,15 +173,7 @@ export interface AgentSlice {
   revokeAgentToken: (name: string, reason?: string) => Promise<void>;
   updateAgentACPConfig: (
     name: string,
-    acpConfig: {
-      executable: string;
-      args: string[];
-      allowEnv: string[];
-      provider: string;
-      model: string;
-      customEnv: Record<string, string>;
-      personaPrompt: string;
-    }
+    acpConfig: AgentACPConfigInput
   ) => Promise<void>;
   refreshAgentProviders: (name: string) => Promise<AgentProviderInfo[]>;
 }

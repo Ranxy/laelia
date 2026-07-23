@@ -301,10 +301,17 @@ export function AgentProfilePage() {
   const modelOptions = selectedProviderInfo?.models ?? [];
   const providerSupportsModel =
     !!selectedProviderInfo?.supportsModelConfigOption;
+  // Model is required when the provider exposes a model config option with
+  // advertised models; a provider that does not expose model selection (or the
+  // "custom" path) does not require one.
+  const modelRequired = providerSupportsModel && modelOptions.length > 0;
   // Save is allowed once a provider (built-in or custom) is chosen. For the
   // custom path an executable is still required; for a built-in provider the
-  // command is derived from the registry, so executable stays empty.
-  const canSave = isCustomProvider ? executable.trim() !== "" : provider !== "";
+  // command is derived from the registry, so executable stays empty. When the
+  // provider exposes model selection, a model must also be chosen.
+  const canSave = isCustomProvider
+    ? executable.trim() !== ""
+    : provider !== "" && (!modelRequired || model.trim() !== "");
 
   const lifecycle = agentLifecycle(agent);
 

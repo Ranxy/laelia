@@ -6,6 +6,7 @@ import type {
 } from "@/types/proto-es/v1/agent_pb";
 import {
   AgentACPConfigSchema,
+  AgentInfoSchema,
   AgentSchema,
   AgentSummarySchema,
   CreateAgentRequestSchema,
@@ -15,7 +16,7 @@ import {
   RotateAgentTokenRequestSchema,
   UpdateAgentACPConfigRequestSchema,
 } from "@/types/proto-es/v1/agent_pb";
-import type { AgentSlice, AppSliceCreator } from "./types";
+import type { AgentACPConfigInput, AgentSlice, AppSliceCreator } from "./types";
 
 export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
   agents: [],
@@ -67,11 +68,21 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
   async createAgent(
     title: string,
     machine: string,
+    acpConfig?: AgentACPConfigInput,
     labels?: Record<string, string>
   ) {
     const res = await agentServiceClient.createAgent(
       create(CreateAgentRequestSchema, {
-        agent: create(AgentSchema, { title, machine, labels }),
+        agent: create(AgentSchema, {
+          title,
+          machine,
+          labels,
+          info: acpConfig
+            ? create(AgentInfoSchema, {
+                acpConfig: create(AgentACPConfigSchema, acpConfig),
+              })
+            : undefined,
+        }),
       })
     );
     return res;

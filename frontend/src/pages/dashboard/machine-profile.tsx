@@ -2,6 +2,8 @@ import { Loader2, Plus, Trash } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
+import { KeyValueEnvEditor } from "@/components/agent/key-value-env-editor";
+import { StringListEditor } from "@/components/agent/string-list-editor";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { MachineConnectionBadge } from "@/components/machine-connection-badge";
 import { Alert } from "@/components/ui/alert";
@@ -23,6 +25,13 @@ import {
 import { FieldRow } from "@/components/ui/field-row";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Sheet,
   SheetBody,
   SheetContent,
@@ -31,6 +40,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
 import { formatTimestamp } from "@/lib/command-status";
 import { buildMachineRunCommand } from "@/lib/machine-token";
 import { cn } from "@/lib/utils";
@@ -90,6 +100,17 @@ function providerDisplayName(p: AgentProviderInfo): string {
   return p.providerId;
 }
 
+function providerLabel(id: string, providers: AgentProviderInfo[]): string {
+  if (id === "custom") return "";
+  const p = providers.find((it) => it.providerId === id);
+  return p ? providerDisplayName(p) : id;
+}
+
+function modelLabel(value: string, models: { value: string; name: string }[]) {
+  const m = models.find((it) => it.value === value);
+  return m ? m.name || m.value : value;
+}
+
 export function MachineProfilePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -121,9 +142,20 @@ export function MachineProfilePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
 
-  // Add-agent sheet state.
+  // Add-agent sheet state. The sheet carries the full ACP config (provider,
+  // model, persona, env, custom command) so an agent can be fully configured at
+  // creation time instead of requiring a second visit to the agent profile.
   const [addOpen, setAddOpen] = useState(false);
   const [agentName, setAgentName] = useState("");
+  const [provider, setProvider] = useState("");
+  const [model, setModel] = useState("");
+  const [personaPrompt, setPersonaPrompt] = useState("");
+  const [customEnvEntries, setCustomEnvEntries] = useState<
+    { key: string; value: string }[]
+  >([]);
+  const [allowEnv, setAllowEnv] = useState<string[]>([]);
+  const [executable, setExecutable] = useState("");
+  const [args, setArgs] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState("");
   const [addedOpen, setAddedOpen] = useState(false);
@@ -177,6 +209,34 @@ export function MachineProfilePage() {
   const info = machine.info;
   const availableProviders: AgentProviderInfo[] =
     info?.availableProviders ?? [];
+
+  // Add-agent form derived state. Provider is required; model is required only
+  // when the selected provider exposes a model config option with advertised
+  // models (a provider that does not expose model selection via the protocol
+  // does not require a model). The "custom" provider hand-types a command and
+  // never exposes model selection, so it requires an executable instead.
+  const isCustomProvider = provider === "custom";
+  const selectedProviderInfo = availableProviders.find(
+    (p) => p.providerId === provider
+  );
+  const modelOptions = selectedProviderInfo?.models ?? [];
+  const modelRequired =
+    !!selectedProviderInfo?.supportsModelConfigOption &&
+    modelOptions.length > 0;
+
+  // resetAddForm clears the create-agent sheet inputs so reopening it starts
+  // from a blank state instead of the previous submission's values.
+  function resetAddForm() {
+    setAgentName("");
+    setProvider("");
+    setModel("");
+    setPersonaPrompt("");
+    setCustomEnvEntries([]);
+    setAllowEnv([]);
+    setExecutable("");
+    setArgs([]);
+    setAddError("");
+  }
 
   async function handleRefreshProviders() {
     setRefreshing(true);
@@ -256,17 +316,46 @@ export function MachineProfilePage() {
 
   async function handleAddAgent() {
     setAddError("");
-    if (!agentName.trim()) {
+    const name = agentName.trim();
+    if (!name) {
       setAddError(t("machine.add-agent-name-required"));
       return;
+    }
+    if (!provider) {
+      setAddError(t("machine.add-agent-provider-required"));
+      return;
+    }
+    if (isCustomProvider && !executable.trim()) {
+      setAddError(t("machine.add-agent-executable-required"));
+      return;
+    }
+    if (modelRequired && !model.trim()) {
+      setAddError(t("machine.add-agent-model-required"));
+      return;
+    }
+    // Fold the key-value editor entries into a map, dropping entries with empty
+    // keys (empty-value entries are kept so a user can set FOO="").
+    const customEnv: Record<string, string> = {};
+    for (const entry of customEnvEntries) {
+      const key = entry.key.trim();
+      if (!key) continue;
+      customEnv[key] = entry.value;
     }
     setAdding(true);
     try {
       const createAgent = useAppStore.getState().createAgent;
-      await createAgent(agentName.trim(), machineName);
-      setAddedTitle(agentName.trim());
-      setAgentName("");
+      await createAgent(name, machineName, {
+        executable: executable.trim(),
+        args: args.map((a) => a.trim()).filter((a) => a !== ""),
+        allowEnv: allowEnv.map((e) => e.trim()).filter((e) => e !== ""),
+        provider: provider.trim(),
+        model: model.trim(),
+        personaPrompt: personaPrompt.trim(),
+        customEnv,
+      });
+      setAddedTitle(name);
       setAddOpen(false);
+      resetAddForm();
       setAddedOpen(true);
       await reload();
       fetchMachines({ pageSize: 100 }, { silent: true });
@@ -445,7 +534,7 @@ export function MachineProfilePage() {
                     size="sm"
                     disabled={!canEdit}
                     onClick={() => {
-                      setAddError("");
+                      resetAddForm();
                       setAddOpen(true);
                     }}
                   >
@@ -556,7 +645,7 @@ export function MachineProfilePage() {
           if (!next) setAddError("");
         }}
       >
-        <SheetContent width="medium">
+        <SheetContent width="wide">
           <SheetHeader>
             <SheetTitle>{t("machine.add-agent-title")}</SheetTitle>
             <SheetDescription>
@@ -567,20 +656,165 @@ export function MachineProfilePage() {
             {addError && (
               <Alert variant="error" description={addError} className="mb-2" />
             )}
-            <FieldRow
-              label={t("machine.field-agent-name")}
-              htmlFor="add-agent-name"
-            >
-              <Input
-                id="add-agent-name"
-                value={agentName}
-                placeholder={t("machine.add-agent-name-placeholder")}
-                onChange={(e) => {
-                  setAgentName(e.target.value);
+            <div className="flex flex-col gap-4">
+              <FieldRow
+                label={t("machine.field-agent-name")}
+                htmlFor="add-agent-name"
+              >
+                <Input
+                  id="add-agent-name"
+                  value={agentName}
+                  placeholder={t("machine.add-agent-name-placeholder")}
+                  onChange={(e) => {
+                    setAgentName(e.target.value);
+                    setAddError("");
+                  }}
+                />
+              </FieldRow>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">
+                  {t("agent.acp-config-provider")}
+                </label>
+                <Select
+                  value={provider}
+                  onValueChange={(v) => {
+                    setProvider(String(v ?? ""));
+                    // Reset model when the provider changes — the previous value
+                    // belongs to the old provider's option set.
+                    setModel("");
+                    setAddError("");
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue>
+                      {(v: string | null) =>
+                        v ? providerLabel(v, availableProviders) : ""
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableProviders.map((p) => (
+                      <SelectItem key={p.providerId} value={p.providerId}>
+                        {providerDisplayName(p)}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="custom">
+                      {t("agent.acp-config-provider-custom")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                {availableProviders.length === 0 && (
+                  <p className="text-xs text-control-light">
+                    {t("machine.add-agent-no-providers")}
+                  </p>
+                )}
+              </div>
+
+              {selectedProviderInfo && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">
+                    {t("agent.acp-config-model")}
+                  </label>
+                  {modelRequired ? (
+                    <Select
+                      value={model}
+                      onValueChange={(v) => {
+                        setModel(String(v ?? ""));
+                        setAddError("");
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue>
+                          {(v: string | null) =>
+                            v ? modelLabel(v, modelOptions) : ""
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {modelOptions.map((m) => (
+                          <SelectItem key={m.value} value={m.value}>
+                            {m.name || m.value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-xs text-control-light">
+                      {t("agent.acp-config-model-unsupported")}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {isCustomProvider && (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium">
+                      {t("agent.acp-config-executable")}
+                    </label>
+                    <Input
+                      placeholder={t("agent.acp-config-executable-placeholder")}
+                      value={executable}
+                      onChange={(e) => {
+                        setExecutable(e.target.value);
+                        setAddError("");
+                      }}
+                    />
+                  </div>
+
+                  <StringListEditor
+                    label={t("agent.acp-config-args")}
+                    placeholder={t("agent.acp-config-args-placeholder")}
+                    values={args}
+                    onChange={(next) => {
+                      setArgs(next);
+                      setAddError("");
+                    }}
+                  />
+                </>
+              )}
+
+              {selectedProviderInfo && !isCustomProvider && (
+                <p className="text-xs text-control-light">
+                  {t("agent.acp-config-derived-command-hint")}
+                </p>
+              )}
+
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">
+                  {t("agent.acp-config-persona-prompt")}
+                </label>
+                <Textarea
+                  className="font-mono text-sm min-h-[120px]"
+                  placeholder={t("agent.acp-config-persona-prompt-placeholder")}
+                  value={personaPrompt}
+                  onChange={(e) => {
+                    setPersonaPrompt(e.target.value);
+                    setAddError("");
+                  }}
+                />
+              </div>
+
+              <KeyValueEnvEditor
+                label={t("agent.acp-config-custom-env")}
+                entries={customEnvEntries}
+                onChange={(next) => {
+                  setCustomEnvEntries(next);
                   setAddError("");
                 }}
               />
-            </FieldRow>
+
+              <StringListEditor
+                label={t("agent.acp-config-allow-env")}
+                placeholder={t("agent.acp-config-allow-env-placeholder")}
+                values={allowEnv}
+                onChange={(next) => {
+                  setAllowEnv(next);
+                  setAddError("");
+                }}
+              />
+            </div>
           </SheetBody>
           <SheetFooter>
             <Button
@@ -591,7 +825,13 @@ export function MachineProfilePage() {
               {t("common.cancel")}
             </Button>
             <Button
-              disabled={adding || !agentName.trim()}
+              disabled={
+                adding ||
+                !agentName.trim() ||
+                !provider ||
+                (isCustomProvider && !executable.trim()) ||
+                (modelRequired && !model.trim())
+              }
               onClick={handleAddAgent}
             >
               {adding ? t("common.creating") : t("common.create")}

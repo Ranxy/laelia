@@ -114,15 +114,39 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 		creatorID = user.ID
 	}
 
+	// ACP config is admin-owned. CreateAgent may carry an initial acp_config
+	// (provider/model/persona/env) so an agent can be fully configured at
+	// creation time instead of requiring a second visit to the agent profile.
+	// When provided, validate it against the parent machine's discovered
+	// providers (provider must be runnable on the host; model is required when
+	// the provider exposes a model config option) and derive the capability from
+	// it. When absent, fall back to the minimal default (allow_env only) and let
+	// the admin configure the agent later.
+	var storedAcpConfig *storepb.AgentACPConfig
+	var capability *v1pb.AgentCapability
+	if reqACP := req.Msg.Agent.GetInfo().GetAcpConfig(); reqACP != nil && !isEmptyAgentACPConfig(reqACP) {
+		if err := validateAgentACPConfig(reqACP, s.machineAvailableProviders(ctx, machine.ID)); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		storedAcpConfig = convertToStoreAgentACPConfig(reqACP)
+		// Inherit the default allow_env set when the caller left it empty so the
+		// child process still receives the baseline passthrough env.
+		if len(storedAcpConfig.AllowEnv) == 0 {
+			storedAcpConfig.AllowEnv = executor.DefaultAllowEnv
+		}
+		capability = executor.BuildCapability(reqACP)
+	} else {
+		storedAcpConfig = &storepb.AgentACPConfig{AllowEnv: executor.DefaultAllowEnv}
+	}
+
 	agentMessage := &store.AgentMessage{
 		Name:         req.Msg.Agent.Title,
 		TokenVersion: 1,
 		MachineID:    machine.ID,
 		Info: &storepb.AgentInfo{
-			Labels: req.Msg.Agent.Labels,
-			AcpConfig: &storepb.AgentACPConfig{
-				AllowEnv: executor.DefaultAllowEnv,
-			},
+			Labels:     req.Msg.Agent.Labels,
+			AcpConfig:  storedAcpConfig,
+			Capability: convertToStoreAgentCapability(capability),
 		},
 		Status:    &storepb.AgentStatus{},
 		CreatedBy: creatorID,
@@ -1093,6 +1117,15 @@ func convertToStoreAgentACPConfig(cfg *v1pb.AgentACPConfig) *storepb.AgentACPCon
 	}
 }
 
+// isEmptyAgentACPConfig reports whether cfg carries no user configuration — the
+// zero value a caller sends when it omits acp_config. CreateAgent treats an
+// empty config as "not provided" so the minimal default is used instead of
+// validating (and rejecting) an empty provider.
+func isEmptyAgentACPConfig(cfg *v1pb.AgentACPConfig) bool {
+	return cfg.Executable == "" && len(cfg.Args) == 0 && len(cfg.AllowEnv) == 0 &&
+		cfg.Provider == "" && cfg.Model == "" && len(cfg.CustomEnv) == 0 && cfg.PersonaPrompt == ""
+}
+
 func convertToV1Providers(in []*storepb.AgentProviderInfo) []*v1pb.AgentProviderInfo {
 	if len(in) == 0 {
 		return nil
@@ -1385,15 +1418,22 @@ func (s *AgentService) RefreshAgentProviders(ctx context.Context, req *connect.R
 	}
 }
 
-// validateAgentACPConfig checks the user-configurable ACP fields. A built-in
-// provider (opencode, claude-code) supplies its own launch command, so
-// executable is only required for the "custom"/empty provider. Every
-// allow_env and custom_env key must be a valid env var name.
+// validateAgentACPConfig checks the user-configurable ACP fields. A provider is
+// required (a built-in id or "custom"); a built-in provider (opencode,
+// claude-code) supplies its own launch command, so executable is only required
+// for the "custom" provider. model is required when the owning machine has
+// probed the provider and the provider exposes a model config option with
+// advertised models — a provider that does not expose model selection via the
+// protocol (or has not probed) does not require a model. Every allow_env and
+// custom_env key must be a valid env var name.
 func validateAgentACPConfig(cfg *v1pb.AgentACPConfig, machineAvailableProviders []*storepb.AgentProviderInfo) error {
 	if cfg == nil {
 		return errors.New("acp_config must be set")
 	}
-	if cfg.Provider != "" && !knownProviderID(cfg.Provider) {
+	if cfg.Provider == "" {
+		return errors.New("acp_config.provider must be set")
+	}
+	if !knownProviderID(cfg.Provider) {
 		return errors.Errorf("invalid acp_config.provider %q: must be a built-in id or \"custom\"", cfg.Provider)
 	}
 	// A built-in provider derives its command from the registry; anything else
@@ -1412,6 +1452,13 @@ func validateAgentACPConfig(cfg *v1pb.AgentACPConfig, machineAvailableProviders 
 			return errors.Errorf("acp_config.provider %q is not available on the owning machine (available: %s)",
 				cfg.Provider, availableProviderIDs(machineAvailableProviders))
 		}
+		// A provider that exposes a model config option with advertised models
+		// requires a model selection. When the machine has not probed (or the
+		// provider does not expose model selection) the requirement cannot be
+		// confirmed, so model is left optional and may be set later.
+		if providerSupportsModel(cfg.Provider, machineAvailableProviders) && cfg.Model == "" {
+			return errors.Errorf("acp_config.model must be set for provider %q", cfg.Provider)
+		}
 	}
 	for _, name := range cfg.AllowEnv {
 		if !envVarNameRegex.MatchString(name) {
@@ -1424,6 +1471,20 @@ func validateAgentACPConfig(cfg *v1pb.AgentACPConfig, machineAvailableProviders 
 		}
 	}
 	return nil
+}
+
+// providerSupportsModel reports whether the provider exposes a model config
+// option with at least one advertised model on the owning machine. Used to
+// decide whether acp_config.model is required. Returns false when the provider
+// is not in the machine's discovered set (including "custom" and the
+// not-yet-probed case), so model is not enforced in those cases.
+func providerSupportsModel(providerID string, available []*storepb.AgentProviderInfo) bool {
+	for _, p := range available {
+		if p.ProviderId == providerID {
+			return p.SupportsModelConfigOption && len(p.Models) > 0
+		}
+	}
+	return false
 }
 
 // machineAvailableProviders returns the owning machine's discovered providers,
