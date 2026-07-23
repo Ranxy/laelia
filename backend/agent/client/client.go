@@ -189,15 +189,110 @@ func New(managerURL, token string, insecure bool, allowHTTP bool) (*MachineClien
 	}, nil
 }
 
-// Connect authenticates the machine. It first tries the persisted refresh
-// token (machine access token), falling back to the single-use registration
-// token. On success it stores the new credentials and spawns a runner for
-// every agent in the response's assigned_agents list.
-// isPermanentAuthFailure reports whether err is a connect error whose code
-// means the machine's credentials are permanently rejected (revoked/rotated
-// token, consumed bootstrap, wrong machine). Such failures will not succeed
-// on retry; the caller should stop rather than hammer the manager. Transient
-// network or server errors return false so the normal backoff retry continues.
+// Connect authenticates the machine. The refresh token is the machine's
+// durable reconnection credential: the registration (bootstrap) token is
+// single-use and consumed on the first successful ConnectMachine, so once a
+// refresh token exists we reconnect through it exclusively. On success it
+// stores the new credentials and spawns a runner for every agent in the
+// response's assigned_agents list.
+func (c *MachineClient) Connect(ctx context.Context, info *v1pb.MachineInfo) error {
+	c.mu.Lock()
+	c.connState = StateConnecting
+	c.mu.Unlock()
+
+	fingerprint := computeFingerprint(info)
+
+	// Once a refresh token has been persisted, reconnect through it alone.
+	// The registration token is already consumed by this point, so falling back
+	// to it would only ever yield "registration token is not active"
+	// (Unauthenticated) — which looks like a permanent credential failure and
+	// would stop the machine even when the refresh token is still valid and a
+	// transient network blip (e.g. a manager restart) is the real cause. The
+	// refresh path returns its own error so the Run loop can distinguish a
+	// genuine credential death (bail) from a transient failure (backoff+retry).
+	if refreshToken := c.credential.LoadRefreshToken(); refreshToken != "" {
+		return c.connectViaRefresh(ctx, info, fingerprint, refreshToken)
+	}
+
+	// First-ever connect: no refresh token yet, so use the single-use
+	// registration token. This is the only path that consumes it.
+	return c.connectViaRegistration(ctx, info, fingerprint, c.credential.BootstrapToken())
+}
+
+// connectViaRefresh reconnects using the persisted refresh token. The refresh
+// token is single-use: RefreshMachineToken consumes it and returns a new one,
+// which we persist immediately so a later retry uses the new token rather than
+// re-presenting the consumed one (which the server treats as theft and revokes
+// the whole family). The access token returned by the refresh response is the
+// machine's bearer credential for the control stream + heartbeat; ConnectMachine
+// on this path returns no access token (it only mints on the bootstrap path),
+// so applyConnectResponse keeps the refresh-minted one.
+func (c *MachineClient) connectViaRefresh(ctx context.Context, info *v1pb.MachineInfo, fingerprint, refreshToken string) error {
+	refreshResp, err := c.refreshToken(ctx, refreshToken, fingerprint)
+	if err != nil {
+		c.mu.Lock()
+		c.connState = StateDisconnected
+		c.mu.Unlock()
+		return errors.Wrap(err, "failed to refresh machine token")
+	}
+	c.mu.Lock()
+	c.accessToken = refreshResp.AccessToken
+	c.mu.Unlock()
+	c.credential.SaveRefreshToken(refreshResp.RefreshToken)
+
+	resp, err := c.connectWithAccessToken(ctx, info, fingerprint)
+	if err != nil {
+		c.mu.Lock()
+		c.connState = StateDisconnected
+		c.mu.Unlock()
+		return errors.Wrap(err, "failed to connect with refreshed access token")
+	}
+	c.applyConnectResponse(resp)
+	slog.Info("connected to manager via refresh token", "agents", len(resp.AssignedAgents))
+	c.spawnAssignedAgents(ctx, resp.AssignedAgents)
+	return nil
+}
+
+// connectViaRegistration performs the first-ever connect with the single-use
+// registration token. ConnectMachine mints the initial access + refresh tokens
+// (the refresh token is persisted by connectWithRegistrationToken).
+func (c *MachineClient) connectViaRegistration(ctx context.Context, info *v1pb.MachineInfo, fingerprint, registrationToken string) error {
+	resp, err := c.connectWithRegistrationToken(ctx, registrationToken, info, fingerprint)
+	if err != nil {
+		c.mu.Lock()
+		c.connState = StateDisconnected
+		c.mu.Unlock()
+		return errors.Wrapf(err, "failed to connect to manager")
+	}
+	c.applyConnectResponse(resp)
+	slog.Info("connected to manager via registration token", "agents", len(resp.AssignedAgents))
+	c.spawnAssignedAgents(ctx, resp.AssignedAgents)
+	return nil
+}
+
+// applyConnectResponse records the session from a successful ConnectMachine.
+// The access token is only overwritten when ConnectMachine actually mints one
+// (the bootstrap path); on the reconnect path ConnectMachine returns no access
+// token, so we keep the refresh-minted token already stored by the caller. The
+// refresh token is persisted by the caller via the credential manager.
+func (c *MachineClient) applyConnectResponse(resp *v1pb.ConnectMachineResponse) {
+	c.mu.Lock()
+	c.connState = StateConnected
+	c.sessionID = resp.SessionId
+	if resp.AccessToken != "" {
+		c.accessToken = resp.AccessToken
+	}
+	c.mu.Unlock()
+	c.backoff.Reset()
+}
+
+// isPermanentAuthFailure reports whether err means the machine's credentials
+// are permanently rejected and retrying cannot help. This is only reached with
+// a refresh-path error (the durable credential) or a first-connect registration
+// error: a revoked/rotated token family, a consumed registration token with no
+// refresh token, a token-version mismatch, or a deleted machine. Transient
+// network or server errors (e.g. 502 while the manager restarts) return false
+// so the normal backoff retry continues and the machine auto-reconnects.
 func isPermanentAuthFailure(err error) bool {
 	var ce *connect.Error
 	if !errors.As(err, &ce) {
@@ -208,63 +303,6 @@ func isPermanentAuthFailure(err error) bool {
 		return true
 	}
 	return false
-}
-
-func (c *MachineClient) Connect(ctx context.Context, info *v1pb.MachineInfo) error {
-	c.mu.Lock()
-	c.connState = StateConnecting
-	c.mu.Unlock()
-
-	fingerprint := computeFingerprint(info)
-
-	refreshToken := c.credential.LoadRefreshToken()
-	if refreshToken != "" {
-		refreshResp, err := c.refreshToken(ctx, refreshToken, fingerprint)
-		if err != nil {
-			slog.Warn("refresh token failed, falling back to registration token", "error", err)
-		} else {
-			c.mu.Lock()
-			c.accessToken = refreshResp.AccessToken
-			c.mu.Unlock()
-			c.credential.SaveRefreshToken(refreshResp.RefreshToken)
-
-			resp, err := c.connectWithAccessToken(ctx, info, fingerprint)
-			if err != nil {
-				slog.Warn("connect with refreshed token failed, falling back", "error", err)
-			} else {
-				c.applyConnectResponse(resp)
-				slog.Info("connected to manager via refresh token", "agents", len(resp.AssignedAgents))
-				c.spawnAssignedAgents(ctx, resp.AssignedAgents)
-				return nil
-			}
-		}
-	}
-
-	registrationToken := c.credential.BootstrapToken()
-	resp, err := c.connectWithRegistrationToken(ctx, registrationToken, info, fingerprint)
-	if err != nil {
-		c.mu.Lock()
-		c.connState = StateDisconnected
-		c.mu.Unlock()
-		return errors.Wrapf(err, "failed to connect to manager")
-	}
-
-	c.applyConnectResponse(resp)
-	slog.Info("connected to manager via registration token", "agents", len(resp.AssignedAgents))
-	c.spawnAssignedAgents(ctx, resp.AssignedAgents)
-	return nil
-}
-
-// applyConnectResponse records the session + access token from a successful
-// ConnectMachine. The refresh token is persisted by the caller via the
-// credential manager.
-func (c *MachineClient) applyConnectResponse(resp *v1pb.ConnectMachineResponse) {
-	c.mu.Lock()
-	c.connState = StateConnected
-	c.sessionID = resp.SessionId
-	c.accessToken = resp.AccessToken
-	c.mu.Unlock()
-	c.backoff.Reset()
 }
 
 func (c *MachineClient) connectWithRegistrationToken(ctx context.Context, registrationToken string, info *v1pb.MachineInfo, fingerprint string) (*v1pb.ConnectMachineResponse, error) {
@@ -423,11 +461,14 @@ func (c *MachineClient) Run(ctx context.Context) error {
 		info := c.collectMachineInfo()
 
 		if err := c.Connect(ctx, info); err != nil {
-			// A permanent credential failure (revoked/rotated token, consumed
-			// bootstrap, wrong machine) will never succeed by retrying — the
-			// admin must rotate the token and restart the machine app with the
-			// new registration token. Stop hammering the manager and exit so the
-			// operator sees a clear failure instead of an infinite retry loop.
+			// A permanent credential failure — the refresh token family was
+			// revoked/rotated, the token version mismatched, the machine was
+			// deleted, or the single-use registration token is consumed with no
+			// refresh token to fall back on — will never succeed by retrying.
+			// The admin must rotate the token and restart the machine app with
+			// the new registration token. A transient failure (e.g. 502 while the
+			// manager restarts) is not permanent: back off and retry so the
+			// machine auto-reconnects once the manager is back.
 			if isPermanentAuthFailure(err) {
 				slog.Error("machine credentials are no longer valid; an admin must rotate the token and restart with the new registration token", "error", err)
 				return errors.Wrap(err, "machine credentials rejected by manager; stopping (rotate token and restart)")
