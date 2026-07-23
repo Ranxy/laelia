@@ -1854,9 +1854,9 @@ type Agent struct {
 	// identicon seeded by the agent id). Format: agents/{agent}/avatar.
 	Avatar string `protobuf:"bytes,13,opt,name=avatar,proto3" json:"avatar,omitempty"`
 	// machine is the resource name of the machine this agent is bound to
-	// (machines/{machine}). Immutable after creation; set by CreateAgent. An agent
-	// runs on exactly one machine; the machine app picks it up via the
-	// MachineChannel control stream.
+	// (machines/{machine}). Required on CreateAgent (the parent machine the agent
+	// runs on) and immutable thereafter; an agent runs on exactly one machine,
+	// and the machine app picks it up via the MachineChannel control stream.
 	Machine       string `protobuf:"bytes,14,opt,name=machine,proto3" json:"machine,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2883,7 +2883,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"created_by\x18\v \x01(\tB\x03\xe0A\x03R\tcreatedBy\x12\x1e\n" +
 	"\bcan_edit\x18\f \x01(\bB\x03\xe0A\x03R\acanEdit\x12\x1b\n" +
 	"\x06avatar\x18\r \x01(\tB\x03\xe0A\x03R\x06avatar\x12\x1d\n" +
-	"\amachine\x18\x0e \x01(\tB\x03\xe0A\x03R\amachine\x1a9\n" +
+	"\amachine\x18\x0e \x01(\tB\x03\xe0A\x02R\amachine\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:!\xeaA\x1e\n" +

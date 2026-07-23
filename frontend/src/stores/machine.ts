@@ -104,13 +104,23 @@ export const createMachineSlice: AppSliceCreator<MachineSlice> = (
     return res.providers;
   },
 
+  // listMachineAgents returns *every* agent bound to the machine, draining the
+  // full page stream rather than only the first page so a machine with >100
+  // agents is not silently truncated. The cap guards against a runaway cursor.
   async listMachineAgents(name: string): Promise<AgentSummary[]> {
-    const res = await machineServiceClient.listMachineAgents({
-      name,
-      pageSize: 100,
-      pageToken: "",
-    });
-    return res.agents;
+    const all: AgentSummary[] = [];
+    let pageToken = "";
+    for (let page = 0; page < 50; page++) {
+      const res = await machineServiceClient.listMachineAgents({
+        name,
+        pageSize: 100,
+        pageToken,
+      });
+      all.push(...res.agents);
+      pageToken = res.nextPageToken;
+      if (!pageToken) break;
+    }
+    return all;
   },
 });
 

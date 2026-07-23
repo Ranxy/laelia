@@ -452,10 +452,10 @@ message Agent {
   string avatar = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // machine is the resource name of the machine this agent is bound to
-  // (machines/{machine}). Immutable after creation; set by CreateAgent. An agent
-  // runs on exactly one machine; the machine app picks it up via the
-  // MachineChannel control stream.
-  string machine = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // (machines/{machine}). Required on CreateAgent (the parent machine the agent
+  // runs on) and immutable thereafter; an agent runs on exactly one machine,
+  // and the machine app picks it up via the MachineChannel control stream.
+  string machine = 14 [(google.api.field_behavior) = REQUIRED];
 }
 
 // AgentSummary is the lightweight list-view projection of an Agent returned by

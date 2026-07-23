@@ -217,6 +217,9 @@ export interface MemberSummary {
 export interface MembersSlice {
   members: MemberSummary[];
   membersLoading: boolean;
+  // membersError is set when either source roster fetch failed; the Members page
+  // shows an error + retry instead of an empty list.
+  membersError: boolean;
 
   fetchMembers: () => Promise<
     | {

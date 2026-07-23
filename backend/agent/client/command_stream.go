@@ -29,6 +29,14 @@ const (
 	// one. A session that finishes faster than this gap waits out the remainder
 	// before opening the next.
 	minSessionGap = 1 * time.Second
+
+	// beginSessionRetryWait is the backoff after a transient BeginSession
+	// failure (e.g. a manager-side DB hiccup returning Internal). The pending
+	// messages that triggered the wake are still queued server-side and the
+	// manager will not re-wake, so the drain loop must retry BeginSession
+	// proactively rather than wait for the next wake. A truly dead stream
+	// surfaces via the receive pump and triggers a full reconnect independently.
+	beginSessionRetryWait = 2 * time.Second
 )
 
 type mergedText struct {
@@ -347,8 +355,21 @@ func (c *commandStream) drainLoop(ctx context.Context, stream *connect.BidiStrea
 
 			resp, err := c.beginSession(ctx, stream, doneCh)
 			if err != nil {
-				slog.Warn("drain loop: begin session failed, will retry on next wake", "error", err)
-				return
+				// Do NOT exit the drain loop: a transient BeginSession error
+				// (e.g. a manager-side DB hiccup) would otherwise deafen the
+				// agent until the whole machine reconnects. The wake that
+				// started this pass already fired and won't re-fire, so back off
+				// and retry BeginSession proactively. A dead stream is caught
+				// separately by the receive pump and drives a full reconnect.
+				slog.Warn("drain loop: begin session failed, backing off before retry", "error", err)
+				select {
+				case <-time.After(beginSessionRetryWait):
+				case <-ctx.Done():
+					return
+				case <-doneCh:
+					return
+				}
+				continue
 			}
 			if resp.Idle {
 				goto START

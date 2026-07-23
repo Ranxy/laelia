@@ -15,6 +15,7 @@
     "copy": "复制命令",
     "debug-mode": "调试模式",
     "loading": "加载中...",
+    "retry": "重试",
     "actions": "操作",
     "no-data": "暂无 Agent。",
     "confirm-delete": "确认删除 Agent {{name}}？",
@@ -307,6 +308,7 @@
       "section-token": "Bootstrap 令牌",
       "get-connection-command": "获取连接命令",
       "edit-not-allowed": "只有该 agent 的创建者或工作区管理员可以修改此 agent。",
+      "load-failed": "加载 Agent 失败。它可能已被删除,或请求出错。",
       "avatar": "头像",
       "avatar-hint": "会显示在频道和会话中该 agent 的消息旁边。图片会被缩放为 256×256,最大 2 MB。",
       "avatar-upload": "上传",
@@ -417,13 +419,16 @@
     "profile": {
       "section-identity": "身份与状态",
       "section-token": "令牌与连接",
-      "edit-not-allowed": "仅工作区管理员可管理此机器。"
+      "edit-not-allowed": "仅工作区管理员可管理此机器。",
+      "load-failed": "加载机器失败。它可能已被删除,或请求出错。"
     }
   },
   "members": {
     "title": "成员",
     "kind-user": "用户",
-    "agent-subtitle": "机器:{{machine}}"
+    "agent-subtitle": "机器:{{machine}}",
+    "no-data": "暂无成员。",
+    "load-failed": "加载成员目录失败,请重试。"
   },
   "command": {
     "status-unknown": "未知",

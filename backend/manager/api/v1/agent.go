@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -1272,7 +1273,7 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
-	if err := validateAgentACPConfig(req.Msg.AcpConfig); err != nil {
+	if err := validateAgentACPConfig(req.Msg.AcpConfig, nil); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
@@ -1282,6 +1283,12 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 	}
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+
+	// Re-validate against the owning machine's discovered providers now that
+	// we know the binding. A built-in provider must be runnable on the host.
+	if err := validateAgentACPConfig(req.Msg.AcpConfig, s.machineAvailableProviders(ctx, agent.MachineID)); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
 	// Preserve the rest of AgentInfo (hostname/os/capability/available_providers/
@@ -1361,7 +1368,7 @@ func (s *AgentService) RefreshAgentProviders(ctx context.Context, req *connect.R
 // provider (opencode, claude-code) supplies its own launch command, so
 // executable is only required for the "custom"/empty provider. Every
 // allow_env and custom_env key must be a valid env var name.
-func validateAgentACPConfig(cfg *v1pb.AgentACPConfig) error {
+func validateAgentACPConfig(cfg *v1pb.AgentACPConfig, machineAvailableProviders []*storepb.AgentProviderInfo) error {
 	if cfg == nil {
 		return errors.New("acp_config must be set")
 	}
@@ -1374,6 +1381,17 @@ func validateAgentACPConfig(cfg *v1pb.AgentACPConfig) error {
 	if !isBuiltin && cfg.Executable == "" {
 		return errors.New("acp_config.executable must be set when provider is not a built-in")
 	}
+	// If the owning machine has discovered its available providers, a built-in
+	// provider must be among them — otherwise the agent is configured for a
+	// provider the host cannot run, which only surfaces at BeginSession. When
+	// the machine has not probed yet (empty list) or the provider is "custom"
+	// (uses an explicit executable, not discovered), skip this check.
+	if len(machineAvailableProviders) > 0 && isBuiltin {
+		if !providerAvailable(cfg.Provider, machineAvailableProviders) {
+			return errors.Errorf("acp_config.provider %q is not available on the owning machine (available: %s)",
+				cfg.Provider, availableProviderIDs(machineAvailableProviders))
+		}
+	}
 	for _, name := range cfg.AllowEnv {
 		if !envVarNameRegex.MatchString(name) {
 			return errors.Errorf("invalid allow_env entry %q: must match ^[A-Za-z_][A-Za-z0-9_]*$", name)
@@ -1385,6 +1403,37 @@ func validateAgentACPConfig(cfg *v1pb.AgentACPConfig) error {
 		}
 	}
 	return nil
+}
+
+// machineAvailableProviders returns the owning machine's discovered providers,
+// or nil if machineID is zero or the machine/providers are unknown. Used to
+// validate that a configured built-in provider is runnable on the host.
+func (s *AgentService) machineAvailableProviders(ctx context.Context, machineID int) []*storepb.AgentProviderInfo {
+	if machineID <= 0 {
+		return nil
+	}
+	machine, err := s.store.GetMachine(ctx, machineID)
+	if err != nil || machine == nil || machine.Info == nil {
+		return nil
+	}
+	return machine.Info.AvailableProviders
+}
+
+func providerAvailable(providerID string, available []*storepb.AgentProviderInfo) bool {
+	for _, p := range available {
+		if p.ProviderId == providerID {
+			return true
+		}
+	}
+	return false
+}
+
+func availableProviderIDs(available []*storepb.AgentProviderInfo) string {
+	ids := make([]string, 0, len(available))
+	for _, p := range available {
+		ids = append(ids, p.ProviderId)
+	}
+	return strings.Join(ids, ", ")
 }
 
 // knownProviderID reports whether id is a recognized provider id (a built-in or

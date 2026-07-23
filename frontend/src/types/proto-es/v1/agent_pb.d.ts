@@ -871,9 +871,9 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
 
   /**
    * machine is the resource name of the machine this agent is bound to
-   * (machines/{machine}). Immutable after creation; set by CreateAgent. An agent
-   * runs on exactly one machine; the machine app picks it up via the
-   * MachineChannel control stream.
+   * (machines/{machine}). Required on CreateAgent (the parent machine the agent
+   * runs on) and immutable thereafter; an agent runs on exactly one machine,
+   * and the machine app picks it up via the MachineChannel control stream.
    *
    * @generated from field: string machine = 14;
    */

@@ -225,19 +225,13 @@ func (s *MachineService) RotateMachineToken(ctx context.Context, req *connect.Re
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate machine token, error: %v", err))
 	}
 
+	// Bump the version (invalidates old tokens), revoke every existing token,
+	// and store the new bootstrap — atomically, in one transaction. A failure
+	// leaves the machine on its current credentials so it is never tokenless;
+	// the admin can retry. Session teardown + dispatcher unregister below are
+	// best-effort and outside the transaction.
 	nowRotated := time.Now()
-	if _, err := s.store.UpdateMachine(ctx, machine, &store.UpdateMachineMessage{
-		TokenVersion:       &newTokenVersion,
-		LastTokenRotatedAt: &nowRotated,
-	}); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update machine token version, error: %v", err))
-	}
-
-	if err := s.store.RevokeAllMachineTokens(ctx, machine.ID); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to revoke old tokens during rotation, error: %v", err))
-	}
-
-	if err := s.store.CreateMachineToken(ctx, &store.MachineTokenMessage{
+	if _, err := s.store.RotateMachineTokens(ctx, machine, newTokenVersion, nowRotated, &store.MachineTokenMessage{
 		MachineID:   machine.ID,
 		TokenHash:   hashToken(registrationToken),
 		TokenType:   storepb.MachineTokenType_MACHINE_BOOTSTRAP,
@@ -246,7 +240,7 @@ func (s *MachineService) RotateMachineToken(ctx context.Context, req *connect.Re
 		ExpiresAt:   time.Now().Add(bootstrapTokenDuration),
 		CreatedBy:   "system",
 	}); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store new machine token, error: %v", err))
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to rotate machine tokens, error: %v", err))
 	}
 
 	terminateReason := "token_rotated"
@@ -440,6 +434,19 @@ func (s *MachineService) ConnectMachine(ctx context.Context, req *connect.Reques
 		machine = authResult.machine
 		tokenFamily = authResult.tokenFamily
 		bootstrapTokenID = authResult.tokenID
+		// Consume the single-use registration token atomically BEFORE any
+		// state mutation. The conditional UPDATE (state=ACTIVE → CONSUMED) is
+		// the serialization point: two concurrent ConnectMachine calls with the
+		// same registration token race here, and only the winner (rows-affected
+		// == 1) proceeds to mint tokens and create a session. The loser gets
+		// Unauthenticated and must not have created a session.
+		consumed, err := s.store.ConsumeMachineToken(ctx, bootstrapTokenID)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to consume registration token, error: %v", err))
+		}
+		if !consumed {
+			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("registration token is no longer active (consumed or revoked)"))
+		}
 	}
 	if tokenFamily == "" {
 		tokenFamily = machine.ResourceID
@@ -525,14 +532,9 @@ func (s *MachineService) ConnectMachine(ctx context.Context, req *connect.Reques
 		}
 		accessTokenExpiresAt = time.Now().Add(accessTokenDuration)
 
-		// The registration token is single-use: consume it now that the
-		// connection has fully succeeded.
-		consumedAt := time.Now()
-		if err := s.store.UpdateMachineTokenState(ctx, bootstrapTokenID, storepb.MachineTokenState_MACHINE_TOKEN_CONSUMED, &consumedAt); err != nil {
-			// non-fatal: a leaked registration token still cannot reconnect
-			// (the session is ACTIVE and ConnectMachine replaces it).
-			slog.Info("non-fatal failure consuming registration token", "machineID", machine.ID, "error", err)
-		}
+		// The registration token was already consumed atomically at the top of
+		// ConnectMachine (the single-use serialization point); nothing to do
+		// here on success.
 	}
 
 	// Resync the full agent roster: the machine app opens an AgentChannel for

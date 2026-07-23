@@ -107,6 +107,9 @@ export function AgentProfilePage() {
   // mutable, so they are never cached in the store — this avoids a stale
   // canEdit surviving a user switch (admin → normal user).
   const [agent, setAgent] = useState<Agent | undefined>(undefined);
+  // loadError distinguishes a failed/missing fetch from an in-progress load so
+  // the profile does not strand the user on a perpetual "Loading…" screen.
+  const [loadError, setLoadError] = useState(false);
 
   // ACP config editor local state, seeded from the agent's persisted config.
   const [executable, setExecutable] = useState("");
@@ -179,9 +182,17 @@ export function AgentProfilePage() {
     }
   }
 
+  async function loadAgent() {
+    if (!agentId) return;
+    const a = await getAgent(agentName);
+    setAgent(a);
+    setLoadError(!a);
+  }
+
   useEffect(() => {
     if (!agentId) return;
-    getAgent(agentName).then(setAgent);
+    void loadAgent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId, agentName, getAgent]);
 
   // Load the owning machine's available providers whenever the agent's machine
@@ -220,7 +231,19 @@ export function AgentProfilePage() {
   if (!agent) {
     return (
       <div className="h-full overflow-y-auto p-6">
-        <p className="text-sm text-control-light">{t("common.loading")}</p>
+        {loadError ? (
+          <div className="flex flex-col gap-3">
+            <Alert
+              variant="error"
+              description={t("agent.profile.load-failed")}
+            />
+            <Button variant="outline" onClick={() => void loadAgent()}>
+              {t("common.retry")}
+            </Button>
+          </div>
+        ) : (
+          <p className="text-sm text-control-light">{t("common.loading")}</p>
+        )}
       </div>
     );
   }

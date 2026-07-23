@@ -15,6 +15,7 @@
     "copy": "Copy Command",
     "debug-mode": "Debug mode",
     "loading": "Loading...",
+    "retry": "Retry",
     "actions": "Actions",
     "no-data": "No agents yet.",
     "confirm-delete": "Delete agent {{name}}?",
@@ -307,6 +308,7 @@
       "section-token": "Bootstrap Token",
       "get-connection-command": "Get connection command",
       "edit-not-allowed": "Only the agent's creator or a workspace admin can edit this agent.",
+      "load-failed": "Failed to load this agent. It may have been deleted or the request failed.",
       "avatar": "Avatar",
       "avatar-hint": "Shown next to the agent's messages in channels and threads. Images are resized to 256×256; max 2 MB.",
       "avatar-upload": "Upload",
@@ -417,13 +419,16 @@
     "profile": {
       "section-identity": "Identity & Status",
       "section-token": "Token & Connection",
-      "edit-not-allowed": "Only a workspace admin can manage this machine."
+      "edit-not-allowed": "Only a workspace admin can manage this machine.",
+      "load-failed": "Failed to load this machine. It may have been deleted or the request failed."
     }
   },
   "members": {
     "title": "Members",
     "kind-user": "User",
-    "agent-subtitle": "Machine: {{machine}}"
+    "agent-subtitle": "Machine: {{machine}}",
+    "no-data": "No members yet.",
+    "load-failed": "Failed to load the member directory. Please retry."
   },
   "command": {
     "status-unknown": "Unknown",

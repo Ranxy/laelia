@@ -479,7 +479,7 @@ RiskLevel is the risk level.
 | created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}); empty for legacy agents with no recorded creator. Only the creator or a workspace admin may modify the agent. |
 | can_edit | [bool](#bool) |  | can_edit reports whether the current caller may modify this agent (laelia.agents.edit): true for the creator (via the agentEditor IAM binding) and for workspace admins (via the all-permissions union), false otherwise. Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths. |
 | avatar | [string](#string) |  | avatar is the resource name of the agent&#39;s uploaded avatar image, or empty when the agent has not uploaded one (frontend renders a deterministic pixel identicon seeded by the agent id). Format: agents/{agent}/avatar. |
-| machine | [string](#string) |  | machine is the resource name of the machine this agent is bound to (machines/{machine}). Immutable after creation; set by CreateAgent. An agent runs on exactly one machine; the machine app picks it up via the MachineChannel control stream. |
+| machine | [string](#string) |  | machine is the resource name of the machine this agent is bound to (machines/{machine}). Required on CreateAgent (the parent machine the agent runs on) and immutable thereafter; an agent runs on exactly one machine, and the machine app picks it up via the MachineChannel control stream. |
 
 
 

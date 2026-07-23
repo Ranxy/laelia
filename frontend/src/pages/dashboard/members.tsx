@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/stores";
 import type { MemberSummary } from "@/stores/types";
 
@@ -14,6 +16,7 @@ export function MembersPage() {
   const navigate = useNavigate();
   const members = useAppStore((s) => s.members);
   const loading = useAppStore((s) => s.membersLoading);
+  const error = useAppStore((s) => s.membersError);
   const fetchMembers = useAppStore((s) => s.fetchMembers);
 
   useEffect(() => {
@@ -38,8 +41,15 @@ export function MembersPage() {
         <div className="mx-auto w-full max-w-3xl">
           {loading ? (
             <p className="text-sm text-control-light">{t("common.loading")}</p>
+          ) : error ? (
+            <div className="flex flex-col gap-3">
+              <Alert variant="error" description={t("members.load-failed")} />
+              <Button variant="outline" onClick={() => void fetchMembers()}>
+                {t("common.retry")}
+              </Button>
+            </div>
           ) : members.length === 0 ? (
-            <p className="text-sm text-control-light">{t("common.no-data")}</p>
+            <p className="text-sm text-control-light">{t("members.no-data")}</p>
           ) : (
             <ul className="flex flex-col gap-1">
               {members.map((member) => {

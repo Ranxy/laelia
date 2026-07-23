@@ -41,6 +41,60 @@ func (s *Store) CreateMachineToken(ctx context.Context, token *MachineTokenMessa
 	return err
 }
 
+// RotateMachineTokens atomically bumps the machine's token_version, revokes
+// every existing machine token, and stores a new bootstrap (registration)
+// token — all in one transaction. On failure nothing changes, so the machine
+// keeps its previous, still-valid credentials and the admin can retry. This
+// avoids the window where the version was bumped and old tokens revoked
+// before the new bootstrap was persisted (which would leave the machine unable
+// to reconnect). Returns the refreshed machine.
+func (s *Store) RotateMachineTokens(ctx context.Context, current *MachineMessage, newVersion int, rotatedAt time.Time, newBootstrap *MachineTokenMessage) (*MachineMessage, error) {
+	tx, err := s.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE machine SET token_version = $2, last_token_rotated_at = $3 WHERE id = $1
+	`, current.ID, newVersion, rotatedAt); err != nil {
+		return nil, err
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE machine_token SET state = 'REVOKED', revoked_at = now()
+		WHERE machine_id = $1 AND state IN ('ACTIVE', 'CONSUMED')
+	`, current.ID); err != nil {
+		return nil, err
+	}
+
+	tokenType := machineTokenTypeToString(newBootstrap.TokenType)
+	state := machineTokenStateToString(newBootstrap.State)
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO machine_token (
+			machine_id, token_hash, token_type, token_family, state,
+			fingerprint, source_ip, expires_at, created_by
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`, newBootstrap.MachineID, newBootstrap.TokenHash, tokenType, newBootstrap.TokenFamily, state,
+		newBootstrap.Fingerprint, newBootstrap.SourceIP, newBootstrap.ExpiresAt, newBootstrap.CreatedBy); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	s.machineIDCache.Remove(current.ID)
+	s.machineResourceIDCache.Remove(current.ResourceID)
+	machine, err := s.GetMachine(ctx, current.ID)
+	if err != nil {
+		return nil, err
+	}
+	s.machineIDCache.Add(machine.ID, machine)
+	s.machineResourceIDCache.Add(machine.ResourceID, machine)
+	return machine, nil
+}
+
 func (s *Store) GetMachineTokenByHash(ctx context.Context, tokenHash string) (*MachineTokenMessage, error) {
 	query := `SELECT
 			id, machine_id, token_hash, token_type, token_family, state,
@@ -94,6 +148,30 @@ func (s *Store) UpdateMachineTokenState(ctx context.Context, tokenID int, state 
 		UPDATE machine_token SET state = $2 WHERE id = $1
 	`, tokenID, stateStr)
 	return err
+}
+
+// ConsumeMachineToken atomically transitions a machine token from ACTIVE to
+// CONSUMED. It returns consumed=true only when a row was actually updated
+// (rows-affected == 1), i.e. the token was ACTIVE and is now CONSUMED.
+// consumed=false means another caller already consumed or revoked it. This is
+// the single-use guard for bootstrap (registration) tokens: by consuming
+// before minting access/refresh tokens and creating a session, concurrent
+// ConnectMachine calls with the same registration token are serialized so only
+// one wins.
+func (s *Store) ConsumeMachineToken(ctx context.Context, tokenID int) (bool, error) {
+	consumedAt := time.Now()
+	res, err := s.GetDB().ExecContext(ctx, `
+		UPDATE machine_token SET state = $2, consumed_at = $3
+		WHERE id = $1 AND state = 'ACTIVE'
+	`, tokenID, machineTokenStateToString(storepb.MachineTokenState_MACHINE_TOKEN_CONSUMED), consumedAt)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n == 1, nil
 }
 
 func (s *Store) RevokeAllMachineTokens(ctx context.Context, machineID int) error {

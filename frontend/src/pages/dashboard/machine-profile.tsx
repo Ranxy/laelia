@@ -102,6 +102,9 @@ export function MachineProfilePage() {
   const [machine, setMachine] = useState<Machine | undefined>(undefined);
   const [agents, setAgents] = useState<AgentSummary[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
+  // loadError distinguishes a failed/missing fetch from an in-progress load so
+  // the profile does not strand the user on a perpetual "Loading…" screen.
+  const [loadError, setLoadError] = useState(false);
 
   // Token / control action state.
   const [rotateOpen, setRotateOpen] = useState(false);
@@ -129,10 +132,12 @@ export function MachineProfilePage() {
   // Remove-agent state.
   const [removeTarget, setRemoveTarget] = useState<AgentSummary | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState("");
 
   async function reload() {
     const m = await getMachine(machineName);
     setMachine(m);
+    setLoadError(!m);
     setAgentsLoading(true);
     try {
       const listMachineAgents = useAppStore.getState().listMachineAgents;
@@ -151,7 +156,19 @@ export function MachineProfilePage() {
   if (!machine) {
     return (
       <div className="h-full overflow-y-auto p-6">
-        <p className="text-sm text-control-light">{t("common.loading")}</p>
+        {loadError ? (
+          <div className="flex flex-col gap-3">
+            <Alert
+              variant="error"
+              description={t("machine.profile.load-failed")}
+            />
+            <Button variant="outline" onClick={() => void reload()}>
+              {t("common.retry")}
+            </Button>
+          </div>
+        ) : (
+          <p className="text-sm text-control-light">{t("common.loading")}</p>
+        )}
       </div>
     );
   }
@@ -263,12 +280,15 @@ export function MachineProfilePage() {
   async function handleConfirmRemoveAgent() {
     if (!removeTarget) return;
     setRemoving(true);
+    setRemoveError("");
     try {
       const deleteAgent = useAppStore.getState().deleteAgent;
       await deleteAgent(removeTarget.name);
       setRemoveTarget(null);
       await reload();
       fetchMachines({ pageSize: 100 }, { silent: true });
+    } catch (err) {
+      setRemoveError(err instanceof Error ? err.message : String(err));
     } finally {
       setRemoving(false);
     }
@@ -610,6 +630,7 @@ export function MachineProfilePage() {
               title: removeTarget?.title ?? "",
             })}
           </AlertDialogDescription>
+          {removeError && <Alert variant="error" description={removeError} />}
           <AlertDialogFooter>
             <AlertDialogClose>
               <Button variant="outline" disabled={removing}>
