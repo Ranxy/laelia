@@ -318,6 +318,14 @@ func (in *APIAuthInterceptor) authenticateMachineByClaims(ctx context.Context, c
 	if machine.Deleted {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("machine %s has been deactivated", claims.Subject))
 	}
+	// Only ACCESS tokens may authenticate machine-side RPCs (MachineChannel,
+	// MachineHeartbeat, agent-callable RPCs). REFRESH tokens are for
+	// RefreshMachineToken only and BOOTSTRAP (registration) tokens are for
+	// ConnectMachine's registration_token field — neither should be accepted as
+	// a bearer access token, since all three share the same audience.
+	if claims.TokenType != TokenTypeAccess {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("machine token type %q is not an access token", claims.TokenType))
+	}
 	if machine.TokenVersion != claims.TokenVersion {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("machine token version mismatch"))
 	}

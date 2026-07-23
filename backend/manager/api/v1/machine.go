@@ -579,23 +579,29 @@ func (s *MachineService) MachineHeartbeat(ctx context.Context, req *connect.Requ
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("machine not authenticated"))
 	}
 
-	if req.Msg.SessionId != "" {
-		session, err := s.store.GetMachineSession(ctx, req.Msg.SessionId)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get machine session, error: %v", err))
-		}
-		if session == nil {
-			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("session not found"))
-		}
-		if session.State == "KICKED" {
-			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("session has been replaced by a new connection"))
-		}
-		if session.MachineID != machine.ID {
-			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("session does not belong to this machine"))
-		}
-		if err := s.store.TouchMachineSession(ctx, req.Msg.SessionId); err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to touch machine session, error: %v", err))
-		}
+	// The session id is mandatory: it binds the heartbeat to a concrete ACTIVE
+	// session. Without this check a machine whose session was KICKED by
+	// ForceDisconnectMachine/RevokeMachineToken could keep heartbeating with an
+	// empty session id, flipping status back to ONLINE and even minting a fresh
+	// access token — defeating the admin's force-disconnect.
+	if req.Msg.SessionId == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("session id is required"))
+	}
+	session, err := s.store.GetMachineSession(ctx, req.Msg.SessionId)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get machine session, error: %v", err))
+	}
+	if session == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("session not found"))
+	}
+	if session.State != "ACTIVE" {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("session is %s (replaced or terminated); reconnect via ConnectMachine", session.State))
+	}
+	if session.MachineID != machine.ID {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("session does not belong to this machine"))
+	}
+	if err := s.store.TouchMachineSession(ctx, req.Msg.SessionId); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to touch machine session, error: %v", err))
 	}
 
 	nowSec := time.Now().Unix()

@@ -6,7 +6,9 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/pkg/errors"
 
+	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
@@ -39,13 +41,24 @@ func (s *MachineStreamService) MachineChannel(
 	if !ok || machine == nil {
 		return connect.NewError(connect.CodeUnauthenticated, nil)
 	}
+	// Reject control streams for machines that are not ONLINE (e.g. KICKED by
+	// ForceDisconnectMachine or OFFLINE). A machine may only (re)open its
+	// control stream after a successful ConnectMachine, which flips state to
+	// ONLINE; this prevents a non-cooperative machine from re-opening the
+	// stream with a still-valid access token to bypass a force-disconnect
+	// without re-connecting.
+	if machine.Status == nil || machine.Status.GetState() != storepb.MachineStatus_ONLINE {
+		return connect.NewError(connect.CodePermissionDenied, errors.Errorf("machine %s is not online", machine.ResourceID))
+	}
 
 	sendFunc := func(msg *v1pb.ManagerMachineStreamMessage) error {
 		return stream.Send(msg)
 	}
 
-	s.dispatcher.RegisterMachine(machine.ID, machine.ResourceID, sendFunc)
-	defer s.dispatcher.UnregisterMachine(machine.ID)
+	sess := s.dispatcher.RegisterMachine(machine.ID, machine.ResourceID, sendFunc)
+	// Identity-aware teardown: if a reconnect replaced this session before the
+	// old stream ends, do not destroy the new (live) session.
+	defer s.dispatcher.UnregisterMachineIf(machine.ID, sess)
 
 	slog.Info("machine control stream connected", "machineID", machine.ID, "resourceID", machine.ResourceID)
 

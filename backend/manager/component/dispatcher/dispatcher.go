@@ -206,7 +206,27 @@ func (d *Dispatcher) UnregisterAgent(agentID int) {
 	}
 	delete(d.sessions, agentID)
 	d.mu.Unlock()
+	d.teardownAgentSession(sess)
+}
 
+// UnregisterAgentIf tears down the agent session only if sess is still the one
+// registered for agentID. The AgentChannel handler uses this for its deferred
+// cleanup so that, when a reconnect has replaced the session in the map, the
+// old stream's teardown does not delete the new (live) session nor arm a grace
+// timer against its in-flight command.
+func (d *Dispatcher) UnregisterAgentIf(agentID int, sess *AgentSession) {
+	d.mu.Lock()
+	current, ok := d.sessions[agentID]
+	if !ok || current != sess {
+		d.mu.Unlock()
+		return
+	}
+	delete(d.sessions, agentID)
+	d.mu.Unlock()
+	d.teardownAgentSession(sess)
+}
+
+func (d *Dispatcher) teardownAgentSession(sess *AgentSession) {
 	sess.mu.Lock()
 	cmdID := sess.currentCmdID
 	sess.mu.Unlock()
@@ -214,10 +234,10 @@ func (d *Dispatcher) UnregisterAgent(agentID int) {
 	// invalidated" rather than writing to the closed stream.
 	sess.send.Store(nil)
 
-	slog.Info("agent unregistered from command dispatch", "agentID", agentID)
+	slog.Info("agent unregistered from command dispatch", "agentID", sess.agentID)
 
 	if cmdID != "" {
-		d.startGracePeriod(agentID, cmdID)
+		d.startGracePeriod(sess.agentID, cmdID)
 	}
 }
 
@@ -269,7 +289,32 @@ func (d *Dispatcher) UnregisterMachine(machineID int) {
 		return
 	}
 	delete(d.machines, machineID)
+	owned := d.detachMachineAgentsLocked(machineID)
+	d.mu.Unlock()
+	d.teardownMachineSession(machine, owned)
+}
 
+// UnregisterMachineIf tears down the machine session only if sess is still the
+// one registered for machineID. The MachineChannel handler uses this for its
+// deferred cleanup so that, when a reconnect has replaced the session in the
+// map, the old stream's teardown does not destroy the new (live) session and
+// re-arming grace timers against its agents' in-flight commands.
+func (d *Dispatcher) UnregisterMachineIf(machineID int, sess *MachineSession) {
+	d.mu.Lock()
+	current, ok := d.machines[machineID]
+	if !ok || current != sess {
+		d.mu.Unlock()
+		return
+	}
+	delete(d.machines, machineID)
+	owned := d.detachMachineAgentsLocked(machineID)
+	d.mu.Unlock()
+	d.teardownMachineSession(current, owned)
+}
+
+// detachMachineAgentsLocked removes and returns every AgentSession owned by
+// machineID. Caller must hold d.mu.
+func (d *Dispatcher) detachMachineAgentsLocked(machineID int) []*AgentSession {
 	owned := make([]*AgentSession, 0)
 	for _, sess := range d.sessions {
 		if sess.machineID == machineID {
@@ -277,8 +322,10 @@ func (d *Dispatcher) UnregisterMachine(machineID int) {
 			delete(d.sessions, sess.agentID)
 		}
 	}
-	d.mu.Unlock()
+	return owned
+}
 
+func (d *Dispatcher) teardownMachineSession(machine *MachineSession, owned []*AgentSession) {
 	machine.send.Store(nil)
 
 	for _, sess := range owned {
@@ -290,7 +337,7 @@ func (d *Dispatcher) UnregisterMachine(machineID int) {
 			d.startGracePeriod(sess.agentID, cmdID)
 		}
 	}
-	slog.Info("machine unregistered from control dispatch", "machineID", machineID, "agents", len(owned))
+	slog.Info("machine unregistered from control dispatch", "machineID", machine.machineID, "agents", len(owned))
 }
 
 func (d *Dispatcher) IsMachineConnected(machineID int) bool {
