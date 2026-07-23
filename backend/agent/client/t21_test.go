@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -60,41 +60,36 @@ func TestBeginSession_NoStaleResponseAcrossReconnect(t *testing.T) {
 	assert.Empty(t, gotCmdID, "ctx expiry should yield no command id")
 }
 
-// TestAgentInfo_RecomputedOnReconnect guards the T21 move of collectAgentInfo
-// into the Run loop: AgentInfo.Capability must reflect the current ACPConfig,
-// not a value cached once at startup. Two configs with different capabilities
-// must yield different AgentInfo when recomputed.
-func TestAgentInfo_RecomputedOnReconnect(t *testing.T) {
-	// Unconfigured agent: SupportsAcp=false.
-	c0 := &Client{}
-	info0 := c0.collectAgentInfo()
-	require.NotNil(t, info0.Capability)
-	assert.False(t, info0.Capability.SupportsAcp, "unconfigured agent must report SupportsAcp=false")
+// TestMachineInfo_RecomputedOnReconnect guards the T21 invariant for the
+// machine app: collectMachineInfo must reflect the current discovered
+// providers, not a value cached once at startup. A re-probe between reconnects
+// that finds new providers must surface them in the next MachineInfo.
+func TestMachineInfo_RecomputedOnReconnect(t *testing.T) {
+	// No providers discovered yet: empty available_providers.
+	c0 := &MachineClient{}
+	info0 := c0.collectMachineInfo()
+	require.NotNil(t, info0)
+	assert.Empty(t, info0.AvailableProviders, "machine with no probe yet reports no providers")
 
-	// After the manager configures ACP on a reconnect, recomputing AgentInfo
-	// from the new config flips SupportsAcp to true and carries the config's
-	// flags — proving collectAgentInfo reads the *current* config, not a cache.
-	configured := &executor.ACPConfig{
-		Executable:         "/usr/local/bin/opencode",
-		MaxTimeoutSeconds:  42,
-		SupportsDiff:       true,
-		SupportsRawEvents:  false,
-		SupportsToolTraces: true,
+	// After a re-probe on reconnect, recomputing MachineInfo carries the fresh
+	// provider list — proving collectMachineInfo reads the *current* cache, not
+	// a snapshot from startup.
+	c1 := &MachineClient{
+		discoveredProviders: []provider.Discovered{
+			{ProviderID: "opencode", DisplayName: "OpenCode", Models: []provider.ModelOption{{Value: "gpt-5", Name: "GPT-5"}}},
+		},
+		discoveredAt: time.Now(),
 	}
-	c1 := &Client{acpConfig: configured}
-	info1 := c1.collectAgentInfo()
-	require.NotNil(t, info1.Capability)
-	assert.True(t, info1.Capability.SupportsAcp, "configured agent must report SupportsAcp=true")
-	assert.Equal(t, int32(42), info1.Capability.MaxTimeoutSeconds)
-	assert.True(t, info1.Capability.SupportsDiff)
-	assert.False(t, info1.Capability.SupportsRawEvents)
+	info1 := c1.collectMachineInfo()
+	require.Len(t, info1.AvailableProviders, 1)
+	assert.Equal(t, "opencode", info1.AvailableProviders[0].ProviderId)
 
-	// Snapshot path mirrors the locked read the Run loop now performs.
-	c := &Client{acpConfig: configured}
-	assert.Same(t, configured, c.acpConfigSnapshot(), "snapshot must return the live config under the lock")
-
-	c.mu.Lock()
-	c.acpConfig = nil
-	c.mu.Unlock()
-	assert.Nil(t, c.acpConfigSnapshot(), "snapshot must reflect an updated config, not a cached one")
+	// A second probe that finds a different set must be reflected, not the old one.
+	c1.mu.Lock()
+	c1.discoveredProviders = []provider.Discovered{{ProviderID: "claude"}}
+	c1.discoveredAt = time.Now()
+	c1.mu.Unlock()
+	info2 := c1.collectMachineInfo()
+	require.Len(t, info2.AvailableProviders, 1)
+	assert.Equal(t, "claude", info2.AvailableProviders[0].ProviderId, "recompute must read the updated provider cache")
 }

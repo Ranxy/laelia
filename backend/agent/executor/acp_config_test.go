@@ -17,7 +17,7 @@ func TestBuildACPConfigDerivesCommandFromProvider(t *testing.T) {
 		Model:     "gpt-4o",
 		CustomEnv: map[string]string{"FOO": "bar"},
 		AllowEnv:  []string{"PATH"},
-	}, "agent-123")
+	}, "machine-1", "agent-123")
 	require.NotNil(t, cfg)
 	assert.Equal(t, "opencode", cfg.Executable)
 	// opencode provider builds `opencode acp --pure --cwd <workingDir>`.
@@ -25,6 +25,7 @@ func TestBuildACPConfigDerivesCommandFromProvider(t *testing.T) {
 	assert.Equal(t, "gpt-4o", cfg.Model)
 	assert.Equal(t, "bar", cfg.CustomEnv["FOO"])
 	assert.Contains(t, cfg.WorkingDir, "agent-123")
+	assert.Contains(t, cfg.WorkingDir, "machine-1")
 }
 
 func TestBuildACPConfigFallsBackToRawExecutableForCustom(t *testing.T) {
@@ -32,7 +33,7 @@ func TestBuildACPConfigFallsBackToRawExecutableForCustom(t *testing.T) {
 		Provider:   "custom",
 		Executable: "npx",
 		Args:       []string{"-y", "some-acp@latest"},
-	}, "agent-1")
+	}, "machine-1", "agent-1")
 	require.NotNil(t, cfg)
 	assert.Equal(t, "npx", cfg.Executable)
 	assert.Equal(t, []string{"-y", "some-acp@latest"}, cfg.Args)
@@ -40,11 +41,11 @@ func TestBuildACPConfigFallsBackToRawExecutableForCustom(t *testing.T) {
 
 func TestBuildACPConfigNilWhenUnconfigured(t *testing.T) {
 	// No provider and no executable -> not configured.
-	assert.Nil(t, BuildACPConfig(&v1pb.AgentACPConfig{}, "agent-1"))
+	assert.Nil(t, BuildACPConfig(&v1pb.AgentACPConfig{}, "machine-1", "agent-1"))
 	// Unknown provider with no executable -> still not configured.
-	assert.Nil(t, BuildACPConfig(&v1pb.AgentACPConfig{Provider: "no-such"}, "agent-1"))
+	assert.Nil(t, BuildACPConfig(&v1pb.AgentACPConfig{Provider: "no-such"}, "machine-1", "agent-1"))
 	// But unknown provider WITH executable falls back to custom path.
-	cfg := BuildACPConfig(&v1pb.AgentACPConfig{Provider: "no-such", Executable: "weird"}, "agent-1")
+	cfg := BuildACPConfig(&v1pb.AgentACPConfig{Provider: "no-such", Executable: "weird"}, "machine-1", "agent-1")
 	require.NotNil(t, cfg)
 	assert.Equal(t, "weird", cfg.Executable)
 }

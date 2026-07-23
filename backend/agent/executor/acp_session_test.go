@@ -32,35 +32,39 @@ func TestSessionFingerprint_StableAndDistinguishing(t *testing.T) {
 // to a temp dir so the test never touches the real ~/.laelia.
 func TestLoadSaveClearACPSession_RoundTrip(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	const agentID = "test-agent-session-roundtrip"
+	const (
+		machineID = "test-machine-session"
+		agentID   = "test-agent-session-roundtrip"
+	)
 
 	// Missing file => cold start, not an error.
-	got, err := loadACPSession(agentID)
+	got, err := loadACPSession(machineID, agentID)
 	require.NoError(t, err)
 	assert.Nil(t, got, "missing session file should yield nil, nil")
 
 	want := &acpSessionState{SessionID: "sess-123", Fingerprint: "fp-abc", CreatedAt: 1700000000}
-	require.NoError(t, saveACPSession(agentID, want))
+	require.NoError(t, saveACPSession(machineID, agentID, want))
 
-	got, err = loadACPSession(agentID)
+	got, err = loadACPSession(machineID, agentID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, want.SessionID, got.SessionID)
 	assert.Equal(t, want.Fingerprint, got.Fingerprint)
 	assert.Equal(t, want.CreatedAt, got.CreatedAt)
 
-	// The file is written under the per-agent dir, sibling of command-state.json.
-	info, statErr := os.Stat(filepath.Join(os.Getenv("HOME"), ".laelia", agentID, "acp-session.json"))
+	// The file is written under the per-machine/per-agent dir, sibling of
+	// command-state.json.
+	info, statErr := os.Stat(filepath.Join(os.Getenv("HOME"), ".laelia", machineID, agentID, "acp-session.json"))
 	require.NoError(t, statErr)
 	assert.True(t, info.Mode().Perm() <= 0o600, "session file must be owner-only")
 
-	clearACPSession(agentID)
-	got, err = loadACPSession(agentID)
+	clearACPSession(machineID, agentID)
+	got, err = loadACPSession(machineID, agentID)
 	require.NoError(t, err)
 	assert.Nil(t, got, "clear must drop the session back to cold-start")
 
 	// Clearing a missing file is a no-op, not an error.
-	clearACPSession(agentID)
+	clearACPSession(machineID, agentID)
 }
 
 // TestTurnPromptText_ColdVsWarm guards the core token-saving invariant:

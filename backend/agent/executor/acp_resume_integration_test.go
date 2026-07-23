@@ -33,12 +33,15 @@ func TestACPExecutorColdThenWarmResumesSession(t *testing.T) {
 	// One workspace for both turns so the fingerprint (provider|model|cwd)
 	// matches and turn 2 actually hits the resume path.
 	workspace := t.TempDir()
-	const agentID = "test-agent-resume-integration"
-	// The session file lands in the real ~/.laelia/<agentID>/ (HOME is left alone
-	// so opencode can find its API key/config). Clear it before and after so
-	// prior runs cannot interfere and we leave nothing behind.
-	clearACPSession(agentID)
-	t.Cleanup(func() { clearACPSession(agentID) })
+	const (
+		machineID = "test-machine-resume-integration"
+		agentID   = "test-agent-resume-integration"
+	)
+	// The session file lands in the real ~/.laelia/<machineID>/<agentID>/ (HOME
+	// is left alone so opencode can find its API key/config). Clear it before and
+	// after so prior runs cannot interfere and we leave nothing behind.
+	clearACPSession(machineID, agentID)
+	t.Cleanup(func() { clearACPSession(machineID, agentID) })
 
 	// Cold turn: seed a file with the secret, ask the agent to read it back. This
 	// is a concrete task opencode finishes in seconds (the init prompt's
@@ -51,6 +54,7 @@ func TestACPExecutorColdThenWarmResumesSession(t *testing.T) {
 	coldRuntime, err := NewACP(Request{
 		CommandID:      "resume-cold",
 		AgentID:        agentID,
+		MachineID:      machineID,
 		TurnPrompt:     "Read the file secret.txt in the current workspace and reply with exactly its contents. Do not add quotes or any extra words.",
 		WorkingDir:     workspace,
 		TimeoutSeconds: 120,
@@ -73,6 +77,7 @@ func TestACPExecutorColdThenWarmResumesSession(t *testing.T) {
 	warmRuntime, err := NewACP(Request{
 		CommandID:      "resume-warm",
 		AgentID:        agentID,
+		MachineID:      machineID,
 		TurnPrompt:     "Reply with exactly the single secret word I told you earlier in this conversation, nothing else. Do not read any file.",
 		WorkingDir:     workspace,
 		TimeoutSeconds: 120,
@@ -131,7 +136,10 @@ func toolCallEventBlob(ev Event) string {
 // The full provider round-trip is covered by TestACPExecutorColdThenWarmResumesSession.
 func TestACPExecutorResumeFallbackToColdOnBadSession(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	const agentID = "test-agent-resume-fallback"
+	const (
+		machineID = "test-machine-resume-fallback"
+		agentID   = "test-agent-resume-fallback"
+	)
 	const fakeProvider = "fake-provider"
 	const fakeModel = "fake-model"
 	workspace := t.TempDir()
@@ -139,27 +147,27 @@ func TestACPExecutorResumeFallbackToColdOnBadSession(t *testing.T) {
 	// Persist a bogus session id with a matching fingerprint so the executor
 	// will attempt ResumeSession (and fail), then fall back to cold.
 	fp := sessionFingerprint(fakeProvider, fakeModel, workspace)
-	require.NoError(t, saveACPSession(agentID, &acpSessionState{SessionID: "dead-session-id", Fingerprint: fp, CreatedAt: 1}))
+	require.NoError(t, saveACPSession(machineID, agentID, &acpSessionState{SessionID: "dead-session-id", Fingerprint: fp, CreatedAt: 1}))
 
 	// The executor would try to spawn a real subprocess for fakeProvider, which
 	// does not exist. Instead of driving run(), assert the precondition the
 	// fallback relies on: the persisted state is what resume would load, and
 	// clearACPSession (the fallback's recovery call) drops it.
-	got, err := loadACPSession(agentID)
+	got, err := loadACPSession(machineID, agentID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, "dead-session-id", got.SessionID)
 	assert.Equal(t, fp, got.Fingerprint)
 
-	clearACPSession(agentID)
-	got, err = loadACPSession(agentID)
+	clearACPSession(machineID, agentID)
+	got, err = loadACPSession(machineID, agentID)
 	require.NoError(t, err)
 	assert.Nil(t, got, "fallback must clear the dead session so the next turn cold-starts")
 
 	// And a fingerprint mismatch also forces cold: a config change must not
 	// resume a session the provider no longer recognizes.
-	require.NoError(t, saveACPSession(agentID, &acpSessionState{SessionID: "stale", Fingerprint: "old-fp", CreatedAt: 1}))
+	require.NoError(t, saveACPSession(machineID, agentID, &acpSessionState{SessionID: "stale", Fingerprint: "old-fp", CreatedAt: 1}))
 	mismatch := sessionFingerprint(fakeProvider, "different-model", workspace)
 	assert.NotEqual(t, "old-fp", mismatch, "different model must yield a different fingerprint")
-	clearACPSession(agentID)
+	clearACPSession(machineID, agentID)
 }

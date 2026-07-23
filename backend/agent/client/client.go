@@ -1,3 +1,10 @@
+// Package client hosts the machine app's manager-facing client. A machine
+// authenticates once (machine registration → access + refresh token) and then
+// hosts many agents: it holds one MachineChannel control stream for roster
+// changes + provider discovery, and opens one AgentChannel per assigned agent
+// for that agent's drain loop. All agents share the machine's access token and
+// a single local daemon socket; the daemon routes each CLI call to the agent
+// named in LAELIA_AGENT.
 package client
 
 import (
@@ -23,10 +30,8 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/Ranxy/laelia/backend/agent/chattools"
 	"github.com/Ranxy/laelia/backend/agent/credential"
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
-	"github.com/Ranxy/laelia/backend/agent/executor"
 	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
@@ -37,11 +42,15 @@ const (
 	defaultConnectTimeout    = 30 * time.Second
 	defaultRetryMaxWait      = 1 * time.Minute
 	defaultRetryBaseWait     = 2 * time.Second
-	// heartbeatTimeout bounds a single Heartbeat RPC. The agent's liveness
-	// must not stall on a manager that accepts the connection but never
-	// replies; a per-call timeout makes heartbeat failure (not the peer's
-	// tcp keepalive) the detection signal.
+	// heartbeatTimeout bounds a single Heartbeat RPC. The machine's liveness
+	// must not stall on a manager that accepts the connection but never replies;
+	// a per-call timeout makes heartbeat failure (not the peer's tcp keepalive)
+	// the detection signal.
 	heartbeatTimeout = 10 * time.Second
+	// machinePingInterval is the MachineChannel keepalive cadence. The manager
+	// pings back (Pong) for liveness correlation; a dead control stream surfaces
+	// to the Run loop alongside heartbeat failure so the whole machine reconnects.
+	machinePingInterval = 15 * time.Second
 )
 
 type ConnState int
@@ -53,31 +62,39 @@ const (
 	StateDisconnecting
 )
 
-type Client struct {
-	managerURL   string
-	httpClient   *http.Client
-	streamClient *http.Client
-	client       v1connect.AgentServiceClient
-	credential   *credential.Manager
-	mu           sync.RWMutex
+// MachineClient is the machine app's manager client. One instance per machine
+// process; it owns the machine auth credentials, the shared local daemon, the
+// MachineChannel control stream, and the set of per-agent runners.
+type MachineClient struct {
+	managerURL     string
+	httpClient     *http.Client
+	streamClient   *http.Client
+	machineClient  v1connect.MachineServiceClient
+	credential     *credential.Manager
+	machineID      string // bare uuid, parsed from the registration token
+	binaryDir      string
+	daemon         *daemonsrv.Server
+	backoff        *ExponentialBackoff
+	machineVersion string
 
+	mu          sync.RWMutex
 	connState   ConnState
 	sessionID   string
 	serverNonce string
 	accessToken string
-	backoff     *ExponentialBackoff
-	cmdStream   *commandStream
-	acpConfig   *executor.ACPConfig
-	daemon      *daemonsrv.Server
-	agentName   string
-	// discoveredProviders is the cached result of probing the host for
-	// installed LLM agent providers + their models. Refreshed once at startup
-	// and on demand via the bidi DiscoverProviders control message.
+
+	// discoveredProviders is the cached result of probing the host for installed
+	// LLM agent providers + their models. Reported in MachineInfo on connect and
+	// re-probed on demand via the MachineChannel DiscoverProviders control
+	// message. Machine-scoped: every hosted agent selects from this list.
 	discoveredProviders []provider.Discovered
 	discoveredAt        time.Time
-	// resourceID is the agent's stable server-assigned UUID, parsed from the
-	// bootstrap token. It keys the per-agent working dir and local state file.
-	resourceID string
+
+	// runners is the live set of per-agent drain loops, keyed by bare agent id.
+	// The MachineChannel receive pump mutates this on AgentAssignment /
+	// RemoveAgent / ReloadAgentAssignment. Guarded by runnersMu.
+	runnersMu sync.Mutex
+	runners   map[string]*agentRunner
 }
 
 type ExponentialBackoff struct {
@@ -105,11 +122,12 @@ func (eb *ExponentialBackoff) Reset() {
 	eb.attempt = 0
 }
 
-func New(managerURL, token string, insecure bool, allowHTTP bool, agentName string) (*Client, error) {
+// New creates a MachineClient. token is the machine registration token printed
+// by CreateMachine; its JWT sub carries the machine's resource id, which keys
+// the on-disk refresh-token file (~/.laelia/machine-token-<id>) and the daemon
+// socket dir (~/.laelia/<id>/).
+func New(managerURL, token string, insecure bool, allowHTTP bool) (*MachineClient, error) {
 	managerURL = strings.TrimRight(managerURL, "/")
-
-	// ACP config is always server-provided on connect (handleServerACPConfig).
-	var acpConfig *executor.ACPConfig
 
 	if strings.HasPrefix(managerURL, "http://") {
 		if !allowHTTP {
@@ -118,17 +136,18 @@ func New(managerURL, token string, insecure bool, allowHTTP bool, agentName stri
 		slog.Warn("plain HTTP connection enabled, traffic will not be encrypted")
 	}
 
-	tokenDir := filepath.Join(os.Getenv("HOME"), ".laelia")
-	resourceID, err := parseResourceIDFromBootstrapToken(token)
+	machineID, err := parseResourceIDFromBootstrapToken(token)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse agent identity from bootstrap token")
+		return nil, errors.Wrap(err, "failed to parse machine identity from registration token")
 	}
-	tokenFile := filepath.Join(tokenDir, "agent-token-"+resourceID)
+	tokenDir := filepath.Join(os.Getenv("HOME"), ".laelia")
+	tokenFile := filepath.Join(tokenDir, "machine-token-"+machineID)
 	httpClient := &http.Client{Timeout: defaultConnectTimeout}
 
-	// Separate HTTP client for the bidi command stream: no global timeout
-	// (the stream is long-lived), but explicit HTTP/2 support to ensure
-	// gRPC bidi streams work through proxies and TLS terminators.
+	// Separate HTTP client for the bidi streams (MachineChannel + each
+	// AgentChannel): no global timeout (the streams are long-lived), but
+	// explicit HTTP/2 support so gRPC bidi works through proxies and TLS
+	// terminators.
 	streamClient := &http.Client{}
 
 	if strings.HasPrefix(managerURL, "https://") {
@@ -136,13 +155,7 @@ func New(managerURL, token string, insecure bool, allowHTTP bool, agentName stri
 			MinVersion:         tls.VersionTLS13,
 			InsecureSkipVerify: insecure,
 		}
-		httpClient.Transport = &http.Transport{
-			TLSClientConfig: tlsCfg,
-		}
-		// Separate transport for the bidi command stream:
-		// - ForceAttemptHTTP2 ensures gRPC bidi streams work through proxies
-		// - ResponseHeaderTimeout bounds only the initial handshake, not the stream
-		// - No http.Client.Timeout so the long-lived stream is not killed prematurely
+		httpClient.Transport = &http.Transport{TLSClientConfig: tlsCfg}
 		streamClient.Transport = &http.Transport{
 			TLSClientConfig:       tlsCfg,
 			ForceAttemptHTTP2:     true,
@@ -150,22 +163,30 @@ func New(managerURL, token string, insecure bool, allowHTTP bool, agentName stri
 		}
 	}
 
-	client := v1connect.NewAgentServiceClient(httpClient, managerURL)
+	binaryDir := ""
+	if exe, err := os.Executable(); err == nil {
+		binaryDir = filepath.Dir(exe)
+	}
 
-	return &Client{
-		managerURL:   managerURL,
-		httpClient:   httpClient,
-		streamClient: streamClient,
-		client:       client,
-		credential:   credential.New(tokenFile, token),
-		backoff:      NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
-		acpConfig:    acpConfig,
-		agentName:    agentName,
-		resourceID:   resourceID,
+	return &MachineClient{
+		managerURL:     managerURL,
+		httpClient:     httpClient,
+		streamClient:   streamClient,
+		machineClient:  v1connect.NewMachineServiceClient(httpClient, managerURL),
+		credential:     credential.New(tokenFile, token),
+		machineID:      machineID,
+		binaryDir:      binaryDir,
+		backoff:        NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
+		runners:        make(map[string]*agentRunner),
+		machineVersion: "0.2.0",
 	}, nil
 }
 
-func (c *Client) Connect(ctx context.Context, info *v1pb.AgentInfo) error {
+// Connect authenticates the machine. It first tries the persisted refresh
+// token (machine access token), falling back to the single-use registration
+// token. On success it stores the new credentials and spawns a runner for
+// every agent in the response's assigned_agents list.
+func (c *MachineClient) Connect(ctx context.Context, info *v1pb.MachineInfo) error {
 	c.mu.Lock()
 	c.connState = StateConnecting
 	c.mu.Unlock()
@@ -176,30 +197,27 @@ func (c *Client) Connect(ctx context.Context, info *v1pb.AgentInfo) error {
 	if refreshToken != "" {
 		refreshResp, err := c.refreshToken(ctx, refreshToken, fingerprint)
 		if err != nil {
-			slog.Warn("refresh token failed, falling back to bootstrap token", "error", err)
+			slog.Warn("refresh token failed, falling back to registration token", "error", err)
 		} else {
+			c.mu.Lock()
 			c.accessToken = refreshResp.AccessToken
+			c.mu.Unlock()
 			c.credential.SaveRefreshToken(refreshResp.RefreshToken)
 
-			connectResp, err := c.connectWithAccessToken(ctx, info, fingerprint)
+			resp, err := c.connectWithAccessToken(ctx, info, fingerprint)
 			if err != nil {
 				slog.Warn("connect with refreshed token failed, falling back", "error", err)
 			} else {
-				c.mu.Lock()
-				c.connState = StateConnected
-				c.sessionID = connectResp.SessionId
-				c.serverNonce = connectResp.NextNonce
-				c.mu.Unlock()
-				c.backoff.Reset()
-				c.handleServerACPConfig(connectResp)
-				slog.Info("connected to manager via refresh token")
+				c.applyConnectResponse(resp)
+				slog.Info("connected to manager via refresh token", "agents", len(resp.AssignedAgents))
+				c.spawnAssignedAgents(ctx, resp.AssignedAgents)
 				return nil
 			}
 		}
 	}
 
-	bootstrapToken := c.credential.BootstrapToken()
-	resp, err := c.connectWithBootstrapToken(ctx, bootstrapToken, info, fingerprint)
+	registrationToken := c.credential.BootstrapToken()
+	resp, err := c.connectWithRegistrationToken(ctx, registrationToken, info, fingerprint)
 	if err != nil {
 		c.mu.Lock()
 		c.connState = StateDisconnected
@@ -207,57 +225,85 @@ func (c *Client) Connect(ctx context.Context, info *v1pb.AgentInfo) error {
 		return errors.Wrapf(err, "failed to connect to manager")
 	}
 
-	c.accessToken = resp.AccessToken
-	c.credential.SaveRefreshToken(resp.RefreshToken)
-	c.mu.Lock()
-	c.connState = StateConnected
-	c.sessionID = resp.SessionId
-	c.serverNonce = resp.NextNonce
-	c.mu.Unlock()
-	c.backoff.Reset()
-	c.handleServerACPConfig(resp)
-	slog.Info("connected to manager via bootstrap token")
+	c.applyConnectResponse(resp)
+	slog.Info("connected to manager via registration token", "agents", len(resp.AssignedAgents))
+	c.spawnAssignedAgents(ctx, resp.AssignedAgents)
 	return nil
 }
 
-func (c *Client) handleServerACPConfig(connectResp *v1pb.ConnectAgentResponse) {
-	cfg := executor.BuildACPConfig(connectResp.AcpConfig, c.resourceID)
-	if cfg == nil {
-		// Agent not configured yet (no executable). Stay inert until the admin
-		// sets one via UpdateAgentACPConfig; the next connect will pick it up.
-		c.mu.Lock()
-		c.acpConfig = nil
-		c.mu.Unlock()
-		return
-	}
-	if err := os.MkdirAll(cfg.WorkingDir, 0o700); err != nil {
-		slog.Warn("failed to create agent working dir", "dir", cfg.WorkingDir, "error", err)
-		return
-	}
+// applyConnectResponse records the session + access token from a successful
+// ConnectMachine. The refresh token is persisted by the caller via the
+// credential manager.
+func (c *MachineClient) applyConnectResponse(resp *v1pb.ConnectMachineResponse) {
 	c.mu.Lock()
-	c.acpConfig = cfg
+	c.connState = StateConnected
+	c.sessionID = resp.SessionId
+	c.accessToken = resp.AccessToken
 	c.mu.Unlock()
-	slog.Info("loaded ACP config from server", "workingDir", cfg.WorkingDir)
+	c.backoff.Reset()
 }
 
-func (c *Client) Heartbeat(ctx context.Context) error {
+func (c *MachineClient) connectWithRegistrationToken(ctx context.Context, registrationToken string, info *v1pb.MachineInfo, fingerprint string) (*v1pb.ConnectMachineResponse, error) {
+	req := connect.NewRequest(&v1pb.ConnectMachineRequest{
+		RegistrationToken: registrationToken,
+		Info:              info,
+		Fingerprint:       fingerprint,
+	})
+	resp, err := c.machineClient.ConnectMachine(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	c.credential.SaveRefreshToken(resp.Msg.RefreshToken)
+	return resp.Msg, nil
+}
+
+func (c *MachineClient) connectWithAccessToken(ctx context.Context, info *v1pb.MachineInfo, fingerprint string) (*v1pb.ConnectMachineResponse, error) {
+	c.mu.RLock()
+	token := c.accessToken
+	c.mu.RUnlock()
+
+	req := connect.NewRequest(&v1pb.ConnectMachineRequest{
+		Info:        info,
+		Fingerprint: fingerprint,
+	})
+	req.Header().Set("Authorization", "Bearer "+token)
+
+	resp, err := c.machineClient.ConnectMachine(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	c.credential.SaveRefreshToken(resp.Msg.RefreshToken)
+	return resp.Msg, nil
+}
+
+func (c *MachineClient) refreshToken(ctx context.Context, refreshToken, fingerprint string) (*v1pb.RefreshMachineTokenResponse, error) {
+	req := connect.NewRequest(&v1pb.RefreshMachineTokenRequest{
+		RefreshToken: refreshToken,
+		Fingerprint:  fingerprint,
+	})
+	resp, err := c.machineClient.RefreshMachineToken(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Msg, nil
+}
+
+func (c *MachineClient) Heartbeat(ctx context.Context) error {
 	c.mu.RLock()
 	sessionID := c.sessionID
 	nonce := c.serverNonce
 	token := c.accessToken
 	c.mu.RUnlock()
 
-	req := connect.NewRequest(&v1pb.AgentHeartbeatRequest{
+	req := connect.NewRequest(&v1pb.MachineHeartbeatRequest{
 		SessionId:     sessionID,
 		PreviousNonce: nonce,
 	})
 	req.Header().Set("Authorization", "Bearer "+token)
 
-	// Per-call timeout: a hung manager must not stall the heartbeat ticker
-	// (and thus liveness detection) until the long-lived ctx is cancelled.
 	hbCtx, cancel := context.WithTimeout(ctx, heartbeatTimeout)
 	defer cancel()
-	resp, err := c.client.AgentHeartbeat(hbCtx, req)
+	resp, err := c.machineClient.MachineHeartbeat(hbCtx, req)
 	if err != nil {
 		return err
 	}
@@ -268,60 +314,58 @@ func (c *Client) Heartbeat(ctx context.Context) error {
 		c.accessToken = resp.Msg.AccessToken
 	}
 	c.mu.Unlock()
-
 	return nil
 }
 
-func (c *Client) Disconnect(ctx context.Context) error {
+func (c *MachineClient) Disconnect(ctx context.Context) error {
 	c.mu.RLock()
 	sessionID := c.sessionID
 	token := c.accessToken
 	c.mu.RUnlock()
 
-	req := connect.NewRequest(&v1pb.AgentDisconnectRequest{
+	req := connect.NewRequest(&v1pb.MachineDisconnectRequest{
 		SessionId: sessionID,
 		Reason:    "shutdown",
 	})
 	req.Header().Set("Authorization", "Bearer "+token)
 
-	_, err := c.client.AgentDisconnect(ctx, req)
+	_, err := c.machineClient.MachineDisconnect(ctx, req)
 
-	// Keep the persisted refresh token. The bootstrap token is single-use
-	// (CONSUMED on the first successful connect), so the refresh token is the
-	// only credential that can reconnect after a clean restart or a transient
-	// stream/heartbeat failure. Wiping it here left the agent with nothing but
-	// the already-consumed bootstrap token, so every reconnect failed with
-	// "bootstrap token is not active". The on-disk token is always the latest
-	// active one (SaveRefreshToken overwrites it on each rotation); permanent
-	// decommission is handled server-side via RotateAgentToken/RevokeAgentToken,
-	// which revoke the whole family and bump the token version, making any
-	// lingering on-disk token useless.
+	// Keep the persisted refresh token: the registration token is single-use
+	// (consumed on first connect), so the refresh token is the only credential
+	// that can reconnect after a restart or transient failure. Permanent
+	// decommission is handled server-side via Rotate/RevokeMachineToken, which
+	// revoke the family and bump the token version.
 	c.mu.Lock()
 	c.connState = StateDisconnected
 	c.mu.Unlock()
-
 	return err
 }
 
-func (c *Client) Hello(ctx context.Context) (*v1pb.HelloResponse, error) {
+func (c *MachineClient) Hello(ctx context.Context) (*v1pb.HelloResponse, error) {
+	// Hello is on AgentService; reuse a throwaway client to probe the manager.
+	agentClient := v1connect.NewAgentServiceClient(c.httpClient, c.managerURL)
 	req := connect.NewRequest(&v1pb.HelloRequest{})
-	resp, err := c.client.Hello(ctx, req)
+	resp, err := agentClient.Hello(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	return resp.Msg, nil
 }
 
-func (c *Client) State() ConnState {
+func (c *MachineClient) State() ConnState {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.connState
 }
 
-func (c *Client) Run(ctx context.Context) error {
-	slog.Info("connecting to manager", "url", c.managerURL)
+// Run is the machine app's main loop: start the shared daemon, probe providers,
+// then repeatedly connect → open the MachineChannel control stream + heartbeat
+// → tear down and reconnect on death. It returns only when ctx is cancelled.
+func (c *MachineClient) Run(ctx context.Context) error {
+	slog.Info("connecting to manager", "url", c.managerURL, "machineID", c.machineID)
 
-	daemonSrv, err := daemonsrv.New(c.managerURL, c.agentName, c.resourceID, func() string {
+	daemonSrv, err := daemonsrv.New(c.managerURL, c.machineID, func() string {
 		c.mu.RLock()
 		defer c.mu.RUnlock()
 		return c.accessToken
@@ -335,37 +379,9 @@ func (c *Client) Run(ctx context.Context) error {
 	c.daemon = daemonSrv
 	defer daemonSrv.Stop()
 
-	binaryDir := ""
-	if exe, err := os.Executable(); err == nil {
-		binaryDir = filepath.Dir(exe)
-	}
-
-	c.cmdStream = newCommandStream(c.streamClient, c.managerURL, daemonSrv.SocketPath(), daemonSrv.SessionToken(), binaryDir, c.agentName, c.resourceID)
-	c.cmdStream.getToken = func() string {
-		c.mu.RLock()
-		defer c.mu.RUnlock()
-		return c.accessToken
-	}
-	c.cmdStream.getSessID = func() string {
-		c.mu.RLock()
-		defer c.mu.RUnlock()
-		return c.sessionID
-	}
-	c.cmdStream.getAcpConfig = func() *executor.ACPConfig {
-		c.mu.RLock()
-		defer c.mu.RUnlock()
-		return c.acpConfig
-	}
-	c.cmdStream.refreshProviders = func(ctx context.Context) []provider.Discovered {
-		return c.refreshProviders(ctx)
-	}
-	c.cmdStream.buildTurnBatch = func(ctx context.Context) (string, error) {
-		return chattools.BuildTurnBatch(ctx, daemonSrv.BatchDeps())
-	}
-
 	// Probe the host once for installed LLM agent providers + models so the
-	// first AgentInfo report carries them. On-demand re-probing is driven by
-	// the bidi DiscoverProviders control message (see command_stream).
+	// first MachineInfo report carries them. On-demand re-probing is driven by
+	// the MachineChannel DiscoverProviders control message.
 	discoverCtx, discoverCancel := context.WithTimeout(ctx, 2*time.Minute)
 	c.refreshProviders(discoverCtx)
 	discoverCancel()
@@ -373,19 +389,14 @@ func (c *Client) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Info("agent stopping")
-			disconnectCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			_ = c.Disconnect(disconnectCtx)
-			cancel()
+			c.shutdown()
 			return nil
 		default:
 		}
 
-		// Recompute AgentInfo each iteration so Capability reflects the latest
-		// AcpConfig (the manager may update it on a reconnect via
-		// handleServerACPConfig). Computing it once before the loop left
-		// Capability stale for the agent's whole lifetime.
-		info := c.collectAgentInfo()
+		// Recompute MachineInfo each iteration so Capability reflects the latest
+		// provider probe.
+		info := c.collectMachineInfo()
 
 		if err := c.Connect(ctx, info); err != nil {
 			slog.Error("connect failed", "error", err)
@@ -395,18 +406,10 @@ func (c *Client) Run(ctx context.Context) error {
 			continue
 		}
 
-		cmdCtx, cmdCancel := context.WithCancel(ctx)
-		// Death fuse: the command stream is the authority on whether the agent
-		// can actually receive work. The bidi stream and the heartbeat are
-		// separate HTTP/2 streams, so a permanently dead command stream can
-		// coexist with a healthy heartbeat — leaving the agent "Connected" but
-		// deaf (never receiving BeginSession/Cancel/Permission). Start returns
-		// its terminal error here (it no longer retries internally), and the
-		// heartbeat loop watches streamErr to tear down and reconnect the whole
-		// agent connection instead of going deaf.
+		ctrlCtx, ctrlCancel := context.WithCancel(ctx)
 		streamErr := make(chan error, 1)
 		go func() {
-			if err := c.cmdStream.Start(cmdCtx); err != nil {
+			if err := c.runControlStream(ctrlCtx, daemonSrv); err != nil {
 				streamErr <- err
 			}
 		}()
@@ -417,23 +420,17 @@ func (c *Client) Run(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				slog.Info("agent stopping")
 				ticker.Stop()
-				cmdCancel()
-				disconnectCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				_ = c.Disconnect(disconnectCtx)
-				cancel()
+				ctrlCancel()
+				c.shutdown()
 				return nil
 			case err := <-streamErr:
-				slog.Warn("command stream died while heartbeat healthy, reconnecting", "error", err)
-				c.mu.Lock()
-				c.connState = StateDisconnected
-				c.mu.Unlock()
+				slog.Warn("machine control stream died while heartbeat healthy, reconnecting", "error", err)
 				ticker.Stop()
-				cmdCancel()
-				disconnectCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				_ = c.Disconnect(disconnectCtx)
-				cancel()
+				ctrlCancel()
+				c.teardownRunners()
+				c.markDisconnected()
+				c.disconnectWithTimeout()
 				if err := c.backoff.Wait(ctx); err != nil {
 					return err
 				}
@@ -441,11 +438,10 @@ func (c *Client) Run(ctx context.Context) error {
 			case <-ticker.C:
 				if err := c.Heartbeat(ctx); err != nil {
 					slog.Error("heartbeat failed", "error", err)
-					c.mu.Lock()
-					c.connState = StateDisconnected
-					c.mu.Unlock()
 					ticker.Stop()
-					cmdCancel()
+					ctrlCancel()
+					c.teardownRunners()
+					c.markDisconnected()
 					break heartbeatLoop
 				}
 				slog.Debug("heartbeat sent")
@@ -454,87 +450,57 @@ func (c *Client) Run(ctx context.Context) error {
 	}
 }
 
-func (c *Client) connectWithBootstrapToken(ctx context.Context, bootstrapToken string, info *v1pb.AgentInfo, fingerprint string) (*v1pb.ConnectAgentResponse, error) {
-	req := connect.NewRequest(&v1pb.ConnectAgentRequest{
-		BootstrapToken: bootstrapToken,
-		Info:           info,
-		Fingerprint:    fingerprint,
-	})
-	resp, err := c.client.ConnectAgent(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return resp.Msg, nil
+// shutdown stops runners and notifies the manager of a graceful disconnect.
+func (c *MachineClient) shutdown() {
+	slog.Info("machine stopping")
+	c.teardownRunners()
+	c.markDisconnected()
+	disconnectCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_ = c.Disconnect(disconnectCtx)
+	cancel()
 }
 
-func (c *Client) connectWithAccessToken(ctx context.Context, info *v1pb.AgentInfo, fingerprint string) (*v1pb.ConnectAgentResponse, error) {
-	c.mu.RLock()
-	token := c.accessToken
-	c.mu.RUnlock()
-
-	req := connect.NewRequest(&v1pb.ConnectAgentRequest{
-		Info:        info,
-		Fingerprint: fingerprint,
-	})
-	req.Header().Set("Authorization", "Bearer "+token)
-
-	resp, err := c.client.ConnectAgent(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return resp.Msg, nil
+func (c *MachineClient) markDisconnected() {
+	c.mu.Lock()
+	c.connState = StateDisconnected
+	c.mu.Unlock()
 }
 
-func (c *Client) refreshToken(ctx context.Context, refreshToken string, fingerprint string) (*v1pb.RefreshAgentTokenResponse, error) {
-	req := connect.NewRequest(&v1pb.RefreshAgentTokenRequest{
-		RefreshToken: refreshToken,
-		Fingerprint:  fingerprint,
-	})
-	resp, err := c.client.RefreshAgentToken(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return resp.Msg, nil
+func (c *MachineClient) disconnectWithTimeout() {
+	disconnectCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_ = c.Disconnect(disconnectCtx)
+	cancel()
 }
 
-func computeFingerprint(info *v1pb.AgentInfo) string {
+func computeFingerprint(info *v1pb.MachineInfo) string {
 	data := fmt.Sprintf("%s:%s:%s", info.Hostname, info.Os, info.Arch)
 	h := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(h[:])[:16]
 }
 
-// acpConfigSnapshot returns the current ACP config under the read lock so
-// AgentInfo can be recomputed from a consistent snapshot.
-func (c *Client) acpConfigSnapshot() *executor.ACPConfig {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.acpConfig
-}
-
-func (c *Client) collectAgentInfo() *v1pb.AgentInfo {
+func (c *MachineClient) collectMachineInfo() *v1pb.MachineInfo {
 	hostname, _ := os.Hostname()
 	c.mu.RLock()
-	acpCfg := c.acpConfig
 	providers := c.discoveredProviders
 	discoveredAt := c.discoveredAt
 	c.mu.RUnlock()
 
-	info := &v1pb.AgentInfo{
+	return &v1pb.MachineInfo{
 		Hostname:           hostname,
 		Os:                 runtime.GOOS,
 		Arch:               runtime.GOARCH,
-		Version:            "0.2.0",
+		Version:            c.machineVersion,
 		Ip:                 getOutboundIP(),
-		Capability:         acpCfg.Capability(),
 		AvailableProviders: discoveredToProto(providers, discoveredAt),
 	}
-	return info
 }
 
 // refreshProviders probes the host for installed LLM agent providers and their
-// models, caching the result so subsequent AgentInfo reports carry it without
-// re-spawning. Safe to call repeatedly; the cache is replaced atomically.
-func (c *Client) refreshProviders(ctx context.Context) []provider.Discovered {
+// models, caching the result so subsequent MachineInfo reports carry it without
+// re-spawning. Safe to call repeatedly; the cache is replaced atomically. The
+// returned slice lets the MachineChannel reply to DiscoverProviders with the
+// fresh list in one probe.
+func (c *MachineClient) refreshProviders(ctx context.Context) []provider.Discovered {
 	discovered := provider.Default().Discover(ctx)
 	c.mu.Lock()
 	c.discoveredProviders = discovered
@@ -553,7 +519,7 @@ func (c *Client) refreshProviders(ctx context.Context) []provider.Discovered {
 }
 
 // discoveredToProto converts the internal discovery result to the proto form
-// reported in AgentInfo.available_providers.
+// reported in MachineInfo.available_providers.
 func discoveredToProto(in []provider.Discovered, at time.Time) []*v1pb.AgentProviderInfo {
 	if len(in) == 0 {
 		return nil
@@ -605,11 +571,20 @@ func parseResourceIDFromBootstrapToken(tokenStr string) (string, error) {
 	claims := jwt.MapClaims{}
 	_, _, err := parser.ParseUnverified(tokenStr, claims)
 	if err != nil {
-		return "", errors.Wrap(err, "invalid bootstrap token format")
+		return "", errors.Wrap(err, "invalid registration token format")
 	}
 	sub, ok := claims["sub"].(string)
 	if !ok || sub == "" {
-		return "", errors.New("bootstrap token missing sub claim")
+		return "", errors.New("registration token missing sub claim")
 	}
 	return sub, nil
+}
+
+// bareAgentID strips the agents/ prefix from a full agent resource name,
+// returning the bare uuid. A value that is already bare is returned unchanged.
+func bareAgentID(agentName string) string {
+	if i := strings.LastIndex(agentName, "/"); i >= 0 {
+		return agentName[i+1:]
+	}
+	return agentName
 }

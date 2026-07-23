@@ -410,7 +410,7 @@ func (e *ACPExecutor) run() {
 			},
 			Terminal: false,
 		},
-		ClientInfo: &acp.Implementation{Name: "laelia-agent", Version: "0.2.0"},
+		ClientInfo: &acp.Implementation{Name: "laelia-machine", Version: "0.2.0"},
 	})
 	if err != nil {
 		e.finishACPProcess(err)
@@ -436,7 +436,7 @@ func (e *ACPExecutor) run() {
 	fingerprint := sessionFingerprint(e.config.Provider, e.config.Model, e.workingDir)
 	resumed := false
 	var configOpts []acp.SessionConfigOption
-	if existing, loadErr := loadACPSession(e.request.AgentID); loadErr != nil {
+	if existing, loadErr := loadACPSession(e.request.MachineID, e.request.AgentID); loadErr != nil {
 		slog.Warn("failed to load persisted acp session state; cold-starting", "agent", e.request.AgentID, "error", loadErr)
 	} else if existing != nil && existing.SessionID != "" && existing.Fingerprint == fingerprint {
 		// opencode replays the prior conversation as session/update during this
@@ -455,7 +455,7 @@ func (e *ACPExecutor) run() {
 			// do not loop forever on a dead session — the cursor is the source of
 			// truth, so no message is lost, only the init prompt is re-sent.
 			slog.Warn("acp session resume failed; cold-starting", "agent", e.request.AgentID, "session_id", existing.SessionID, "error", resumeErr)
-			clearACPSession(e.request.AgentID)
+			clearACPSession(e.request.MachineID, e.request.AgentID)
 		} else {
 			e.sessionID = existing.SessionID
 			configOpts = resumeResp.ConfigOptions
@@ -491,7 +491,7 @@ func (e *ACPExecutor) run() {
 	// Persist the session id now that NewSession/ResumeSession has accepted it,
 	// so the next turn can resume even if the Prompt below fails — the cursor is
 	// the source of truth, so a re-prompt next turn is safe.
-	if saveErr := saveACPSession(e.request.AgentID, &acpSessionState{
+	if saveErr := saveACPSession(e.request.MachineID, e.request.AgentID, &acpSessionState{
 		SessionID:   e.sessionID,
 		Fingerprint: fingerprint,
 		CreatedAt:   time.Now().Unix(),

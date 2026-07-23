@@ -29,14 +29,11 @@ func TestAuthorize(t *testing.T) {
 	assert.Nil(t, s.authorize(r))
 }
 
-func TestDepsFallsBackToAgentResourceID(t *testing.T) {
-	s := &Server{agentResourceID: "default-agent"}
-	d := s.deps(Request{Agent: "", Command: "c"})
-	assert.Equal(t, "default-agent", d.Agent)
+func TestDepsRoutesByRequestAgent(t *testing.T) {
+	s := &Server{}
+	d := s.deps(Request{Agent: "agents/explicit", Command: "c"})
+	assert.Equal(t, "agents/explicit", d.Agent)
 	assert.Equal(t, "c", d.Command)
-
-	d = s.deps(Request{Agent: "explicit"})
-	assert.Equal(t, "explicit", d.Agent)
 }
 
 func TestAsChatError(t *testing.T) {

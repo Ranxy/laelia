@@ -13,15 +13,15 @@ import (
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
 
-// fakeAgentClient implements v1connect.AgentServiceClient by embedding the
-// interface (nil) and overriding only AgentHeartbeat. Other methods would
-// nil-panic, but Heartbeat only calls AgentHeartbeat.
-type fakeAgentClient struct {
-	v1connect.AgentServiceClient
-	heartbeatFn func(ctx context.Context, req *connect.Request[v1pb.AgentHeartbeatRequest]) (*connect.Response[v1pb.AgentHeartbeatResponse], error)
+// fakeMachineClient implements v1connect.MachineServiceClient by embedding the
+// interface (nil) and overriding only MachineHeartbeat. Other methods would
+// nil-panic, but Heartbeat only calls MachineHeartbeat.
+type fakeMachineClient struct {
+	v1connect.MachineServiceClient
+	heartbeatFn func(ctx context.Context, req *connect.Request[v1pb.MachineHeartbeatRequest]) (*connect.Response[v1pb.MachineHeartbeatResponse], error)
 }
 
-func (f *fakeAgentClient) AgentHeartbeat(ctx context.Context, req *connect.Request[v1pb.AgentHeartbeatRequest]) (*connect.Response[v1pb.AgentHeartbeatResponse], error) {
+func (f *fakeMachineClient) MachineHeartbeat(ctx context.Context, req *connect.Request[v1pb.MachineHeartbeatRequest]) (*connect.Response[v1pb.MachineHeartbeatResponse], error) {
 	return f.heartbeatFn(ctx, req)
 }
 
@@ -29,19 +29,19 @@ func (f *fakeAgentClient) AgentHeartbeat(ctx context.Context, req *connect.Reque
 // timeout: the Heartbeat RPC must run under a deadline bounded by
 // heartbeatTimeout, independent of the long-lived caller ctx. A manager that
 // accepts the connection but never replies must fail the heartbeat (and thus
-// trigger reconnect) within ~10s, rather than stalling until the agent's ctx
+// trigger reconnect) within ~10s, rather than stalling until the machine's ctx
 // is cancelled.
 func TestHeartbeat_PerCallTimeoutDetectsHungManager(t *testing.T) {
 	var gotCtx context.Context
-	fake := &fakeAgentClient{
-		heartbeatFn: func(ctx context.Context, _ *connect.Request[v1pb.AgentHeartbeatRequest]) (*connect.Response[v1pb.AgentHeartbeatResponse], error) {
+	fake := &fakeMachineClient{
+		heartbeatFn: func(ctx context.Context, _ *connect.Request[v1pb.MachineHeartbeatRequest]) (*connect.Response[v1pb.MachineHeartbeatResponse], error) {
 			gotCtx = ctx
 			// Return immediately; the assertion is on the ctx the RPC was
 			// invoked with, not on wall-clock blocking.
 			return nil, context.DeadlineExceeded
 		},
 	}
-	c := &Client{client: fake}
+	c := &MachineClient{machineClient: fake}
 
 	err := c.Heartbeat(context.Background())
 	require.Error(t, err)

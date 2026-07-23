@@ -40,39 +40,46 @@ const (
 	EnvCommand      = "LAELIA_COMMAND"
 )
 
-// Server is the local loopback daemon. It is constructed once per agent
-// process and lives for the whole agent lifetime.
+// Server is the local loopback daemon. A machine runs ONE daemon for all its
+// hosted agents: the socket lives at ~/.laelia/<machineID>/daemon.sock and the
+// daemon routes each request to the agent named in LAELIA_AGENT (injected into
+// every ACP subprocess). It is constructed once per machine process and lives
+// for the whole machine lifetime.
 type Server struct {
-	managerURL      string
-	agentResourceID string
-	getToken        func() string
-	httpClient      *http.Client
+	managerURL        string
+	machineResourceID string
+	getToken          func() string
+	httpClient        *http.Client
 
 	socketPath   string
 	sessionToken string
-	// tempDir is the agent's temp workspace for file upload/download. It is a
-	// "temp" subdir of the per-agent working dir, isolated from the agent's
-	// other working files. File commands confine all local paths to it.
+	// tempDir is the machine's temp workspace for file upload/download. It is a
+	// "temp" subdir of the per-machine working dir, shared by all agents on the
+	// machine. File commands confine all local paths to it.
 	tempDir string
 
 	listener   net.Listener
 	httpServer *http.Server
 
-	clientOnce sync.Once
-	client     v1connect.CommandServiceClient
+	// agentClients caches a per-agent CommandServiceClient. Each carries the
+	// live machine access token (Authorization) AND the X-Laelia-Agent header
+	// (agents/{agent}) so the manager can route a machine-token call to the
+	// agent the daemon is acting for. One daemon hosts many agents, so the
+	// client varies per agent even though the token is shared.
+	agentClientsMu sync.Mutex
+	agentClients   map[string]v1connect.CommandServiceClient
 }
 
 // New creates a daemon bound to a unix socket at
-// ~/.laelia/<resourceID>/daemon.sock. The caller must ensure the per-agent
-// working dir already exists (the client creates it on connect). getToken
-// returns the current agent access token (rotated by heartbeat).
-func New(managerURL, agentResourceID, resourceID string, getToken func() string, httpClient *http.Client) (*Server, error) {
+// ~/.laelia/<machineResourceID>/daemon.sock. getToken returns the current
+// machine access token (rotated by heartbeat), shared by every hosted agent.
+func New(managerURL, machineResourceID string, getToken func() string, httpClient *http.Client) (*Server, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, errors.Wrap(err, "resolve home dir")
 	}
-	socketPath := filepath.Join(home, ".laelia", resourceID, "daemon.sock")
-	tempDir := filepath.Join(home, ".laelia", resourceID, "temp")
+	socketPath := filepath.Join(home, ".laelia", machineResourceID, "daemon.sock")
+	tempDir := filepath.Join(home, ".laelia", machineResourceID, "temp")
 
 	token := make([]byte, 32)
 	if _, err := rand.Read(token); err != nil {
@@ -86,13 +93,14 @@ func New(managerURL, agentResourceID, resourceID string, getToken func() string,
 	slog.Debug("LAELIA_SESSION_TOKEN", slog.String("prefix", sessionToken[:8]), slog.String("sha256", sha256Prefix(sessionToken)))
 
 	return &Server{
-		managerURL:      managerURL,
-		agentResourceID: agentResourceID,
-		getToken:        getToken,
-		httpClient:      httpClient,
-		socketPath:      socketPath,
-		sessionToken:    sessionToken,
-		tempDir:         tempDir,
+		managerURL:        managerURL,
+		machineResourceID: machineResourceID,
+		getToken:          getToken,
+		httpClient:        httpClient,
+		socketPath:        socketPath,
+		sessionToken:      sessionToken,
+		tempDir:           tempDir,
+		agentClients:      make(map[string]v1connect.CommandServiceClient),
 	}, nil
 }
 
@@ -100,37 +108,69 @@ func (s *Server) SocketPath() string   { return s.socketPath }
 func (s *Server) SessionToken() string { return s.sessionToken }
 func (s *Server) TempDir() string      { return s.tempDir }
 
-// BatchDeps returns a Deps whose Client carries the live agent access token,
-// for in-process calls from the agent client's drain loop (the turn-batch
-// builder). Only the Client is meaningful for the read-only batch RPCs
-// (ListChannelUpdates, GetChannel, ListConversationMessages), which resolve
-// the caller from auth rather than the Deps.Agent/Command fields.
-func (s *Server) BatchDeps() chattools.Deps {
-	return chattools.Deps{Client: s.commandClient(), Agent: s.agentResourceID}
+// BatchDeps returns a Deps for the agent identified by agentBareID (the bare
+// agents/{id} tail), for in-process calls from that agent's drain loop (the
+// turn-batch builder). The Client carries the live machine access token and the
+// X-Laelia-Agent header (agents/<agentBareID>) so the manager resolves the
+// caller as that agent; Deps.Agent is the bare id chattools uses to build
+// agents/<id>/commands/<id> resource names. Each agent runner passes its own
+// agent id.
+func (s *Server) BatchDeps(agentBareID string) chattools.Deps {
+	return chattools.Deps{Client: s.agentClient(agentBareID), Agent: agentBareID}
 }
 
-// client builds (once) a CommandServiceClient that carries the live access
-// token on every call via an interceptor.
-func (s *Server) commandClient() v1connect.CommandServiceClient {
-	s.clientOnce.Do(func() {
-		s.client = v1connect.NewCommandServiceClient(
-			s.httpClient,
-			s.managerURL,
-			connect.WithInterceptors(s.authInterceptor()),
-		)
-	})
-	return s.client
+// agentClient returns a cached CommandServiceClient for the agent identified by
+// agentBareID (the bare uuid). Every call it makes carries the live machine
+// access token (Authorization) and the X-Laelia-Agent header (agents/<id>), so
+// the manager — which authenticates the machine token — can route the call to
+// this specific agent. One daemon hosts many agents, so the client varies per
+// agent even though the token is shared.
+func (s *Server) agentClient(agentBareID string) v1connect.CommandServiceClient {
+	s.agentClientsMu.Lock()
+	defer s.agentClientsMu.Unlock()
+	if s.agentClients == nil {
+		s.agentClients = make(map[string]v1connect.CommandServiceClient)
+	}
+	if c, ok := s.agentClients[agentBareID]; ok {
+		return c
+	}
+	c := v1connect.NewCommandServiceClient(
+		s.httpClient,
+		s.managerURL,
+		connect.WithInterceptors(s.authInterceptor(agentBareID)),
+	)
+	s.agentClients[agentBareID] = c
+	return c
 }
 
-func (s *Server) authInterceptor() connect.UnaryInterceptorFunc {
+// authInterceptor builds a unary interceptor that stamps every request with the
+// live machine access token and the X-Laelia-Agent header (agents/<agentBareID>)
+// for the given agent.
+func (s *Server) authInterceptor(agentBareID string) connect.UnaryInterceptorFunc {
 	return func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 			if token := s.getToken(); token != "" {
 				req.Header().Set("Authorization", "Bearer "+token)
 			}
+			if agentBareID != "" {
+				req.Header().Set("X-Laelia-Agent", agentResourceName(agentBareID))
+			}
 			return next(ctx, req)
 		}
 	}
+}
+
+// agentResourceName converts a bare agent id to its full resource name
+// (agents/<id>) as the manager's X-Laelia-Agent header expects. A value that is
+// already a full name is returned unchanged.
+func agentResourceName(agentBareID string) string {
+	if agentBareID == "" {
+		return ""
+	}
+	if strings.HasPrefix(agentBareID, "agents/") {
+		return agentBareID
+	}
+	return "agents/" + agentBareID
 }
 
 // Start binds the unix socket and serves HTTP/JSON in a background goroutine.
@@ -264,13 +304,16 @@ type Response struct {
 }
 
 func (s *Server) deps(r Request) chattools.Deps {
-	agent := r.Agent
-	if agent == "" {
-		agent = s.agentResourceID
-	}
+	// r.Agent is the agents/{id} the CLI set from LAELIA_AGENT; the executor
+	// injects it into every ACP subprocess, so it is always present for a
+	// well-formed drain session. The CommandServiceClient is routed per-agent
+	// (it stamps the X-Laelia-Agent header), and Deps.Agent is also set so the
+	// chattools layer can pass the caller identity in the request body. An
+	// empty value is passed through and fails server-side caller resolution
+	// rather than silently routing to a default.
 	return chattools.Deps{
-		Client:  s.commandClient(),
-		Agent:   agent,
+		Client:  s.agentClient(r.Agent),
+		Agent:   r.Agent,
 		Command: r.Command,
 	}
 }
@@ -280,7 +323,7 @@ func (s *Server) deps(r Request) chattools.Deps {
 func (s *Server) authorize(r *http.Request) *chattools.Error {
 	got := r.Header.Get("Authorization")
 	if got == "" {
-		return &chattools.Error{Code: "TOKEN_MISSING", Message: "no session token (LAELIA_SESSION_TOKEN unset)", NextAction: "Run inside a drain session started by `laelia-agent daemon`."}
+		return &chattools.Error{Code: "TOKEN_MISSING", Message: "no session token (LAELIA_SESSION_TOKEN unset)", NextAction: "Run inside a drain session started by `laelia-machine run`."}
 	}
 	if got != "Bearer "+s.sessionToken {
 		return &chattools.Error{Code: "TOKEN_INVALID", Message: "session token does not match this daemon", NextAction: "The daemon restarted with a new token; this should not happen mid-session."}
@@ -724,13 +767,13 @@ func (s *Server) handleAgentList(w http.ResponseWriter, r *http.Request) {
 }
 
 // ensureStaleSocket clears a leftover socket file only if nothing is listening
-// on it. If a process answers the dial, another daemon for this resource ID is
+// on it. If a process answers the dial, another daemon for this machine is
 // already running and we must not steal its socket.
 func (s *Server) ensureStaleSocket() error {
 	conn, err := net.DialTimeout("unix", s.socketPath, 500*time.Millisecond)
 	if err == nil {
 		_ = conn.Close()
-		return errors.Errorf("daemon socket %q is live; another laelia-agent daemon is already running for this agent", s.socketPath)
+		return errors.Errorf("daemon socket %q is live; another laelia-machine daemon is already running for this machine", s.socketPath)
 	}
 	// No listener: remove the stale file (or no-op if it is already gone) so
 	// the subsequent net.Listen succeeds.

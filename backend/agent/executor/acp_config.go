@@ -69,10 +69,11 @@ type ACPConfig struct {
 }
 
 // AgentWorkingDir returns the per-agent persistent working directory under
-// ~/.laelia/<agentID>/. The caller is responsible for creating it.
-func AgentWorkingDir(agentID string) string {
+// ~/.laelia/<machineID>/<agentID>/. A machine hosts many agents, so the machine
+// id namespaces each agent's state on a shared host. The caller creates it.
+func AgentWorkingDir(machineID, agentID string) string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".laelia", agentID)
+	return filepath.Join(home, ".laelia", machineID, agentID)
 }
 
 // BuildACPConfig resolves the user-configurable AgentACPConfig (provider,
@@ -83,12 +84,12 @@ func AgentWorkingDir(agentID string) string {
 // used as-is. It returns nil when the agent has not been configured yet
 // (neither a known provider nor an executable), which keeps the "not
 // configured" gating in NewACP and reports supports_acp=false via Capability().
-func BuildACPConfig(user *v1pb.AgentACPConfig, agentID string) *ACPConfig {
+func BuildACPConfig(user *v1pb.AgentACPConfig, machineID, agentID string) *ACPConfig {
 	if user == nil {
 		return nil
 	}
 
-	executable, args := resolvedCommand(user, agentID)
+	executable, args := resolvedCommand(user, machineID, agentID)
 	if executable == "" {
 		return nil
 	}
@@ -106,7 +107,7 @@ func BuildACPConfig(user *v1pb.AgentACPConfig, agentID string) *ACPConfig {
 		PersonaPrompt:        user.PersonaPrompt,
 		CustomEnv:            user.CustomEnv,
 		AllowEnv:             user.AllowEnv,
-		WorkingDir:           AgentWorkingDir(agentID),
+		WorkingDir:           AgentWorkingDir(machineID, agentID),
 		ReadTextFiles:        true,
 		WriteTextFiles:       true,
 		AutoApproveToolKinds: defaultAutoApproveToolKinds,
@@ -121,18 +122,18 @@ func BuildACPConfig(user *v1pb.AgentACPConfig, agentID string) *ACPConfig {
 // (looked up in the default registry) supplies its own launch command rooted
 // at the agent working directory; anything else (provider "custom", empty, or
 // unknown) falls back to the raw executable/args fields.
-func resolvedCommand(user *v1pb.AgentACPConfig, agentID string) (string, []string) {
+func resolvedCommand(user *v1pb.AgentACPConfig, machineID, agentID string) (string, []string) {
 	if p, ok := provider.Default().Lookup(user.Provider); ok {
-		return p.BuildCommand(AgentWorkingDir(agentID))
+		return p.BuildCommand(AgentWorkingDir(machineID, agentID))
 	}
 	return user.Executable, user.Args
 }
 
 // BuildCapability derives the agent capability from the user-configurable ACP
 // settings (template-provided flags + whether an executable is configured). It
-// does not touch the filesystem and ignores the agent id.
+// does not touch the filesystem and ignores the agent/machine ids.
 func BuildCapability(user *v1pb.AgentACPConfig) *v1pb.AgentCapability {
-	return BuildACPConfig(user, "").Capability()
+	return BuildACPConfig(user, "", "").Capability()
 }
 
 func (c *ACPConfig) Capability() *v1pb.AgentCapability {

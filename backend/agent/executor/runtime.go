@@ -21,11 +21,17 @@ type Request struct {
 	AgentResourceID  string
 	AgentDisplayName string
 	// AgentID is the agent's stable server-assigned UUID (parsed from the
-	// bootstrap token). It keys the per-agent working dir and the persistent
+	// agents/{id} tail). It keys the per-agent working dir and the persistent
 	// ACP session-state file (acp-session.json) that lets drain turns resume
 	// the same ACP session instead of cold-starting. Distinct from
-	// AgentResourceID (the --agent-name flag).
+	// AgentResourceID, which is the same bare id carried as LAELIA_AGENT.
 	AgentID string
+	// MachineID is the resource id (uuid) of the machine hosting this agent.
+	// A machine hosts many agents on one host, so it namespaces each agent's
+	// on-disk state (~/.laelia/<machineID>/<agentID>/): working dir, ACP
+	// session-state, and command-state. Empty only in unit tests that don't
+	// touch the filesystem.
+	MachineID string
 	// TurnPrompt is the "New messages received:" bounded batch the LLM is
 	// prompted with this turn. On a cold turn (no reusable ACP session) the
 	// executor prepends the full init prompt (buildPrompt) and then the batch;

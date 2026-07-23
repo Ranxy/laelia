@@ -15,29 +15,29 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(daemonCmd)
+	rootCmd.AddCommand(runCmd)
 }
 
-var daemonCmd = &cobra.Command{
-	Use:   "daemon",
-	Short: "Connect to the manager and run the agent drain loop",
+var runCmd = &cobra.Command{
+	Use:   "run",
+	Short: "Connect to the manager and host this machine's agents",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		return runDaemon()
+		return runMachine()
 	},
 }
 
-func runDaemon() error {
+func runMachine() error {
 	if flags.token == "" {
-		return errors.New("--token is required (the bootstrap token issued by the manager)")
+		return errors.New("--token is required (the machine registration token issued by CreateMachine)")
 	}
 	if flags.debug {
 		log.LogLevel.Set(slog.LevelDebug)
 	}
 	log.SetSlog()
 
-	slog.Info("laelia-agent starting", "manager", flags.managerURL)
+	slog.Info("laelia-machine starting", "manager", flags.managerURL)
 
-	apiClient, err := client.New(flags.managerURL, flags.token, flags.insecure, flags.allowHTTP, flags.agentName)
+	machine, err := client.New(flags.managerURL, flags.token, flags.insecure, flags.allowHTTP)
 	if err != nil {
 		return err
 	}
@@ -49,9 +49,9 @@ func runDaemon() error {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		slog.Info("shutdown signal received, stopping agent")
+		slog.Info("shutdown signal received, stopping machine")
 		cancel()
 	}()
 
-	return apiClient.Run(ctx)
+	return machine.Run(ctx)
 }

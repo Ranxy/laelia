@@ -14,7 +14,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
-	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
@@ -81,19 +80,23 @@ type commandStream struct {
 	getToken     func() string
 	getSessID    func() string
 	getAcpConfig func() *executor.ACPConfig
-	// refreshProviders re-probes the host for installed LLM agent providers
-	// and returns the freshly discovered set. Wired from Client so the
-	// DiscoverProviders control message can trigger an on-demand re-probe and
-	// reply with the result. Nil in tests.
-	refreshProviders func(ctx context.Context) []provider.Discovered
-	socketPath       string
-	sessionToken     string
-	binaryDir        string
-	agentResourceID  string
-	// resourceID is the agent's stable server-assigned UUID (parsed from the
-	// bootstrap token). It keys the per-agent working dir and local state file,
-	// distinct from agentResourceID (the --agent-name flag).
-	resourceID  string
+	socketPath   string
+	sessionToken string
+	binaryDir    string
+	// agentName is the agent's full resource name (agents/{agent}), carried
+	// in-stream as AgentReady.agent_name so the manager can bind this AgentChannel
+	// to the agent. It is NOT used as LAELIA_AGENT — that is the bare agentID.
+	agentName string
+	// agentID is the agent's bare server-assigned UUID (the agents/{agent} tail).
+	// It keys the per-agent working dir and local state file under the machine's
+	// namespace, is passed to the executor as Request.AgentID, and — as
+	// Request.AgentResourceID — becomes LAELIA_AGENT, which the daemon and
+	// chattools use as a bare id (e.g. agents/<id>/commands/<id>).
+	agentID string
+	// machineID is the bare UUID of the machine hosting this agent. It namespaces
+	// the agent's on-disk state (~/.laelia/<machineID>/<agentID>/) and is passed
+	// to the executor as Request.MachineID.
+	machineID   string
 	isExecuting atomic.Bool
 
 	// drain loop coordination. wakeCh is buffered(1): a wake while one is
@@ -114,18 +117,19 @@ type commandStream struct {
 	buildTurnBatch func(ctx context.Context) (string, error)
 }
 
-func newCommandStream(httpClient *http.Client, managerURL, socketPath, sessionToken, binaryDir, agentResourceID, resourceID string) *commandStream {
+func newCommandStream(httpClient *http.Client, managerURL, socketPath, sessionToken, binaryDir, agentName, agentID, machineID string) *commandStream {
 	c := &commandStream{
-		client:          v1connect.NewAgentStreamServiceClient(httpClient, managerURL),
-		managerURL:      managerURL,
-		backoff:         NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
-		socketPath:      socketPath,
-		sessionToken:    sessionToken,
-		binaryDir:       binaryDir,
-		agentResourceID: agentResourceID,
-		resourceID:      resourceID,
-		wakeCh:          make(chan struct{}, 1),
-		beginRespCh:     make(chan *v1pb.BeginSessionResponse, 1),
+		client:       v1connect.NewAgentStreamServiceClient(httpClient, managerURL),
+		managerURL:   managerURL,
+		backoff:      NewExponentialBackoff(defaultRetryBaseWait, defaultRetryMaxWait),
+		socketPath:   socketPath,
+		sessionToken: sessionToken,
+		binaryDir:    binaryDir,
+		agentName:    agentName,
+		agentID:      agentID,
+		machineID:    machineID,
+		wakeCh:       make(chan struct{}, 1),
+		beginRespCh:  make(chan *v1pb.BeginSessionResponse, 1),
 	}
 	c.newSessionRuntime = c.buildRuntime
 	return c
@@ -182,11 +186,12 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 	ready := &v1pb.AgentStreamMessage{
 		Message: &v1pb.AgentStreamMessage_AgentReady{
 			AgentReady: &v1pb.AgentReady{
+				AgentName: c.agentName,
 				SessionId: c.getSessID(),
 			},
 		},
 	}
-	if state, err := executor.LoadLocalState(c.resourceID); err != nil {
+	if state, err := executor.LoadLocalState(c.machineID, c.agentID); err != nil {
 		slog.Warn("failed to load local command state", "error", err)
 	} else if state != nil {
 		ready.GetAgentReady().LastCommandId = state.CommandID
@@ -257,32 +262,6 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 						resolver.ResolvePermission(d.OptionId)
 					}
 				}
-
-			case *v1pb.ManagerStreamMessage_DiscoverProviders:
-				// Manager-triggered on-demand re-probe (RefreshAgentProviders RPC).
-				// Re-probe the host and reply with the freshly discovered providers
-				// so the manager can persist them into agent.info and hand them back
-				// to the caller. Bounded ctx so a stuck probe can't hold the receive
-				// pump forever; the reply is best-effort — a dead stream just drops it.
-				req := m.DiscoverProviders
-				go func(requestID string) {
-					probeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-					defer cancel()
-					var providers []*v1pb.AgentProviderInfo
-					if c.refreshProviders != nil {
-						providers = discoveredToProto(c.refreshProviders(probeCtx), time.Now())
-					}
-					if err := stream.Send(&v1pb.AgentStreamMessage{
-						Message: &v1pb.AgentStreamMessage_ProvidersDiscovered{
-							ProvidersDiscovered: &v1pb.ProvidersDiscovered{
-								RequestId: requestID,
-								Providers: providers,
-							},
-						},
-					}); err != nil {
-						slog.Warn("failed to send providers_discovered reply", "requestID", requestID, "error", err)
-					}
-				}(req.RequestId)
 
 			default:
 				slog.Warn("unknown message type from manager")
@@ -477,7 +456,7 @@ func (c *commandStream) runCommand(
 		LastSeqSent:      0,
 		LastEventSeqSent: 0,
 	}
-	if err := executor.SaveLocalState(c.resourceID, state); err != nil {
+	if err := executor.SaveLocalState(c.machineID, c.agentID, state); err != nil {
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 	}
 
@@ -487,7 +466,7 @@ func (c *commandStream) runCommand(
 			return
 		}
 		runtime.Cancel()
-		_ = executor.ClearLocalState(c.resourceID)
+		_ = executor.ClearLocalState(c.machineID, c.agentID)
 		_ = sendCommandResult(stream, &v1pb.CommandResult{
 			CommandId:    commandID,
 			ExitCode:     -1,
@@ -510,7 +489,7 @@ func (c *commandStream) runCommand(
 		slog.Error("failed to send command start event", "commandID", commandID, "error", err)
 		return
 	}
-	if err := executor.SaveLocalState(c.resourceID, state); err != nil {
+	if err := executor.SaveLocalState(c.machineID, c.agentID, state); err != nil {
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 	}
 
@@ -547,7 +526,7 @@ func (c *commandStream) runCommand(
 			} else {
 				slog.Info("command result sent", "commandID", commandID, "exitCode", result.ExitCode)
 			}
-			_ = executor.ClearLocalState(c.resourceID)
+			_ = executor.ClearLocalState(c.machineID, c.agentID)
 			return
 
 		case event, ok := <-runtime.EventChannel():
@@ -559,7 +538,7 @@ func (c *commandStream) runCommand(
 				slog.Error("failed to send command event", "commandID", commandID, "error", err)
 				return
 			}
-			if err := executor.SaveLocalState(c.resourceID, state); err != nil {
+			if err := executor.SaveLocalState(c.machineID, c.agentID, state); err != nil {
 				slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 			}
 
@@ -580,7 +559,7 @@ func (c *commandStream) runCommand(
 				}
 				_ = merged.append(chunk.StreamType, chunk.Content)
 			}
-			if err := executor.SaveLocalState(c.resourceID, state); err != nil {
+			if err := executor.SaveLocalState(c.machineID, c.agentID, state); err != nil {
 				slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 			}
 		}
@@ -650,9 +629,10 @@ func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime
 		TimeoutSeconds:   req.TimeoutSeconds,
 		AllowDiff:        req.AllowDiff,
 		ConversationID:   req.ConversationId,
-		AgentResourceID:  c.agentResourceID,
+		AgentResourceID:  c.agentID,
 		AgentDisplayName: req.AgentDisplayName,
-		AgentID:          c.resourceID,
+		AgentID:          c.agentID,
+		MachineID:        c.machineID,
 		DaemonSocket:     c.socketPath,
 		SessionToken:     c.sessionToken,
 		BinaryDir:        c.binaryDir,

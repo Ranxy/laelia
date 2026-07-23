@@ -36,15 +36,15 @@ func sessionFingerprint(provider, model, workingDir string) string {
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
-func acpSessionPath(agentID string) string {
+func acpSessionPath(machineID, agentID string) string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".laelia", agentID, "acp-session.json")
+	return filepath.Join(home, ".laelia", machineID, agentID, "acp-session.json")
 }
 
 // loadACPSession reads the persisted ACP session state. A missing file is not
 // an error: it means the agent has never opened a session and must cold-start.
-func loadACPSession(agentID string) (*acpSessionState, error) {
-	data, err := os.ReadFile(acpSessionPath(agentID))
+func loadACPSession(machineID, agentID string) (*acpSessionState, error) {
+	data, err := os.ReadFile(acpSessionPath(machineID, agentID))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -62,21 +62,21 @@ func loadACPSession(agentID string) (*acpSessionState, error) {
 // resume it instead of cold-starting. It is best-effort: a write failure only
 // means the next turn cold-starts (re-sends the init prompt), never a lost
 // message — the durable per-channel cursor is the source of truth.
-func saveACPSession(agentID string, state *acpSessionState) error {
+func saveACPSession(machineID, agentID string, state *acpSessionState) error {
 	data, err := json.Marshal(state)
 	if err != nil {
 		return err
 	}
-	dir := filepath.Dir(acpSessionPath(agentID))
+	dir := filepath.Dir(acpSessionPath(machineID, agentID))
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	return os.WriteFile(acpSessionPath(agentID), data, 0o600)
+	return os.WriteFile(acpSessionPath(machineID, agentID), data, 0o600)
 }
 
 // clearACPSession drops the persisted ACP session so the next turn cold-starts.
 // Called when a ResumeSession fails (the provider lost the session) so we do
 // not loop forever retrying a dead id.
-func clearACPSession(agentID string) {
-	_ = os.Remove(acpSessionPath(agentID))
+func clearACPSession(machineID, agentID string) {
+	_ = os.Remove(acpSessionPath(machineID, agentID))
 }
