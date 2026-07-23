@@ -55,6 +55,7 @@ var allPermissionSet = func() map[permission.Permission]bool {
 // are also absent: they are granted only via workspaceAdmin.
 var memberBaselinePermissions = permissionSet(
 	permission.AgentsGet,
+	permission.MachinesGet,
 	permission.ConversationsCreate,
 	permission.ConversationsList,
 	permission.CommandsGet,

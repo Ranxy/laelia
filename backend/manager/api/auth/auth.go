@@ -49,6 +49,15 @@ const (
 	GatewayMetadataAccessTokenKey   = "laelia-access-token"
 	GatewayMetadataRequestOriginKey = "laelia-request-origin"
 
+	// DeclaredAgentHeader is the HTTP header (and grpc-gateway metadata key)
+	// a machine app sets on agent-callable RPCs to declare which agent it is
+	// acting on behalf of (agents/{agent}). A machine authenticates once with
+	// its access token; per-agent identity is carried per-request by this
+	// header. The auth interceptor resolves it, verifies the machine owns the
+	// agent (agent.machine_id == machine.id), and injects the agent under
+	// AgentContextKey so existing handlers resolve the caller unchanged.
+	DeclaredAgentHeader = "X-Laelia-Agent"
+
 	TokenTypeBootstrap = "BOOTSTRAP"
 	TokenTypeAccess    = "ACCESS"
 	TokenTypeRefresh   = "REFRESH"
@@ -117,6 +126,15 @@ func (in *APIAuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFun
 		}
 		if result.machine != nil {
 			ctx = context.WithValue(ctx, common.MachineContextKey, result.machine)
+			// A machine may act on behalf of an agent declared via the
+			// X-Laelia-Agent header; resolve + ownership-check it here so
+			// existing agent-callable handlers see the agent via
+			// GetAgentFromContext unchanged.
+			if declared, derr := in.resolveDeclaredAgent(ctx, result.machine, req.Header()); derr != nil {
+				return nil, derr
+			} else if declared != nil {
+				ctx = context.WithValue(ctx, common.AgentContextKey, declared)
+			}
 		}
 		if result.accessTokenExpiresAt > 0 {
 			ctx = context.WithValue(ctx, common.AccessTokenExpiresAtContextKey, result.accessTokenExpiresAt)
@@ -165,6 +183,11 @@ func (in *APIAuthInterceptor) WrapStreamingHandler(next connect.StreamingHandler
 		}
 		if result.machine != nil {
 			ctx = context.WithValue(ctx, common.MachineContextKey, result.machine)
+			if declared, derr := in.resolveDeclaredAgent(ctx, result.machine, conn.RequestHeader()); derr != nil {
+				return derr
+			} else if declared != nil {
+				ctx = context.WithValue(ctx, common.AgentContextKey, declared)
+			}
 		}
 		if result.accessTokenExpiresAt > 0 {
 			ctx = context.WithValue(ctx, common.AccessTokenExpiresAtContextKey, result.accessTokenExpiresAt)
@@ -301,6 +324,35 @@ func (in *APIAuthInterceptor) authenticateMachineByClaims(ctx context.Context, c
 
 	in.profile.LastActiveTS.Store(time.Now().Unix())
 	return machine, nil
+}
+
+// resolveDeclaredAgent resolves the agent a machine caller is acting on behalf
+// of, from the DeclaredAgentHeader (agents/{agent}). It verifies the machine
+// owns the agent (agent.machine_id == machine.id) and that the agent is not
+// deleted. Returns nil (no error) when the header is absent — the caller is a
+// machine not acting on behalf of an agent (e.g. MachineHeartbeat). On a
+// machine call to an agent-callable RPC the header is required, and the
+// handler's GetAgentFromContext returning false yields Unauthenticated.
+func (in *APIAuthInterceptor) resolveDeclaredAgent(ctx context.Context, machine *store.MachineMessage, headers http.Header) (*store.AgentMessage, error) {
+	agentName := headers.Get(DeclaredAgentHeader)
+	if agentName == "" {
+		return nil, nil
+	}
+	resourceID, err := common.GetAgentResourceID(agentName)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errs.Wrapf(err, "invalid %s header", DeclaredAgentHeader))
+	}
+	agent, err := in.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errs.Errorf("failed to find declared agent %s", resourceID))
+	}
+	if agent == nil || agent.Deleted {
+		return nil, connect.NewError(connect.CodePermissionDenied, errs.Errorf("declared agent %s not found", resourceID))
+	}
+	if agent.MachineID != machine.ID {
+		return nil, connect.NewError(connect.CodePermissionDenied, errs.Errorf("machine %s does not own agent %s", machine.ResourceID, resourceID))
+	}
+	return agent, nil
 }
 
 func GetTokenFromMetadata(md metadata.MD) (string, error) {

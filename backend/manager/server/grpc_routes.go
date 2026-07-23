@@ -84,6 +84,8 @@ func configureGrpcRouters(
 	agentService := apiv1.NewAgentService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager, s3clientmanager)
 	commandService := apiv1.NewCommandService(stores, cmdDispatcher, s3clientmanager, iamManager)
 	agentCommandService := apiv1.NewAgentCommandService(stores, cmdDispatcher)
+	machineService := apiv1.NewMachineService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager)
+	machineStreamService := apiv1.NewMachineStreamService(stores, cmdDispatcher)
 	settingService := apiv1.NewSettingService(stores, s3clientmanager, profile)
 	roleService := apiv1.NewRoleService(stores)
 	iamService := apiv1.NewIamService(stores)
@@ -137,6 +139,10 @@ func configureGrpcRouters(
 	connectHandlers[commandPath] = commandHandler
 	agentCmdPath, agentCmdHandler := v1connect.NewAgentStreamServiceHandler(agentCommandService, handlerOpts)
 	connectHandlers[agentCmdPath] = agentCmdHandler
+	machinePath, machineHandler := v1connect.NewMachineServiceHandler(machineService, handlerOpts)
+	connectHandlers[machinePath] = machineHandler
+	machineStreamPath, machineStreamHandler := v1connect.NewMachineStreamServiceHandler(machineStreamService, handlerOpts)
+	connectHandlers[machineStreamPath] = machineStreamHandler
 	settingPath, settingHandler := v1connect.NewSettingServiceHandler(settingService, handlerOpts)
 	connectHandlers[settingPath] = settingHandler
 	rolePath, roleHandler := v1connect.NewRoleServiceHandler(roleService, handlerOpts)
@@ -150,6 +156,8 @@ func configureGrpcRouters(
 		v1connect.AgentServiceName,
 		v1connect.CommandServiceName,
 		v1connect.AgentStreamServiceName,
+		v1connect.MachineServiceName,
+		v1connect.MachineStreamServiceName,
 		v1connect.SettingServiceName,
 		v1connect.RoleServiceName,
 		v1connect.IamServiceName,
@@ -182,6 +190,9 @@ func configureGrpcRouters(
 		return err
 	}
 	if err := v1pb.RegisterCommandServiceHandler(ctx, mux, grpcConn); err != nil {
+		return err
+	}
+	if err := v1pb.RegisterMachineServiceHandler(ctx, mux, grpcConn); err != nil {
 		return err
 	}
 	if err := v1pb.RegisterSettingServiceHandler(ctx, mux, grpcConn); err != nil {

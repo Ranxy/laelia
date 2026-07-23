@@ -19,6 +19,7 @@ const (
 	RolePrefix                 = "roles/"
 	GroupPrefix                = "groups/"
 	AgentNamePrefix            = "agents/"
+	MachineNamePrefix          = "machines/"
 	ConversationNamePrefix     = "conversations/"
 )
 
@@ -191,6 +192,22 @@ func GetAgentResourceID(name string) (string, error) {
 
 func FormatAgentUID(uid string) string {
 	return fmt.Sprintf("%s%s", AgentNamePrefix, uid)
+}
+
+// GetMachineResourceID returns the machine resource id (uuid) from a
+// machines/{machine} resource name.
+func GetMachineResourceID(name string) (string, error) {
+	tokens, err := GetNameParentTokens(name, MachineNamePrefix)
+	if err != nil {
+		return "", err
+	}
+	return tokens[0], nil
+}
+
+// FormatMachineUID returns the machines/{machine} resource name for the given
+// machine resource id.
+func FormatMachineUID(uid string) string {
+	return fmt.Sprintf("%s%s", MachineNamePrefix, uid)
 }
 
 // FormatConversationName returns the conversation resource name for the given

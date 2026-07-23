@@ -8,7 +8,9 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 
+	"github.com/Ranxy/laelia/backend/common"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
@@ -25,12 +27,20 @@ func NewAgentCommandService(s *store.Store, d *dispatcher.Dispatcher) *AgentStre
 	return &AgentStreamService{store: s, dispatcher: d}
 }
 
+// AgentChannel is the per-agent data plane. The machine app opens one
+// AgentChannel per hosted agent, authenticating the stream with the machine's
+// access token (the auth interceptor resolves it into MachineContextKey). The
+// first inbound message must be AgentReady carrying agent_name (agents/{id});
+// the handler resolves that agent, verifies the machine owns it
+// (agent.machine_id == machine.id), and registers the agent-keyed session. The
+// rest of the stream — BeginSession / Progress / Result / Event / Ping /
+// ProvidersDiscovered — is unchanged and keyed by agent id.
 func (s *AgentStreamService) AgentChannel(
 	ctx context.Context,
 	stream *connect.BidiStream[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage],
 ) error {
-	agent, ok := GetAgentFromContext(ctx)
-	if !ok || agent == nil {
+	machine, ok := GetMachineFromContext(ctx)
+	if !ok || machine == nil {
 		return connect.NewError(connect.CodeUnauthenticated, nil)
 	}
 
@@ -38,8 +48,29 @@ func (s *AgentStreamService) AgentChannel(
 		return stream.Send(msg)
 	}
 
-	sess := s.dispatcher.RegisterAgent(ctx, agent.ID, agent.MachineID, agent.ResourceID, sendFunc)
+	// The agent is declared in-stream, not by a header: wait for the first
+	// AgentReady before registering. A non-AgentReady first message is a
+	// protocol violation.
+	first, err := stream.Receive()
+	if err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		return err
+	}
+	ready, ok := first.Message.(*v1pb.AgentStreamMessage_AgentReady)
+	if !ok || ready.AgentReady == nil {
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("first agent stream message must be AgentReady"))
+	}
+	agent, err := s.resolveAgentForMachine(ctx, machine, ready.AgentReady.GetAgentName())
+	if err != nil {
+		return err
+	}
+
+	sess := s.dispatcher.RegisterAgent(ctx, agent.ID, machine.ID, agent.ResourceID, sendFunc)
 	defer s.dispatcher.UnregisterAgent(agent.ID)
+
+	s.handleAgentReady(ctx, agent, sess, ready.AgentReady)
 
 	for {
 		msg, err := stream.Receive()
@@ -53,6 +84,7 @@ func (s *AgentStreamService) AgentChannel(
 
 		switch m := msg.Message.(type) {
 		case *v1pb.AgentStreamMessage_AgentReady:
+			// A reconnecting runner re-announces; re-run the ready bookkeeping.
 			s.handleAgentReady(ctx, agent, sess, m.AgentReady)
 
 		case *v1pb.AgentStreamMessage_BeginSession:
@@ -105,6 +137,30 @@ func (s *AgentStreamService) AgentChannel(
 			slog.Warn("unknown agent stream message type")
 		}
 	}
+}
+
+// resolveAgentForMachine looks up the agent declared by an AgentReady and
+// verifies the authenticated machine owns it. The agent_name is the agents/{id}
+// resource name carried in-stream.
+func (s *AgentStreamService) resolveAgentForMachine(ctx context.Context, machine *store.MachineMessage, agentName string) (*store.AgentMessage, error) {
+	if agentName == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("AgentReady.agent_name must be set"))
+	}
+	resourceID, err := common.GetAgentResourceID(agentName)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get agent, error: %v", err))
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+	if agent.MachineID != machine.ID {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("agent %s is not bound to machine %s", resourceID, machine.ResourceID))
+	}
+	return agent, nil
 }
 
 func (s *AgentStreamService) handleAgentReady(

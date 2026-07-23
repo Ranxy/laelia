@@ -25,6 +25,15 @@ const (
 	AgentsEdit         Permission = "laelia.agents.edit"
 	AgentsListSessions Permission = "laelia.agents.listSessions"
 
+	// Machines — a machine is the long-lived agent-application process a user
+	// runs once on a host; it hosts one or more agents. create/get are workspace
+	// baseline; edit/delete are admin-tier (rotate/revoke token, force-disconnect,
+	// delete). Per-resource scoping is not used (machines are workspace-scoped).
+	MachinesCreate Permission = "laelia.machines.create"
+	MachinesGet    Permission = "laelia.machines.get"
+	MachinesEdit   Permission = "laelia.machines.edit"
+	MachinesDelete Permission = "laelia.machines.delete"
+
 	// Commands
 	CommandsGet    Permission = "laelia.commands.get"
 	CommandsList   Permission = "laelia.commands.list"
@@ -101,6 +110,11 @@ var allPermissions = []Permission{
 	AgentsGet,
 	AgentsEdit,
 	AgentsListSessions,
+
+	MachinesCreate,
+	MachinesGet,
+	MachinesEdit,
+	MachinesDelete,
 
 	CommandsGet,
 	CommandsList,

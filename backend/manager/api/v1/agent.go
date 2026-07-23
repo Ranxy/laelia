@@ -81,6 +81,28 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("agent title must be set"))
 	}
 
+	// An agent is bound to exactly one machine (agent.machine_id NOT NULL): the
+	// machine app hosts the agent's drain loop, so there is no per-agent process
+	// or token. CreateAgent therefore requires a machine parent and pushes an
+	// AgentAssignment to the owning machine's MachineChannel so the machine app
+	// opens an AgentChannel for the new agent immediately. If the machine is
+	// offline the push is best-effort (logged, not queued): the next
+	// ConnectMachine resyncs the full roster from the DB.
+	if req.Msg.Agent.Machine == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("agent.machine (parent machine) must be set"))
+	}
+	machineResourceID, err := common.GetMachineResourceID(req.Msg.Agent.Machine)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	machine, err := s.store.GetMachineByResourceID(ctx, machineResourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get parent machine, error: %v", err))
+	}
+	if machine == nil || machine.Deleted {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("parent machine %s not found", machineResourceID))
+	}
+
 	// Record the creator for display (Agent.created_by). CreateAgent is
 	// admin-tier (only workspaceAdmin holds laelia.agents.create), so a user is
 	// always present; guard defensively against a missing one. Editing the agent
@@ -94,6 +116,7 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 	agentMessage := &store.AgentMessage{
 		Name:         req.Msg.Agent.Title,
 		TokenVersion: 1,
+		MachineID:    machine.ID,
 		Info: &storepb.AgentInfo{
 			Labels: req.Msg.Agent.Labels,
 			AcpConfig: &storepb.AgentACPConfig{
@@ -108,28 +131,24 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to create agent, error: %v", err))
 	}
+	created.MachineResourceID = machine.ResourceID
 
-	bootstrapToken, err := auth.GenerateAgentToken(created.Name, created.ResourceID, created.TokenVersion, auth.TokenTypeBootstrap, s.profile.Mode, s.secret, bootstrapTokenDuration)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate agent token, error: %v", err))
-	}
-
-	tokenHash := hashToken(bootstrapToken)
-	if err := s.store.CreateAgentToken(ctx, &store.AgentTokenMessage{
-		AgentID:     created.ID,
-		TokenHash:   tokenHash,
-		TokenType:   storepb.AgentTokenType_BOOTSTRAP,
-		TokenFamily: created.ResourceID,
-		State:       storepb.AgentTokenState_ACTIVE,
-		ExpiresAt:   time.Now().Add(bootstrapTokenDuration),
-		CreatedBy:   "system",
-	}); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store agent token, error: %v", err))
+	// Best-effort: tell the machine app to host the new agent now. A missed push
+	// (machine offline, send race) is recovered on the next ConnectMachine
+	// resync, so a send failure is logged, not returned.
+	if s.dispatcher != nil {
+		assignment := &v1pb.AgentAssignment{
+			AgentName:        common.FormatAgentUID(created.ResourceID),
+			AgentDisplayName: created.Name,
+			AcpConfig:        convertToV1AgentACPConfig(created.Info.GetAcpConfig()),
+		}
+		if pushErr := s.dispatcher.SendAgentAssignment(machine.ID, assignment); pushErr != nil {
+			slog.Info("best-effort agent assignment push skipped", "agent", created.ResourceID, "machine", machine.ResourceID, "error", pushErr)
+		}
 	}
 
 	response := &v1pb.CreateAgentResponse{
-		Agent:          convertToAgent(created),
-		BootstrapToken: bootstrapToken,
+		Agent: convertToAgent(created),
 	}
 	return connect.NewResponse(response), nil
 }
@@ -235,6 +254,15 @@ func (s *AgentService) DeleteAgent(ctx context.Context, req *connect.Request[v1p
 	}
 	if err := s.store.DeleteAgent(ctx, resourceID); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to delete agent, error: %v", err))
+	}
+
+	// Best-effort: tell the machine app to tear down the deleted agent's runner.
+	// A missed push is harmless — the agent row is soft-deleted and won't appear
+	// in the next ConnectMachine resync, so the runner is simply not restarted.
+	if s.dispatcher != nil && agent.MachineID > 0 {
+		if pushErr := s.dispatcher.SendRemoveAgent(agent.MachineID, common.FormatAgentUID(agent.ResourceID)); pushErr != nil {
+			slog.Info("best-effort remove-agent push skipped", "agent", agent.ResourceID, "machineID", agent.MachineID, "error", pushErr)
+		}
 	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
@@ -920,6 +948,7 @@ func convertToAgent(agent *store.AgentMessage) *v1pb.Agent {
 		Status:       status,
 		CreatedAt:    timestamppb.New(agent.CreatedAt),
 		TokenVersion: int32(agent.TokenVersion),
+		Machine:      common.FormatMachineUID(agent.MachineResourceID),
 	}
 	if !agent.LastTokenRotatedAt.IsZero() {
 		result.LastTokenRotatedAt = timestamppb.New(agent.LastTokenRotatedAt)
@@ -946,10 +975,11 @@ func convertToAgentSummary(agent *store.AgentMessage) *v1pb.AgentSummary {
 		state = v1pb.State_DELETED
 	}
 	summary := &v1pb.AgentSummary{
-		Name:   common.FormatAgentUID(agent.ResourceID),
-		State:  state,
-		Title:  agent.Name,
-		Status: convertToV1AgentStatus(agent.Status, agent.Deleted),
+		Name:    common.FormatAgentUID(agent.ResourceID),
+		State:   state,
+		Title:   agent.Name,
+		Status:  convertToV1AgentStatus(agent.Status, agent.Deleted),
+		Machine: common.FormatMachineUID(agent.MachineResourceID),
 	}
 	if agent.Info != nil && agent.Info.AcpConfig != nil {
 		summary.Provider = agent.Info.AcpConfig.Provider
@@ -1263,6 +1293,16 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 	patch := &store.UpdateAgentMessage{Info: patchInfo}
 	if _, err := s.store.UpdateAgent(ctx, agent, patch); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	// Best-effort: hot-reload the agent's ACP config on the machine. The runner
+	// picks up the new config at its next BeginSession; a provider/model change
+	// invalidates the persisted ACP SessionId so the next turn cold-starts with
+	// the new config. A missed push (machine offline) is recovered on reconnect.
+	if s.dispatcher != nil && agent.MachineID > 0 {
+		if pushErr := s.dispatcher.SendAgentConfigUpdate(agent.MachineID, common.FormatAgentUID(agent.ResourceID), req.Msg.AcpConfig); pushErr != nil {
+			slog.Info("best-effort agent config update push skipped", "agent", agent.ResourceID, "machineID", agent.MachineID, "error", pushErr)
+		}
 	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }

@@ -37,6 +37,10 @@ type AgentMessage struct {
 	// (legacy agents created before the machine refactor). Immutable after
 	// creation; set by CreateAgent.
 	MachineID int
+	// MachineResourceID is the resource id (uuid) of the bound machine, populated
+	// via a LEFT JOIN on read so converters can emit the machines/{machine} name
+	// without an N+1 lookup. Empty for unbound/legacy agents.
+	MachineResourceID string
 }
 
 // GetResourceID returns the agent's resource name, used to key context-derived
@@ -164,8 +168,10 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 		agent.last_token_rotated_at,
 		agent.created_by,
 		agent.avatar_s3_key,
-		agent.machine_id
+		agent.machine_id,
+		machine.resource_id
 	FROM agent
+	LEFT JOIN machine ON machine.id = agent.machine_id
 	WHERE ` + strings.Join(where, " AND ") + ` ORDER BY agent.created_at ASC`
 
 	if v := find.Limit; v != nil {
@@ -187,6 +193,7 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 		var statusBytes []byte
 		var lastTokenRotatedAt sql.NullTime
 		var machineID sql.NullInt64
+		var machineResourceID sql.NullString
 		if err := rows.Scan(
 			&agentMessage.ID,
 			&agentMessage.ResourceID,
@@ -200,6 +207,7 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 			&agentMessage.CreatedBy,
 			&agentMessage.AvatarS3Key,
 			&machineID,
+			&machineResourceID,
 		); err != nil {
 			return nil, err
 		}
@@ -208,6 +216,9 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 		}
 		if machineID.Valid {
 			agentMessage.MachineID = int(machineID.Int64)
+		}
+		if machineResourceID.Valid {
+			agentMessage.MachineResourceID = machineResourceID.String
 		}
 
 		info := &models.AgentInfo{}
