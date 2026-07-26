@@ -238,10 +238,14 @@ func (c *MachineClient) Connect(ctx context.Context, info *v1pb.MachineInfo) err
 }
 
 // connectViaRefresh reconnects using the persisted refresh token. The refresh
-// token is single-use: RefreshMachineToken consumes it and returns a new one,
-// which we persist immediately so a later retry uses the new token rather than
-// re-presenting the consumed one (which the server treats as theft and revokes
-// the whole family). The access token returned by the refresh response is the
+// token is a durable, multi-use reconnection credential: RefreshMachineToken
+// reuses it across reconnects and only mints a replacement when it is near
+// expiry (rolling renewal) — it does NOT consume it on every reconnect. So a
+// lost refresh response (e.g. a manager hard-killed mid-request) is safely
+// retryable: the same token is presented again and the server does not treat
+// the retry as theft. Only when the server returns a non-empty RefreshToken
+// (a rolling renewal) do we persist the replacement; otherwise we keep the
+// existing token. The access token returned by the refresh response is the
 // machine's bearer credential for the control stream + heartbeat; ConnectMachine
 // on this path returns no access token (it only mints on the bootstrap path),
 // so applyConnectResponse keeps the refresh-minted one.
@@ -256,7 +260,13 @@ func (c *MachineClient) connectViaRefresh(ctx context.Context, info *v1pb.Machin
 	c.mu.Lock()
 	c.accessToken = refreshResp.AccessToken
 	c.mu.Unlock()
-	c.credential.SaveRefreshToken(refreshResp.RefreshToken)
+	// Persist a replacement only when the server actually minted one (rolling
+	// renewal near expiry). On the common reconnect the server reuses the same
+	// refresh token and returns "" — saving that would wipe the durable
+	// credential (the bug that made every manager restart unrecoverable).
+	if refreshResp.RefreshToken != "" {
+		c.credential.SaveRefreshToken(refreshResp.RefreshToken)
+	}
 
 	resp, err := c.connectWithAccessToken(ctx, info, fingerprint)
 	if err != nil {
@@ -333,7 +343,13 @@ func (c *MachineClient) connectWithRegistrationToken(ctx context.Context, regist
 	if err != nil {
 		return nil, err
 	}
-	c.credential.SaveRefreshToken(resp.Msg.RefreshToken)
+	// ConnectMachine mints a refresh token only on the bootstrap (registration)
+	// path; on the access-token reconnect path it returns "". Persisting that
+	// empty value would overwrite the durable refresh token on disk and make
+	// the next reconnect unrecoverable — so only persist a non-empty token.
+	if resp.Msg.RefreshToken != "" {
+		c.credential.SaveRefreshToken(resp.Msg.RefreshToken)
+	}
 	return resp.Msg, nil
 }
 
@@ -352,7 +368,13 @@ func (c *MachineClient) connectWithAccessToken(ctx context.Context, info *v1pb.M
 	if err != nil {
 		return nil, err
 	}
-	c.credential.SaveRefreshToken(resp.Msg.RefreshToken)
+	// ConnectMachine mints a refresh token only on the bootstrap (registration)
+	// path; on the access-token reconnect path it returns "". Persisting that
+	// empty value would overwrite the durable refresh token on disk and make
+	// the next reconnect unrecoverable — so only persist a non-empty token.
+	if resp.Msg.RefreshToken != "" {
+		c.credential.SaveRefreshToken(resp.Msg.RefreshToken)
+	}
 	return resp.Msg, nil
 }
 

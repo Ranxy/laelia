@@ -27,15 +27,20 @@ import (
 )
 
 // machineRefreshTokenDuration is how long a machine refresh token stays
-// valid. Machines are long-lived hosts that reconnect after arbitrary
-// downtime (a desktop powered off over a weekend, a laptop on a trip), so
-// the refresh token — the durable reconnection credential — must outlast
-// that. The agent-wide 24h refreshTokenDuration is too short: a machine
-// offline for more than a day could not reconnect and an admin would have
-// to rotate the token just to bring it back. 30d is long enough to survive
-// normal downtime while the single-use rotation + reuse-revocation still
-// bounds a stolen token's value.
-const machineRefreshTokenDuration = 30 * 24 * time.Hour
+// valid. The refresh token is a durable, multi-use reconnection credential
+// (not single-use-rotated on every reconnect), so its lifetime must cover
+// long downtime: a desktop powered off over a weekend, a laptop on a trip,
+// a host offline for patching. 90d bounds a stolen token's value while
+// keeping manual rotation quarterly.
+const machineRefreshTokenDuration = 90 * 24 * time.Hour
+
+// machineRefreshRotateWindow is how close to expiry a refresh token must be
+// before RefreshMachineToken mints a replacement (rolling renewal). Inside
+// the window the old token is left ACTIVE — it expires on its own within the
+// window, so a thief holding the pre-renewal token has at most this long. The
+// common reconnect (outside the window) reuses the same token and never
+// consumes it, so a lost refresh response is safely retryable.
+const machineRefreshRotateWindow = 10 * 24 * time.Hour
 
 // MachineService implements MachineService: management RPCs (admin/IAM) for
 // machines and the machine-side authentication RPCs the machine app calls to
@@ -687,10 +692,19 @@ func (s *MachineService) MachineDisconnect(ctx context.Context, req *connect.Req
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
-// RefreshMachineToken rotates a machine refresh token: verifies the JWT
-// signature, looks up the stored token, detects reuse (revokes the family),
-// binds the token's version to the machine's current version, and mints a fresh
-// access + refresh pair. Mirrors RefreshAgentToken.
+// RefreshMachineToken reissues a machine access token using the persisted
+// refresh token. Unlike a single-use refresh-token rotation, the machine
+// refresh token is a durable, MULTI-USE reconnection credential: the common
+// reconnect reuses the same refresh token (no consumption, no new row), so a
+// lost refresh response — e.g. a manager hard-killed mid-request — is safely
+// retryable (the same token is presented again, the server does not treat the
+// retry as theft). Only when the token is within machineRefreshRotateWindow of
+// expiry does the server mint a replacement (rolling renewal), leaving the
+// old token to expire on its own. Theft is detected by fingerprint binding
+// (rejected if presented from a different machine) and by token-version
+// mismatch (an admin RotateMachineToken bumps the version and revokes the
+// family); a CONSUMED/REVOKED token still triggers family revocation as a
+// safety net.
 func (s *MachineService) RefreshMachineToken(ctx context.Context, req *connect.Request[v1pb.RefreshMachineTokenRequest]) (*connect.Response[v1pb.RefreshMachineTokenResponse], error) {
 	refreshTokenStr := req.Msg.RefreshToken
 	if refreshTokenStr == "" {
@@ -717,6 +731,11 @@ func (s *MachineService) RefreshMachineToken(ctx context.Context, req *connect.R
 	switch action := machineRefreshReuseAction(storedToken.State); action {
 	case refreshActionProceed:
 	case refreshActionRevokeFamily:
+		// A CONSUMED or REVOKED refresh token being presented again. The
+		// multi-use flow never consumes a refresh token, so reaching here means
+		// either an artifact of the old single-use flow, an admin
+		// Revoke/RotateMachineToken, or genuine theft — revoke the family and
+		// reject in all cases.
 		if err := s.store.RevokeMachineTokenFamily(ctx, storedToken.TokenFamily); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to revoke token family, error: %v", err))
 		}
@@ -747,31 +766,35 @@ func (s *MachineService) RefreshMachineToken(ctx context.Context, req *connect.R
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("refresh token version mismatch"))
 	}
 
-	if storedToken.State == storepb.MachineTokenState_MACHINE_TOKEN_ACTIVE {
-		consumedAt := time.Now()
-		if err := s.store.UpdateMachineTokenState(ctx, storedToken.ID, storepb.MachineTokenState_MACHINE_TOKEN_CONSUMED, &consumedAt); err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to mark refresh token as consumed, error: %v", err))
-		}
-	}
-
 	accessToken, err := auth.GenerateMachineTokenWithSession(machine.Name, machine.ResourceID, machine.TokenVersion, auth.TokenTypeAccess, "", s.profile.Mode, s.secret, accessTokenDuration)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate access token, error: %v", err))
 	}
-	newRefreshToken, err := auth.GenerateMachineTokenWithSession(machine.Name, machine.ResourceID, machine.TokenVersion, auth.TokenTypeRefresh, "", s.profile.Mode, s.secret, machineRefreshTokenDuration)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate refresh token, error: %v", err))
-	}
-	if err := s.store.CreateMachineToken(ctx, &store.MachineTokenMessage{
-		MachineID:   machine.ID,
-		TokenHash:   hashToken(newRefreshToken),
-		TokenType:   storepb.MachineTokenType_MACHINE_REFRESH,
-		TokenFamily: storedToken.TokenFamily,
-		State:       storepb.MachineTokenState_MACHINE_TOKEN_ACTIVE,
-		Fingerprint: req.Msg.Fingerprint,
-		ExpiresAt:   time.Now().Add(machineRefreshTokenDuration),
-	}); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store new refresh token, error: %v", err))
+
+	// Multi-use: reuse the same refresh token across reconnects. Mint a
+	// replacement only when the current one is within the rolling-renewal
+	// window of expiry, so the credential self-renews without manual rotation
+	// and the machine never dies from expiry as long as it reconnects within
+	// the window. The old token is left ACTIVE and expires on its own within
+	// the window (a pre-renewal thief is bounded by it); it is not consumed, so
+	// a lost renewal response is safely retryable.
+	newRefreshToken := ""
+	if time.Until(storedToken.ExpiresAt) < machineRefreshRotateWindow {
+		newRefreshToken, err = auth.GenerateMachineTokenWithSession(machine.Name, machine.ResourceID, machine.TokenVersion, auth.TokenTypeRefresh, "", s.profile.Mode, s.secret, machineRefreshTokenDuration)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate refresh token, error: %v", err))
+		}
+		if err := s.store.CreateMachineToken(ctx, &store.MachineTokenMessage{
+			MachineID:   machine.ID,
+			TokenHash:   hashToken(newRefreshToken),
+			TokenType:   storepb.MachineTokenType_MACHINE_REFRESH,
+			TokenFamily: storedToken.TokenFamily,
+			State:       storepb.MachineTokenState_MACHINE_TOKEN_ACTIVE,
+			Fingerprint: req.Msg.Fingerprint,
+			ExpiresAt:   time.Now().Add(machineRefreshTokenDuration),
+		}); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store new refresh token, error: %v", err))
+		}
 	}
 
 	return connect.NewResponse(&v1pb.RefreshMachineTokenResponse{
