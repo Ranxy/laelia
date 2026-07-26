@@ -940,6 +940,16 @@ export declare type AgentSummary = Message<"laelia.v1.AgentSummary"> & {
    * @generated from field: string machine = 7;
    */
   machine: string;
+
+  /**
+   * created_by is the creator's user resource name (users/{id}); empty for
+   * legacy agents with no recorded creator. Surfaced on the summary so list
+   * consumers (e.g. the Members page's per-user "Created Agents" view) can
+   * group agents by creator without an N+1 of GetAgent.
+   *
+   * @generated from field: string created_by = 8;
+   */
+  createdBy: string;
 };
 
 /**

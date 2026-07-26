@@ -1,5 +1,5 @@
 import type { RouteObject } from "react-router-dom";
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useParams } from "react-router-dom";
 import { DashboardLayout } from "@/app/layouts/dashboard-layout";
 import {
   ACTIVITY_ROUTE,
@@ -21,6 +21,17 @@ import {
   SETTINGS_ROUTE_STORAGE,
   SETTINGS_ROUTE_USERS,
 } from "../handles";
+
+// AgentRouteRedirect preserves the legacy /agents/:agentId/** deep links
+// (thread-panel, command-list, reminder-detail, machine-profile, etc.) by
+// forwarding them to the canonical Members-embedded agent detail tree. The
+// Members page now owns the agent detail layout; /agents exists only as a
+// redirect so existing navigate(`/agents/...`) call sites keep working.
+function AgentRouteRedirect() {
+  const { agentId, "*": splat } = useParams<{ agentId: string; "*": string }>();
+  const rest = splat ? `/${splat}` : "";
+  return <Navigate to={`/members/agents/${agentId ?? ""}${rest}`} replace />;
+}
 
 export const dashboardRoutes: RouteObject[] = [
   {
@@ -69,18 +80,29 @@ export const dashboardRoutes: RouteObject[] = [
         ],
       },
       {
-        path: "agents",
-        // The Agents list page is gone (replaced by Members + Machines). This
-        // route now exists only to host per-agent detail pages reached from a
-        // member row or a machine roster link; the index redirects to Members.
-        element: <Outlet />,
+        // Members owns the workspace directory (left rail) and the member
+        // detail panes. The agent detail tree (AgentDetailLayout + its four
+        // tab pages) is nested here so the route-name index resolves
+        // AGENT_ROUTE_* / COMMAND_ROUTE_* / REMINDER_ROUTE_* under
+        // /members/agents/:agentId — the left rail's tab navigation then
+        // stays within Members. Defined before the legacy /agents redirect
+        // so the index (first-registration-wins) picks these paths.
+        path: "members",
+        handle: { name: MEMBERS_ROUTE },
+        lazy: () =>
+          import("@/pages/dashboard/members").then((m) => ({
+            Component: m.MembersPage,
+          })),
         children: [
           {
             index: true,
-            element: <Navigate to="/members" replace />,
+            lazy: () =>
+              import("@/pages/dashboard/members-empty-state").then((m) => ({
+                Component: m.MembersEmptyState,
+              })),
           },
           {
-            path: ":agentId",
+            path: "agents/:agentId",
             lazy: () =>
               import("@/app/layouts/agent-detail-layout").then((m) => ({
                 Component: m.AgentDetailLayout,
@@ -136,6 +158,13 @@ export const dashboardRoutes: RouteObject[] = [
               },
             ],
           },
+          {
+            path: "users/:userId",
+            lazy: () =>
+              import("@/pages/dashboard/human-detail").then((m) => ({
+                Component: m.HumanDetailPage,
+              })),
+          },
         ],
       },
       {
@@ -175,12 +204,21 @@ export const dashboardRoutes: RouteObject[] = [
         ],
       },
       {
-        path: "members",
-        handle: { name: MEMBERS_ROUTE },
-        lazy: () =>
-          import("@/pages/dashboard/members").then((m) => ({
-            Component: m.MembersPage,
-          })),
+        // Legacy /agents deep links redirect into the Members-embedded agent
+        // detail tree. The index redirects to the Members directory; any
+        // /agents/:agentId[/**] forwards to /members/agents/:agentId[/**].
+        path: "agents",
+        element: <Outlet />,
+        children: [
+          {
+            index: true,
+            element: <Navigate to="/members" replace />,
+          },
+          {
+            path: ":agentId/*",
+            element: <AgentRouteRedirect />,
+          },
+        ],
       },
       {
         path: "settings",

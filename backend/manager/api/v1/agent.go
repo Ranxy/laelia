@@ -1008,11 +1008,13 @@ func convertToAgent(agent *store.AgentMessage, connected bool) *v1pb.Agent {
 }
 
 // convertToAgentSummary builds the lightweight ListAgents projection of an
-// agent: identity, lifecycle state, connection status, and the
+// agent: identity, lifecycle state, connection status, the
 // provider/executable signal that the frontend agentLifecycle() classifier
-// reads. Heavy per-agent data (available_providers, the rest of acp_config,
-// capability, host info, token fields, created_by, can_edit) is omitted — it
-// is only returned by GetAgent. See ListAgents for the contract rationale.
+// reads, and the creator (created_by) so list consumers can group agents by
+// owner without an N+1 of GetAgent. Heavy per-agent data (available_providers,
+// the rest of acp_config, capability, host info, token fields, can_edit) is
+// omitted — it is only returned by GetAgent. See ListAgents for the contract
+// rationale.
 func convertToAgentSummary(agent *store.AgentMessage, connected bool) *v1pb.AgentSummary {
 	state := v1pb.State_ACTIVE
 	if agent.Deleted {
@@ -1028,6 +1030,11 @@ func convertToAgentSummary(agent *store.AgentMessage, connected bool) *v1pb.Agen
 	if agent.Info != nil && agent.Info.AcpConfig != nil {
 		summary.Provider = agent.Info.AcpConfig.Provider
 		summary.Executable = agent.Info.AcpConfig.Executable
+	}
+	// Surface the creator on the summary (users/{id}) so list consumers can
+	// group agents by creator without an N+1 of GetAgent.
+	if agent.CreatedBy != 0 {
+		summary.CreatedBy = common.FormatUserUID(agent.CreatedBy)
 	}
 	return summary
 }

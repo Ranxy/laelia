@@ -37,12 +37,8 @@ const (
 	AgentAccessTokenAudienceFmt   = "ll.agent.access.%s"
 	MachineAccessTokenAudienceFmt = "ll.machine.access.%s"
 
-	apiTokenDuration          = 1 * time.Hour
-	DefaultTokenDuration      = 7 * 24 * time.Hour
-	DefaultAgentTokenDuration = 365 * 24 * time.Hour
-	// DefaultMachineTokenDuration matches the agent app: a long-lived machine
-	// access token so the machine app stays connected without frequent reconnects.
-	DefaultMachineTokenDuration = 365 * 24 * time.Hour
+	apiTokenDuration     = 1 * time.Hour
+	DefaultTokenDuration = 7 * 24 * time.Hour
 
 	AccessTokenCookieName = "access-token"
 

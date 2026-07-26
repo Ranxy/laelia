@@ -131,6 +131,9 @@ export function AgentProfilePage() {
   const [machineProviders, setMachineProviders] = useState<AgentProviderInfo[]>(
     []
   );
+  // machineTitle is the owning machine's display title (resolved from
+  // agent.machine so the identity grid shows a name, not the raw id).
+  const [machineTitle, setMachineTitle] = useState("");
 
   const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -202,11 +205,13 @@ export function AgentProfilePage() {
     const machineName = agent?.machine;
     if (!machineName) {
       setMachineProviders([]);
+      setMachineTitle("");
       return;
     }
-    getMachine(machineName).then((m) =>
-      setMachineProviders(m?.info?.availableProviders ?? [])
-    );
+    getMachine(machineName).then((m) => {
+      setMachineProviders(m?.info?.availableProviders ?? []);
+      setMachineTitle(m?.title ?? "");
+    });
   }, [agent?.machine, getMachine]);
 
   // Re-seed the editor whenever the persisted config reference changes (e.g.
@@ -360,7 +365,7 @@ export function AgentProfilePage() {
                         navigate(`/machines/${machineResourceID}`)
                       }
                     >
-                      {agent.machine}
+                      {machineTitle || agent.machine}
                     </button>
                   </Field>
                 )}

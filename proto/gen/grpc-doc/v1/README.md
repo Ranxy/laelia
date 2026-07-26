@@ -784,6 +784,7 @@ view does not gate affordances on it (delete is enforced server-side).
 | provider | [string](#string) |  | provider/executable mirror acp_config.provider/executable on the full Agent, surfaced top-level so list consumers don&#39;t pull in AgentInfo. |
 | executable | [string](#string) |  |  |
 | machine | [string](#string) |  | machine is the resource name of the machine this agent is bound to (machines/{machine}). |
+| created_by | [string](#string) |  | created_by is the creator&#39;s user resource name (users/{id}); empty for legacy agents with no recorded creator. Surfaced on the summary so list consumers (e.g. the Members page&#39;s per-user &#34;Created Agents&#34; view) can group agents by creator without an N&#43;1 of GetAgent. |
 
 
 

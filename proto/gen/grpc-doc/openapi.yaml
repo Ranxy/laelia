@@ -3690,6 +3690,13 @@ components:
                     description: |-
                         machine is the resource name of the machine this agent is bound to
                          (machines/{machine}).
+                createdBy:
+                    type: string
+                    description: |-
+                        created_by is the creator's user resource name (users/{id}); empty for
+                         legacy agents with no recorded creator. Surfaced on the summary so list
+                         consumers (e.g. the Members page's per-user "Created Agents" view) can
+                         group agents by creator without an N+1 of GetAgent.
             description: |-
                 AgentSummary is the lightweight list-view projection of an Agent returned by
                  ListAgents. It carries only the fields list/header views need: identity,

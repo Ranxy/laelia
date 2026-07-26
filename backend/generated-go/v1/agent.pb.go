@@ -2004,7 +2004,12 @@ type AgentSummary struct {
 	Executable string `protobuf:"bytes,6,opt,name=executable,proto3" json:"executable,omitempty"`
 	// machine is the resource name of the machine this agent is bound to
 	// (machines/{machine}).
-	Machine       string `protobuf:"bytes,7,opt,name=machine,proto3" json:"machine,omitempty"`
+	Machine string `protobuf:"bytes,7,opt,name=machine,proto3" json:"machine,omitempty"`
+	// created_by is the creator's user resource name (users/{id}); empty for
+	// legacy agents with no recorded creator. Surfaced on the summary so list
+	// consumers (e.g. the Members page's per-user "Created Agents" view) can
+	// group agents by creator without an N+1 of GetAgent.
+	CreatedBy     string `protobuf:"bytes,8,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2084,6 +2089,13 @@ func (x *AgentSummary) GetExecutable() string {
 func (x *AgentSummary) GetMachine() string {
 	if x != nil {
 		return x.Machine
+	}
+	return ""
+}
+
+func (x *AgentSummary) GetCreatedBy() string {
+	if x != nil {
+		return x.CreatedBy
 	}
 	return ""
 }
@@ -2887,7 +2899,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:!\xeaA\x1e\n" +
-	"\flaelia/Agent\x12\x0eagents/{agent}J\x04\b\x04\x10\x05R\x05token\"\xe6\x01\n" +
+	"\flaelia/Agent\x12\x0eagents/{agent}J\x04\b\x04\x10\x05R\x05token\"\x85\x02\n" +
 	"\fAgentSummary\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -2897,7 +2909,9 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\n" +
 	"executable\x18\x06 \x01(\tR\n" +
 	"executable\x12\x18\n" +
-	"\amachine\x18\a \x01(\tR\amachine\"\xce\x03\n" +
+	"\amachine\x18\a \x01(\tR\amachine\x12\x1d\n" +
+	"\n" +
+	"created_by\x18\b \x01(\tR\tcreatedBy\"\xce\x03\n" +
 	"\tAgentInfo\x12\x1d\n" +
 	"\n" +
 	"agent_type\x18\x01 \x01(\tR\tagentType\x12\x1a\n" +
