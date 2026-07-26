@@ -906,6 +906,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ListTaskCountsRequest"><span class="badge">M</span>ListTaskCountsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListTaskCountsResponse"><span class="badge">M</span>ListTaskCountsResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ListTasksRequest"><span class="badge">M</span>ListTasksRequest</a>
                 </li>
               
@@ -8435,6 +8443,75 @@ conversation. </p></td>
 
         
       
+        <h3 id="laelia.v1.ListTaskCountsRequest">ListTaskCountsRequest</h3>
+        <p>ListTaskCountsRequest asks for per-status task totals for a conversation, so</p><p>the task board summary stays accurate regardless of how many tasks are loaded</p><p>into the paginated list view.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListTaskCountsResponse">ListTaskCountsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>todo_count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>in_progress_count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>in_review_count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>done_count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ListTasksRequest">ListTasksRequest</h3>
         <p></p>
 
@@ -8460,6 +8537,22 @@ conversation. </p></td>
 Empty returns tasks in every status. </p></td>
                 </tr>
               
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>page_size is the maximum number of tasks to return in one page. The server
+clamps it to a sane range and applies a default when zero. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>page_token is the opaque cursor returned in the previous response&#39;s
+next_page_token; empty starts at the newest task. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -8481,8 +8574,16 @@ Empty returns tasks in every status. </p></td>
                   <td>tasks</td>
                   <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
                   <td>repeated</td>
-                  <td><p>tasks are the channel&#39;s task root messages, each with task populated,
-ordered by task_number ascending. </p></td>
+                  <td><p>tasks are one page of the channel&#39;s task root messages, each with task
+populated, ordered by task_number descending (newest first). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>next_page_token is the cursor for the next (older) page; empty when this
+page is the last. </p></td>
                 </tr>
               
             </tbody>
@@ -11128,8 +11229,17 @@ member (user or agent) may convert. Emits a system notification row.</p></td>
                 <td>ListTasks</td>
                 <td><a href="#laelia.v1.ListTasksRequest">ListTasksRequest</a></td>
                 <td><a href="#laelia.v1.ListTasksResponse">ListTasksResponse</a></td>
-                <td><p>ListTasks returns the task board for a conversation: every task (root
-message with task metadata) in the channel, optionally filtered by status.</p></td>
+                <td><p>ListTasks returns one page of the task board for a conversation: the
+channel&#39;s tasks (root messages with task metadata), newest first, optionally
+filtered by status. Use page_size / page_token for pagination.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ListTaskCounts</td>
+                <td><a href="#laelia.v1.ListTaskCountsRequest">ListTaskCountsRequest</a></td>
+                <td><a href="#laelia.v1.ListTaskCountsResponse">ListTaskCountsResponse</a></td>
+                <td><p>ListTaskCounts returns per-status task totals for a conversation, so the
+task board summary stays accurate independent of list pagination.</p></td>
               </tr>
             
               <tr>
@@ -11677,6 +11787,16 @@ user, hiding it from All and Unread. The caller&#39;s own id must own the row.</
                 <td>ListTasks</td>
                 <td>GET</td>
                 <td>/v1/{conversation=conversations/*}/tasks</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListTaskCounts</td>
+                <td>GET</td>
+                <td>/v1/{conversation=conversations/*}/tasks:counts</td>
                 <td></td>
               </tr>
               

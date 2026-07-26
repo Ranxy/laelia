@@ -271,6 +271,9 @@ type Request struct {
 	Status string `json:"status,omitempty"`
 	// Statuses is the repeatable status filter for `task list --status`.
 	Statuses []string `json:"statuses,omitempty"`
+	// PageSize caps one page of `task list` results (newest first); 0 uses the
+	// server default.
+	PageSize int32 `json:"page_size,omitempty"`
 
 	// File command fields.
 	LocalPath    string `json:"local_path,omitempty"`
@@ -469,6 +472,8 @@ func (s *Server) handleTaskList(w http.ResponseWriter, r *http.Request) {
 		text, err := chattools.ListTasks(r.Context(), s.deps(req), chattools.ListTasksInput{
 			Conversation: req.Conversation,
 			Statuses:     req.Statuses,
+			PageSize:     req.PageSize,
+			PageToken:    req.PageToken,
 		})
 		return text, asChatError(err)
 	})

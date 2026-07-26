@@ -804,11 +804,36 @@ message ListTasksRequest {
   // status_filter, when non-empty, restricts the result to the given statuses.
   // Empty returns tasks in every status.
   repeated TaskStatus status_filter = 2;
+  // page_size is the maximum number of tasks to return in one page. The server
+  // clamps it to a sane range and applies a default when zero.
+  int32 page_size = 3;
+  // page_token is the opaque cursor returned in the previous response's
+  // next_page_token; empty starts at the newest task.
+  string page_token = 4;
 }
 message ListTasksResponse {
-  // tasks are the channel's task root messages, each with task populated,
-  // ordered by task_number ascending.
+  // tasks are one page of the channel's task root messages, each with task
+  // populated, ordered by task_number descending (newest first).
   repeated ChatMessage tasks = 1;
+  // next_page_token is the cursor for the next (older) page; empty when this
+  // page is the last.
+  string next_page_token = 2;
+}
+
+// ListTaskCountsRequest asks for per-status task totals for a conversation, so
+// the task board summary stays accurate regardless of how many tasks are loaded
+// into the paginated list view.
+message ListTaskCountsRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
+}
+message ListTaskCountsResponse {
+  int32 todo_count = 1;
+  int32 in_progress_count = 2;
+  int32 in_review_count = 3;
+  int32 done_count = 4;
 }
 
 message ClaimTaskRequest {
@@ -1453,10 +1478,19 @@ service CommandService {
     option (laelia.v1.audit) = true;
   }
 
-  // ListTasks returns the task board for a conversation: every task (root
-  // message with task metadata) in the channel, optionally filtered by status.
+  // ListTasks returns one page of the task board for a conversation: the
+  // channel's tasks (root messages with task metadata), newest first, optionally
+  // filtered by status. Use page_size / page_token for pagination.
   rpc ListTasks(ListTasksRequest) returns (ListTasksResponse) {
     option (google.api.http) = {get: "/v1/{conversation=conversations/*}/tasks"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.read";
+  }
+
+  // ListTaskCounts returns per-status task totals for a conversation, so the
+  // task board summary stays accurate independent of list pagination.
+  rpc ListTaskCounts(ListTaskCountsRequest) returns (ListTaskCountsResponse) {
+    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/tasks:counts"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }

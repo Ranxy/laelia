@@ -2392,6 +2392,22 @@ export declare type ListTasksRequest = Message<"laelia.v1.ListTasksRequest"> & {
    * @generated from field: repeated laelia.v1.TaskStatus status_filter = 2;
    */
   statusFilter: TaskStatus[];
+
+  /**
+   * page_size is the maximum number of tasks to return in one page. The server
+   * clamps it to a sane range and applies a default when zero.
+   *
+   * @generated from field: int32 page_size = 3;
+   */
+  pageSize: number;
+
+  /**
+   * page_token is the opaque cursor returned in the previous response's
+   * next_page_token; empty starts at the newest task.
+   *
+   * @generated from field: string page_token = 4;
+   */
+  pageToken: string;
 };
 
 /**
@@ -2405,12 +2421,20 @@ export declare const ListTasksRequestSchema: GenMessage<ListTasksRequest>;
  */
 export declare type ListTasksResponse = Message<"laelia.v1.ListTasksResponse"> & {
   /**
-   * tasks are the channel's task root messages, each with task populated,
-   * ordered by task_number ascending.
+   * tasks are one page of the channel's task root messages, each with task
+   * populated, ordered by task_number descending (newest first).
    *
    * @generated from field: repeated laelia.v1.ChatMessage tasks = 1;
    */
   tasks: ChatMessage[];
+
+  /**
+   * next_page_token is the cursor for the next (older) page; empty when this
+   * page is the last.
+   *
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
 };
 
 /**
@@ -2418,6 +2442,57 @@ export declare type ListTasksResponse = Message<"laelia.v1.ListTasksResponse"> &
  * Use `create(ListTasksResponseSchema)` to create a new message.
  */
 export declare const ListTasksResponseSchema: GenMessage<ListTasksResponse>;
+
+/**
+ * ListTaskCountsRequest asks for per-status task totals for a conversation, so
+ * the task board summary stays accurate regardless of how many tasks are loaded
+ * into the paginated list view.
+ *
+ * @generated from message laelia.v1.ListTaskCountsRequest
+ */
+export declare type ListTaskCountsRequest = Message<"laelia.v1.ListTaskCountsRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListTaskCountsRequest.
+ * Use `create(ListTaskCountsRequestSchema)` to create a new message.
+ */
+export declare const ListTaskCountsRequestSchema: GenMessage<ListTaskCountsRequest>;
+
+/**
+ * @generated from message laelia.v1.ListTaskCountsResponse
+ */
+export declare type ListTaskCountsResponse = Message<"laelia.v1.ListTaskCountsResponse"> & {
+  /**
+   * @generated from field: int32 todo_count = 1;
+   */
+  todoCount: number;
+
+  /**
+   * @generated from field: int32 in_progress_count = 2;
+   */
+  inProgressCount: number;
+
+  /**
+   * @generated from field: int32 in_review_count = 3;
+   */
+  inReviewCount: number;
+
+  /**
+   * @generated from field: int32 done_count = 4;
+   */
+  doneCount: number;
+};
+
+/**
+ * Describes the message laelia.v1.ListTaskCountsResponse.
+ * Use `create(ListTaskCountsResponseSchema)` to create a new message.
+ */
+export declare const ListTaskCountsResponseSchema: GenMessage<ListTaskCountsResponse>;
 
 /**
  * @generated from message laelia.v1.ClaimTaskRequest
@@ -4815,8 +4890,9 @@ export declare const CommandService: GenService<{
     output: typeof ConvertMessageToTaskResponseSchema;
   },
   /**
-   * ListTasks returns the task board for a conversation: every task (root
-   * message with task metadata) in the channel, optionally filtered by status.
+   * ListTasks returns one page of the task board for a conversation: the
+   * channel's tasks (root messages with task metadata), newest first, optionally
+   * filtered by status. Use page_size / page_token for pagination.
    *
    * @generated from rpc laelia.v1.CommandService.ListTasks
    */
@@ -4824,6 +4900,17 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof ListTasksRequestSchema;
     output: typeof ListTasksResponseSchema;
+  },
+  /**
+   * ListTaskCounts returns per-status task totals for a conversation, so the
+   * task board summary stays accurate independent of list pagination.
+   *
+   * @generated from rpc laelia.v1.CommandService.ListTaskCounts
+   */
+  listTaskCounts: {
+    methodKind: "unary";
+    input: typeof ListTaskCountsRequestSchema;
+    output: typeof ListTaskCountsResponseSchema;
   },
   /**
    * CreateTask posts a new top-level task message in a channel (used by agents

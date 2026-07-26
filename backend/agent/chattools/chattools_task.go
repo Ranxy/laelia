@@ -15,6 +15,12 @@ import (
 type ListTasksInput struct {
 	Conversation string   `json:"conversation"`
 	Statuses     []string `json:"statuses,omitempty"`
+	// PageSize caps one page of results; 0 uses the server default. Newest
+	// tasks come first.
+	PageSize int32 `json:"page_size,omitempty"`
+	// PageToken is the cursor returned by a previous page's next_page_token;
+	// empty starts at the newest task.
+	PageToken string `json:"page_token,omitempty"`
 }
 
 type ClaimTaskInput struct {
@@ -91,11 +97,18 @@ func formatTaskLine(addr string, m *v1pb.ChatMessage) string {
 
 // --- Task operations ------------------------------------------------------
 
-// ListTasks returns the task board for a conversation, optionally filtered by
-// status. Each line carries the full message resource name so the agent can
+// ListTasks returns one page of the task board for a conversation, newest
+// first. Each line carries the full message resource name so the agent can
 // claim/review/done it without reconstructing the name. Run this each drain to
 // discover TODO tasks the agent has already acked past (message read only
 // returns the cursor delta, so old tasks need an explicit listing).
+//
+// By default (no --status) it returns only non-done tasks (TODO, IN_PROGRESS,
+// IN_REVIEW) — completed work is rarely interesting to an agent draining a
+// channel, and this keeps the listing focused. Pass --status (repeatable) to
+// override, e.g. `--status done` to review completed work. The agent paginates
+// older tasks itself with --page-token (the footer prints the next token when
+// there are more); this never loops server-side.
 func ListTasks(ctx context.Context, d Deps, in ListTasksInput) (string, error) {
 	name, err := resolveConversationAddress(ctx, d, in.Conversation)
 	if err != nil {
@@ -105,25 +118,39 @@ func ListTasks(ctx context.Context, d Deps, in ListTasksInput) (string, error) {
 		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the address from the batch header or `laelia-agent message check`, e.g. #general or dm:@alice)", "")
 	}
 
+	// Default to non-done: an agent draining a channel cares about work still
+	// open, not completed history. An explicit --status overrides this (and can
+	// include done).
 	var filter []v1pb.TaskStatus
-	for _, s := range in.Statuses {
-		if s == "" {
-			continue
+	if len(in.Statuses) > 0 {
+		for _, s := range in.Statuses {
+			if s == "" {
+				continue
+			}
+			st, ok := parseTaskStatus(s)
+			if !ok {
+				return "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("unknown task status %q (want todo, in_progress, in_review, or done)", s), "Pass --status with a valid value.")
+			}
+			filter = append(filter, st)
 		}
-		st, ok := parseTaskStatus(s)
-		if !ok {
-			return "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("unknown task status %q (want todo, in_progress, in_review, or done)", s), "Pass --status with a valid value.")
+	} else {
+		filter = []v1pb.TaskStatus{
+			v1pb.TaskStatus_TASK_STATUS_TODO,
+			v1pb.TaskStatus_TASK_STATUS_IN_PROGRESS,
+			v1pb.TaskStatus_TASK_STATUS_IN_REVIEW,
 		}
-		filter = append(filter, st)
 	}
 
 	resp, err := d.Client.ListTasks(ctx, connect.NewRequest(&v1pb.ListTasksRequest{
 		Conversation: name,
 		StatusFilter: filter,
+		PageSize:     in.PageSize,
+		PageToken:    in.PageToken,
 	}))
 	if err != nil {
 		return "", wrapManagerError(err)
 	}
+	tasks := resp.Msg.GetTasks()
 
 	// The address the agent supplied is already a name form; use it for handles
 	// and the header label so they round-trip without a GetChannel round-trip.
@@ -131,15 +158,20 @@ func ListTasks(ctx context.Context, d Deps, in ListTasksInput) (string, error) {
 	// handles itself; the header label is quoted here so the agent can copy it
 	// verbatim (channel addresses start with '#', a shell comment char).
 	addr := strings.TrimSpace(in.Conversation)
-	text := fmt.Sprintf("Tasks in %s (%d):\n", quoteAddress(addr), len(resp.Msg.Tasks))
-	if len(resp.Msg.Tasks) == 0 {
+	text := fmt.Sprintf("Tasks in %s (%d):\n", quoteAddress(addr), len(tasks))
+	if len(tasks) == 0 {
 		text += "(none)\n"
 		return text, nil
 	}
-	for _, t := range resp.Msg.Tasks {
+	for _, t := range tasks {
 		text += formatTaskLine(addr, t)
 	}
 	text += "\nPass a task's `<address>:<message-id>` handle to `laelia-agent task claim` (TODO→IN_PROGRESS), `task review` (IN_PROGRESS→IN_REVIEW), or `task done` (IN_REVIEW→DONE).\n"
+	if next := resp.Msg.GetNextPageToken(); next != "" {
+		// Surface the cursor so the agent can fetch older tasks itself; it never
+		// needs to guess. Quote the token so it pastes verbatim as one arg.
+		text += fmt.Sprintf("\nOlder tasks remain. See them with: laelia-agent task list %s --page-token %q\n", quoteAddress(addr), next)
+	}
 	return text, nil
 }
 

@@ -1,4 +1,5 @@
 import { ListChecks, Loader2, MessageCircleReply, X } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { EmptyState, LoadingState } from "@/components/chat/states";
 import { TaskStatusBadge } from "@/components/chat/task-status-badge";
@@ -18,10 +19,16 @@ export interface TasksPanelProps {
   onOpenTask: (taskMessageId: string) => void;
 }
 
-// TasksPanel is the right-side task board for a channel: every task (root
-// message with task metadata) listed with its number, status badge, assignee,
-// and content. Mirrors ThreadPanel's open/close shape. Each card drills into
-// the task's thread (its workspace) via onOpenTask. A "Convert to Task"
+const EMPTY_TASKS: ChatMessageUI[] = [];
+const EMPTY_COUNTS = { todo: 0, inProgress: 0, inReview: 0, done: 0 };
+
+// TasksPanel is the right-side task board for a channel: tasks (root messages
+// with task metadata) listed newest-first with their number, status badge,
+// assignee, and content. Mirrors ThreadPanel's open/close shape. Each card
+// drills into the task's thread (its workspace) via onOpenTask. The list is
+// paginated — scrolling to the bottom loads the next (older) page via
+// loadMoreTasks — and the status summary uses ListTaskCounts totals so it stays
+// accurate regardless of how many tasks are loaded. A "Convert to Task"
 // affordance is intentionally NOT exposed per row here — conversion is driven
 // from the message row's own context; this panel is browsing the board plus a
 // refresh action.
@@ -36,12 +43,38 @@ export function TasksPanel({
 
   const tasks = useAppStore((s) => s.tasksByConv[convName] ?? EMPTY_TASKS);
   const loading = useAppStore((s) => s.tasksLoading[convName] ?? false);
+  const nextPageToken = useAppStore(
+    (s) => s.tasksNextPageToken[convName] ?? ""
+  );
+  const counts = useAppStore(
+    (s) => s.taskCountsByConv[convName] ?? EMPTY_COUNTS
+  );
   const loadTasks = useAppStore((s) => s.loadTasks);
+  const loadMoreTasks = useAppStore((s) => s.loadMoreTasks);
+  const loadTaskCounts = useAppStore((s) => s.loadTaskCounts);
 
-  const todoCount = tasks.filter((m) => m.task?.status === 1).length;
-  const inProgressCount = tasks.filter((m) => m.task?.status === 2).length;
-  const inReviewCount = tasks.filter((m) => m.task?.status === 3).length;
-  const doneCount = tasks.filter((m) => m.task?.status === 4).length;
+  const hasMore = nextPageToken !== "";
+
+  // Infinite scroll: when the bottom sentinel enters the viewport and there is
+  // another (older) page available, load it. The store's loadMoreTasks is a
+  // no-op while a load is in flight, so repeated intersections are safe.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting) && hasMore && !loading) {
+        void loadMoreTasks(channelId);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [channelId, hasMore, loading, loadMoreTasks]);
+
+  const handleRefresh = () => {
+    void loadTasks(channelId);
+    void loadTaskCounts(channelId);
+  };
 
   return (
     <aside className="flex w-[420px] shrink-0 flex-col border-l border-control-border">
@@ -53,10 +86,10 @@ export function TasksPanel({
           </p>
           <p className="text-[11px] text-control-placeholder">
             {t("channelTask.panel-summary", {
-              todo: todoCount,
-              inProgress: inProgressCount,
-              inReview: inReviewCount,
-              done: doneCount,
+              todo: counts.todo,
+              inProgress: counts.inProgress,
+              inReview: counts.inReview,
+              done: counts.done,
             })}
           </p>
         </div>
@@ -64,7 +97,7 @@ export function TasksPanel({
           type="button"
           size="xs"
           variant="ghost"
-          onClick={() => void loadTasks(channelId)}
+          onClick={handleRefresh}
           disabled={loading}
           aria-label={t("channelTask.refresh")}
         >
@@ -96,6 +129,19 @@ export function TasksPanel({
           {tasks.map((task) => (
             <TaskCard key={task.id} task={task} onOpenTask={onOpenTask} />
           ))}
+          {/* Scroll-to-bottom sentinel: triggers loadMoreTasks when visible.
+              Shown only when there is another page; a spinner replaces it while
+              that page is loading. */}
+          {hasMore && (
+            <div
+              ref={sentinelRef}
+              className="flex items-center justify-center py-2 text-control-placeholder"
+            >
+              {loading && tasks.length > 0 && (
+                <Loader2 className="size-4 animate-spin" />
+              )}
+            </div>
+          )}
         </div>
       </div>
     </aside>
@@ -154,5 +200,3 @@ function TaskCard({
     </div>
   );
 }
-
-const EMPTY_TASKS: ChatMessageUI[] = [];

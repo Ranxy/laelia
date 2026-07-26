@@ -1710,8 +1710,9 @@ paths:
             tags:
                 - CommandService
             description: |-
-                ListTasks returns the task board for a conversation: every task (root
-                 message with task metadata) in the channel, optionally filtered by status.
+                ListTasks returns one page of the task board for a conversation: the
+                 channel's tasks (root messages with task metadata), newest first, optionally
+                 filtered by status. Use page_size / page_token for pagination.
             operationId: CommandService_ListTasks
             parameters:
                 - name: conversation
@@ -1736,6 +1737,21 @@ paths:
                             - TASK_STATUS_DONE
                         type: string
                         format: enum
+                - name: pageSize
+                  in: query
+                  description: |-
+                    page_size is the maximum number of tasks to return in one page. The server
+                     clamps it to a sane range and applies a default when zero.
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  description: |-
+                    page_token is the opaque cursor returned in the previous response's
+                     next_page_token; empty starts at the newest task.
+                  schema:
+                    type: string
             responses:
                 "200":
                     description: OK
@@ -1743,6 +1759,34 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/ListTasksResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}/tasks:counts:
+        get:
+            tags:
+                - CommandService
+            description: |-
+                ListTaskCounts returns per-status task totals for a conversation, so the
+                 task board summary stays accurate independent of list pagination.
+            operationId: CommandService_ListTaskCounts
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListTaskCountsResponse'
                 default:
                     description: Default error response
                     content:
@@ -4747,6 +4791,21 @@ components:
                         $ref: '#/components/schemas/Role'
                 nextPageToken:
                     type: string
+        ListTaskCountsResponse:
+            type: object
+            properties:
+                todoCount:
+                    type: integer
+                    format: int32
+                inProgressCount:
+                    type: integer
+                    format: int32
+                inReviewCount:
+                    type: integer
+                    format: int32
+                doneCount:
+                    type: integer
+                    format: int32
         ListTasksResponse:
             type: object
             properties:
@@ -4755,8 +4814,13 @@ components:
                     items:
                         $ref: '#/components/schemas/ChatMessage'
                     description: |-
-                        tasks are the channel's task root messages, each with task populated,
-                         ordered by task_number ascending.
+                        tasks are one page of the channel's task root messages, each with task
+                         populated, ordered by task_number descending (newest first).
+                nextPageToken:
+                    type: string
+                    description: |-
+                        next_page_token is the cursor for the next (older) page; empty when this
+                         page is the last.
         ListThreadMessagesResponse:
             type: object
             properties:

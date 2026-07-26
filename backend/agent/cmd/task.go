@@ -16,14 +16,20 @@ var taskCmd = &cobra.Command{
 	Short: "List, claim, advance, and create channel tasks (LLM-facing, used during drain sessions)",
 }
 
-// task list <address> [--status S]... — the task board, optionally
-// filtered by status. Each line prints the full message resource name the
-// agent passes to claim/review/done.
-var taskListStatuses []string
+// task list <address> [--status S]... [--page-size N] [--page-token T] — one
+// page of the task board (newest first), optionally filtered by status. Without
+// --status it returns only non-done tasks. Each line prints the full message
+// resource name the agent passes to claim/review/done. When more tasks remain,
+// the footer prints the next page token to pass back via --page-token.
+var (
+	taskListStatuses  []string
+	taskListPageSize  int32
+	taskListPageToken string
+)
 
 var taskListCmd = &cobra.Command{
 	Use:   "list <address>",
-	Short: "List tasks in a conversation (the task board), optionally filtered by status",
+	Short: "List tasks in a conversation (the task board, newest first), optionally filtered by status",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !requireArgs(cmd, 1, args) {
 			return ErrCLIFailed
@@ -31,6 +37,8 @@ var taskListCmd = &cobra.Command{
 		if !call("/task/list", daemonsrv.Request{
 			Conversation: args[0],
 			Statuses:     taskListStatuses,
+			PageSize:     taskListPageSize,
+			PageToken:    taskListPageToken,
 		}) {
 			return ErrCLIFailed
 		}
@@ -132,7 +140,9 @@ var taskCreateCmd = &cobra.Command{
 }
 
 func init() {
-	taskListCmd.Flags().StringArrayVar(&taskListStatuses, "status", nil, "filter by status (repeatable): todo, in_progress, in_review, done")
+	taskListCmd.Flags().StringArrayVar(&taskListStatuses, "status", nil, "filter by status (repeatable): todo, in_progress, in_review, done. Omit to list non-done tasks only (default).")
+	taskListCmd.Flags().Int32Var(&taskListPageSize, "page-size", 0, "max tasks per page (newest first); 0 uses the server default")
+	taskListCmd.Flags().StringVar(&taskListPageToken, "page-token", "", "cursor from a previous page's footer to fetch older tasks")
 
 	taskCreateCmd.Flags().StringVar(&taskCreateContent, "content", "", "task text; \"-\" reads from stdin")
 	taskCreateCmd.Flags().StringArrayVar(&taskCreateAttachments, "attach", nil, "file id to attach to this task (repeatable); the file must already be uploaded to this conversation via `file upload --conversation`")

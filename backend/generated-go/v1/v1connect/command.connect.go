@@ -138,6 +138,9 @@ const (
 	// CommandServiceListTasksProcedure is the fully-qualified name of the CommandService's ListTasks
 	// RPC.
 	CommandServiceListTasksProcedure = "/laelia.v1.CommandService/ListTasks"
+	// CommandServiceListTaskCountsProcedure is the fully-qualified name of the CommandService's
+	// ListTaskCounts RPC.
+	CommandServiceListTaskCountsProcedure = "/laelia.v1.CommandService/ListTaskCounts"
 	// CommandServiceCreateTaskProcedure is the fully-qualified name of the CommandService's CreateTask
 	// RPC.
 	CommandServiceCreateTaskProcedure = "/laelia.v1.CommandService/CreateTask"
@@ -286,9 +289,13 @@ type CommandServiceClient interface {
 	// attaching task metadata (number, status=TODO, no assignee). Any channel
 	// member (user or agent) may convert. Emits a system notification row.
 	ConvertMessageToTask(context.Context, *connect.Request[v1.ConvertMessageToTaskRequest]) (*connect.Response[v1.ConvertMessageToTaskResponse], error)
-	// ListTasks returns the task board for a conversation: every task (root
-	// message with task metadata) in the channel, optionally filtered by status.
+	// ListTasks returns one page of the task board for a conversation: the
+	// channel's tasks (root messages with task metadata), newest first, optionally
+	// filtered by status. Use page_size / page_token for pagination.
 	ListTasks(context.Context, *connect.Request[v1.ListTasksRequest]) (*connect.Response[v1.ListTasksResponse], error)
+	// ListTaskCounts returns per-status task totals for a conversation, so the
+	// task board summary stays accurate independent of list pagination.
+	ListTaskCounts(context.Context, *connect.Request[v1.ListTaskCountsRequest]) (*connect.Response[v1.ListTaskCountsResponse], error)
 	// CreateTask posts a new top-level task message in a channel (used by agents
 	// to break work into subtasks for others to claim). The new task is created
 	// unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a
@@ -582,6 +589,12 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("ListTasks")),
 			connect.WithClientOptions(opts...),
 		),
+		listTaskCounts: connect.NewClient[v1.ListTaskCountsRequest, v1.ListTaskCountsResponse](
+			httpClient,
+			baseURL+CommandServiceListTaskCountsProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ListTaskCounts")),
+			connect.WithClientOptions(opts...),
+		),
 		createTask: connect.NewClient[v1.CreateTaskRequest, v1.CreateTaskResponse](
 			httpClient,
 			baseURL+CommandServiceCreateTaskProcedure,
@@ -753,6 +766,7 @@ type commandServiceClient struct {
 	postMessage               *connect.Client[v1.PostMessageRequest, v1.PostMessageResponse]
 	convertMessageToTask      *connect.Client[v1.ConvertMessageToTaskRequest, v1.ConvertMessageToTaskResponse]
 	listTasks                 *connect.Client[v1.ListTasksRequest, v1.ListTasksResponse]
+	listTaskCounts            *connect.Client[v1.ListTaskCountsRequest, v1.ListTaskCountsResponse]
 	createTask                *connect.Client[v1.CreateTaskRequest, v1.CreateTaskResponse]
 	claimTask                 *connect.Client[v1.ClaimTaskRequest, v1.ClaimTaskResponse]
 	unclaimTask               *connect.Client[v1.UnclaimTaskRequest, v1.UnclaimTaskResponse]
@@ -947,6 +961,11 @@ func (c *commandServiceClient) ListTasks(ctx context.Context, req *connect.Reque
 	return c.listTasks.CallUnary(ctx, req)
 }
 
+// ListTaskCounts calls laelia.v1.CommandService.ListTaskCounts.
+func (c *commandServiceClient) ListTaskCounts(ctx context.Context, req *connect.Request[v1.ListTaskCountsRequest]) (*connect.Response[v1.ListTaskCountsResponse], error) {
+	return c.listTaskCounts.CallUnary(ctx, req)
+}
+
 // CreateTask calls laelia.v1.CommandService.CreateTask.
 func (c *commandServiceClient) CreateTask(ctx context.Context, req *connect.Request[v1.CreateTaskRequest]) (*connect.Response[v1.CreateTaskResponse], error) {
 	return c.createTask.CallUnary(ctx, req)
@@ -1134,9 +1153,13 @@ type CommandServiceHandler interface {
 	// attaching task metadata (number, status=TODO, no assignee). Any channel
 	// member (user or agent) may convert. Emits a system notification row.
 	ConvertMessageToTask(context.Context, *connect.Request[v1.ConvertMessageToTaskRequest]) (*connect.Response[v1.ConvertMessageToTaskResponse], error)
-	// ListTasks returns the task board for a conversation: every task (root
-	// message with task metadata) in the channel, optionally filtered by status.
+	// ListTasks returns one page of the task board for a conversation: the
+	// channel's tasks (root messages with task metadata), newest first, optionally
+	// filtered by status. Use page_size / page_token for pagination.
 	ListTasks(context.Context, *connect.Request[v1.ListTasksRequest]) (*connect.Response[v1.ListTasksResponse], error)
+	// ListTaskCounts returns per-status task totals for a conversation, so the
+	// task board summary stays accurate independent of list pagination.
+	ListTaskCounts(context.Context, *connect.Request[v1.ListTaskCountsRequest]) (*connect.Response[v1.ListTaskCountsResponse], error)
 	// CreateTask posts a new top-level task message in a channel (used by agents
 	// to break work into subtasks for others to claim). The new task is created
 	// unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a
@@ -1426,6 +1449,12 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("ListTasks")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceListTaskCountsHandler := connect.NewUnaryHandler(
+		CommandServiceListTaskCountsProcedure,
+		svc.ListTaskCounts,
+		connect.WithSchema(commandServiceMethods.ByName("ListTaskCounts")),
+		connect.WithHandlerOptions(opts...),
+	)
 	commandServiceCreateTaskHandler := connect.NewUnaryHandler(
 		CommandServiceCreateTaskProcedure,
 		svc.CreateTask,
@@ -1628,6 +1657,8 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceConvertMessageToTaskHandler.ServeHTTP(w, r)
 		case CommandServiceListTasksProcedure:
 			commandServiceListTasksHandler.ServeHTTP(w, r)
+		case CommandServiceListTaskCountsProcedure:
+			commandServiceListTaskCountsHandler.ServeHTTP(w, r)
 		case CommandServiceCreateTaskProcedure:
 			commandServiceCreateTaskHandler.ServeHTTP(w, r)
 		case CommandServiceClaimTaskProcedure:
@@ -1815,6 +1846,10 @@ func (UnimplementedCommandServiceHandler) ConvertMessageToTask(context.Context, 
 
 func (UnimplementedCommandServiceHandler) ListTasks(context.Context, *connect.Request[v1.ListTasksRequest]) (*connect.Response[v1.ListTasksResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListTasks is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ListTaskCounts(context.Context, *connect.Request[v1.ListTaskCountsRequest]) (*connect.Response[v1.ListTaskCountsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListTaskCounts is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) CreateTask(context.Context, *connect.Request[v1.CreateTaskRequest]) (*connect.Response[v1.CreateTaskResponse], error) {

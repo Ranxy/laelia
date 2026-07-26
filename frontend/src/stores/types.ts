@@ -412,14 +412,31 @@ export interface ImagePreviewSlice {
 // state, and the convert-message-to-task mutation. Tasks live in the same
 // chatMessages flow as regular messages (a task IS a message with metadata);
 // this slice is only the panel's separate view onto the task subset.
+export interface TaskCountsUI {
+  todo: number;
+  inProgress: number;
+  inReview: number;
+  done: number;
+}
+
 export interface TaskSlice {
   tasksByConv: Record<string, ChatMessageUI[]>;
+  // nextPageToken per conversation: "" means no more (older) pages to load.
+  tasksNextPageToken: Record<string, string>;
+  // Per-status totals per conversation, from ListTaskCounts, so the board
+  // summary stays accurate regardless of how many tasks the paginated list has
+  // loaded into tasksByConv.
+  taskCountsByConv: Record<string, TaskCountsUI>;
   tasksLoading: Record<string, boolean>;
   tasksPanelOpen: Record<string, boolean>;
 
   toggleTasksPanel: (conversationId: string) => void;
   closeTasksPanel: (conversationId: string) => void;
   loadTasks: (conversationId: string, statusFilter?: number[]) => Promise<void>;
+  // loadMoreTasks appends the next (older) page to tasksByConv; a no-op when
+  // there is no next page or a load is already in flight.
+  loadMoreTasks: (conversationId: string) => Promise<void>;
+  loadTaskCounts: (conversationId: string) => Promise<void>;
   convertMessageToTask: (
     conversationId: string,
     messageId: string

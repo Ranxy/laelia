@@ -101,7 +101,7 @@ func (s *CommandService) ListTasks(ctx context.Context, req *connect.Request[v1p
 		}
 		filter = append(filter, int16(st))
 	}
-	msgs, err := s.store.ListTasks(ctx, convID, filter)
+	msgs, nextToken, err := s.store.ListTasks(ctx, convID, filter, int(req.Msg.PageSize), req.Msg.PageToken)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to list tasks"))
 	}
@@ -109,7 +109,26 @@ func (s *CommandService) ListTasks(ctx context.Context, req *connect.Request[v1p
 	for _, m := range msgs {
 		tasks = append(tasks, storeToV1ChatMessage(m))
 	}
-	return connect.NewResponse(&v1pb.ListTasksResponse{Tasks: tasks}), nil
+	return connect.NewResponse(&v1pb.ListTasksResponse{Tasks: tasks, NextPageToken: nextToken}), nil
+}
+
+// ListTaskCounts returns per-status task totals for a conversation, so the task
+// board summary stays accurate independent of list pagination.
+func (s *CommandService) ListTaskCounts(ctx context.Context, req *connect.Request[v1pb.ListTaskCountsRequest]) (*connect.Response[v1pb.ListTaskCountsResponse], error) {
+	convID, err := parseConversationID(req.Msg.Conversation)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
+	}
+	todo, inProgress, inReview, done, err := s.store.ListTaskCounts(ctx, convID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to list task counts"))
+	}
+	return connect.NewResponse(&v1pb.ListTaskCountsResponse{
+		TodoCount:       todo,
+		InProgressCount: inProgress,
+		InReviewCount:   inReview,
+		DoneCount:       done,
+	}), nil
 }
 
 // CreateTask posts a new top-level task message in a channel (used by agents to

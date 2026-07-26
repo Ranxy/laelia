@@ -44,7 +44,11 @@ export interface ThreadPanelProps {
   channelTitle: string;
   rootMessageId: string;
   onClose: () => void;
-  onViewInChannel: () => void;
+  // onViewInChannel renders the header "View in channel" jump. Omitted (and the
+  // button hidden) when the thread is already shown inside its channel — the
+  // jump is only meaningful from a standalone/embedded context (activity detail,
+  // reminder detail) that is not the channel itself.
+  onViewInChannel?: () => void;
   onPreviewAttachment?: (attachment: Attachment, rootMessageId: string) => void;
   onJumpToSection?: (
     attachment: Attachment,
@@ -606,7 +610,11 @@ function ThreadHeader({
   channelId: string;
   rootMsg: ChatMessageUI | null;
   onClose: () => void;
-  onViewInChannel: () => void;
+  // onViewInChannel renders the header "View in channel" jump. Omitted (and the
+  // button hidden) when the thread is already shown inside its channel — the
+  // jump is only meaningful from a standalone/embedded context (activity detail,
+  // reminder detail) that is not the channel itself.
+  onViewInChannel?: () => void;
 }) {
   const { t } = useTranslation();
   const closeThread = useAppStore((s) => s.closeThread);
@@ -637,16 +645,18 @@ function ThreadHeader({
           {title} — #{channelName}
         </p>
       </div>
-      <button
-        type="button"
-        onClick={onViewInChannel}
-        className="flex items-center gap-1 text-xs text-control-placeholder hover:text-accent transition-colors"
-      >
-        <ExternalLink className="size-3.5" />
-        <span className="hidden sm:inline">
-          {t("chat.thread-view-in-channel")}
-        </span>
-      </button>
+      {onViewInChannel && (
+        <button
+          type="button"
+          onClick={onViewInChannel}
+          className="flex items-center gap-1 text-xs text-control-placeholder hover:text-accent transition-colors"
+        >
+          <ExternalLink className="size-3.5" />
+          <span className="hidden sm:inline">
+            {t("chat.thread-view-in-channel")}
+          </span>
+        </button>
+      )}
       <button
         type="button"
         onClick={onClose}

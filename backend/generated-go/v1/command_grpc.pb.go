@@ -54,6 +54,7 @@ const (
 	CommandService_PostMessage_FullMethodName               = "/laelia.v1.CommandService/PostMessage"
 	CommandService_ConvertMessageToTask_FullMethodName      = "/laelia.v1.CommandService/ConvertMessageToTask"
 	CommandService_ListTasks_FullMethodName                 = "/laelia.v1.CommandService/ListTasks"
+	CommandService_ListTaskCounts_FullMethodName            = "/laelia.v1.CommandService/ListTaskCounts"
 	CommandService_CreateTask_FullMethodName                = "/laelia.v1.CommandService/CreateTask"
 	CommandService_ClaimTask_FullMethodName                 = "/laelia.v1.CommandService/ClaimTask"
 	CommandService_UnclaimTask_FullMethodName               = "/laelia.v1.CommandService/UnclaimTask"
@@ -157,9 +158,13 @@ type CommandServiceClient interface {
 	// attaching task metadata (number, status=TODO, no assignee). Any channel
 	// member (user or agent) may convert. Emits a system notification row.
 	ConvertMessageToTask(ctx context.Context, in *ConvertMessageToTaskRequest, opts ...grpc.CallOption) (*ConvertMessageToTaskResponse, error)
-	// ListTasks returns the task board for a conversation: every task (root
-	// message with task metadata) in the channel, optionally filtered by status.
+	// ListTasks returns one page of the task board for a conversation: the
+	// channel's tasks (root messages with task metadata), newest first, optionally
+	// filtered by status. Use page_size / page_token for pagination.
 	ListTasks(ctx context.Context, in *ListTasksRequest, opts ...grpc.CallOption) (*ListTasksResponse, error)
+	// ListTaskCounts returns per-status task totals for a conversation, so the
+	// task board summary stays accurate independent of list pagination.
+	ListTaskCounts(ctx context.Context, in *ListTaskCountsRequest, opts ...grpc.CallOption) (*ListTaskCountsResponse, error)
 	// CreateTask posts a new top-level task message in a channel (used by agents
 	// to break work into subtasks for others to claim). The new task is created
 	// unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a
@@ -604,6 +609,16 @@ func (c *commandServiceClient) ListTasks(ctx context.Context, in *ListTasksReque
 	return out, nil
 }
 
+func (c *commandServiceClient) ListTaskCounts(ctx context.Context, in *ListTaskCountsRequest, opts ...grpc.CallOption) (*ListTaskCountsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTaskCountsResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListTaskCounts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *commandServiceClient) CreateTask(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateTaskResponse)
@@ -903,9 +918,13 @@ type CommandServiceServer interface {
 	// attaching task metadata (number, status=TODO, no assignee). Any channel
 	// member (user or agent) may convert. Emits a system notification row.
 	ConvertMessageToTask(context.Context, *ConvertMessageToTaskRequest) (*ConvertMessageToTaskResponse, error)
-	// ListTasks returns the task board for a conversation: every task (root
-	// message with task metadata) in the channel, optionally filtered by status.
+	// ListTasks returns one page of the task board for a conversation: the
+	// channel's tasks (root messages with task metadata), newest first, optionally
+	// filtered by status. Use page_size / page_token for pagination.
 	ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error)
+	// ListTaskCounts returns per-status task totals for a conversation, so the
+	// task board summary stays accurate independent of list pagination.
+	ListTaskCounts(context.Context, *ListTaskCountsRequest) (*ListTaskCountsResponse, error)
 	// CreateTask posts a new top-level task message in a channel (used by agents
 	// to break work into subtasks for others to claim). The new task is created
 	// unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a
@@ -1093,6 +1112,9 @@ func (UnimplementedCommandServiceServer) ConvertMessageToTask(context.Context, *
 }
 func (UnimplementedCommandServiceServer) ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListTasks not implemented")
+}
+func (UnimplementedCommandServiceServer) ListTaskCounts(context.Context, *ListTaskCountsRequest) (*ListTaskCountsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTaskCounts not implemented")
 }
 func (UnimplementedCommandServiceServer) CreateTask(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateTask not implemented")
@@ -1779,6 +1801,24 @@ func _CommandService_ListTasks_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommandService_ListTaskCounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTaskCountsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListTaskCounts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListTaskCounts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListTaskCounts(ctx, req.(*ListTaskCountsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CommandService_CreateTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateTaskRequest)
 	if err := dec(in); err != nil {
@@ -2309,6 +2349,10 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListTasks",
 			Handler:    _CommandService_ListTasks_Handler,
+		},
+		{
+			MethodName: "ListTaskCounts",
+			Handler:    _CommandService_ListTaskCounts_Handler,
 		},
 		{
 			MethodName: "CreateTask",

@@ -189,6 +189,8 @@
     - [ListPeerAgentsResponse](#laelia-v1-ListPeerAgentsResponse)
     - [ListRemindersRequest](#laelia-v1-ListRemindersRequest)
     - [ListRemindersResponse](#laelia-v1-ListRemindersResponse)
+    - [ListTaskCountsRequest](#laelia-v1-ListTaskCountsRequest)
+    - [ListTaskCountsResponse](#laelia-v1-ListTaskCountsResponse)
     - [ListTasksRequest](#laelia-v1-ListTasksRequest)
     - [ListTasksResponse](#laelia-v1-ListTasksResponse)
     - [ListThreadMessagesRequest](#laelia-v1-ListThreadMessagesRequest)
@@ -3277,6 +3279,41 @@ connection state. Agent-callable. Powers the &#34;agent list&#34; discovery tool
 
 
 
+<a name="laelia-v1-ListTaskCountsRequest"></a>
+
+### ListTaskCountsRequest
+ListTaskCountsRequest asks for per-status task totals for a conversation, so
+the task board summary stays accurate regardless of how many tasks are loaded
+into the paginated list view.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListTaskCountsResponse"></a>
+
+### ListTaskCountsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| todo_count | [int32](#int32) |  |  |
+| in_progress_count | [int32](#int32) |  |  |
+| in_review_count | [int32](#int32) |  |  |
+| done_count | [int32](#int32) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-ListTasksRequest"></a>
 
 ### ListTasksRequest
@@ -3287,6 +3324,8 @@ connection state. Agent-callable. Powers the &#34;agent list&#34; discovery tool
 | ----- | ---- | ----- | ----------- |
 | conversation | [string](#string) |  |  |
 | status_filter | [TaskStatus](#laelia-v1-TaskStatus) | repeated | status_filter, when non-empty, restricts the result to the given statuses. Empty returns tasks in every status. |
+| page_size | [int32](#int32) |  | page_size is the maximum number of tasks to return in one page. The server clamps it to a sane range and applies a default when zero. |
+| page_token | [string](#string) |  | page_token is the opaque cursor returned in the previous response&#39;s next_page_token; empty starts at the newest task. |
 
 
 
@@ -3301,7 +3340,8 @@ connection state. Agent-callable. Powers the &#34;agent list&#34; discovery tool
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| tasks | [ChatMessage](#laelia-v1-ChatMessage) | repeated | tasks are the channel&#39;s task root messages, each with task populated, ordered by task_number ascending. |
+| tasks | [ChatMessage](#laelia-v1-ChatMessage) | repeated | tasks are one page of the channel&#39;s task root messages, each with task populated, ordered by task_number descending (newest first). |
+| next_page_token | [string](#string) |  | next_page_token is the cursor for the next (older) page; empty when this page is the last. |
 
 
 
@@ -4427,7 +4467,8 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | SendMessage | [SendMessageRequest](#laelia-v1-SendMessageRequest) | [ChatMessage](#laelia-v1-ChatMessage) |  |
 | PostMessage | [PostMessageRequest](#laelia-v1-PostMessageRequest) | [PostMessageResponse](#laelia-v1-PostMessageResponse) |  |
 | ConvertMessageToTask | [ConvertMessageToTaskRequest](#laelia-v1-ConvertMessageToTaskRequest) | [ConvertMessageToTaskResponse](#laelia-v1-ConvertMessageToTaskResponse) | ConvertMessageToTask turns an existing top-level message into a task by attaching task metadata (number, status=TODO, no assignee). Any channel member (user or agent) may convert. Emits a system notification row. |
-| ListTasks | [ListTasksRequest](#laelia-v1-ListTasksRequest) | [ListTasksResponse](#laelia-v1-ListTasksResponse) | ListTasks returns the task board for a conversation: every task (root message with task metadata) in the channel, optionally filtered by status. |
+| ListTasks | [ListTasksRequest](#laelia-v1-ListTasksRequest) | [ListTasksResponse](#laelia-v1-ListTasksResponse) | ListTasks returns one page of the task board for a conversation: the channel&#39;s tasks (root messages with task metadata), newest first, optionally filtered by status. Use page_size / page_token for pagination. |
+| ListTaskCounts | [ListTaskCountsRequest](#laelia-v1-ListTaskCountsRequest) | [ListTaskCountsResponse](#laelia-v1-ListTaskCountsResponse) | ListTaskCounts returns per-status task totals for a conversation, so the task board summary stays accurate independent of list pagination. |
 | CreateTask | [CreateTaskRequest](#laelia-v1-CreateTaskRequest) | [CreateTaskResponse](#laelia-v1-CreateTaskResponse) | CreateTask posts a new top-level task message in a channel (used by agents to break work into subtasks for others to claim). The new task is created unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a system notification row and wakes other agent members. |
 | ClaimTask | [ClaimTaskRequest](#laelia-v1-ClaimTaskRequest) | [ClaimTaskResponse](#laelia-v1-ClaimTaskResponse) | ClaimTask atomically transitions a TODO task to IN_PROGRESS and assigns it to the calling agent, subscribing the agent to the task&#39;s thread so approval replies wake it. Returns FAILED_PRECONDITION if the task is already claimed or not in TODO. Emits a system notification row. |
 | UnclaimTask | [UnclaimTaskRequest](#laelia-v1-UnclaimTaskRequest) | [UnclaimTaskResponse](#laelia-v1-UnclaimTaskResponse) | UnclaimTask releases the calling agent&#39;s claim on a task it owns, setting it back to TODO so another agent may claim it. Not allowed on DONE (terminal). Emits a system notification row. |

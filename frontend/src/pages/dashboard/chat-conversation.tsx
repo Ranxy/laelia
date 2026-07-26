@@ -693,19 +693,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     [channelId, conversationName, openThread, closeTasksPanel]
   );
 
-  const handleViewInChannel = useCallback(() => {
-    const rootId = threadRootOpen;
-    closeThread();
-    if (rootId && scrollRef.current) {
-      // Defer until the panel unmounts so the main list reclaims width.
-      requestAnimationFrame(() => {
-        scrollRef.current
-          ?.querySelector(`[data-msg-id="${rootId}"]`)
-          ?.scrollIntoView({ block: "center", behavior: "smooth" });
-      });
-    }
-  }, [threadRootOpen, closeThread]);
-
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
       {/* Header */}
@@ -1097,7 +1084,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             channelTitle={channel?.title ?? channelId ?? ""}
             rootMessageId={threadRootOpen}
             onClose={closeThread}
-            onViewInChannel={handleViewInChannel}
             onPreviewAttachment={handlePreviewAttachment}
             onJumpToSection={handleJumpToSection}
             onPreviewImage={handlePreviewImage}

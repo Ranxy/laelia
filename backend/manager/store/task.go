@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -320,46 +321,100 @@ func (s *Store) GetTaskMessage(ctx context.Context, msgID uuid.UUID) (*ChatMessa
 	return msg, nil
 }
 
-// ListTasks returns the task board for a conversation: every root message that
-// has a task row, ordered by task_number ascending, with TaskInfo (and
-// thread_reply_count) populated. statusFilter, when non-empty, restricts the
-// result to the given statuses.
-func (s *Store) ListTasks(ctx context.Context, convID uuid.UUID, statusFilter []int16) ([]*ChatMessage, error) {
+// ListTasks returns one page of the task board for a conversation: root
+// messages that have a task row, ordered by task_number descending (newest
+// first), with TaskInfo (and thread_reply_count) populated. statusFilter, when
+// non-empty, restricts the result to the given statuses. Pagination is the same
+// OFFSET-token model as ListActivities: pageToken is the string offset, pageSize
+// is clamped to [1,100] with a default of 30. The returned nextToken is empty
+// when this page is the last.
+func (s *Store) ListTasks(ctx context.Context, convID uuid.UUID, statusFilter []int16, pageSize int, pageToken string) ([]*ChatMessage, string, error) {
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 30
+	}
+	offset, err := strconv.Atoi(pageToken)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
 	args := []any{convID}
 	where := ` AND cm.thread_root_message_id IS NULL`
 	if len(statusFilter) > 0 {
 		where += ` AND t.status = ANY($2)`
 		args = append(args, statusFilter)
 	}
+	idx := len(args) + 1
+	args = append(args, pageSize, offset)
 	rows, err := s.GetDB().QueryContext(ctx, `SELECT `+chatMessageColumns+`
 		FROM chat_message cm
 		JOIN principal p ON p.id = cm.principal_id
 		LEFT JOIN agent a ON a.id = cm.sender_agent_id
 		JOIN task t ON t.message_id = cm.id
 		WHERE cm.conversation_id = $1`+where+`
-		ORDER BY t.task_number ASC`, args...)
+		ORDER BY t.task_number DESC
+		LIMIT $`+itoa(idx)+` OFFSET $`+itoa(idx+1), args...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to list tasks")
+		return nil, "", errors.Wrapf(err, "failed to list tasks")
 	}
 	defer rows.Close()
 	var msgs []*ChatMessage
 	for rows.Next() {
 		msg, scanErr := scanChatMessageRow(rows)
 		if scanErr != nil {
-			return nil, scanErr
+			return nil, "", scanErr
 		}
 		msgs = append(msgs, msg)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrapf(err, "failed to iterate tasks")
+		return nil, "", errors.Wrapf(err, "failed to iterate tasks")
 	}
 	if err := s.fillThreadReplyCounts(ctx, msgs); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if err := s.fillTaskInfo(ctx, msgs); err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return msgs, nil
+	nextToken := ""
+	if len(msgs) == pageSize {
+		nextToken = strconv.Itoa(offset + pageSize)
+	}
+	return msgs, nextToken, nil
+}
+
+// ListTaskCounts returns per-status task totals for a conversation, so the task
+// board summary stays accurate regardless of how many tasks the paginated list
+// has loaded. One GROUP BY query covers all four non-unspecified statuses.
+func (s *Store) ListTaskCounts(ctx context.Context, convID uuid.UUID) (todo, inProgress, inReview, done int32, err error) {
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT status, COUNT(*)::int FROM task WHERE conversation_id = $1 GROUP BY status
+	`, convID)
+	if err != nil {
+		return 0, 0, 0, 0, errors.Wrapf(err, "failed to list task counts")
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var status int16
+		var count int32
+		if err := rows.Scan(&status, &count); err != nil {
+			return 0, 0, 0, 0, errors.Wrapf(err, "failed to scan task count")
+		}
+		switch status {
+		case TaskStatusTodo:
+			todo = count
+		case TaskStatusInProgress:
+			inProgress = count
+		case TaskStatusInReview:
+			inReview = count
+		case TaskStatusDone:
+			done = count
+		default:
+			// Unknown / UNSPECIFIED statuses are not surfaced in the summary.
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, 0, 0, 0, errors.Wrapf(err, "failed to iterate task counts")
+	}
+	return todo, inProgress, inReview, done, nil
 }
 
 // fillTaskInfo populates TaskInfo on each root message in msgs by joining the
