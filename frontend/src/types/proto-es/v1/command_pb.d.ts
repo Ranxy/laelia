@@ -1155,7 +1155,8 @@ export declare type Conversation = Message<"laelia.v1.Conversation"> & {
   /**
    * address is the name-based display address for this conversation, the form
    * agents write and read: "#<title>" for a channel (type 2), "dm:@<peer>" for a
-   * direct message (type 1 peer is the user, type 3 peer is the other agent).
+   * direct message (type 1 peer is the user, type 3 peer is the other agent,
+   * type 4 peer is the other user).
    * Empty when the address is not applicable. Populated by the single builder
    * convertToV1Conversation so every emit site renders the same form.
    *
@@ -1559,6 +1560,44 @@ export declare type GetOrCreateConversationResponse = Message<"laelia.v1.GetOrCr
  * Use `create(GetOrCreateConversationResponseSchema)` to create a new message.
  */
 export declare const GetOrCreateConversationResponseSchema: GenMessage<GetOrCreateConversationResponse>;
+
+/**
+ * GetOrCreateUserUserDM opens (or reuses) the type-4 direct conversation
+ * between the calling user and a peer user. User-only (an agent token must not
+ * create a user-user DM). The peer is resolved by user resource name
+ * ("users/<id>"); self-address is rejected; the pair is canonicalized by the
+ * store. This is the user-user twin of the user-agent GetOrCreateConversation.
+ *
+ * @generated from message laelia.v1.GetOrCreateUserUserDMRequest
+ */
+export declare type GetOrCreateUserUserDMRequest = Message<"laelia.v1.GetOrCreateUserUserDMRequest"> & {
+  /**
+   * @generated from field: string peer_user = 1;
+   */
+  peerUser: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetOrCreateUserUserDMRequest.
+ * Use `create(GetOrCreateUserUserDMRequestSchema)` to create a new message.
+ */
+export declare const GetOrCreateUserUserDMRequestSchema: GenMessage<GetOrCreateUserUserDMRequest>;
+
+/**
+ * @generated from message laelia.v1.GetOrCreateUserUserDMResponse
+ */
+export declare type GetOrCreateUserUserDMResponse = Message<"laelia.v1.GetOrCreateUserUserDMResponse"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetOrCreateUserUserDMResponse.
+ * Use `create(GetOrCreateUserUserDMResponseSchema)` to create a new message.
+ */
+export declare const GetOrCreateUserUserDMResponseSchema: GenMessage<GetOrCreateUserUserDMResponse>;
 
 /**
  * ResolveChannelByTitle looks up the unique channel (type 2) with the given
@@ -4529,6 +4568,19 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof GetOrCreateConversationRequestSchema;
     output: typeof GetOrCreateConversationResponseSchema;
+  },
+  /**
+   * GetOrCreateUserUserDM opens (or reuses) the type-4 user-to-user DM between
+   * the calling user and a peer user. User-only. The peer is resolved by user
+   * resource name ("users/<id>"); self-address is rejected; the pair is
+   * canonicalized by the store. User-user twin of GetOrCreateConversation.
+   *
+   * @generated from rpc laelia.v1.CommandService.GetOrCreateUserUserDM
+   */
+  getOrCreateUserUserDM: {
+    methodKind: "unary";
+    input: typeof GetOrCreateUserUserDMRequestSchema;
+    output: typeof GetOrCreateUserUserDMResponseSchema;
   },
   /**
    * ResolveChannelByTitle looks up the unique channel (type 2) with the given

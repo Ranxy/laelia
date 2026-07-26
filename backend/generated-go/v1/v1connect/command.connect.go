@@ -63,6 +63,9 @@ const (
 	// CommandServiceGetOrCreateConversationProcedure is the fully-qualified name of the
 	// CommandService's GetOrCreateConversation RPC.
 	CommandServiceGetOrCreateConversationProcedure = "/laelia.v1.CommandService/GetOrCreateConversation"
+	// CommandServiceGetOrCreateUserUserDMProcedure is the fully-qualified name of the CommandService's
+	// GetOrCreateUserUserDM RPC.
+	CommandServiceGetOrCreateUserUserDMProcedure = "/laelia.v1.CommandService/GetOrCreateUserUserDM"
 	// CommandServiceResolveChannelByTitleProcedure is the fully-qualified name of the CommandService's
 	// ResolveChannelByTitle RPC.
 	CommandServiceResolveChannelByTitleProcedure = "/laelia.v1.CommandService/ResolveChannelByTitle"
@@ -217,6 +220,11 @@ type CommandServiceClient interface {
 	SearchChatHistory(context.Context, *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error)
 	GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error)
 	GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error)
+	// GetOrCreateUserUserDM opens (or reuses) the type-4 user-to-user DM between
+	// the calling user and a peer user. User-only. The peer is resolved by user
+	// resource name ("users/<id>"); self-address is rejected; the pair is
+	// canonicalized by the store. User-user twin of GetOrCreateConversation.
+	GetOrCreateUserUserDM(context.Context, *connect.Request[v1.GetOrCreateUserUserDMRequest]) (*connect.Response[v1.GetOrCreateUserUserDMResponse], error)
 	// ResolveChannelByTitle looks up the unique channel (type 2) with the given
 	// title, returning NOT_FOUND when absent (it never creates one). Agent-
 	// callable: no auth_method annotation, identity from GetAgentFromContext.
@@ -422,6 +430,12 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			httpClient,
 			baseURL+CommandServiceGetOrCreateConversationProcedure,
 			connect.WithSchema(commandServiceMethods.ByName("GetOrCreateConversation")),
+			connect.WithClientOptions(opts...),
+		),
+		getOrCreateUserUserDM: connect.NewClient[v1.GetOrCreateUserUserDMRequest, v1.GetOrCreateUserUserDMResponse](
+			httpClient,
+			baseURL+CommandServiceGetOrCreateUserUserDMProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("GetOrCreateUserUserDM")),
 			connect.WithClientOptions(opts...),
 		),
 		resolveChannelByTitle: connect.NewClient[v1.ResolveChannelByTitleRequest, v1.ResolveChannelByTitleResponse](
@@ -714,6 +728,7 @@ type commandServiceClient struct {
 	searchChatHistory         *connect.Client[v1.SearchChatHistoryRequest, v1.SearchChatHistoryResponse]
 	getCommandContext         *connect.Client[v1.GetCommandContextRequest, v1.GetCommandContextResponse]
 	getOrCreateConversation   *connect.Client[v1.GetOrCreateConversationRequest, v1.GetOrCreateConversationResponse]
+	getOrCreateUserUserDM     *connect.Client[v1.GetOrCreateUserUserDMRequest, v1.GetOrCreateUserUserDMResponse]
 	resolveChannelByTitle     *connect.Client[v1.ResolveChannelByTitleRequest, v1.ResolveChannelByTitleResponse]
 	getOrCreateUserDM         *connect.Client[v1.GetOrCreateUserDMRequest, v1.GetOrCreateUserDMResponse]
 	getOrCreateAgentDM        *connect.Client[v1.GetOrCreateAgentDMRequest, v1.GetOrCreateAgentDMResponse]
@@ -805,6 +820,11 @@ func (c *commandServiceClient) GetCommandContext(ctx context.Context, req *conne
 // GetOrCreateConversation calls laelia.v1.CommandService.GetOrCreateConversation.
 func (c *commandServiceClient) GetOrCreateConversation(ctx context.Context, req *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error) {
 	return c.getOrCreateConversation.CallUnary(ctx, req)
+}
+
+// GetOrCreateUserUserDM calls laelia.v1.CommandService.GetOrCreateUserUserDM.
+func (c *commandServiceClient) GetOrCreateUserUserDM(ctx context.Context, req *connect.Request[v1.GetOrCreateUserUserDMRequest]) (*connect.Response[v1.GetOrCreateUserUserDMResponse], error) {
+	return c.getOrCreateUserUserDM.CallUnary(ctx, req)
 }
 
 // ResolveChannelByTitle calls laelia.v1.CommandService.ResolveChannelByTitle.
@@ -1048,6 +1068,11 @@ type CommandServiceHandler interface {
 	SearchChatHistory(context.Context, *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error)
 	GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error)
 	GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error)
+	// GetOrCreateUserUserDM opens (or reuses) the type-4 user-to-user DM between
+	// the calling user and a peer user. User-only. The peer is resolved by user
+	// resource name ("users/<id>"); self-address is rejected; the pair is
+	// canonicalized by the store. User-user twin of GetOrCreateConversation.
+	GetOrCreateUserUserDM(context.Context, *connect.Request[v1.GetOrCreateUserUserDMRequest]) (*connect.Response[v1.GetOrCreateUserUserDMResponse], error)
 	// ResolveChannelByTitle looks up the unique channel (type 2) with the given
 	// title, returning NOT_FOUND when absent (it never creates one). Agent-
 	// callable: no auth_method annotation, identity from GetAgentFromContext.
@@ -1249,6 +1274,12 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		CommandServiceGetOrCreateConversationProcedure,
 		svc.GetOrCreateConversation,
 		connect.WithSchema(commandServiceMethods.ByName("GetOrCreateConversation")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceGetOrCreateUserUserDMHandler := connect.NewUnaryHandler(
+		CommandServiceGetOrCreateUserUserDMProcedure,
+		svc.GetOrCreateUserUserDM,
+		connect.WithSchema(commandServiceMethods.ByName("GetOrCreateUserUserDM")),
 		connect.WithHandlerOptions(opts...),
 	)
 	commandServiceResolveChannelByTitleHandler := connect.NewUnaryHandler(
@@ -1547,6 +1578,8 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceGetCommandContextHandler.ServeHTTP(w, r)
 		case CommandServiceGetOrCreateConversationProcedure:
 			commandServiceGetOrCreateConversationHandler.ServeHTTP(w, r)
+		case CommandServiceGetOrCreateUserUserDMProcedure:
+			commandServiceGetOrCreateUserUserDMHandler.ServeHTTP(w, r)
 		case CommandServiceResolveChannelByTitleProcedure:
 			commandServiceResolveChannelByTitleHandler.ServeHTTP(w, r)
 		case CommandServiceGetOrCreateUserDMProcedure:
@@ -1682,6 +1715,10 @@ func (UnimplementedCommandServiceHandler) GetCommandContext(context.Context, *co
 
 func (UnimplementedCommandServiceHandler) GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.GetOrCreateConversation is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) GetOrCreateUserUserDM(context.Context, *connect.Request[v1.GetOrCreateUserUserDMRequest]) (*connect.Response[v1.GetOrCreateUserUserDMResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.GetOrCreateUserUserDM is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) ResolveChannelByTitle(context.Context, *connect.Request[v1.ResolveChannelByTitleRequest]) (*connect.Response[v1.ResolveChannelByTitleResponse], error) {

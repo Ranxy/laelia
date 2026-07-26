@@ -553,6 +553,43 @@ func (s *CommandService) GetOrCreateConversation(ctx context.Context, req *conne
 	}), nil
 }
 
+func (s *CommandService) GetOrCreateUserUserDM(ctx context.Context, req *connect.Request[v1pb.GetOrCreateUserUserDMRequest]) (*connect.Response[v1pb.GetOrCreateUserUserDMResponse], error) {
+	// GetOrCreateUserUserDM starts a 1:1 DM between the caller and another
+	// user. It is a user-facing action; an agent token must not create a
+	// user-user DM owned by the system principal.
+	user, ok := GetUserFromContext(ctx)
+	if !ok || user == nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("GetOrCreateUserUserDM is for authenticated users"))
+	}
+	if req.Msg.PeerUser == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("peer_user must not be empty"))
+	}
+
+	peerID, err := common.GetUserID(req.Msg.PeerUser)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrap(err, "invalid peer_user"))
+	}
+	peer, err := s.store.GetUserByID(ctx, peerID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve peer user"))
+	}
+	if peer == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %s not found", req.Msg.PeerUser))
+	}
+	if peer.ID == user.ID {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("a user cannot open a DM with themselves"))
+	}
+
+	conv, err := s.store.GetOrCreateUserUserDM(ctx, user.ID, peer.ID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get or create user DM"))
+	}
+
+	return connect.NewResponse(&v1pb.GetOrCreateUserUserDMResponse{
+		Name: fmt.Sprintf("conversations/%s", conv.ID.String()),
+	}), nil
+}
+
 func (s *CommandService) ListConversationMessages(ctx context.Context, req *connect.Request[v1pb.ListConversationMessagesRequest]) (*connect.Response[v1pb.ListConversationMessagesResponse], error) {
 	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {

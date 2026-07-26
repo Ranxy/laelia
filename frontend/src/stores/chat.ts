@@ -2,6 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import { commandServiceClient } from "@/connect";
 import {
   GetOrCreateConversationRequestSchema,
+  GetOrCreateUserUserDMRequestSchema,
   ListConversationMessagesRequestSchema,
   SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
@@ -26,6 +27,13 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
     set((state) => ({
       conversations: { ...state.conversations, [agent]: res.name },
     }));
+    return res.name;
+  },
+
+  async getOrCreateUserUserDM(peerUser) {
+    const res = await commandServiceClient.getOrCreateUserUserDM(
+      create(GetOrCreateUserUserDMRequestSchema, { peerUser })
+    );
     return res.name;
   },
 

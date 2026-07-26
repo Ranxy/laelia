@@ -440,6 +440,8 @@
     "add-human": "Invite human",
     "row-open-agent": "Open agent detail — {{title}}",
     "row-open-human": "Open profile — {{title}}",
+    "message-agent": "Message",
+    "message-human": "Message",
     "human": {
       "you": "(you)",
       "handle": "@{{id}}",

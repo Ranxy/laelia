@@ -11,6 +11,7 @@ import {
   Plus,
   Send,
   Trash2,
+  User,
   Users,
   X,
 } from "lucide-react";
@@ -78,9 +79,11 @@ const EMPTY_ACTIVITIES: AgentActivity[] = [];
 const MENTION_POPUP_ID = "mention-popup";
 
 // Conversation type values mirror Conversation.type: 1 = direct/DM (user+agent),
-// 2 = channel, 3 = AGENT_DM (agent+agent, owned by the system bot).
+// 2 = channel, 3 = AGENT_DM (agent+agent, owned by the system bot),
+// 4 = USER_DM (user+user, owned by the initiator).
 const CONVERSATION_TYPE_DM = 1;
 const CONVERSATION_TYPE_AGENT_DM = 3;
+const CONVERSATION_TYPE_USER_DM = 4;
 
 function memberTypeLabel(
   t: (key: string) => string,
@@ -219,10 +222,12 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     undefined;
   const isDm = channel?.type === CONVERSATION_TYPE_DM;
   // Agent-to-agent DMs (type 3) are admin view-only: a user cannot send or
-  // alter membership there. membershipFixed covers both DM shapes (user+agent
-  // and agent+agent), whose rosters are fixed at creation.
+  // alter membership there. User-to-user DMs (type 4) are writable by both
+  // users but their roster is fixed at creation. membershipFixed covers all
+  // three DM shapes (user+agent, agent+agent, user+user).
   const isAgentDm = channel?.type === CONVERSATION_TYPE_AGENT_DM;
-  const membershipFixed = isDm || isAgentDm;
+  const isUserDm = channel?.type === CONVERSATION_TYPE_USER_DM;
+  const membershipFixed = isDm || isAgentDm || isUserDm;
   const isOwner =
     channel && currentUser
       ? channel.ownerId === currentUser.name.split("/").pop()
@@ -717,12 +722,14 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
         <div
           className={cn(
             "flex size-8 items-center justify-center rounded-lg",
-            isDm || isAgentDm
+            isDm || isAgentDm || isUserDm
               ? "bg-accent/10 text-accent"
               : "bg-control-bg text-control"
           )}
         >
-          {isDm || isAgentDm ? (
+          {isUserDm ? (
+            <User className="size-4" />
+          ) : isDm || isAgentDm ? (
             <Bot className="size-4" />
           ) : (
             <Hash className="size-4" />

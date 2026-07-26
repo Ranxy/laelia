@@ -29,6 +29,7 @@ const (
 	CommandService_SearchChatHistory_FullMethodName         = "/laelia.v1.CommandService/SearchChatHistory"
 	CommandService_GetCommandContext_FullMethodName         = "/laelia.v1.CommandService/GetCommandContext"
 	CommandService_GetOrCreateConversation_FullMethodName   = "/laelia.v1.CommandService/GetOrCreateConversation"
+	CommandService_GetOrCreateUserUserDM_FullMethodName     = "/laelia.v1.CommandService/GetOrCreateUserUserDM"
 	CommandService_ResolveChannelByTitle_FullMethodName     = "/laelia.v1.CommandService/ResolveChannelByTitle"
 	CommandService_GetOrCreateUserDM_FullMethodName         = "/laelia.v1.CommandService/GetOrCreateUserDM"
 	CommandService_GetOrCreateAgentDM_FullMethodName        = "/laelia.v1.CommandService/GetOrCreateAgentDM"
@@ -90,6 +91,11 @@ type CommandServiceClient interface {
 	SearchChatHistory(ctx context.Context, in *SearchChatHistoryRequest, opts ...grpc.CallOption) (*SearchChatHistoryResponse, error)
 	GetCommandContext(ctx context.Context, in *GetCommandContextRequest, opts ...grpc.CallOption) (*GetCommandContextResponse, error)
 	GetOrCreateConversation(ctx context.Context, in *GetOrCreateConversationRequest, opts ...grpc.CallOption) (*GetOrCreateConversationResponse, error)
+	// GetOrCreateUserUserDM opens (or reuses) the type-4 user-to-user DM between
+	// the calling user and a peer user. User-only. The peer is resolved by user
+	// resource name ("users/<id>"); self-address is rejected; the pair is
+	// canonicalized by the store. User-user twin of GetOrCreateConversation.
+	GetOrCreateUserUserDM(ctx context.Context, in *GetOrCreateUserUserDMRequest, opts ...grpc.CallOption) (*GetOrCreateUserUserDMResponse, error)
 	// ResolveChannelByTitle looks up the unique channel (type 2) with the given
 	// title, returning NOT_FOUND when absent (it never creates one). Agent-
 	// callable: no auth_method annotation, identity from GetAgentFromContext.
@@ -342,6 +348,16 @@ func (c *commandServiceClient) GetOrCreateConversation(ctx context.Context, in *
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetOrCreateConversationResponse)
 	err := c.cc.Invoke(ctx, CommandService_GetOrCreateConversation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) GetOrCreateUserUserDM(ctx context.Context, in *GetOrCreateUserUserDMRequest, opts ...grpc.CallOption) (*GetOrCreateUserUserDMResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOrCreateUserUserDMResponse)
+	err := c.cc.Invoke(ctx, CommandService_GetOrCreateUserUserDM_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -821,6 +837,11 @@ type CommandServiceServer interface {
 	SearchChatHistory(context.Context, *SearchChatHistoryRequest) (*SearchChatHistoryResponse, error)
 	GetCommandContext(context.Context, *GetCommandContextRequest) (*GetCommandContextResponse, error)
 	GetOrCreateConversation(context.Context, *GetOrCreateConversationRequest) (*GetOrCreateConversationResponse, error)
+	// GetOrCreateUserUserDM opens (or reuses) the type-4 user-to-user DM between
+	// the calling user and a peer user. User-only. The peer is resolved by user
+	// resource name ("users/<id>"); self-address is rejected; the pair is
+	// canonicalized by the store. User-user twin of GetOrCreateConversation.
+	GetOrCreateUserUserDM(context.Context, *GetOrCreateUserUserDMRequest) (*GetOrCreateUserUserDMResponse, error)
 	// ResolveChannelByTitle looks up the unique channel (type 2) with the given
 	// title, returning NOT_FOUND when absent (it never creates one). Agent-
 	// callable: no auth_method annotation, identity from GetAgentFromContext.
@@ -997,6 +1018,9 @@ func (UnimplementedCommandServiceServer) GetCommandContext(context.Context, *Get
 }
 func (UnimplementedCommandServiceServer) GetOrCreateConversation(context.Context, *GetOrCreateConversationRequest) (*GetOrCreateConversationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetOrCreateConversation not implemented")
+}
+func (UnimplementedCommandServiceServer) GetOrCreateUserUserDM(context.Context, *GetOrCreateUserUserDMRequest) (*GetOrCreateUserUserDMResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOrCreateUserUserDM not implemented")
 }
 func (UnimplementedCommandServiceServer) ResolveChannelByTitle(context.Context, *ResolveChannelByTitleRequest) (*ResolveChannelByTitleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResolveChannelByTitle not implemented")
@@ -1301,6 +1325,24 @@ func _CommandService_GetOrCreateConversation_Handler(srv interface{}, ctx contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CommandServiceServer).GetOrCreateConversation(ctx, req.(*GetOrCreateConversationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_GetOrCreateUserUserDM_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrCreateUserUserDMRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).GetOrCreateUserUserDM(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_GetOrCreateUserUserDM_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).GetOrCreateUserUserDM(ctx, req.(*GetOrCreateUserUserDMRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2167,6 +2209,10 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetOrCreateConversation",
 			Handler:    _CommandService_GetOrCreateConversation_Handler,
+		},
+		{
+			MethodName: "GetOrCreateUserUserDM",
+			Handler:    _CommandService_GetOrCreateUserUserDM_Handler,
 		},
 		{
 			MethodName: "ResolveChannelByTitle",

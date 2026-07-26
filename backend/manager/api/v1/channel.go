@@ -83,6 +83,15 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 				title = agent.Name
 				peerName = agent.Name
 			}
+		} else if conv.Type == 4 {
+			// For user-user DMs (type=4) the title is empty in the DB; surface
+			// the peer user's display name instead so the left rail renders the
+			// DM row without an extra member fetch. The peer is the user member
+			// that is not the viewer.
+			if name := s.resolveUserDMPeerName(ctx, conv.ID, user.ID); name != "" {
+				title = name
+				peerName = name
+			}
 		}
 		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, peerName, memberCount, uc.UnreadCount, title))
 	}
@@ -186,12 +195,16 @@ func (s *CommandService) GetChannel(ctx context.Context, req *connect.Request[v1
 	ownerName := resolveUserName(ctx, s.store, conv.OwnerID)
 	// The DM peer depends on the viewer: the agent daemon calls GetChannel on
 	// its own DMs and must see the user (or other agent) as the peer, not
-	// itself. Detect the caller's agent identity and pass it down.
+	// itself. Detect the caller's agent and user identity and pass them down.
 	viewerAgentResourceID := ""
 	if caller, ok := GetAgentFromContext(ctx); ok && caller != nil {
 		viewerAgentResourceID = caller.ResourceID
 	}
-	peerName := s.resolvePeerNameForViewer(ctx, conv, viewerAgentResourceID)
+	viewerUserID := 0
+	if user, ok := GetUserFromContext(ctx); ok && user != nil {
+		viewerUserID = user.ID
+	}
+	peerName := s.resolvePeerNameForViewer(ctx, conv, viewerAgentResourceID, viewerUserID)
 	title := conv.Title
 	if peerName != "" && conv.Type != store.ConversationTypeChannel {
 		// DMs store no title; surface the peer name so the row matches the
@@ -823,7 +836,7 @@ func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, 
 	switch conv.Type {
 	case store.ConversationTypeChannel:
 		address = "#" + title
-	case store.ConversationTypeDM, store.ConversationTypeAgentDM:
+	case store.ConversationTypeDM, store.ConversationTypeAgentDM, store.ConversationTypeUserDM:
 		if peerName != "" {
 			address = "dm:@" + peerName
 		}
@@ -892,12 +905,14 @@ func (s *CommandService) resolveAgentDMPeerName(ctx context.Context, convID uuid
 //     the user (owner); otherwise the peer is the agent (conv.AgentID).
 //   - type 3 (agent DM): the other agent (the agent member that is not the
 //     viewer; the first agent when the viewer is not an agent).
+//   - type 4 (user DM): the other user (the user member that is not the
+//     viewer; the first user when the viewer is not a user).
 //   - type 2 (channel): "" (channels have no peer).
 //
-// The viewer's agent resource id is "" when the caller is a user/admin. Used
-// by GetChannel; the list endpoints resolve the peer per-row from their own
-// viewer context.
-func (s *CommandService) resolvePeerNameForViewer(ctx context.Context, conv *store.ConversationMessage, viewerAgentResourceID string) string {
+// The viewer's agent resource id is "" when the caller is a user/admin; the
+// viewer's user id is 0 when the caller is an agent. Used by GetChannel; the
+// list endpoints resolve the peer per-row from their own viewer context.
+func (s *CommandService) resolvePeerNameForViewer(ctx context.Context, conv *store.ConversationMessage, viewerAgentResourceID string, viewerUserID int) string {
 	switch conv.Type {
 	case store.ConversationTypeDM:
 		if viewerAgentResourceID != "" {
@@ -913,6 +928,41 @@ func (s *CommandService) resolvePeerNameForViewer(ctx context.Context, conv *sto
 		return agent.Name
 	case store.ConversationTypeAgentDM:
 		return s.resolveAgentDMPeerName(ctx, conv.ID, viewerAgentResourceID)
+	case store.ConversationTypeUserDM:
+		return s.resolveUserDMPeerName(ctx, conv.ID, viewerUserID)
+	}
+	return ""
+}
+
+// resolveUserDMPeerName returns the display name of the other user in a type-4
+// user DM — the first user member whose principal id is not viewerUserID. When
+// viewerUserID is 0 (no caller-user perspective, e.g. an admin fetching a
+// single type-4 conversation via GetChannel) the first resolvable user member
+// is returned. Returns "" when there is no resolvable non-self peer user
+// (well-formed type-4 DMs always have two user members, so this only happens
+// on a degenerate roster); it never returns the viewer's own name.
+func (s *CommandService) resolveUserDMPeerName(ctx context.Context, convID uuid.UUID, viewerUserID int) string {
+	members, err := s.store.ListConversationMembers(ctx, convID)
+	if err != nil {
+		slog.Warn("failed to list members for user-DM peer", "conversationID", convID, "error", err)
+		return ""
+	}
+	for _, m := range members {
+		if m.MemberType != store.MemberTypeUser {
+			continue
+		}
+		pid, parseErr := strconv.Atoi(m.MemberID)
+		if parseErr != nil {
+			continue
+		}
+		if viewerUserID != 0 && pid == viewerUserID {
+			continue
+		}
+		user, err := s.store.GetUserByID(ctx, pid)
+		if err != nil || user == nil || user.Name == "" {
+			continue
+		}
+		return user.Name
 	}
 	return ""
 }

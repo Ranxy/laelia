@@ -267,6 +267,10 @@ export interface ChatSlice {
   chatCurrentVersion: Record<string, bigint>;
 
   getOrCreateConversation: (agent: string) => Promise<string>;
+  // getOrCreateUserUserDM opens (or reuses) the 1:1 DM between the calling
+  // user and a peer user (resource name "users/{id}"). Returns the
+  // conversation name "conversations/{id}".
+  getOrCreateUserUserDM: (peerUser: string) => Promise<string>;
   loadMessages: (conversation: string) => Promise<void>;
   sendChatMessage: (
     agent: string,

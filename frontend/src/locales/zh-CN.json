@@ -440,6 +440,8 @@
     "add-human": "邀请成员",
     "row-open-agent": "查看 Agent 详情 — {{title}}",
     "row-open-human": "查看资料 — {{title}}",
+    "message-agent": "发消息",
+    "message-human": "发消息",
     "human": {
       "you": "(你)",
       "handle": "@{{id}}",

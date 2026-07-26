@@ -2,10 +2,11 @@ import {
   ArrowLeft,
   Bell,
   ListChecks,
+  Loader2,
   MessageSquare,
   UserCircle,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
   REMINDER_ROUTE_LIST,
 } from "@/router/handles";
 import { resolvePath } from "@/router/route-index";
+import { useAppStore } from "@/stores";
 
 type TabKey = "profile" | "commands" | "reminders" | "chat";
 
@@ -33,6 +35,9 @@ export function AgentDetailLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { agentId } = useParams<{ agentId: string }>();
+  const getOrCreateConversation = useAppStore((s) => s.getOrCreateConversation);
+  const fetchChannels = useAppStore((s) => s.fetchChannels);
+  const [startingChat, setStartingChat] = useState(false);
 
   // Derive the active tab from the URL so deep links, refresh, and back/forward
   // keep the highlight in sync with the rendered child route.
@@ -45,6 +50,20 @@ export function AgentDetailLayout() {
     if (afterId === "chat") return "chat";
     return "profile";
   }, [location.pathname, agentId]);
+
+  // startChat opens (or reuses) the user↔agent DM and jumps to the chat surface.
+  // The DM also appears in the chat left rail once channels are refreshed.
+  async function startChat() {
+    if (!agentId || startingChat) return;
+    setStartingChat(true);
+    try {
+      const name = await getOrCreateConversation(`agents/${agentId}`);
+      await fetchChannels();
+      navigate(`/${name.split("/").pop()}`);
+    } finally {
+      setStartingChat(false);
+    }
+  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -102,6 +121,20 @@ export function AgentDetailLayout() {
                 {t("agent.tab-chat")}
               </TabsTrigger>
             </TabsList>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={startChat}
+              disabled={startingChat || !agentId}
+              className="mb-1 ml-auto shrink-0"
+            >
+              {startingChat ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <MessageSquare className="size-4" />
+              )}
+              {t("members.message-agent")}
+            </Button>
           </div>
         </div>
         <div className="flex-1 overflow-hidden">

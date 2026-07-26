@@ -384,7 +384,8 @@ message Conversation {
   int32 unread_count = 9;
   // address is the name-based display address for this conversation, the form
   // agents write and read: "#<title>" for a channel (type 2), "dm:@<peer>" for a
-  // direct message (type 1 peer is the user, type 3 peer is the other agent).
+  // direct message (type 1 peer is the user, type 3 peer is the other agent,
+  // type 4 peer is the other user).
   // Empty when the address is not applicable. Populated by the single builder
   // convertToV1Conversation so every emit site renders the same form.
   string address = 11;
@@ -509,6 +510,22 @@ message GetOrCreateConversationRequest {
 }
 
 message GetOrCreateConversationResponse {
+  string name = 1;
+}
+
+// GetOrCreateUserUserDM opens (or reuses) the type-4 direct conversation
+// between the calling user and a peer user. User-only (an agent token must not
+// create a user-user DM). The peer is resolved by user resource name
+// ("users/<id>"); self-address is rejected; the pair is canonicalized by the
+// store. This is the user-user twin of the user-agent GetOrCreateConversation.
+message GetOrCreateUserUserDMRequest {
+  string peer_user = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/User"
+  ];
+}
+
+message GetOrCreateUserUserDMResponse {
   string name = 1;
 }
 
@@ -1213,6 +1230,16 @@ service CommandService {
 
   rpc GetOrCreateConversation(GetOrCreateConversationRequest) returns (GetOrCreateConversationResponse) {
     option (google.api.http) = {post: "/v1/{agent=agents/*}/conversations"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.create";
+  }
+
+  // GetOrCreateUserUserDM opens (or reuses) the type-4 user-to-user DM between
+  // the calling user and a peer user. User-only. The peer is resolved by user
+  // resource name ("users/<id>"); self-address is rejected; the pair is
+  // canonicalized by the store. User-user twin of GetOrCreateConversation.
+  rpc GetOrCreateUserUserDM(GetOrCreateUserUserDMRequest) returns (GetOrCreateUserUserDMResponse) {
+    option (google.api.http) = {post: "/v1/{peer_user=users/*}/conversations"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.create";
   }

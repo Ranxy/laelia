@@ -786,6 +786,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.GetOrCreateUserUserDMRequest"><span class="badge">M</span>GetOrCreateUserUserDMRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetOrCreateUserUserDMResponse"><span class="badge">M</span>GetOrCreateUserUserDMResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.GetReminderRequest"><span class="badge">M</span>GetReminderRequest</a>
                 </li>
               
@@ -6738,7 +6746,8 @@ ListChannels; 0 (or unset) when the user is caught up. </p></td>
                   <td></td>
                   <td><p>address is the name-based display address for this conversation, the form
 agents write and read: &#34;#&lt;title&gt;&#34; for a channel (type 2), &#34;dm:@&lt;peer&gt;&#34; for a
-direct message (type 1 peer is the user, type 3 peer is the other agent).
+direct message (type 1 peer is the user, type 3 peer is the other agent,
+type 4 peer is the other user).
 Empty when the address is not applicable. Populated by the single builder
 convertToV1Conversation so every emit site renders the same form. </p></td>
                 </tr>
@@ -7567,6 +7576,54 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
                 <tr>
                   <td>conversation</td>
                   <td><a href="#laelia.v1.Conversation">Conversation</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetOrCreateUserUserDMRequest">GetOrCreateUserUserDMRequest</h3>
+        <p>GetOrCreateUserUserDM opens (or reuses) the type-4 direct conversation</p><p>between the calling user and a peer user. User-only (an agent token must not</p><p>create a user-user DM). The peer is resolved by user resource name</p><p>("users/<id>"); self-address is rejected; the pair is canonicalized by the</p><p>store. This is the user-user twin of the user-agent GetOrCreateConversation.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>peer_user</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetOrCreateUserUserDMResponse">GetOrCreateUserUserDMResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -10869,6 +10926,16 @@ is performed by ClaimTask, not this RPC. </p></td>
               </tr>
             
               <tr>
+                <td>GetOrCreateUserUserDM</td>
+                <td><a href="#laelia.v1.GetOrCreateUserUserDMRequest">GetOrCreateUserUserDMRequest</a></td>
+                <td><a href="#laelia.v1.GetOrCreateUserUserDMResponse">GetOrCreateUserUserDMResponse</a></td>
+                <td><p>GetOrCreateUserUserDM opens (or reuses) the type-4 user-to-user DM between
+the calling user and a peer user. User-only. The peer is resolved by user
+resource name (&#34;users/&lt;id&gt;&#34;); self-address is rejected; the pair is
+canonicalized by the store. User-user twin of GetOrCreateConversation.</p></td>
+              </tr>
+            
+              <tr>
                 <td>ResolveChannelByTitle</td>
                 <td><a href="#laelia.v1.ResolveChannelByTitleRequest">ResolveChannelByTitleRequest</a></td>
                 <td><a href="#laelia.v1.ResolveChannelByTitleResponse">ResolveChannelByTitleResponse</a></td>
@@ -11360,6 +11427,16 @@ user, hiding it from All and Unread. The caller&#39;s own id must own the row.</
                 <td>GetOrCreateConversation</td>
                 <td>POST</td>
                 <td>/v1/{agent=agents/*}/conversations</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetOrCreateUserUserDM</td>
+                <td>POST</td>
+                <td>/v1/{peer_user=users/*}/conversations</td>
                 <td></td>
               </tr>
               

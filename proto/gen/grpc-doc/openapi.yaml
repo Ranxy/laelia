@@ -3145,6 +3145,36 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/users/{user}/conversations:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                GetOrCreateUserUserDM opens (or reuses) the type-4 user-to-user DM between
+                 the calling user and a peer user. User-only. The peer is resolved by user
+                 resource name ("users/<id>"); self-address is rejected; the pair is
+                 canonicalized by the store. User-user twin of GetOrCreateConversation.
+            operationId: CommandService_GetOrCreateUserUserDM
+            parameters:
+                - name: user
+                  in: path
+                  description: The user id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetOrCreateUserUserDMResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/users/{user}:undelete:
         post:
             tags:
@@ -4216,7 +4246,8 @@ components:
                     description: |-
                         address is the name-based display address for this conversation, the form
                          agents write and read: "#<title>" for a channel (type 2), "dm:@<peer>" for a
-                         direct message (type 1 peer is the user, type 3 peer is the other agent).
+                         direct message (type 1 peer is the user, type 3 peer is the other agent,
+                         type 4 peer is the other user).
                          Empty when the address is not applicable. Populated by the single builder
                          convertToV1Conversation so every emit site renders the same form.
         ConvertMessageToReminderRequest:
@@ -4492,6 +4523,11 @@ components:
             properties:
                 conversation:
                     $ref: '#/components/schemas/Conversation'
+        GetOrCreateUserUserDMResponse:
+            type: object
+            properties:
+                name:
+                    type: string
         GetReminderResponse:
             type: object
             properties:

@@ -159,6 +159,8 @@
     - [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse)
     - [GetOrCreateUserDMRequest](#laelia-v1-GetOrCreateUserDMRequest)
     - [GetOrCreateUserDMResponse](#laelia-v1-GetOrCreateUserDMResponse)
+    - [GetOrCreateUserUserDMRequest](#laelia-v1-GetOrCreateUserUserDMRequest)
+    - [GetOrCreateUserUserDMResponse](#laelia-v1-GetOrCreateUserUserDMResponse)
     - [GetReminderRequest](#laelia-v1-GetReminderRequest)
     - [GetReminderResponse](#laelia-v1-GetReminderResponse)
     - [LeaveChannelRequest](#laelia-v1-LeaveChannelRequest)
@@ -2335,7 +2337,7 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | updated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | unread_count | [int32](#int32) |  | unread_count is the number of chat_message rows with room_version beyond the requesting user&#39;s read cursor for this conversation. Populated by ListChannels; 0 (or unset) when the user is caught up. |
-| address | [string](#string) |  | address is the name-based display address for this conversation, the form agents write and read: &#34;#&lt;title&gt;&#34; for a channel (type 2), &#34;dm:@&lt;peer&gt;&#34; for a direct message (type 1 peer is the user, type 3 peer is the other agent). Empty when the address is not applicable. Populated by the single builder convertToV1Conversation so every emit site renders the same form. |
+| address | [string](#string) |  | address is the name-based display address for this conversation, the form agents write and read: &#34;#&lt;title&gt;&#34; for a channel (type 2), &#34;dm:@&lt;peer&gt;&#34; for a direct message (type 1 peer is the user, type 3 peer is the other agent, type 4 peer is the other user). Empty when the address is not applicable. Populated by the single builder convertToV1Conversation so every emit site renders the same form. |
 
 
 
@@ -2787,6 +2789,40 @@ is the agent-callable twin of the user-only GetOrCreateConversation.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | conversation | [Conversation](#laelia-v1-Conversation) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetOrCreateUserUserDMRequest"></a>
+
+### GetOrCreateUserUserDMRequest
+GetOrCreateUserUserDM opens (or reuses) the type-4 direct conversation
+between the calling user and a peer user. User-only (an agent token must not
+create a user-user DM). The peer is resolved by user resource name
+(&#34;users/&lt;id&gt;&#34;); self-address is rejected; the pair is canonicalized by the
+store. This is the user-user twin of the user-agent GetOrCreateConversation.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| peer_user | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetOrCreateUserUserDMResponse"></a>
+
+### GetOrCreateUserUserDMResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
 
 
 
@@ -4367,6 +4403,7 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | SearchChatHistory | [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest) | [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse) |  |
 | GetCommandContext | [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest) | [GetCommandContextResponse](#laelia-v1-GetCommandContextResponse) |  |
 | GetOrCreateConversation | [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest) | [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse) |  |
+| GetOrCreateUserUserDM | [GetOrCreateUserUserDMRequest](#laelia-v1-GetOrCreateUserUserDMRequest) | [GetOrCreateUserUserDMResponse](#laelia-v1-GetOrCreateUserUserDMResponse) | GetOrCreateUserUserDM opens (or reuses) the type-4 user-to-user DM between the calling user and a peer user. User-only. The peer is resolved by user resource name (&#34;users/&lt;id&gt;&#34;); self-address is rejected; the pair is canonicalized by the store. User-user twin of GetOrCreateConversation. |
 | ResolveChannelByTitle | [ResolveChannelByTitleRequest](#laelia-v1-ResolveChannelByTitleRequest) | [ResolveChannelByTitleResponse](#laelia-v1-ResolveChannelByTitleResponse) | ResolveChannelByTitle looks up the unique channel (type 2) with the given title, returning NOT_FOUND when absent (it never creates one). Agent- callable: no auth_method annotation, identity from GetAgentFromContext. Powers the &#34;#&lt;title&gt;&#34; address resolver. |
 | GetOrCreateUserDM | [GetOrCreateUserDMRequest](#laelia-v1-GetOrCreateUserDMRequest) | [GetOrCreateUserDMResponse](#laelia-v1-GetOrCreateUserDMResponse) | GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent and a named end user. Agent-callable. The peer is resolved by principal display name; ambiguous or unknown names fail. Agent-callable twin of the user-only GetOrCreateConversation. Powers the &#34;dm:@&lt;user&gt;&#34; address resolver. |
 | GetOrCreateAgentDM | [GetOrCreateAgentDMRequest](#laelia-v1-GetOrCreateAgentDMRequest) | [GetOrCreateAgentDMResponse](#laelia-v1-GetOrCreateAgentDMResponse) | GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent DM between the calling agent and a peer agent. Agent-callable. Self-address is rejected. The peer is resolved by agent resource name (&#34;agents/&lt;id&gt;&#34;); the pair is canonicalized by the store. Powers the &#34;dm:@&lt;agent&gt;&#34; address resolver. |

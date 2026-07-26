@@ -1,4 +1,4 @@
-import { Bot, Hash, Loader2, Plus } from "lucide-react";
+import { Bot, Hash, Loader2, Plus, User } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -14,8 +14,10 @@ import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { Conversation } from "@/types/proto-es/v1/command_pb";
 
-// Conversation type values mirror Conversation.type: 1 = direct/DM, 2 = channel.
+// Conversation type values mirror Conversation.type: 1 = user↔agent DM,
+// 2 = channel, 4 = user↔user DM.
 const CONVERSATION_TYPE_DM = 1;
+const CONVERSATION_TYPE_USER_DM = 4;
 
 export function ConversationList() {
   const { t } = useTranslation();
@@ -107,6 +109,7 @@ export function ConversationList() {
         {filtered.map((conv) => {
           const id = conv.name.split("/").pop() ?? "";
           const isDm = conv.type === CONVERSATION_TYPE_DM;
+          const isUserDm = conv.type === CONVERSATION_TYPE_USER_DM;
           const active = id === conversationId;
           const unread = unreadByConv[conv.name] ?? 0;
           return (
@@ -114,6 +117,7 @@ export function ConversationList() {
               key={conv.name}
               conv={conv}
               isDm={isDm}
+              isUserDm={isUserDm}
               active={active}
               unread={unread}
               onClick={() => navigate(`/${id}`)}
@@ -163,16 +167,19 @@ export function ConversationList() {
 function ConversationRow({
   conv,
   isDm,
+  isUserDm,
   active,
   unread,
   onClick,
 }: {
   conv: Conversation;
   isDm: boolean;
+  isUserDm: boolean;
   active: boolean;
   unread: number;
   onClick: () => void;
 }) {
+  const isDirect = isDm || isUserDm;
   return (
     <button
       type="button"
@@ -188,7 +195,13 @@ function ConversationRow({
           active ? "bg-accent/15 text-accent" : "bg-control-bg text-control"
         )}
       >
-        {isDm ? <Bot className="size-4" /> : <Hash className="size-4" />}
+        {isUserDm ? (
+          <User className="size-4" />
+        ) : isDm ? (
+          <Bot className="size-4" />
+        ) : (
+          <Hash className="size-4" />
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <p
@@ -199,7 +212,7 @@ function ConversationRow({
         >
           {conv.title || conv.name}
         </p>
-        {!isDm && (
+        {!isDirect && (
           <p className="text-xs text-control-placeholder mt-0.5">
             {conv.memberCount} {conv.memberCount === 1 ? "member" : "members"}
           </p>
@@ -210,7 +223,7 @@ function ConversationRow({
           className={cn(
             "shrink-0 inline-flex items-center justify-center rounded-full",
             "min-w-5 h-5 px-1.5 text-xs font-semibold",
-            isDm
+            isDirect
               ? "bg-accent text-accent-foreground"
               : "bg-accent/15 text-accent"
           )}

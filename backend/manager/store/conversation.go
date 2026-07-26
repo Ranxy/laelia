@@ -14,11 +14,13 @@ import (
 
 // Conversation type values, mirrored by the laelia.v1.ConversationType enum.
 // 1 = DM (one user + one agent), 2 = channel (many members), 3 = AGENT_DM
-// (exactly two agents, no users; owner of record is the SYSTEM_BOT principal).
+// (exactly two agents, no users; owner of record is the SYSTEM_BOT principal),
+// 4 = USER_DM (exactly two users, no agents; owner of record is the initiator).
 const (
 	ConversationTypeDM      int32 = 1
 	ConversationTypeChannel int32 = 2
 	ConversationTypeAgentDM int32 = 3
+	ConversationTypeUserDM  int32 = 4
 )
 
 type ConversationMessage struct {
@@ -221,6 +223,107 @@ func (s *Store) GetOrCreateAgentDM(ctx context.Context, agentAID, agentBID int) 
 	}
 	if seedErr := s.SeedCursorOnJoin(ctx, agentBID, newConv.ID); seedErr != nil {
 		return nil, errors.Wrap(seedErr, "failed to seed agent B cursor for new agent DM")
+	}
+
+	return &newConv, nil
+}
+
+// insertUserDMSQL creates a type-4 user-DM, returning the row. The pair is
+// ordered (lo < hi) by the caller, and idx_conversation_user_dm_unique
+// (partial WHERE type = 4) dedups races: when two callers race to open the same
+// user-DM, only one INSERT returns a row; the other gets sql.ErrNoRows and
+// re-reads the winning row. Mirrors insertAgentDMSQL for type-3 agent DMs.
+// created_by/owner_id are the initiator (the store caller), satisfying the NOT
+// NULL FKs; agent_id is NULL since a user-DM has no agent.
+const insertUserDMSQL = `
+	INSERT INTO conversation (agent_id, title, type, created_by, owner_id, user_dm_a, user_dm_b)
+	VALUES (NULL, '', 4, $1, $1, $2, $3)
+	ON CONFLICT (user_dm_a, user_dm_b) WHERE type = 4 DO NOTHING
+	RETURNING id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+`
+
+// findUserDM looks up an existing type-4 user-DM by the ordered principal-id
+// pair via the dedup columns.
+func (s *Store) findUserDM(ctx context.Context, lo, hi int) (*ConversationMessage, error) {
+	var conv ConversationMessage
+	err := s.GetDB().QueryRowContext(ctx, `
+		SELECT id, agent_id, title, type, created_by, owner_id, created_at, updated_at, version
+		FROM conversation
+		WHERE type = 4 AND user_dm_a = $1 AND user_dm_b = $2
+	`, lo, hi).Scan(
+		&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, errors.Wrap(err, "failed to find user DM")
+	}
+	return &conv, nil
+}
+
+// GetOrCreateUserUserDM returns the 1:1 DM between two users, creating it if
+// absent. callerID is the initiator (owner of record); peerID is the other
+// user. It is order-independent for dedup (the pair is canonicalized to
+// lo < hi) and race-free via idx_conversation_user_dm_unique + ON CONFLICT DO
+// NOTHING, then re-reading the winning row. Both users are added as members
+// and have their read cursors seeded so only future messages surface. Mirrors
+// GetOrCreateAgentDM for type-3 agent DMs.
+func (s *Store) GetOrCreateUserUserDM(ctx context.Context, callerID, peerID int) (*ConversationMessage, error) {
+	if callerID == peerID {
+		return nil, errors.Errorf("user-DM requires two distinct users (got %d twice)", callerID)
+	}
+
+	lo, hi := callerID, peerID
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+
+	if conv, err := s.findUserDM(ctx, lo, hi); err != nil {
+		return nil, err
+	} else if conv != nil {
+		return conv, nil
+	}
+
+	tx, err := s.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var newConv ConversationMessage
+	err = tx.QueryRowContext(ctx, insertUserDMSQL, callerID, lo, hi).Scan(
+		&newConv.ID, &newConv.AgentID, &newConv.Title, &newConv.Type, &newConv.CreatedBy, &newConv.OwnerID, &newConv.CreatedAt, &newConv.UpdatedAt, &newConv.Version,
+	)
+	if err != nil {
+		// ON CONFLICT DO NOTHING returns no row when another caller won the
+		// race. Roll back the empty tx and return the winning row.
+		if errors.Is(err, sql.ErrNoRows) {
+			return s.findUserDM(ctx, lo, hi)
+		}
+		return nil, errors.Wrap(err, "failed to insert user DM")
+	}
+
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, fmt.Sprintf("%d", callerID), MemberRoleOwner); err != nil {
+		return nil, err
+	}
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, fmt.Sprintf("%d", peerID), MemberRoleMember); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	// Seed both users' read cursors to the new conversation's version so they
+	// start caught up and only see future messages. Seeding only on the create
+	// path is intentional: returning an existing conversation must not re-seed
+	// (and thus skip) unread messages.
+	if seedErr := s.SeedUserReadCursorOnJoin(ctx, callerID, newConv.ID); seedErr != nil {
+		return nil, errors.Wrap(seedErr, "failed to seed caller read cursor for new user DM")
+	}
+	if seedErr := s.SeedUserReadCursorOnJoin(ctx, peerID, newConv.ID); seedErr != nil {
+		return nil, errors.Wrap(seedErr, "failed to seed peer read cursor for new user DM")
 	}
 
 	return &newConv, nil

@@ -1,5 +1,13 @@
 import { create } from "@bufbuild/protobuf";
-import { Check, Loader2, Pencil, Trash2, Upload, X } from "lucide-react";
+import {
+  Check,
+  Loader2,
+  MessageSquare,
+  Pencil,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -42,6 +50,8 @@ export function HumanDetailPage() {
   const agents = useAppStore((s) => s.agents);
   const updateUser = useAppStore((s) => s.updateUser);
   const fetchCurrentUser = useAppStore((s) => s.fetchCurrentUser);
+  const getOrCreateUserUserDM = useAppStore((s) => s.getOrCreateUserUserDM);
+  const fetchChannels = useAppStore((s) => s.fetchChannels);
   const canUpdateUsers = useHasPermission("laelia.users.update");
   const canGetPolicy = useHasPermission("laelia.iam.getPolicy");
 
@@ -75,6 +85,22 @@ export function HumanDetailPage() {
   // Avatar upload (self only).
   const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Start a 1:1 DM with this user. Self is rejected by the backend, so the
+  // button is hidden when viewing your own profile.
+  const [startingChat, setStartingChat] = useState(false);
+
+  async function startChat() {
+    if (!userId || startingChat) return;
+    setStartingChat(true);
+    try {
+      const name = await getOrCreateUserUserDM(`users/${userId}`);
+      await fetchChannels();
+      navigate(`/${name.split("/").pop()}`);
+    } finally {
+      setStartingChat(false);
+    }
+  }
 
   // Role badges from the workspace IAM policy. Fetched only when the caller
   // may read the policy; otherwise the Role row is hidden.
@@ -264,6 +290,22 @@ export function HumanDetailPage() {
             )}
           </div>
         </div>
+        {!isSelf && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={startChat}
+            disabled={startingChat}
+            className="shrink-0"
+          >
+            {startingChat ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <MessageSquare className="size-4" />
+            )}
+            {t("members.message-human")}
+          </Button>
+        )}
       </div>
 
       {/* Description. */}
