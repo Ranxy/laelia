@@ -26,6 +26,17 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
+// machineRefreshTokenDuration is how long a machine refresh token stays
+// valid. Machines are long-lived hosts that reconnect after arbitrary
+// downtime (a desktop powered off over a weekend, a laptop on a trip), so
+// the refresh token — the durable reconnection credential — must outlast
+// that. The agent-wide 24h refreshTokenDuration is too short: a machine
+// offline for more than a day could not reconnect and an admin would have
+// to rotate the token just to bring it back. 30d is long enough to survive
+// normal downtime while the single-use rotation + reuse-revocation still
+// bounds a stolen token's value.
+const machineRefreshTokenDuration = 30 * 24 * time.Hour
+
 // MachineService implements MachineService: management RPCs (admin/IAM) for
 // machines and the machine-side authentication RPCs the machine app calls to
 // register itself and stay connected. A machine authenticates once with a
@@ -523,7 +534,7 @@ func (s *MachineService) ConnectMachine(ctx context.Context, req *connect.Reques
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate access token, error: %v", err))
 		}
-		refreshToken, err = auth.GenerateMachineTokenWithSession(updated.Name, updated.ResourceID, updated.TokenVersion, auth.TokenTypeRefresh, "", s.profile.Mode, s.secret, refreshTokenDuration)
+		refreshToken, err = auth.GenerateMachineTokenWithSession(updated.Name, updated.ResourceID, updated.TokenVersion, auth.TokenTypeRefresh, "", s.profile.Mode, s.secret, machineRefreshTokenDuration)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate refresh token, error: %v", err))
 		}
@@ -534,7 +545,7 @@ func (s *MachineService) ConnectMachine(ctx context.Context, req *connect.Reques
 			TokenFamily: tokenFamily,
 			State:       storepb.MachineTokenState_MACHINE_TOKEN_ACTIVE,
 			Fingerprint: req.Msg.Fingerprint,
-			ExpiresAt:   time.Now().Add(refreshTokenDuration),
+			ExpiresAt:   time.Now().Add(machineRefreshTokenDuration),
 		}); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store refresh token, error: %v", err))
 		}
@@ -747,7 +758,7 @@ func (s *MachineService) RefreshMachineToken(ctx context.Context, req *connect.R
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate access token, error: %v", err))
 	}
-	newRefreshToken, err := auth.GenerateMachineTokenWithSession(machine.Name, machine.ResourceID, machine.TokenVersion, auth.TokenTypeRefresh, "", s.profile.Mode, s.secret, refreshTokenDuration)
+	newRefreshToken, err := auth.GenerateMachineTokenWithSession(machine.Name, machine.ResourceID, machine.TokenVersion, auth.TokenTypeRefresh, "", s.profile.Mode, s.secret, machineRefreshTokenDuration)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to generate refresh token, error: %v", err))
 	}
@@ -758,7 +769,7 @@ func (s *MachineService) RefreshMachineToken(ctx context.Context, req *connect.R
 		TokenFamily: storedToken.TokenFamily,
 		State:       storepb.MachineTokenState_MACHINE_TOKEN_ACTIVE,
 		Fingerprint: req.Msg.Fingerprint,
-		ExpiresAt:   time.Now().Add(refreshTokenDuration),
+		ExpiresAt:   time.Now().Add(machineRefreshTokenDuration),
 	}); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to store new refresh token, error: %v", err))
 	}

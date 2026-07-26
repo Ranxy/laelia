@@ -192,9 +192,9 @@ func New(managerURL, token string, insecure bool, allowHTTP bool) (*MachineClien
 // Connect authenticates the machine. The refresh token is the machine's
 // durable reconnection credential: the registration (bootstrap) token is
 // single-use and consumed on the first successful ConnectMachine, so once a
-// refresh token exists we reconnect through it exclusively. On success it
-// stores the new credentials and spawns a runner for every agent in the
-// response's assigned_agents list.
+// refresh token exists we reconnect through it. On success it stores the new
+// credentials and spawns a runner for every agent in the response's
+// assigned_agents list.
 func (c *MachineClient) Connect(ctx context.Context, info *v1pb.MachineInfo) error {
 	c.mu.Lock()
 	c.connState = StateConnecting
@@ -202,20 +202,38 @@ func (c *MachineClient) Connect(ctx context.Context, info *v1pb.MachineInfo) err
 
 	fingerprint := computeFingerprint(info)
 
-	// Once a refresh token has been persisted, reconnect through it alone.
-	// The registration token is already consumed by this point, so falling back
-	// to it would only ever yield "registration token is not active"
-	// (Unauthenticated) — which looks like a permanent credential failure and
-	// would stop the machine even when the refresh token is still valid and a
-	// transient network blip (e.g. a manager restart) is the real cause. The
-	// refresh path returns its own error so the Run loop can distinguish a
-	// genuine credential death (bail) from a transient failure (backoff+retry).
-	if refreshToken := c.credential.LoadRefreshToken(); refreshToken != "" {
-		return c.connectViaRefresh(ctx, info, fingerprint, refreshToken)
+	// Once a refresh token has been persisted, reconnect through it: the
+	// single-use registration token is already consumed by this point.
+	refreshToken := c.credential.LoadRefreshToken()
+	if refreshToken != "" {
+		err := c.connectViaRefresh(ctx, info, fingerprint, refreshToken)
+		if err == nil {
+			return nil
+		}
+		if !isPermanentAuthFailure(err) {
+			// Transient (network/server) failure: keep the refresh token and let
+			// the Run loop back off and retry. Falling back to the (consumed)
+			// registration token would only yield "registration token is not
+			// active" — a permanent-looking failure that would stop the machine
+			// on a mere blip (e.g. a manager restart).
+			c.mu.Lock()
+			c.connState = StateDisconnected
+			c.mu.Unlock()
+			return err
+		}
+		// Permanent auth failure: the refresh token is dead — expired, or its
+		// family was revoked / its version was bumped because an admin rotated
+		// the token. Drop the stale refresh token and fall back to the
+		// registration token the app was launched with. After a rotation that
+		// is a fresh, unused bootstrap; without rotation it is the already
+		// consumed bootstrap, so the registration path fails too and the Run
+		// loop bails (admin must rotate) — which is the correct outcome.
+		slog.Info("machine refresh token rejected; falling back to registration token", "error", err)
+		c.credential.DeleteRefreshToken()
 	}
 
-	// First-ever connect: no refresh token yet, so use the single-use
-	// registration token. This is the only path that consumes it.
+	// First-ever connect (no refresh token) or recovery after a rotation: use
+	// the registration token. This is the only path that consumes it.
 	return c.connectViaRegistration(ctx, info, fingerprint, c.credential.BootstrapToken())
 }
 
