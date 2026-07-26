@@ -1119,6 +1119,11 @@ enum ActivityCategory {
   ACTIVITY_CATEGORY_TASK = 2;
   ACTIVITY_CATEGORY_REMINDER = 4;
   ACTIVITY_CATEGORY_THREAD = 8;
+  // DIRECT marks a 1:1 DM message (user<->user or agent->user) addressed to the
+  // user but carrying no other category (no @mention, not a task/reminder, not a
+  // thread reply). It gives DMs a notifiable signal where they would otherwise
+  // produce no Activity row.
+  ACTIVITY_CATEGORY_DIRECT = 16;
 }
 
 // ActivityState is the user-facing lifecycle of an Activity item. UNREAD -> READ

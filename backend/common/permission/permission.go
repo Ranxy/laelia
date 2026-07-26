@@ -73,6 +73,15 @@ const (
 	ActivitiesList     Permission = "laelia.activities.list"
 	ActivitiesMarkDone Permission = "laelia.activities.markDone"
 
+	// Web Push notifications (per-user browser subscriptions). Workspace-scope
+	// and self-service: the caller's own principal id is the implicit owner, so
+	// these are NOT resource-scoped. Any authenticated user manages their own
+	// subscriptions.
+	PushConfigGet           Permission = "laelia.pushConfig.get"
+	PushConfigUpdate        Permission = "laelia.pushConfig.update"
+	PushSubscriptionsCreate Permission = "laelia.pushSubscriptions.create"
+	PushSubscriptionsDelete Permission = "laelia.pushSubscriptions.delete"
+
 	// Files
 	FilesUpload   Permission = "laelia.files.upload"
 	FilesDownload Permission = "laelia.files.download"
@@ -140,6 +149,11 @@ var allPermissions = []Permission{
 
 	ActivitiesList,
 	ActivitiesMarkDone,
+
+	PushConfigGet,
+	PushConfigUpdate,
+	PushSubscriptionsCreate,
+	PushSubscriptionsDelete,
 
 	FilesUpload,
 	FilesDownload,

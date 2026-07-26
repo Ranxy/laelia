@@ -3,8 +3,10 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,6 +23,7 @@ const (
 	ActivityCategoryTask     int32 = 2
 	ActivityCategoryReminder int32 = 4
 	ActivityCategoryThread   int32 = 8
+	ActivityCategoryDirect   int32 = 16
 )
 
 // ActivityState mirrors the laelia.v1.ActivityState enum. UNREAD -> READ happens
@@ -343,7 +346,9 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 	}
 
 	// mentionCats (MENTION) are emitted as their own rows; threadCats
-	// (TASK|REMINDER|THREAD) fold under the thread root.
+	// (TASK|REMINDER|THREAD) fold under the thread root. DIRECT (1:1 DMs) is
+	// folded into mentionCats too since it is keyed by the message id, never by
+	// the thread root — DMs are never inThread.
 	mentionCats := make(map[int]int32)
 	for _, mn := range msg.Mentions {
 		if mn.Type != "user" || mn.Id == "" {
@@ -354,6 +359,22 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 			continue
 		}
 		mentionCats[uid] |= ActivityCategoryMention
+	}
+	// DIRECT: a top-level message in a 1:1 DM (user<->user type=4 or
+	// user<->agent type=1) is addressed to the other user member even with no
+	// @mention. Without this, plain DM replies produce no activity row and the
+	// recipient gets no notification. Thread replies inside a DM still ride the
+	// THREAD category, so only top-level DM messages add DIRECT here. Agent
+	// senders are never in userMembers, so the user owner is targeted directly.
+	if !msg.ThreadRootMessageID.Valid {
+		if conv, err := s.GetConversation(ctx, msg.ConversationID); err != nil {
+			slog.Warn("failed to get conversation for DIRECT activity",
+				"conversationID", msg.ConversationID, "messageID", msg.ID, "error", err)
+		} else if conv.Type == ConversationTypeDM || conv.Type == ConversationTypeUserDM {
+			for uid := range userMembers {
+				mentionCats[uid] |= ActivityCategoryDirect
+			}
+		}
 	}
 	threadCats := make(map[int]int32)
 	if rootIsTask {
@@ -409,6 +430,11 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 	// into the folded thread row instead of emitting a duplicate mention row.
 	mentionOnRoot := inThread && msg.ID == effectiveRoot
 
+	// pushTargets collects the (user, categories) pairs for which an activity
+	// row was upserted, so a single detached goroutine can fan Web Push
+	// notifications out after the emit loops (rather than one goroutine per
+	// row). The webpush sender owns its own per-subscription fan-out pool.
+	var pushTargets []pushTarget
 	upsert := func(uid int, key, messageID uuid.UUID, root uuid.NullUUID, cats int32) {
 		if cats == 0 {
 			return
@@ -424,6 +450,10 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 		}); err != nil {
 			slog.Warn("failed to upsert activity",
 				"principalID", uid, "activityKey", key, "messageID", messageID, "error", err)
+			return
+		}
+		if s.webPushSender != nil {
+			pushTargets = append(pushTargets, pushTarget{uid: uid, cats: cats})
 		}
 	}
 
@@ -452,4 +482,141 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 			upsert(uid, msg.ID, msg.ID, threadRootNull, mc)
 		}
 	}
+
+	// Fan Web Push notifications out to every targeted user on a single detached
+	// goroutine, mirroring GenerateActivityForMessage's fire-and-forget policy.
+	// The request ctx may be cancelled by the time this runs, so use a detached
+	// context; the sender's per-subscription fan-out is bounded internally. A
+	// missed push is not data corruption, so failures are logged inside the
+	// sender and never propagate.
+	if s.webPushSender != nil && len(pushTargets) > 0 {
+		sender := s.webPushSender
+		targets := pushTargets
+		go func() {
+			ctx := context.Background()
+			for _, t := range targets {
+				if payload := buildPushPayload(msg, t.cats); payload != nil {
+					sender.SendToUser(ctx, t.uid, payload)
+				}
+			}
+		}()
+	}
+}
+
+// pushTarget pairs a targeted user with the activity categories that made the
+// message relevant to them, so the push payload's title can reflect the reason.
+type pushTarget struct {
+	uid  int
+	cats int32
+}
+
+// maxPushSummaryLen caps the message excerpt embedded in a push payload body.
+// Web Push payloads must stay under 4078 bytes (RFC 8291); the JSON envelope
+// leaves ample headroom well below this cap.
+const maxPushSummaryLen = 200
+
+// pushPayload is the JSON contract between the manager and the frontend service
+// worker (see frontend/public/sw.js). The SW shows {title}/{body} and uses
+// {route} to deep-link on click; {conversation} is the notification tag so
+// repeats in the same conversation coalesce.
+type pushPayload struct {
+	Title        string `json:"title"`
+	Body         string `json:"body"`
+	Conversation string `json:"conversation"`
+	MessageID    string `json:"messageId"`
+	Category     string `json:"category"`
+	Route        string `json:"route"`
+}
+
+// buildPushPayload marshals the Web Push notification body for one targeted
+// user. The title reflects the highest-priority category in cats; the body is
+// "{sender}: {summary}". Returns nil when no recognizable category is set
+// (nothing to push). Best-effort: a marshal error is logged and returns nil.
+func buildPushPayload(msg *ChatMessage, cats int32) []byte {
+	category := pushCategoryName(cats)
+	if category == "" {
+		return nil
+	}
+	sender := pushSenderName(msg)
+	summary := truncatePushSummary(msg.Content)
+	body := strings.TrimSpace(sender + " " + summary)
+	if body == "" {
+		body = category
+	}
+	payload := pushPayload{
+		Title:        pushTitleFor(cats),
+		Body:         body,
+		Conversation: "conversations/" + msg.ConversationID.String(),
+		MessageID:    msg.ID.String(),
+		Category:     category,
+		Route:        "/" + msg.ConversationID.String(),
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		slog.Warn("failed to marshal push payload", "messageID", msg.ID, "error", err)
+		return nil
+	}
+	return data
+}
+
+// pushCategoryName maps the highest-priority category flag set in cats to the
+// name the service worker uses for analytics/tagging. Empty when no category is
+// set. Priority order is MENTION > DIRECT > TASK > REMINDER > THREAD so a
+// mention-on-task-thread reports as MENTION.
+func pushCategoryName(cats int32) string {
+	switch {
+	case cats&ActivityCategoryMention != 0:
+		return "MENTION"
+	case cats&ActivityCategoryDirect != 0:
+		return "DIRECT"
+	case cats&ActivityCategoryTask != 0:
+		return "TASK"
+	case cats&ActivityCategoryReminder != 0:
+		return "REMINDER"
+	case cats&ActivityCategoryThread != 0:
+		return "THREAD"
+	}
+	return ""
+}
+
+// pushTitleFor returns a human notification title for the highest-priority
+// category in cats.
+func pushTitleFor(cats int32) string {
+	switch {
+	case cats&ActivityCategoryMention != 0:
+		return "You were mentioned"
+	case cats&ActivityCategoryDirect != 0:
+		return "New direct message"
+	case cats&ActivityCategoryTask != 0:
+		return "Task update"
+	case cats&ActivityCategoryReminder != 0:
+		return "Reminder update"
+	case cats&ActivityCategoryThread != 0:
+		return "New thread reply"
+	}
+	return "New message"
+}
+
+// pushSenderName returns the display name of the message sender for the push
+// body prefix.
+func pushSenderName(msg *ChatMessage) string {
+	switch msg.SenderType {
+	case SenderTypeUser:
+		return msg.PrincipalName
+	case SenderTypeAgent:
+		return msg.AgentName
+	}
+	return ""
+}
+
+// truncatePushSummary collapses a message body to a single-line excerpt of at
+// most maxPushSummaryLen runes for the push notification body.
+func truncatePushSummary(s string) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.TrimSpace(s)
+	r := []rune(s)
+	if len(r) <= maxPushSummaryLen {
+		return s
+	}
+	return string(r[:maxPushSummaryLen]) + "…"
 }

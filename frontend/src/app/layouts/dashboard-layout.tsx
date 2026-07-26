@@ -1,11 +1,13 @@
 import { Menu } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ImagePreviewOverlay } from "@/components/preview/image-preview-overlay";
 import { MarkdownPreviewOverlay } from "@/components/preview/markdown-preview-overlay";
 import { SetupChecklistDialog } from "@/components/setup-checklist-dialog";
 import { DesktopSidebar, MobileSidebar } from "@/components/sidebar";
 import { UserMenu } from "@/components/user-menu";
+import { toastManager } from "@/lib/toast";
+import { reSubscribeIfEnabled, suppressRoute } from "@/lib/web-push";
 
 const COLLAPSED_KEY = "laelia-sidebar-collapsed";
 
@@ -21,6 +23,7 @@ export function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => {
@@ -38,6 +41,45 @@ export function DashboardLayout() {
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
+
+  // Web Push: re-establish the push subscription on boot if the user previously
+  // enabled it (handles browser-rotated subscriptions across reloads), tell the
+  // service worker which conversation the page is currently viewing so pushes
+  // for it are suppressed (the user is already looking at them), and listen for
+  // PUSH_SUPPRESSED / NOTIFICATION_CLICK messages from the SW.
+  useEffect(() => {
+    void reSubscribeIfEnabled();
+  }, []);
+
+  useEffect(() => {
+    // The conversation route is "/{conversationId}"; sending any pathname is
+    // safe — the SW only suppresses when a push's route matches it exactly.
+    void suppressRoute(location.pathname);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+      if (data.type === "PUSH_SUPPRESSED" && data.payload) {
+        const payload = data.payload as {
+          title?: string;
+          body?: string;
+        };
+        toastManager.add({
+          type: "info",
+          title: payload.title,
+          description: payload.body,
+        });
+      } else if (data.type === "NOTIFICATION_CLICK" && data.route) {
+        navigate(data.route);
+      }
+    }
+    navigator.serviceWorker?.addEventListener("message", onMessage);
+    return () => {
+      navigator.serviceWorker?.removeEventListener("message", onMessage);
+    };
+  }, [navigate]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">

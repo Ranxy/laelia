@@ -28,6 +28,7 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/component/ratelimit"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
+	"github.com/Ranxy/laelia/backend/manager/component/webpush"
 	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -90,6 +91,18 @@ func configureGrpcRouters(
 	roleService := apiv1.NewRoleService(stores)
 	iamService := apiv1.NewIamService(stores)
 
+	// Web Push: load the auto-generated VAPID keypair from the setting table
+	// (initializeSetting guarantees a row exists by this point) and build the
+	// sender. Inject it into the store so activity generation can fire push
+	// notifications fire-and-forget.
+	webpushCfg, err := stores.GetWebPushSetting(ctx)
+	if err != nil {
+		return errors.Wrapf(err, "failed to load web push setting")
+	}
+	webpushSender := webpush.NewSender(webpushCfg.GetPublicKey(), webpushCfg.GetPrivateKey(), webpushCfg.GetSubject(), stores)
+	stores.SetWebPushSender(webpushSender)
+	notificationService := apiv1.NewNotificationService(stores, webpushSender, iamManager)
+
 	rateLimiterCfg := ratelimit.DefaultConfig()
 	rateLimiterCfg.TrustProxy = profile.TrustProxy
 	rateLimiter, err := ratelimit.New(rateLimiterCfg)
@@ -149,6 +162,8 @@ func configureGrpcRouters(
 	connectHandlers[rolePath] = roleHandler
 	iamPath, iamHandler := v1connect.NewIamServiceHandler(iamService, handlerOpts)
 	connectHandlers[iamPath] = iamHandler
+	notificationPath, notificationHandler := v1connect.NewNotificationServiceHandler(notificationService, handlerOpts)
+	connectHandlers[notificationPath] = notificationHandler
 
 	reflector := grpcreflect.NewStaticReflector(
 		v1connect.UserServiceName,
@@ -161,6 +176,7 @@ func configureGrpcRouters(
 		v1connect.SettingServiceName,
 		v1connect.RoleServiceName,
 		v1connect.IamServiceName,
+		v1connect.NotificationServiceName,
 	)
 	reflectPath, reflectHandler := grpcreflect.NewHandlerV1(reflector)
 	connectHandlers[reflectPath] = reflectHandler
@@ -202,6 +218,9 @@ func configureGrpcRouters(
 		return err
 	}
 	if err := v1pb.RegisterIamServiceHandler(ctx, mux, grpcConn); err != nil {
+		return err
+	}
+	if err := v1pb.RegisterNotificationServiceHandler(ctx, mux, grpcConn); err != nil {
 		return err
 	}
 

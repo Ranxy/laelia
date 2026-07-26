@@ -359,16 +359,22 @@ const (
 	ActivityCategory_ACTIVITY_CATEGORY_TASK        ActivityCategory = 2
 	ActivityCategory_ACTIVITY_CATEGORY_REMINDER    ActivityCategory = 4
 	ActivityCategory_ACTIVITY_CATEGORY_THREAD      ActivityCategory = 8
+	// DIRECT marks a 1:1 DM message (user<->user or agent->user) addressed to the
+	// user but carrying no other category (no @mention, not a task/reminder, not a
+	// thread reply). It gives DMs a notifiable signal where they would otherwise
+	// produce no Activity row.
+	ActivityCategory_ACTIVITY_CATEGORY_DIRECT ActivityCategory = 16
 )
 
 // Enum value maps for ActivityCategory.
 var (
 	ActivityCategory_name = map[int32]string{
-		0: "ACTIVITY_CATEGORY_UNSPECIFIED",
-		1: "ACTIVITY_CATEGORY_MENTION",
-		2: "ACTIVITY_CATEGORY_TASK",
-		4: "ACTIVITY_CATEGORY_REMINDER",
-		8: "ACTIVITY_CATEGORY_THREAD",
+		0:  "ACTIVITY_CATEGORY_UNSPECIFIED",
+		1:  "ACTIVITY_CATEGORY_MENTION",
+		2:  "ACTIVITY_CATEGORY_TASK",
+		4:  "ACTIVITY_CATEGORY_REMINDER",
+		8:  "ACTIVITY_CATEGORY_THREAD",
+		16: "ACTIVITY_CATEGORY_DIRECT",
 	}
 	ActivityCategory_value = map[string]int32{
 		"ACTIVITY_CATEGORY_UNSPECIFIED": 0,
@@ -376,6 +382,7 @@ var (
 		"ACTIVITY_CATEGORY_TASK":        2,
 		"ACTIVITY_CATEGORY_REMINDER":    4,
 		"ACTIVITY_CATEGORY_THREAD":      8,
+		"ACTIVITY_CATEGORY_DIRECT":      16,
 	}
 )
 
@@ -10466,13 +10473,14 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x19REMINDER_STATUS_COMPLETED\x10\x03\x12\x1d\n" +
 	"\x19REMINDER_STATUS_CANCELLED\x10\x04\x12\x1a\n" +
 	"\x16REMINDER_STATUS_MISSED\x10\x05\x12\x1a\n" +
-	"\x16REMINDER_STATUS_FAILED\x10\x06*\xae\x01\n" +
+	"\x16REMINDER_STATUS_FAILED\x10\x06*\xcc\x01\n" +
 	"\x10ActivityCategory\x12!\n" +
 	"\x1dACTIVITY_CATEGORY_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19ACTIVITY_CATEGORY_MENTION\x10\x01\x12\x1a\n" +
 	"\x16ACTIVITY_CATEGORY_TASK\x10\x02\x12\x1e\n" +
 	"\x1aACTIVITY_CATEGORY_REMINDER\x10\x04\x12\x1c\n" +
-	"\x18ACTIVITY_CATEGORY_THREAD\x10\b*|\n" +
+	"\x18ACTIVITY_CATEGORY_THREAD\x10\b\x12\x1c\n" +
+	"\x18ACTIVITY_CATEGORY_DIRECT\x10\x10*|\n" +
 	"\rActivityState\x12\x1e\n" +
 	"\x1aACTIVITY_STATE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15ACTIVITY_STATE_UNREAD\x10\x01\x12\x17\n" +

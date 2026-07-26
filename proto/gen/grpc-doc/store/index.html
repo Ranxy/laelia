@@ -452,6 +452,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.store.WebPushSetting"><span class="badge">M</span>WebPushSetting</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.store.WorkspaceProfileSetting"><span class="badge">M</span>WorkspaceProfileSetting</a>
                 </li>
               
@@ -2773,6 +2777,55 @@ stores; false for AWS virtual-host style). </p></td>
 
         
       
+        <h3 id="laelia.store.WebPushSetting">WebPushSetting</h3>
+        <p>WebPushSetting holds the VAPID keypair (RFC 8292) used to sign Web Push</p><p>notifications. The keypair is auto-generated on first boot and stored here so</p><p>a self-hosted SaaS deployment needs no env config; rotating the keys</p><p>invalidates every existing push subscription, so the values must stay stable.</p><p>Stored as plaintext (same mechanism as AUTH_SECRET); the private key is never</p><p>returned by any RPC — GetPushConfig only exposes the public key.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>public_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>base64url (no padding) VAPID public key, sent to browsers for subscription. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>private_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>base64url (no padding) VAPID private key, used only server-side to sign. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>subject</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>VAPID subject: a mailto: or https: URL identifying the sender. Required by
+some push services (notably APNs). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>http_proxy</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>http_proxy is an optional outbound HTTP(S) proxy used when the manager
+posts notifications to browser push services. Empty (default) means direct
+connection. Useful when the manager&#39;s network cannot reach the push
+endpoints directly. Only http:// and https:// schemes are supported. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.store.WorkspaceProfileSetting">WorkspaceProfileSetting</h3>
         <p></p>
 
@@ -2961,6 +3014,12 @@ stores; false for AWS virtual-host style). </p></td>
               <tr>
                 <td>S3_CONFIG</td>
                 <td>10</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>WEB_PUSH_CONFIG</td>
+                <td>11</td>
                 <td><p></p></td>
               </tr>
             

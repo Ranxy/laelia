@@ -24,6 +24,7 @@ import {
   MEMBERS_ROUTE,
   SETTINGS_ROUTE,
   SETTINGS_ROUTE_IAM,
+  SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_ROLES,
   SETTINGS_ROUTE_STORAGE,
   SETTINGS_ROUTE_USERS,
@@ -135,6 +136,11 @@ function useSidebarItems(): SidebarItem[] {
             name: SETTINGS_ROUTE_STORAGE,
             type: "route",
             hide: !canViewStorage,
+          },
+          {
+            title: t("sidebar.settings-notifications"),
+            name: SETTINGS_ROUTE_NOTIFICATIONS,
+            type: "route",
           },
           {
             title: t("sidebar.settings-users"),

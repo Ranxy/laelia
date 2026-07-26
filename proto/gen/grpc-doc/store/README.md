@@ -72,6 +72,7 @@
     - [EnvironmentSetting.Environment.TagsEntry](#laelia-store-EnvironmentSetting-Environment-TagsEntry)
     - [PasswordRestrictionSetting](#laelia-store-PasswordRestrictionSetting)
     - [S3ConfigSetting](#laelia-store-S3ConfigSetting)
+    - [WebPushSetting](#laelia-store-WebPushSetting)
     - [WorkspaceProfileSetting](#laelia-store-WorkspaceProfileSetting)
   
     - [IPValidationPolicy](#laelia-store-IPValidationPolicy)
@@ -1054,6 +1055,29 @@ considered unconfigured and upload/download endpoints reject with
 
 
 
+<a name="laelia-store-WebPushSetting"></a>
+
+### WebPushSetting
+WebPushSetting holds the VAPID keypair (RFC 8292) used to sign Web Push
+notifications. The keypair is auto-generated on first boot and stored here so
+a self-hosted SaaS deployment needs no env config; rotating the keys
+invalidates every existing push subscription, so the values must stay stable.
+Stored as plaintext (same mechanism as AUTH_SECRET); the private key is never
+returned by any RPC — GetPushConfig only exposes the public key.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| public_key | [string](#string) |  | base64url (no padding) VAPID public key, sent to browsers for subscription. |
+| private_key | [string](#string) |  | base64url (no padding) VAPID private key, used only server-side to sign. |
+| subject | [string](#string) |  | VAPID subject: a mailto: or https: URL identifying the sender. Required by some push services (notably APNs). |
+| http_proxy | [string](#string) |  | http_proxy is an optional outbound HTTP(S) proxy used when the manager posts notifications to browser push services. Empty (default) means direct connection. Useful when the manager&#39;s network cannot reach the push endpoints directly. Only http:// and https:// schemes are supported. |
+
+
+
+
+
+
 <a name="laelia-store-WorkspaceProfileSetting"></a>
 
 ### WorkspaceProfileSetting
@@ -1111,6 +1135,7 @@ IP validation policy for agent connections.
 | ENVIRONMENT | 8 |  |
 | AGENT_SECURITY | 9 |  |
 | S3_CONFIG | 10 |  |
+| WEB_PUSH_CONFIG | 11 |  |
 
 
  

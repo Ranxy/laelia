@@ -3,12 +3,14 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	"github.com/Ranxy/laelia/backend/common"
 	models "github.com/Ranxy/laelia/backend/generated-go/store"
+	"github.com/Ranxy/laelia/backend/manager/component/webpush"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
@@ -122,5 +124,40 @@ func (s *Server) initializeSetting(ctx context.Context) error {
 		return err
 	}
 
+	// Web Push VAPID keypair: auto-generate on first boot and persist, so a
+	// self-hosted deployment needs no env config. Rotating the keys later
+	// invalidates every existing push subscription, so once generated the values
+	// must stay stable — only generate when the row is absent or empty.
+	return s.initWebPushSetting(ctx)
+}
+
+// initWebPushSetting ensures a VAPID keypair exists in the setting table. When
+// the public or private key is missing it generates a fresh keypair and stores
+// it; otherwise the existing keypair is left untouched. The subject defaults to
+// the workspace ExternalURL when it is an http(s) URL, else a stable mailto:.
+func (s *Server) initWebPushSetting(ctx context.Context) error {
+	cfg, err := s.store.GetWebPushSetting(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to read web push setting")
+	}
+	if cfg.GetPublicKey() != "" && cfg.GetPrivateKey() != "" {
+		return nil
+	}
+
+	privateKey, publicKey, err := webpush.GenerateKeys()
+	if err != nil {
+		return errors.Wrap(err, "failed to generate VAPID keys")
+	}
+	subject := s.profile.ExternalURL
+	if !strings.HasPrefix(subject, "http://") && !strings.HasPrefix(subject, "https://") {
+		subject = "mailto:laelia@localhost"
+	}
+	if _, err := s.store.UpsertWebPushSetting(ctx, &models.WebPushSetting{
+		PublicKey:  publicKey,
+		PrivateKey: privateKey,
+		Subject:    subject,
+	}); err != nil {
+		return errors.Wrap(err, "failed to persist VAPID keys")
+	}
 	return nil
 }

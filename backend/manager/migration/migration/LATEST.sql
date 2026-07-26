@@ -770,6 +770,26 @@ CREATE INDEX IF NOT EXISTS idx_user_thread_participant_user
 CREATE INDEX IF NOT EXISTS idx_chat_message_mentions_gin
     ON chat_message USING GIN (mentions jsonb_path_ops);
 
+-- web_push_subscription stores per-user browser Web Push endpoints so the
+-- manager can deliver system notifications for directed messages even when the
+-- user's tab is closed. One user may have many subscriptions (multiple
+-- devices/browsers). PK (principal_id, endpoint) makes re-subscribing the same
+-- browser idempotent; ON DELETE CASCADE drops a user's subscriptions with the
+-- account. Keys (p256dh, auth) are refreshed on upsert since browsers can
+-- rotate them.
+CREATE TABLE IF NOT EXISTS web_push_subscription (
+    principal_id INTEGER NOT NULL REFERENCES principal(id) ON DELETE CASCADE,
+    endpoint     TEXT NOT NULL,
+    p256dh       TEXT NOT NULL,
+    auth         TEXT NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (principal_id, endpoint)
+);
+
+CREATE INDEX IF NOT EXISTS idx_web_push_subscription_user
+    ON web_push_subscription (principal_id);
+
 -- Schema migration history (bytebase-style version tracking). The migrator
 -- records each applied schema version here; the UNIQUE(version) index guards
 -- against double-application. Created by LATEST.sql on fresh installs.

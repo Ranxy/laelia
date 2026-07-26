@@ -18,6 +18,7 @@ enum SettingName {
   ENVIRONMENT = 8;
   AGENT_SECURITY = 9;
   S3_CONFIG = 10;
+  WEB_PUSH_CONFIG = 11;
 }
 
 message WorkspaceProfileSetting {
@@ -128,4 +129,25 @@ message S3ConfigSetting {
   bool force_path_style = 6;
   // Whether the endpoint uses TLS. Only meaningful when endpoint is set.
   bool use_ssl = 7;
+}
+
+// WebPushSetting holds the VAPID keypair (RFC 8292) used to sign Web Push
+// notifications. The keypair is auto-generated on first boot and stored here so
+// a self-hosted SaaS deployment needs no env config; rotating the keys
+// invalidates every existing push subscription, so the values must stay stable.
+// Stored as plaintext (same mechanism as AUTH_SECRET); the private key is never
+// returned by any RPC — GetPushConfig only exposes the public key.
+message WebPushSetting {
+  // base64url (no padding) VAPID public key, sent to browsers for subscription.
+  string public_key = 1;
+  // base64url (no padding) VAPID private key, used only server-side to sign.
+  string private_key = 2;
+  // VAPID subject: a mailto: or https: URL identifying the sender. Required by
+  // some push services (notably APNs).
+  string subject = 3;
+  // http_proxy is an optional outbound HTTP(S) proxy used when the manager
+  // posts notifications to browser push services. Empty (default) means direct
+  // connection. Useful when the manager's network cannot reach the push
+  // endpoints directly. Only http:// and https:// schemes are supported.
+  string http_proxy = 4;
 }

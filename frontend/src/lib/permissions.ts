@@ -80,6 +80,15 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     permissions: ["laelia.settings.get", "laelia.settings.update"],
   },
   {
+    resource: "notifications",
+    permissions: [
+      "laelia.pushConfig.get",
+      "laelia.pushConfig.update",
+      "laelia.pushSubscriptions.create",
+      "laelia.pushSubscriptions.delete",
+    ],
+  },
+  {
     resource: "roles",
     permissions: [
       "laelia.roles.create",

@@ -8,6 +8,7 @@ import { CommandService } from "@/types/proto-es/v1/command_pb";
 import { SettingService } from "@/types/proto-es/v1/setting_pb";
 import { RoleService } from "@/types/proto-es/v1/role_service_pb";
 import { IamService } from "@/types/proto-es/v1/iam_service_pb";
+import { NotificationService } from "@/types/proto-es/v1/notification_pb";
 import { createAuthInterceptor } from "./auth-interceptor";
 
 // Guards against a stampede of concurrent 401s each triggering a redirect.
@@ -60,3 +61,7 @@ export const commandServiceClient = createClient(CommandService, transport);
 export const settingServiceClient = createClient(SettingService, transport);
 export const roleServiceClient = createClient(RoleService, transport);
 export const iamServiceClient = createClient(IamService, transport);
+export const notificationServiceClient = createClient(
+  NotificationService,
+  transport
+);

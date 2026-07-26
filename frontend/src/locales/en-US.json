@@ -67,7 +67,8 @@
     "settings-storage": "Storage",
     "settings-users": "Users",
     "settings-roles": "Roles",
-    "settings-iam": "Access"
+    "settings-iam": "Access",
+    "settings-notifications": "Notifications"
   },
   "settings": {
     "title": "Settings",
@@ -88,6 +89,28 @@
       "avatar-upload-failed": "Failed to update avatar",
       "avatar-removed": "Avatar removed",
       "avatar-remove-failed": "Failed to remove avatar"
+    },
+    "notifications": {
+      "title": "Desktop notifications",
+      "description": "Get browser notifications for directed messages — @mentions, thread replies, task and reminder updates, and 1:1 DMs — even when this tab is closed.",
+      "enable": "Enable desktop notifications",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "loading": "Checking notification status…",
+      "not-configured": "Web Push is not configured on this server.",
+      "permission-denied": "Notification permission was blocked. Re-enable it from your browser's site settings for this origin.",
+      "permission-prompt": "Allow notifications in the browser prompt to enable.",
+      "enable-failed": "Failed to enable notifications",
+      "disable-failed": "Failed to disable notifications",
+      "unsupported": "This browser does not support Web Push notifications.",
+      "proxy-title": "Delivery proxy (admin)",
+      "proxy-description": "Route push delivery through an HTTP(S) proxy when the server cannot reach browser push services directly. Leave empty for a direct connection. Optional, off by default.",
+      "proxy-placeholder": "http://proxy.example.com:8080",
+      "proxy-save": "Save proxy",
+      "proxy-saving": "Saving…",
+      "proxy-saved": "Proxy saved",
+      "proxy-invalid": "Invalid proxy URL. Use an http:// or https:// URL.",
+      "proxy-save-failed": "Failed to save proxy"
     },
     "s3": {
       "title": "Storage",

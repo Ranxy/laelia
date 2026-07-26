@@ -15,6 +15,13 @@ type Store struct {
 	dbConnManager *DBConnectionManager
 	enableCache   bool
 
+	// webPushSender dispatches Web Push notifications for directed messages. It
+	// is injected via SetWebPushSender after construction to avoid a circular
+	// dependency: the webpush component imports the store, so the store cannot
+	// import it back. Nil (the default) disables push dispatch —
+	// generateActivityRows treats a nil sender as a no-op.
+	webPushSender WebPushSender
+
 	userIDCache            *lru.Cache[int, *UserMessage]
 	userEmailCache         *lru.Cache[string, *UserMessage]
 	settingCache           *lru.Cache[models.SettingName, *SettingMessage]

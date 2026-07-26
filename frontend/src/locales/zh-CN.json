@@ -67,7 +67,8 @@
     "settings-storage": "存储配置",
     "settings-users": "用户管理",
     "settings-roles": "角色",
-    "settings-iam": "访问控制"
+    "settings-iam": "访问控制",
+    "settings-notifications": "通知"
   },
   "settings": {
     "title": "设置",
@@ -88,6 +89,28 @@
       "avatar-upload-failed": "更新头像失败",
       "avatar-removed": "头像已移除",
       "avatar-remove-failed": "移除头像失败"
+    },
+    "notifications": {
+      "title": "桌面通知",
+      "description": "当有定向消息时接收浏览器通知 —— @提及、你参与的 thread 回复、任务与提醒更新,以及一对一私聊 —— 即使关闭了标签页也能收到。",
+      "enable": "开启桌面通知",
+      "enabled": "已开启",
+      "disabled": "已关闭",
+      "loading": "正在检查通知状态…",
+      "not-configured": "服务器尚未配置 Web Push。",
+      "permission-denied": "通知权限已被阻止。请在本站点浏览器设置中重新允许通知。",
+      "permission-prompt": "请在浏览器弹窗中允许通知以开启。",
+      "enable-failed": "开启通知失败",
+      "disable-failed": "关闭通知失败",
+      "unsupported": "此浏览器不支持 Web Push 通知。",
+      "proxy-title": "推送代理(管理员)",
+      "proxy-description": "当服务器无法直接访问浏览器推送服务时,可通过 HTTP(S) 代理转发推送。留空表示直连。可选,默认关闭。",
+      "proxy-placeholder": "http://proxy.example.com:8080",
+      "proxy-save": "保存代理",
+      "proxy-saving": "保存中…",
+      "proxy-saved": "代理已保存",
+      "proxy-invalid": "代理地址无效。请使用 http:// 或 https:// 开头的地址。",
+      "proxy-save-failed": "保存代理失败"
     },
     "s3": {
       "title": "存储配置",

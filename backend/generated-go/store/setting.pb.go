@@ -36,6 +36,7 @@ const (
 	SettingName_ENVIRONMENT                 SettingName = 8
 	SettingName_AGENT_SECURITY              SettingName = 9
 	SettingName_S3_CONFIG                   SettingName = 10
+	SettingName_WEB_PUSH_CONFIG             SettingName = 11
 )
 
 // Enum value maps for SettingName.
@@ -52,6 +53,7 @@ var (
 		8:  "ENVIRONMENT",
 		9:  "AGENT_SECURITY",
 		10: "S3_CONFIG",
+		11: "WEB_PUSH_CONFIG",
 	}
 	SettingName_value = map[string]int32{
 		"SETTING_NAME_UNSPECIFIED":    0,
@@ -65,6 +67,7 @@ var (
 		"ENVIRONMENT":                 8,
 		"AGENT_SECURITY":              9,
 		"S3_CONFIG":                   10,
+		"WEB_PUSH_CONFIG":             11,
 	}
 )
 
@@ -631,6 +634,88 @@ func (x *S3ConfigSetting) GetUseSsl() bool {
 	return false
 }
 
+// WebPushSetting holds the VAPID keypair (RFC 8292) used to sign Web Push
+// notifications. The keypair is auto-generated on first boot and stored here so
+// a self-hosted SaaS deployment needs no env config; rotating the keys
+// invalidates every existing push subscription, so the values must stay stable.
+// Stored as plaintext (same mechanism as AUTH_SECRET); the private key is never
+// returned by any RPC — GetPushConfig only exposes the public key.
+type WebPushSetting struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// base64url (no padding) VAPID public key, sent to browsers for subscription.
+	PublicKey string `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	// base64url (no padding) VAPID private key, used only server-side to sign.
+	PrivateKey string `protobuf:"bytes,2,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
+	// VAPID subject: a mailto: or https: URL identifying the sender. Required by
+	// some push services (notably APNs).
+	Subject string `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
+	// http_proxy is an optional outbound HTTP(S) proxy used when the manager
+	// posts notifications to browser push services. Empty (default) means direct
+	// connection. Useful when the manager's network cannot reach the push
+	// endpoints directly. Only http:// and https:// schemes are supported.
+	HttpProxy     string `protobuf:"bytes,4,opt,name=http_proxy,json=httpProxy,proto3" json:"http_proxy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WebPushSetting) Reset() {
+	*x = WebPushSetting{}
+	mi := &file_store_setting_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebPushSetting) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebPushSetting) ProtoMessage() {}
+
+func (x *WebPushSetting) ProtoReflect() protoreflect.Message {
+	mi := &file_store_setting_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebPushSetting.ProtoReflect.Descriptor instead.
+func (*WebPushSetting) Descriptor() ([]byte, []int) {
+	return file_store_setting_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *WebPushSetting) GetPublicKey() string {
+	if x != nil {
+		return x.PublicKey
+	}
+	return ""
+}
+
+func (x *WebPushSetting) GetPrivateKey() string {
+	if x != nil {
+		return x.PrivateKey
+	}
+	return ""
+}
+
+func (x *WebPushSetting) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *WebPushSetting) GetHttpProxy() string {
+	if x != nil {
+		return x.HttpProxy
+	}
+	return ""
+}
+
 type EnvironmentSetting_Environment struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -643,7 +728,7 @@ type EnvironmentSetting_Environment struct {
 
 func (x *EnvironmentSetting_Environment) Reset() {
 	*x = EnvironmentSetting_Environment{}
-	mi := &file_store_setting_proto_msgTypes[5]
+	mi := &file_store_setting_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -655,7 +740,7 @@ func (x *EnvironmentSetting_Environment) String() string {
 func (*EnvironmentSetting_Environment) ProtoMessage() {}
 
 func (x *EnvironmentSetting_Environment) ProtoReflect() protoreflect.Message {
-	mi := &file_store_setting_proto_msgTypes[5]
+	mi := &file_store_setting_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -753,7 +838,15 @@ const file_store_setting_proto_rawDesc = "" +
 	"\n" +
 	"secret_key\x18\x05 \x01(\tR\tsecretKey\x12(\n" +
 	"\x10force_path_style\x18\x06 \x01(\bR\x0eforcePathStyle\x12\x17\n" +
-	"\ause_ssl\x18\a \x01(\bR\x06useSsl*\xff\x01\n" +
+	"\ause_ssl\x18\a \x01(\bR\x06useSsl\"\x89\x01\n" +
+	"\x0eWebPushSetting\x12\x1d\n" +
+	"\n" +
+	"public_key\x18\x01 \x01(\tR\tpublicKey\x12\x1f\n" +
+	"\vprivate_key\x18\x02 \x01(\tR\n" +
+	"privateKey\x12\x18\n" +
+	"\asubject\x18\x03 \x01(\tR\asubject\x12\x1d\n" +
+	"\n" +
+	"http_proxy\x18\x04 \x01(\tR\thttpProxy*\x94\x02\n" +
 	"\vSettingName\x12\x1c\n" +
 	"\x18SETTING_NAME_UNSPECIFIED\x10\x00\x12\x0f\n" +
 	"\vAUTH_SECRET\x10\x01\x12\x11\n" +
@@ -766,7 +859,8 @@ const file_store_setting_proto_rawDesc = "" +
 	"\vENVIRONMENT\x10\b\x12\x12\n" +
 	"\x0eAGENT_SECURITY\x10\t\x12\r\n" +
 	"\tS3_CONFIG\x10\n" +
-	"*\x83\x01\n" +
+	"\x12\x13\n" +
+	"\x0fWEB_PUSH_CONFIG\x10\v*\x83\x01\n" +
 	"\x12IPValidationPolicy\x12$\n" +
 	" IP_VALIDATION_POLICY_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11IP_VALIDATION_OFF\x10\x01\x12\x16\n" +
@@ -786,7 +880,7 @@ func file_store_setting_proto_rawDescGZIP() []byte {
 }
 
 var file_store_setting_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_store_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_store_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_store_setting_proto_goTypes = []any{
 	(SettingName)(0),                       // 0: laelia.store.SettingName
 	(IPValidationPolicy)(0),                // 1: laelia.store.IPValidationPolicy
@@ -795,25 +889,26 @@ var file_store_setting_proto_goTypes = []any{
 	(*EnvironmentSetting)(nil),             // 4: laelia.store.EnvironmentSetting
 	(*AgentSecuritySetting)(nil),           // 5: laelia.store.AgentSecuritySetting
 	(*S3ConfigSetting)(nil),                // 6: laelia.store.S3ConfigSetting
-	(*EnvironmentSetting_Environment)(nil), // 7: laelia.store.EnvironmentSetting.Environment
-	nil,                                    // 8: laelia.store.EnvironmentSetting.Environment.TagsEntry
-	(*durationpb.Duration)(nil),            // 9: google.protobuf.Duration
+	(*WebPushSetting)(nil),                 // 7: laelia.store.WebPushSetting
+	(*EnvironmentSetting_Environment)(nil), // 8: laelia.store.EnvironmentSetting.Environment
+	nil,                                    // 9: laelia.store.EnvironmentSetting.Environment.TagsEntry
+	(*durationpb.Duration)(nil),            // 10: google.protobuf.Duration
 }
 var file_store_setting_proto_depIdxs = []int32{
-	9, // 0: laelia.store.WorkspaceProfileSetting.token_duration:type_name -> google.protobuf.Duration
-	9, // 1: laelia.store.WorkspaceProfileSetting.maximum_role_expiration:type_name -> google.protobuf.Duration
-	9, // 2: laelia.store.PasswordRestrictionSetting.password_rotation:type_name -> google.protobuf.Duration
-	7, // 3: laelia.store.EnvironmentSetting.environments:type_name -> laelia.store.EnvironmentSetting.Environment
-	9, // 4: laelia.store.AgentSecuritySetting.bootstrap_token_duration:type_name -> google.protobuf.Duration
-	9, // 5: laelia.store.AgentSecuritySetting.access_token_duration:type_name -> google.protobuf.Duration
-	9, // 6: laelia.store.AgentSecuritySetting.refresh_token_duration:type_name -> google.protobuf.Duration
-	1, // 7: laelia.store.AgentSecuritySetting.ip_validation_policy:type_name -> laelia.store.IPValidationPolicy
-	8, // 8: laelia.store.EnvironmentSetting.Environment.tags:type_name -> laelia.store.EnvironmentSetting.Environment.TagsEntry
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	9, // [9:9] is the sub-list for extension type_name
-	9, // [9:9] is the sub-list for extension extendee
-	0, // [0:9] is the sub-list for field type_name
+	10, // 0: laelia.store.WorkspaceProfileSetting.token_duration:type_name -> google.protobuf.Duration
+	10, // 1: laelia.store.WorkspaceProfileSetting.maximum_role_expiration:type_name -> google.protobuf.Duration
+	10, // 2: laelia.store.PasswordRestrictionSetting.password_rotation:type_name -> google.protobuf.Duration
+	8,  // 3: laelia.store.EnvironmentSetting.environments:type_name -> laelia.store.EnvironmentSetting.Environment
+	10, // 4: laelia.store.AgentSecuritySetting.bootstrap_token_duration:type_name -> google.protobuf.Duration
+	10, // 5: laelia.store.AgentSecuritySetting.access_token_duration:type_name -> google.protobuf.Duration
+	10, // 6: laelia.store.AgentSecuritySetting.refresh_token_duration:type_name -> google.protobuf.Duration
+	1,  // 7: laelia.store.AgentSecuritySetting.ip_validation_policy:type_name -> laelia.store.IPValidationPolicy
+	9,  // 8: laelia.store.EnvironmentSetting.Environment.tags:type_name -> laelia.store.EnvironmentSetting.Environment.TagsEntry
+	9,  // [9:9] is the sub-list for method output_type
+	9,  // [9:9] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_store_setting_proto_init() }
@@ -827,7 +922,7 @@ func file_store_setting_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_store_setting_proto_rawDesc), len(file_store_setting_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

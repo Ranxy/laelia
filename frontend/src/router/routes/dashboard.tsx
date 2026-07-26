@@ -16,6 +16,7 @@ import {
   REMINDER_ROUTE_DETAIL,
   REMINDER_ROUTE_LIST,
   SETTINGS_ROUTE_IAM,
+  SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_PROFILE,
   SETTINGS_ROUTE_ROLES,
   SETTINGS_ROUTE_STORAGE,
@@ -238,6 +239,14 @@ export const dashboardRoutes: RouteObject[] = [
             lazy: () =>
               import("@/pages/dashboard/settings-storage").then((m) => ({
                 Component: m.SettingsStoragePage,
+              })),
+          },
+          {
+            path: "notifications",
+            handle: { name: SETTINGS_ROUTE_NOTIFICATIONS },
+            lazy: () =>
+              import("@/pages/dashboard/settings-notifications").then((m) => ({
+                Component: m.SettingsNotificationsPage,
               })),
           },
           {

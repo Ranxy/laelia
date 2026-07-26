@@ -310,6 +310,17 @@
     - [MachineService](#laelia-v1-MachineService)
     - [MachineStreamService](#laelia-v1-MachineStreamService)
   
+- [v1/notification.proto](#v1_notification-proto)
+    - [CreatePushSubscriptionRequest](#laelia-v1-CreatePushSubscriptionRequest)
+    - [DeletePushSubscriptionRequest](#laelia-v1-DeletePushSubscriptionRequest)
+    - [GetPushConfigRequest](#laelia-v1-GetPushConfigRequest)
+    - [GetPushConfigResponse](#laelia-v1-GetPushConfigResponse)
+    - [PushSubscription](#laelia-v1-PushSubscription)
+    - [UpdatePushConfigRequest](#laelia-v1-UpdatePushConfigRequest)
+    - [UpdatePushConfigResponse](#laelia-v1-UpdatePushConfigResponse)
+  
+    - [NotificationService](#laelia-v1-NotificationService)
+  
 - [v1/role_service.proto](#v1_role_service-proto)
     - [CreateRoleRequest](#laelia-v1-CreateRoleRequest)
     - [DeleteRoleRequest](#laelia-v1-DeleteRoleRequest)
@@ -4283,6 +4294,7 @@ cannot share value names), matching SenderType/TaskStatus.
 | ACTIVITY_CATEGORY_TASK | 2 |  |
 | ACTIVITY_CATEGORY_REMINDER | 4 |  |
 | ACTIVITY_CATEGORY_THREAD | 8 |  |
+| ACTIVITY_CATEGORY_DIRECT | 16 | DIRECT marks a 1:1 DM message (user&lt;-&gt;user or agent-&gt;user) addressed to the user but carrying no other category (no @mention, not a task/reminder, not a thread reply). It gives DMs a notifiable signal where they would otherwise produce no Activity row. |
 
 
 
@@ -5274,6 +5286,150 @@ its own AgentChannel.
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | MachineChannel | [MachineStreamMessage](#laelia-v1-MachineStreamMessage) stream | [ManagerMachineStreamMessage](#laelia-v1-ManagerMachineStreamMessage) stream |  |
+
+ 
+
+
+
+<a name="v1_notification-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/notification.proto
+
+
+
+<a name="laelia-v1-CreatePushSubscriptionRequest"></a>
+
+### CreatePushSubscriptionRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| endpoint | [string](#string) |  | endpoint is the push service endpoint URL returned by PushSubscription.endpoint. |
+| p256dh | [string](#string) |  | p256dh is the base64url ECDH P-256 public key from the subscription&#39;s keys. |
+| auth | [string](#string) |  | auth is the base64url 16-byte auth secret from the subscription&#39;s keys. |
+
+
+
+
+
+
+<a name="laelia-v1-DeletePushSubscriptionRequest"></a>
+
+### DeletePushSubscriptionRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | name is &#34;users/{user}/pushSubscriptions/{endpointKey}&#34;. |
+
+
+
+
+
+
+<a name="laelia-v1-GetPushConfigRequest"></a>
+
+### GetPushConfigRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-GetPushConfigResponse"></a>
+
+### GetPushConfigResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| enabled | [bool](#bool) |  | enabled is false when the manager has no VAPID keys configured; the frontend must not offer to subscribe in that case. |
+| vapid_public_key | [string](#string) |  | vapid_public_key is the base64url VAPID public key, only meaningful when enabled is true. |
+| http_proxy | [string](#string) |  | http_proxy is the configured outbound HTTP proxy for push delivery, only populated for admins (callers with laelia.pushConfig.update). Empty for non-admins or when no proxy is configured. |
+
+
+
+
+
+
+<a name="laelia-v1-PushSubscription"></a>
+
+### PushSubscription
+PushSubscription is a registered browser push endpoint for a user. The
+resource name is &#34;users/{user}/pushSubscriptions/{endpointKey}&#34;.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| endpoint | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdatePushConfigRequest"></a>
+
+### UpdatePushConfigRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| http_proxy | [string](#string) |  | http_proxy is the outbound HTTP(S) proxy URL, or empty to disable the proxy (direct connection). Only http:// and https:// schemes are accepted. |
+
+
+
+
+
+
+<a name="laelia-v1-UpdatePushConfigResponse"></a>
+
+### UpdatePushConfigResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| http_proxy | [string](#string) |  | http_proxy echoes the stored proxy value (empty when the proxy is off). |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="laelia-v1-NotificationService"></a>
+
+### NotificationService
+NotificationService manages per-user browser Web Push subscriptions so the
+manager can deliver system notifications for directed messages (mentions,
+thread replies, task/reminder updates, and 1:1 DMs) even when the user&#39;s
+browser tab is closed. All RPCs are user-scoped: the caller&#39;s own principal
+id is the implicit owner, mirroring ListActivities. The VAPID keypair is
+auto-generated on first boot and stored in the setting table, so no env
+config is required; GetPushConfig reports enabled=false if the keypair is
+somehow absent. An optional outbound HTTP proxy (for networks that cannot
+reach browser push services directly) is admin-configurable via
+UpdatePushConfig.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetPushConfig | [GetPushConfigRequest](#laelia-v1-GetPushConfigRequest) | [GetPushConfigResponse](#laelia-v1-GetPushConfigResponse) | GetPushConfig reports whether Web Push is enabled and, when it is, returns the VAPID public key the browser needs to subscribe. The http_proxy field is populated only for callers holding laelia.pushConfig.update (admins); other callers receive it empty. |
+| UpdatePushConfig | [UpdatePushConfigRequest](#laelia-v1-UpdatePushConfigRequest) | [UpdatePushConfigResponse](#laelia-v1-UpdatePushConfigResponse) | UpdatePushConfig sets the optional outbound HTTP proxy used when the manager posts notifications to browser push services. Admin-only. An empty http_proxy disables the proxy (direct connection). The change takes effect immediately on the running manager. |
+| CreatePushSubscription | [CreatePushSubscriptionRequest](#laelia-v1-CreatePushSubscriptionRequest) | [PushSubscription](#laelia-v1-PushSubscription) | CreatePushSubscription registers a browser push subscription for the authenticated user. Idempotent on (user, endpoint): re-subscribing the same browser refreshes its p256dh/auth keys. Returns FailedPrecondition when Web Push is disabled. |
+| DeletePushSubscription | [DeletePushSubscriptionRequest](#laelia-v1-DeletePushSubscriptionRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | DeletePushSubscription removes a push subscription for the authenticated user. The name is &#34;users/{user}/pushSubscriptions/{endpointKey}&#34; where endpointKey is the URL-safe base64 of the subscription endpoint; the name&#39;s user must be the caller. |
 
  
 

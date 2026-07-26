@@ -4525,6 +4525,16 @@ export enum ActivityCategory {
    * @generated from enum value: ACTIVITY_CATEGORY_THREAD = 8;
    */
   THREAD = 8,
+
+  /**
+   * DIRECT marks a 1:1 DM message (user<->user or agent->user) addressed to the
+   * user but carrying no other category (no @mention, not a task/reminder, not a
+   * thread reply). It gives DMs a notifiable signal where they would otherwise
+   * produce no Activity row.
+   *
+   * @generated from enum value: ACTIVITY_CATEGORY_DIRECT = 16;
+   */
+  DIRECT = 16,
 }
 
 /**

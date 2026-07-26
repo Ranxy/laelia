@@ -1379,6 +1379,49 @@
         
           
           <li>
+            <a href="#v1%2fnotification.proto">v1/notification.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.v1.CreatePushSubscriptionRequest"><span class="badge">M</span>CreatePushSubscriptionRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DeletePushSubscriptionRequest"><span class="badge">M</span>DeletePushSubscriptionRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetPushConfigRequest"><span class="badge">M</span>GetPushConfigRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetPushConfigResponse"><span class="badge">M</span>GetPushConfigResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.PushSubscription"><span class="badge">M</span>PushSubscription</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdatePushConfigRequest"><span class="badge">M</span>UpdatePushConfigRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdatePushConfigResponse"><span class="badge">M</span>UpdatePushConfigResponse</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#laelia.v1.NotificationService"><span class="badge">S</span>NotificationService</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
             <a href="#v1%2frole_service.proto">v1/role_service.proto</a>
             <ul>
               
@@ -10594,6 +10637,15 @@ is performed by ClaimTask, not this RPC. </p></td>
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>ACTIVITY_CATEGORY_DIRECT</td>
+                <td>16</td>
+                <td><p>DIRECT marks a 1:1 DM message (user&lt;-&gt;user or agent-&gt;user) addressed to the
+user but carrying no other category (no @mention, not a task/reminder, not a
+thread reply). It gives DMs a notifiable signal where they would otherwise
+produce no Activity row.</p></td>
+              </tr>
+            
           </tbody>
         </table>
       
@@ -13852,6 +13904,321 @@ machine must host (so the machine app can open an AgentChannel for each).</p></t
           </tbody>
         </table>
 
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="v1/notification.proto">v1/notification.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.v1.CreatePushSubscriptionRequest">CreatePushSubscriptionRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>endpoint</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>endpoint is the push service endpoint URL returned by PushSubscription.endpoint. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>p256dh</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>p256dh is the base64url ECDH P-256 public key from the subscription&#39;s keys. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>auth</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>auth is the base64url 16-byte auth secret from the subscription&#39;s keys. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DeletePushSubscriptionRequest">DeletePushSubscriptionRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>name is &#34;users/{user}/pushSubscriptions/{endpointKey}&#34;. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetPushConfigRequest">GetPushConfigRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.GetPushConfigResponse">GetPushConfigResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>enabled</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>enabled is false when the manager has no VAPID keys configured; the
+frontend must not offer to subscribe in that case. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>vapid_public_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>vapid_public_key is the base64url VAPID public key, only meaningful when
+enabled is true. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>http_proxy</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>http_proxy is the configured outbound HTTP proxy for push delivery, only
+populated for admins (callers with laelia.pushConfig.update). Empty for
+non-admins or when no proxy is configured. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.PushSubscription">PushSubscription</h3>
+        <p>PushSubscription is a registered browser push endpoint for a user. The</p><p>resource name is "users/{user}/pushSubscriptions/{endpointKey}".</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>endpoint</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdatePushConfigRequest">UpdatePushConfigRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>http_proxy</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>http_proxy is the outbound HTTP(S) proxy URL, or empty to disable the
+proxy (direct connection). Only http:// and https:// schemes are accepted. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdatePushConfigResponse">UpdatePushConfigResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>http_proxy</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>http_proxy echoes the stored proxy value (empty when the proxy is off). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="laelia.v1.NotificationService">NotificationService</h3>
+        <p>NotificationService manages per-user browser Web Push subscriptions so the</p><p>manager can deliver system notifications for directed messages (mentions,</p><p>thread replies, task/reminder updates, and 1:1 DMs) even when the user's</p><p>browser tab is closed. All RPCs are user-scoped: the caller's own principal</p><p>id is the implicit owner, mirroring ListActivities. The VAPID keypair is</p><p>auto-generated on first boot and stored in the setting table, so no env</p><p>config is required; GetPushConfig reports enabled=false if the keypair is</p><p>somehow absent. An optional outbound HTTP proxy (for networks that cannot</p><p>reach browser push services directly) is admin-configurable via</p><p>UpdatePushConfig.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GetPushConfig</td>
+                <td><a href="#laelia.v1.GetPushConfigRequest">GetPushConfigRequest</a></td>
+                <td><a href="#laelia.v1.GetPushConfigResponse">GetPushConfigResponse</a></td>
+                <td><p>GetPushConfig reports whether Web Push is enabled and, when it is, returns
+the VAPID public key the browser needs to subscribe. The http_proxy field
+is populated only for callers holding laelia.pushConfig.update (admins);
+other callers receive it empty.</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdatePushConfig</td>
+                <td><a href="#laelia.v1.UpdatePushConfigRequest">UpdatePushConfigRequest</a></td>
+                <td><a href="#laelia.v1.UpdatePushConfigResponse">UpdatePushConfigResponse</a></td>
+                <td><p>UpdatePushConfig sets the optional outbound HTTP proxy used when the
+manager posts notifications to browser push services. Admin-only. An empty
+http_proxy disables the proxy (direct connection). The change takes effect
+immediately on the running manager.</p></td>
+              </tr>
+            
+              <tr>
+                <td>CreatePushSubscription</td>
+                <td><a href="#laelia.v1.CreatePushSubscriptionRequest">CreatePushSubscriptionRequest</a></td>
+                <td><a href="#laelia.v1.PushSubscription">PushSubscription</a></td>
+                <td><p>CreatePushSubscription registers a browser push subscription for the
+authenticated user. Idempotent on (user, endpoint): re-subscribing the
+same browser refreshes its p256dh/auth keys. Returns FailedPrecondition
+when Web Push is disabled.</p></td>
+              </tr>
+            
+              <tr>
+                <td>DeletePushSubscription</td>
+                <td><a href="#laelia.v1.DeletePushSubscriptionRequest">DeletePushSubscriptionRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p>DeletePushSubscription removes a push subscription for the authenticated
+user. The name is &#34;users/{user}/pushSubscriptions/{endpointKey}&#34; where
+endpointKey is the URL-safe base64 of the subscription endpoint; the name&#39;s
+user must be the caller.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+          
+          
+          <h4>Methods with HTTP bindings</h4>
+          <table>
+            <thead>
+              <tr>
+                <td>Method Name</td>
+                <td>Method</td>
+                <td>Pattern</td>
+                <td>Body</td>
+              </tr>
+            </thead>
+            <tbody>
+            
+              
+              
+              <tr>
+                <td>GetPushConfig</td>
+                <td>GET</td>
+                <td>/v1/pushConfig</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdatePushConfig</td>
+                <td>PATCH</td>
+                <td>/v1/pushConfig</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>CreatePushSubscription</td>
+                <td>POST</td>
+                <td>/v1/pushSubscriptions</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>DeletePushSubscription</td>
+                <td>DELETE</td>
+                <td>/v1/{name=users/*/pushSubscriptions/*}</td>
+                <td></td>
+              </tr>
+              
+            
+            </tbody>
+          </table>
+          
         
     
       
