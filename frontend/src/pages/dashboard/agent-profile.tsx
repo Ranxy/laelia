@@ -1,4 +1,4 @@
-import { Loader2, Trash2, Upload } from "lucide-react";
+import { Check, Loader2, Pencil, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -26,8 +26,10 @@ import {
 import { agentResourceName, formatTimestamp } from "@/lib/command-status";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
+import type { AgentACPConfigInput } from "@/stores/types";
 import {
   type Agent,
+  type AgentACPConfig,
   type AgentProviderInfo,
 } from "@/types/proto-es/v1/agent_pb";
 import { agentLifecycle, lifecycleLabel } from "./agents";
@@ -73,15 +75,18 @@ function Card({
   title,
   children,
   footer,
+  actions,
 }: {
   title: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  actions?: React.ReactNode;
 }) {
   return (
     <section className="flex flex-col rounded-lg border border-control-border bg-background shadow-xs">
-      <header className="border-b border-control-border px-5 py-3">
+      <header className="flex items-center justify-between border-b border-control-border px-5 py-3">
         <h2 className="text-sm font-semibold text-control">{title}</h2>
+        {actions}
       </header>
       <div className="flex flex-col gap-4 p-5">{children}</div>
       {footer && (
@@ -112,17 +117,42 @@ export function AgentProfilePage() {
   const [loadError, setLoadError] = useState(false);
 
   // ACP config editor local state, seeded from the agent's persisted config.
+  // All fields except personaPrompt auto-persist (selects + add/remove
+  // immediately, text inputs on blur); personaPrompt has its own explicit
+  // inline edit→save cycle. configRef mirrors the live fields synchronously so
+  // the async save always reads current values; agentRef mirrors the latest
+  // fetched agent so saves can read the persisted config/persona snapshot.
   const [executable, setExecutable] = useState("");
   const [args, setArgs] = useState<string[]>([]);
   const [allowEnv, setAllowEnv] = useState<string[]>([]);
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
-  const [personaPrompt, setPersonaPrompt] = useState("");
   const [customEnvEntries, setCustomEnvEntries] = useState<
     { key: string; value: string }[]
   >([]);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState("");
+  const [personaDraft, setPersonaDraft] = useState("");
+  const [personaEditing, setPersonaEditing] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+
+  const configRef = useRef({
+    executable: "",
+    args: [] as string[],
+    allowEnv: [] as string[],
+    provider: "",
+    model: "",
+    customEnvEntries: [] as { key: string; value: string }[],
+  });
+  const agentRef = useRef<Agent | undefined>(undefined);
+  agentRef.current = agent;
+  // Saves are serialized through this chain so config auto-saves and persona
+  // saves never overlap. Each save refetches the agent, which updates the
+  // persisted snapshot for the next save — last write wins, no revert races.
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
 
   // Available providers are machine-scoped: the owning machine probes its host
   // and exposes them on Machine.info.availableProviders. We fetch the machine
@@ -214,24 +244,34 @@ export function AgentProfilePage() {
     });
   }, [agent?.machine, getMachine]);
 
-  // Re-seed the editor whenever the persisted config reference changes (e.g.
-  // after a save round-trip), so the form reflects the latest server state
-  // instead of stale local edits.
+  // Seed the editor once per agent (on load / agent switch). Deliberately keyed
+  // on agent.name only — NOT on acpConfig — so the refetch that follows each
+  // auto-save does not clobber in-progress edits. The server does not push
+  // config changes to us, so there is no external drift to re-sync against.
   useEffect(() => {
     const cfg = agent?.info?.acpConfig;
-    setExecutable(cfg?.executable ?? "");
-    setArgs(cfg?.args ? [...cfg.args] : []);
-    setAllowEnv(cfg?.allowEnv ? [...cfg.allowEnv] : []);
-    setProvider(cfg?.provider ?? "");
-    setModel(cfg?.model ?? "");
-    setPersonaPrompt(cfg?.personaPrompt ?? "");
-    setCustomEnvEntries(
-      cfg?.customEnv
+    const next = {
+      executable: cfg?.executable ?? "",
+      args: cfg?.args ? [...cfg.args] : [],
+      allowEnv: cfg?.allowEnv ? [...cfg.allowEnv] : [],
+      provider: cfg?.provider ?? "",
+      model: cfg?.model ?? "",
+      customEnvEntries: cfg?.customEnv
         ? Object.entries(cfg.customEnv).map(([key, value]) => ({ key, value }))
-        : []
-    );
-    setSaveError("");
-  }, [agent?.name, agent?.info?.acpConfig]);
+        : [],
+    };
+    configRef.current = next;
+    setExecutable(next.executable);
+    setArgs(next.args);
+    setAllowEnv(next.allowEnv);
+    setProvider(next.provider);
+    setModel(next.model);
+    setCustomEnvEntries(next.customEnvEntries);
+    setPersonaDraft(cfg?.personaPrompt ?? "");
+    setPersonaEditing(false);
+    setSaveStatus("idle");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agent?.name]);
 
   if (!agent) {
     return (
@@ -261,37 +301,85 @@ export function AgentProfilePage() {
   // never offers a 403.
   const canEdit = agent.canEdit;
 
-  async function handleSaveACPConfig() {
-    setSaving(true);
-    setSaveError("");
-    try {
-      // Fold the key-value editor entries into a map, dropping entries with
-      // empty keys (empty-value entries are kept so a user can set FOO="").
-      const customEnv: Record<string, string> = {};
-      for (const entry of customEnvEntries) {
-        const key = entry.key.trim();
-        if (!key) continue;
-        customEnv[key] = entry.value;
-      }
-      const updateAgentACPConfig = useAppStore.getState().updateAgentACPConfig;
-      await updateAgentACPConfig(agentName, {
-        executable: executable.trim(),
-        args: args.map((a) => a.trim()).filter((a) => a !== ""),
-        allowEnv: allowEnv.map((e) => e.trim()).filter((e) => e !== ""),
-        provider: provider.trim(),
-        model: model.trim(),
-        personaPrompt: personaPrompt.trim(),
-        customEnv,
-      });
-      setAgent(await getAgent(agentName));
-      fetchAgents({ pageSize: 100 }, { silent: true });
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : t("agent.acp-config-save-failed");
-      setSaveError(msg);
-    } finally {
-      setSaving(false);
+  // Fold the key-value editor entries into a map, dropping entries with empty
+  // keys (empty-value entries are kept so a user can set FOO="").
+  function foldCustomEnv(
+    entries: { key: string; value: string }[]
+  ): Record<string, string> {
+    const customEnv: Record<string, string> = {};
+    for (const entry of entries) {
+      const key = entry.key.trim();
+      if (!key) continue;
+      customEnv[key] = entry.value;
     }
+    return customEnv;
+  }
+
+  // Build a full-replace config payload from the live draft, carrying the given
+  // persona (the persisted persona for config auto-saves, so an unsaved persona
+  // draft is never persisted by a config save).
+  function buildFromDraft(
+    draft: typeof configRef.current,
+    personaPrompt: string
+  ): AgentACPConfigInput {
+    return {
+      executable: draft.executable.trim(),
+      args: draft.args.map((a) => a.trim()).filter((a) => a !== ""),
+      allowEnv: draft.allowEnv.map((e) => e.trim()).filter((e) => e !== ""),
+      provider: draft.provider.trim(),
+      model: draft.model.trim(),
+      customEnv: foldCustomEnv(draft.customEnvEntries),
+      personaPrompt,
+    };
+  }
+
+  // Build a full-replace config payload from the persisted server config,
+  // overriding only persona — so a persona save never touches (possibly
+  // mid-edit, possibly invalid) config draft state.
+  function buildFromPersisted(
+    cfg: AgentACPConfig | undefined,
+    personaPrompt: string
+  ): AgentACPConfigInput {
+    return {
+      executable: cfg?.executable ?? "",
+      args: cfg?.args ? [...cfg.args] : [],
+      allowEnv: cfg?.allowEnv ? [...cfg.allowEnv] : [],
+      provider: cfg?.provider ?? "",
+      model: cfg?.model ?? "",
+      customEnv: { ...(cfg?.customEnv ?? {}) },
+      personaPrompt,
+    };
+  }
+
+  // Serialize saves: each save awaits the previous, then refetches the agent so
+  // the persisted snapshot used by the next save is current. Errors surface as a
+  // toast plus the "error" status; success shows a fleeting "saved" status.
+  function enqueueSave(
+    build: () => AgentACPConfigInput,
+    opts?: { silent?: boolean }
+  ) {
+    saveChainRef.current = saveChainRef.current.then(async () => {
+      setSaveStatus("saving");
+      try {
+        const updateAgentACPConfig =
+          useAppStore.getState().updateAgentACPConfig;
+        await updateAgentACPConfig(agentName, build());
+        setAgent(await getAgent(agentName));
+        fetchAgents({ pageSize: 100 }, { silent: true });
+        if (!opts?.silent) {
+          setSaveStatus("saved");
+          if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+          savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 1500);
+        }
+      } catch (err) {
+        setSaveStatus("error");
+        toastManager.add({
+          type: "error",
+          title: t("agent.acp-config-save-failed"),
+          description: err instanceof Error ? err.message : String(err),
+        });
+      }
+    });
   }
 
   // Available providers are machine-scoped: the owning machine probes its host
@@ -306,17 +394,63 @@ export function AgentProfilePage() {
   const modelOptions = selectedProviderInfo?.models ?? [];
   const providerSupportsModel =
     !!selectedProviderInfo?.supportsModelConfigOption;
-  // Model is required when the provider exposes a model config option with
-  // advertised models; a provider that does not expose model selection (or the
-  // "custom" path) does not require one.
-  const modelRequired = providerSupportsModel && modelOptions.length > 0;
-  // Save is allowed once a provider (built-in or custom) is chosen. For the
-  // custom path an executable is still required; for a built-in provider the
-  // command is derived from the registry, so executable stays empty. When the
-  // provider exposes model selection, a model must also be chosen.
-  const canSave = isCustomProvider
-    ? executable.trim() !== ""
-    : provider !== "" && (!modelRequired || model.trim() !== "");
+  // A config is saveable once a provider (built-in or custom) is chosen. For
+  // the custom path an executable is still required; for a built-in provider
+  // the command is derived from the registry, so executable stays empty. When
+  // the provider exposes model selection, a model must also be chosen.
+  function canSaveFor(draft: typeof configRef.current): boolean {
+    if (draft.provider === "custom") return draft.executable.trim() !== "";
+    const info = availableProviders.find(
+      (p) => p.providerId === draft.provider
+    );
+    const needsModel =
+      !!info?.supportsModelConfigOption && (info?.models ?? []).length > 0;
+    return draft.provider !== "" && (!needsModel || draft.model.trim() !== "");
+  }
+
+  // Skip a save when the live draft matches what the server already holds
+  // (e.g. focus→blur with no edit), to avoid redundant writes.
+  function isConfigDirty(): boolean {
+    const cfg = agentRef.current?.info?.acpConfig;
+    const draft = buildFromDraft(configRef.current, cfg?.personaPrompt ?? "");
+    const persisted = buildFromPersisted(cfg, cfg?.personaPrompt ?? "");
+    return JSON.stringify(draft) !== JSON.stringify(persisted);
+  }
+
+  function saveConfig() {
+    if (!canEdit) return;
+    if (!canSaveFor(configRef.current)) return;
+    if (!isConfigDirty()) {
+      setSaveStatus("idle");
+      return;
+    }
+    // Read the persisted persona inside the build closure (at execution time,
+    // after any earlier saves in the queue have refetched) so a config save
+    // queued behind a persona save never reverts the persona.
+    enqueueSave(() =>
+      buildFromDraft(
+        configRef.current,
+        agentRef.current?.info?.acpConfig?.personaPrompt ?? ""
+      )
+    );
+  }
+
+  function savePersona() {
+    if (!canEdit) return;
+    const persistedPersona =
+      agentRef.current?.info?.acpConfig?.personaPrompt ?? "";
+    if (personaDraft.trim() === persistedPersona.trim()) {
+      setPersonaEditing(false);
+      return;
+    }
+    setPersonaEditing(false);
+    // Read the persisted config inside the build closure (at execution time)
+    // so a persona save picks up the latest server config rather than a stale
+    // snapshot captured at click time.
+    enqueueSave(() =>
+      buildFromPersisted(agentRef.current?.info?.acpConfig, personaDraft.trim())
+    );
+  }
 
   const lifecycle = agentLifecycle(agent);
 
@@ -343,9 +477,9 @@ export function AgentProfilePage() {
           <Alert variant="info" description={t("agent.pending-config-hint")} />
         )}
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="flex flex-col gap-6">
           {/* Identity & status */}
-          <div className="lg:col-span-4">
+          <div>
             <Card title={t("agent.profile.section-identity")}>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
                 <Field label={t("agent.detail-name")}>{agent.title}</Field>
@@ -440,21 +574,28 @@ export function AgentProfilePage() {
           </div>
 
           {/* ACP config */}
-          <div className="lg:col-span-8">
+          <div>
             <Card
               title={t("agent.acp-config")}
-              footer={
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    disabled={saving || !canSave || !canEdit}
-                    onClick={handleSaveACPConfig}
-                  >
-                    {saving ? t("common.saving") : t("common.save")}
-                  </Button>
-                </div>
+              actions={
+                saveStatus === "saving" ? (
+                  <span className="flex items-center gap-1 text-xs text-control-light">
+                    <Loader2 className="size-3 animate-spin" />
+                    {t("agent.acp-config-saving")}
+                  </span>
+                ) : saveStatus === "saved" ? (
+                  <span className="flex items-center gap-1 text-xs text-control-light">
+                    <Check className="size-3" />
+                    {t("agent.acp-config-saved")}
+                  </span>
+                ) : saveStatus === "error" ? (
+                  <span className="flex items-center gap-1 text-xs text-error">
+                    <span className="size-1.5 rounded-full bg-error" />
+                    {t("agent.acp-config-save-error")}
+                  </span>
+                ) : null
               }
             >
-              {saveError && <Alert variant="error" description={saveError} />}
               <fieldset disabled={!canEdit} className="contents">
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-1">
@@ -471,11 +612,17 @@ export function AgentProfilePage() {
                       <Select
                         value={provider}
                         onValueChange={(v) => {
-                          setProvider(String(v ?? ""));
+                          const next = String(v ?? "");
                           // Reset model when the provider changes — the previous
                           // value belongs to the old provider's option set.
+                          configRef.current = {
+                            ...configRef.current,
+                            provider: next,
+                            model: "",
+                          };
+                          setProvider(next);
                           setModel("");
-                          setSaveError("");
+                          saveConfig();
                         }}
                       >
                         <SelectTrigger>
@@ -521,8 +668,13 @@ export function AgentProfilePage() {
                         <Select
                           value={model}
                           onValueChange={(v) => {
-                            setModel(String(v ?? ""));
-                            setSaveError("");
+                            const next = String(v ?? "");
+                            configRef.current = {
+                              ...configRef.current,
+                              model: next,
+                            };
+                            setModel(next);
+                            saveConfig();
                           }}
                         >
                           <SelectTrigger>
@@ -560,9 +712,14 @@ export function AgentProfilePage() {
                           )}
                           value={executable}
                           onChange={(e) => {
-                            setExecutable(e.target.value);
-                            setSaveError("");
+                            const next = e.target.value;
+                            configRef.current = {
+                              ...configRef.current,
+                              executable: next,
+                            };
+                            setExecutable(next);
                           }}
+                          onBlur={() => saveConfig()}
                         />
                       </div>
 
@@ -571,8 +728,19 @@ export function AgentProfilePage() {
                         placeholder={t("agent.acp-config-args-placeholder")}
                         values={args}
                         onChange={(next) => {
+                          configRef.current = {
+                            ...configRef.current,
+                            args: next,
+                          };
                           setArgs(next);
-                          setSaveError("");
+                        }}
+                        onCommit={(next) => {
+                          configRef.current = {
+                            ...configRef.current,
+                            args: next,
+                          };
+                          setArgs(next);
+                          saveConfig();
                         }}
                       />
                     </>
@@ -585,28 +753,86 @@ export function AgentProfilePage() {
                   )}
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium">
-                      {t("agent.acp-config-persona-prompt")}
-                    </label>
-                    <Textarea
-                      className="font-mono text-sm min-h-[160px]"
-                      placeholder={t(
-                        "agent.acp-config-persona-prompt-placeholder"
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs font-semibold uppercase tracking-widest text-control-light">
+                        {t("agent.acp-config-persona-prompt")}
+                      </div>
+                      {!personaEditing && (
+                        <button
+                          type="button"
+                          aria-label={t("common.edit")}
+                          title={t("common.edit")}
+                          className="text-control-light hover:text-control transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                          disabled={!canEdit}
+                          onClick={() => setPersonaEditing(true)}
+                        >
+                          <Pencil className="size-3" />
+                        </button>
                       )}
-                      value={personaPrompt}
-                      onChange={(e) => {
-                        setPersonaPrompt(e.target.value);
-                        setSaveError("");
-                      }}
-                    />
+                    </div>
+                    {personaEditing ? (
+                      <div className="flex flex-col gap-2">
+                        <Textarea
+                          className="font-mono text-sm min-h-[160px]"
+                          placeholder={t(
+                            "agent.acp-config-persona-prompt-placeholder"
+                          )}
+                          value={personaDraft}
+                          onChange={(e) => setPersonaDraft(e.target.value)}
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            disabled={!canEdit}
+                            onClick={savePersona}
+                          >
+                            {t("common.save")}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setPersonaDraft(
+                                agentRef.current?.info?.acpConfig
+                                  ?.personaPrompt ?? ""
+                              );
+                              setPersonaEditing(false);
+                            }}
+                          >
+                            {t("common.cancel")}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-main whitespace-pre-wrap">
+                        {personaDraft.trim() ? (
+                          personaDraft
+                        ) : (
+                          <span className="italic text-control-light">
+                            {t("agent.acp-config-persona-empty")}
+                          </span>
+                        )}
+                      </p>
+                    )}
                   </div>
 
                   <KeyValueEnvEditor
                     label={t("agent.acp-config-custom-env")}
                     entries={customEnvEntries}
                     onChange={(next) => {
+                      configRef.current = {
+                        ...configRef.current,
+                        customEnvEntries: next,
+                      };
                       setCustomEnvEntries(next);
-                      setSaveError("");
+                    }}
+                    onCommit={(next) => {
+                      configRef.current = {
+                        ...configRef.current,
+                        customEnvEntries: next,
+                      };
+                      setCustomEnvEntries(next);
+                      saveConfig();
                     }}
                   />
 
@@ -615,8 +841,19 @@ export function AgentProfilePage() {
                     placeholder={t("agent.acp-config-allow-env-placeholder")}
                     values={allowEnv}
                     onChange={(next) => {
+                      configRef.current = {
+                        ...configRef.current,
+                        allowEnv: next,
+                      };
                       setAllowEnv(next);
-                      setSaveError("");
+                    }}
+                    onCommit={(next) => {
+                      configRef.current = {
+                        ...configRef.current,
+                        allowEnv: next,
+                      };
+                      setAllowEnv(next);
+                      saveConfig();
                     }}
                   />
                 </div>

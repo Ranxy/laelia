@@ -393,9 +393,9 @@ export function MachineProfilePage() {
           />
         )}
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="flex flex-col gap-6">
           {/* Identity & host info */}
-          <div className="lg:col-span-4">
+          <div className="flex flex-col gap-6">
             <Card title={t("machine.profile.section-identity")}>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
                 <Field label={t("machine.detail-name")}>{machine.title}</Field>
@@ -439,7 +439,7 @@ export function MachineProfilePage() {
             </Card>
 
             {/* Token & connection control */}
-            <div className="mt-6">
+            <div>
               <Card title={t("machine.profile.section-token")}>
                 {actionError && (
                   <Alert variant="error" description={actionError} />
@@ -487,7 +487,7 @@ export function MachineProfilePage() {
           </div>
 
           {/* Providers + agent roster */}
-          <div className="lg:col-span-8 flex flex-col gap-6">
+          <div className="flex flex-col gap-6">
             <Card
               title={t("machine.providers")}
               footer={

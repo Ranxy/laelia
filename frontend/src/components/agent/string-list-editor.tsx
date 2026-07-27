@@ -10,13 +10,23 @@ export function StringListEditor({
   placeholder,
   values,
   onChange,
+  onCommit,
 }: {
   label: string;
   placeholder: string;
   values: string[];
+  // onChange fires on every keystroke for live local-state updates.
   onChange: (next: string[]) => void;
+  // onCommit, when provided, fires on input blur and on add/remove — the
+  // caller uses it to persist (the page wires it to auto-save). When omitted,
+  // add/remove fall back to onChange (legacy behavior) and blur is a no-op.
+  onCommit?: (next: string[]) => void;
 }) {
   const { t } = useTranslation();
+  const commit = (next: string[]) => {
+    if (onCommit) onCommit(next);
+    else onChange(next);
+  };
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between">
@@ -24,7 +34,7 @@ export function StringListEditor({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onChange([...values, ""])}
+          onClick={() => commit([...values, ""])}
         >
           {t("common.add")}
         </Button>
@@ -40,11 +50,12 @@ export function StringListEditor({
                 next[index] = e.target.value;
                 onChange(next);
               }}
+              onBlur={() => onCommit?.(values)}
             />
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onChange(values.filter((_, i) => i !== index))}
+              onClick={() => commit(values.filter((_, i) => i !== index))}
             >
               {t("common.remove")}
             </Button>
