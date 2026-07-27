@@ -816,7 +816,11 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             className="flex-1 overflow-y-auto"
           >
             <div className="mx-auto flex max-w-3xl flex-col gap-4 px-6 pt-6 pb-4">
-              {loading && <LoadingState />}
+              {/* LoadingState only when there's genuinely nothing to show yet.
+                  On a revisit cached messages are already in the store, so a
+                  background refetch (which flips chatLoading true) must NOT hide
+                  them behind a spinner — that was the per-revisit flash. */}
+              {loading && messages.length === 0 && <LoadingState />}
               {!loading && messages.length === 0 && (
                 <EmptyState icon={Send} message={t("chat.empty")} />
               )}
@@ -850,6 +854,12 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                       debugMode={currentUser?.debugMode ?? false}
                       currentPrincipalId={currentUser?.name.split("/").pop()}
                       scrollRoot={scrollRef}
+                      // For small/medium chats, render markdown synchronously on
+                      // first paint so entering the conversation doesn't flash as
+                      // each visible row swaps its inline raw-text placeholder for
+                      // block markdown a frame later. Large histories keep the
+                      // lazy gate so off-screen rows stay cheap to mount.
+                      eager={messages.length <= 40}
                     />
                   </div>
                 );

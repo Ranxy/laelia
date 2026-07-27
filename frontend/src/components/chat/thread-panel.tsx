@@ -337,6 +337,10 @@ export function ThreadPanel({
                 onPreviewImage={onPreviewImage}
                 debugMode={currentUser?.debugMode ?? false}
                 currentPrincipalId={currentUser?.name.split("/").pop()}
+                // The root is a single message — render its markdown synchronously
+                // so opening the thread doesn't flash as it swaps the raw-text
+                // placeholder for the real markdown a frame later.
+                eager
               />
             </div>
           )}
@@ -375,6 +379,10 @@ export function ThreadPanel({
                   onPreviewImage={onPreviewImage}
                   debugMode={currentUser?.debugMode ?? false}
                   currentPrincipalId={currentUser?.name.split("/").pop()}
+                  // Small threads render markdown synchronously to avoid the
+                  // per-row fallback→swap flash on open; large threads keep the
+                  // lazy gate so off-screen replies stay cheap.
+                  eager={replies.length <= 40}
                 />
               </div>
             );

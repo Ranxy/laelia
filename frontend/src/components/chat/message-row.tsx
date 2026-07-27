@@ -121,6 +121,12 @@ export interface MessageRowProps {
   // rediscovering it per row (which would thrash layout on a 100-row mount).
   // Optional: when omitted LazyMarkdown walks the DOM to find the container.
   scrollRoot?: RefObject<HTMLElement | null>;
+  // eager renders the markdown synchronously on first paint (skipping
+  // LazyMarkdown's fallback→swap) for every row. The channel chat sets this for
+  // small/medium conversations so entering them doesn't flash as each visible
+  // row swaps its inline raw-text placeholder for block markdown a frame later.
+  // Large histories leave it off so off-screen rows stay cheap to mount.
+  eager?: boolean;
 }
 
 export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
@@ -141,6 +147,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     debugMode,
     currentPrincipalId,
     scrollRoot,
+    eager = false,
   } = props;
   const { t } = useTranslation();
   const isUser = msg.role === "user";
@@ -207,6 +214,18 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     }
     prevStreamingRef.current = isStreaming;
   }, [isStreaming, displayContent]);
+
+  // fade gates markstream-react's node fade-in on the streaming→final transition
+  // that happens *within this mount*, not on "this is a final message." A row
+  // that mounts already-final (history from the server) would otherwise replay
+  // the 280ms opacity fade on every channel entry — and because rows are keyed
+  // by msg.id they remount on every switch, so the flash recurred each visit.
+  // The sticky ref records whether this row was ever streaming in its lifetime:
+  // historical rows start false and stay false (no fade); rows that mounted
+  // streaming stay true after finalizing, so the finalize fade still plays once.
+  const wasStreamingRef = useRef(isStreaming);
+  if (isStreaming) wasStreamingRef.current = true;
+  const fade = wasStreamingRef.current && !isStreaming;
 
   const eventSummary = useMemo(() => {
     const parts: string[] = [];
@@ -425,7 +444,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
               return (
                 <span key={i} className="markstream-chat break-words inline">
                   <LazyMarkdown
-                    eager={isStreaming}
+                    eager={isStreaming || eager}
                     scrollRoot={scrollRoot}
                     fallback={
                       <span className="whitespace-pre-wrap break-words">
@@ -437,7 +456,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
                         customId={markdownCustomId}
                         content={seg.text}
                         final
-                        fade
+                        fade={fade}
                       />
                     )}
                   />
@@ -451,7 +470,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
           ) : displayContent ? (
             <div className="markstream-chat break-words">
               <LazyMarkdown
-                eager={isStreaming}
+                eager={isStreaming || eager}
                 scrollRoot={scrollRoot}
                 fallback={
                   <span className="whitespace-pre-wrap break-words">
@@ -464,7 +483,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
                     content={displayContent}
                     final={!isStreaming}
                     smoothStreaming={isStreaming ? "auto" : false}
-                    fade={!isStreaming}
+                    fade={fade}
                     typewriter={isStreaming}
                     maxLiveNodes={isStreaming ? 0 : undefined}
                   />
