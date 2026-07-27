@@ -1163,6 +1163,18 @@ export declare type Conversation = Message<"laelia.v1.Conversation"> & {
    * @generated from field: string address = 11;
    */
   address: string;
+
+  /**
+   * read_version is the requesting user's per-conversation read cursor
+   * (user_channel_cursor.read_version) — the room_version of the last message
+   * the user has read. Populated by GetChannel for a user viewer so the
+   * Activity detail embed can scroll to the first unread message (the user's
+   * last-read position) instead of the latest message. 0 when the caller is not
+   * a user or has no cursor row (treated as caught-up).
+   *
+   * @generated from field: int64 read_version = 12;
+   */
+  readVersion: bigint;
 };
 
 /**

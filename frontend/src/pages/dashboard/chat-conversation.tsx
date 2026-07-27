@@ -94,17 +94,21 @@ function memberTypeLabel(
     : t("channel.member-type-user");
 }
 
-// ChannelConversationViewProps lets this page be reused embedded (read-only)
-// in the Activity detail pane, in addition to its primary use as the chat
-// route. When `conversationId` is omitted the route param is used; `readOnly`
-// hides the composer (like an agent-to-agent DM); `scrollToMessageId` scrolls
-// the list to a specific message once loaded; `onViewInChannel` renders a
-// header "View in channel" affordance. All props are optional and default to
-// the route-driven behavior, so the existing chat page is unchanged.
+// ChannelConversationViewProps lets this page be reused embedded in the
+// Activity detail pane, in addition to its primary use as the chat route. It
+// is always writable there (the user replies inline, mirroring task/reminder);
+// only an agent-to-agent DM (type 3) shows the admin view-only banner, gated
+// inside on the conversation type. When `conversationId` is omitted the route
+// param is used; `scrollToMessageId` scrolls the list to a specific message
+// once loaded (a top-level channel mention); `scrollToReadVersion` instead
+// scrolls to the first message whose room_version exceeds the given read
+// cursor (the user's last-read position), used for a DM; `onViewInChannel`
+// renders a header "View in channel" affordance. All props are optional and
+// default to the route-driven behavior, so the existing chat page is unchanged.
 export interface ChannelConversationViewProps {
   conversationId?: string;
-  readOnly?: boolean;
   scrollToMessageId?: string;
+  scrollToReadVersion?: bigint;
   onViewInChannel?: () => void;
 }
 
@@ -380,6 +384,41 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
         ?.scrollIntoView({ block: "center", behavior: "smooth" });
     });
   }, [scrollToMessageId, messages.length]);
+
+  // When embedded with a scrollToReadVersion (the Activity detail pane for a
+  // DM, pointing at the user's last-read position), scroll the list to the
+  // first message whose room_version exceeds the read cursor — the first
+  // unread message, where the user resumes reading. If every loaded message
+  // is already read (cursor caught up), stick to the bottom instead. Runs at
+  // most once per version so it does not fight the user's own scrolling.
+  const scrollToReadVersion = props?.scrollToReadVersion ?? 0n;
+  const scrollToReadVersionRef = useRef<bigint>(0n);
+  useEffect(() => {
+    if (scrollToReadVersion <= 0n || messages.length === 0) return;
+    if (scrollToReadVersionRef.current === scrollToReadVersion) return;
+    scrollToReadVersionRef.current = scrollToReadVersion;
+    // Find the first message strictly past the read cursor. Messages are
+    // chronological (oldest first), so the first match is the resume point.
+    const target = messages.find(
+      (m) => (m.roomVersion ?? 0n) > scrollToReadVersion
+    );
+    // Defer so the layout has settled after the messages update.
+    requestAnimationFrame(() => {
+      if (target) {
+        // Park at the resume point and release stick-to-bottom so the
+        // background poller does not yank the user back down while they read
+        // forward from their last-read position.
+        stickToBottomRef.current = false;
+        scrollRef.current
+          ?.querySelector(`[data-msg-id="${target.id}"]`)
+          ?.scrollIntoView({ block: "center", behavior: "smooth" });
+      } else if (scrollRef.current) {
+        // Caught up — land at the bottom.
+        stickToBottomRef.current = true;
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    });
+  }, [scrollToReadVersion, messages.length]);
 
   // Restore the entering conversation's draft. Declared before the persist
   // effect so it reads the saved draft before any stale write lands.
@@ -835,11 +874,12 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             </button>
           )}
 
-          {/* Input area — hidden for agent-to-agent DMs (type 3) and for any
-              read-only embedded view (e.g. the Activity detail pane). A user
-              can read but cannot send or intervene. */}
+          {/* Input area — hidden only for agent-to-agent DMs (type 3: an admin
+              can view but cannot intervene). Every other embedded view (the
+              Activity detail pane for a DM or a top-level channel mention) is
+              writable, mirroring task/reminder: the user replies inline. */}
           <div className="shrink-0 bg-background">
-            {isAgentDm || props?.readOnly ? (
+            {isAgentDm ? (
               <div className="mx-auto max-w-3xl px-6 py-4">
                 <div className="rounded-2xl border border-control-border bg-control-bg/40 px-4 py-3 text-center text-xs text-control-placeholder">
                   {t("chat.agent-dm-view-only")}
@@ -1264,9 +1304,9 @@ export function ChatEmptyState() {
   );
 }
 
-// ChannelConversationView is the reusable form of this page, embedded read-only
-// in the Activity detail pane for top-level channel/DM activity items. It is the
-// same component with optional props (conversationId/readOnly/
-// scrollToMessageId/onViewInChannel) that default to the route-driven behavior,
-// so the chat route itself is unchanged.
+// ChannelConversationView is the reusable form of this page, embedded in the
+// Activity detail pane for top-level channel/DM activity items (writable, like
+// task/reminder). It is the same component with optional props
+// (conversationId/scrollToMessageId/scrollToReadVersion/onViewInChannel) that
+// default to the route-driven behavior, so the chat route itself is unchanged.
 export const ChannelConversationView = ChatConversationPage;

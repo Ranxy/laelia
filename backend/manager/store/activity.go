@@ -345,6 +345,18 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 		userMembers[uid] = true
 	}
 
+	// Resolve the conversation once: its type decides whether this is a 1:1 DM,
+	// which folds every category into a single per-chat row (see the emit loop
+	// below), and whether a top-level message is a DIRECT message addressed to
+	// the peer even with no @mention.
+	conv, err := s.GetConversation(ctx, msg.ConversationID)
+	if err != nil {
+		slog.Warn("failed to get conversation for activity",
+			"conversationID", msg.ConversationID, "messageID", msg.ID, "error", err)
+		return
+	}
+	isDM := conv.Type == ConversationTypeDM || conv.Type == ConversationTypeUserDM
+
 	// mentionCats (MENTION) are emitted as their own rows; threadCats
 	// (TASK|REMINDER|THREAD) fold under the thread root. DIRECT (1:1 DMs) is
 	// folded into mentionCats too since it is keyed by the message id, never by
@@ -366,14 +378,9 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 	// recipient gets no notification. Thread replies inside a DM still ride the
 	// THREAD category, so only top-level DM messages add DIRECT here. Agent
 	// senders are never in userMembers, so the user owner is targeted directly.
-	if !msg.ThreadRootMessageID.Valid {
-		if conv, err := s.GetConversation(ctx, msg.ConversationID); err != nil {
-			slog.Warn("failed to get conversation for DIRECT activity",
-				"conversationID", msg.ConversationID, "messageID", msg.ID, "error", err)
-		} else if conv.Type == ConversationTypeDM || conv.Type == ConversationTypeUserDM {
-			for uid := range userMembers {
-				mentionCats[uid] |= ActivityCategoryDirect
-			}
+	if !msg.ThreadRootMessageID.Valid && isDM {
+		for uid := range userMembers {
+			mentionCats[uid] |= ActivityCategoryDirect
 		}
 	}
 	threadCats := make(map[int]int32)
@@ -464,22 +471,40 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 		}
 		threadCats[uid] = 0
 	}
-	for uid, tc := range threadCats {
-		mc := mentionCats[uid]
-		if inThread {
-			// Folded thread row keyed by the root. Merge a root-mention into it.
-			cats := tc
-			if mentionOnRoot {
-				cats |= mc
+	if isDM {
+		// A 1:1 DM is a single continuous chat, not a stream of independent
+		// notifications, so fold every category for a user in this conversation
+		// into ONE row keyed by the conversation id, bumped to the latest
+		// message. A plain reply, an @mention, and a thread reply in the same
+		// DM all merge into the same row (categories OR-merged) instead of
+		// spawning a row per message. The row carries no thread_root so the
+		// activity opens the whole chat (scrolled to the user's last-read
+		// position), not a single message.
+		for uid, tc := range threadCats {
+			cats := tc | mentionCats[uid]
+			if cats == 0 {
+				continue
 			}
-			upsert(uid, effectiveRoot, msg.ID, uuid.NullUUID{UUID: effectiveRoot, Valid: true}, cats)
-			// A mention on a reply (not the root) gets its own row keyed by the message.
-			if mc != 0 && !mentionOnRoot {
+			upsert(uid, msg.ConversationID, msg.ID, uuid.NullUUID{}, cats)
+		}
+	} else {
+		for uid, tc := range threadCats {
+			mc := mentionCats[uid]
+			if inThread {
+				// Folded thread row keyed by the root. Merge a root-mention into it.
+				cats := tc
+				if mentionOnRoot {
+					cats |= mc
+				}
+				upsert(uid, effectiveRoot, msg.ID, uuid.NullUUID{UUID: effectiveRoot, Valid: true}, cats)
+				// A mention on a reply (not the root) gets its own row keyed by the message.
+				if mc != 0 && !mentionOnRoot {
+					upsert(uid, msg.ID, msg.ID, threadRootNull, mc)
+				}
+			} else {
+				// No thread: a top-level mention is its own row keyed by the message.
 				upsert(uid, msg.ID, msg.ID, threadRootNull, mc)
 			}
-		} else {
-			// No thread: a top-level mention is its own row keyed by the message.
-			upsert(uid, msg.ID, msg.ID, threadRootNull, mc)
 		}
 	}
 

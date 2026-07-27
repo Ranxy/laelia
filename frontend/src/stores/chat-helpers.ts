@@ -22,6 +22,7 @@ export function toUiMessage(msg: ChatMessage): ChatMessageUI {
     attachments: msg.attachments,
     threadRoot: msg.threadRoot || undefined,
     threadReplyCount: msg.threadReplyCount || undefined,
+    roomVersion: msg.roomVersion || undefined,
     task: msg.task
       ? {
           taskNumber: msg.task.taskNumber,

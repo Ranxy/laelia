@@ -42,7 +42,7 @@ func (s *CommandService) ResolveChannelByTitle(ctx context.Context, req *connect
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
 	ownerName := resolveUserName(ctx, s.store, conv.OwnerID)
 	return connect.NewResponse(&v1pb.ResolveChannelByTitleResponse{
-		Conversation: convertToV1Conversation(conv, ownerName, "", memberCount, 0, conv.Title),
+		Conversation: convertToV1Conversation(conv, ownerName, "", memberCount, 0, conv.Title, 0),
 	}), nil
 }
 
@@ -78,7 +78,7 @@ func (s *CommandService) GetOrCreateUserDM(ctx context.Context, req *connect.Req
 
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
 	return connect.NewResponse(&v1pb.GetOrCreateUserDMResponse{
-		Conversation: convertToV1Conversation(conv, users[0].Name, users[0].Name, memberCount, 0, users[0].Name),
+		Conversation: convertToV1Conversation(conv, users[0].Name, users[0].Name, memberCount, 0, users[0].Name, 0),
 	}), nil
 }
 
@@ -113,7 +113,7 @@ func (s *CommandService) GetOrCreateAgentDM(ctx context.Context, req *connect.Re
 
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
 	return connect.NewResponse(&v1pb.GetOrCreateAgentDMResponse{
-		Conversation: convertToV1Conversation(conv, resolveUserName(ctx, s.store, conv.OwnerID), peer.Name, memberCount, 0, peer.Name),
+		Conversation: convertToV1Conversation(conv, resolveUserName(ctx, s.store, conv.OwnerID), peer.Name, memberCount, 0, peer.Name, 0),
 	}), nil
 }
 

@@ -140,14 +140,23 @@ export function ActivityDetail() {
     );
   }
 
-  // Top-level message: embed the full channel view read-only, scrolled to the
-  // message. ChannelConversationView is ChatConversationPage parameterized
-  // with our props so it defaults to the route-driven behavior elsewhere.
+  // Top-level message: embed the full channel view, writable (mirroring
+  // task/reminder — the user replies inline without leaving Activity). The
+  // scroll target depends on the conversation:
+  //  - A DM (type 1 user↔agent or type 4 user↔user) is a single folded activity
+  //    row per chat; scroll to the user's last-read position (channel.readVersion)
+  //    so they resume reading where they left off, not at the latest message.
+  //  - A channel (type 2) top-level mention scrolls to the mentioning message
+  //    (the precise pointer the user was @mentioned at).
+  // channel already falls back to fetchedChannel (see its declaration above),
+  // so a DM the user isn't a left-rail member of still resolves here.
+  const isDM = channel?.type === 1 || channel?.type === 4;
+  const readVersion = channel?.readVersion ?? 0n;
   return (
     <ChannelConversationView
       conversationId={convId}
-      readOnly
-      scrollToMessageId={msgId}
+      scrollToMessageId={isDM ? undefined : msgId}
+      scrollToReadVersion={isDM ? readVersion : undefined}
       onViewInChannel={viewInChannel}
     />
   );

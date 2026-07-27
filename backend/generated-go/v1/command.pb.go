@@ -2768,7 +2768,14 @@ type Conversation struct {
 	// type 4 peer is the other user).
 	// Empty when the address is not applicable. Populated by the single builder
 	// convertToV1Conversation so every emit site renders the same form.
-	Address       string `protobuf:"bytes,11,opt,name=address,proto3" json:"address,omitempty"`
+	Address string `protobuf:"bytes,11,opt,name=address,proto3" json:"address,omitempty"`
+	// read_version is the requesting user's per-conversation read cursor
+	// (user_channel_cursor.read_version) — the room_version of the last message
+	// the user has read. Populated by GetChannel for a user viewer so the
+	// Activity detail embed can scroll to the first unread message (the user's
+	// last-read position) instead of the latest message. 0 when the caller is not
+	// a user or has no cursor row (treated as caught-up).
+	ReadVersion   int64 `protobuf:"varint,12,opt,name=read_version,json=readVersion,proto3" json:"read_version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2871,6 +2878,13 @@ func (x *Conversation) GetAddress() string {
 		return x.Address
 	}
 	return ""
+}
+
+func (x *Conversation) GetReadVersion() int64 {
+	if x != nil {
+		return x.ReadVersion
+	}
+	return 0
 }
 
 type ChannelMember struct {
@@ -9910,7 +9924,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x12thread_reply_count\x18\x0f \x01(\x05R\x10threadReplyCount\x12'\n" +
 	"\x04task\x18\x10 \x01(\v2\x13.laelia.v1.TaskInfoR\x04task\x12\x19\n" +
 	"\bagent_id\x18\x11 \x01(\tR\aagentId\x12!\n" +
-	"\fprincipal_id\x18\x12 \x01(\tR\vprincipalId\"\xb1\x03\n" +
+	"\fprincipal_id\x18\x12 \x01(\tR\vprincipalId\"\xd4\x03\n" +
 	"\fConversation\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
@@ -9924,7 +9938,8 @@ const file_v1_command_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12!\n" +
 	"\funread_count\x18\t \x01(\x05R\vunreadCount\x12\x18\n" +
-	"\aaddress\x18\v \x01(\tR\aaddress:S\xeaAP\n" +
+	"\aaddress\x18\v \x01(\tR\aaddress\x12!\n" +
+	"\fread_version\x18\f \x01(\x03R\vreadVersion:S\xeaAP\n" +
 	"\x13laelia/Conversation\x12\x1cconversations/{conversation}*\rconversations2\fconversation\"\x84\x02\n" +
 	"\rChannelMember\x12\x1f\n" +
 	"\vmember_type\x18\x01 \x01(\x05R\n" +

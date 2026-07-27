@@ -59,6 +59,11 @@ export interface ChatMessageUI {
   // task table for it). Populated for root messages; absent for replies and
   // non-task messages. Drives the inline "[task #N status=...]" badge.
   task?: TaskInfoUI;
+  // roomVersion is the message's room_version (its monotonic position in the
+  // conversation). Used by the Activity detail embed to scroll to the user's
+  // last-read position: the first message whose room_version exceeds the
+  // requesting user's read cursor. Absent on the optimistic send placeholder.
+  roomVersion?: bigint;
 }
 
 // TaskInfoUI is the UI mirror of laelia.v1.TaskInfo attached to a task root

@@ -34,7 +34,7 @@ func (s *CommandService) CreateChannel(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create channel"))
 	}
 
-	return connect.NewResponse(convertToV1Conversation(conv, user.Name, "", 1, 0, conv.Title)), nil
+	return connect.NewResponse(convertToV1Conversation(conv, user.Name, "", 1, 0, conv.Title, 0)), nil
 }
 
 func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[v1pb.ListChannelsRequest]) (*connect.Response[v1pb.ListChannelsResponse], error) {
@@ -93,7 +93,7 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 				peerName = name
 			}
 		}
-		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, peerName, memberCount, uc.UnreadCount, title))
+		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, peerName, memberCount, uc.UnreadCount, title, 0))
 	}
 
 	return connect.NewResponse(&v1pb.ListChannelsResponse{
@@ -171,7 +171,7 @@ func (s *CommandService) ListChannelsForAgent(ctx context.Context, req *connect.
 		default:
 			// type 2 channels have no peer; title is already the channel title.
 		}
-		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, peerName, memberCount, uc.UnreadCount, title))
+		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, peerName, memberCount, uc.UnreadCount, title, 0))
 	}
 
 	return connect.NewResponse(&v1pb.ListChannelsForAgentResponse{
@@ -212,7 +212,20 @@ func (s *CommandService) GetChannel(ctx context.Context, req *connect.Request[v1
 		title = peerName
 	}
 
-	return connect.NewResponse(convertToV1Conversation(conv, ownerName, peerName, memberCount, 0, title)), nil
+	// read_version is the requesting user's per-conversation read cursor, so the
+	// Activity detail embed can scroll to the user's last-read position. Only
+	// meaningful for a user viewer; an agent caller (or a missing cursor row)
+	// yields 0, which the frontend treats as caught-up.
+	readVersion := int64(0)
+	if viewerUserID != 0 {
+		if rv, found, err := s.store.GetUserReadCursor(ctx, viewerUserID, conv.ID); err != nil {
+			slog.Warn("failed to read user channel cursor", "conversationID", conv.ID, "error", err)
+		} else if found {
+			readVersion = rv
+		}
+	}
+
+	return connect.NewResponse(convertToV1Conversation(conv, ownerName, peerName, memberCount, 0, title, readVersion)), nil
 }
 
 func (s *CommandService) UpdateChannel(ctx context.Context, req *connect.Request[v1pb.UpdateChannelRequest]) (*connect.Response[v1pb.Conversation], error) {
@@ -234,7 +247,7 @@ func (s *CommandService) UpdateChannel(ctx context.Context, req *connect.Request
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, updated.ID)
 	ownerName := resolveUserName(ctx, s.store, updated.OwnerID)
 
-	return connect.NewResponse(convertToV1Conversation(updated, ownerName, "", memberCount, 0, updated.Title)), nil
+	return connect.NewResponse(convertToV1Conversation(updated, ownerName, "", memberCount, 0, updated.Title, 0)), nil
 }
 
 func (s *CommandService) DeleteChannel(ctx context.Context, req *connect.Request[v1pb.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error) {
@@ -410,7 +423,7 @@ func (s *CommandService) TransferChannelOwnership(ctx context.Context, req *conn
 	memberCount, _ := s.store.GetConversationMemberCount(ctx, updated.ID)
 	ownerName := resolveUserName(ctx, s.store, updated.OwnerID)
 	return connect.NewResponse(&v1pb.TransferChannelOwnershipResponse{
-		Conversation: convertToV1Conversation(updated, ownerName, "", memberCount, 0, updated.Title),
+		Conversation: convertToV1Conversation(updated, ownerName, "", memberCount, 0, updated.Title, 0),
 	}), nil
 }
 
@@ -831,7 +844,7 @@ func (s *CommandService) notifyThreadParticipants(ctx context.Context, convID, r
 // Callers resolve peerName (they already resolve owner/title for their view)
 // so the builder stays free of lookups. Empty peerName leaves a DM address
 // empty rather than emitting a malformed "dm:@".
-func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, peerName string, memberCount int, unreadCount int32, title string) *v1pb.Conversation {
+func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, peerName string, memberCount int, unreadCount int32, title string, readVersion int64) *v1pb.Conversation {
 	var address string
 	switch conv.Type {
 	case store.ConversationTypeChannel:
@@ -854,6 +867,7 @@ func convertToV1Conversation(conv *store.ConversationMessage, ownerName string, 
 		UpdatedAt:   timestamppb.New(conv.UpdatedAt),
 		UnreadCount: unreadCount,
 		Address:     address,
+		ReadVersion: readVersion,
 	}
 }
 
