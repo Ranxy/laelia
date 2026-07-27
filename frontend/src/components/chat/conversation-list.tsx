@@ -1,7 +1,8 @@
-import { Bot, Hash, Loader2, Plus, User } from "lucide-react";
+import { Hash, Loader2, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
+import { Avatar } from "@/components/chat/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useAvatar } from "@/lib/avatar-cache";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { Conversation } from "@/types/proto-es/v1/command_pb";
@@ -180,6 +182,12 @@ function ConversationRow({
   onClick: () => void;
 }) {
   const isDirect = isDm || isUserDm;
+  // conv.peer is the DM peer's resource name ("users/<id>" or "agents/<id>");
+  // appending "/avatar" yields the avatar resource name the cache dispatches by
+  // prefix. Undefined for channels (no peer), which keep the Hash icon below.
+  const avatarName = conv.peer ? `${conv.peer}/avatar` : undefined;
+  const avatarSrc = useAvatar(avatarName);
+  const peerId = conv.peer ? (conv.peer.split("/").pop() ?? "") : "";
   return (
     <button
       type="button"
@@ -189,20 +197,18 @@ function ConversationRow({
         active ? "bg-accent/10" : "hover:bg-control-bg/40"
       )}
     >
-      <div
-        className={cn(
-          "flex size-9 shrink-0 items-center justify-center rounded-lg",
-          active ? "bg-accent/15 text-accent" : "bg-control-bg text-control"
-        )}
-      >
-        {isUserDm ? (
-          <User className="size-4" />
-        ) : isDm ? (
-          <Bot className="size-4" />
-        ) : (
+      {isDirect ? (
+        <Avatar src={avatarSrc} seed={peerId || conv.title || conv.name} />
+      ) : (
+        <div
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-lg",
+            active ? "bg-accent/15 text-accent" : "bg-control-bg text-control"
+          )}
+        >
           <Hash className="size-4" />
-        )}
-      </div>
+        </div>
+      )}
       <div className="min-w-0 flex-1">
         <p
           className={cn(

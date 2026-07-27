@@ -4417,6 +4417,13 @@ components:
                          Activity detail embed can scroll to the first unread message (the user's
                          last-read position) instead of the latest message. 0 when the caller is not
                          a user or has no cursor row (treated as caught-up).
+                peer:
+                    type: string
+                    description: |-
+                        peer is the DM peer's resource name from the viewer's perspective
+                         ("users/<id>" for a user peer, "agents/<id>" for an agent peer). Empty for
+                         channels (type 2) and when no peer can be resolved. Lets list viewers fetch
+                         the peer's avatar without an extra member lookup.
         ConvertMessageToReminderRequest:
             required:
                 - message

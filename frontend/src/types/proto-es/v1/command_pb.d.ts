@@ -1175,6 +1175,16 @@ export declare type Conversation = Message<"laelia.v1.Conversation"> & {
    * @generated from field: int64 read_version = 12;
    */
   readVersion: bigint;
+
+  /**
+   * peer is the DM peer's resource name from the viewer's perspective
+   * ("users/<id>" for a user peer, "agents/<id>" for an agent peer). Empty for
+   * channels (type 2) and when no peer can be resolved. Lets list viewers fetch
+   * the peer's avatar without an extra member lookup.
+   *
+   * @generated from field: string peer = 13;
+   */
+  peer: string;
 };
 
 /**

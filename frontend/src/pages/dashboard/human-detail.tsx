@@ -21,11 +21,16 @@ import {
   roleServiceClient,
   userServiceClient,
 } from "@/connect";
-import { invalidateAvatar, useAvatar } from "@/lib/avatar-cache";
+import {
+  avatarNameForAgentId,
+  invalidateAvatar,
+  useAvatar,
+} from "@/lib/avatar-cache";
 import { resizeImageFile } from "@/lib/image-resize";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/auth";
+import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
 import type { Role } from "@/types/proto-es/v1/role_service_pb";
 import {
   DeleteAvatarRequestSchema,
@@ -417,33 +422,40 @@ export function HumanDetailPage() {
           </p>
         ) : (
           <div className="flex flex-col gap-2">
-            {createdAgents.map((agent) => {
-              const id = agent.name.replace(/^agents\//, "");
-              return (
-                <button
-                  key={agent.name}
-                  type="button"
-                  onClick={() => navigate(`/members/agents/${id}`)}
-                  className="flex items-center gap-3 rounded-md border border-control-border bg-background px-3 py-2 text-left transition-colors hover:border-accent/40 hover:bg-control-bg/60"
-                >
-                  <Avatar seed={id || agent.title} />
-                  <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                    <span className="truncate text-sm font-medium text-main">
-                      {agent.title}
-                    </span>
-                    {agent.provider && (
-                      <span className="truncate text-xs text-control-light font-mono">
-                        {agent.provider}
-                      </span>
-                    )}
-                  </div>
-                  <ConnectionBadge state={agent.status?.state} />
-                </button>
-              );
-            })}
+            {createdAgents.map((agent) => (
+              <CreatedAgentRow key={agent.name} agent={agent} />
+            ))}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+// CreatedAgentRow is one row of the "Created Agents" sub-list. Extracted to its
+// own component so it can call useAvatar (hooks can't run inside a .map body).
+function CreatedAgentRow({ agent }: { agent: AgentSummary }) {
+  const navigate = useNavigate();
+  const id = agent.name.replace(/^agents\//, "");
+  const avatarSrc = useAvatar(avatarNameForAgentId(id));
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(`/members/agents/${id}`)}
+      className="flex items-center gap-3 rounded-md border border-control-border bg-background px-3 py-2 text-left transition-colors hover:border-accent/40 hover:bg-control-bg/60"
+    >
+      <Avatar seed={id || agent.title} src={avatarSrc} />
+      <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+        <span className="truncate text-sm font-medium text-main">
+          {agent.title}
+        </span>
+        {agent.provider && (
+          <span className="truncate text-xs text-control-light font-mono">
+            {agent.provider}
+          </span>
+        )}
+      </div>
+      <ConnectionBadge state={agent.status?.state} />
+    </button>
   );
 }

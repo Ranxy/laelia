@@ -6815,6 +6815,16 @@ last-read position) instead of the latest message. 0 when the caller is not
 a user or has no cursor row (treated as caught-up). </p></td>
                 </tr>
               
+                <tr>
+                  <td>peer</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>peer is the DM peer&#39;s resource name from the viewer&#39;s perspective
+(&#34;users/&lt;id&gt;&#34; for a user peer, &#34;agents/&lt;id&gt;&#34; for an agent peer). Empty for
+channels (type 2) and when no peer can be resolved. Lets list viewers fetch
+the peer&#39;s avatar without an extra member lookup. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 

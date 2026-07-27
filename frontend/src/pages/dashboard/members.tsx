@@ -1,4 +1,4 @@
-import { ChevronDown, Plus, User as UserIcon } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useMatch, useNavigate } from "react-router-dom";
@@ -6,6 +6,11 @@ import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  avatarNameForAgentId,
+  avatarNameForUserId,
+  useAvatar,
+} from "@/lib/avatar-cache";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { MemberSummary } from "@/stores/types";
@@ -223,6 +228,10 @@ function MemberRow({
   const navigate = useNavigate();
   const isAgent = member.kind === "agent";
   const resourceId = member.name.replace(/^(agents|users)\//, "");
+  const avatarName = isAgent
+    ? avatarNameForAgentId(resourceId)
+    : avatarNameForUserId(resourceId);
+  const avatarSrc = useAvatar(avatarName);
 
   function open() {
     navigate(
@@ -246,13 +255,7 @@ function MemberRow({
           : "border-transparent hover:bg-control-bg/60"
       )}
     >
-      {isAgent ? (
-        <Avatar seed={resourceId || member.title} />
-      ) : (
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
-          <UserIcon className="size-4" />
-        </div>
-      )}
+      <Avatar seed={resourceId || member.title} src={avatarSrc} />
       <div className="min-w-0 flex-1 flex flex-col gap-0.5">
         <span className="truncate text-sm font-medium text-main">
           {member.title}
