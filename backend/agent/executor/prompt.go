@@ -6,7 +6,12 @@ import (
 	"strings"
 )
 
-func buildPrompt(name, personaPrompt string) string {
+// BuildPrompt assembles the cold-start init prompt that primes an agent session
+// with its identity, persona, and the autonomous drain-loop instructions. It is
+// sent once at cold start (ACP Resume or a fresh pi session); warm turns receive
+// only the new-message batch. Exported so the non-ACP pi executor can reuse the
+// same prompt the ACP path sends.
+func BuildPrompt(name, personaPrompt string) string {
 	prompts := []string{
 		agentIdentityText(name),
 	}

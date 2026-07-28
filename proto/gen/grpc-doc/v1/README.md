@@ -529,10 +529,12 @@ permissions) is derived from a built-in template, not set by the admin.
 | executable | [string](#string) |  | command to run, e.g. &#34;npx&#34;. Only used when provider is &#34;custom&#34; or empty. |
 | args | [string](#string) | repeated | args passed to executable, e.g. [&#34;-y&#34;, &#34;@agentclientprotocol/claude-agent-acp@latest&#34;] |
 | allow_env | [string](#string) | repeated | env var names the child process may inherit |
-| provider | [string](#string) |  | selected LLM agent provider id, e.g. &#34;opencode&#34;, &#34;claude-code&#34;, &#34;custom&#34; |
+| provider | [string](#string) |  | selected LLM agent provider id, e.g. &#34;opencode&#34;, &#34;claude-code&#34;, &#34;custom&#34;, &#34;builtin-pi&#34; |
 | model | [string](#string) |  | selected model valueId, matching an option advertised by the provider in NewSession ConfigOptions |
 | custom_env | [AgentACPConfig.CustomEnvEntry](#laelia-v1-AgentACPConfig-CustomEnvEntry) | repeated | user-defined key-value env vars overlaid (and overriding) the inherited allow_env set |
 | persona_prompt | [string](#string) |  | admin-authored self-awareness prompt: personality, chat style, focus area. Empty = not loaded. |
+| api_provider | [string](#string) |  | api_provider is the LLM API provider for the built-in pi runtime (&#34;deepseek&#34; or &#34;openrouter&#34; in phase 1). Only meaningful when provider == &#34;builtin-pi&#34;; ignored by ACP runtimes. |
+| api_key | [string](#string) |  | api_key is the plaintext LLM API key for the api_provider. Only meaningful when provider == &#34;builtin-pi&#34;; ignored by ACP runtimes. Stored in the agent info JSONB with the same plaintext-at-rest posture as custom_env. |
 
 
 
@@ -571,6 +573,7 @@ permissions) is derived from a built-in template, not set by the admin.
 | max_event_count | [int32](#int32) |  |  |
 | max_output_bytes | [int64](#int64) |  |  |
 | supports_autonomous_decision | [bool](#bool) |  |  |
+| supports_pi | [bool](#bool) |  | supports_pi is true for agents backed by the built-in non-ACP pi runtime. The dispatcher&#39;s BeginSession gate accepts either supports_acp or supports_pi so a pi agent can run drain sessions without an ACP executor. |
 
 
 

@@ -41,6 +41,8 @@ message AgentACPConfig {
   string model = 5;
   map<string, string> custom_env = 6;
   string persona_prompt = 7;
+  string api_provider = 8;
+  string api_key = 9;
 }
 
 message AgentProviderInfo {
@@ -68,6 +70,7 @@ message AgentCapability {
   int32 max_event_count = 7;
   int64 max_output_bytes = 8;
   bool supports_autonomous_decision = 9;
+  bool supports_pi = 10;
 }
 
 message AgentStatus {

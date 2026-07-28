@@ -109,6 +109,8 @@
 | model | [string](#string) |  |  |
 | custom_env | [AgentACPConfig.CustomEnvEntry](#laelia-store-AgentACPConfig-CustomEnvEntry) | repeated |  |
 | persona_prompt | [string](#string) |  |  |
+| api_provider | [string](#string) |  |  |
+| api_key | [string](#string) |  |  |
 
 
 
@@ -147,6 +149,7 @@
 | max_event_count | [int32](#int32) |  |  |
 | max_output_bytes | [int64](#int64) |  |  |
 | supports_autonomous_decision | [bool](#bool) |  |  |
+| supports_pi | [bool](#bool) |  |  |
 
 
 

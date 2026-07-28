@@ -144,6 +144,12 @@ export interface AgentACPConfigInput {
   model: string;
   customEnv: Record<string, string>;
   personaPrompt: string;
+  // builtin-pi runtime fields (only meaningful when provider === "builtin-pi"):
+  // apiProvider is the LLM API provider ("deepseek" | "openrouter"); apiKey is
+  // the plaintext LLM API key. apiKey may be left empty on update to keep the
+  // existing stored key (the server treats empty as "preserve").
+  apiProvider: string;
+  apiKey: string;
 }
 
 export interface AgentSlice {

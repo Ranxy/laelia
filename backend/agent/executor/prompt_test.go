@@ -6,7 +6,7 @@ import (
 )
 
 func TestBuildPromptOmitsPersonaWhenEmpty(t *testing.T) {
-	got := buildPrompt("alice", "")
+	got := BuildPrompt("alice", "")
 	if strings.Contains(got, "Your persona") {
 		t.Fatalf("prompt should not contain persona section when empty, got:\n%s", got)
 	}
@@ -19,7 +19,7 @@ func TestBuildPromptOmitsPersonaWhenEmpty(t *testing.T) {
 }
 
 func TestBuildPromptInjectsPersonaAfterIdentity(t *testing.T) {
-	got := buildPrompt("alice", "  Be concise and prefer Go.  ")
+	got := BuildPrompt("alice", "  Be concise and prefer Go.  ")
 	identityIdx := strings.Index(got, agentIdentityText("alice"))
 	personaIdx := strings.Index(got, "## Your persona")
 	commIdx := strings.Index(got, AgentCommunicationPrompt)

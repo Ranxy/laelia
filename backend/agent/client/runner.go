@@ -9,15 +9,22 @@ import (
 	"github.com/Ranxy/laelia/backend/agent/chattools"
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/pi"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
 // agentRunner owns one agent's AgentChannel drain loop. A machine hosts one
 // runner per assigned agent; the runner is spawned on AgentAssignment (or on
 // connect from the assigned_agents list) and torn down on RemoveAgent. The
-// runner's ACP config is hot-reloadable via AgentConfigUpdate / ReloadAgentAssignment,
-// picked up at the next BeginSession. All runners share the machine's access
-// token and the machine-level daemon socket.
+// runner's runtime config is hot-reloadable via AgentConfigUpdate /
+// ReloadAgentAssignment, picked up at the next BeginSession.
+//
+// An agent is backed by EXACTLY ONE runtime: either an ACP config (claude-code
+// / opencode, spawned per turn) OR a pi config (builtin-pi, one long-lived
+// `pi --mode rpc` subprocess shared across turns). The two never coexist on the
+// same runner; applyAssignment flips between them and tears down the other side.
+// All runners share the machine's access token and the machine-level daemon
+// socket.
 type agentRunner struct {
 	machine     *MachineClient
 	daemon      *daemonsrv.Server
@@ -27,6 +34,8 @@ type agentRunner struct {
 
 	mu        sync.Mutex
 	acpConfig *executor.ACPConfig
+	piConfig  *pi.PiConfig
+	piSession *pi.Session
 	cancel    context.CancelFunc
 	done      chan struct{}
 }
@@ -47,6 +56,62 @@ func (r *agentRunner) buildAcpConfig(assignment *v1pb.AgentAssignment) *executor
 	return cfg
 }
 
+// buildPiConfig resolves the server-owned AgentACPConfig into a pi config +
+// creates the per-agent working dir. Returns nil if the assignment is not a
+// configured builtin-pi agent (provider != builtin-pi, unknown api_provider,
+// or empty api key), which keeps the runner inert.
+func (r *agentRunner) buildPiConfig(assignment *v1pb.AgentAssignment) *pi.PiConfig {
+	piBinary, err := pi.ResolveBinary()
+	if err != nil {
+		slog.Warn("pi binary unavailable; agent stays inert", "agent", r.agentName, "error", err)
+		return nil
+	}
+	cfg := pi.BuildPiConfig(
+		assignment.GetAcpConfig(),
+		r.machine.machineID, r.agentID, r.agentID,
+		piBinary, r.daemon.SocketPath(), r.daemon.SessionToken(), r.machine.binaryDir,
+	)
+	if cfg == nil {
+		return nil
+	}
+	if err := os.MkdirAll(cfg.WorkingDir, 0o700); err != nil {
+		slog.Warn("failed to create agent working dir", "dir", cfg.WorkingDir, "error", err)
+		return nil
+	}
+	return cfg
+}
+
+// applyAssignment is the single config-entry point: it resolves the assignment
+// to either an ACP or a pi config, hot-reloading the in-place runner. For a pi
+// agent, an unchanged launch fingerprint keeps the warm session; a changed one
+// restarts the subprocess so the new launch shape (provider/model/key/binary)
+// takes effect. The non-active side is always torn down so the two runtimes
+// never coexist.
+func (r *agentRunner) applyAssignment(a *v1pb.AgentAssignment) {
+	acp := a.GetAcpConfig()
+	if acp != nil && acp.GetProvider() == pi.BuiltinPiProvider {
+		r.setConfig(nil)
+		newPi := r.buildPiConfig(a)
+		if newPi == nil {
+			r.stopPiSession()
+			r.setPiConfig(nil)
+			return
+		}
+		prev := r.currentPiConfig()
+		if prev == nil || prev.LaunchFingerprint() != newPi.LaunchFingerprint() {
+			// Launch shape changed (or first pi config): restart the subprocess.
+			// An unchanged fingerprint keeps the warm session and its conversation.
+			r.restartPiSession(newPi)
+		}
+		r.setPiConfig(newPi)
+		return
+	}
+	// ACP (or unconfigured): tear down any pi session and load the ACP config.
+	r.stopPiSession()
+	r.setPiConfig(nil)
+	r.setConfig(r.buildAcpConfig(a))
+}
+
 func (r *agentRunner) setConfig(cfg *executor.ACPConfig) {
 	r.mu.Lock()
 	r.acpConfig = cfg
@@ -57,6 +122,39 @@ func (r *agentRunner) currentConfig() *executor.ACPConfig {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.acpConfig
+}
+
+func (r *agentRunner) setPiConfig(cfg *pi.PiConfig) {
+	r.mu.Lock()
+	r.piConfig = cfg
+	r.mu.Unlock()
+}
+
+func (r *agentRunner) currentPiConfig() *pi.PiConfig {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.piConfig
+}
+
+// restartPiSession stops any existing pi session and starts a fresh one bound
+// to cfg. The session is started lazily on the first turn (so the opening
+// turn's command id seeds LAELIA_COMMAND), so this only constructs it.
+func (r *agentRunner) restartPiSession(cfg *pi.PiConfig) {
+	r.stopPiSession()
+	r.mu.Lock()
+	r.piSession = pi.NewSession(cfg)
+	r.mu.Unlock()
+}
+
+// stopPiSession tears down the pi subprocess if one is running.
+func (r *agentRunner) stopPiSession() {
+	r.mu.Lock()
+	sess := r.piSession
+	r.piSession = nil
+	r.mu.Unlock()
+	if sess != nil {
+		sess.Stop()
+	}
 }
 
 // start opens the agent's AgentChannel and runs its drain loop in a background
@@ -85,6 +183,7 @@ func (r *agentRunner) start(ctx context.Context) {
 	}
 	cs.getSessID = func() string { return "" } // no per-agent session; AgentReady carries agent_name only
 	cs.getAcpConfig = r.currentConfig
+	cs.newSessionRuntime = r.buildRuntimeForAgent
 	cs.buildTurnBatch = func(ctx context.Context) (string, error) {
 		return chattools.BuildTurnBatch(ctx, r.daemon.BatchDeps(r.agentID))
 	}
@@ -98,7 +197,45 @@ func (r *agentRunner) start(ctx context.Context) {
 	slog.Info("opened AgentChannel for agent", "agent", r.agentName, "displayName", r.displayName)
 }
 
-// stop cancels the runner's drain loop and waits for it to exit.
+// buildRuntimeForAgent is the per-turn runtime branch point, overriding the
+// commandStream's default ACP-only builder. A pi agent gets a per-turn
+// PiExecutor over the shared long-lived pi session; every other agent gets the
+// existing ACP executor spawned per turn.
+func (r *agentRunner) buildRuntimeForAgent(req *v1pb.CommandRequest) (executor.Runtime, error) {
+	ereq := executor.Request{
+		CommandID:        req.CommandId,
+		TurnPrompt:       req.Instruction,
+		Profile:          req.Profile,
+		WorkingDir:       req.WorkingDir,
+		Env:              req.Env,
+		TimeoutSeconds:   req.TimeoutSeconds,
+		AllowDiff:        req.AllowDiff,
+		ConversationID:   req.ConversationId,
+		AgentResourceID:  r.agentID,
+		AgentDisplayName: req.AgentDisplayName,
+		AgentID:          r.agentID,
+		MachineID:        r.machine.machineID,
+		DaemonSocket:     r.daemon.SocketPath(),
+		SessionToken:     r.daemon.SessionToken(),
+		BinaryDir:        r.machine.binaryDir,
+	}
+	if piCfg := r.currentPiConfig(); piCfg != nil {
+		r.mu.Lock()
+		sess := r.piSession
+		r.mu.Unlock()
+		if sess == nil {
+			sess = pi.NewSession(piCfg)
+			r.mu.Lock()
+			r.piSession = sess
+			r.mu.Unlock()
+		}
+		return pi.NewPi(ereq, sess, piCfg)
+	}
+	return executor.NewACP(ereq, r.currentConfig())
+}
+
+// stop cancels the runner's drain loop, tears down any pi subprocess, and
+// waits for the loop to exit.
 func (r *agentRunner) stop() {
 	if r.cancel != nil {
 		r.cancel()
@@ -106,6 +243,7 @@ func (r *agentRunner) stop() {
 	if r.done != nil {
 		<-r.done
 	}
+	r.stopPiSession()
 	slog.Info("tore down agent runner", "agent", r.agentName)
 }
 
@@ -131,7 +269,7 @@ func (c *MachineClient) spawnOrUpdate(ctx context.Context, a *v1pb.AgentAssignme
 	if existing, ok := c.runners[agentID]; ok {
 		c.runnersMu.Unlock()
 		existing.displayName = a.GetAgentDisplayName()
-		existing.setConfig(existing.buildAcpConfig(a))
+		existing.applyAssignment(a)
 		slog.Info("hot-reloaded agent assignment", "agent", a.GetAgentName())
 		return
 	}
@@ -142,7 +280,7 @@ func (c *MachineClient) spawnOrUpdate(ctx context.Context, a *v1pb.AgentAssignme
 		agentID:     agentID,
 		displayName: a.GetAgentDisplayName(),
 	}
-	r.setConfig(r.buildAcpConfig(a))
+	r.applyAssignment(a)
 	c.runners[agentID] = r
 	c.runnersMu.Unlock()
 

@@ -21,6 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/pi"
 	"github.com/Ranxy/laelia/backend/agent/provider"
 	"github.com/Ranxy/laelia/backend/common"
 	"github.com/Ranxy/laelia/backend/common/permission"
@@ -134,7 +135,7 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 		if len(storedAcpConfig.AllowEnv) == 0 {
 			storedAcpConfig.AllowEnv = executor.DefaultAllowEnv
 		}
-		capability = executor.BuildCapability(reqACP)
+		capability = buildCapabilityForACPConfig(reqACP)
 	} else {
 		storedAcpConfig = &storepb.AgentACPConfig{AllowEnv: executor.DefaultAllowEnv}
 	}
@@ -240,6 +241,14 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 	out := convertToAgent(agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
 	caller, _ := GetUserFromContext(ctx)
 	out.CanEdit = s.canEditAgent(ctx, caller, out.Name)
+	// The builtin-pi api_key is a plaintext secret. Redact it for callers who
+	// cannot edit this agent; editors (workspaceAdmin / agents.edit) still see
+	// it so they can populate the password field on the config form.
+	if !out.CanEdit && out.GetInfo().GetAcpConfig().GetProvider() == pi.BuiltinPiProvider {
+		if out.Info.AcpConfig != nil {
+			out.Info.AcpConfig.ApiKey = ""
+		}
+	}
 	return connect.NewResponse(out), nil
 }
 
@@ -501,7 +510,7 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 	} else {
 		patch.Info = &storepb.AgentInfo{}
 	}
-	patch.Info.Capability = convertToStoreAgentCapability(executor.BuildCapability(convertToV1AgentACPConfig(storedAcpConfig)))
+	patch.Info.Capability = convertToStoreAgentCapability(buildCapabilityForACPConfig(convertToV1AgentACPConfig(storedAcpConfig)))
 	patch.Info.AcpConfig = storedAcpConfig
 
 	updated, err := s.store.UpdateAgent(ctx, agent, patch)
@@ -1133,6 +1142,21 @@ func isEmptyAgentACPConfig(cfg *v1pb.AgentACPConfig) bool {
 		cfg.Provider == "" && cfg.Model == "" && len(cfg.CustomEnv) == 0 && cfg.PersonaPrompt == ""
 }
 
+// buildCapabilityForACPConfig derives the agent capability from the
+// user-configurable ACP settings, branching on the runtime. A builtin-pi agent
+// (provider == pi.BuiltinPiProvider) is a non-ACP runtime: its capability comes
+// from the pi package (SupportsPi, not SupportsAcp) and does not depend on a
+// host-detected executable. Every other provider is an ACP runtime and goes
+// through the existing executor.BuildCapability path. This is the single place
+// the manager picks a runtime's capability, so the executor package stays
+// pi-free (no import cycle: pi already imports executor).
+func buildCapabilityForACPConfig(cfg *v1pb.AgentACPConfig) *v1pb.AgentCapability {
+	if cfg != nil && cfg.GetProvider() == pi.BuiltinPiProvider {
+		return pi.BuildPiCapability(cfg)
+	}
+	return executor.BuildCapability(cfg)
+}
+
 func convertToV1Providers(in []*storepb.AgentProviderInfo) []*v1pb.AgentProviderInfo {
 	if len(in) == 0 {
 		return nil
@@ -1334,16 +1358,26 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
-	if err := validateAgentACPConfig(req.Msg.AcpConfig, nil); err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	}
-
 	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+
+	// builtin-pi api_key is a secret: the config form does not echo it back on
+	// save (the password field is left empty to avoid retransmitting it). An
+	// empty api_key here means "keep the existing key", so copy it from the
+	// stored config before validation so the required-field check passes.
+	if req.Msg.AcpConfig != nil && req.Msg.AcpConfig.Provider == pi.BuiltinPiProvider && strings.TrimSpace(req.Msg.AcpConfig.ApiKey) == "" {
+		if existing := agent.Info.GetAcpConfig(); existing != nil {
+			req.Msg.AcpConfig.ApiKey = existing.ApiKey
+		}
+	}
+
+	if err := validateAgentACPConfig(req.Msg.AcpConfig, nil); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
 	// Re-validate against the owning machine's discovered providers now that
@@ -1443,6 +1477,22 @@ func validateAgentACPConfig(cfg *v1pb.AgentACPConfig, machineAvailableProviders 
 	if !knownProviderID(cfg.Provider) {
 		return errors.Errorf("invalid acp_config.provider %q: must be a built-in id or \"custom\"", cfg.Provider)
 	}
+	// builtin-pi is a non-ACP runtime: it needs an API provider + API key +
+	// model, not a host-detected executable. Validate its fields and skip the
+	// host-availability / model-config-option checks (pi is always available —
+	// it is bundled with laelia, not installed on the host).
+	if cfg.Provider == pi.BuiltinPiProvider {
+		if !pi.IsKnownAPIProvider(cfg.ApiProvider) {
+			return errors.Errorf("acp_config.api_provider %q is not supported (phase 1: deepseek, openrouter)", cfg.ApiProvider)
+		}
+		if strings.TrimSpace(cfg.ApiKey) == "" {
+			return errors.New("acp_config.api_key must be set for builtin-pi")
+		}
+		if strings.TrimSpace(cfg.Model) == "" {
+			return errors.New("acp_config.model must be set for builtin-pi")
+		}
+		return nil
+	}
 	// A built-in provider derives its command from the registry; anything else
 	// requires a raw executable.
 	_, isBuiltin := provider.Default().Lookup(cfg.Provider)
@@ -1525,10 +1575,10 @@ func availableProviderIDs(available []*storepb.AgentProviderInfo) string {
 	return strings.Join(ids, ", ")
 }
 
-// knownProviderID reports whether id is a recognized provider id (a built-in or
-// the "custom" escape hatch).
+// knownProviderID reports whether id is a recognized provider id (a built-in,
+// the bundled non-ACP pi runtime, or the "custom" escape hatch).
 func knownProviderID(id string) bool {
-	if id == "custom" {
+	if id == "custom" || id == pi.BuiltinPiProvider {
 		return true
 	}
 	_, ok := provider.Default().Lookup(id)

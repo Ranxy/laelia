@@ -588,7 +588,7 @@ func (e *ACPExecutor) turnPromptText(resumed bool) string {
 	if identityName == "" {
 		identityName = e.request.AgentResourceID
 	}
-	initPrompt := buildPrompt(identityName, e.config.PersonaPrompt)
+	initPrompt := BuildPrompt(identityName, e.config.PersonaPrompt)
 	if batch == "" {
 		return initPrompt
 	}

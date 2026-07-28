@@ -149,6 +149,8 @@ export function MachineProfilePage() {
   const [agentName, setAgentName] = useState("");
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
+  const [apiProvider, setApiProvider] = useState("");
+  const [apiKey, setApiKey] = useState("");
   const [personaPrompt, setPersonaPrompt] = useState("");
   const [customEnvEntries, setCustomEnvEntries] = useState<
     { key: string; value: string }[]
@@ -216,6 +218,7 @@ export function MachineProfilePage() {
   // does not require a model). The "custom" provider hand-types a command and
   // never exposes model selection, so it requires an executable instead.
   const isCustomProvider = provider === "custom";
+  const isPiProvider = provider === "builtin-pi";
   const selectedProviderInfo = availableProviders.find(
     (p) => p.providerId === provider
   );
@@ -223,6 +226,14 @@ export function MachineProfilePage() {
   const modelRequired =
     !!selectedProviderInfo?.supportsModelConfigOption &&
     modelOptions.length > 0;
+  // The built-in pi runtime: phase-1 API providers. deepseek has a fixed model
+  // dropdown; openrouter is free-text.
+  const piAPIProviders = [
+    { id: "deepseek", models: ["deepseek-chat", "deepseek-reasoner"] },
+    { id: "openrouter", models: [] as string[] },
+  ];
+  const piSelectedAPI = piAPIProviders.find((p) => p.id === apiProvider);
+  const piModelOptions = piSelectedAPI?.models ?? [];
 
   // resetAddForm clears the create-agent sheet inputs so reopening it starts
   // from a blank state instead of the previous submission's values.
@@ -230,6 +241,8 @@ export function MachineProfilePage() {
     setAgentName("");
     setProvider("");
     setModel("");
+    setApiProvider("");
+    setApiKey("");
     setPersonaPrompt("");
     setCustomEnvEntries([]);
     setAllowEnv([]);
@@ -329,6 +342,20 @@ export function MachineProfilePage() {
       setAddError(t("machine.add-agent-executable-required"));
       return;
     }
+    if (isPiProvider) {
+      if (!apiProvider.trim()) {
+        setAddError(t("machine.add-agent-provider-required"));
+        return;
+      }
+      if (!model.trim()) {
+        setAddError(t("machine.add-agent-model-required"));
+        return;
+      }
+      if (!apiKey.trim()) {
+        setAddError(t("machine.add-agent-api-key-required"));
+        return;
+      }
+    }
     if (modelRequired && !model.trim()) {
       setAddError(t("machine.add-agent-model-required"));
       return;
@@ -352,6 +379,8 @@ export function MachineProfilePage() {
         model: model.trim(),
         personaPrompt: personaPrompt.trim(),
         customEnv,
+        apiProvider: apiProvider.trim(),
+        apiKey: apiKey.trim(),
       });
       setAddedTitle(name);
       setAddOpen(false);
@@ -680,20 +709,29 @@ export function MachineProfilePage() {
                   value={provider}
                   onValueChange={(v) => {
                     setProvider(String(v ?? ""));
-                    // Reset model when the provider changes — the previous value
-                    // belongs to the old provider's option set.
+                    // Reset model + pi fields when the provider changes — the
+                    // previous values belong to the old runtime.
                     setModel("");
+                    setApiProvider("");
+                    setApiKey("");
                     setAddError("");
                   }}
                 >
                   <SelectTrigger>
                     <SelectValue>
                       {(v: string | null) =>
-                        v ? providerLabel(v, availableProviders) : ""
+                        v
+                          ? v === "builtin-pi"
+                            ? t("agent.acp-config-provider-builtin-pi")
+                            : providerLabel(v, availableProviders)
+                          : ""
                       }
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="builtin-pi">
+                      {t("agent.acp-config-provider-builtin-pi")}
+                    </SelectItem>
                     {availableProviders.map((p) => (
                       <SelectItem key={p.providerId} value={p.providerId}>
                         {providerDisplayName(p)}
@@ -710,6 +748,97 @@ export function MachineProfilePage() {
                   </p>
                 )}
               </div>
+
+              {isPiProvider && (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium">
+                      {t("agent.acp-config-pi-api-provider")}
+                    </label>
+                    <Select
+                      value={apiProvider}
+                      onValueChange={(v) => {
+                        const next = String(v ?? "");
+                        setApiProvider(next);
+                        setModel("");
+                        setAddError("");
+                        const opts =
+                          piAPIProviders.find((p) => p.id === next)?.models ??
+                          [];
+                        if (opts.length > 0) setModel(opts[0]);
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue>
+                          {(v: string | null) => v ?? ""}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {piAPIProviders.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.id}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium">
+                      {t("agent.acp-config-model")}
+                    </label>
+                    {piModelOptions.length > 0 ? (
+                      <Select
+                        value={model}
+                        onValueChange={(v) => {
+                          setModel(String(v ?? ""));
+                          setAddError("");
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue>
+                            {(v: string | null) => v ?? ""}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {piModelOptions.map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {m}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        placeholder={t("agent.acp-config-pi-model-placeholder")}
+                        value={model}
+                        onChange={(e) => {
+                          setModel(e.target.value);
+                          setAddError("");
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium">
+                      {t("agent.acp-config-pi-api-key")}
+                    </label>
+                    <Input
+                      type="password"
+                      placeholder={t("agent.acp-config-pi-api-key-placeholder")}
+                      value={apiKey}
+                      onChange={(e) => {
+                        setApiKey(e.target.value);
+                        setAddError("");
+                      }}
+                    />
+                    <p className="text-xs text-control-light">
+                      {t("agent.acp-config-pi-api-key-hint")}
+                    </p>
+                  </div>
+                </>
+              )}
 
               {selectedProviderInfo && (
                 <div className="flex flex-col gap-1">
@@ -747,7 +876,7 @@ export function MachineProfilePage() {
                 </div>
               )}
 
-              {isCustomProvider && (
+              {isCustomProvider && !isPiProvider && (
                 <>
                   <div className="flex flex-col gap-1">
                     <label className="text-sm font-medium">
@@ -775,7 +904,7 @@ export function MachineProfilePage() {
                 </>
               )}
 
-              {selectedProviderInfo && !isCustomProvider && (
+              {selectedProviderInfo && !isCustomProvider && !isPiProvider && (
                 <p className="text-xs text-control-light">
                   {t("agent.acp-config-derived-command-hint")}
                 </p>
@@ -796,24 +925,28 @@ export function MachineProfilePage() {
                 />
               </div>
 
-              <KeyValueEnvEditor
-                label={t("agent.acp-config-custom-env")}
-                entries={customEnvEntries}
-                onChange={(next) => {
-                  setCustomEnvEntries(next);
-                  setAddError("");
-                }}
-              />
+              {!isPiProvider && (
+                <KeyValueEnvEditor
+                  label={t("agent.acp-config-custom-env")}
+                  entries={customEnvEntries}
+                  onChange={(next) => {
+                    setCustomEnvEntries(next);
+                    setAddError("");
+                  }}
+                />
+              )}
 
-              <StringListEditor
-                label={t("agent.acp-config-allow-env")}
-                placeholder={t("agent.acp-config-allow-env-placeholder")}
-                values={allowEnv}
-                onChange={(next) => {
-                  setAllowEnv(next);
-                  setAddError("");
-                }}
-              />
+              {!isPiProvider && (
+                <StringListEditor
+                  label={t("agent.acp-config-allow-env")}
+                  placeholder={t("agent.acp-config-allow-env-placeholder")}
+                  values={allowEnv}
+                  onChange={(next) => {
+                    setAllowEnv(next);
+                    setAddError("");
+                  }}
+                />
+              )}
             </div>
           </SheetBody>
           <SheetFooter>
@@ -830,7 +963,9 @@ export function MachineProfilePage() {
                 !agentName.trim() ||
                 !provider ||
                 (isCustomProvider && !executable.trim()) ||
-                (modelRequired && !model.trim())
+                (modelRequired && !model.trim()) ||
+                (isPiProvider &&
+                  (!apiProvider.trim() || !model.trim() || !apiKey.trim()))
               }
               onClick={handleAddAgent}
             >

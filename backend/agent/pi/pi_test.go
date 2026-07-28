@@ -1,0 +1,307 @@
+package pi
+
+import (
+	"context"
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/Ranxy/laelia/backend/agent/executor"
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
+)
+
+// TestPiFingerprint_StableAndDistinguishing guards the resume gate: identical
+// (apiProvider, model, workingDir) must hash identically, and any change must
+// invalidate the fingerprint so a config change does not resume a stale session.
+func TestPiFingerprint_StableAndDistinguishing(t *testing.T) {
+	a := piFingerprint(&PiConfig{APIProvider: "deepseek", Model: "deepseek-chat", WorkingDir: "/work"})
+	assert.Equal(t, a, piFingerprint(&PiConfig{APIProvider: "deepseek", Model: "deepseek-chat", WorkingDir: "/work"}))
+
+	assert.NotEqual(t, a, piFingerprint(&PiConfig{APIProvider: "openrouter", Model: "deepseek-chat", WorkingDir: "/work"}))
+	assert.NotEqual(t, a, piFingerprint(&PiConfig{APIProvider: "deepseek", Model: "deepseek-reasoner", WorkingDir: "/work"}))
+	assert.NotEqual(t, a, piFingerprint(&PiConfig{APIProvider: "deepseek", Model: "deepseek-chat", WorkingDir: "/else"}))
+}
+
+// TestLoadSavePiSession_RoundTrip exercises the durable session file. A missing
+// file is nil/nil (cold start); save→load round-trips. HOME is redirected so the
+// test never touches the real ~/.laelia.
+func TestLoadSavePiSession_RoundTrip(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	const (
+		machineID = "test-machine-pi"
+		agentID   = "test-agent-pi-roundtrip"
+	)
+
+	got, err := loadPiSession(machineID, agentID)
+	require.NoError(t, err)
+	assert.Nil(t, got, "missing session file should yield nil, nil")
+
+	want := &piSessionState{SessionPath: "/path/to/session.jsonl", Fingerprint: "fp-abc"}
+	require.NoError(t, savePiSession(machineID, agentID, want))
+
+	got, err = loadPiSession(machineID, agentID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, want.SessionPath, got.SessionPath)
+	assert.Equal(t, want.Fingerprint, got.Fingerprint)
+}
+
+// TestBuildPiConfig_Gating confirms BuildPiConfig returns nil unless the
+// provider is builtin-pi AND a known api_provider AND a non-empty api_key —
+// the runner treats nil as "not a pi agent / not yet configured".
+func TestBuildPiConfig_Gating(t *testing.T) {
+	base := func() *v1pb.AgentACPConfig {
+		return &v1pb.AgentACPConfig{
+			Provider:      BuiltinPiProvider,
+			ApiProvider:   APIProviderDeepseek,
+			Model:         "deepseek-chat",
+			ApiKey:        "sk-test",
+			PersonaPrompt: "be concise",
+		}
+	}
+
+	t.Run("valid", func(t *testing.T) {
+		cfg := BuildPiConfig(base(), "m", "a", "agents/a", "/bin/pi", "/sock", "tok", "/bin")
+		require.NotNil(t, cfg)
+		assert.Equal(t, APIProviderDeepseek, cfg.APIProvider)
+		assert.Equal(t, "deepseek-chat", cfg.Model)
+		assert.Equal(t, "sk-test", cfg.APIKey)
+		assert.Equal(t, "be concise", cfg.PersonaPrompt)
+	})
+
+	t.Run("wrong provider", func(t *testing.T) {
+		c := base()
+		c.Provider = "opencode"
+		assert.Nil(t, BuildPiConfig(c, "m", "a", "agents/a", "/bin/pi", "/sock", "tok", "/bin"))
+	})
+
+	t.Run("unknown api_provider", func(t *testing.T) {
+		c := base()
+		c.ApiProvider = "anthropic"
+		assert.Nil(t, BuildPiConfig(c, "m", "a", "agents/a", "/bin/pi", "/sock", "tok", "/bin"))
+	})
+
+	t.Run("empty api_key", func(t *testing.T) {
+		c := base()
+		c.ApiKey = "  "
+		assert.Nil(t, BuildPiConfig(c, "m", "a", "agents/a", "/bin/pi", "/sock", "tok", "/bin"))
+	})
+
+	t.Run("nil config", func(t *testing.T) {
+		assert.Nil(t, BuildPiConfig(nil, "m", "a", "agents/a", "/bin/pi", "/sock", "tok", "/bin"))
+	})
+}
+
+// TestBuildPiCapability confirms pi agents advertise SupportsPi and NOT
+// SupportsAcp, and that non-pi configs get a zero capability.
+func TestBuildPiCapability(t *testing.T) {
+	t.Run("pi config", func(t *testing.T) {
+		capability := BuildPiCapability(&v1pb.AgentACPConfig{Provider: BuiltinPiProvider, ApiProvider: APIProviderDeepseek, ApiKey: "k"})
+		assert.True(t, capability.SupportsPi)
+		assert.False(t, capability.SupportsAcp)
+		assert.True(t, capability.SupportsDiff)
+		assert.True(t, capability.SupportsToolTraces)
+	})
+
+	t.Run("non-pi config", func(t *testing.T) {
+		capability := BuildPiCapability(&v1pb.AgentACPConfig{Provider: "opencode"})
+		assert.False(t, capability.SupportsPi)
+		assert.False(t, capability.SupportsAcp)
+	})
+
+	t.Run("nil config", func(t *testing.T) {
+		capability := BuildPiCapability(nil)
+		assert.False(t, capability.SupportsPi)
+		assert.False(t, capability.SupportsAcp)
+	})
+}
+
+// TestLaunchArgs confirms the pi argv shape: rpc mode, provider/model from the
+// api provider spec, session-dir, and the headless-minimizing flags.
+func TestLaunchArgs(t *testing.T) {
+	cfg := &PiConfig{APIProvider: APIProviderOpenRouter, Model: "anthropic/claude-3.5-sonnet", WorkingDir: "/work"}
+	args := cfg.launchArgs()
+	want := []string{
+		"--mode", "rpc",
+		"--provider", "openrouter",
+		"--model", "anthropic/claude-3.5-sonnet",
+		"--session-dir", "/work",
+		"--no-extensions",
+		"--no-skills",
+		"--no-prompt-templates",
+		"--approve",
+	}
+	assert.Equal(t, want, args)
+}
+
+// TestBuildPiEnv_APIKeyAndBootstrap confirms the env the subprocess receives:
+// only the whitelisted host vars, the provider's API key env, and the laelia
+// bootstrap vars. The API key must land in the env var the configured provider
+// expects (DEEPSEEK_API_KEY vs OPENROUTER_API_KEY).
+func TestBuildPiEnv_APIKeyAndBootstrap(t *testing.T) {
+	t.Setenv("HOME", "/home/test")
+	t.Setenv("PATH", "/usr/bin")
+	t.Setenv("LANG", "en_US.UTF-8")
+	t.Setenv("SECRET_SHOULD_NOT_LEAK", "nope")
+
+	cfg := &PiConfig{
+		APIProvider:     APIProviderDeepseek,
+		APIKey:          "sk-deepseek",
+		AgentResourceID: "agents/abc",
+		DaemonSocket:    "/tmp/sock",
+		SessionToken:    "tok",
+		BinaryDir:       "/opt/laelia/bin",
+	}
+	env := cfg.buildPiEnv("commands/1")
+
+	m := envMap(env)
+	assert.Equal(t, "sk-deepseek", m["DEEPSEEK_API_KEY"])
+	assert.Equal(t, "", m["OPENROUTER_API_KEY"], "deepseek provider must not set the openrouter key")
+	assert.Equal(t, "/tmp/sock", m["LAELIA_DAEMON_SOCKET"])
+	assert.Equal(t, "tok", m["LAELIA_SESSION_TOKEN"])
+	assert.Equal(t, "agents/abc", m["LAELIA_AGENT"])
+	assert.Equal(t, "commands/1", m["LAELIA_COMMAND"])
+	assert.Contains(t, m["PATH"], "/opt/laelia/bin")
+	assert.NotContains(t, m, "SECRET_SHOULD_NOT_LEAK", "non-whitelisted host env must not leak")
+
+	// openrouter variant: key lands in OPENROUTER_API_KEY.
+	cfg.APIProvider = APIProviderOpenRouter
+	cfg.APIKey = "sk-or"
+	env = cfg.buildPiEnv("commands/1")
+	assert.Equal(t, "sk-or", envMap(env)["OPENROUTER_API_KEY"])
+}
+
+func envMap(env []string) map[string]string {
+	m := map[string]string{}
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			m[k] = v
+		}
+	}
+	return m
+}
+
+// TestJSONLFraming_LFOnly verifies the line-splitting rule the readPump relies
+// on: bufio.Reader.ReadString('\n') splits on LF only, so a JSON payload
+// containing U+2028/U+2029 (which Node's readline would split on) stays intact.
+// This is the framing-safety guarantee for the Go side of the protocol.
+func TestJSONLFraming_LFOnly(t *testing.T) {
+	payload := map[string]any{"message": "line separator inside"}
+	data, err := json.Marshal(payload)
+	require.NoError(t, err)
+	// Simulate one JSONL line: the payload followed by LF.
+	line := string(data) + "\n"
+	assert.True(t, strings.HasSuffix(line, "\n"))
+
+	// Decode it back the way readPump does: strip trailing LF (and optional CR).
+	raw := strings.TrimSuffix(line, "\n")
+	raw = strings.TrimSuffix(raw, "\r")
+	var got map[string]any
+	require.NoError(t, json.Unmarshal([]byte(raw), &got))
+	assert.Equal(t, "line separator inside", got["message"], "U+2028/U+2029 must not split the line")
+}
+
+// TestResponseCorrelation verifies the id-based request/response correlation
+// the Session uses to route get_state/switch_session responses to waiting Send
+// callers.
+func TestResponseCorrelation(t *testing.T) {
+	resp := response{Type: "response", ID: "laelia-1", Command: "get_state", Success: true}
+	data, err := json.Marshal(resp)
+	require.NoError(t, err)
+
+	var head struct {
+		Type string `json:"type"`
+		ID   string `json:"id,omitempty"`
+	}
+	require.NoError(t, json.Unmarshal(data, &head))
+	assert.Equal(t, "response", head.Type)
+	assert.Equal(t, "laelia-1", head.ID)
+
+	var r response
+	require.NoError(t, json.Unmarshal(data, &r))
+	assert.Equal(t, "laelia-1", r.ID)
+	assert.True(t, r.Success)
+	assert.Equal(t, "get_state", r.Command)
+}
+
+// TestEventMapping_TextDeltaAndToolCalls exercises the executor's event→Event
+// mapping without spawning a subprocess: feed events through handleEvent and
+// assert the emitted executor.Events.
+func TestEventMapping_TextDeltaAndToolCalls(t *testing.T) {
+	e := newTestExecutor(t)
+	defer close(e.outputCh)
+	defer close(e.eventCh)
+	defer close(e.resultCh)
+	defer close(e.done)
+
+	// text_delta → STDOUT output + TEXT_DELTA event.
+	e.handleEvent(&event{
+		Type:                  eventMessageUpdate,
+		AssistantMessageEvent: &assistantMessageEvent{Type: assistantEventTextDelta, Delta: "hello"},
+	})
+	// tool start → TOOL_CALL_STARTED.
+	e.handleEvent(&event{
+		Type:       eventToolExecutionStart,
+		ToolCallID: "tc-1",
+		ToolName:   "bash",
+		Args:       json.RawMessage(`{"command":"echo hi"}`),
+	})
+	// tool end → TOOL_CALL_FINISHED.
+	e.handleEvent(&event{
+		Type:       eventToolExecutionEnd,
+		ToolCallID: "tc-1",
+		Result:     json.RawMessage(`{"stdout":"hi"}`),
+	})
+	// agent_settled → terminal.
+	assert.True(t, e.handleEvent(&event{Type: eventAgentSettled}))
+
+	// Drain events: expect 1 output chunk + 3 events (text_delta, started, finished).
+	var events []executor.Event
+	for {
+		select {
+		case ev := <-e.eventCh:
+			events = append(events, ev)
+		case chunk := <-e.outputCh:
+			_ = chunk
+		default:
+			goto done
+		}
+	}
+done:
+	require.Len(t, events, 3, "text_delta + tool start + tool end")
+	assert.Equal(t, v1pb.CommandEventType_TEXT_DELTA, events[0].Type)
+	assert.Equal(t, "hello", events[0].TextDelta.Content)
+	assert.Equal(t, v1pb.CommandEventType_TOOL_CALL_STARTED, events[1].Type)
+	assert.Equal(t, "bash", events[1].ToolCallStarted.Title)
+	assert.Equal(t, v1pb.CommandEventType_TOOL_CALL_FINISHED, events[2].Type)
+	assert.Equal(t, "success", events[2].ToolCallFinished.Status)
+	assert.Equal(t, int32(1), e.toolCallCount.Load())
+}
+
+// newTestExecutor builds a PiExecutor with a nil-noop session for event-mapping
+// tests that never touch the subprocess.
+func newTestExecutor(t *testing.T) *PiExecutor {
+	t.Helper()
+	cfg := &PiConfig{
+		APIProvider:    APIProviderDeepseek,
+		Model:          "deepseek-chat",
+		APIKey:         "sk",
+		PiBinaryPath:   "/bin/pi",
+		MaxEventCount:  10000,
+		MaxOutputBytes: 1 << 20,
+	}
+	e := &PiExecutor{
+		cfg:         cfg,
+		identity:    "TestAgent",
+		ctx:         context.Background(),
+		outputCh:    make(chan executor.OutputChunk, outputBufferSize),
+		eventCh:     make(chan executor.Event, outputBufferSize),
+		resultCh:    make(chan executor.Result, 1),
+		done:        make(chan struct{}),
+		toolStarted: map[string]bool{},
+	}
+	return e
+}

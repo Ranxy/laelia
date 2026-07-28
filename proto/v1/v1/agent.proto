@@ -527,10 +527,17 @@ message AgentACPConfig {
   string executable = 1; // command to run, e.g. "npx". Only used when provider is "custom" or empty.
   repeated string args = 2; // args passed to executable, e.g. ["-y", "@agentclientprotocol/claude-agent-acp@latest"]
   repeated string allow_env = 3; // env var names the child process may inherit
-  string provider = 4; // selected LLM agent provider id, e.g. "opencode", "claude-code", "custom"
+  string provider = 4; // selected LLM agent provider id, e.g. "opencode", "claude-code", "custom", "builtin-pi"
   string model = 5; // selected model valueId, matching an option advertised by the provider in NewSession ConfigOptions
   map<string, string> custom_env = 6; // user-defined key-value env vars overlaid (and overriding) the inherited allow_env set
   string persona_prompt = 7; // admin-authored self-awareness prompt: personality, chat style, focus area. Empty = not loaded.
+  // api_provider is the LLM API provider for the built-in pi runtime ("deepseek" or "openrouter"
+  // in phase 1). Only meaningful when provider == "builtin-pi"; ignored by ACP runtimes.
+  string api_provider = 8;
+  // api_key is the plaintext LLM API key for the api_provider. Only meaningful when
+  // provider == "builtin-pi"; ignored by ACP runtimes. Stored in the agent info JSONB with the
+  // same plaintext-at-rest posture as custom_env.
+  string api_key = 9;
 }
 
 message AgentCapability {
@@ -542,6 +549,10 @@ message AgentCapability {
   int32 max_event_count = 7;
   int64 max_output_bytes = 8;
   bool supports_autonomous_decision = 9;
+  // supports_pi is true for agents backed by the built-in non-ACP pi runtime. The dispatcher's
+  // BeginSession gate accepts either supports_acp or supports_pi so a pi agent can run drain
+  // sessions without an ACP executor.
+  bool supports_pi = 10;
 }
 
 message AgentStatus {

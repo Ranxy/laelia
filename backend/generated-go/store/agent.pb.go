@@ -306,6 +306,8 @@ type AgentACPConfig struct {
 	Model         string                 `protobuf:"bytes,5,opt,name=model,proto3" json:"model,omitempty"`
 	CustomEnv     map[string]string      `protobuf:"bytes,6,rep,name=custom_env,json=customEnv,proto3" json:"custom_env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	PersonaPrompt string                 `protobuf:"bytes,7,opt,name=persona_prompt,json=personaPrompt,proto3" json:"persona_prompt,omitempty"`
+	ApiProvider   string                 `protobuf:"bytes,8,opt,name=api_provider,json=apiProvider,proto3" json:"api_provider,omitempty"`
+	ApiKey        string                 `protobuf:"bytes,9,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -385,6 +387,20 @@ func (x *AgentACPConfig) GetCustomEnv() map[string]string {
 func (x *AgentACPConfig) GetPersonaPrompt() string {
 	if x != nil {
 		return x.PersonaPrompt
+	}
+	return ""
+}
+
+func (x *AgentACPConfig) GetApiProvider() string {
+	if x != nil {
+		return x.ApiProvider
+	}
+	return ""
+}
+
+func (x *AgentACPConfig) GetApiKey() string {
+	if x != nil {
+		return x.ApiKey
 	}
 	return ""
 }
@@ -551,6 +567,7 @@ type AgentCapability struct {
 	MaxEventCount              int32                  `protobuf:"varint,7,opt,name=max_event_count,json=maxEventCount,proto3" json:"max_event_count,omitempty"`
 	MaxOutputBytes             int64                  `protobuf:"varint,8,opt,name=max_output_bytes,json=maxOutputBytes,proto3" json:"max_output_bytes,omitempty"`
 	SupportsAutonomousDecision bool                   `protobuf:"varint,9,opt,name=supports_autonomous_decision,json=supportsAutonomousDecision,proto3" json:"supports_autonomous_decision,omitempty"`
+	SupportsPi                 bool                   `protobuf:"varint,10,opt,name=supports_pi,json=supportsPi,proto3" json:"supports_pi,omitempty"`
 	unknownFields              protoimpl.UnknownFields
 	sizeCache                  protoimpl.SizeCache
 }
@@ -637,6 +654,13 @@ func (x *AgentCapability) GetMaxOutputBytes() int64 {
 func (x *AgentCapability) GetSupportsAutonomousDecision() bool {
 	if x != nil {
 		return x.SupportsAutonomousDecision
+	}
+	return false
+}
+
+func (x *AgentCapability) GetSupportsPi() bool {
+	if x != nil {
+		return x.SupportsPi
 	}
 	return false
 }
@@ -740,7 +764,7 @@ const file_store_agent_proto_rawDesc = "" +
 	" \x01(\v2\x1c.laelia.store.AgentACPConfigR\tacpConfig\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc4\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x80\x03\n" +
 	"\x0eAgentACPConfig\x12\x1e\n" +
 	"\n" +
 	"executable\x18\x01 \x01(\tR\n" +
@@ -751,7 +775,9 @@ const file_store_agent_proto_rawDesc = "" +
 	"\x05model\x18\x05 \x01(\tR\x05model\x12J\n" +
 	"\n" +
 	"custom_env\x18\x06 \x03(\v2+.laelia.store.AgentACPConfig.CustomEnvEntryR\tcustomEnv\x12%\n" +
-	"\x0epersona_prompt\x18\a \x01(\tR\rpersonaPrompt\x1a<\n" +
+	"\x0epersona_prompt\x18\a \x01(\tR\rpersonaPrompt\x12!\n" +
+	"\fapi_provider\x18\b \x01(\tR\vapiProvider\x12\x17\n" +
+	"\aapi_key\x18\t \x01(\tR\x06apiKey\x1a<\n" +
 	"\x0eCustomEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd0\x02\n" +
@@ -768,7 +794,7 @@ const file_store_agent_proto_rawDesc = "" +
 	"\x10AgentModelOption\x12\x14\n" +
 	"\x05value\x18\x01 \x01(\tR\x05value\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\"\xff\x02\n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\"\xa0\x03\n" +
 	"\x0fAgentCapability\x12!\n" +
 	"\fsupports_acp\x18\x01 \x01(\bR\vsupportsAcp\x12.\n" +
 	"\x13max_timeout_seconds\x18\x03 \x01(\x05R\x11maxTimeoutSeconds\x12#\n" +
@@ -777,7 +803,10 @@ const file_store_agent_proto_rawDesc = "" +
 	"\x14supports_tool_traces\x18\x06 \x01(\bR\x12supportsToolTraces\x12&\n" +
 	"\x0fmax_event_count\x18\a \x01(\x05R\rmaxEventCount\x12(\n" +
 	"\x10max_output_bytes\x18\b \x01(\x03R\x0emaxOutputBytes\x12@\n" +
-	"\x1csupports_autonomous_decision\x18\t \x01(\bR\x1asupportsAutonomousDecision\"\xd3\x02\n" +
+	"\x1csupports_autonomous_decision\x18\t \x01(\bR\x1asupportsAutonomousDecision\x12\x1f\n" +
+	"\vsupports_pi\x18\n" +
+	" \x01(\bR\n" +
+	"supportsPi\"\xd3\x02\n" +
 	"\vAgentStatus\x12?\n" +
 	"\x05state\x18\x01 \x01(\x0e2).laelia.store.AgentStatus.ConnectionStateR\x05state\x12*\n" +
 	"\x11last_heartbeat_at\x18\x02 \x01(\x03R\x0flastHeartbeatAt\x12!\n" +

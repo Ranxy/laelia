@@ -1136,7 +1136,7 @@ export declare type AgentACPConfig = Message<"laelia.v1.AgentACPConfig"> & {
   allowEnv: string[];
 
   /**
-   * selected LLM agent provider id, e.g. "opencode", "claude-code", "custom"
+   * selected LLM agent provider id, e.g. "opencode", "claude-code", "custom", "builtin-pi"
    *
    * @generated from field: string provider = 4;
    */
@@ -1162,6 +1162,23 @@ export declare type AgentACPConfig = Message<"laelia.v1.AgentACPConfig"> & {
    * @generated from field: string persona_prompt = 7;
    */
   personaPrompt: string;
+
+  /**
+   * api_provider is the LLM API provider for the built-in pi runtime ("deepseek" or "openrouter"
+   * in phase 1). Only meaningful when provider == "builtin-pi"; ignored by ACP runtimes.
+   *
+   * @generated from field: string api_provider = 8;
+   */
+  apiProvider: string;
+
+  /**
+   * api_key is the plaintext LLM API key for the api_provider. Only meaningful when
+   * provider == "builtin-pi"; ignored by ACP runtimes. Stored in the agent info JSONB with the
+   * same plaintext-at-rest posture as custom_env.
+   *
+   * @generated from field: string api_key = 9;
+   */
+  apiKey: string;
 };
 
 /**
@@ -1213,6 +1230,15 @@ export declare type AgentCapability = Message<"laelia.v1.AgentCapability"> & {
    * @generated from field: bool supports_autonomous_decision = 9;
    */
   supportsAutonomousDecision: boolean;
+
+  /**
+   * supports_pi is true for agents backed by the built-in non-ACP pi runtime. The dispatcher's
+   * BeginSession gate accepts either supports_acp or supports_pi so a pi agent can run drain
+   * sessions without an ACP executor.
+   *
+   * @generated from field: bool supports_pi = 10;
+   */
+  supportsPi: boolean;
 };
 
 /**

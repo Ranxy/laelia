@@ -564,11 +564,12 @@ func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb
 		return nil, errors.New("agent not found")
 	}
 
-	// An agent must support ACP tasks to run an autonomous drain session. A
-	// non-ACP agent stays idle (it has no executor to process messages); the
-	// agent connection itself is the primary gate, this is the server-side backstop.
-	if capability := agent.Info.GetCapability(); capability == nil || !capability.GetSupportsAcp() {
-		slog.Warn("agent is not ACP-capable; staying idle", "agent", agent.ResourceID)
+	// An agent must support an autonomous drain runtime (ACP or the bundled
+	// non-ACP pi runtime) to run a session. An agent with neither stays idle —
+	// it has no executor to process messages. The agent connection itself is
+	// the primary gate; this is the server-side backstop.
+	if capability := agent.Info.GetCapability(); capability == nil || (!capability.GetSupportsAcp() && !capability.GetSupportsPi()) {
+		slog.Warn("agent is not runtime-capable; staying idle", "agent", agent.ResourceID)
 		return &v1pb.BeginSessionResponse{Idle: true}, nil
 	}
 

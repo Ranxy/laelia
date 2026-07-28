@@ -1942,7 +1942,7 @@ and the machine app picks it up via the MachineChannel control stream. </p></td>
                   <td>provider</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>selected LLM agent provider id, e.g. &#34;opencode&#34;, &#34;claude-code&#34;, &#34;custom&#34; </p></td>
+                  <td><p>selected LLM agent provider id, e.g. &#34;opencode&#34;, &#34;claude-code&#34;, &#34;custom&#34;, &#34;builtin-pi&#34; </p></td>
                 </tr>
               
                 <tr>
@@ -1964,6 +1964,23 @@ and the machine app picks it up via the MachineChannel control stream. </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>admin-authored self-awareness prompt: personality, chat style, focus area. Empty = not loaded. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>api_provider</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>api_provider is the LLM API provider for the built-in pi runtime (&#34;deepseek&#34; or &#34;openrouter&#34;
+in phase 1). Only meaningful when provider == &#34;builtin-pi&#34;; ignored by ACP runtimes. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>api_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>api_key is the plaintext LLM API key for the api_provider. Only meaningful when
+provider == &#34;builtin-pi&#34;; ignored by ACP runtimes. Stored in the agent info JSONB with the
+same plaintext-at-rest posture as custom_env. </p></td>
                 </tr>
               
             </tbody>
@@ -2068,6 +2085,15 @@ and the machine app picks it up via the MachineChannel control stream. </p></td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>supports_pi</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>supports_pi is true for agents backed by the built-in non-ACP pi runtime. The dispatcher&#39;s
+BeginSession gate accepts either supports_acp or supports_pi so a pi agent can run drain
+sessions without an ACP executor. </p></td>
                 </tr>
               
             </tbody>

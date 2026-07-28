@@ -127,6 +127,8 @@ export function AgentProfilePage() {
   const [allowEnv, setAllowEnv] = useState<string[]>([]);
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
+  const [apiProvider, setApiProvider] = useState("");
+  const [apiKey, setApiKey] = useState("");
   const [customEnvEntries, setCustomEnvEntries] = useState<
     { key: string; value: string }[]
   >([]);
@@ -142,6 +144,8 @@ export function AgentProfilePage() {
     allowEnv: [] as string[],
     provider: "",
     model: "",
+    apiProvider: "",
+    apiKey: "",
     customEnvEntries: [] as { key: string; value: string }[],
   });
   const agentRef = useRef<Agent | undefined>(undefined);
@@ -256,6 +260,11 @@ export function AgentProfilePage() {
       allowEnv: cfg?.allowEnv ? [...cfg.allowEnv] : [],
       provider: cfg?.provider ?? "",
       model: cfg?.model ?? "",
+      apiProvider: cfg?.apiProvider ?? "",
+      // Seed the key from the persisted config so an editor can see/keep it.
+      // Non-editors get an empty key server-side (redacted), which is fine —
+      // they cannot save anyway. On save, an empty key means "keep existing".
+      apiKey: cfg?.apiKey ?? "",
       customEnvEntries: cfg?.customEnv
         ? Object.entries(cfg.customEnv).map(([key, value]) => ({ key, value }))
         : [],
@@ -266,6 +275,8 @@ export function AgentProfilePage() {
     setAllowEnv(next.allowEnv);
     setProvider(next.provider);
     setModel(next.model);
+    setApiProvider(next.apiProvider);
+    setApiKey(next.apiKey);
     setCustomEnvEntries(next.customEnvEntries);
     setPersonaDraft(cfg?.personaPrompt ?? "");
     setPersonaEditing(false);
@@ -330,6 +341,9 @@ export function AgentProfilePage() {
       model: draft.model.trim(),
       customEnv: foldCustomEnv(draft.customEnvEntries),
       personaPrompt,
+      apiProvider: draft.apiProvider.trim(),
+      // Empty apiKey on save means "keep the existing stored key" server-side.
+      apiKey: draft.apiKey,
     };
   }
 
@@ -348,6 +362,9 @@ export function AgentProfilePage() {
       model: cfg?.model ?? "",
       customEnv: { ...(cfg?.customEnv ?? {}) },
       personaPrompt,
+      apiProvider: cfg?.apiProvider ?? "",
+      // Preserve the stored key on a persona-only save.
+      apiKey: cfg?.apiKey ?? "",
     };
   }
 
@@ -388,18 +405,33 @@ export function AgentProfilePage() {
   // not know about.
   const availableProviders: AgentProviderInfo[] = machineProviders;
   const isCustomProvider = provider === "custom";
+  const isPiProvider = provider === "builtin-pi";
   const selectedProviderInfo = availableProviders.find(
     (p) => p.providerId === provider
   );
   const modelOptions = selectedProviderInfo?.models ?? [];
   const providerSupportsModel =
     !!selectedProviderInfo?.supportsModelConfigOption;
-  // A config is saveable once a provider (built-in or custom) is chosen. For
-  // the custom path an executable is still required; for a built-in provider
-  // the command is derived from the registry, so executable stays empty. When
-  // the provider exposes model selection, a model must also be chosen.
+  // The set of LLM API providers the built-in pi runtime supports in phase 1.
+  // deepseek exposes a fixed model dropdown; openrouter is free-text (thousands
+  // of models, no fixed list).
+  const piAPIProviders = [
+    { id: "deepseek", models: ["deepseek-chat", "deepseek-reasoner"] },
+    { id: "openrouter", models: [] as string[] },
+  ];
+  const piSelectedAPI = piAPIProviders.find((p) => p.id === apiProvider);
+  const piModelOptions = piSelectedAPI?.models ?? [];
+  // A config is saveable once a provider (built-in, custom, or builtin-pi) is
+  // chosen. For the custom path an executable is still required; for a built-in
+  // provider the command is derived from the registry, so executable stays
+  // empty. When the provider exposes model selection, a model must also be
+  // chosen. For builtin-pi, an api provider + model are required; the api key
+  // is optional on save (empty means keep the existing stored key).
   function canSaveFor(draft: typeof configRef.current): boolean {
     if (draft.provider === "custom") return draft.executable.trim() !== "";
+    if (draft.provider === "builtin-pi") {
+      return draft.apiProvider.trim() !== "" && draft.model.trim() !== "";
+    }
     const info = availableProviders.find(
       (p) => p.providerId === draft.provider
     );
@@ -602,7 +634,7 @@ export function AgentProfilePage() {
                     <label className="text-sm font-medium">
                       {t("agent.acp-config-provider")}
                     </label>
-                    {availableProviders.length === 0 ? (
+                    {availableProviders.length === 0 && !canEdit ? (
                       <p className="text-xs text-control-light">
                         {machineResourceID
                           ? t("agent.acp-config-no-providers-machine")
@@ -613,26 +645,38 @@ export function AgentProfilePage() {
                         value={provider}
                         onValueChange={(v) => {
                           const next = String(v ?? "");
-                          // Reset model when the provider changes — the previous
-                          // value belongs to the old provider's option set.
+                          // Reset model + pi fields when the provider changes —
+                          // the previous values belong to the old runtime.
                           configRef.current = {
                             ...configRef.current,
                             provider: next,
                             model: "",
+                            apiProvider: "",
                           };
                           setProvider(next);
                           setModel("");
+                          setApiProvider("");
                           saveConfig();
                         }}
                       >
                         <SelectTrigger>
                           <SelectValue>
                             {(v: string | null) =>
-                              v ? providerLabel(v, availableProviders) : ""
+                              v
+                                ? v === "builtin-pi"
+                                  ? t("agent.acp-config-provider-builtin-pi")
+                                  : providerLabel(v, availableProviders)
+                                : ""
                             }
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
+                          {/* builtin-pi is always available — it is bundled with
+                            laelia, not host-detected — so it shows on every
+                            agent regardless of the machine's probe results. */}
+                          <SelectItem value="builtin-pi">
+                            {t("agent.acp-config-provider-builtin-pi")}
+                          </SelectItem>
                           {availableProviders.map((p) => (
                             <SelectItem key={p.providerId} value={p.providerId}>
                               {providerDisplayName(p)}
@@ -658,6 +702,132 @@ export function AgentProfilePage() {
                       </p>
                     )}
                   </div>
+
+                  {isPiProvider && (
+                    <>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-medium">
+                          {t("agent.acp-config-pi-api-provider")}
+                        </label>
+                        <Select
+                          value={apiProvider}
+                          onValueChange={(v) => {
+                            const next = String(v ?? "");
+                            // Reset model when the API provider changes — the
+                            // previous model belongs to the old provider's set.
+                            configRef.current = {
+                              ...configRef.current,
+                              apiProvider: next,
+                              model: "",
+                            };
+                            setApiProvider(next);
+                            setModel("");
+                            // Default the model to the first option for providers
+                            // with a fixed list (deepseek); openrouter stays
+                            // empty for the user to type.
+                            const opts =
+                              piAPIProviders.find((p) => p.id === next)
+                                ?.models ?? [];
+                            if (opts.length > 0) {
+                              configRef.current = {
+                                ...configRef.current,
+                                model: opts[0],
+                              };
+                              setModel(opts[0]);
+                            }
+                            saveConfig();
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue>
+                              {(v: string | null) => v ?? ""}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {piAPIProviders.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.id}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-medium">
+                          {t("agent.acp-config-model")}
+                        </label>
+                        {piModelOptions.length > 0 ? (
+                          <Select
+                            value={model}
+                            onValueChange={(v) => {
+                              const next = String(v ?? "");
+                              configRef.current = {
+                                ...configRef.current,
+                                model: next,
+                              };
+                              setModel(next);
+                              saveConfig();
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue>
+                                {(v: string | null) => v ?? ""}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {piModelOptions.map((m) => (
+                                <SelectItem key={m} value={m}>
+                                  {m}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            placeholder={t(
+                              "agent.acp-config-pi-model-placeholder"
+                            )}
+                            value={model}
+                            onChange={(e) => {
+                              const next = e.target.value;
+                              configRef.current = {
+                                ...configRef.current,
+                                model: next,
+                              };
+                              setModel(next);
+                            }}
+                            onBlur={() => saveConfig()}
+                          />
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-medium">
+                          {t("agent.acp-config-pi-api-key")}
+                        </label>
+                        <Input
+                          type="password"
+                          placeholder={t(
+                            "agent.acp-config-pi-api-key-placeholder"
+                          )}
+                          value={apiKey}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            configRef.current = {
+                              ...configRef.current,
+                              apiKey: next,
+                            };
+                            setApiKey(next);
+                          }}
+                          onBlur={() => saveConfig()}
+                        />
+                        <p className="text-xs text-control-light">
+                          {t("agent.acp-config-pi-api-key-hint")}
+                        </p>
+                      </div>
+                    </>
+                  )}
 
                   {selectedProviderInfo && (
                     <div className="flex flex-col gap-1">
@@ -700,7 +870,7 @@ export function AgentProfilePage() {
                     </div>
                   )}
 
-                  {isCustomProvider && (
+                  {isCustomProvider && !isPiProvider && (
                     <>
                       <div className="flex flex-col gap-1">
                         <label className="text-sm font-medium">
@@ -746,11 +916,13 @@ export function AgentProfilePage() {
                     </>
                   )}
 
-                  {selectedProviderInfo && !isCustomProvider && (
-                    <p className="text-xs text-control-light">
-                      {t("agent.acp-config-derived-command-hint")}
-                    </p>
-                  )}
+                  {selectedProviderInfo &&
+                    !isCustomProvider &&
+                    !isPiProvider && (
+                      <p className="text-xs text-control-light">
+                        {t("agent.acp-config-derived-command-hint")}
+                      </p>
+                    )}
 
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
@@ -816,46 +988,50 @@ export function AgentProfilePage() {
                     )}
                   </div>
 
-                  <KeyValueEnvEditor
-                    label={t("agent.acp-config-custom-env")}
-                    entries={customEnvEntries}
-                    onChange={(next) => {
-                      configRef.current = {
-                        ...configRef.current,
-                        customEnvEntries: next,
-                      };
-                      setCustomEnvEntries(next);
-                    }}
-                    onCommit={(next) => {
-                      configRef.current = {
-                        ...configRef.current,
-                        customEnvEntries: next,
-                      };
-                      setCustomEnvEntries(next);
-                      saveConfig();
-                    }}
-                  />
+                  {!isPiProvider && (
+                    <KeyValueEnvEditor
+                      label={t("agent.acp-config-custom-env")}
+                      entries={customEnvEntries}
+                      onChange={(next) => {
+                        configRef.current = {
+                          ...configRef.current,
+                          customEnvEntries: next,
+                        };
+                        setCustomEnvEntries(next);
+                      }}
+                      onCommit={(next) => {
+                        configRef.current = {
+                          ...configRef.current,
+                          customEnvEntries: next,
+                        };
+                        setCustomEnvEntries(next);
+                        saveConfig();
+                      }}
+                    />
+                  )}
 
-                  <StringListEditor
-                    label={t("agent.acp-config-allow-env")}
-                    placeholder={t("agent.acp-config-allow-env-placeholder")}
-                    values={allowEnv}
-                    onChange={(next) => {
-                      configRef.current = {
-                        ...configRef.current,
-                        allowEnv: next,
-                      };
-                      setAllowEnv(next);
-                    }}
-                    onCommit={(next) => {
-                      configRef.current = {
-                        ...configRef.current,
-                        allowEnv: next,
-                      };
-                      setAllowEnv(next);
-                      saveConfig();
-                    }}
-                  />
+                  {!isPiProvider && (
+                    <StringListEditor
+                      label={t("agent.acp-config-allow-env")}
+                      placeholder={t("agent.acp-config-allow-env-placeholder")}
+                      values={allowEnv}
+                      onChange={(next) => {
+                        configRef.current = {
+                          ...configRef.current,
+                          allowEnv: next,
+                        };
+                        setAllowEnv(next);
+                      }}
+                      onCommit={(next) => {
+                        configRef.current = {
+                          ...configRef.current,
+                          allowEnv: next,
+                        };
+                        setAllowEnv(next);
+                        saveConfig();
+                      }}
+                    />
+                  )}
                 </div>
               </fieldset>
             </Card>
