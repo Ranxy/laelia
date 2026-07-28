@@ -677,6 +677,74 @@ export declare type RefreshAgentProvidersResponse = Message<"laelia.v1.RefreshAg
 export declare const RefreshAgentProvidersResponseSchema: GenMessage<RefreshAgentProvidersResponse>;
 
 /**
+ * @generated from message laelia.v1.ListPiModelsRequest
+ */
+export declare type ListPiModelsRequest = Message<"laelia.v1.ListPiModelsRequest"> & {
+  /**
+   * LLM API provider id ("deepseek" | "openrouter"). See AgentACPConfig.api_provider.
+   *
+   * @generated from field: string api_provider = 1;
+   */
+  apiProvider: string;
+
+  /**
+   * Plaintext LLM API key. Required for deepseek; ignored (public endpoint) for openrouter.
+   *
+   * @generated from field: string api_key = 2;
+   */
+  apiKey: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListPiModelsRequest.
+ * Use `create(ListPiModelsRequestSchema)` to create a new message.
+ */
+export declare const ListPiModelsRequestSchema: GenMessage<ListPiModelsRequest>;
+
+/**
+ * @generated from message laelia.v1.ListPiModelsResponse
+ */
+export declare type ListPiModelsResponse = Message<"laelia.v1.ListPiModelsResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.PiModel models = 1;
+   */
+  models: PiModel[];
+};
+
+/**
+ * Describes the message laelia.v1.ListPiModelsResponse.
+ * Use `create(ListPiModelsResponseSchema)` to create a new message.
+ */
+export declare const ListPiModelsResponseSchema: GenMessage<ListPiModelsResponse>;
+
+/**
+ * PiModel is one model id returned by the LLM API provider's model-listing API.
+ *
+ * @generated from message laelia.v1.PiModel
+ */
+export declare type PiModel = Message<"laelia.v1.PiModel"> & {
+  /**
+   * model id, the value passed to pi --model
+   *
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * optional display name (deepseek echoes id; openrouter has a human-readable name)
+   *
+   * @generated from field: string name = 2;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.PiModel.
+ * Use `create(PiModelSchema)` to create a new message.
+ */
+export declare const PiModelSchema: GenMessage<PiModel>;
+
+/**
  * @generated from message laelia.v1.UploadAgentAvatarRequest
  */
 export declare type UploadAgentAvatarRequest = Message<"laelia.v1.UploadAgentAvatarRequest"> & {
@@ -1467,6 +1535,20 @@ export declare const AgentService: GenService<{
     methodKind: "unary";
     input: typeof RefreshAgentProvidersRequestSchema;
     output: typeof RefreshAgentProvidersResponseSchema;
+  },
+  /**
+   * List the models a built-in pi agent's LLM API provider exposes. The manager
+   * proxies the provider's model-listing HTTP API (DeepSeek `GET /models` with
+   * the caller's api_key; OpenRouter `GET /models`, public) so the model list is
+   * fetched dynamically rather than hardcoded. Not agent-scoped: the add-agent
+   * form calls it before the agent exists. Admin (agents.edit) only.
+   *
+   * @generated from rpc laelia.v1.AgentService.ListPiModels
+   */
+  listPiModels: {
+    methodKind: "unary";
+    input: typeof ListPiModelsRequestSchema;
+    output: typeof ListPiModelsResponseSchema;
   },
   /**
    * Agent initial connection using bootstrap token

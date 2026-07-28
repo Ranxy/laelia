@@ -1,5 +1,5 @@
 import { Loader2, Plus, Trash } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { KeyValueEnvEditor } from "@/components/agent/key-value-env-editor";
@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { ModelCombobox } from "@/components/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +49,7 @@ import { useAppStore } from "@/stores";
 import {
   type AgentProviderInfo,
   type AgentSummary,
+  type PiModel,
 } from "@/types/proto-es/v1/agent_pb";
 import { type Machine } from "@/types/proto-es/v1/machine_pb";
 
@@ -162,6 +164,11 @@ export function MachineProfilePage() {
   const [addError, setAddError] = useState("");
   const [addedOpen, setAddedOpen] = useState(false);
   const [addedTitle, setAddedTitle] = useState("");
+  // Dynamic model list for the builtin-pi runtime: fetched from the provider's
+  // model API via the manager (ListPiModels), cached per api_provider.
+  const [piModels, setPiModels] = useState<PiModel[]>([]);
+  const [piModelsLoading, setPiModelsLoading] = useState(false);
+  const piModelsCacheRef = useRef<Map<string, PiModel[]>>(new Map());
 
   // Remove-agent state.
   const [removeTarget, setRemoveTarget] = useState<AgentSummary | null>(null);
@@ -186,6 +193,19 @@ export function MachineProfilePage() {
     void reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [machineId, machineName]);
+
+  // Auto-fetch the pi model list when the API provider changes. Lives before
+  // the `if (!machine)` early return so the hook order is stable across the
+  // loading→loaded transition (Rules of Hooks). fetchPiModels is hoisted.
+  useEffect(() => {
+    if (provider !== "builtin-pi" || !apiProvider) return;
+    if (piModelsCacheRef.current.has(apiProvider)) {
+      setPiModels(piModelsCacheRef.current.get(apiProvider) ?? []);
+      return;
+    }
+    void fetchPiModels(apiProvider, apiKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider, apiProvider, apiKey]);
 
   if (!machine) {
     return (
@@ -226,14 +246,38 @@ export function MachineProfilePage() {
   const modelRequired =
     !!selectedProviderInfo?.supportsModelConfigOption &&
     modelOptions.length > 0;
-  // The built-in pi runtime: phase-1 API providers. deepseek has a fixed model
-  // dropdown; openrouter is free-text.
-  const piAPIProviders = [
-    { id: "deepseek", models: ["deepseek-chat", "deepseek-reasoner"] },
-    { id: "openrouter", models: [] as string[] },
-  ];
-  const piSelectedAPI = piAPIProviders.find((p) => p.id === apiProvider);
-  const piModelOptions = piSelectedAPI?.models ?? [];
+  // The built-in pi runtime: phase-1 API provider ids. The model list for each
+  // is fetched dynamically from the provider's model API (see fetchPiModels),
+  // never hardcoded.
+  const piAPIProviderIds = ["deepseek", "openrouter"];
+
+  // fetchPiModels loads the model list for an API provider from the manager
+  // (ListPiModels). deepseek requires the api_key; openrouter is public.
+  async function fetchPiModels(nextProvider: string, key: string) {
+    if (!nextProvider) return;
+    if (nextProvider === "deepseek" && key.trim() === "") return;
+    const cached = piModelsCacheRef.current.get(nextProvider);
+    if (cached) {
+      setPiModels(cached);
+      return;
+    }
+    setPiModelsLoading(true);
+    setAddError("");
+    try {
+      const listPiModels = useAppStore.getState().listPiModels;
+      const models = await listPiModels(nextProvider, key);
+      piModelsCacheRef.current.set(nextProvider, models);
+      setPiModels(models);
+    } catch (err) {
+      setAddError(
+        err instanceof Error
+          ? err.message
+          : t("agent.acp-config-pi-models-refresh-failed")
+      );
+    } finally {
+      setPiModelsLoading(false);
+    }
+  }
 
   // resetAddForm clears the create-agent sheet inputs so reopening it starts
   // from a blank state instead of the previous submission's values.
@@ -249,6 +293,7 @@ export function MachineProfilePage() {
     setExecutable("");
     setArgs([]);
     setAddError("");
+    setPiModels([]);
   }
 
   async function handleRefreshProviders() {
@@ -762,10 +807,6 @@ export function MachineProfilePage() {
                         setApiProvider(next);
                         setModel("");
                         setAddError("");
-                        const opts =
-                          piAPIProviders.find((p) => p.id === next)?.models ??
-                          [];
-                        if (opts.length > 0) setModel(opts[0]);
                       }}
                     >
                       <SelectTrigger>
@@ -774,9 +815,9 @@ export function MachineProfilePage() {
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {piAPIProviders.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.id}
+                        {piAPIProviderIds.map((id) => (
+                          <SelectItem key={id} value={id}>
+                            {id}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -785,47 +826,15 @@ export function MachineProfilePage() {
 
                   <div className="flex flex-col gap-1">
                     <label className="text-sm font-medium">
-                      {t("agent.acp-config-model")}
-                    </label>
-                    {piModelOptions.length > 0 ? (
-                      <Select
-                        value={model}
-                        onValueChange={(v) => {
-                          setModel(String(v ?? ""));
-                          setAddError("");
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue>
-                            {(v: string | null) => v ?? ""}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {piModelOptions.map((m) => (
-                            <SelectItem key={m} value={m}>
-                              {m}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input
-                        placeholder={t("agent.acp-config-pi-model-placeholder")}
-                        value={model}
-                        onChange={(e) => {
-                          setModel(e.target.value);
-                          setAddError("");
-                        }}
-                      />
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium">
                       {t("agent.acp-config-pi-api-key")}
                     </label>
                     <Input
                       type="password"
+                      // An LLM API key is not a login password: stop password
+                      // managers from autofilling a generated password here.
+                      autoComplete="off"
+                      data-1p-ignore
+                      data-lpignore="true"
                       placeholder={t("agent.acp-config-pi-api-key-placeholder")}
                       value={apiKey}
                       onChange={(e) => {
@@ -836,6 +845,56 @@ export function MachineProfilePage() {
                     <p className="text-xs text-control-light">
                       {t("agent.acp-config-pi-api-key-hint")}
                     </p>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium">
+                      {t("agent.acp-config-model")}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <ModelCombobox
+                        className="flex-1"
+                        value={model}
+                        options={piModels}
+                        loading={piModelsLoading}
+                        placeholder={t("agent.acp-config-pi-model-placeholder")}
+                        disabled={!apiProvider}
+                        emptyLabel={t("agent.acp-config-pi-models-empty")}
+                        onValueChange={(next) => {
+                          setModel(next);
+                          setAddError("");
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={
+                          !apiProvider ||
+                          piModelsLoading ||
+                          (apiProvider === "deepseek" && apiKey.trim() === "")
+                        }
+                        onClick={() => {
+                          if (apiProvider) {
+                            piModelsCacheRef.current.delete(apiProvider);
+                          }
+                          void fetchPiModels(apiProvider, apiKey);
+                        }}
+                      >
+                        {piModelsLoading ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          t("agent.acp-config-pi-models-refresh")
+                        )}
+                      </Button>
+                    </div>
+                    {apiProvider &&
+                      !piModelsLoading &&
+                      piModels.length === 0 && (
+                        <p className="text-xs text-control-light">
+                          {t("agent.acp-config-pi-models-empty")}
+                        </p>
+                      )}
                   </div>
                 </>
               )}

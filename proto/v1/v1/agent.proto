@@ -110,6 +110,21 @@ service AgentService {
     option (laelia.v1.audit) = true;
   }
 
+  // List the models a built-in pi agent's LLM API provider exposes. The manager
+  // proxies the provider's model-listing HTTP API (DeepSeek `GET /models` with
+  // the caller's api_key; OpenRouter `GET /models`, public) so the model list is
+  // fetched dynamically rather than hardcoded. Not agent-scoped: the add-agent
+  // form calls it before the agent exists. Admin (agents.edit) only.
+  rpc ListPiModels(ListPiModelsRequest) returns (ListPiModelsResponse) {
+    option (google.api.http) = {
+      post: "/v1/pi:listModels"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.agents.edit";
+    option (laelia.v1.audit) = true;
+  }
+
   // ========== Agent Connection APIs (CUSTOM auth, agent tokens) ==========
 
   // Agent initial connection using bootstrap token
@@ -373,6 +388,23 @@ message RefreshAgentProvidersRequest {
 
 message RefreshAgentProvidersResponse {
   repeated AgentProviderInfo providers = 1;
+}
+
+message ListPiModelsRequest {
+  // LLM API provider id ("deepseek" | "openrouter"). See AgentACPConfig.api_provider.
+  string api_provider = 1 [(google.api.field_behavior) = REQUIRED];
+  // Plaintext LLM API key. Required for deepseek; ignored (public endpoint) for openrouter.
+  string api_key = 2;
+}
+
+message ListPiModelsResponse {
+  repeated PiModel models = 1;
+}
+
+// PiModel is one model id returned by the LLM API provider's model-listing API.
+message PiModel {
+  string id = 1; // model id, the value passed to pi --model
+  string name = 2; // optional display name (deepseek echoes id; openrouter has a human-readable name)
 }
 
 // --- Avatar ---

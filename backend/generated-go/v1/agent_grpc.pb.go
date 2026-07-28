@@ -30,6 +30,7 @@ const (
 	AgentService_ListAgentSessions_FullMethodName     = "/laelia.v1.AgentService/ListAgentSessions"
 	AgentService_UpdateAgentACPConfig_FullMethodName  = "/laelia.v1.AgentService/UpdateAgentACPConfig"
 	AgentService_RefreshAgentProviders_FullMethodName = "/laelia.v1.AgentService/RefreshAgentProviders"
+	AgentService_ListPiModels_FullMethodName          = "/laelia.v1.AgentService/ListPiModels"
 	AgentService_ConnectAgent_FullMethodName          = "/laelia.v1.AgentService/ConnectAgent"
 	AgentService_AgentHeartbeat_FullMethodName        = "/laelia.v1.AgentService/AgentHeartbeat"
 	AgentService_AgentDisconnect_FullMethodName       = "/laelia.v1.AgentService/AgentDisconnect"
@@ -62,6 +63,12 @@ type AgentServiceClient interface {
 	// and their models. Returns the freshly discovered provider list (also
 	// persisted into agent.info.available_providers). Admin only.
 	RefreshAgentProviders(ctx context.Context, in *RefreshAgentProvidersRequest, opts ...grpc.CallOption) (*RefreshAgentProvidersResponse, error)
+	// List the models a built-in pi agent's LLM API provider exposes. The manager
+	// proxies the provider's model-listing HTTP API (DeepSeek `GET /models` with
+	// the caller's api_key; OpenRouter `GET /models`, public) so the model list is
+	// fetched dynamically rather than hardcoded. Not agent-scoped: the add-agent
+	// form calls it before the agent exists. Admin (agents.edit) only.
+	ListPiModels(ctx context.Context, in *ListPiModelsRequest, opts ...grpc.CallOption) (*ListPiModelsResponse, error)
 	// Agent initial connection using bootstrap token
 	ConnectAgent(ctx context.Context, in *ConnectAgentRequest, opts ...grpc.CallOption) (*ConnectAgentResponse, error)
 	// Agent heartbeat
@@ -192,6 +199,16 @@ func (c *agentServiceClient) RefreshAgentProviders(ctx context.Context, in *Refr
 	return out, nil
 }
 
+func (c *agentServiceClient) ListPiModels(ctx context.Context, in *ListPiModelsRequest, opts ...grpc.CallOption) (*ListPiModelsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPiModelsResponse)
+	err := c.cc.Invoke(ctx, AgentService_ListPiModels_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *agentServiceClient) ConnectAgent(ctx context.Context, in *ConnectAgentRequest, opts ...grpc.CallOption) (*ConnectAgentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ConnectAgentResponse)
@@ -294,6 +311,12 @@ type AgentServiceServer interface {
 	// and their models. Returns the freshly discovered provider list (also
 	// persisted into agent.info.available_providers). Admin only.
 	RefreshAgentProviders(context.Context, *RefreshAgentProvidersRequest) (*RefreshAgentProvidersResponse, error)
+	// List the models a built-in pi agent's LLM API provider exposes. The manager
+	// proxies the provider's model-listing HTTP API (DeepSeek `GET /models` with
+	// the caller's api_key; OpenRouter `GET /models`, public) so the model list is
+	// fetched dynamically rather than hardcoded. Not agent-scoped: the add-agent
+	// form calls it before the agent exists. Admin (agents.edit) only.
+	ListPiModels(context.Context, *ListPiModelsRequest) (*ListPiModelsResponse, error)
 	// Agent initial connection using bootstrap token
 	ConnectAgent(context.Context, *ConnectAgentRequest) (*ConnectAgentResponse, error)
 	// Agent heartbeat
@@ -353,6 +376,9 @@ func (UnimplementedAgentServiceServer) UpdateAgentACPConfig(context.Context, *Up
 }
 func (UnimplementedAgentServiceServer) RefreshAgentProviders(context.Context, *RefreshAgentProvidersRequest) (*RefreshAgentProvidersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RefreshAgentProviders not implemented")
+}
+func (UnimplementedAgentServiceServer) ListPiModels(context.Context, *ListPiModelsRequest) (*ListPiModelsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPiModels not implemented")
 }
 func (UnimplementedAgentServiceServer) ConnectAgent(context.Context, *ConnectAgentRequest) (*ConnectAgentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ConnectAgent not implemented")
@@ -579,6 +605,24 @@ func _AgentService_RefreshAgentProviders_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AgentService_ListPiModels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPiModelsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).ListPiModels(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_ListPiModels_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).ListPiModels(ctx, req.(*ListPiModelsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AgentService_ConnectAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ConnectAgentRequest)
 	if err := dec(in); err != nil {
@@ -769,6 +813,10 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RefreshAgentProviders",
 			Handler:    _AgentService_RefreshAgentProviders_Handler,
+		},
+		{
+			MethodName: "ListPiModels",
+			Handler:    _AgentService_ListPiModels_Handler,
 		},
 		{
 			MethodName: "ConnectAgent",

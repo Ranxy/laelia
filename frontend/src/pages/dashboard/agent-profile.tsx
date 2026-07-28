@@ -8,6 +8,7 @@ import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ModelCombobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -31,6 +32,7 @@ import {
   type Agent,
   type AgentACPConfig,
   type AgentProviderInfo,
+  type PiModel,
 } from "@/types/proto-es/v1/agent_pb";
 import { agentLifecycle, lifecycleLabel } from "./agents";
 
@@ -137,6 +139,19 @@ export function AgentProfilePage() {
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
+  // Dynamic model list for the builtin-pi runtime: fetched from the provider's
+  // model API via the manager (ListPiModels), cached per api_provider so
+  // toggling providers does not refetch.
+  const [piModels, setPiModels] = useState<PiModel[]>([]);
+  const [piModelsLoading, setPiModelsLoading] = useState(false);
+  const [piModelsError, setPiModelsError] = useState("");
+  const piModelsCacheRef = useRef<Map<string, PiModel[]>>(new Map());
+  // Debounce timer for the "fetch models when the user stops typing the api
+  // key" trigger. The model list is fetched only on explicit user actions
+  // (api key change / Refresh button), NEVER on page entry — see fetchPiModels.
+  const apiKeyFetchDebounceRef = useRef<
+    ReturnType<typeof setTimeout> | undefined
+  >(undefined);
 
   const configRef = useRef({
     executable: "",
@@ -284,6 +299,16 @@ export function AgentProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent?.name]);
 
+  // Clear any pending debounce when the editor unmounts. Lives before the
+  // `if (!agent)` early return so the hook order is stable (Rules of Hooks).
+  useEffect(() => {
+    return () => {
+      if (apiKeyFetchDebounceRef.current) {
+        clearTimeout(apiKeyFetchDebounceRef.current);
+      }
+    };
+  }, []);
+
   if (!agent) {
     return (
       <div className="h-full overflow-y-auto p-6">
@@ -412,15 +437,46 @@ export function AgentProfilePage() {
   const modelOptions = selectedProviderInfo?.models ?? [];
   const providerSupportsModel =
     !!selectedProviderInfo?.supportsModelConfigOption;
-  // The set of LLM API providers the built-in pi runtime supports in phase 1.
-  // deepseek exposes a fixed model dropdown; openrouter is free-text (thousands
-  // of models, no fixed list).
-  const piAPIProviders = [
-    { id: "deepseek", models: ["deepseek-chat", "deepseek-reasoner"] },
-    { id: "openrouter", models: [] as string[] },
-  ];
-  const piSelectedAPI = piAPIProviders.find((p) => p.id === apiProvider);
-  const piModelOptions = piSelectedAPI?.models ?? [];
+  // The LLM API provider ids the built-in pi runtime supports in phase 1. The
+  // model list for each is fetched dynamically from the provider's model API
+  // (see fetchPiModels), never hardcoded.
+  const piAPIProviderIds = ["deepseek", "openrouter"];
+
+  // fetchPiModels loads the model list for an API provider from the manager
+  // (ListPiModels). deepseek requires the api_key; openrouter is public. Results
+  // are cached per provider so toggling back does not refetch.
+  async function fetchPiModels(nextProvider: string, key: string) {
+    if (!nextProvider) return;
+    if (nextProvider === "deepseek" && key.trim() === "") return;
+    const cached = piModelsCacheRef.current.get(nextProvider);
+    if (cached) {
+      setPiModels(cached);
+      setPiModelsError("");
+      return;
+    }
+    setPiModelsLoading(true);
+    setPiModelsError("");
+    try {
+      const listPiModels = useAppStore.getState().listPiModels;
+      const models = await listPiModels(nextProvider, key);
+      piModelsCacheRef.current.set(nextProvider, models);
+      setPiModels(models);
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : t("agent.acp-config-pi-models-refresh-failed");
+      setPiModelsError(msg);
+      toastManager.add({
+        type: "error",
+        title: t("agent.acp-config-pi-models-refresh-failed"),
+        description: msg,
+      });
+    } finally {
+      setPiModelsLoading(false);
+    }
+  }
+
   // A config is saveable once a provider (built-in, custom, or builtin-pi) is
   // chosen. For the custom path an executable is still required; for a built-in
   // provider the command is derived from the registry, so executable stays
@@ -715,26 +771,22 @@ export function AgentProfilePage() {
                             const next = String(v ?? "");
                             // Reset model when the API provider changes — the
                             // previous model belongs to the old provider's set.
+                            // Clear the cached model list too (it is per
+                            // provider) and cancel a pending key-change fetch;
+                            // the user clicks Refresh to load the new list.
                             configRef.current = {
                               ...configRef.current,
                               apiProvider: next,
                               model: "",
                             };
+                            if (apiKeyFetchDebounceRef.current) {
+                              clearTimeout(apiKeyFetchDebounceRef.current);
+                              apiKeyFetchDebounceRef.current = undefined;
+                            }
                             setApiProvider(next);
                             setModel("");
-                            // Default the model to the first option for providers
-                            // with a fixed list (deepseek); openrouter stays
-                            // empty for the user to type.
-                            const opts =
-                              piAPIProviders.find((p) => p.id === next)
-                                ?.models ?? [];
-                            if (opts.length > 0) {
-                              configRef.current = {
-                                ...configRef.current,
-                                model: opts[0],
-                              };
-                              setModel(opts[0]);
-                            }
+                            setPiModels([]);
+                            setPiModelsError("");
                             saveConfig();
                           }}
                         >
@@ -744,9 +796,9 @@ export function AgentProfilePage() {
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            {piAPIProviders.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.id}
+                            {piAPIProviderIds.map((id) => (
+                              <SelectItem key={id} value={id}>
+                                {id}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -757,48 +809,57 @@ export function AgentProfilePage() {
                         <label className="text-sm font-medium">
                           {t("agent.acp-config-model")}
                         </label>
-                        {piModelOptions.length > 0 ? (
-                          <Select
+                        <div className="flex items-center gap-2">
+                          <ModelCombobox
+                            className="flex-1"
                             value={model}
-                            onValueChange={(v) => {
-                              const next = String(v ?? "");
-                              configRef.current = {
-                                ...configRef.current,
-                                model: next,
-                              };
-                              setModel(next);
-                              saveConfig();
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue>
-                                {(v: string | null) => v ?? ""}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {piModelOptions.map((m) => (
-                                <SelectItem key={m} value={m}>
-                                  {m}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Input
+                            options={piModels}
+                            loading={piModelsLoading}
                             placeholder={t(
                               "agent.acp-config-pi-model-placeholder"
                             )}
-                            value={model}
-                            onChange={(e) => {
-                              const next = e.target.value;
+                            disabled={!apiProvider}
+                            emptyLabel={t("agent.acp-config-pi-models-empty")}
+                            onValueChange={(next) => {
                               configRef.current = {
                                 ...configRef.current,
                                 model: next,
                               };
                               setModel(next);
                             }}
-                            onBlur={() => saveConfig()}
                           />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={
+                              !apiProvider ||
+                              piModelsLoading ||
+                              (apiProvider === "deepseek" &&
+                                apiKey.trim() === "")
+                            }
+                            onClick={() => {
+                              // Force a refetch: drop the cache entry first
+                              // and cancel any pending key-change debounce.
+                              if (apiKeyFetchDebounceRef.current) {
+                                clearTimeout(apiKeyFetchDebounceRef.current);
+                                apiKeyFetchDebounceRef.current = undefined;
+                              }
+                              if (apiProvider) {
+                                piModelsCacheRef.current.delete(apiProvider);
+                              }
+                              void fetchPiModels(apiProvider, apiKey);
+                            }}
+                          >
+                            {piModelsLoading ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              t("agent.acp-config-pi-models-refresh")
+                            )}
+                          </Button>
+                        </div>
+                        {piModelsError && (
+                          <p className="text-xs text-danger">{piModelsError}</p>
                         )}
                       </div>
 
@@ -808,6 +869,12 @@ export function AgentProfilePage() {
                         </label>
                         <Input
                           type="password"
+                          // An LLM API key is not a login password: stop password
+                          // managers from autofilling a generated password here
+                          // (which would silently overwrite the real key on save).
+                          autoComplete="off"
+                          data-1p-ignore
+                          data-lpignore="true"
                           placeholder={t(
                             "agent.acp-config-pi-api-key-placeholder"
                           )}
@@ -819,8 +886,27 @@ export function AgentProfilePage() {
                               apiKey: next,
                             };
                             setApiKey(next);
+                            // Fetch the model list once the user stops typing
+                            // the key (debounced) — this is the "user changed
+                            // the api key" trigger. deepseek needs the key;
+                            // fetchPiModels no-ops for deepseek + empty key.
+                            if (apiKeyFetchDebounceRef.current) {
+                              clearTimeout(apiKeyFetchDebounceRef.current);
+                            }
+                            apiKeyFetchDebounceRef.current = setTimeout(() => {
+                              void fetchPiModels(apiProvider, next);
+                            }, 600);
                           }}
-                          onBlur={() => saveConfig()}
+                          onBlur={() => {
+                            // Leaving the field: persist the key, and fetch
+                            // immediately rather than waiting on the debounce.
+                            if (apiKeyFetchDebounceRef.current) {
+                              clearTimeout(apiKeyFetchDebounceRef.current);
+                              apiKeyFetchDebounceRef.current = undefined;
+                            }
+                            saveConfig();
+                            void fetchPiModels(apiProvider, apiKey);
+                          }}
                         />
                         <p className="text-xs text-control-light">
                           {t("agent.acp-config-pi-api-key-hint")}

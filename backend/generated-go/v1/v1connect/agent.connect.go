@@ -62,6 +62,9 @@ const (
 	// AgentServiceRefreshAgentProvidersProcedure is the fully-qualified name of the AgentService's
 	// RefreshAgentProviders RPC.
 	AgentServiceRefreshAgentProvidersProcedure = "/laelia.v1.AgentService/RefreshAgentProviders"
+	// AgentServiceListPiModelsProcedure is the fully-qualified name of the AgentService's ListPiModels
+	// RPC.
+	AgentServiceListPiModelsProcedure = "/laelia.v1.AgentService/ListPiModels"
 	// AgentServiceConnectAgentProcedure is the fully-qualified name of the AgentService's ConnectAgent
 	// RPC.
 	AgentServiceConnectAgentProcedure = "/laelia.v1.AgentService/ConnectAgent"
@@ -107,6 +110,12 @@ type AgentServiceClient interface {
 	// and their models. Returns the freshly discovered provider list (also
 	// persisted into agent.info.available_providers). Admin only.
 	RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error)
+	// List the models a built-in pi agent's LLM API provider exposes. The manager
+	// proxies the provider's model-listing HTTP API (DeepSeek `GET /models` with
+	// the caller's api_key; OpenRouter `GET /models`, public) so the model list is
+	// fetched dynamically rather than hardcoded. Not agent-scoped: the add-agent
+	// form calls it before the agent exists. Admin (agents.edit) only.
+	ListPiModels(context.Context, *connect.Request[v1.ListPiModelsRequest]) (*connect.Response[v1.ListPiModelsResponse], error)
 	// Agent initial connection using bootstrap token
 	ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error)
 	// Agent heartbeat
@@ -200,6 +209,12 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(agentServiceMethods.ByName("RefreshAgentProviders")),
 			connect.WithClientOptions(opts...),
 		),
+		listPiModels: connect.NewClient[v1.ListPiModelsRequest, v1.ListPiModelsResponse](
+			httpClient,
+			baseURL+AgentServiceListPiModelsProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("ListPiModels")),
+			connect.WithClientOptions(opts...),
+		),
 		connectAgent: connect.NewClient[v1.ConnectAgentRequest, v1.ConnectAgentResponse](
 			httpClient,
 			baseURL+AgentServiceConnectAgentProcedure,
@@ -263,6 +278,7 @@ type agentServiceClient struct {
 	listAgentSessions     *connect.Client[v1.ListAgentSessionsRequest, v1.ListAgentSessionsResponse]
 	updateAgentACPConfig  *connect.Client[v1.UpdateAgentACPConfigRequest, emptypb.Empty]
 	refreshAgentProviders *connect.Client[v1.RefreshAgentProvidersRequest, v1.RefreshAgentProvidersResponse]
+	listPiModels          *connect.Client[v1.ListPiModelsRequest, v1.ListPiModelsResponse]
 	connectAgent          *connect.Client[v1.ConnectAgentRequest, v1.ConnectAgentResponse]
 	agentHeartbeat        *connect.Client[v1.AgentHeartbeatRequest, v1.AgentHeartbeatResponse]
 	agentDisconnect       *connect.Client[v1.AgentDisconnectRequest, emptypb.Empty]
@@ -321,6 +337,11 @@ func (c *agentServiceClient) UpdateAgentACPConfig(ctx context.Context, req *conn
 // RefreshAgentProviders calls laelia.v1.AgentService.RefreshAgentProviders.
 func (c *agentServiceClient) RefreshAgentProviders(ctx context.Context, req *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error) {
 	return c.refreshAgentProviders.CallUnary(ctx, req)
+}
+
+// ListPiModels calls laelia.v1.AgentService.ListPiModels.
+func (c *agentServiceClient) ListPiModels(ctx context.Context, req *connect.Request[v1.ListPiModelsRequest]) (*connect.Response[v1.ListPiModelsResponse], error) {
+	return c.listPiModels.CallUnary(ctx, req)
 }
 
 // ConnectAgent calls laelia.v1.AgentService.ConnectAgent.
@@ -383,6 +404,12 @@ type AgentServiceHandler interface {
 	// and their models. Returns the freshly discovered provider list (also
 	// persisted into agent.info.available_providers). Admin only.
 	RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error)
+	// List the models a built-in pi agent's LLM API provider exposes. The manager
+	// proxies the provider's model-listing HTTP API (DeepSeek `GET /models` with
+	// the caller's api_key; OpenRouter `GET /models`, public) so the model list is
+	// fetched dynamically rather than hardcoded. Not agent-scoped: the add-agent
+	// form calls it before the agent exists. Admin (agents.edit) only.
+	ListPiModels(context.Context, *connect.Request[v1.ListPiModelsRequest]) (*connect.Response[v1.ListPiModelsResponse], error)
 	// Agent initial connection using bootstrap token
 	ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error)
 	// Agent heartbeat
@@ -472,6 +499,12 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(agentServiceMethods.ByName("RefreshAgentProviders")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentServiceListPiModelsHandler := connect.NewUnaryHandler(
+		AgentServiceListPiModelsProcedure,
+		svc.ListPiModels,
+		connect.WithSchema(agentServiceMethods.ByName("ListPiModels")),
+		connect.WithHandlerOptions(opts...),
+	)
 	agentServiceConnectAgentHandler := connect.NewUnaryHandler(
 		AgentServiceConnectAgentProcedure,
 		svc.ConnectAgent,
@@ -542,6 +575,8 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 			agentServiceUpdateAgentACPConfigHandler.ServeHTTP(w, r)
 		case AgentServiceRefreshAgentProvidersProcedure:
 			agentServiceRefreshAgentProvidersHandler.ServeHTTP(w, r)
+		case AgentServiceListPiModelsProcedure:
+			agentServiceListPiModelsHandler.ServeHTTP(w, r)
 		case AgentServiceConnectAgentProcedure:
 			agentServiceConnectAgentHandler.ServeHTTP(w, r)
 		case AgentServiceAgentHeartbeatProcedure:
@@ -605,6 +640,10 @@ func (UnimplementedAgentServiceHandler) UpdateAgentACPConfig(context.Context, *c
 
 func (UnimplementedAgentServiceHandler) RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.RefreshAgentProviders is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) ListPiModels(context.Context, *connect.Request[v1.ListPiModelsRequest]) (*connect.Response[v1.ListPiModelsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.ListPiModels is not implemented"))
 }
 
 func (UnimplementedAgentServiceHandler) ConnectAgent(context.Context, *connect.Request[v1.ConnectAgentRequest]) (*connect.Response[v1.ConnectAgentResponse], error) {

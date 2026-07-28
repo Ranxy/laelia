@@ -1115,6 +1115,8 @@ func convertToV1AgentACPConfig(cfg *storepb.AgentACPConfig) *v1pb.AgentACPConfig
 		Model:         cfg.Model,
 		CustomEnv:     cfg.CustomEnv,
 		PersonaPrompt: cfg.PersonaPrompt,
+		ApiProvider:   cfg.ApiProvider,
+		ApiKey:        cfg.ApiKey,
 	}
 }
 
@@ -1130,6 +1132,8 @@ func convertToStoreAgentACPConfig(cfg *v1pb.AgentACPConfig) *storepb.AgentACPCon
 		Model:         cfg.Model,
 		CustomEnv:     cfg.CustomEnv,
 		PersonaPrompt: cfg.PersonaPrompt,
+		ApiProvider:   cfg.ApiProvider,
+		ApiKey:        cfg.ApiKey,
 	}
 }
 
@@ -1457,6 +1461,35 @@ func (s *AgentService) RefreshAgentProviders(ctx context.Context, req *connect.R
 	case <-ctx.Done():
 		return nil, connect.NewError(connect.CodeDeadlineExceeded, ctx.Err())
 	}
+}
+
+// ListPiModels proxies an LLM API provider's model-listing API so the agent
+// config form can populate the model picker dynamically (no hardcoded model
+// list). Not agent-scoped — the add-agent form calls it before the agent exists.
+// The api_key is used only for the outbound provider call and is never logged
+// (the audit interceptor records method/actor/status only, not the body).
+func (*AgentService) ListPiModels(ctx context.Context, req *connect.Request[v1pb.ListPiModelsRequest]) (*connect.Response[v1pb.ListPiModelsResponse], error) {
+	apiProvider := strings.TrimSpace(req.Msg.ApiProvider)
+	if !pi.IsKnownAPIProvider(apiProvider) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unsupported api_provider %q", req.Msg.ApiProvider))
+	}
+	// DeepSeek's /models requires the caller's key; OpenRouter's is public.
+	if apiProvider == pi.APIProviderDeepseek && strings.TrimSpace(req.Msg.ApiKey) == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("api_key is required to list models for this provider"))
+	}
+
+	models, err := pi.ListModels(ctx, apiProvider, req.Msg.ApiKey)
+	if err != nil {
+		// Validation already ruled out client-side errors; anything left is an
+		// upstream provider/network failure (auth, timeout, non-2xx).
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Wrap(err, "failed to list models from provider"))
+	}
+
+	out := make([]*v1pb.PiModel, 0, len(models))
+	for _, m := range models {
+		out = append(out, &v1pb.PiModel{Id: m.ID, Name: m.Name})
+	}
+	return connect.NewResponse(&v1pb.ListPiModelsResponse{Models: out}), nil
 }
 
 // validateAgentACPConfig checks the user-configurable ACP fields. A provider is

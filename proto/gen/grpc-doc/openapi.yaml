@@ -2509,6 +2509,36 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/pi:listModels:
+        post:
+            tags:
+                - AgentService
+            description: |-
+                List the models a built-in pi agent's LLM API provider exposes. The manager
+                 proxies the provider's model-listing HTTP API (DeepSeek `GET /models` with
+                 the caller's api_key; OpenRouter `GET /models`, public) so the model list is
+                 fetched dynamically rather than hardcoded. Not agent-scoped: the add-agent
+                 form calls it before the agent exists. Admin (agents.edit) only.
+            operationId: AgentService_ListPiModels
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ListPiModelsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListPiModelsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/pushConfig:
         get:
             tags:
@@ -4955,6 +4985,24 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/PeerAgent'
+        ListPiModelsRequest:
+            required:
+                - apiProvider
+            type: object
+            properties:
+                apiProvider:
+                    type: string
+                    description: LLM API provider id ("deepseek" | "openrouter"). See AgentACPConfig.api_provider.
+                apiKey:
+                    type: string
+                    description: Plaintext LLM API key. Required for deepseek; ignored (public endpoint) for openrouter.
+        ListPiModelsResponse:
+            type: object
+            properties:
+                models:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/PiModel'
         ListRemindersResponse:
             type: object
             properties:
@@ -5339,6 +5387,14 @@ components:
                     type: string
                 kind:
                     type: string
+        PiModel:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+            description: PiModel is one model id returned by the LLM API provider's model-listing API.
         PostMessageRequest:
             required:
                 - conversation

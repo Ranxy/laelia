@@ -3,6 +3,7 @@ import { agentServiceClient } from "@/connect";
 import type {
   AgentProviderInfo,
   AgentSummary,
+  PiModel,
 } from "@/types/proto-es/v1/agent_pb";
 import {
   AgentACPConfigSchema,
@@ -11,6 +12,7 @@ import {
   AgentSummarySchema,
   CreateAgentRequestSchema,
   DeleteAgentRequestSchema,
+  ListPiModelsRequestSchema,
   RefreshAgentProvidersRequestSchema,
   RevokeAgentTokenRequestSchema,
   RotateAgentTokenRequestSchema,
@@ -139,6 +141,13 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     // available_providers surface in the editor; this slice no longer holds a
     // cached agent to refresh.
     return res.providers;
+  },
+
+  async listPiModels(apiProvider: string, apiKey: string): Promise<PiModel[]> {
+    const res = await agentServiceClient.listPiModels(
+      create(ListPiModelsRequestSchema, { apiProvider, apiKey })
+    );
+    return res.models;
   },
 });
 

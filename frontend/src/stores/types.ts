@@ -5,6 +5,7 @@ import type {
   AgentStatus_ConnectionState,
   AgentSummary,
   CreateAgentResponse,
+  PiModel,
   RotateAgentTokenResponse,
 } from "@/types/proto-es/v1/agent_pb";
 import type {
@@ -187,6 +188,10 @@ export interface AgentSlice {
     acpConfig: AgentACPConfigInput
   ) => Promise<void>;
   refreshAgentProviders: (name: string) => Promise<AgentProviderInfo[]>;
+  // listPiModels proxies an LLM API provider's model-listing API through the
+  // manager (CORS + key hygiene). Fetched dynamically so the model list is never
+  // hardcoded. apiKey is required for deepseek and ignored for openrouter.
+  listPiModels: (apiProvider: string, apiKey: string) => Promise<PiModel[]>;
 }
 
 // MachineSlice owns the machine roster and the machine-management mutations.

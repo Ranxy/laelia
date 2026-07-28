@@ -51,8 +51,11 @@
     - [ListAgentSessionsResponse](#laelia-v1-ListAgentSessionsResponse)
     - [ListAgentsRequest](#laelia-v1-ListAgentsRequest)
     - [ListAgentsResponse](#laelia-v1-ListAgentsResponse)
+    - [ListPiModelsRequest](#laelia-v1-ListPiModelsRequest)
+    - [ListPiModelsResponse](#laelia-v1-ListPiModelsResponse)
     - [PendingCommandHint](#laelia-v1-PendingCommandHint)
     - [PendingCommandHint.EnvEntry](#laelia-v1-PendingCommandHint-EnvEntry)
+    - [PiModel](#laelia-v1-PiModel)
     - [RefreshAgentProvidersRequest](#laelia-v1-RefreshAgentProvidersRequest)
     - [RefreshAgentProvidersResponse](#laelia-v1-RefreshAgentProvidersResponse)
     - [RefreshAgentTokenRequest](#laelia-v1-RefreshAgentTokenRequest)
@@ -1065,6 +1068,37 @@ view does not gate affordances on it (delete is enforced server-side).
 
 
 
+<a name="laelia-v1-ListPiModelsRequest"></a>
+
+### ListPiModelsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| api_provider | [string](#string) |  | LLM API provider id (&#34;deepseek&#34; | &#34;openrouter&#34;). See AgentACPConfig.api_provider. |
+| api_key | [string](#string) |  | Plaintext LLM API key. Required for deepseek; ignored (public endpoint) for openrouter. |
+
+
+
+
+
+
+<a name="laelia-v1-ListPiModelsResponse"></a>
+
+### ListPiModelsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| models | [PiModel](#laelia-v1-PiModel) | repeated |  |
+
+
+
+
+
+
 <a name="laelia-v1-PendingCommandHint"></a>
 
 ### PendingCommandHint
@@ -1094,6 +1128,22 @@ view does not gate affordances on it (delete is enforced server-side).
 | ----- | ---- | ----- | ----------- |
 | key | [string](#string) |  |  |
 | value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-PiModel"></a>
+
+### PiModel
+PiModel is one model id returned by the LLM API provider&#39;s model-listing API.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| id | [string](#string) |  | model id, the value passed to pi --model |
+| name | [string](#string) |  | optional display name (deepseek echoes id; openrouter has a human-readable name) |
 
 
 
@@ -1291,6 +1341,7 @@ view does not gate affordances on it (delete is enforced server-side).
 | ListAgentSessions | [ListAgentSessionsRequest](#laelia-v1-ListAgentSessionsRequest) | [ListAgentSessionsResponse](#laelia-v1-ListAgentSessionsResponse) | List agent sessions |
 | UpdateAgentACPConfig | [UpdateAgentACPConfigRequest](#laelia-v1-UpdateAgentACPConfigRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Update agent ACP config YAML (admin only) |
 | RefreshAgentProviders | [RefreshAgentProvidersRequest](#laelia-v1-RefreshAgentProvidersRequest) | [RefreshAgentProvidersResponse](#laelia-v1-RefreshAgentProvidersResponse) | Ask the agent daemon to re-probe its host for installed LLM agent providers and their models. Returns the freshly discovered provider list (also persisted into agent.info.available_providers). Admin only. |
+| ListPiModels | [ListPiModelsRequest](#laelia-v1-ListPiModelsRequest) | [ListPiModelsResponse](#laelia-v1-ListPiModelsResponse) | List the models a built-in pi agent&#39;s LLM API provider exposes. The manager proxies the provider&#39;s model-listing HTTP API (DeepSeek `GET /models` with the caller&#39;s api_key; OpenRouter `GET /models`, public) so the model list is fetched dynamically rather than hardcoded. Not agent-scoped: the add-agent form calls it before the agent exists. Admin (agents.edit) only. |
 | ConnectAgent | [ConnectAgentRequest](#laelia-v1-ConnectAgentRequest) | [ConnectAgentResponse](#laelia-v1-ConnectAgentResponse) | Agent initial connection using bootstrap token |
 | AgentHeartbeat | [AgentHeartbeatRequest](#laelia-v1-AgentHeartbeatRequest) | [AgentHeartbeatResponse](#laelia-v1-AgentHeartbeatResponse) | Agent heartbeat |
 | AgentDisconnect | [AgentDisconnectRequest](#laelia-v1-AgentDisconnectRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Agent graceful disconnect |
