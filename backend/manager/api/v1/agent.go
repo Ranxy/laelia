@@ -1234,13 +1234,15 @@ func convertToV1AgentCapability(capability *storepb.AgentCapability) *v1pb.Agent
 		return nil
 	}
 	return &v1pb.AgentCapability{
-		SupportsAcp:        capability.SupportsAcp,
-		MaxTimeoutSeconds:  capability.MaxTimeoutSeconds,
-		SupportsDiff:       capability.SupportsDiff,
-		SupportsRawEvents:  capability.SupportsRawEvents,
-		SupportsToolTraces: capability.SupportsToolTraces,
-		MaxEventCount:      capability.MaxEventCount,
-		MaxOutputBytes:     capability.MaxOutputBytes,
+		SupportsAcp:                capability.SupportsAcp,
+		MaxTimeoutSeconds:          capability.MaxTimeoutSeconds,
+		SupportsDiff:               capability.SupportsDiff,
+		SupportsRawEvents:          capability.SupportsRawEvents,
+		SupportsToolTraces:         capability.SupportsToolTraces,
+		MaxEventCount:              capability.MaxEventCount,
+		MaxOutputBytes:             capability.MaxOutputBytes,
+		SupportsAutonomousDecision: capability.SupportsAutonomousDecision,
+		SupportsPi:                 capability.SupportsPi,
 	}
 }
 
@@ -1249,13 +1251,15 @@ func convertToStoreAgentCapability(capability *v1pb.AgentCapability) *storepb.Ag
 		return nil
 	}
 	return &storepb.AgentCapability{
-		SupportsAcp:        capability.SupportsAcp,
-		MaxTimeoutSeconds:  capability.MaxTimeoutSeconds,
-		SupportsDiff:       capability.SupportsDiff,
-		SupportsRawEvents:  capability.SupportsRawEvents,
-		SupportsToolTraces: capability.SupportsToolTraces,
-		MaxEventCount:      capability.MaxEventCount,
-		MaxOutputBytes:     capability.MaxOutputBytes,
+		SupportsAcp:                capability.SupportsAcp,
+		MaxTimeoutSeconds:          capability.MaxTimeoutSeconds,
+		SupportsDiff:               capability.SupportsDiff,
+		SupportsRawEvents:          capability.SupportsRawEvents,
+		SupportsToolTraces:         capability.SupportsToolTraces,
+		MaxEventCount:              capability.MaxEventCount,
+		MaxOutputBytes:             capability.MaxOutputBytes,
+		SupportsAutonomousDecision: capability.SupportsAutonomousDecision,
+		SupportsPi:                 capability.SupportsPi,
 	}
 }
 
@@ -1395,6 +1399,15 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 	// built a fresh Info{AcpConfig:...} and clobbered the agent-reported fields.
 	patchInfo := cloneStoreAgentInfo(agent.Info)
 	patchInfo.AcpConfig = convertToStoreAgentACPConfig(req.Msg.AcpConfig)
+	// Re-derive the capability from the new config so it stays in sync. The
+	// capability is a pure function of the config (buildCapabilityForACPConfig);
+	// without this, changing a provider (e.g. ACP → builtin-pi) left a stale
+	// capability — the dispatcher's BeginSession gate then mis-classified the
+	// runtime (a pi agent with supports_pi=false stays idle forever). This also
+	// self-repairs existing pi agents whose capability was written by a converter
+	// that predated the supports_pi field: re-saving their config now writes the
+	// correct capability.
+	patchInfo.Capability = convertToStoreAgentCapability(buildCapabilityForACPConfig(req.Msg.AcpConfig))
 
 	patch := &store.UpdateAgentMessage{Info: patchInfo}
 	if _, err := s.store.UpdateAgent(ctx, agent, patch); err != nil {

@@ -19,6 +19,22 @@ type TimelineItem =
   | { kind: "output"; ts: number; output: CommandOutput }
   | { kind: "tool"; ts: number; pair: ToolCallPair };
 
+// A run of consecutive same-stream output chunks merged into one text block.
+// Chunks arrive at flush boundaries (per-token for pi, per-~4KB for ACP); each
+// renders as its own block-level div, so unmerged output splits words across
+// lines. LLM tokens carry their own whitespace, so concatenating chunk contents
+// reproduces the original text exactly (same as the backend outputBuffer does
+// before flushing). Tool cards and stream-type changes break a run.
+type MergedOutput = {
+  type: CommandOutput_StreamType;
+  content: string;
+  key: string;
+};
+
+type RenderItem =
+  | { kind: "output"; merged: MergedOutput }
+  | { kind: "tool"; pair: ToolCallPair };
+
 function tsToMs(ts: { seconds?: bigint; nanos?: number } | undefined): number {
   if (!ts?.seconds) return 0;
   return Number(ts.seconds) * 1000 + (ts.nanos ?? 0) / 1_000_000;
@@ -51,6 +67,31 @@ export function CommandTimeline({
     return [...outputItems, ...toolItems].sort((a, b) => a.ts - b.ts);
   }, [outputs, events]);
 
+  const renderItems = useMemo<RenderItem[]>(() => {
+    const out: RenderItem[] = [];
+    for (const item of items) {
+      if (item.kind === "tool") {
+        out.push({ kind: "tool", pair: item.pair });
+        continue;
+      }
+      const o = item.output;
+      const last = out[out.length - 1];
+      if (last && last.kind === "output" && last.merged.type === o.type) {
+        last.merged.content += o.content;
+        continue;
+      }
+      out.push({
+        kind: "output",
+        merged: {
+          type: o.type,
+          content: o.content,
+          key: `out-${o.commandId}-${o.seqNo}`,
+        },
+      });
+    }
+    return out;
+  }, [items]);
+
   if (outputs.length === 0 && items.length === 0) {
     return (
       <div
@@ -73,19 +114,19 @@ export function CommandTimeline({
         className
       )}
     >
-      {items.map((item) => {
+      {renderItems.map((item) => {
         if (item.kind === "output") {
-          const o = item.output;
+          const m = item.merged;
           return (
             <div
-              key={`out-${o.commandId}-${o.seqNo}`}
+              key={m.key}
               className={cn("whitespace-pre-wrap break-all", {
-                "text-matrix-green": o.type === CommandOutput_StreamType.STDOUT,
-                "text-error": o.type === CommandOutput_StreamType.STDERR,
-                "text-warning": o.type === CommandOutput_StreamType.SYSTEM,
+                "text-matrix-green": m.type === CommandOutput_StreamType.STDOUT,
+                "text-error": m.type === CommandOutput_StreamType.STDERR,
+                "text-warning": m.type === CommandOutput_StreamType.SYSTEM,
               })}
             >
-              {o.content}
+              {m.content}
             </div>
           );
         }

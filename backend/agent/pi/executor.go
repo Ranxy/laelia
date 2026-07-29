@@ -50,6 +50,15 @@ type PiExecutor struct {
 	// agent does not post its own reply (it normally does, via laelia-agent).
 	stdoutBuf strings.Builder
 
+	// buffer batches STDOUT/SYSTEM text deltas into consolidated CommandOutput
+	// chunks, mirroring executor.outputBuffer. pi streams per-token text deltas;
+	// without batching each token becomes its own command_output row (and, as the
+	// timeline renders each chunk as a block-level div, its own line). LLM tokens
+	// carry their own whitespace, so concatenating deltas before flushing
+	// reproduces the original text exactly. Flushed on the byte threshold, a
+	// 500ms tick, tool-call boundaries, and at finish.
+	buffer outputBuffer
+
 	// eventCounter caps structured events (separate from seqNo so ordering and
 	// the cap do not conflate).
 	eventCounter atomic.Int32
@@ -66,6 +75,10 @@ var _ executor.Runtime = (*PiExecutor)(nil)
 // stream pump. It mirrors executor.outputBufferSize; duplicated here to avoid
 // exporting an internal constant from the executor package.
 const outputBufferSize = 1024
+
+// flushOutputInterval is the periodic buffer-flush cadence, mirroring
+// executor.flushOutputInterval so pi's live-stream latency matches ACP's.
+const flushOutputInterval = 500 * time.Millisecond
 
 // NewPi constructs a per-turn Runtime over the shared pi session. The session
 // is started lazily on the first Start so the opening turn's command id seeds
@@ -131,6 +144,12 @@ func (e *PiExecutor) run() {
 	defer close(e.resultCh)
 	defer close(e.done)
 	defer e.cancel()
+	defer e.buffer.flush(e)
+
+	// Periodic flush so buffered text reaches the stream even when the agent
+	// emits slowly (the byte threshold alone would stall until enough deltas
+	// accumulate). Exits when the turn ctx is cancelled below.
+	go e.startFlushTimer()
 
 	// Lazy-start: the first turn seeds LAELIA_COMMAND with its command id. A
 	// session that died between turns is restarted the same way.
@@ -230,30 +249,14 @@ func (e *PiExecutor) handleMessageUpdate(ev *event) {
 			return
 		}
 		_, _ = e.stdoutBuf.WriteString(ame.Delta)
-		e.sendOutput(v1pb.CommandOutput_STDOUT, ame.Delta)
-		e.sendEvent(executor.Event{
-			Type:    v1pb.CommandEventType_TEXT_DELTA,
-			Summary: "text",
-			Text:    ame.Delta,
-			TextDelta: &v1pb.TextDeltaPayload{
-				StreamType: "stdout",
-				Content:    ame.Delta,
-			},
-		})
+		e.buffer.append(v1pb.CommandOutput_STDOUT, ame.Delta)
+		e.flushIfNeeded()
 	case assistantEventThinkingDelta:
 		if ame.Delta == "" {
 			return
 		}
-		e.sendOutput(v1pb.CommandOutput_SYSTEM, ame.Delta)
-		e.sendEvent(executor.Event{
-			Type:    v1pb.CommandEventType_TEXT_DELTA,
-			Summary: "thinking",
-			Text:    ame.Delta,
-			TextDelta: &v1pb.TextDeltaPayload{
-				StreamType: "system",
-				Content:    ame.Delta,
-			},
-		})
+		e.buffer.append(v1pb.CommandOutput_SYSTEM, ame.Delta)
+		e.flushIfNeeded()
 	case assistantEventDone:
 		// message complete; nothing to emit.
 	case assistantEventError:
@@ -280,10 +283,9 @@ func (e *PiExecutor) handleToolStart(ev *event) {
 	e.toolMu.Unlock()
 
 	e.toolCallCount.Add(1)
-	title := ev.ToolName
-	if title == "" {
-		title = "tool"
-	}
+	title := deriveToolTitle(ev.ToolName, ev.Args)
+	// Flush buffered text so it streams before the tool card interleaves.
+	e.buffer.flush(e)
 	e.sendEvent(executor.Event{
 		Type:    v1pb.CommandEventType_TOOL_CALL_STARTED,
 		Summary: title,
@@ -302,6 +304,7 @@ func (e *PiExecutor) handleToolEnd(ev *event) {
 	if ev.IsError {
 		status = "error"
 	}
+	e.buffer.flush(e)
 	e.sendEvent(executor.Event{
 		Type:    v1pb.CommandEventType_TOOL_CALL_FINISHED,
 		Summary: status,
@@ -325,6 +328,92 @@ func (e *PiExecutor) sendOutput(streamType v1pb.CommandOutput_StreamType, conten
 	select {
 	case e.outputCh <- chunk:
 	case <-e.ctx.Done():
+	}
+}
+
+// outputBuffer accumulates STDOUT/SYSTEM text deltas and flushes them as
+// consolidated CommandOutput chunks. Mirrors executor.outputBuffer; duplicated
+// here because that type is unexported. See the PiExecutor.buffer field doc for
+// why batching is required.
+type outputBuffer struct {
+	mu     sync.Mutex
+	stdout strings.Builder
+	system strings.Builder
+	order  []v1pb.CommandOutput_StreamType
+}
+
+func (b *outputBuffer) append(streamType v1pb.CommandOutput_StreamType, text string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	switch streamType {
+	case v1pb.CommandOutput_STDOUT:
+		if b.stdout.Len() == 0 {
+			b.order = append(b.order, streamType)
+		}
+		_, _ = b.stdout.WriteString(text)
+	case v1pb.CommandOutput_SYSTEM:
+		if b.system.Len() == 0 {
+			b.order = append(b.order, streamType)
+		}
+		_, _ = b.system.WriteString(text)
+	default:
+		// Other stream types (STDERR) are sent directly, not buffered.
+	}
+}
+
+func (b *outputBuffer) totalLen() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.stdout.Len() + b.system.Len()
+}
+
+func (b *outputBuffer) flush(e *PiExecutor) {
+	b.mu.Lock()
+	stdout := b.stdout.String()
+	b.stdout.Reset()
+	system := b.system.String()
+	b.system.Reset()
+	order := b.order
+	b.order = b.order[:0]
+	b.mu.Unlock()
+
+	for _, st := range order {
+		switch st {
+		case v1pb.CommandOutput_STDOUT:
+			if stdout != "" {
+				e.sendOutput(v1pb.CommandOutput_STDOUT, stdout)
+				stdout = ""
+			}
+		case v1pb.CommandOutput_SYSTEM:
+			if system != "" {
+				e.sendOutput(v1pb.CommandOutput_SYSTEM, system)
+				system = ""
+			}
+		default:
+		}
+	}
+}
+
+// flushIfNeeded drains the buffer once it crosses the configured byte threshold.
+func (e *PiExecutor) flushIfNeeded() {
+	if e.buffer.totalLen() >= int(e.cfg.OutputFlushBytes) {
+		e.buffer.flush(e)
+	}
+}
+
+// startFlushTimer emits any buffered text on a fixed interval so a slow stream
+// still reaches the UI before the threshold is reached. Exits when the turn ctx
+// is cancelled (run's deferred cancel).
+func (e *PiExecutor) startFlushTimer() {
+	ticker := time.NewTicker(flushOutputInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			e.buffer.flush(e)
+		case <-e.ctx.Done():
+			return
+		}
 	}
 }
 
@@ -409,6 +498,10 @@ func (e *PiExecutor) turnPromptText(resumed bool) string {
 // finish flushes and emits the terminal FinalSummary event and Result, then
 // returns so run() can close the channels.
 func (e *PiExecutor) finish(err error, resumed bool) {
+	// Flush any buffered tail text before the terminal summary so it streams in
+	// order (the deferred flush in run is a no-op safety net after this).
+	e.buffer.flush(e)
+
 	sessionID := e.session.SessionFile()
 
 	finalSummary := strings.TrimSpace(e.stdoutBuf.String())
@@ -461,6 +554,49 @@ func (e *PiExecutor) finish(err error, resumed bool) {
 		SessionID:    sessionID,
 		Resumed:      resumed,
 	}
+}
+
+// deriveToolTitle builds the tool-card title from the tool name + its args, so
+// the card shows the operand directly (e.g. the bash command) instead of just
+// "bash" requiring a click to expand. This mirrors how opencode sets the ACP
+// ToolCall title to the bash command. For a tool whose args carry a "command"
+// field (bash/shell), the command is the title; for read/edit the path is
+// appended; otherwise the tool name is used. The full args remain in the
+// expanded rawInput regardless.
+func deriveToolTitle(toolName string, args json.RawMessage) string {
+	name := toolName
+	if name == "" {
+		name = "tool"
+	}
+	if len(args) == 0 {
+		return name
+	}
+	var m map[string]any
+	if err := json.Unmarshal(args, &m); err != nil {
+		return name
+	}
+	if cmd := stringField(m, "command"); cmd != "" {
+		return cmd
+	}
+	if p := stringField(m, "path", "file_path", "file"); p != "" {
+		return name + " " + p
+	}
+	return name
+}
+
+// stringField returns the first non-empty string value among the given keys in
+// m, or "" if none match.
+func stringField(m map[string]any, keys ...string) string {
+	for _, k := range keys {
+		if v, ok := m[k]; ok {
+			if s, ok := v.(string); ok {
+				if trimmed := strings.TrimSpace(s); trimmed != "" {
+					return s
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // rawJSONToStruct decodes a pi event's json.RawMessage field (args/result) into

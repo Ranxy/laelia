@@ -237,12 +237,13 @@ func TestEventMapping_TextDeltaAndToolCalls(t *testing.T) {
 	defer close(e.resultCh)
 	defer close(e.done)
 
-	// text_delta → STDOUT output + TEXT_DELTA event.
+	// text_delta is buffered (no event, no output yet); the LLM token carries
+	// its own whitespace so concatenated deltas reproduce the original text.
 	e.handleEvent(&event{
 		Type:                  eventMessageUpdate,
 		AssistantMessageEvent: &assistantMessageEvent{Type: assistantEventTextDelta, Delta: "hello"},
 	})
-	// tool start → TOOL_CALL_STARTED.
+	// tool start flushes the buffer (one STDOUT chunk "hello") + TOOL_CALL_STARTED.
 	e.handleEvent(&event{
 		Type:       eventToolExecutionStart,
 		ToolCallID: "tc-1",
@@ -258,27 +259,57 @@ func TestEventMapping_TextDeltaAndToolCalls(t *testing.T) {
 	// agent_settled → terminal.
 	assert.True(t, e.handleEvent(&event{Type: eventAgentSettled}))
 
-	// Drain events: expect 1 output chunk + 3 events (text_delta, started, finished).
+	// Drain: 2 events (started, finished) + 1 buffered STDOUT chunk flushed at
+	// the tool-call boundary. text_delta no longer emits a TEXT_DELTA event
+	// (unused on the frontend; matches ACP, which emits none).
 	var events []executor.Event
+	var outputs []executor.OutputChunk
 	for {
 		select {
 		case ev := <-e.eventCh:
 			events = append(events, ev)
 		case chunk := <-e.outputCh:
-			_ = chunk
+			outputs = append(outputs, chunk)
 		default:
 			goto done
 		}
 	}
 done:
-	require.Len(t, events, 3, "text_delta + tool start + tool end")
-	assert.Equal(t, v1pb.CommandEventType_TEXT_DELTA, events[0].Type)
-	assert.Equal(t, "hello", events[0].TextDelta.Content)
-	assert.Equal(t, v1pb.CommandEventType_TOOL_CALL_STARTED, events[1].Type)
-	assert.Equal(t, "bash", events[1].ToolCallStarted.Title)
-	assert.Equal(t, v1pb.CommandEventType_TOOL_CALL_FINISHED, events[2].Type)
-	assert.Equal(t, "success", events[2].ToolCallFinished.Status)
+	require.Len(t, events, 2, "tool start + tool end")
+	assert.Equal(t, v1pb.CommandEventType_TOOL_CALL_STARTED, events[0].Type)
+	// The bash command is the title (mirrors opencode), not just "bash".
+	assert.Equal(t, "echo hi", events[0].ToolCallStarted.Title)
+	assert.Equal(t, v1pb.CommandEventType_TOOL_CALL_FINISHED, events[1].Type)
+	assert.Equal(t, "success", events[1].ToolCallFinished.Status)
+	require.Len(t, outputs, 1, "buffered text_delta flushed as one STDOUT chunk")
+	assert.Equal(t, v1pb.CommandOutput_STDOUT, outputs[0].StreamType)
+	assert.Equal(t, "hello", outputs[0].Content)
 	assert.Equal(t, int32(1), e.toolCallCount.Load())
+}
+
+// TestDeriveToolTitle covers the tool-card title derivation: the bash command
+// becomes the title; read/edit append the path; unknown shapes fall back to the
+// tool name.
+func TestDeriveToolTitle(t *testing.T) {
+	cases := []struct {
+		name     string
+		toolName string
+		args     json.RawMessage
+		want     string
+	}{
+		{"bash command", "bash", json.RawMessage(`{"command":"echo hi"}`), "echo hi"},
+		{"edit path", "edit", json.RawMessage(`{"path":"notes/channels.md","edits":[]}`), "edit notes/channels.md"},
+		{"read file_path", "read", json.RawMessage(`{"file_path":"src/main.go"}`), "read src/main.go"},
+		{"no args", "bash", nil, "bash"},
+		{"unknown shape", "grep", json.RawMessage(`{"pattern":"foo"}`), "grep"},
+		{"empty command falls back", "bash", json.RawMessage(`{"command":"  "}`), "bash"},
+		{"empty tool name", "", json.RawMessage(`{"command":"ls"}`), "ls"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, deriveToolTitle(tc.toolName, tc.args))
+		})
+	}
 }
 
 // newTestExecutor builds a PiExecutor with a nil-noop session for event-mapping
@@ -286,12 +317,13 @@ done:
 func newTestExecutor(t *testing.T) *PiExecutor {
 	t.Helper()
 	cfg := &PiConfig{
-		APIProvider:    APIProviderDeepseek,
-		Model:          "deepseek-chat",
-		APIKey:         "sk",
-		PiBinaryPath:   "/bin/pi",
-		MaxEventCount:  10000,
-		MaxOutputBytes: 1 << 20,
+		APIProvider:      APIProviderDeepseek,
+		Model:            "deepseek-chat",
+		APIKey:           "sk",
+		PiBinaryPath:     "/bin/pi",
+		MaxEventCount:    10000,
+		MaxOutputBytes:   1 << 20,
+		OutputFlushBytes: defaultOutputFlushBytes,
 	}
 	e := &PiExecutor{
 		cfg:         cfg,
