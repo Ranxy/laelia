@@ -15,6 +15,7 @@ import {
   MEMBERS_ROUTE,
   REMINDER_ROUTE_DETAIL,
   REMINDER_ROUTE_LIST,
+  SETTINGS_ROUTE_CHAT,
   SETTINGS_ROUTE_IAM,
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_PROFILE,
@@ -239,6 +240,14 @@ export const dashboardRoutes: RouteObject[] = [
             lazy: () =>
               import("@/pages/dashboard/settings-storage").then((m) => ({
                 Component: m.SettingsStoragePage,
+              })),
+          },
+          {
+            path: "chat",
+            handle: { name: SETTINGS_ROUTE_CHAT },
+            lazy: () =>
+              import("@/pages/dashboard/settings-chat").then((m) => ({
+                Component: m.SettingsChatPage,
               })),
           },
           {

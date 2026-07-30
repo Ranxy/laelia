@@ -23,3 +23,10 @@ message UserProfile {
   // source means where the user comes from. For now we support Entra ID SCIM sync, so the source could be Entra ID.
   string source = 3;
 }
+
+// ChatPreferences mirrors laelia.v1.ChatPreferences. Stored as jsonb on the
+// principal row; a NULL/absent value means "use the default" (enter_to_send
+// true), so a nil pointer in the store layer signals "unset".
+message ChatPreferences {
+  bool enter_to_send = 1;
+}

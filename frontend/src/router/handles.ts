@@ -16,6 +16,7 @@ export const MEMBERS_ROUTE = "members";
 export const SETTINGS_ROUTE = "settings";
 export const SETTINGS_ROUTE_PROFILE = "settings.profile";
 export const SETTINGS_ROUTE_STORAGE = "settings.storage";
+export const SETTINGS_ROUTE_CHAT = "settings.chat";
 export const SETTINGS_ROUTE_NOTIFICATIONS = "settings.notifications";
 export const SETTINGS_ROUTE_USERS = "settings.users";
 export const SETTINGS_ROUTE_ROLES = "settings.roles";

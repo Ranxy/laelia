@@ -23,6 +23,7 @@ import {
   MACHINE_ROUTE_LIST,
   MEMBERS_ROUTE,
   SETTINGS_ROUTE,
+  SETTINGS_ROUTE_CHAT,
   SETTINGS_ROUTE_IAM,
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_ROLES,
@@ -136,6 +137,11 @@ function useSidebarItems(): SidebarItem[] {
             name: SETTINGS_ROUTE_STORAGE,
             type: "route",
             hide: !canViewStorage,
+          },
+          {
+            title: t("sidebar.settings-chat"),
+            name: SETTINGS_ROUTE_CHAT,
+            type: "route",
           },
           {
             title: t("sidebar.settings-notifications"),

@@ -535,6 +535,10 @@ func (s *UserService) UpdateUser(ctx context.Context, request *connect.Request[v
 			patch.Phone = &request.Msg.User.Phone
 		case "description":
 			patch.Description = &request.Msg.User.Description
+		case "chat_preferences":
+			if v := request.Msg.User.ChatPreferences; v != nil {
+				patch.ChatPreferences = &storepb.ChatPreferences{EnterToSend: v.EnterToSend}
+			}
 		default:
 		}
 	}
@@ -726,6 +730,14 @@ func convertToUser(user *store.UserMessage) *v1pb.User {
 	if user.AvatarS3Key != "" {
 		convertedUser.Avatar = common.FormatUserAvatar(user.ID)
 	}
+
+	// ChatPreferences defaults to enter_to_send = true (the historic behavior)
+	// when the user has never customized it (nil = NULL column).
+	enterToSend := true
+	if user.ChatPreferences != nil {
+		enterToSend = user.ChatPreferences.EnterToSend
+	}
+	convertedUser.ChatPreferences = &v1pb.ChatPreferences{EnterToSend: enterToSend}
 
 	for _, group := range user.Groups {
 		convertedUser.Groups = append(convertedUser.Groups, common.FormatGroupEmail(group))

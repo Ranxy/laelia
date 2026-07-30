@@ -52,6 +52,10 @@ export function CommentsAside({
   const currentPrincipalId = useAppStore((s) =>
     s.currentUser?.name.split("/").pop()
   );
+  // Per-user chat keybinding (see chat-conversation.tsx for rationale).
+  const enterToSend = useAppStore(
+    (s) => s.currentUser?.chatPreferences?.enterToSend ?? true
+  );
 
   const [pendingAnchor, setPendingAnchor] = useState<CommentAnchor | null>(
     null
@@ -182,7 +186,10 @@ export function CommentsAside({
             rows={2}
             className="max-h-32 min-h-10 resize-none border-0 bg-transparent text-sm focus-visible:ring-0"
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (e.nativeEvent.isComposing) return;
+              if (e.key !== "Enter") return;
+              const wantSend = enterToSend ? !e.shiftKey : e.shiftKey;
+              if (wantSend) {
                 e.preventDefault();
                 handleSend();
               }
@@ -191,7 +198,11 @@ export function CommentsAside({
           <div className="flex items-center justify-between gap-2 px-1.5 pb-1.5">
             <span className="text-[10px] text-control-placeholder">
               {pendingAnchor
-                ? t("preview.comments-ready")
+                ? t(
+                    enterToSend
+                      ? "preview.comments-ready"
+                      : "preview.comments-ready-inverted"
+                  )
                 : t("preview.comments-select-hint")}
             </span>
             <Button

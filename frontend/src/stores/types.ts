@@ -28,7 +28,10 @@ import type {
   MachineSummary,
   RotateMachineTokenResponse,
 } from "@/types/proto-es/v1/machine_pb";
-import type { User } from "@/types/proto-es/v1/user_service_pb";
+import type {
+  ChatPreferences,
+  User,
+} from "@/types/proto-es/v1/user_service_pb";
 
 export interface ChatMessageUI {
   id: string;
@@ -126,6 +129,7 @@ export interface UserSlice {
       email?: string;
       phone?: string;
       description?: string;
+      chatPreferences?: ChatPreferences;
     },
     maskPaths: string[]
   ) => Promise<User>;

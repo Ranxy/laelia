@@ -479,6 +479,10 @@
             <ul>
               
                 <li>
+                  <a href="#laelia.store.ChatPreferences"><span class="badge">M</span>ChatPreferences</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.store.UserProfile"><span class="badge">M</span>UserProfile</a>
                 </li>
               
@@ -3058,6 +3062,30 @@ endpoints directly. Only http:// and https:// schemes are supported. </p></td>
       </div>
       <p></p>
 
+      
+        <h3 id="laelia.store.ChatPreferences">ChatPreferences</h3>
+        <p>ChatPreferences mirrors laelia.v1.ChatPreferences. Stored as jsonb on the</p><p>principal row; a NULL/absent value means "use the default" (enter_to_send</p><p>true), so a nil pointer in the store layer signals "unset".</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>enter_to_send</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
       
         <h3 id="laelia.store.UserProfile">UserProfile</h3>
         <p></p>

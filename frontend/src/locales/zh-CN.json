@@ -68,7 +68,8 @@
     "settings-users": "用户管理",
     "settings-roles": "角色",
     "settings-iam": "访问控制",
-    "settings-notifications": "通知"
+    "settings-notifications": "通知",
+    "settings-chat": "聊天"
   },
   "settings": {
     "title": "设置",
@@ -111,6 +112,14 @@
       "proxy-saved": "代理已保存",
       "proxy-invalid": "代理地址无效。请使用 http:// 或 https:// 开头的地址。",
       "proxy-save-failed": "保存代理失败"
+    },
+    "chat": {
+      "title": "聊天",
+      "description": "聊天输入框的个人偏好。修改后立即生效,仅对你本人有效,并随账号在不同设备间同步。",
+      "enter-to-send": "按 Enter 发送消息",
+      "enter-to-send-hint": "开启时:Enter 发送消息,Shift+Enter 换行。关闭后则相反:Enter 换行,Shift+Enter 发送。",
+      "saved": "聊天偏好已保存",
+      "save-failed": "保存聊天偏好失败"
     },
     "s3": {
       "title": "存储配置",
@@ -564,6 +573,7 @@
     "allow-always": "始终允许",
     "deny": "拒绝",
     "send-hint": "Enter 发送 · Shift+Enter 换行",
+    "send-hint-inverted": "Shift+Enter 发送 · Enter 换行",
     "tool-input": "输入",
     "tool-output": "输出",
     "input-not-captured": "未捕获输入",
@@ -593,6 +603,7 @@
     "comments-placeholder": "对 {{name}} 发表评论…",
     "comments-select-hint": "在文档中框选文本，为评论锚定段落。",
     "comments-ready": "已锚定段落，按 Enter 发送。",
+    "comments-ready-inverted": "已锚定段落，按 Shift+Enter 发送。",
     "comments-send": "发送评论",
     "image-load-failed": "无法加载该图片。"
   },

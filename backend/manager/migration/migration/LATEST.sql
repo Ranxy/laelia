@@ -43,6 +43,12 @@ ALTER TABLE principal ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT
 -- Idempotent ALTER for the avatar_s3_key column (see comment above).
 ALTER TABLE principal ADD COLUMN IF NOT EXISTS avatar_s3_key text NOT NULL DEFAULT '';
 
+-- Idempotent ALTER for the chat_preferences column. Nullable: a NULL value
+-- means "use the default" (enter_to_send = true, the historic behavior); only
+-- an explicit user write persists a real value. Stored as ChatPreferences
+-- (proto/store/store/user.proto).
+ALTER TABLE principal ADD COLUMN IF NOT EXISTS chat_preferences jsonb;
+
 -- Setting
 CREATE TABLE setting (
     id serial PRIMARY KEY,

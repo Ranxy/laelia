@@ -68,7 +68,8 @@
     "settings-users": "Users",
     "settings-roles": "Roles",
     "settings-iam": "Access",
-    "settings-notifications": "Notifications"
+    "settings-notifications": "Notifications",
+    "settings-chat": "Chat"
   },
   "settings": {
     "title": "Settings",
@@ -111,6 +112,14 @@
       "proxy-saved": "Proxy saved",
       "proxy-invalid": "Invalid proxy URL. Use an http:// or https:// URL.",
       "proxy-save-failed": "Failed to save proxy"
+    },
+    "chat": {
+      "title": "Chat",
+      "description": "Per-user chat composer preferences. Changes take effect immediately and only apply to you, following your account across devices.",
+      "enter-to-send": "Enter to send",
+      "enter-to-send-hint": "When on, pressing Enter sends the message and Shift+Enter inserts a newline. Turn off to invert: Enter inserts a newline and Shift+Enter sends.",
+      "saved": "Chat preference saved",
+      "save-failed": "Failed to save chat preference"
     },
     "s3": {
       "title": "Storage",
@@ -564,6 +573,7 @@
     "allow-always": "Allow Always",
     "deny": "Deny",
     "send-hint": "Enter to send · Shift+Enter for newline",
+    "send-hint-inverted": "Shift+Enter to send · Enter for newline",
     "tool-input": "Input",
     "tool-output": "Output",
     "input-not-captured": "Input not captured",
@@ -593,6 +603,7 @@
     "comments-placeholder": "Comment on {{name}}…",
     "comments-select-hint": "Select text in the document to anchor your comment.",
     "comments-ready": "Anchored — press Enter to send.",
+    "comments-ready-inverted": "Anchored — press Shift+Enter to send.",
     "comments-send": "Send comment",
     "image-load-failed": "Couldn't load this image."
   },

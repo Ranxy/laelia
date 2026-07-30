@@ -129,6 +129,10 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const removeChannelMember = useAppStore((s) => s.removeChannelMember);
   const markConversationRead = useAppStore((s) => s.markConversationRead);
   const currentUser = useAppStore((s) => s.currentUser);
+  // Per-user chat keybinding: Enter sends (default) or, when the user has
+  // inverted it in Settings, Shift+Enter sends. Reactive so a settings change
+  // takes effect on the next render without a reload.
+  const enterToSend = currentUser?.chatPreferences?.enterToSend ?? true;
   const fetchAgents = useAppStore((s) => s.fetchAgents);
   const fetchChannels = useAppStore((s) => s.fetchChannels);
   const openThread = useAppStore((s) => s.openThread);
@@ -1029,7 +1033,10 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                           return;
                         }
                       }
-                      if (e.key === "Enter" && !e.shiftKey) {
+                      if (e.nativeEvent.isComposing) return;
+                      if (e.key !== "Enter") return;
+                      const wantSend = enterToSend ? !e.shiftKey : e.shiftKey;
+                      if (wantSend) {
                         e.preventDefault();
                         handleSend();
                       }
@@ -1093,7 +1100,11 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                         </span>
                       </button>
                       <span className="text-xs text-control-placeholder">
-                        {t("chat.send-hint")}
+                        {t(
+                          enterToSend
+                            ? "chat.send-hint"
+                            : "chat.send-hint-inverted"
+                        )}
                       </span>
                     </div>
                     <Button

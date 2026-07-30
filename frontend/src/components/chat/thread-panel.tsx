@@ -95,6 +95,8 @@ export function ThreadPanel({
   const agents = useAppStore((s) => s.agents);
   const openImagePreview = useAppStore((s) => s.openImagePreview);
   const currentUser = useAppStore((s) => s.currentUser);
+  // Per-user chat keybinding (see chat-conversation.tsx for rationale).
+  const enterToSend = currentUser?.chatPreferences?.enterToSend ?? true;
   const navigate = useNavigate();
 
   const messages = thread?.messages ?? EMPTY_THREAD;
@@ -528,7 +530,10 @@ export function ThreadPanel({
                       return;
                     }
                   }
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.nativeEvent.isComposing) return;
+                  if (e.key !== "Enter") return;
+                  const wantSend = enterToSend ? !e.shiftKey : e.shiftKey;
+                  if (wantSend) {
                     e.preventDefault();
                     handleSend();
                   }

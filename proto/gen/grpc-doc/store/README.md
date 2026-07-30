@@ -79,6 +79,7 @@
     - [SettingName](#laelia-store-SettingName)
   
 - [store/user.proto](#store_user-proto)
+    - [ChatPreferences](#laelia-store-ChatPreferences)
     - [UserProfile](#laelia-store-UserProfile)
   
     - [PrincipalType](#laelia-store-PrincipalType)
@@ -1153,6 +1154,23 @@ IP validation policy for agent connections.
 <p align="right"><a href="#top">Top</a></p>
 
 ## store/user.proto
+
+
+
+<a name="laelia-store-ChatPreferences"></a>
+
+### ChatPreferences
+ChatPreferences mirrors laelia.v1.ChatPreferences. Stored as jsonb on the
+principal row; a NULL/absent value means &#34;use the default&#34; (enter_to_send
+true), so a nil pointer in the store layer signals &#34;unset&#34;.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| enter_to_send | [bool](#bool) |  |  |
+
+
+
 
 
 

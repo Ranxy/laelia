@@ -74,6 +74,7 @@
 - [v1/user_service.proto](#v1_user_service-proto)
     - [BatchGetUsersRequest](#laelia-v1-BatchGetUsersRequest)
     - [BatchGetUsersResponse](#laelia-v1-BatchGetUsersResponse)
+    - [ChatPreferences](#laelia-v1-ChatPreferences)
     - [CreateUserRequest](#laelia-v1-CreateUserRequest)
     - [DeleteAvatarRequest](#laelia-v1-DeleteAvatarRequest)
     - [DeleteUserRequest](#laelia-v1-DeleteUserRequest)
@@ -1394,6 +1395,23 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 
 
 
+<a name="laelia-v1-ChatPreferences"></a>
+
+### ChatPreferences
+ChatPreferences holds per-user chat composer preferences. Only the user
+themselves sees the effect; stored per principal so it follows the account
+across devices/browsers.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| enter_to_send | [bool](#bool) |  | enter_to_send is true when pressing Enter sends the message and Shift&#43;Enter inserts a newline (the historic default). When false the keybinding is inverted: Enter inserts a newline and Shift&#43;Enter sends. |
+
+
+
+
+
+
 <a name="laelia-v1-CreateUserRequest"></a>
 
 ### CreateUserRequest
@@ -1600,6 +1618,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | permissions | [string](#string) | repeated | permissions is the caller&#39;s effective workspace-scope permission set (roles/workspaceMember baseline ∪ the permissions of every workspace role the user holds), populated only by GetCurrentUser. The frontend gates workspace actions on this (e.g. laelia.users.update). Per-resource permissions (conversations.read/send/manage, agents.edit) are resolved per resource and surfaced on the resource, not here. |
 | debug_mode | [bool](#bool) |  | debug_mode is true when RuntimeDebug is enabled for the workspace. Populated only by GetCurrentUser so the frontend can gate debug-only UI without calling the admin-gated SettingService.GetDebugConfig. |
 | avatar | [string](#string) |  | avatar is the resource name of the user&#39;s uploaded avatar image, or empty when the user has not uploaded one (in which case the frontend renders a deterministic pixel identicon seeded by the user id). Format: users/{user}/avatar. |
+| chat_preferences | [ChatPreferences](#laelia-v1-ChatPreferences) |  | chat_preferences holds per-user chat composer preferences. Editable via UpdateUser with update_mask &#34;chat_preferences&#34;. When unset (the user has never customized it) the server returns the default {enter_to_send = true} so the historic behavior is preserved. |
 
 
 

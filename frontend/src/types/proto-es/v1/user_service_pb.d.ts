@@ -372,6 +372,16 @@ export declare type User = Message<"laelia.v1.User"> & {
    * @generated from field: string avatar = 19;
    */
   avatar: string;
+
+  /**
+   * chat_preferences holds per-user chat composer preferences. Editable via
+   * UpdateUser with update_mask "chat_preferences". When unset (the user has
+   * never customized it) the server returns the default {enter_to_send = true}
+   * so the historic behavior is preserved.
+   *
+   * @generated from field: laelia.v1.ChatPreferences chat_preferences = 20;
+   */
+  chatPreferences?: ChatPreferences | undefined;
 };
 
 /**
@@ -379,6 +389,30 @@ export declare type User = Message<"laelia.v1.User"> & {
  * Use `create(UserSchema)` to create a new message.
  */
 export declare const UserSchema: GenMessage<User>;
+
+/**
+ * ChatPreferences holds per-user chat composer preferences. Only the user
+ * themselves sees the effect; stored per principal so it follows the account
+ * across devices/browsers.
+ *
+ * @generated from message laelia.v1.ChatPreferences
+ */
+export declare type ChatPreferences = Message<"laelia.v1.ChatPreferences"> & {
+  /**
+   * enter_to_send is true when pressing Enter sends the message and Shift+Enter
+   * inserts a newline (the historic default). When false the keybinding is
+   * inverted: Enter inserts a newline and Shift+Enter sends.
+   *
+   * @generated from field: bool enter_to_send = 1;
+   */
+  enterToSend: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.ChatPreferences.
+ * Use `create(ChatPreferencesSchema)` to create a new message.
+ */
+export declare const ChatPreferencesSchema: GenMessage<ChatPreferences>;
 
 /**
  * @generated from message laelia.v1.UserProfile

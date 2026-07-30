@@ -128,7 +128,8 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
       // Pinning: move the item to the very top (most-recently-pinned first).
       // Unpinning: re-sort the full list so the released item falls to its
       // time-based spot among the non-pinned group.
-      const ordered = pinned && target ? [target, ...rest] : reorderChannels(channels);
+      const ordered =
+        pinned && target ? [target, ...rest] : reorderChannels(channels);
       return { channels: ordered };
     });
     try {

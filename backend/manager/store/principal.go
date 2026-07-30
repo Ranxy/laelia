@@ -39,13 +39,14 @@ type FindUserMessage struct {
 
 // UpdateUserMessage is the message to update a user.
 type UpdateUserMessage struct {
-	Email        *string
-	Name         *string
-	PasswordHash *string
-	Delete       *bool
-	Profile      *models.UserProfile
-	Phone        *string
-	Description  *string
+	Email           *string
+	Name            *string
+	PasswordHash    *string
+	Delete          *bool
+	Profile         *models.UserProfile
+	Phone           *string
+	Description     *string
+	ChatPreferences *models.ChatPreferences
 }
 
 // UserMessage is the message for an user.
@@ -70,6 +71,11 @@ type UserMessage struct {
 	// AvatarS3Key is the S3 object key of the user's uploaded avatar image, empty
 	// when the user has not uploaded one (the frontend renders a pixel identicon).
 	AvatarS3Key string
+	// ChatPreferences holds per-user chat composer preferences. A nil pointer
+	// means "unset" (the column is NULL): the API layer surfaces the default
+	// (enter_to_send = true) so the historic behavior is preserved until the
+	// user explicitly customizes it.
+	ChatPreferences *models.ChatPreferences
 }
 
 // GetResourceID returns the stable per-user resource name used to key
@@ -356,7 +362,8 @@ func buildListUsersQuery(find *FindUserMessage) (string, []any) {
 		principal.created_at,
 		user_groups.groups,
 		principal.description,
-		principal.avatar_s3_key
+		principal.avatar_s3_key,
+		principal.chat_preferences
 	FROM principal
 	INNER JOIN user_groups ON principal.id = user_groups.user_id
 	` + join + ` WHERE ` + strings.Join(where, " AND ") + ` ORDER BY type DESC, created_at ASC`
@@ -382,6 +389,7 @@ func listUserImpl(ctx context.Context, txn *sql.Tx, find *FindUserMessage) ([]*U
 	for rows.Next() {
 		var userMessage UserMessage
 		var profileBytes []byte
+		var chatPrefBytes []byte
 		var typeString string
 		var groups pq.StringArray
 		if err := rows.Scan(
@@ -397,6 +405,7 @@ func listUserImpl(ctx context.Context, txn *sql.Tx, find *FindUserMessage) ([]*U
 			&groups,
 			&userMessage.Description,
 			&userMessage.AvatarS3Key,
+			&chatPrefBytes,
 		); err != nil {
 			return nil, err
 		}
@@ -412,6 +421,14 @@ func listUserImpl(ctx context.Context, txn *sql.Tx, find *FindUserMessage) ([]*U
 			return nil, err
 		}
 		userMessage.Profile = &profile
+
+		if len(chatPrefBytes) > 0 {
+			chatPrefs := &models.ChatPreferences{}
+			if err := json.Unmarshal(chatPrefBytes, chatPrefs); err != nil {
+				return nil, err
+			}
+			userMessage.ChatPreferences = chatPrefs
+		}
 
 		userMessages = append(userMessages, &userMessage)
 	}
@@ -521,6 +538,13 @@ func (s *Store) UpdateUser(ctx context.Context, currentUser *UserMessage, patch 
 	}
 	if v := patch.Description; v != nil {
 		principalSet, principalArgs = append(principalSet, fmt.Sprintf("description = $%d", len(principalArgs)+1)), append(principalArgs, *v)
+	}
+	if v := patch.ChatPreferences; v != nil {
+		chatPrefsBytes, err := json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+		principalSet, principalArgs = append(principalSet, fmt.Sprintf("chat_preferences = $%d", len(principalArgs)+1)), append(principalArgs, chatPrefsBytes)
 	}
 	principalArgs = append(principalArgs, currentUser.ID)
 

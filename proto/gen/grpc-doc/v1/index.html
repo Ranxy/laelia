@@ -452,6 +452,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ChatPreferences"><span class="badge">M</span>ChatPreferences</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.CreateUserRequest"><span class="badge">M</span>CreateUserRequest</a>
                 </li>
               
@@ -4156,6 +4160,32 @@ Format: users/{user uid or user email} </p></td>
 
         
       
+        <h3 id="laelia.v1.ChatPreferences">ChatPreferences</h3>
+        <p>ChatPreferences holds per-user chat composer preferences. Only the user</p><p>themselves sees the effect; stored per principal so it follows the account</p><p>across devices/browsers.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>enter_to_send</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>enter_to_send is true when pressing Enter sends the message and Shift&#43;Enter
+inserts a newline (the historic default). When false the keybinding is
+inverted: Enter inserts a newline and Shift&#43;Enter sends. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.CreateUserRequest">CreateUserRequest</h3>
         <p></p>
 
@@ -4658,6 +4688,16 @@ without calling the admin-gated SettingService.GetDebugConfig. </p></td>
                   <td><p>avatar is the resource name of the user&#39;s uploaded avatar image, or empty
 when the user has not uploaded one (in which case the frontend renders a
 deterministic pixel identicon seeded by the user id). Format: users/{user}/avatar. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>chat_preferences</td>
+                  <td><a href="#laelia.v1.ChatPreferences">ChatPreferences</a></td>
+                  <td></td>
+                  <td><p>chat_preferences holds per-user chat composer preferences. Editable via
+UpdateUser with update_mask &#34;chat_preferences&#34;. When unset (the user has
+never customized it) the server returns the default {enter_to_send = true}
+so the historic behavior is preserved. </p></td>
                 </tr>
               
             </tbody>

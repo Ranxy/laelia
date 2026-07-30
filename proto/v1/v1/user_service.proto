@@ -280,6 +280,22 @@ message User {
   // when the user has not uploaded one (in which case the frontend renders a
   // deterministic pixel identicon seeded by the user id). Format: users/{user}/avatar.
   string avatar = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // chat_preferences holds per-user chat composer preferences. Editable via
+  // UpdateUser with update_mask "chat_preferences". When unset (the user has
+  // never customized it) the server returns the default {enter_to_send = true}
+  // so the historic behavior is preserved.
+  ChatPreferences chat_preferences = 20;
+}
+
+// ChatPreferences holds per-user chat composer preferences. Only the user
+// themselves sees the effect; stored per principal so it follows the account
+// across devices/browsers.
+message ChatPreferences {
+  // enter_to_send is true when pressing Enter sends the message and Shift+Enter
+  // inserts a newline (the historic default). When false the keybinding is
+  // inverted: Enter inserts a newline and Shift+Enter sends.
+  bool enter_to_send = 1;
 }
 
 enum UserType {
