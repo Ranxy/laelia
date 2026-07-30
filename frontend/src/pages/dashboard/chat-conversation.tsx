@@ -815,7 +815,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             onScroll={handleScroll}
             className="flex-1 overflow-y-auto"
           >
-            <div className="mx-auto flex max-w-3xl flex-col gap-4 px-6 pt-6 pb-4">
+            <div className="flex flex-col gap-4 px-6 pt-6 pb-4">
               {/* LoadingState only when there's genuinely nothing to show yet.
                   On a revisit cached messages are already in the store, so a
                   background refetch (which flips chatLoading true) must NOT hide
@@ -890,13 +890,13 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
               writable, mirroring task/reminder: the user replies inline. */}
           <div className="shrink-0 bg-background">
             {isAgentDm ? (
-              <div className="mx-auto max-w-3xl px-6 py-4">
+              <div className="px-6 py-4">
                 <div className="rounded-2xl border border-control-border bg-control-bg/40 px-4 py-3 text-center text-xs text-control-placeholder">
                   {t("chat.agent-dm-view-only")}
                 </div>
               </div>
             ) : (
-              <div className="mx-auto max-w-3xl px-6 pb-5 pt-2">
+              <div className="px-6 pb-5 pt-2">
                 <div
                   className="rounded-2xl border border-control-border bg-control-bg/40 focus-within:border-accent focus-within:bg-background transition-colors"
                   onDragOver={(e) => {
