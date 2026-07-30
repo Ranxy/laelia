@@ -324,6 +324,13 @@ export interface ChannelSlice {
   fetchChannelsForAgent: (agentName: string) => Promise<void>;
   createChannel: (title: string) => Promise<Conversation>;
   markConversationRead: (conversationId: string) => Promise<void>;
+  // Pin or unpin a conversation for the current user. Pinned channels/DMs sort
+  // to the top of the left-rail list and stay there regardless of last message
+  // time. Optimistically reorders the local channel list; refetches on error.
+  setConversationPinned: (
+    conversationId: string,
+    pinned: boolean
+  ) => Promise<void>;
   sendChannelMessage: (
     conversationId: string,
     content: string,

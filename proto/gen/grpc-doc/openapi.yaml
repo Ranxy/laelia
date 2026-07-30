@@ -2066,6 +2066,37 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}:setPinned:
+        post:
+            tags:
+                - CommandService
+            operationId: CommandService_SetConversationPinned
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SetConversationPinnedRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/SetConversationPinnedResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/conversations/{conversation}:transferOwnership:
         post:
             tags:
@@ -4471,6 +4502,13 @@ components:
                          ("users/<id>" for a user peer, "agents/<id>" for an agent peer). Empty for
                          channels (type 2) and when no peer can be resolved. Lets list viewers fetch
                          the peer's avatar without an extra member lookup.
+                pinned:
+                    type: boolean
+                    description: |-
+                        pinned is the requesting user's per-conversation pin state
+                         (conversation_member.pinned). Pinned channels/DMs stay at the top of the
+                         left-rail list regardless of last message time. Per-user: each viewer has
+                         their own pins. Populated by ListChannels and GetChannel for a user viewer.
         ConvertMessageToReminderRequest:
             required:
                 - message
@@ -5782,6 +5820,24 @@ components:
                     $ref: '#/components/schemas/IamPolicy'
                 etag:
                     type: string
+        SetConversationPinnedRequest:
+            required:
+                - conversation
+            type: object
+            properties:
+                conversation:
+                    type: string
+                pinned:
+                    type: boolean
+            description: |-
+                SetConversationPinned sets or clears the requesting user's per-conversation
+                 pin. Pinning a channel or DM keeps it at the top of the user's left-rail
+                 list independent of last message time. Per-user state
+                 (conversation_member.pinned/pinned_at); only the caller's own pin is
+                 affected.
+        SetConversationPinnedResponse:
+            type: object
+            properties: {}
         SetWorkspaceIamPolicyRequest:
             required:
                 - policy

@@ -97,6 +97,10 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 			}
 		}
 		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, peerName, peerResource, memberCount, uc.UnreadCount, title, 0))
+		// pinned is the requesting user's per-conversation pin state; the list
+		// query already returns pinned-first, this just surfaces the flag so the
+		// frontend can render a pin indicator.
+		v1Convs[len(v1Convs)-1].Pinned = uc.Pinned
 	}
 
 	return connect.NewResponse(&v1pb.ListChannelsResponse{
@@ -224,15 +228,23 @@ func (s *CommandService) GetChannel(ctx context.Context, req *connect.Request[v1
 	// meaningful for a user viewer; an agent caller (or a missing cursor row)
 	// yields 0, which the frontend treats as caught-up.
 	readVersion := int64(0)
+	pinned := false
 	if viewerUserID != 0 {
 		if rv, found, err := s.store.GetUserReadCursor(ctx, viewerUserID, conv.ID); err != nil {
 			slog.Warn("failed to read user channel cursor", "conversationID", conv.ID, "error", err)
 		} else if found {
 			readVersion = rv
 		}
+		if p, err := s.store.GetConversationPinned(ctx, conv.ID, viewerUserID); err != nil {
+			slog.Warn("failed to read conversation pinned", "conversationID", conv.ID, "error", err)
+		} else {
+			pinned = p
+		}
 	}
 
-	return connect.NewResponse(convertToV1Conversation(conv, ownerName, peer.name, peer.resource, memberCount, 0, title, readVersion)), nil
+	resp := convertToV1Conversation(conv, ownerName, peer.name, peer.resource, memberCount, 0, title, readVersion)
+	resp.Pinned = pinned
+	return connect.NewResponse(resp), nil
 }
 
 func (s *CommandService) UpdateChannel(ctx context.Context, req *connect.Request[v1pb.UpdateChannelRequest]) (*connect.Response[v1pb.Conversation], error) {
@@ -1054,6 +1066,27 @@ func (s *CommandService) MarkConversationRead(ctx context.Context, req *connect.
 		slog.Warn("failed to mark conversation activities read", "conversationID", convID, "userID", user.ID, "error", err)
 	}
 	return connect.NewResponse(&v1pb.MarkConversationReadResponse{ReadVersion: readVersion}), nil
+}
+
+func (s *CommandService) SetConversationPinned(ctx context.Context, req *connect.Request[v1pb.SetConversationPinnedRequest]) (*connect.Response[v1pb.SetConversationPinnedResponse], error) {
+	convID, err := parseConversationID(req.Msg.Conversation)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
+	}
+	user, ok := GetUserFromContext(ctx)
+	if !ok || user == nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("SetConversationPinned is for authenticated users"))
+	}
+	// SetConversationPinned updates the caller's own membership row; a missing
+	// row (non-member) returns ErrConversationMemberNotFound, which doubles as
+	// the membership gate so only members can pin.
+	if err := s.store.SetConversationPinned(ctx, convID, user.ID, req.Msg.Pinned); err != nil {
+		if errors.Is(err, store.ErrConversationMemberNotFound) {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("must be a member to pin a conversation"))
+		}
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to set conversation pinned"))
+	}
+	return connect.NewResponse(&v1pb.SetConversationPinnedResponse{}), nil
 }
 
 func resolveMemberDisplayName(ctx context.Context, s *store.Store, memberType int32, memberID string) string {

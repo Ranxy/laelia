@@ -229,6 +229,8 @@
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
     - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
     - [SendMessageRequest](#laelia-v1-SendMessageRequest)
+    - [SetConversationPinnedRequest](#laelia-v1-SetConversationPinnedRequest)
+    - [SetConversationPinnedResponse](#laelia-v1-SetConversationPinnedResponse)
     - [TaskInfo](#laelia-v1-TaskInfo)
     - [TextDeltaPayload](#laelia-v1-TextDeltaPayload)
     - [ThreadUpdate](#laelia-v1-ThreadUpdate)
@@ -2407,6 +2409,7 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | address | [string](#string) |  | address is the name-based display address for this conversation, the form agents write and read: &#34;#&lt;title&gt;&#34; for a channel (type 2), &#34;dm:@&lt;peer&gt;&#34; for a direct message (type 1 peer is the user, type 3 peer is the other agent, type 4 peer is the other user). Empty when the address is not applicable. Populated by the single builder convertToV1Conversation so every emit site renders the same form. |
 | read_version | [int64](#int64) |  | read_version is the requesting user&#39;s per-conversation read cursor (user_channel_cursor.read_version) — the room_version of the last message the user has read. Populated by GetChannel for a user viewer so the Activity detail embed can scroll to the first unread message (the user&#39;s last-read position) instead of the latest message. 0 when the caller is not a user or has no cursor row (treated as caught-up). |
 | peer | [string](#string) |  | peer is the DM peer&#39;s resource name from the viewer&#39;s perspective (&#34;users/&lt;id&gt;&#34; for a user peer, &#34;agents/&lt;id&gt;&#34; for an agent peer). Empty for channels (type 2) and when no peer can be resolved. Lets list viewers fetch the peer&#39;s avatar without an extra member lookup. |
+| pinned | [bool](#bool) |  | pinned is the requesting user&#39;s per-conversation pin state (conversation_member.pinned). Pinned channels/DMs stay at the top of the left-rail list regardless of last message time. Per-user: each viewer has their own pins. Populated by ListChannels and GetChannel for a user viewer. |
 
 
 
@@ -4013,6 +4016,36 @@ creates one. Powers the &#34;#&lt;title&gt;&#34; address resolver.
 
 
 
+<a name="laelia-v1-SetConversationPinnedRequest"></a>
+
+### SetConversationPinnedRequest
+SetConversationPinned sets or clears the requesting user&#39;s per-conversation
+pin. Pinning a channel or DM keeps it at the top of the user&#39;s left-rail
+list independent of last message time. Per-user state
+(conversation_member.pinned/pinned_at); only the caller&#39;s own pin is
+affected.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| pinned | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SetConversationPinnedResponse"></a>
+
+### SetConversationPinnedResponse
+
+
+
+
+
+
+
 <a name="laelia-v1-TaskInfo"></a>
 
 ### TaskInfo
@@ -4554,6 +4587,7 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | AckProcessedVersion | [AckProcessedVersionRequest](#laelia-v1-AckProcessedVersionRequest) | [AckProcessedVersionResponse](#laelia-v1-AckProcessedVersionResponse) |  |
 | FetchConversationActivity | [FetchConversationActivityRequest](#laelia-v1-FetchConversationActivityRequest) | [FetchConversationActivityResponse](#laelia-v1-FetchConversationActivityResponse) |  |
 | MarkConversationRead | [MarkConversationReadRequest](#laelia-v1-MarkConversationReadRequest) | [MarkConversationReadResponse](#laelia-v1-MarkConversationReadResponse) |  |
+| SetConversationPinned | [SetConversationPinnedRequest](#laelia-v1-SetConversationPinnedRequest) | [SetConversationPinnedResponse](#laelia-v1-SetConversationPinnedResponse) |  |
 | UploadFile | [UploadFileRequest](#laelia-v1-UploadFileRequest) | [File](#laelia-v1-File) | UploadFile stores data in S3 and persists a file row. Intended for the agent daemon (browser uploads go through the Echo multipart route). No google.api.http annotation: the agent reaches it via Connect-JSON over the CommandServiceClient, and avoiding a /v1/files/{id} gateway entry keeps it from colliding with the browser download route. |
 | DownloadFile | [DownloadFileRequest](#laelia-v1-DownloadFileRequest) | [DownloadFileResponse](#laelia-v1-DownloadFileResponse) | DownloadFile fetches a file&#39;s bytes from S3. The caller must be a member of the file&#39;s conversation. Used by the agent daemon; browser downloads go through the Echo route. |
 | ListFiles | [ListFilesRequest](#laelia-v1-ListFilesRequest) | [ListFilesResponse](#laelia-v1-ListFilesResponse) | ListFiles returns the files attached to a conversation. The caller must be a member. |

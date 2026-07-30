@@ -1185,6 +1185,16 @@ export declare type Conversation = Message<"laelia.v1.Conversation"> & {
    * @generated from field: string peer = 13;
    */
   peer: string;
+
+  /**
+   * pinned is the requesting user's per-conversation pin state
+   * (conversation_member.pinned). Pinned channels/DMs stay at the top of the
+   * left-rail list regardless of last message time. Per-user: each viewer has
+   * their own pins. Populated by ListChannels and GetChannel for a user viewer.
+   *
+   * @generated from field: bool pinned = 14;
+   */
+  pinned: boolean;
 };
 
 /**
@@ -3341,6 +3351,45 @@ export declare type MarkConversationReadResponse = Message<"laelia.v1.MarkConver
 export declare const MarkConversationReadResponseSchema: GenMessage<MarkConversationReadResponse>;
 
 /**
+ * SetConversationPinned sets or clears the requesting user's per-conversation
+ * pin. Pinning a channel or DM keeps it at the top of the user's left-rail
+ * list independent of last message time. Per-user state
+ * (conversation_member.pinned/pinned_at); only the caller's own pin is
+ * affected.
+ *
+ * @generated from message laelia.v1.SetConversationPinnedRequest
+ */
+export declare type SetConversationPinnedRequest = Message<"laelia.v1.SetConversationPinnedRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: bool pinned = 2;
+   */
+  pinned: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.SetConversationPinnedRequest.
+ * Use `create(SetConversationPinnedRequestSchema)` to create a new message.
+ */
+export declare const SetConversationPinnedRequestSchema: GenMessage<SetConversationPinnedRequest>;
+
+/**
+ * @generated from message laelia.v1.SetConversationPinnedResponse
+ */
+export declare type SetConversationPinnedResponse = Message<"laelia.v1.SetConversationPinnedResponse"> & {
+};
+
+/**
+ * Describes the message laelia.v1.SetConversationPinnedResponse.
+ * Use `create(SetConversationPinnedResponseSchema)` to create a new message.
+ */
+export declare const SetConversationPinnedResponseSchema: GenMessage<SetConversationPinnedResponse>;
+
+/**
  * Activity is one item in a user's per-user activity feed. Each item corresponds
  * to a single chat_message relevant to the user, tagged with the category(ies)
  * that made it relevant. The message itself is the source of truth for
@@ -5129,6 +5178,14 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof MarkConversationReadRequestSchema;
     output: typeof MarkConversationReadResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.SetConversationPinned
+   */
+  setConversationPinned: {
+    methodKind: "unary";
+    input: typeof SetConversationPinnedRequestSchema;
+    output: typeof SetConversationPinnedResponseSchema;
   },
   /**
    * UploadFile stores data in S3 and persists a file row. Intended for the

@@ -401,6 +401,11 @@ message Conversation {
   // channels (type 2) and when no peer can be resolved. Lets list viewers fetch
   // the peer's avatar without an extra member lookup.
   string peer = 13;
+  // pinned is the requesting user's per-conversation pin state
+  // (conversation_member.pinned). Pinned channels/DMs stay at the top of the
+  // left-rail list regardless of last message time. Per-user: each viewer has
+  // their own pins. Populated by ListChannels and GetChannel for a user viewer.
+  bool pinned = 14;
 }
 
 message ChannelMember {
@@ -1118,6 +1123,21 @@ message MarkConversationReadResponse {
   int64 read_version = 1;
 }
 
+// SetConversationPinned sets or clears the requesting user's per-conversation
+// pin. Pinning a channel or DM keeps it at the top of the user's left-rail
+// list independent of last message time. Per-user state
+// (conversation_member.pinned/pinned_at); only the caller's own pin is
+// affected.
+message SetConversationPinnedRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+  bool pinned = 2;
+}
+
+message SetConversationPinnedResponse {}
+
 // ActivityCategory flags which kind of conversation event an Activity item
 // represents. A single Activity row may carry several categories OR-ed together
 // (a task-thread reply that @mentions a user is both TASK and MENTION). The
@@ -1659,6 +1679,15 @@ service CommandService {
   rpc MarkConversationRead(MarkConversationReadRequest) returns (MarkConversationReadResponse) {
     option (google.api.http) = {
       post: "/v1/{conversation=conversations/*}:markRead"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.read";
+  }
+
+  rpc SetConversationPinned(SetConversationPinnedRequest) returns (SetConversationPinnedResponse) {
+    option (google.api.http) = {
+      post: "/v1/{conversation=conversations/*}:setPinned"
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;

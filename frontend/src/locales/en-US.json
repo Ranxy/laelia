@@ -745,6 +745,8 @@
     "add-member-search": "Search users…",
     "add-member-search-agent": "Search agents…",
     "no-results": "No results",
-    "attach-file": "Attach file"
+    "attach-file": "Attach file",
+    "pin": "Pin to top",
+    "unpin": "Unpin"
   }
 }

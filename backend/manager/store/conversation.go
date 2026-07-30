@@ -466,6 +466,12 @@ func (s *Store) ListUserConversations(ctx context.Context, principalID int, limi
 type UserConversation struct {
 	Conversation ConversationMessage
 	UnreadCount  int32
+	// Pinned/PinnedAt are the requesting user's per-conversation pin state from
+	// conversation_member. Pinned items sort to the top of the list; PinnedAt
+	// orders the pinned group (most-recently-pinned first), independent of
+	// Conversation.UpdatedAt so pinned items don't drift as new messages arrive.
+	Pinned   bool
+	PinnedAt sql.NullTime
 }
 
 // ListUserConversationsWithUnread returns every conversation the user is a
@@ -490,12 +496,13 @@ func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID
 		         WHERE m.conversation_id = c.id
 		           AND m.thread_root_message_id IS NULL
 		           AND m.room_version > COALESCE(ucc.read_version, c.version)
-		       ), 0)
+		       ), 0),
+		       cm.pinned, cm.pinned_at
 		FROM conversation c
 		JOIN conversation_member cm ON cm.conversation_id = c.id
 		LEFT JOIN user_channel_cursor ucc ON ucc.principal_id = $3 AND ucc.conversation_id = c.id
 		WHERE cm.member_type = $1 AND cm.member_id = $2
-		ORDER BY c.updated_at DESC
+		ORDER BY cm.pinned DESC, cm.pinned_at DESC NULLS LAST, c.updated_at DESC
 		LIMIT $4 OFFSET $5
 	`, MemberTypeUser, fmt.Sprintf("%d", principalID), principalID, limit, offset)
 	if err != nil {
@@ -510,6 +517,7 @@ func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID
 		if err := rows.Scan(
 			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
 			&uc.UnreadCount,
+			&uc.Pinned, &uc.PinnedAt,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan user conversation")
 		}

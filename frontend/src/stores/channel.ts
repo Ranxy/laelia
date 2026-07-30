@@ -1,5 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { commandServiceClient } from "@/connect";
+import type { Conversation } from "@/types/proto-es/v1/command_pb";
 import {
   AddChannelMemberRequestSchema,
   CreateChannelRequestSchema,
@@ -13,11 +14,27 @@ import {
   MarkConversationReadRequestSchema,
   RemoveChannelMemberRequestSchema,
   SendMessageRequestSchema,
+  SetConversationPinnedRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { appendNewMessages, toUiMessage } from "./chat";
 import type { AppSliceCreator, ChannelSlice, ChatMessageUI } from "./types";
 
 const WATCHER_POLL_INTERVAL_MS = 2000;
+
+// reorderChannels sorts the list the way the backend does: pinned items first
+// (preserving their existing relative order, which mirrors the server's
+// pinned_at DESC), then non-pinned items by updatedAt DESC. Used after an
+// optimistic unpin so the released item falls to its time-based spot.
+const reorderChannels = (channels: Conversation[]): Conversation[] =>
+  [...channels].sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    if (a.pinned) return 0;
+    const at = a.updatedAt?.seconds ?? 0n;
+    const bt = b.updatedAt?.seconds ?? 0n;
+    if (at > bt) return -1;
+    if (at < bt) return 1;
+    return 0;
+  });
 
 export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
   set,
@@ -92,6 +109,35 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
       }));
     } catch {
       // network error — the next fetchChannels tick will reconcile
+    }
+  },
+
+  async setConversationPinned(conversationId, pinned) {
+    const conversation = `conversations/${conversationId}`;
+    // Optimistically flip the flag and reorder so the UI updates instantly.
+    // Pinned items sort to the top; the just-pinned item goes to the very top
+    // (most-recently-pinned first, matching the backend's pinned_at DESC).
+    // Unpinning falls back to updatedAt DESC among the non-pinned group; the
+    // next fetchChannels tick reconciles exact pinned_at ordering.
+    set((s) => {
+      const channels = s.channels.map((c) =>
+        c.name === conversation ? { ...c, pinned } : c
+      );
+      const target = channels.find((c) => c.name === conversation);
+      const rest = channels.filter((c) => c.name !== conversation);
+      // Pinning: move the item to the very top (most-recently-pinned first).
+      // Unpinning: re-sort the full list so the released item falls to its
+      // time-based spot among the non-pinned group.
+      const ordered = pinned && target ? [target, ...rest] : reorderChannels(channels);
+      return { channels: ordered };
+    });
+    try {
+      await commandServiceClient.setConversationPinned(
+        create(SetConversationPinnedRequestSchema, { conversation, pinned })
+      );
+    } catch {
+      // reconcile from the server on failure
+      void get().fetchChannels();
     }
   },
 

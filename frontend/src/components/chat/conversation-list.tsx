@@ -1,4 +1,4 @@
-import { Hash, Loader2, Plus } from "lucide-react";
+import { Hash, Loader2, Pin, PinOff, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -31,6 +31,7 @@ export function ConversationList() {
   const unreadByConv = useAppStore((s) => s.unreadByConv);
   const fetchChannels = useAppStore((s) => s.fetchChannels);
   const createChannel = useAppStore((s) => s.createChannel);
+  const setConversationPinned = useAppStore((s) => s.setConversationPinned);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -123,6 +124,7 @@ export function ConversationList() {
               active={active}
               unread={unread}
               onClick={() => navigate(`/${id}`)}
+              onTogglePin={(pinned) => setConversationPinned(id, pinned)}
             />
           );
         })}
@@ -173,6 +175,7 @@ function ConversationRow({
   active,
   unread,
   onClick,
+  onTogglePin,
 }: {
   conv: Conversation;
   isDm: boolean;
@@ -180,7 +183,9 @@ function ConversationRow({
   active: boolean;
   unread: number;
   onClick: () => void;
+  onTogglePin: (pinned: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const isDirect = isDm || isUserDm;
   // conv.peer is the DM peer's resource name ("users/<id>" or "agents/<id>");
   // appending "/avatar" yields the avatar resource name the cache dispatches by
@@ -188,55 +193,81 @@ function ConversationRow({
   const avatarName = conv.peer ? `${conv.peer}/avatar` : undefined;
   const avatarSrc = useAvatar(avatarName);
   const peerId = conv.peer ? (conv.peer.split("/").pop() ?? "") : "";
+  const pinned = conv.pinned ?? false;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
-        active ? "bg-accent/10" : "hover:bg-control-bg/40"
-      )}
-    >
-      {isDirect ? (
-        <Avatar src={avatarSrc} seed={peerId || conv.title || conv.name} />
-      ) : (
-        <div
-          className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-lg",
-            active ? "bg-accent/15 text-accent" : "bg-control-bg text-control"
-          )}
-        >
-          <Hash className="size-4" />
-        </div>
-      )}
-      <div className="min-w-0 flex-1">
-        <p
-          className={cn(
-            "text-sm truncate",
-            unread > 0 ? "font-semibold text-main" : "font-medium text-main"
-          )}
-        >
-          {conv.title || conv.name}
-        </p>
-        {!isDirect && (
-          <p className="text-xs text-control-placeholder mt-0.5">
-            {conv.memberCount} {conv.memberCount === 1 ? "member" : "members"}
-          </p>
+    <div className="group relative flex w-full items-center">
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          "flex w-full items-center gap-3 px-3 py-2.5 pr-10 text-left transition-colors",
+          active ? "bg-accent/10" : "hover:bg-control-bg/40"
         )}
-      </div>
-      {unread > 0 && (
-        <span
-          className={cn(
-            "shrink-0 inline-flex items-center justify-center rounded-full",
-            "min-w-5 h-5 px-1.5 text-xs font-semibold",
-            isDirect
-              ? "bg-accent text-accent-foreground"
-              : "bg-accent/15 text-accent"
+      >
+        {isDirect ? (
+          <Avatar src={avatarSrc} seed={peerId || conv.title || conv.name} />
+        ) : (
+          <div
+            className={cn(
+              "flex size-9 shrink-0 items-center justify-center rounded-lg",
+              active ? "bg-accent/15 text-accent" : "bg-control-bg text-control"
+            )}
+          >
+            <Hash className="size-4" />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p
+            className={cn(
+              "text-sm truncate",
+              unread > 0 ? "font-semibold text-main" : "font-medium text-main"
+            )}
+          >
+            {conv.title || conv.name}
+          </p>
+          {!isDirect && (
+            <p className="text-xs text-control-placeholder mt-0.5">
+              {conv.memberCount} {conv.memberCount === 1 ? "member" : "members"}
+            </p>
           )}
-        >
-          {unread > 99 ? "99+" : unread}
-        </span>
-      )}
-    </button>
+        </div>
+        {pinned && (
+          <Pin className="size-3.5 shrink-0 text-accent" aria-hidden />
+        )}
+        {unread > 0 && (
+          <span
+            className={cn(
+              "shrink-0 inline-flex items-center justify-center rounded-full",
+              "min-w-5 h-5 px-1.5 text-xs font-semibold",
+              isDirect
+                ? "bg-accent text-accent-foreground"
+                : "bg-accent/15 text-accent"
+            )}
+          >
+            {unread > 99 ? "99+" : unread}
+          </span>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onTogglePin(!pinned);
+        }}
+        aria-label={pinned ? t("channel.unpin") : t("channel.pin")}
+        className={cn(
+          "absolute right-1 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded transition-colors",
+          pinned
+            ? "text-accent opacity-100"
+            : "text-control-light opacity-0 hover:bg-control-bg group-hover:opacity-100"
+        )}
+      >
+        {pinned ? (
+          <PinOff className="size-3.5" />
+        ) : (
+          <Pin className="size-3.5" />
+        )}
+      </button>
+    </div>
   );
 }

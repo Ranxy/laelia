@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   contentWithMentionTags,
+  type MentionRef,
   mentionTagMarkdown,
   splitByMentions,
-  type MentionRef,
 } from "@/components/chat/mentions";
 
 const alice: MentionRef = { type: "user", id: "u-1", name: "alice" };
@@ -55,12 +55,8 @@ describe("contentWithMentionTags", () => {
 describe("splitByMentions parity", () => {
   it("places one mention segment per matched occurrence", () => {
     const segs = splitByMentions("a @alice b @bob c", [alice, bob]);
-    expect(segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))).toEqual([
-      "a ",
-      "@alice",
-      " b ",
-      "@bob",
-      " c",
-    ]);
+    expect(
+      segs.map((s) => (s.mention ? `@${s.mention.name}` : s.text))
+    ).toEqual(["a ", "@alice", " b ", "@bob", " c"]);
   });
 });

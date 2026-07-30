@@ -191,6 +191,50 @@ func (s *Store) UpdateConversationMemberRole(ctx context.Context, convID uuid.UU
 	return execUpdateConversationMemberRole(ctx, s.GetDB(), convID, memberType, memberID, role)
 }
 
+// SetConversationPinned sets or clears the requesting user's per-conversation
+// pin. pinned_at is stamped on pin (drives stable most-recently-pinned-first
+// ordering within the pinned group) and cleared to NULL on unpin. Returns
+// ErrConversationMemberNotFound when the user is not a member. Per-user by the
+// conversation_member PK; only the caller's own row is touched.
+func (s *Store) SetConversationPinned(ctx context.Context, convID uuid.UUID, principalID int, pinned bool) error {
+	var pinnedAt any
+	if pinned {
+		pinnedAt = time.Now()
+	}
+	res, err := s.GetDB().ExecContext(ctx, `
+		UPDATE conversation_member SET pinned = $4, pinned_at = $5
+		WHERE conversation_id = $1 AND member_type = $2 AND member_id = $3
+	`, convID, MemberTypeUser, fmt.Sprintf("%d", principalID), pinned, pinnedAt)
+	if err != nil {
+		return errors.Wrapf(err, "failed to set conversation pinned")
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return errors.Wrapf(err, "failed to read conversation pinned update result")
+	}
+	if n == 0 {
+		return ErrConversationMemberNotFound
+	}
+	return nil
+}
+
+// GetConversationPinned returns the requesting user's per-conversation pin
+// state. A missing membership row yields false (not a member / not pinned).
+func (s *Store) GetConversationPinned(ctx context.Context, convID uuid.UUID, principalID int) (bool, error) {
+	var pinned bool
+	err := s.GetDB().QueryRowContext(ctx, `
+		SELECT cm.pinned FROM conversation_member cm
+		WHERE cm.conversation_id = $1 AND cm.member_type = $2 AND cm.member_id = $3
+	`, convID, MemberTypeUser, fmt.Sprintf("%d", principalID)).Scan(&pinned)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, errors.Wrapf(err, "failed to get conversation pinned")
+	}
+	return pinned, nil
+}
+
 // TransferChannelOwnership atomically hands channel ownership from the old
 // owner (a user, identified by principal id) to a new owner: it updates the
 // denormalized conversation.owner_id, demotes the old owner to Member, and

@@ -745,6 +745,8 @@
     "add-member-search": "搜索用户…",
     "add-member-search-agent": "搜索 Agent…",
     "no-results": "无结果",
-    "attach-file": "添加文件"
+    "attach-file": "添加文件",
+    "pin": "置顶",
+    "unpin": "取消置顶"
   }
 }

@@ -192,6 +192,9 @@ const (
 	// CommandServiceMarkConversationReadProcedure is the fully-qualified name of the CommandService's
 	// MarkConversationRead RPC.
 	CommandServiceMarkConversationReadProcedure = "/laelia.v1.CommandService/MarkConversationRead"
+	// CommandServiceSetConversationPinnedProcedure is the fully-qualified name of the CommandService's
+	// SetConversationPinned RPC.
+	CommandServiceSetConversationPinnedProcedure = "/laelia.v1.CommandService/SetConversationPinned"
 	// CommandServiceUploadFileProcedure is the fully-qualified name of the CommandService's UploadFile
 	// RPC.
 	CommandServiceUploadFileProcedure = "/laelia.v1.CommandService/UploadFile"
@@ -351,6 +354,7 @@ type CommandServiceClient interface {
 	AckProcessedVersion(context.Context, *connect.Request[v1.AckProcessedVersionRequest]) (*connect.Response[v1.AckProcessedVersionResponse], error)
 	FetchConversationActivity(context.Context, *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error)
 	MarkConversationRead(context.Context, *connect.Request[v1.MarkConversationReadRequest]) (*connect.Response[v1.MarkConversationReadResponse], error)
+	SetConversationPinned(context.Context, *connect.Request[v1.SetConversationPinnedRequest]) (*connect.Response[v1.SetConversationPinnedResponse], error)
 	// UploadFile stores data in S3 and persists a file row. Intended for the
 	// agent daemon (browser uploads go through the Echo multipart route). No
 	// google.api.http annotation: the agent reaches it via Connect-JSON over the
@@ -697,6 +701,12 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("MarkConversationRead")),
 			connect.WithClientOptions(opts...),
 		),
+		setConversationPinned: connect.NewClient[v1.SetConversationPinnedRequest, v1.SetConversationPinnedResponse](
+			httpClient,
+			baseURL+CommandServiceSetConversationPinnedProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("SetConversationPinned")),
+			connect.WithClientOptions(opts...),
+		),
 		uploadFile: connect.NewClient[v1.UploadFileRequest, v1.File](
 			httpClient,
 			baseURL+CommandServiceUploadFileProcedure,
@@ -784,6 +794,7 @@ type commandServiceClient struct {
 	ackProcessedVersion       *connect.Client[v1.AckProcessedVersionRequest, v1.AckProcessedVersionResponse]
 	fetchConversationActivity *connect.Client[v1.FetchConversationActivityRequest, v1.FetchConversationActivityResponse]
 	markConversationRead      *connect.Client[v1.MarkConversationReadRequest, v1.MarkConversationReadResponse]
+	setConversationPinned     *connect.Client[v1.SetConversationPinnedRequest, v1.SetConversationPinnedResponse]
 	uploadFile                *connect.Client[v1.UploadFileRequest, v1.File]
 	downloadFile              *connect.Client[v1.DownloadFileRequest, v1.DownloadFileResponse]
 	listFiles                 *connect.Client[v1.ListFilesRequest, v1.ListFilesResponse]
@@ -1051,6 +1062,11 @@ func (c *commandServiceClient) MarkConversationRead(ctx context.Context, req *co
 	return c.markConversationRead.CallUnary(ctx, req)
 }
 
+// SetConversationPinned calls laelia.v1.CommandService.SetConversationPinned.
+func (c *commandServiceClient) SetConversationPinned(ctx context.Context, req *connect.Request[v1.SetConversationPinnedRequest]) (*connect.Response[v1.SetConversationPinnedResponse], error) {
+	return c.setConversationPinned.CallUnary(ctx, req)
+}
+
 // UploadFile calls laelia.v1.CommandService.UploadFile.
 func (c *commandServiceClient) UploadFile(ctx context.Context, req *connect.Request[v1.UploadFileRequest]) (*connect.Response[v1.File], error) {
 	return c.uploadFile.CallUnary(ctx, req)
@@ -1215,6 +1231,7 @@ type CommandServiceHandler interface {
 	AckProcessedVersion(context.Context, *connect.Request[v1.AckProcessedVersionRequest]) (*connect.Response[v1.AckProcessedVersionResponse], error)
 	FetchConversationActivity(context.Context, *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error)
 	MarkConversationRead(context.Context, *connect.Request[v1.MarkConversationReadRequest]) (*connect.Response[v1.MarkConversationReadResponse], error)
+	SetConversationPinned(context.Context, *connect.Request[v1.SetConversationPinnedRequest]) (*connect.Response[v1.SetConversationPinnedResponse], error)
 	// UploadFile stores data in S3 and persists a file row. Intended for the
 	// agent daemon (browser uploads go through the Echo multipart route). No
 	// google.api.http annotation: the agent reaches it via Connect-JSON over the
@@ -1557,6 +1574,12 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("MarkConversationRead")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceSetConversationPinnedHandler := connect.NewUnaryHandler(
+		CommandServiceSetConversationPinnedProcedure,
+		svc.SetConversationPinned,
+		connect.WithSchema(commandServiceMethods.ByName("SetConversationPinned")),
+		connect.WithHandlerOptions(opts...),
+	)
 	commandServiceUploadFileHandler := connect.NewUnaryHandler(
 		CommandServiceUploadFileProcedure,
 		svc.UploadFile,
@@ -1693,6 +1716,8 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceFetchConversationActivityHandler.ServeHTTP(w, r)
 		case CommandServiceMarkConversationReadProcedure:
 			commandServiceMarkConversationReadHandler.ServeHTTP(w, r)
+		case CommandServiceSetConversationPinnedProcedure:
+			commandServiceSetConversationPinnedHandler.ServeHTTP(w, r)
 		case CommandServiceUploadFileProcedure:
 			commandServiceUploadFileHandler.ServeHTTP(w, r)
 		case CommandServiceDownloadFileProcedure:
@@ -1918,6 +1943,10 @@ func (UnimplementedCommandServiceHandler) FetchConversationActivity(context.Cont
 
 func (UnimplementedCommandServiceHandler) MarkConversationRead(context.Context, *connect.Request[v1.MarkConversationReadRequest]) (*connect.Response[v1.MarkConversationReadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.MarkConversationRead is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) SetConversationPinned(context.Context, *connect.Request[v1.SetConversationPinnedRequest]) (*connect.Response[v1.SetConversationPinnedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.SetConversationPinned is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) UploadFile(context.Context, *connect.Request[v1.UploadFileRequest]) (*connect.Response[v1.File], error) {

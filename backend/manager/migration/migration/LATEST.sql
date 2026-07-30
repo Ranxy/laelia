@@ -427,6 +427,12 @@ ALTER TABLE chat_message ADD COLUMN IF NOT EXISTS sender_agent_id INTEGER REFERE
 ALTER TABLE conversation_member ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ NOT NULL DEFAULT now();
 ALTER TABLE conversation_member ADD COLUMN IF NOT EXISTS member_role SMALLINT NOT NULL DEFAULT 2;
 
+-- 7. Add per-user pinned/pinned_at to conversation_member so a user can pin a
+-- channel or DM to the top of their left-rail list. Per-(user,conversation) by
+-- the table's PK; pinned_at drives stable ordering within the pinned group.
+ALTER TABLE conversation_member ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE conversation_member ADD COLUMN IF NOT EXISTS pinned_at TIMESTAMPTZ;
+
 CREATE INDEX IF NOT EXISTS idx_chat_message_sender_agent ON chat_message(sender_agent_id) WHERE sender_agent_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_conversation_member_lookup ON conversation_member(member_type, member_id);
 

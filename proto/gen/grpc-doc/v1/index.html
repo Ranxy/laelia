@@ -1066,6 +1066,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.SetConversationPinnedRequest"><span class="badge">M</span>SetConversationPinnedRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SetConversationPinnedResponse"><span class="badge">M</span>SetConversationPinnedResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.TaskInfo"><span class="badge">M</span>TaskInfo</a>
                 </li>
               
@@ -6970,6 +6978,16 @@ channels (type 2) and when no peer can be resolved. Lets list viewers fetch
 the peer&#39;s avatar without an extra member lookup. </p></td>
                 </tr>
               
+                <tr>
+                  <td>pinned</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>pinned is the requesting user&#39;s per-conversation pin state
+(conversation_member.pinned). Pinned channels/DMs stay at the top of the
+left-rail list regardless of last message time. Per-user: each viewer has
+their own pins. Populated by ListChannels and GetChannel for a user viewer. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -10124,6 +10142,44 @@ TODO. Only valid for top-level messages (thread_root must be empty). </p></td>
 
         
       
+        <h3 id="laelia.v1.SetConversationPinnedRequest">SetConversationPinnedRequest</h3>
+        <p>SetConversationPinned sets or clears the requesting user's per-conversation</p><p>pin. Pinning a channel or DM keeps it at the top of the user's left-rail</p><p>list independent of last message time. Per-user state</p><p>(conversation_member.pinned/pinned_at); only the caller's own pin is</p><p>affected.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>pinned</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SetConversationPinnedResponse">SetConversationPinnedResponse</h3>
+        <p></p>
+
+        
+
+        
+      
         <h3 id="laelia.v1.TaskInfo">TaskInfo</h3>
         <p>TaskInfo is the task metadata attached to a ChatMessage that is a task. It is</p><p>a read-only join output populated by ListConversationMessages /</p><p>ListThreadMessages for root messages; absent on non-task messages and on</p><p>thread replies. The chat_message itself remains the source of truth for</p><p>content/sender/room_version.</p>
 
@@ -11607,6 +11663,13 @@ from the auth context.</p></td>
               </tr>
             
               <tr>
+                <td>SetConversationPinned</td>
+                <td><a href="#laelia.v1.SetConversationPinnedRequest">SetConversationPinnedRequest</a></td>
+                <td><a href="#laelia.v1.SetConversationPinnedResponse">SetConversationPinnedResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
                 <td>UploadFile</td>
                 <td><a href="#laelia.v1.UploadFileRequest">UploadFileRequest</a></td>
                 <td><a href="#laelia.v1.File">File</a></td>
@@ -12186,6 +12249,16 @@ user, hiding it from All and Unread. The caller&#39;s own id must own the row.</
                 <td>MarkConversationRead</td>
                 <td>POST</td>
                 <td>/v1/{conversation=conversations/*}:markRead</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>SetConversationPinned</td>
+                <td>POST</td>
+                <td>/v1/{conversation=conversations/*}:setPinned</td>
                 <td>*</td>
               </tr>
               
