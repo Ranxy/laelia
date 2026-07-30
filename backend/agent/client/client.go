@@ -158,13 +158,26 @@ func New(managerURL, token string, insecure bool, allowHTTP bool) (*MachineClien
 	streamClient := &http.Client{}
 
 	if strings.HasPrefix(managerURL, "https://") {
+		// Each transport gets its own TLS config: http2.ConfigureTransport
+		// (triggered by ForceAttemptHTTP2) appends "h2" to the shared
+		// *tls.Config's NextProtos in place. Sharing one pointer between the
+		// h1-only httpClient and the h2 streamClient would leak "h2" into the
+		// unary client's ALPN, so new unary connections negotiate h2 with the
+		// proxy but the h1-only transport can't speak it — the proxy's HTTP/2
+		// SETTINGS frame then parses as "malformed HTTP response" and corrupts
+		// the connection pool under concurrent load (e.g. one message fanned
+		// out to many agents at once). Clone() keeps the two configs
+		// independent; enabling h2 on both lets ALPN pick h2 either way.
 		tlsCfg := &tls.Config{
 			MinVersion:         tls.VersionTLS13,
 			InsecureSkipVerify: insecure,
 		}
-		httpClient.Transport = &http.Transport{TLSClientConfig: tlsCfg}
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig:   tlsCfg.Clone(),
+			ForceAttemptHTTP2: true,
+		}
 		streamClient.Transport = &http.Transport{
-			TLSClientConfig:       tlsCfg,
+			TLSClientConfig:       tlsCfg.Clone(),
 			ForceAttemptHTTP2:     true,
 			ResponseHeaderTimeout: 60 * time.Second,
 		}

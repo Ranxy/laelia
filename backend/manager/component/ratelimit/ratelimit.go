@@ -46,12 +46,13 @@ func DefaultConfig() Config {
 }
 
 type RateLimiter struct {
-	cfg           Config
-	globalLimiter *rate.Limiter
-	ipLimiters    *lru.Cache[string, *rate.Limiter]
-	agentLimiters *lru.Cache[string, *rate.Limiter]
-	userLimiters  *lru.Cache[string, *rate.Limiter]
-	mu            sync.Mutex
+	cfg              Config
+	globalLimiter    *rate.Limiter
+	ipLimiters       *lru.Cache[string, *rate.Limiter]
+	agentLimiters    *lru.Cache[string, *rate.Limiter] // heartbeat bucket
+	agentAPILimiters *lru.Cache[string, *rate.Limiter] // agent API call bucket
+	userLimiters     *lru.Cache[string, *rate.Limiter]
+	mu               sync.Mutex
 }
 
 func New(cfg Config) (*RateLimiter, error) {
@@ -63,17 +64,22 @@ func New(cfg Config) (*RateLimiter, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create agent rate limiter cache")
 	}
+	agentAPICache, err := lru.New[string, *rate.Limiter](10000)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create agent API rate limiter cache")
+	}
 	userCache, err := lru.New[string, *rate.Limiter](10000)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create user rate limiter cache")
 	}
 
 	return &RateLimiter{
-		cfg:           cfg,
-		globalLimiter: rate.NewLimiter(rate.Limit(cfg.GlobalRate), cfg.GlobalBurst),
-		ipLimiters:    ipCache,
-		agentLimiters: agentCache,
-		userLimiters:  userCache,
+		cfg:              cfg,
+		globalLimiter:    rate.NewLimiter(rate.Limit(cfg.GlobalRate), cfg.GlobalBurst),
+		ipLimiters:       ipCache,
+		agentLimiters:    agentCache,
+		agentAPILimiters: agentAPICache,
+		userLimiters:     userCache,
 	}, nil
 }
 
@@ -118,7 +124,13 @@ func (rl *RateLimiter) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 					return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("API rate limit exceeded"))
 				}
 			} else if id := extractIdentifier(ctx, common.AgentContextKey); id != "" {
-				if !rl.getAgentLimiter(id).Allow() {
+				// Agent API calls (ListPeerAgents, GetOrCreateAgentDM,
+				// SendMessage, ...) get their own APIRate/APIBurst bucket —
+				// distinct from the heartbeat bucket. Sharing the heartbeat
+				// bucket (2/s, burst 10) made a single agent's burst of
+				// peer-discovery RPCs during message processing both trip 429s
+				// and starve its own heartbeats.
+				if !rl.getAgentAPILimiter(id).Allow() {
 					return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("API rate limit exceeded"))
 				}
 			} else {
@@ -166,6 +178,21 @@ func (rl *RateLimiter) getAgentLimiter(agentID string) *rate.Limiter {
 	}
 	limiter := rate.NewLimiter(rate.Limit(rl.cfg.HeartbeatRate), rl.cfg.HeartbeatBurst)
 	rl.agentLimiters.Add(agentID, limiter)
+	return limiter
+}
+
+// getAgentAPILimiter returns the per-agent API call bucket (APIRate/APIBurst),
+// separate from the heartbeat bucket so a burst of agent RPCs cannot starve
+// the agent's heartbeats or trip on the tiny heartbeat burst.
+func (rl *RateLimiter) getAgentAPILimiter(agentID string) *rate.Limiter {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	if limiter, ok := rl.agentAPILimiters.Get(agentID); ok {
+		return limiter
+	}
+	limiter := rate.NewLimiter(rate.Limit(rl.cfg.APIRate), rl.cfg.APIBurst)
+	rl.agentAPILimiters.Add(agentID, limiter)
 	return limiter
 }
 
