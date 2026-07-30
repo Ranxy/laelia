@@ -11,6 +11,56 @@ import { MarkdownCodeBlockNode, setCustomComponents } from "markstream-react";
 // very first evaluation of this module.
 let registered = false;
 
+// Renders an inline @mention badge inside agent markdown. markstream emits a
+// CustomComponentNode for the <mention> tag (enabled per-render via
+// customHtmlTags); this component turns it into a styled chip carrying the
+// mention ref as data-* attributes. A delegated click handler on the message
+// bubble reads those attributes and dispatches onMentionClick. Keyboard
+// activation forwards to the same delegated click. No <a href> is used so the
+// browser never surfaces the mention ref as a hover tooltip / status preview.
+//
+// `markstreamDisplay: "inline"` keeps the node inline within its paragraph so
+// the badge flows with the surrounding prose.
+// biome-ignore lint/suspicious/noExplicitAny: markstream custom component API is loosely typed
+function MentionChip({ node }: any) {
+  const attrs: Record<string, string> = {};
+  const raw = (node as { attrs?: unknown }).attrs;
+  if (Array.isArray(raw)) {
+    for (const entry of raw) {
+      if (Array.isArray(entry)) {
+        attrs[entry[0]] = String(entry[1]);
+      } else if (entry && typeof entry === "object") {
+        const e = entry as { name?: string; value?: unknown };
+        if (e.name) attrs[e.name] = String(e.value ?? "");
+      }
+    }
+  } else if (raw && typeof raw === "object") {
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      attrs[k] = String(v);
+    }
+  }
+  const name = attrs.name ?? "";
+  return (
+    <span
+      data-mtype={attrs.type}
+      data-mid={attrs.id}
+      data-mname={name}
+      role="button"
+      tabIndex={0}
+      className="mention-chip"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          (e.currentTarget as HTMLElement).click();
+        }
+      }}
+    >
+      @{name}
+    </span>
+  );
+}
+MentionChip.markstreamDisplay = "inline" as const;
+
 function registerMarkdownComponents(): void {
   if (registered) return;
   registered = true;
@@ -24,6 +74,7 @@ function registerMarkdownComponents(): void {
         {...(ctx?.codeBlockProps ?? {})}
       />
     ),
+    mention: MentionChip,
   });
 }
 

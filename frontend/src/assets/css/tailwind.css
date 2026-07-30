@@ -510,6 +510,22 @@ body[data-bb-screenshot-active] [data-screenshot-hide] {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+/* Mention badges inside agent markdown are rendered as inline <mention>
+   custom nodes (see MessageRow / mentions.ts / lib/markdown) so they flow
+   inline with the prose. Styled to match the standalone MentionBadge chip. */
+.markstream-chat .mention-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  background-color: rgb(var(--color-accent) / 0.15);
+  color: rgb(var(--color-accent));
+  font-weight: 500;
+  cursor: pointer;
+}
+.markstream-chat .mention-chip:hover {
+  background-color: rgb(var(--color-accent) / 0.25);
+}
 .markstream-chat hr {
   border: none;
   border-top: 1px solid rgb(var(--color-control-border));

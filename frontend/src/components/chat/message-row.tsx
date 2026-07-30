@@ -3,6 +3,7 @@ import MarkdownRender from "markstream-react";
 import {
   memo,
   type RefObject,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -12,7 +13,10 @@ import { useTranslation } from "react-i18next";
 import { Avatar, formatTime } from "@/components/chat/avatar";
 import { FileCard } from "@/components/chat/file-card";
 import { LazyMarkdown } from "@/components/chat/lazy-markdown";
-import { splitByMentions } from "@/components/chat/mentions";
+import {
+  contentWithMentionTags,
+  splitByMentions,
+} from "@/components/chat/mentions";
 import { RemoteImage } from "@/components/chat/remote-image";
 import { TaskStatusBadge } from "@/components/chat/task-status-badge";
 import { ChatDiff } from "@/components/chat-events/diff-view";
@@ -249,7 +253,39 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     [MentionBadge, displayContent, msg.mentions]
   );
 
+  // Agent markdown with @mentions rewritten to inline <mention> nodes, so a
+  // mention flows inline with the surrounding prose instead of landing on its
+  // own line (which happened when each text segment was rendered through its
+  // own block-emitting MarkdownRender). Only computed for the mention-aware path.
+  const agentMentionContent = useMemo(
+    () =>
+      MentionBadge && !isUser
+        ? contentWithMentionTags(displayContent ?? "", msg.mentions ?? [])
+        : null,
+    [MentionBadge, isUser, displayContent, msg.mentions]
+  );
+
   const MentionBadgeCmp = MentionBadge;
+
+  // Delegated click handler for mention chips rendered inside agent markdown.
+  // The custom <mention> node renders a span carrying {type, id, name} as
+  // data-* attributes (see lib/markdown); recover them and dispatch
+  // onMentionClick. Kept as a stable callback so the bubble div isn't
+  // re-attached on every render.
+  const handleBubbleClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!onMentionClick) return;
+      const target = e.target as HTMLElement | null;
+      const chip = target?.closest?.("[data-mtype]");
+      if (!chip) return;
+      const type = chip.getAttribute("data-mtype");
+      const id = chip.getAttribute("data-mid");
+      const name = chip.getAttribute("data-mname");
+      if (!type || !id || !name) return;
+      onMentionClick(type, id, name);
+    },
+    [onMentionClick]
+  );
 
   // "Reply in thread" entry. Rendered in the header when the header is shown
   // (showAvatar), and as a standalone hover row otherwise — so every root
@@ -414,55 +450,65 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
                 ? "bg-control-bg/60 text-main rounded-tl-sm px-4 py-3 max-w-[80%]"
                 : "hidden"
           )}
+          onClick={handleBubbleClick}
         >
           {segments && MentionBadgeCmp ? (
-            // Mention-aware rendering (channel chat): interleave plain text and
-            // mention badges. User text stays pre-wrapped; agent text goes
-            // through the markdown renderer.
-            segments.length > 0 &&
-            segments.map((seg, i) => {
-              const mention = seg.mention;
-              if (mention) {
-                return (
-                  <MentionBadgeCmp
-                    key={`${i}-${mention.name}`}
-                    name={mention.name}
-                    onClick={() =>
-                      onMentionClick?.(mention.type, mention.id, mention.name)
-                    }
-                  />
-                );
-              }
-              if (!seg.text) return null;
-              if (isUser) {
+            // Mention-aware rendering (channel chat / threads).
+            isUser ? (
+              // User text is plain (no markdown): interleave pre-wrapped text
+              // spans with real MentionBadge chips. Both are inline-level, so
+              // they already flow inline correctly.
+              segments.length > 0 &&
+              segments.map((seg, i) => {
+                const mention = seg.mention;
+                if (mention) {
+                  return (
+                    <MentionBadgeCmp
+                      key={`${i}-${mention.name}`}
+                      name={mention.name}
+                      onClick={() =>
+                        onMentionClick?.(mention.type, mention.id, mention.name)
+                      }
+                    />
+                  );
+                }
+                if (!seg.text) return null;
                 return (
                   <span key={i} className="whitespace-pre-wrap break-words">
                     {seg.text}
                   </span>
                 );
-              }
-              return (
-                <span key={i} className="markstream-chat break-words inline">
-                  <LazyMarkdown
-                    eager={isStreaming || eager}
-                    scrollRoot={scrollRoot}
-                    fallback={
-                      <span className="whitespace-pre-wrap break-words">
-                        {seg.text}
-                      </span>
-                    }
-                    render={() => (
-                      <MarkdownRender
-                        customId={markdownCustomId}
-                        content={seg.text}
-                        final
-                        fade={fade}
-                      />
-                    )}
-                  />
-                </span>
-              );
-            })
+              })
+            ) : (
+              // Agent: render the whole body in a single markdown pass with
+              // @mentions rewritten to inline links (agentMentionContent). A
+              // single MarkdownRender keeps the mention inside the same <p> as
+              // the surrounding prose, so it flows inline instead of being
+              // forced onto its own line by per-segment block <p> wrappers.
+              <div className="markstream-chat break-words">
+                <LazyMarkdown
+                  eager={isStreaming || eager}
+                  scrollRoot={scrollRoot}
+                  fallback={
+                    <span className="whitespace-pre-wrap break-words">
+                      {displayContent}
+                    </span>
+                  }
+                  render={() => (
+                    <MarkdownRender
+                      customId={markdownCustomId}
+                      content={agentMentionContent ?? ""}
+                      customHtmlTags={["mention"]}
+                      final={!isStreaming}
+                      smoothStreaming={isStreaming ? "auto" : false}
+                      fade={fade}
+                      typewriter={isStreaming}
+                      maxLiveNodes={isStreaming ? 0 : undefined}
+                    />
+                  )}
+                />
+              </div>
+            )
           ) : isUser ? (
             <div className="whitespace-pre-wrap break-words">
               {displayContent || ""}
