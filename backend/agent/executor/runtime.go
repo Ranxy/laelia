@@ -40,6 +40,11 @@ type Request struct {
 	// this turn" (cold start with an idle inbox), in which case the executor
 	// sends the init prompt alone so the agent is primed for future turns.
 	TurnPrompt string
+	// ReanchorPrompt is the condensed identity anchor the executor prepends to
+	// a warm (resumed) turn when the runner decided the session needs
+	// re-anchoring (a compaction was observed, or many warm turns passed
+	// without one). Ignored on cold turns, which send the full init prompt.
+	ReanchorPrompt string
 	// DaemonSocket / SessionToken / BinaryDir configure the CLI the LLM shells
 	// out to. The executor injects them into the ACP subprocess env so the
 	// `laelia-agent message ...` / `laelia-agent command context` subcommands can

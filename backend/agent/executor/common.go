@@ -34,4 +34,8 @@ type Result struct {
 	// Resumed reports whether the turn resumed an existing ACP session (warm)
 	// or created a new one (cold). Drives metrics/debugging.
 	Resumed bool
+	// Fingerprint is the session fingerprint the turn used (same inputs as
+	// acp-session.json / pi-session.json). The runner compares it against the
+	// persisted context state and resets stats when the config changed.
+	Fingerprint string
 }

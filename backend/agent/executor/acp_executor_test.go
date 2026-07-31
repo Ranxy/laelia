@@ -299,6 +299,33 @@ func TestACPSessionUpdateSkipsUsageDuringReplay(t *testing.T) {
 	assert.Empty(t, exec.eventCh, "replayed usage must not emit events")
 }
 
+func TestACPTurnPromptText_ReanchorOnWarmTurn(t *testing.T) {
+	exec := &ACPExecutor{request: Request{
+		TurnPrompt:     "New messages received:\n\nwork",
+		ReanchorPrompt: BuildReanchorPrompt("alice"),
+	}}
+	got := exec.turnPromptText(true)
+	assert.Contains(t, got, "Re-anchor (context compaction recovery)")
+	assert.Contains(t, got, "New messages received:")
+	assert.True(t, strings.Index(got, "Re-anchor") < strings.Index(got, "New messages received:"),
+		"anchor must be prepended to the warm batch")
+}
+
+func TestACPTurnPromptText_ColdTurnIgnoresReanchor(t *testing.T) {
+	exec := &ACPExecutor{
+		request: Request{
+			TurnPrompt:       "batch",
+			ReanchorPrompt:   BuildReanchorPrompt("alice"),
+			AgentDisplayName: "alice",
+		},
+		config: &ACPConfig{},
+	}
+	got := exec.turnPromptText(false)
+	assert.NotContains(t, got, "Re-anchor")
+	assert.Contains(t, got, "You are \"alice\"", "cold turn sends the full init prompt")
+	assert.Contains(t, got, "batch")
+}
+
 func TestACPSessionUpdateFlushesOnSizeThreshold(t *testing.T) {
 	exec := newTestBufferedExecutor()
 	exec.config.OutputFlushBytes = 20

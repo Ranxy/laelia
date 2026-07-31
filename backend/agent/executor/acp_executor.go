@@ -197,6 +197,7 @@ type ACPExecutor struct {
 	toolCallStates   map[string]*toolCallState
 	sessionID        string
 	initializedAgent string
+	fingerprint      string
 	// replayingHistory is set while a session/resume RPC is in flight. Some ACP
 	// agents (notably opencode v1.17.x) replay the entire prior conversation as
 	// session/update notifications DURING session/resume — before the resume
@@ -440,6 +441,7 @@ func (e *ACPExecutor) run() {
 	// memory + procedure) is sent only on a cold NewSession and lives in the
 	// resumed session's history thereafter — that is the per-turn token saving.
 	fingerprint := sessionFingerprint(e.config.Provider, e.config.Model, e.workingDir)
+	e.fingerprint = fingerprint
 	resumed := false
 	var configOpts []acp.SessionConfigOption
 	if existing, loadErr := loadACPSession(e.request.MachineID, e.request.AgentID); loadErr != nil {
@@ -588,7 +590,14 @@ func (e *ACPExecutor) turnPromptText(resumed bool) string {
 	// inbox), in which case the init prompt alone primes the session.
 	batch := strings.TrimSpace(e.request.TurnPrompt)
 	if resumed {
-		return batch
+		anchor := strings.TrimSpace(e.request.ReanchorPrompt)
+		if anchor == "" {
+			return batch
+		}
+		if batch == "" {
+			return anchor
+		}
+		return anchor + "\n\n" + batch
 	}
 	identityName := e.request.AgentDisplayName
 	if identityName == "" {
@@ -631,6 +640,9 @@ func (e *ACPExecutor) scanACPStderr(stderr io.Reader) {
 }
 
 func (e *ACPExecutor) sendACPResult(result Result) {
+	if result.Fingerprint == "" {
+		result.Fingerprint = e.fingerprint
+	}
 	result.LastSeqNo = e.seqNo.Load()
 	e.resultCh <- result
 }

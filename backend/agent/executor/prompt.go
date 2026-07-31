@@ -45,8 +45,20 @@ You are "%[1]s". Recognize yourself, so you don't reply to your own messages or 
 //go:embed prompt/agent_memory.md
 var AgentMemoryPrompt string
 
+//go:embed prompt/reanchor.md
+var reanchorPromptTemplate string
+
 //go:embed prompt/communication.md
 var AgentCommunicationPrompt string
+
+// BuildReanchorPrompt renders the identity anchor prepended to a warm turn
+// after a context compaction (or after many warm turns without one). The agent
+// lost the cold-start init prompt when the window was compacted, so the anchor
+// re-establishes its identity, the MEMORY.md recovery entry point, and the core
+// procedure.
+func BuildReanchorPrompt(name string) string {
+	return strings.ReplaceAll(reanchorPromptTemplate, "{{name}}", name)
+}
 
 // AgentFirstPromptBody is the fixed instruction the autonomous drain loop loads
 // into a session at cold start. It is agent-first (AX "Agent Inbox"): each turn

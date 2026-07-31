@@ -319,6 +319,32 @@ done:
 	assert.Equal(t, "window full", events[1].ContextCompaction.Reason)
 }
 
+func TestPiTurnPromptText_ReanchorOnWarmTurn(t *testing.T) {
+	e := newTestExecutor(t)
+	e.req = executor.Request{
+		TurnPrompt:     "New messages received:\n\nwork",
+		ReanchorPrompt: executor.BuildReanchorPrompt("alice"),
+	}
+	got := e.turnPromptText(true)
+	assert.Contains(t, got, "Re-anchor (context compaction recovery)")
+	assert.Contains(t, got, "New messages received:")
+	assert.True(t, strings.Index(got, "Re-anchor") < strings.Index(got, "New messages received:"),
+		"anchor must be prepended to the warm batch")
+}
+
+func TestPiTurnPromptText_ColdTurnIgnoresReanchor(t *testing.T) {
+	e := newTestExecutor(t)
+	e.identity = "alice"
+	e.req = executor.Request{
+		TurnPrompt:     "batch",
+		ReanchorPrompt: executor.BuildReanchorPrompt("alice"),
+	}
+	got := e.turnPromptText(false)
+	assert.NotContains(t, got, "Re-anchor")
+	assert.Contains(t, got, `You are "alice"`, "cold turn sends the full init prompt")
+	assert.Contains(t, got, "batch")
+}
+
 // TestDeriveToolTitle covers the tool-card title derivation: the bash command
 // becomes the title; read/edit append the path; unknown shapes fall back to the
 // tool name.

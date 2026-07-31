@@ -2,8 +2,10 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"strings"
 	"sync"
@@ -37,7 +39,31 @@ const (
 	// proactively rather than wait for the next wake. A truly dead stream
 	// surfaces via the receive pump and triggers a full reconnect independently.
 	beginSessionRetryWait = 2 * time.Second
+
+	// reanchorEveryTurns is the warm-turn cadence for periodic re-anchoring:
+	// after this many consecutive warm turns without a compaction, the next
+	// warm turn carries the identity anchor.
+	reanchorEveryTurns = 10
+
+	// contextWarningThreshold is the used/size ratio at or above which the turn
+	// batch carries a context-window warning.
+	contextWarningThreshold = 0.9
+
+	// usageDropInferenceRatio is the used-token drop (vs the last observation)
+	// that infers a context compaction finished when no direct event arrived.
+	usageDropInferenceRatio = 0.3
+
+	// contextQuietWindow is the no-agent-message quiet period required before a
+	// usage drop is treated as a compaction rather than active generation.
+	contextQuietWindow = 10 * time.Second
 )
+
+// compactionStaleTimeout is how long a CONTEXT_COMPACTION_STARTED may run
+// without a matching FINISHED before the drain loop surfaces a WARNING
+// ("Context compaction still running; no finish event observed"). It mirrors
+// A var (not const) so tests can
+// shrink the window.
+var compactionStaleTimeout = 5 * time.Minute
 
 type mergedText struct {
 	builder    strings.Builder
@@ -117,8 +143,9 @@ type commandStream struct {
 	currentExecutorMu sync.Mutex
 
 	// newSessionRuntime builds the runtime for a drain session. It defaults to
-	// buildRuntime (real ACP) and is overridable in tests.
-	newSessionRuntime func(req *v1pb.CommandRequest) (executor.Runtime, error)
+	// buildRuntime (real ACP) and is overridable in tests and by the runner
+	// (pi / ACP branch).
+	newSessionRuntime func(req executor.Request) (executor.Runtime, error)
 	// buildTurnBatch renders the "New messages received:" batch that opens a
 	// drain turn, using the auth-bearing CommandServiceClient the daemon exposes.
 	// Nil in tests (the test supplies TurnPrompt directly on the request).
@@ -403,12 +430,227 @@ func (c *commandStream) beginSession(ctx context.Context, stream *connect.BidiSt
 	}
 }
 
+// contextObserver applies the context state machine (design doc L1/L2) to the
+// events flowing through one command on the runCommand goroutine: it records
+// usage observations, infers compaction from usage drops, runs the compaction
+// watchdog, and folds compaction events into the per-agent ContextState. All
+// mutations happen on the pump goroutine, so no locking is needed. Extra events
+// it emits (inferred compaction finish, stale warning) use the same LocalState
+// sequence counter as the pump.
+type contextObserver struct {
+	state      *executor.ContextState
+	stream     *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage]
+	commandID  string
+	localState *executor.LocalState
+
+	// watchdogCh receives one signal when a compaction has been active for
+	// compactionStaleTimeout without a finish event.
+	watchdogCh chan struct{}
+	timer      *time.Timer
+	// lastAgentChunkAt is the last time an agent_message_chunk raw event was
+	// observed; a usage drop while the agent is actively generating is not a
+	// compaction.
+	lastAgentChunkAt time.Time
+}
+
+func newContextObserver(state *executor.ContextState, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, localState *executor.LocalState) *contextObserver {
+	return &contextObserver{
+		state:      state,
+		stream:     stream,
+		commandID:  commandID,
+		localState: localState,
+		watchdogCh: make(chan struct{}, 1),
+	}
+}
+
+func (o *contextObserver) startWatchdog() {
+	o.stopWatchdog()
+	o.timer = time.AfterFunc(compactionStaleTimeout, func() {
+		select {
+		case o.watchdogCh <- struct{}{}:
+		default:
+		}
+	})
+}
+
+func (o *contextObserver) stopWatchdog() {
+	if o.timer != nil {
+		o.timer.Stop()
+		o.timer = nil
+	}
+}
+
+// observe applies context-state updates for one forwarded event and emits any
+// derived events (inferred compaction finish). It is a no-op when context
+// tracking is disabled (state nil).
+func (o *contextObserver) observe(event *executor.Event) error {
+	if o.state == nil {
+		return nil
+	}
+	switch event.Type {
+	case v1pb.CommandEventType_CONTEXT_COMPACTION_STARTED:
+		o.state.Compaction.Active = true
+		o.state.Compaction.LastStartAt = time.Now()
+		o.startWatchdog()
+	case v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED:
+		o.onCompactionFinished()
+	case v1pb.CommandEventType_CONTEXT_USAGE_UPDATE:
+		if event.ContextUsage == nil {
+			return nil
+		}
+		prevUsed := o.state.Usage.Used
+		o.state.Usage = executor.ContextUsage{
+			Size:      event.ContextUsage.Size,
+			Used:      event.ContextUsage.Used,
+			UpdatedAt: time.Now(),
+		}
+		if !o.state.Compaction.Active && o.inferCompaction(prevUsed, event.ContextUsage.Used) {
+			return o.emitInferredCompaction()
+		}
+	case v1pb.CommandEventType_RAW_ACP:
+		if event.Summary == "agent_message_chunk" {
+			o.lastAgentChunkAt = time.Now()
+		}
+	default:
+	}
+	return nil
+}
+
+// inferCompaction reports whether the observed used-token drop looks like a
+// context compaction: > usageDropInferenceRatio below the previous observation
+// and not while the agent is actively streaming message chunks.
+func (o *contextObserver) inferCompaction(prevUsed, used int64) bool {
+	if prevUsed <= 0 || used < 0 {
+		return false
+	}
+	drop := prevUsed - used
+	if drop <= 0 || float64(drop)/float64(prevUsed) <= usageDropInferenceRatio {
+		return false
+	}
+	if !o.lastAgentChunkAt.IsZero() && time.Since(o.lastAgentChunkAt) < contextQuietWindow {
+		return false
+	}
+	return true
+}
+
+func (o *contextObserver) onCompactionFinished() {
+	o.stopWatchdog()
+	o.state.Compaction.Active = false
+	o.state.Compaction.Count++
+	o.state.Compaction.LastAt = time.Now()
+	o.state.NeedsReanchor = true
+	o.state.Session.Turns = 0
+}
+
+// emitInferredCompaction reports a compaction that was detected from a usage
+// drop (no direct agent event) and applies the same finish state as a direct
+// event.
+func (o *contextObserver) emitInferredCompaction() error {
+	o.onCompactionFinished()
+	event := executor.Event{
+		SeqNo:   nextEventSeq(o.localState),
+		Type:    v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED,
+		Summary: "Context compaction finished (inferred from usage drop)",
+		ContextCompaction: &v1pb.ContextCompactionPayload{
+			Inferred: true,
+		},
+	}
+	return sendCommandEvent(o.stream, o.commandID, &event)
+}
+
+// onWatchdog surfaces the stale-compaction
+func (o *contextObserver) onWatchdog() error {
+	msg := "Context compaction still running; no finish event observed"
+	event := executor.Event{
+		SeqNo:   nextEventSeq(o.localState),
+		Type:    v1pb.CommandEventType_WARNING,
+		Summary: msg,
+		Warning: &v1pb.WarningPayload{Message: msg},
+	}
+	return sendCommandEvent(o.stream, o.commandID, &event)
+}
+
+// reanchorPrompt decides whether this turn carries the identity anchor and
+// consumes the decision state: NeedsReanchor (set after a compaction) or the
+// periodic warm-turn threshold. The anchor is only actually prepended on warm
+// turns by the executor; a cold turn re-sends the full init prompt, so
+// consuming the decision either way is correct.
+func reanchorPrompt(ctxState *executor.ContextState, name string) string {
+	if ctxState == nil {
+		return ""
+	}
+	if !ctxState.NeedsReanchor && ctxState.Session.Turns < reanchorEveryTurns {
+		return ""
+	}
+	ctxState.NeedsReanchor = false
+	ctxState.Session.Turns = 0
+	return executor.BuildReanchorPrompt(name)
+}
+
+// appendContextWarning appends the context-window warning to the turn batch
+// when the last observed usage is at or above contextWarningThreshold.
+func appendContextWarning(prompt string, ctxState *executor.ContextState) string {
+	if prompt == "" || ctxState == nil || ctxState.Usage.Size <= 0 {
+		return prompt
+	}
+	ratio := ctxState.UsageRatio()
+	if ratio < contextWarningThreshold {
+		return prompt
+	}
+	pct := int(math.Round(ratio * 100))
+	warning := fmt.Sprintf(
+		"Context warning: your context window is ~%d%% full (%d/%d tokens). Prefer concise replies; write durable knowledge to MEMORY.md.",
+		pct, ctxState.Usage.Used, ctxState.Usage.Size,
+	)
+	return strings.TrimRight(prompt, "\n") + "\n\n" + warning
+}
+
+// persistContextState folds the completed turn into the context state (warm
+// turn count, fingerprint-change reset) and saves it. In-turn observations
+// (usage/compaction) are persisted even when result is nil (failed turn).
+func (c *commandStream) persistContextState(ctxState *executor.ContextState, result *executor.Result) {
+	if ctxState == nil {
+		return
+	}
+	if result != nil {
+		if result.Fingerprint != "" {
+			if ctxState.Fingerprint != "" && ctxState.Fingerprint != result.Fingerprint {
+				ctxState.ResetForFingerprint(result.Fingerprint)
+			} else {
+				ctxState.Fingerprint = result.Fingerprint
+			}
+		}
+		if result.Resumed {
+			ctxState.Session.Turns++
+		} else {
+			ctxState.Session.Turns = 0
+			ctxState.Session.ColdStarts++
+		}
+	}
+	if err := executor.SaveContextState(c.machineID, c.agentID, ctxState); err != nil {
+		slog.Warn("failed to persist context state", "agent", c.agentID, "error", err)
+	}
+}
+
 // runSession executes one drain session: it builds the agent-first runtime
 // (fixed prompt) and pumps progress/events/result over the bidi stream via
 // runCommand. The agent itself decides which channel to process and how, by
 // shelling out to the `laelia-agent` CLI over the local daemon. Blocking:
 // returns when the session finishes.
 func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, agentDisplayName string) {
+	// Per-agent context state drives re-anchor / usage-warning decisions for
+	// this turn and is updated from the events below. A load failure disables
+	// context tracking for the turn (never blocks work).
+	ctxState, err := executor.LoadContextState(c.machineID, c.agentID)
+	if err != nil {
+		slog.Warn("failed to load context state; context tracking disabled for turn", "commandID", commandID, "error", err)
+		ctxState = nil
+	} else if ctxState == nil {
+		// First observed turn: start with an empty state so observations and
+		// decisions below have a place to accumulate.
+		ctxState = &executor.ContextState{}
+	}
+
 	// Build the "New messages received:" bounded batch that opens this turn. It
 	// is the user message the LLM is prompted with (the init prompt is sent only
 	// once, at cold start, and inherited via session resume on warm turns).
@@ -420,12 +662,17 @@ func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStre
 			turnPrompt = batch
 		}
 	}
+	turnPrompt = appendContextWarning(turnPrompt, ctxState)
 
-	req := &v1pb.CommandRequest{
-		CommandId:        commandID,
-		Instruction:      turnPrompt,
+	name := agentDisplayName
+	if name == "" {
+		name = c.agentID
+	}
+	req := executor.Request{
+		CommandID:        commandID,
+		TurnPrompt:       turnPrompt,
 		AgentDisplayName: agentDisplayName,
-		TimeoutSeconds:   0,
+		ReanchorPrompt:   reanchorPrompt(ctxState, name),
 	}
 
 	runtime, err := c.newSessionRuntime(req)
@@ -439,6 +686,7 @@ func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStre
 		}); sendErr != nil {
 			slog.Error("failed to send drain session failure result", "commandID", commandID, "error", sendErr)
 		}
+		c.persistContextState(ctxState, nil)
 		return
 	}
 
@@ -447,7 +695,8 @@ func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStre
 	c.isExecuting.Store(true)
 	defer c.isExecuting.Store(false)
 
-	c.runCommand(ctx, runtime, stream, req)
+	result := c.runCommand(ctx, runtime, stream, req, ctxState)
+	c.persistContextState(ctxState, result)
 }
 
 func (c *commandStream) setCurrentExecutor(ex executor.Runtime) {
@@ -466,9 +715,10 @@ func (c *commandStream) runCommand(
 	ctx context.Context,
 	runtime executor.Runtime,
 	stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage],
-	req *v1pb.CommandRequest,
-) {
-	commandID := req.CommandId
+	req executor.Request,
+	ctxState *executor.ContextState,
+) *executor.Result {
+	commandID := req.CommandID
 	state := &executor.LocalState{
 		CommandID:        commandID,
 		ExecutorKind:     "ACP",
@@ -480,6 +730,8 @@ func (c *commandStream) runCommand(
 	if err := executor.SaveLocalState(c.machineID, c.agentID, state); err != nil {
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
 	}
+	observer := newContextObserver(ctxState, stream, commandID, state)
+	defer observer.stopWatchdog()
 
 	resultSent := false
 	defer func() {
@@ -508,7 +760,7 @@ func (c *commandStream) runCommand(
 		},
 	}); err != nil {
 		slog.Error("failed to send command start event", "commandID", commandID, "error", err)
-		return
+		return nil
 	}
 	if err := executor.SaveLocalState(c.machineID, c.agentID, state); err != nil {
 		slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
@@ -519,7 +771,7 @@ func (c *commandStream) runCommand(
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 
 		case <-runtime.Done():
 			_ = merged.flush(stream, commandID, state)
@@ -527,7 +779,7 @@ func (c *commandStream) runCommand(
 			// DrainOutput flushes any output/events the runtime produced while
 			// the consumer was busy sending the result, mutating state so
 			// LastSeqSent/LastEventSeqSent reflect exactly what was forwarded.
-			drainOutput(ctx, runtime, stream, commandID, state, &merged)
+			drainOutput(ctx, runtime, stream, commandID, state, &merged, observer)
 
 			_ = merged.flush(stream, commandID, state)
 
@@ -548,7 +800,13 @@ func (c *commandStream) runCommand(
 				slog.Info("command result sent", "commandID", commandID, "exitCode", result.ExitCode)
 			}
 			_ = executor.ClearLocalState(c.machineID, c.agentID)
-			return
+			return &result
+
+		case <-observer.watchdogCh:
+			if err := observer.onWatchdog(); err != nil {
+				slog.Error("failed to send compaction watchdog warning", "commandID", commandID, "error", err)
+				return nil
+			}
 
 		case event, ok := <-runtime.EventChannel():
 			if !ok {
@@ -557,7 +815,11 @@ func (c *commandStream) runCommand(
 			event.SeqNo = nextEventSeq(state)
 			if err := sendCommandEvent(stream, commandID, &event); err != nil {
 				slog.Error("failed to send command event", "commandID", commandID, "error", err)
-				return
+				return nil
+			}
+			if err := observer.observe(&event); err != nil {
+				slog.Error("failed to send derived context event", "commandID", commandID, "error", err)
+				return nil
 			}
 			if err := executor.SaveLocalState(c.machineID, c.agentID, state); err != nil {
 				slog.Warn("failed to persist local command state", "commandID", commandID, "error", err)
@@ -569,14 +831,14 @@ func (c *commandStream) runCommand(
 			}
 			if err := sendCommandProgress(stream, commandID, chunk); err != nil {
 				slog.Error("failed to send command progress", "commandID", commandID, "error", err)
-				return
+				return nil
 			}
 			state.LastSeqSent = maxSeq(state.LastSeqSent, chunk.SeqNo)
 
 			if merged.append(chunk.StreamType, chunk.Content) {
 				if err := merged.flush(stream, commandID, state); err != nil {
 					slog.Error("failed to send merged text delta", "commandID", commandID, "error", err)
-					return
+					return nil
 				}
 				_ = merged.append(chunk.StreamType, chunk.Content)
 			}
@@ -602,6 +864,7 @@ func drainOutput(
 	commandID string,
 	state *executor.LocalState,
 	merged *mergedText,
+	observer *contextObserver,
 ) {
 	outputClosed, eventClosed := false, false
 	for !outputClosed || !eventClosed {
@@ -635,29 +898,20 @@ func drainOutput(
 				_ = merged.flush(stream, commandID, state)
 				return
 			}
+			if observer != nil {
+				if err := observer.observe(&event); err != nil {
+					slog.Error("failed to send derived context event", "commandID", commandID, "error", err)
+					_ = merged.flush(stream, commandID, state)
+					return
+				}
+			}
 		}
 	}
 	_ = merged.flush(stream, commandID, state)
 }
 
-func (c *commandStream) buildRuntime(req *v1pb.CommandRequest) (executor.Runtime, error) {
-	return executor.NewACP(executor.Request{
-		CommandID:        req.CommandId,
-		TurnPrompt:       req.Instruction,
-		Profile:          req.Profile,
-		WorkingDir:       req.WorkingDir,
-		Env:              req.Env,
-		TimeoutSeconds:   req.TimeoutSeconds,
-		AllowDiff:        req.AllowDiff,
-		ConversationID:   req.ConversationId,
-		AgentResourceID:  c.agentID,
-		AgentDisplayName: req.AgentDisplayName,
-		AgentID:          c.agentID,
-		MachineID:        c.machineID,
-		DaemonSocket:     c.socketPath,
-		SessionToken:     c.sessionToken,
-		BinaryDir:        c.binaryDir,
-	}, c.getAcpConfig())
+func (c *commandStream) buildRuntime(req executor.Request) (executor.Runtime, error) {
+	return executor.NewACP(req, c.getAcpConfig())
 }
 
 func sendCommandProgress(stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, chunk executor.OutputChunk) error {

@@ -200,25 +200,16 @@ func (r *agentRunner) start(ctx context.Context) {
 // buildRuntimeForAgent is the per-turn runtime branch point, overriding the
 // commandStream's default ACP-only builder. A pi agent gets a per-turn
 // PiExecutor over the shared long-lived pi session; every other agent gets the
-// existing ACP executor spawned per turn.
-func (r *agentRunner) buildRuntimeForAgent(req *v1pb.CommandRequest) (executor.Runtime, error) {
-	ereq := executor.Request{
-		CommandID:        req.CommandId,
-		TurnPrompt:       req.Instruction,
-		Profile:          req.Profile,
-		WorkingDir:       req.WorkingDir,
-		Env:              req.Env,
-		TimeoutSeconds:   req.TimeoutSeconds,
-		AllowDiff:        req.AllowDiff,
-		ConversationID:   req.ConversationId,
-		AgentResourceID:  r.agentID,
-		AgentDisplayName: req.AgentDisplayName,
-		AgentID:          r.agentID,
-		MachineID:        r.machine.machineID,
-		DaemonSocket:     r.daemon.SocketPath(),
-		SessionToken:     r.daemon.SessionToken(),
-		BinaryDir:        r.machine.binaryDir,
-	}
+// existing ACP executor spawned per turn. The drain loop's Request already
+// carries the command/turn fields; this fills the machine/daemon wiring.
+func (r *agentRunner) buildRuntimeForAgent(req executor.Request) (executor.Runtime, error) {
+	ereq := req
+	ereq.AgentResourceID = r.agentID
+	ereq.AgentID = r.agentID
+	ereq.MachineID = r.machine.machineID
+	ereq.DaemonSocket = r.daemon.SocketPath()
+	ereq.SessionToken = r.daemon.SessionToken()
+	ereq.BinaryDir = r.machine.binaryDir
 	if piCfg := r.currentPiConfig(); piCfg != nil {
 		r.mu.Lock()
 		sess := r.piSession

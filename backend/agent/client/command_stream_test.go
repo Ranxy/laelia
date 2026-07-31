@@ -53,8 +53,8 @@ func TestCommandStreamRunCommandSendsProgressEventAndResult(t *testing.T) {
 		close(runtime.doneCh)
 	})
 
-	req := &v1pb.CommandRequest{
-		CommandId: "cmd-1",
+	req := executor.Request{
+		CommandID: "cmd-1",
 		Profile:   "opencode",
 	}
 
@@ -63,7 +63,7 @@ func TestCommandStreamRunCommandSendsProgressEventAndResult(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		(&commandStream{}).runCommand(ctx, runtime, stream, req)
+		(&commandStream{}).runCommand(ctx, runtime, stream, req, nil)
 		close(done)
 	}()
 
@@ -145,7 +145,7 @@ func TestDrainOutputSendsProgressAndSynthesizedEvent(t *testing.T) {
 	state := &executor.LocalState{LastSeqSent: 4, LastEventSeqSent: 6}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	drainOutput(ctx, runtime, stream, "cmd-2", state, &mergedText{})
+	drainOutput(ctx, runtime, stream, "cmd-2", state, &mergedText{}, nil)
 
 	assert.Equal(t, int32(9), state.LastSeqSent, "LastSeqSent must advance to the drained chunk")
 	// The synthesized TEXT_DELTA flush increments the event seq from 6 -> 7
@@ -316,7 +316,7 @@ func TestDrainLoopIdleResponseEndsPass(t *testing.T) {
 	cs := &commandStream{
 		wakeCh:      make(chan struct{}, 1),
 		beginRespCh: make(chan *v1pb.BeginSessionResponse, 1),
-		newSessionRuntime: func(_ *v1pb.CommandRequest) (executor.Runtime, error) {
+		newSessionRuntime: func(_ executor.Request) (executor.Runtime, error) {
 			t.Fatal("runtime must not be built for an idle session")
 			return nil, nil
 		},
@@ -369,7 +369,7 @@ func TestRunSessionExecutesRuntime(t *testing.T) {
 	})
 
 	cs := &commandStream{
-		newSessionRuntime: func(_ *v1pb.CommandRequest) (executor.Runtime, error) {
+		newSessionRuntime: func(_ executor.Request) (executor.Runtime, error) {
 			return runtime, nil
 		},
 	}
@@ -434,7 +434,7 @@ func TestDrainOutput_SequenceMonotonic(t *testing.T) {
 	state := &executor.LocalState{LastSeqSent: 4, LastEventSeqSent: 6}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	drainOutput(ctx, runtime, stream, "cmd-m", state, &mergedText{})
+	drainOutput(ctx, runtime, stream, "cmd-m", state, &mergedText{}, nil)
 
 	assert.Equal(t, int32(11), state.LastSeqSent, "LastSeqSent must be the max drained chunk seq")
 	// 2 forwarded events (7, 8) + 1 synthesized TEXT_DELTA flush (9) = 9, which

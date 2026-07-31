@@ -30,11 +30,11 @@ func TestACPCommandStreamReadFile(t *testing.T) {
 	acpConfig := newOpencodeCSConfig(bin, workspace, false)
 	cs := &commandStream{getAcpConfig: func() *executor.ACPConfig { return acpConfig }}
 
-	req := &v1pb.CommandRequest{
-		CommandId:      "acp-cs-read",
+	req := executor.Request{
+		CommandID:      "acp-cs-read",
 		WorkingDir:     workspace,
 		TimeoutSeconds: 120,
-		Instruction:    "Read the file target.txt in the current workspace and reply with exactly its contents. Do not add quotes or any extra words.",
+		TurnPrompt:     "Read the file target.txt in the current workspace and reply with exactly its contents. Do not add quotes or any extra words.",
 	}
 
 	runtime, err := cs.buildRuntime(req)
@@ -45,7 +45,7 @@ func TestACPCommandStreamReadFile(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		cs.runCommand(ctx, runtime, stream, req)
+		cs.runCommand(ctx, runtime, stream, req, nil)
 		close(done)
 	}()
 
@@ -85,11 +85,11 @@ func TestACPCommandStreamWriteFile(t *testing.T) {
 	acpConfig := newOpencodeCSConfig(bin, workspace, true)
 	cs := &commandStream{getAcpConfig: func() *executor.ACPConfig { return acpConfig }}
 
-	req := &v1pb.CommandRequest{
-		CommandId:      "acp-cs-write",
+	req := executor.Request{
+		CommandID:      "acp-cs-write",
 		WorkingDir:     workspace,
 		TimeoutSeconds: 120,
-		Instruction:    "Use your file editing tool to replace the entire contents of note.txt with exactly LAELIA_CS_WRITE_OK. After the write succeeds, reply with exactly DONE.",
+		TurnPrompt:     "Use your file editing tool to replace the entire contents of note.txt with exactly LAELIA_CS_WRITE_OK. After the write succeeds, reply with exactly DONE.",
 		AllowDiff:      true,
 	}
 
@@ -101,7 +101,7 @@ func TestACPCommandStreamWriteFile(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		cs.runCommand(ctx, runtime, stream, req)
+		cs.runCommand(ctx, runtime, stream, req, nil)
 		close(done)
 	}()
 
@@ -138,11 +138,11 @@ func TestACPCommandStreamCancel(t *testing.T) {
 	acpConfig := newOpencodeCSConfig(bin, workspace, false)
 	cs := &commandStream{getAcpConfig: func() *executor.ACPConfig { return acpConfig }}
 
-	req := &v1pb.CommandRequest{
-		CommandId:      "acp-cs-cancel",
+	req := executor.Request{
+		CommandID:      "acp-cs-cancel",
 		WorkingDir:     workspace,
 		TimeoutSeconds: 120,
-		Instruction:    "Create a file named big_report.txt. Write a detailed 500-word markdown report about the history of computing, including sections on early mechanical computers, the transistor era, the microprocessor revolution, the internet age, and modern AI computing. After writing, read back the file and count the words.",
+		TurnPrompt:     "Create a file named big_report.txt. Write a detailed 500-word markdown report about the history of computing, including sections on early mechanical computers, the transistor era, the microprocessor revolution, the internet age, and modern AI computing. After writing, read back the file and count the words.",
 	}
 
 	runtime, err := cs.buildRuntime(req)
@@ -153,7 +153,7 @@ func TestACPCommandStreamCancel(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		cs.runCommand(ctx, runtime, stream, req)
+		cs.runCommand(ctx, runtime, stream, req, nil)
 		close(done)
 	}()
 

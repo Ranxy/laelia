@@ -500,7 +500,14 @@ func (e *PiExecutor) nextSeq() int32 { return e.seqNo.Add(1) }
 func (e *PiExecutor) turnPromptText(resumed bool) string {
 	batch := strings.TrimSpace(e.req.TurnPrompt)
 	if resumed {
-		return batch
+		anchor := strings.TrimSpace(e.req.ReanchorPrompt)
+		if anchor == "" {
+			return batch
+		}
+		if batch == "" {
+			return anchor
+		}
+		return anchor + "\n\n" + batch
 	}
 	initPrompt := executor.BuildPrompt(e.identity, e.cfg.PersonaPrompt)
 	if batch == "" {
@@ -567,6 +574,7 @@ func (e *PiExecutor) finish(err error, resumed bool) {
 		Result:       resultPayload,
 		SessionID:    sessionID,
 		Resumed:      resumed,
+		Fingerprint:  piFingerprint(e.cfg),
 	}
 }
 
