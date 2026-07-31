@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -79,6 +80,14 @@ const outputBufferSize = 1024
 // flushOutputInterval is the periodic buffer-flush cadence, mirroring
 // executor.flushOutputInterval so pi's live-stream latency matches ACP's.
 const flushOutputInterval = 500 * time.Millisecond
+
+// usagePollInterval is how often a long turn re-samples pi's context usage
+// (pi is pull-based; ACP pushes usage updates). A var so tests can shrink it.
+var usagePollInterval = 60 * time.Second
+
+// usagePollTimeout bounds a single get_session_stats round trip so a hung pi
+// cannot delay a turn (the start-of-turn sample blocks before the prompt).
+const usagePollTimeout = 5 * time.Second
 
 // NewPi constructs a per-turn Runtime over the shared pi session. The session
 // is started lazily on the first Start so the opening turn's command id seeds
@@ -162,6 +171,12 @@ func (e *PiExecutor) run() {
 
 	resumed := e.session.IsWarm()
 
+	// Sample context usage at turn start (pi is pull-based, unlike ACP's
+	// pushed UsageUpdate) and keep sampling during long turns. A failed sample
+	// never blocks the turn.
+	e.emitSessionUsage()
+	e.startUsagePoller()
+
 	events := e.session.beginTurn()
 	defer e.session.endTurn()
 
@@ -205,6 +220,81 @@ func (e *PiExecutor) run() {
 	}
 
 	e.finish(nil, resumed)
+}
+
+// emitSessionUsage polls pi's current context-window usage and forwards it as a
+// CONTEXT_USAGE_UPDATE event. Failures are non-fatal: the turn proceeds without
+// an observation (the next poll or turn retries).
+func (e *PiExecutor) emitSessionUsage() {
+	ctx, cancel := context.WithTimeout(e.ctx, usagePollTimeout)
+	defer cancel()
+	stats, err := e.session.sessionStats(ctx)
+	if err != nil {
+		slog.Debug("pi: get_session_stats failed; skipping usage observation", "error", err)
+		return
+	}
+	event := usageEventFromStats(stats)
+	if event == nil {
+		return
+	}
+	e.sendEvent(*event)
+}
+
+// startUsagePoller re-samples pi usage on a fixed cadence until the turn ends,
+// so the context-usage bar stays live during long turns.
+func (e *PiExecutor) startUsagePoller() {
+	ticker := time.NewTicker(usagePollInterval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				e.emitSessionUsage()
+			case <-e.ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+// usageEventFromStats maps a get_session_stats payload to a
+// CONTEXT_USAGE_UPDATE event, or nil when no valid context-window usage is
+// available (contextUsage omitted, or tokens/percent null right after a
+// compaction). pi's displayed percent is preferred for the ratio when present;
+// otherwise it is derived from tokens/contextWindow.
+func usageEventFromStats(stats *sessionStatsData) *executor.Event {
+	if stats == nil || stats.ContextUsage == nil {
+		return nil
+	}
+	cu := stats.ContextUsage
+	if cu.ContextWindow == nil || *cu.ContextWindow <= 0 {
+		return nil
+	}
+	size := *cu.ContextWindow
+	used := int64(0)
+	ratio := float64(0)
+	if cu.Tokens != nil && *cu.Tokens >= 0 {
+		used = *cu.Tokens
+	}
+	if cu.Percent != nil && *cu.Percent >= 0 {
+		ratio = *cu.Percent / 100
+		if used == 0 {
+			used = int64(math.Round(ratio * float64(size)))
+		}
+	} else if used > 0 {
+		ratio = float64(used) / float64(size)
+	} else {
+		return nil
+	}
+	return &executor.Event{
+		Type:    v1pb.CommandEventType_CONTEXT_USAGE_UPDATE,
+		Summary: fmt.Sprintf("Context usage: %d/%d tokens", used, size),
+		ContextUsage: &v1pb.ContextUsagePayload{
+			Size:       size,
+			Used:       used,
+			UsageRatio: ratio,
+		},
+	}
 }
 
 // handleEvent maps one pi event to executor output/events. Returns true when the

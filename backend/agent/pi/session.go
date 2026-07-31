@@ -340,6 +340,24 @@ func (s *Session) prompt(ctx context.Context, message string) error {
 	return nil
 }
 
+// sessionStats fetches the session's token usage and current context-window
+// estimate via get_session_stats. Unlike ACP's pushed UsageUpdate, pi exposes
+// usage only as a pull command, so callers poll it.
+func (s *Session) sessionStats(ctx context.Context) (*sessionStatsData, error) {
+	r, err := s.send(ctx, getSessionStatsCommand{Type: "get_session_stats"})
+	if err != nil {
+		return nil, err
+	}
+	if !r.Success {
+		return nil, pkgerrors.Errorf("pi: get_session_stats failed: %s", r.Error)
+	}
+	var data sessionStatsData
+	if err := json.Unmarshal(r.Data, &data); err != nil {
+		return nil, pkgerrors.Wrap(err, "pi: decode get_session_stats response")
+	}
+	return &data, nil
+}
+
 // abort cancels the current agent operation. Fire-and-forget (no id, no wait).
 func (s *Session) abort() {
 	_ = s.writeLine(abortCommand{Type: "abort"})

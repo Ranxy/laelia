@@ -227,6 +227,99 @@ func TestResponseCorrelation(t *testing.T) {
 	assert.Equal(t, "get_state", r.Command)
 }
 
+// TestSessionStatsResponseDecode verifies the get_session_stats response shape
+// (command framing + contextUsage fields) decodes into sessionStatsData.
+func TestSessionStatsResponseDecode(t *testing.T) {
+	raw := `{"type":"response","id":"laelia-2","command":"get_session_stats","success":true,"data":{"sessionFile":"/tmp/s.jsonl","sessionId":"abc","tokens":{"input":50000,"output":10000,"total":105000},"cost":0.45,"contextUsage":{"tokens":60000,"contextWindow":200000,"percent":30}}}`
+	var r response
+	require.NoError(t, json.Unmarshal([]byte(raw), &r))
+	assert.Equal(t, "get_session_stats", r.Command)
+
+	var data sessionStatsData
+	require.NoError(t, json.Unmarshal(r.Data, &data))
+	require.NotNil(t, data.ContextUsage)
+	require.NotNil(t, data.ContextUsage.Tokens)
+	assert.Equal(t, int64(60000), *data.ContextUsage.Tokens)
+	require.NotNil(t, data.ContextUsage.ContextWindow)
+	assert.Equal(t, int64(200000), *data.ContextUsage.ContextWindow)
+	require.NotNil(t, data.ContextUsage.Percent)
+	assert.InDelta(t, 30.0, *data.ContextUsage.Percent, 1e-9)
+
+	// Command framing: the stats command is a plain JSON object with a type.
+	cmd, err := json.Marshal(getSessionStatsCommand{Type: "get_session_stats"})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"type":"get_session_stats"}`, string(cmd))
+}
+
+// TestUsageEventFromStats maps get_session_stats data to the structured usage
+// event the frontend progress bar consumes.
+func TestUsageEventFromStats(t *testing.T) {
+	i64 := func(v int64) *int64 { return &v }
+	f64 := func(v float64) *float64 { return &v }
+
+	t.Run("valid with percent", func(t *testing.T) {
+		ev := usageEventFromStats(&sessionStatsData{
+			ContextUsage: &sessionContextUsage{
+				Tokens:        i64(60000),
+				ContextWindow: i64(200000),
+				Percent:       f64(30),
+			},
+		})
+		require.NotNil(t, ev)
+		assert.Equal(t, v1pb.CommandEventType_CONTEXT_USAGE_UPDATE, ev.Type)
+		require.NotNil(t, ev.ContextUsage)
+		assert.Equal(t, int64(200000), ev.ContextUsage.Size)
+		assert.Equal(t, int64(60000), ev.ContextUsage.Used)
+		assert.InDelta(t, 0.3, ev.ContextUsage.UsageRatio, 1e-9)
+	})
+
+	t.Run("derived ratio without percent", func(t *testing.T) {
+		ev := usageEventFromStats(&sessionStatsData{
+			ContextUsage: &sessionContextUsage{
+				Tokens:        i64(50000),
+				ContextWindow: i64(200000),
+			},
+		})
+		require.NotNil(t, ev)
+		assert.InDelta(t, 0.25, ev.ContextUsage.UsageRatio, 1e-9)
+	})
+
+	t.Run("tokens null after compaction, percent present", func(t *testing.T) {
+		ev := usageEventFromStats(&sessionStatsData{
+			ContextUsage: &sessionContextUsage{
+				ContextWindow: i64(200000),
+				Percent:       f64(25),
+			},
+		})
+		require.NotNil(t, ev)
+		assert.Equal(t, int64(50000), ev.ContextUsage.Used, "used derived from percent when tokens are null")
+	})
+
+	t.Run("omitted contextUsage", func(t *testing.T) {
+		assert.Nil(t, usageEventFromStats(&sessionStatsData{}))
+		assert.Nil(t, usageEventFromStats(nil))
+	})
+
+	t.Run("null after compaction", func(t *testing.T) {
+		ev := usageEventFromStats(&sessionStatsData{
+			ContextUsage: &sessionContextUsage{
+				ContextWindow: i64(200000),
+			},
+		})
+		assert.Nil(t, ev, "tokens and percent both null -> no usable observation")
+	})
+
+	t.Run("zero context window", func(t *testing.T) {
+		ev := usageEventFromStats(&sessionStatsData{
+			ContextUsage: &sessionContextUsage{
+				Tokens:        i64(1),
+				ContextWindow: i64(0),
+			},
+		})
+		assert.Nil(t, ev)
+	})
+}
+
 // TestEventMapping_TextDeltaAndToolCalls exercises the executor's event→Event
 // mapping without spawning a subprocess: feed events through handleEvent and
 // assert the emitted executor.Events.

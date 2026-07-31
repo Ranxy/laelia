@@ -33,6 +33,11 @@ type getStateCommand struct {
 	ID   string `json:"id,omitempty"`
 }
 
+type getSessionStatsCommand struct {
+	Type string `json:"type"`
+	ID   string `json:"id,omitempty"`
+}
+
 type switchSessionCommand struct {
 	Type        string `json:"type"`
 	ID          string `json:"id,omitempty"`
@@ -54,6 +59,25 @@ type response struct {
 type getStateData struct {
 	SessionFile string `json:"sessionFile"`
 	SessionID   string `json:"sessionId"`
+}
+
+// sessionStatsData is the `data` payload of a get_session_stats response. It
+// carries cumulative token/cost statistics plus the current context-window
+// estimate pi uses for compaction and footer display.
+type sessionStatsData struct {
+	SessionFile  string               `json:"sessionFile,omitempty"`
+	SessionID    string               `json:"sessionId,omitempty"`
+	ContextUsage *sessionContextUsage `json:"contextUsage,omitempty"`
+}
+
+// sessionContextUsage is the current context-window estimate. tokens/percent
+// are null immediately after a compaction until a fresh assistant response
+// provides valid usage; the whole object is omitted when no model/context
+// window is available.
+type sessionContextUsage struct {
+	Tokens        *int64   `json:"tokens"`
+	ContextWindow *int64   `json:"contextWindow"`
+	Percent       *float64 `json:"percent"`
 }
 
 // event is the raw envelope for a streamed stdout line. Type discriminates the
