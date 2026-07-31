@@ -67,6 +67,37 @@ func TestLoadSaveClearACPSession_RoundTrip(t *testing.T) {
 	clearACPSession(machineID, agentID)
 }
 
+// TestRecordResumeFailure_ThresholdAndReset guards the G8 resume-failure
+// counter: each failure increments the context-state counter, and the third
+// consecutive failure reports warned=true and resets it to 0 (the caller
+// surfaces the WARNING).
+func TestRecordResumeFailure_ThresholdAndReset(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	// recordResumeFailure does not save (the drain loop persists the counter
+	// at the end of the turn via Result.ResumeFailures), so persist between
+	// calls the way the drain loop would.
+	failures, warned := recordResumeFailure("m", "a")
+	assert.Equal(t, 1, failures)
+	assert.False(t, warned)
+	require.NoError(t, SaveContextState("m", "a", &ContextState{Session: SessionHealth{ResumeFailures: failures}}))
+
+	failures, warned = recordResumeFailure("m", "a")
+	assert.Equal(t, 2, failures)
+	assert.False(t, warned)
+	require.NoError(t, SaveContextState("m", "a", &ContextState{Session: SessionHealth{ResumeFailures: failures}}))
+
+	failures, warned = recordResumeFailure("m", "a")
+	assert.Equal(t, 0, failures, "counter resets after the warning threshold")
+	assert.True(t, warned)
+
+	// The counter is read from the persisted context state (not a global), so
+	// a fresh agent starts at 1 again.
+	failures, warned = recordResumeFailure("other", "agent")
+	assert.Equal(t, 1, failures)
+	assert.False(t, warned)
+}
+
 // TestTurnPromptText_ColdVsWarm guards the core token-saving invariant:
 //   - warm (resumed) turn sends ONLY the batch;
 //   - cold turn prepends the init prompt (identity + persona) and appends the batch;

@@ -530,6 +530,9 @@ func (e *PiExecutor) finish(err error, resumed bool) {
 	errMsg := ""
 	if err != nil {
 		errMsg = err.Error()
+		if executor.ClassifyInputTooLarge(err) {
+			errMsg = strings.TrimRight(errMsg, "\n") + "\n\n" + executor.InputTooLargeGuidance
+		}
 		exitCode = 1
 		if errors.Is(err, context.DeadlineExceeded) {
 			exitCode = 124

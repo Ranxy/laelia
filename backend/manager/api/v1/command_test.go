@@ -4,6 +4,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
@@ -38,6 +45,56 @@ func TestBuildLightChatContextEmpty(t *testing.T) {
 	result := buildLightChatContext(nil)
 	if !strings.Contains(result, "## Recent conversation") {
 		t.Error("expected header even for empty entries")
+	}
+}
+
+// TestConvertToV1CommandEvent_ContextPayloads guards the persisted-event
+// round trip for the context event types: without these unmarshal cases the
+// frontend receives events whose payload is unset, and the context usage bar /
+// compaction rows render nothing.
+func TestConvertToV1CommandEvent_ContextPayloads(t *testing.T) {
+	cmdID := uuid.New()
+	cases := []struct {
+		name    string
+		event   v1pb.CommandEventType
+		payload proto.Message
+		check   func(*testing.T, *v1pb.CommandEvent)
+	}{
+		{
+			name:    "compaction",
+			event:   v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED,
+			payload: &v1pb.ContextCompactionPayload{Reason: "window full", Inferred: true},
+			check: func(t *testing.T, ev *v1pb.CommandEvent) {
+				require.NotNil(t, ev.GetContextCompaction())
+				assert.Equal(t, "window full", ev.GetContextCompaction().GetReason())
+				assert.True(t, ev.GetContextCompaction().GetInferred())
+			},
+		},
+		{
+			name:    "usage",
+			event:   v1pb.CommandEventType_CONTEXT_USAGE_UPDATE,
+			payload: &v1pb.ContextUsagePayload{Size: 200000, Used: 180000, UsageRatio: 0.9},
+			check: func(t *testing.T, ev *v1pb.CommandEvent) {
+				require.NotNil(t, ev.GetContextUsage())
+				assert.Equal(t, int64(200000), ev.GetContextUsage().GetSize())
+				assert.Equal(t, int64(180000), ev.GetContextUsage().GetUsed())
+				assert.InDelta(t, 0.9, ev.GetContextUsage().GetUsageRatio(), 1e-9)
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			data, err := protojson.Marshal(tc.payload)
+			require.NoError(t, err)
+			ev := convertToV1CommandEvent(&store.CommandEventMessage{
+				CommandID:   cmdID,
+				SeqNo:       1,
+				EventType:   int32(tc.event),
+				Summary:     "summary",
+				PayloadJSON: string(data),
+			})
+			tc.check(t, ev)
+		})
 	}
 }
 

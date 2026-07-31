@@ -314,3 +314,19 @@ func TestPersistContextStateFingerprintReset(t *testing.T) {
 	assert.Equal(t, "new", loaded.Fingerprint)
 	assert.Equal(t, 1, loaded.Session.ColdStarts)
 }
+
+func TestPersistContextStateResumeFailures(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	cs := &commandStream{machineID: "m", agentID: "a"}
+	state := &executor.ContextState{
+		Session:     executor.SessionHealth{Turns: 3, ResumeFailures: 0},
+		Fingerprint: "fp",
+	}
+	cs.persistContextState(state, &executor.Result{Fingerprint: "fp", Resumed: false, ResumeFailures: 2})
+	assert.Equal(t, 2, state.Session.ResumeFailures, "failed resume count mirrors the executor's counter")
+	assert.Zero(t, state.Session.Turns, "cold start resets the warm-turn counter")
+
+	cs.persistContextState(state, &executor.Result{Fingerprint: "fp", Resumed: true, ResumeFailures: 0})
+	assert.Zero(t, state.Session.ResumeFailures, "successful warm resume clears the failure counter")
+	assert.Equal(t, 1, state.Session.Turns)
+}

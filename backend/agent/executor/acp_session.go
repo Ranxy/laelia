@@ -8,6 +8,10 @@ import (
 	"path/filepath"
 )
 
+// maxResumeFailuresBeforeWarning is the consecutive ResumeSession failure count
+// that surfaces a WARNING event (and resets the counter).
+const maxResumeFailuresBeforeWarning = 3
+
 // acpSessionState is the durable record of the ACP session an agent is reusing
 // across drain turns. Each turn spawns a fresh ACP subprocess (cold start is
 // cheap and frees resources while idle), but resumes the SAME Acp SessionId so
@@ -80,4 +84,22 @@ func saveACPSession(machineID, agentID string, state *acpSessionState) error {
 // not loop forever retrying a dead id.
 func clearACPSession(machineID, agentID string) {
 	_ = os.Remove(acpSessionPath(machineID, agentID))
+}
+
+// recordResumeFailure increments the consecutive resume-failure counter in the
+// agent's context state and reports whether the warning threshold was crossed
+// (the counter is reset to 0 once it is). It does not save: the drain loop
+// persists the counter at the end of the turn via Result.ResumeFailures, so the
+// context state keeps a single writer.
+func recordResumeFailure(machineID, agentID string) (failures int, warned bool) {
+	state, err := LoadContextState(machineID, agentID)
+	if err != nil || state == nil {
+		state = &ContextState{}
+	}
+	state.Session.ResumeFailures++
+	if state.Session.ResumeFailures >= maxResumeFailuresBeforeWarning {
+		state.Session.ResumeFailures = 0
+		return 0, true
+	}
+	return state.Session.ResumeFailures, false
 }

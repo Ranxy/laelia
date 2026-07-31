@@ -766,6 +766,10 @@ func (d *Dispatcher) FetchConversationActivity(ctx context.Context, conversation
 			}
 		case int32(v1pb.CommandEventType_TOOL_CALL_FINISHED):
 			act.Status = "thinking"
+		case int32(v1pb.CommandEventType_CONTEXT_COMPACTION_STARTED):
+			act.Status = "compacting"
+		case int32(v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED), int32(v1pb.CommandEventType_CONTEXT_USAGE_UPDATE):
+			act.Status = "thinking"
 		default:
 			act.Status = "starting"
 		}
@@ -1303,6 +1307,10 @@ func marshalEventPayload(event *v1pb.CommandEvent) ([]byte, error) {
 		return protojson.Marshal(event.GetPermissionTimedOut())
 	case v1pb.CommandEventType_PERMISSION_DECIDED:
 		return protojson.Marshal(event.GetPermissionDecided())
+	case v1pb.CommandEventType_CONTEXT_COMPACTION_STARTED, v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED:
+		return protojson.Marshal(event.GetContextCompaction())
+	case v1pb.CommandEventType_CONTEXT_USAGE_UPDATE:
+		return protojson.Marshal(event.GetContextUsage())
 	default:
 		return nil, nil
 	}

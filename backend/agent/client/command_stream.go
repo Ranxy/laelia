@@ -626,6 +626,10 @@ func (c *commandStream) persistContextState(ctxState *executor.ContextState, res
 			ctxState.Session.Turns = 0
 			ctxState.Session.ColdStarts++
 		}
+		// The ACP executor owns the resume-failure counter (it increments on
+		// each failed ResumeSession and resets after the warning); mirror its
+		// final value so this save is the single writer for the file.
+		ctxState.Session.ResumeFailures = result.ResumeFailures
 	}
 	if err := executor.SaveContextState(c.machineID, c.agentID, ctxState); err != nil {
 		slog.Warn("failed to persist context state", "agent", c.agentID, "error", err)

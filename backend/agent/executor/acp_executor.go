@@ -198,6 +198,7 @@ type ACPExecutor struct {
 	sessionID        string
 	initializedAgent string
 	fingerprint      string
+	resumeFailures   int
 	// replayingHistory is set while a session/resume RPC is in flight. Some ACP
 	// agents (notably opencode v1.17.x) replay the entire prior conversation as
 	// session/update notifications DURING session/resume — before the resume
@@ -464,6 +465,17 @@ func (e *ACPExecutor) run() {
 			// truth, so no message is lost, only the init prompt is re-sent.
 			slog.Warn("acp session resume failed; cold-starting", "agent", e.request.AgentID, "session_id", existing.SessionID, "error", resumeErr)
 			clearACPSession(e.request.MachineID, e.request.AgentID)
+			failures, warned := recordResumeFailure(e.request.MachineID, e.request.AgentID)
+			e.resumeFailures = failures
+			if warned {
+				e.sendEvent(Event{
+					Type:    v1pb.CommandEventType_WARNING,
+					Summary: "ACP session resume failed repeatedly; starting a fresh session",
+					Warning: &v1pb.WarningPayload{
+						Message: "ACP session resume failed 3 times in a row; cold-starting a fresh session.",
+					},
+				})
+			}
 		} else {
 			e.sessionID = existing.SessionID
 			configOpts = resumeResp.ConfigOptions
@@ -625,7 +637,11 @@ func (e *ACPExecutor) finishACPProcess(err error) {
 		e.sendACPResult(Result{ExitCode: 130, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: e.ctx.Err().Error()})
 		return
 	}
-	e.sendACPResult(Result{ExitCode: 1, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: simplifyACPError(err)})
+	errMsg := simplifyACPError(err)
+	if ClassifyInputTooLarge(err) {
+		errMsg = strings.TrimRight(errMsg, "\n") + "\n\n" + InputTooLargeGuidance
+	}
+	e.sendACPResult(Result{ExitCode: 1, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: errMsg})
 }
 
 func (e *ACPExecutor) scanACPStderr(stderr io.Reader) {
@@ -642,6 +658,9 @@ func (e *ACPExecutor) scanACPStderr(stderr io.Reader) {
 func (e *ACPExecutor) sendACPResult(result Result) {
 	if result.Fingerprint == "" {
 		result.Fingerprint = e.fingerprint
+	}
+	if result.ResumeFailures == 0 {
+		result.ResumeFailures = e.resumeFailures
 	}
 	result.LastSeqNo = e.seqNo.Load()
 	e.resultCh <- result

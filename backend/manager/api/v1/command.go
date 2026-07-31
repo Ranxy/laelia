@@ -396,6 +396,16 @@ func convertToV1CommandEvent(event *store.CommandEventMessage) *v1pb.CommandEven
 			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
 				v1Event.Payload = &v1pb.CommandEvent_PermissionDecided{PermissionDecided: p}
 			}
+		case v1pb.CommandEventType_CONTEXT_COMPACTION_STARTED, v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED:
+			p := &v1pb.ContextCompactionPayload{}
+			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
+				v1Event.Payload = &v1pb.CommandEvent_ContextCompaction{ContextCompaction: p}
+			}
+		case v1pb.CommandEventType_CONTEXT_USAGE_UPDATE:
+			p := &v1pb.ContextUsagePayload{}
+			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
+				v1Event.Payload = &v1pb.CommandEvent_ContextUsage{ContextUsage: p}
+			}
 		default:
 		}
 	}

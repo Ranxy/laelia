@@ -185,6 +185,24 @@ func TestMarshalEventPayload(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "context_compaction_finished",
+			event: &v1pb.CommandEvent{
+				Type: v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED,
+				Payload: &v1pb.CommandEvent_ContextCompaction{
+					ContextCompaction: &v1pb.ContextCompactionPayload{Reason: "window full", Inferred: true},
+				},
+			},
+		},
+		{
+			name: "context_usage_update",
+			event: &v1pb.CommandEvent{
+				Type: v1pb.CommandEventType_CONTEXT_USAGE_UPDATE,
+				Payload: &v1pb.CommandEvent_ContextUsage{
+					ContextUsage: &v1pb.ContextUsagePayload{Size: 200000, Used: 180000, UsageRatio: 0.9},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

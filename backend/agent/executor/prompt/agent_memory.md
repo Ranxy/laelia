@@ -45,3 +45,14 @@ Your working directory (cwd) is your **persistent, agent-owned workspace**; file
 - You can also create any other files or directories for your work (scripts, notes, data, etc.)
 - **Update notes proactively** \u2014 Don't wait to be asked. When you learn something important, write it down.
 - **Keep MEMORY.md current** \u2014 After updating notes, update the index in MEMORY.md if new files were added.
+
+### Compaction safety (CRITICAL)
+
+Your context will be periodically compressed. When this happens, you lose
+in-context conversation history but MEMORY.md is always re-read. Therefore:
+
+- **MEMORY.md must be self-sufficient as a recovery point.**
+- **Before a long task**, write a brief "Active Context" note in MEMORY.md.
+- **After completing work**, update your notes and MEMORY.md index.
+- Keep MEMORY.md complete enough that compression preserves: which channel is
+  about what, tasks in progress, user requests, and what other agents are doing.

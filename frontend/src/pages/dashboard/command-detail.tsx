@@ -5,6 +5,7 @@ import { ChatToolCall } from "@/components/chat-events/tool-call";
 import { CommandStatusBadge } from "@/components/command-status-badge";
 import { FinalSummary } from "@/components/command-terminal";
 import { CommandTimeline } from "@/components/command-timeline";
+import { ContextUsageBar } from "@/components/context-usage-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -212,6 +213,12 @@ export function CommandDetailPage() {
   const outputs = activeOutputs[cmdName] ?? [];
   const events = activeEvents[cmdName] ?? [];
   const visibleEvents = events.filter(isVisibleEvent);
+  const latestUsage = useMemo(() => {
+    const usage = visibleEvents.filter(
+      (ev) => ev.type === CommandEventType.CONTEXT_USAGE_UPDATE
+    );
+    return usage.length > 0 ? usage[usage.length - 1] : null;
+  }, [visibleEvents]);
 
   // Pair TOOL_CALL_STARTED with TOOL_CALL_FINISHED so the Events panel shows
   // one structured card per tool call (input + output) instead of two
@@ -232,6 +239,9 @@ export function CommandDetailPage() {
   }, [toolPairs]);
 
   const renderEvent = (ev: CommandEvent) => {
+    // Usage updates are rendered as one live progress bar (latestUsage), not
+    // one row per rate-limited update.
+    if (ev.type === CommandEventType.CONTEXT_USAGE_UPDATE) return null;
     if (ev.type === CommandEventType.TOOL_CALL_STARTED) {
       const pair = toolPairByStartedSeqNo.get(ev.seqNo);
       return (
@@ -398,6 +408,7 @@ export function CommandDetailPage() {
                 {t("command.events")}
               </h2>
               <div className="rounded border border-control-border p-2 flex flex-col gap-1 flex-1 min-h-0 overflow-auto max-h-[400px] lg:max-h-none">
+                {latestUsage && <ContextUsageBar event={latestUsage} />}
                 {visibleEvents.map((ev) => renderEvent(ev))}
               </div>
             </div>
