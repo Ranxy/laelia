@@ -287,6 +287,38 @@ done:
 	assert.Equal(t, int32(1), e.toolCallCount.Load())
 }
 
+// TestEventMapping_CompactionEvents verifies pi's compaction_start/end events
+// are promoted to structured CONTEXT_COMPACTION_* events with the reason.
+func TestEventMapping_CompactionEvents(t *testing.T) {
+	e := newTestExecutor(t)
+	defer close(e.outputCh)
+	defer close(e.eventCh)
+	defer close(e.resultCh)
+	defer close(e.done)
+
+	e.handleEvent(&event{Type: eventCompactionStart, Reason: "  window full  "})
+	e.handleEvent(&event{Type: eventCompactionEnd, Reason: "  window full  "})
+
+	var events []executor.Event
+	for {
+		select {
+		case ev := <-e.eventCh:
+			events = append(events, ev)
+		default:
+			goto done
+		}
+	}
+done:
+	require.Len(t, events, 2, "compaction start + end")
+	assert.Equal(t, v1pb.CommandEventType_CONTEXT_COMPACTION_STARTED, events[0].Type)
+	require.NotNil(t, events[0].ContextCompaction)
+	assert.Equal(t, "window full", events[0].ContextCompaction.Reason)
+	assert.False(t, events[0].ContextCompaction.Inferred, "pi events are direct, not inferred")
+	assert.Equal(t, v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED, events[1].Type)
+	require.NotNil(t, events[1].ContextCompaction)
+	assert.Equal(t, "window full", events[1].ContextCompaction.Reason)
+}
+
 // TestDeriveToolTitle covers the tool-card title derivation: the bash command
 // becomes the title; read/edit append the path; unknown shapes fall back to the
 // tool name.

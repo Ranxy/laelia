@@ -4331,6 +4331,9 @@ components:
                         - PERMISSION_REQUESTED
                         - PERMISSION_TIMED_OUT
                         - PERMISSION_DECIDED
+                        - CONTEXT_COMPACTION_STARTED
+                        - CONTEXT_COMPACTION_FINISHED
+                        - CONTEXT_USAGE_UPDATE
                     type: string
                     format: enum
                 summary:
@@ -4360,6 +4363,10 @@ components:
                     $ref: '#/components/schemas/PermissionTimedOutPayload'
                 permissionDecided:
                     $ref: '#/components/schemas/PermissionDecidedPayload'
+                contextCompaction:
+                    $ref: '#/components/schemas/ContextCompactionPayload'
+                contextUsage:
+                    $ref: '#/components/schemas/ContextUsagePayload'
         CommandOutput:
             type: object
             properties:
@@ -4460,6 +4467,30 @@ components:
                     description: |-
                         The full set of agents this machine must host. The machine app opens one
                          AgentChannel per entry immediately after connect (and on every reconnect).
+        ContextCompactionPayload:
+            type: object
+            properties:
+                reason:
+                    type: string
+                inferred:
+                    type: boolean
+            description: |-
+                ContextCompactionPayload describes a context-window compaction observed on
+                 the agent runtime. inferred is true when the compaction was detected
+                 indirectly (e.g. a usage drop) rather than reported by the agent.
+        ContextUsagePayload:
+            type: object
+            properties:
+                size:
+                    type: string
+                used:
+                    type: string
+                usageRatio:
+                    type: number
+                    format: double
+            description: |-
+                ContextUsagePayload is a point-in-time snapshot of the session context
+                 window. usage_ratio is used/size.
         Conversation:
             type: object
             properties:

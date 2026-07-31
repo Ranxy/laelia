@@ -686,6 +686,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ContextCompactionPayload"><span class="badge">M</span>ContextCompactionPayload</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ContextUsagePayload"><span class="badge">M</span>ContextUsagePayload</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.Conversation"><span class="badge">M</span>Conversation</a>
                 </li>
               
@@ -6556,6 +6564,20 @@ FAILED_PRECONDITION instead and this response is not sent. </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>context_compaction</td>
+                  <td><a href="#laelia.v1.ContextCompactionPayload">ContextCompactionPayload</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>context_usage</td>
+                  <td><a href="#laelia.v1.ContextUsagePayload">ContextUsagePayload</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -6898,6 +6920,75 @@ update so it never appears twice. </p></td>
                 <tr>
                   <td>reminder</td>
                   <td><a href="#laelia.v1.Reminder">Reminder</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ContextCompactionPayload">ContextCompactionPayload</h3>
+        <p>ContextCompactionPayload describes a context-window compaction observed on</p><p>the agent runtime. inferred is true when the compaction was detected</p><p>indirectly (e.g. a usage drop) rather than reported by the agent.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>reason</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>inferred</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ContextUsagePayload">ContextUsagePayload</h3>
+        <p>ContextUsagePayload is a point-in-time snapshot of the session context</p><p>window. usage_ratio is used/size.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>size</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>used</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>usage_ratio</td>
+                  <td><a href="#double">double</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -11024,6 +11115,24 @@ produce no Activity row.</p></td>
               <tr>
                 <td>PERMISSION_DECIDED</td>
                 <td>11</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>CONTEXT_COMPACTION_STARTED</td>
+                <td>12</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>CONTEXT_COMPACTION_FINISHED</td>
+                <td>13</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>CONTEXT_USAGE_UPDATE</td>
+                <td>14</td>
                 <td><p></p></td>
               </tr>
             

@@ -248,6 +248,57 @@ func TestACPSessionUpdateFlushesOnToolCallBoundary(t *testing.T) {
 	assert.Equal(t, "hello", output.Content)
 }
 
+// TestACPSessionUpdateEmitsContextUsage guards UsageUpdate parsing: the first
+// update emits a structured CONTEXT_USAGE_UPDATE event, updates inside the
+// rate-limit window are suppressed, and updates after the interval flow again.
+func TestACPSessionUpdateEmitsContextUsage(t *testing.T) {
+	exec := newTestBufferedExecutor()
+	client := &acpRuntimeClient{executor: exec}
+
+	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
+		Update: acp.SessionUpdate{UsageUpdate: &acp.SessionUsageUpdate{Size: 200000, Used: 180000}},
+	}))
+	// Same window: rate-limited away.
+	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
+		Update: acp.SessionUpdate{UsageUpdate: &acp.SessionUsageUpdate{Size: 200000, Used: 190000}},
+	}))
+	// Interval elapsed: the next update flows.
+	exec.usageMu.Lock()
+	exec.lastUsageEmit = time.Now().Add(-usageUpdateMinInterval - time.Second)
+	exec.usageMu.Unlock()
+	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
+		Update: acp.SessionUpdate{UsageUpdate: &acp.SessionUsageUpdate{Size: 200000, Used: 195000}},
+	}))
+
+	var usageEvents []Event
+	for len(exec.eventCh) > 0 {
+		ev := <-exec.eventCh
+		if ev.Type == v1pb.CommandEventType_CONTEXT_USAGE_UPDATE {
+			usageEvents = append(usageEvents, ev)
+		}
+	}
+	require.Len(t, usageEvents, 2, "rate limit suppresses the middle update")
+	require.NotNil(t, usageEvents[0].ContextUsage)
+	assert.Equal(t, int64(200000), usageEvents[0].ContextUsage.Size)
+	assert.Equal(t, int64(180000), usageEvents[0].ContextUsage.Used)
+	assert.InDelta(t, 0.9, usageEvents[0].ContextUsage.UsageRatio, 1e-9)
+	require.NotNil(t, usageEvents[1].ContextUsage)
+	assert.Equal(t, int64(195000), usageEvents[1].ContextUsage.Used)
+}
+
+// TestACPSessionUpdateSkipsUsageDuringReplay: usage notifications replayed
+// during session/resume must not surface as fresh CONTEXT_USAGE_UPDATE events.
+func TestACPSessionUpdateSkipsUsageDuringReplay(t *testing.T) {
+	exec := newTestBufferedExecutor()
+	client := &acpRuntimeClient{executor: exec}
+
+	exec.replayingHistory.Store(true)
+	require.NoError(t, client.SessionUpdate(context.Background(), acp.SessionNotification{
+		Update: acp.SessionUpdate{UsageUpdate: &acp.SessionUsageUpdate{Size: 200000, Used: 100000}},
+	}))
+	assert.Empty(t, exec.eventCh, "replayed usage must not emit events")
+}
+
 func TestACPSessionUpdateFlushesOnSizeThreshold(t *testing.T) {
 	exec := newTestBufferedExecutor()
 	exec.config.OutputFlushBytes = 20

@@ -27,6 +27,7 @@ import (
 const flushOutputInterval = 500 * time.Millisecond
 const maxRawEventBatchSize = 256
 const permissionTimeout = 120 * time.Second
+const usageUpdateMinInterval = 5 * time.Second
 
 // debugToolCalls gates verbose logging of every ACP ToolCall / ToolCallUpdate
 // frame the agent receives, so we can see exactly which fields (esp. rawInput,
@@ -214,7 +215,12 @@ type ACPExecutor struct {
 	toolCallAdapter provider.ToolCallAdapter
 	buffer          outputBuffer
 	rawEvents       rawEventBatch
-	permissionCh    chan acp.PermissionOptionId
+	// usageMu guards lastUsageEmit, which rate-limits CONTEXT_USAGE_UPDATE
+	// events so streaming ACP UsageUpdate notifications do not flood the
+	// command timeline.
+	usageMu       sync.Mutex
+	lastUsageEmit time.Time
+	permissionCh  chan acp.PermissionOptionId
 	// permMu guards perCommandAllow/perCommandReject. The ACP client methods
 	// may be invoked concurrently; without a lock these maps would race.
 	permMu           sync.Mutex
@@ -1080,10 +1086,37 @@ func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNo
 		c.executor.rawEvents.flush(c.executor)
 		c.executor.rawEvents.append(c.executor, "usage", toJSONMap(u.UsageUpdate))
 		c.executor.rawEvents.flush(c.executor)
+		c.executor.emitContextUsage(u.UsageUpdate)
 	default:
 		c.executor.rawEvents.append(c.executor, "session_update", toJSONMap(u))
 	}
 	return nil
+}
+
+// emitContextUsage forwards a parsed ACP UsageUpdate as a structured
+// CONTEXT_USAGE_UPDATE event, rate-limited to usageUpdateMinInterval. Updates
+// with a missing/zero window size are skipped (the ACP capability is UNSTABLE).
+func (e *ACPExecutor) emitContextUsage(u *acp.SessionUsageUpdate) {
+	if u == nil || u.Size <= 0 {
+		return
+	}
+	e.usageMu.Lock()
+	if time.Since(e.lastUsageEmit) < usageUpdateMinInterval {
+		e.usageMu.Unlock()
+		return
+	}
+	e.lastUsageEmit = time.Now()
+	e.usageMu.Unlock()
+
+	e.sendEvent(Event{
+		Type:    v1pb.CommandEventType_CONTEXT_USAGE_UPDATE,
+		Summary: fmt.Sprintf("Context usage: %d/%d tokens", u.Used, u.Size),
+		ContextUsage: &v1pb.ContextUsagePayload{
+			Size:       int64(u.Size),
+			Used:       int64(u.Used),
+			UsageRatio: float64(u.Used) / float64(u.Size),
+		},
+	})
 }
 
 func (c *acpRuntimeClient) CreateTerminal(context.Context, acp.CreateTerminalRequest) (acp.CreateTerminalResponse, error) {

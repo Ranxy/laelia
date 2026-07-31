@@ -43,6 +43,11 @@ const commandEventTypeToI18nKey: Record<CommandEventType, string> = {
   [CommandEventType.PERMISSION_REQUESTED]: "command.event-permission-requested",
   [CommandEventType.PERMISSION_TIMED_OUT]: "command.event-permission-timed-out",
   [CommandEventType.PERMISSION_DECIDED]: "command.event-permission-decided",
+  [CommandEventType.CONTEXT_COMPACTION_STARTED]:
+    "command.event-context-compaction-started",
+  [CommandEventType.CONTEXT_COMPACTION_FINISHED]:
+    "command.event-context-compaction-finished",
+  [CommandEventType.CONTEXT_USAGE_UPDATE]: "command.event-context-usage",
 };
 
 function formatDuration(ms: number | bigint | undefined): string {

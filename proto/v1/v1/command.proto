@@ -78,6 +78,9 @@ enum CommandEventType {
   PERMISSION_REQUESTED = 9;
   PERMISSION_TIMED_OUT = 10;
   PERMISSION_DECIDED = 11;
+  CONTEXT_COMPACTION_STARTED = 12;
+  CONTEXT_COMPACTION_FINISHED = 13;
+  CONTEXT_USAGE_UPDATE = 14;
 }
 
 message Command {
@@ -149,6 +152,8 @@ message CommandEvent {
     PermissionRequestedPayload permission_requested = 18;
     PermissionTimedOutPayload permission_timed_out = 19;
     PermissionDecidedPayload permission_decided = 20;
+    ContextCompactionPayload context_compaction = 21;
+    ContextUsagePayload context_usage = 22;
   }
 }
 
@@ -215,6 +220,22 @@ message PermissionDecidedPayload {
   string kind = 2;
   string option_id = 3;
   string option_kind = 4;
+}
+
+// ContextCompactionPayload describes a context-window compaction observed on
+// the agent runtime. inferred is true when the compaction was detected
+// indirectly (e.g. a usage drop) rather than reported by the agent.
+message ContextCompactionPayload {
+  string reason = 1;
+  bool inferred = 2;
+}
+
+// ContextUsagePayload is a point-in-time snapshot of the session context
+// window. usage_ratio is used/size.
+message ContextUsagePayload {
+  int64 size = 1;
+  int64 used = 2;
+  double usage_ratio = 3;
 }
 
 message SearchChatHistoryRequest {

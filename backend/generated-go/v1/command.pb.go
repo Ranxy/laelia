@@ -219,6 +219,9 @@ const (
 	CommandEventType_PERMISSION_REQUESTED           CommandEventType = 9
 	CommandEventType_PERMISSION_TIMED_OUT           CommandEventType = 10
 	CommandEventType_PERMISSION_DECIDED             CommandEventType = 11
+	CommandEventType_CONTEXT_COMPACTION_STARTED     CommandEventType = 12
+	CommandEventType_CONTEXT_COMPACTION_FINISHED    CommandEventType = 13
+	CommandEventType_CONTEXT_USAGE_UPDATE           CommandEventType = 14
 )
 
 // Enum value maps for CommandEventType.
@@ -236,6 +239,9 @@ var (
 		9:  "PERMISSION_REQUESTED",
 		10: "PERMISSION_TIMED_OUT",
 		11: "PERMISSION_DECIDED",
+		12: "CONTEXT_COMPACTION_STARTED",
+		13: "CONTEXT_COMPACTION_FINISHED",
+		14: "CONTEXT_USAGE_UPDATE",
 	}
 	CommandEventType_value = map[string]int32{
 		"COMMAND_EVENT_TYPE_UNSPECIFIED": 0,
@@ -250,6 +256,9 @@ var (
 		"PERMISSION_REQUESTED":           9,
 		"PERMISSION_TIMED_OUT":           10,
 		"PERMISSION_DECIDED":             11,
+		"CONTEXT_COMPACTION_STARTED":     12,
+		"CONTEXT_COMPACTION_FINISHED":    13,
+		"CONTEXT_USAGE_UPDATE":           14,
 	}
 )
 
@@ -891,6 +900,8 @@ type CommandEvent struct {
 	//	*CommandEvent_PermissionRequested
 	//	*CommandEvent_PermissionTimedOut
 	//	*CommandEvent_PermissionDecided
+	//	*CommandEvent_ContextCompaction
+	//	*CommandEvent_ContextUsage
 	Payload       isCommandEvent_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1067,6 +1078,24 @@ func (x *CommandEvent) GetPermissionDecided() *PermissionDecidedPayload {
 	return nil
 }
 
+func (x *CommandEvent) GetContextCompaction() *ContextCompactionPayload {
+	if x != nil {
+		if x, ok := x.Payload.(*CommandEvent_ContextCompaction); ok {
+			return x.ContextCompaction
+		}
+	}
+	return nil
+}
+
+func (x *CommandEvent) GetContextUsage() *ContextUsagePayload {
+	if x != nil {
+		if x, ok := x.Payload.(*CommandEvent_ContextUsage); ok {
+			return x.ContextUsage
+		}
+	}
+	return nil
+}
+
 type isCommandEvent_Payload interface {
 	isCommandEvent_Payload()
 }
@@ -1115,6 +1144,14 @@ type CommandEvent_PermissionDecided struct {
 	PermissionDecided *PermissionDecidedPayload `protobuf:"bytes,20,opt,name=permission_decided,json=permissionDecided,proto3,oneof"`
 }
 
+type CommandEvent_ContextCompaction struct {
+	ContextCompaction *ContextCompactionPayload `protobuf:"bytes,21,opt,name=context_compaction,json=contextCompaction,proto3,oneof"`
+}
+
+type CommandEvent_ContextUsage struct {
+	ContextUsage *ContextUsagePayload `protobuf:"bytes,22,opt,name=context_usage,json=contextUsage,proto3,oneof"`
+}
+
 func (*CommandEvent_Lifecycle) isCommandEvent_Payload() {}
 
 func (*CommandEvent_TextDelta) isCommandEvent_Payload() {}
@@ -1136,6 +1173,10 @@ func (*CommandEvent_PermissionRequested) isCommandEvent_Payload() {}
 func (*CommandEvent_PermissionTimedOut) isCommandEvent_Payload() {}
 
 func (*CommandEvent_PermissionDecided) isCommandEvent_Payload() {}
+
+func (*CommandEvent_ContextCompaction) isCommandEvent_Payload() {}
+
+func (*CommandEvent_ContextUsage) isCommandEvent_Payload() {}
 
 type LifecyclePayload struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1801,6 +1842,123 @@ func (x *PermissionDecidedPayload) GetOptionKind() string {
 	return ""
 }
 
+// ContextCompactionPayload describes a context-window compaction observed on
+// the agent runtime. inferred is true when the compaction was detected
+// indirectly (e.g. a usage drop) rather than reported by the agent.
+type ContextCompactionPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Reason        string                 `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
+	Inferred      bool                   `protobuf:"varint,2,opt,name=inferred,proto3" json:"inferred,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ContextCompactionPayload) Reset() {
+	*x = ContextCompactionPayload{}
+	mi := &file_v1_command_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ContextCompactionPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ContextCompactionPayload) ProtoMessage() {}
+
+func (x *ContextCompactionPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ContextCompactionPayload.ProtoReflect.Descriptor instead.
+func (*ContextCompactionPayload) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ContextCompactionPayload) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *ContextCompactionPayload) GetInferred() bool {
+	if x != nil {
+		return x.Inferred
+	}
+	return false
+}
+
+// ContextUsagePayload is a point-in-time snapshot of the session context
+// window. usage_ratio is used/size.
+type ContextUsagePayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Size          int64                  `protobuf:"varint,1,opt,name=size,proto3" json:"size,omitempty"`
+	Used          int64                  `protobuf:"varint,2,opt,name=used,proto3" json:"used,omitempty"`
+	UsageRatio    float64                `protobuf:"fixed64,3,opt,name=usage_ratio,json=usageRatio,proto3" json:"usage_ratio,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ContextUsagePayload) Reset() {
+	*x = ContextUsagePayload{}
+	mi := &file_v1_command_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ContextUsagePayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ContextUsagePayload) ProtoMessage() {}
+
+func (x *ContextUsagePayload) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_command_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ContextUsagePayload.ProtoReflect.Descriptor instead.
+func (*ContextUsagePayload) Descriptor() ([]byte, []int) {
+	return file_v1_command_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ContextUsagePayload) GetSize() int64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *ContextUsagePayload) GetUsed() int64 {
+	if x != nil {
+		return x.Used
+	}
+	return 0
+}
+
+func (x *ContextUsagePayload) GetUsageRatio() float64 {
+	if x != nil {
+		return x.UsageRatio
+	}
+	return 0
+}
+
 type SearchChatHistoryRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Agent         string                 `protobuf:"bytes,1,opt,name=agent,proto3" json:"agent,omitempty"`
@@ -1816,7 +1974,7 @@ type SearchChatHistoryRequest struct {
 
 func (x *SearchChatHistoryRequest) Reset() {
 	*x = SearchChatHistoryRequest{}
-	mi := &file_v1_command_proto_msgTypes[16]
+	mi := &file_v1_command_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1828,7 +1986,7 @@ func (x *SearchChatHistoryRequest) String() string {
 func (*SearchChatHistoryRequest) ProtoMessage() {}
 
 func (x *SearchChatHistoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[16]
+	mi := &file_v1_command_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1841,7 +1999,7 @@ func (x *SearchChatHistoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchChatHistoryRequest.ProtoReflect.Descriptor instead.
 func (*SearchChatHistoryRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{16}
+	return file_v1_command_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *SearchChatHistoryRequest) GetAgent() string {
@@ -1903,7 +2061,7 @@ type SearchChatHistoryResponse struct {
 
 func (x *SearchChatHistoryResponse) Reset() {
 	*x = SearchChatHistoryResponse{}
-	mi := &file_v1_command_proto_msgTypes[17]
+	mi := &file_v1_command_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1915,7 +2073,7 @@ func (x *SearchChatHistoryResponse) String() string {
 func (*SearchChatHistoryResponse) ProtoMessage() {}
 
 func (x *SearchChatHistoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[17]
+	mi := &file_v1_command_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1928,7 +2086,7 @@ func (x *SearchChatHistoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchChatHistoryResponse.ProtoReflect.Descriptor instead.
 func (*SearchChatHistoryResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{17}
+	return file_v1_command_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *SearchChatHistoryResponse) GetEntries() []*ChatMessage {
@@ -1958,7 +2116,7 @@ type ChatHistoryEntry struct {
 
 func (x *ChatHistoryEntry) Reset() {
 	*x = ChatHistoryEntry{}
-	mi := &file_v1_command_proto_msgTypes[18]
+	mi := &file_v1_command_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1970,7 +2128,7 @@ func (x *ChatHistoryEntry) String() string {
 func (*ChatHistoryEntry) ProtoMessage() {}
 
 func (x *ChatHistoryEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[18]
+	mi := &file_v1_command_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1983,7 +2141,7 @@ func (x *ChatHistoryEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatHistoryEntry.ProtoReflect.Descriptor instead.
 func (*ChatHistoryEntry) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{18}
+	return file_v1_command_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ChatHistoryEntry) GetMessageId() string {
@@ -2032,7 +2190,7 @@ type Mention struct {
 
 func (x *Mention) Reset() {
 	*x = Mention{}
-	mi := &file_v1_command_proto_msgTypes[19]
+	mi := &file_v1_command_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2044,7 +2202,7 @@ func (x *Mention) String() string {
 func (*Mention) ProtoMessage() {}
 
 func (x *Mention) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[19]
+	mi := &file_v1_command_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2057,7 +2215,7 @@ func (x *Mention) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Mention.ProtoReflect.Descriptor instead.
 func (*Mention) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{19}
+	return file_v1_command_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *Mention) GetType() string {
@@ -2108,7 +2266,7 @@ type Attachment struct {
 
 func (x *Attachment) Reset() {
 	*x = Attachment{}
-	mi := &file_v1_command_proto_msgTypes[20]
+	mi := &file_v1_command_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2120,7 +2278,7 @@ func (x *Attachment) String() string {
 func (*Attachment) ProtoMessage() {}
 
 func (x *Attachment) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[20]
+	mi := &file_v1_command_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2133,7 +2291,7 @@ func (x *Attachment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Attachment.ProtoReflect.Descriptor instead.
 func (*Attachment) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{20}
+	return file_v1_command_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Attachment) GetId() string {
@@ -2202,7 +2360,7 @@ type File struct {
 
 func (x *File) Reset() {
 	*x = File{}
-	mi := &file_v1_command_proto_msgTypes[21]
+	mi := &file_v1_command_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2214,7 +2372,7 @@ func (x *File) String() string {
 func (*File) ProtoMessage() {}
 
 func (x *File) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[21]
+	mi := &file_v1_command_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2227,7 +2385,7 @@ func (x *File) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use File.ProtoReflect.Descriptor instead.
 func (*File) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{21}
+	return file_v1_command_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *File) GetId() string {
@@ -2298,7 +2456,7 @@ type UploadFileRequest struct {
 
 func (x *UploadFileRequest) Reset() {
 	*x = UploadFileRequest{}
-	mi := &file_v1_command_proto_msgTypes[22]
+	mi := &file_v1_command_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2310,7 +2468,7 @@ func (x *UploadFileRequest) String() string {
 func (*UploadFileRequest) ProtoMessage() {}
 
 func (x *UploadFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[22]
+	mi := &file_v1_command_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2323,7 +2481,7 @@ func (x *UploadFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadFileRequest.ProtoReflect.Descriptor instead.
 func (*UploadFileRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{22}
+	return file_v1_command_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *UploadFileRequest) GetConversation() string {
@@ -2363,7 +2521,7 @@ type DownloadFileRequest struct {
 
 func (x *DownloadFileRequest) Reset() {
 	*x = DownloadFileRequest{}
-	mi := &file_v1_command_proto_msgTypes[23]
+	mi := &file_v1_command_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2375,7 +2533,7 @@ func (x *DownloadFileRequest) String() string {
 func (*DownloadFileRequest) ProtoMessage() {}
 
 func (x *DownloadFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[23]
+	mi := &file_v1_command_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2388,7 +2546,7 @@ func (x *DownloadFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadFileRequest.ProtoReflect.Descriptor instead.
 func (*DownloadFileRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{23}
+	return file_v1_command_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *DownloadFileRequest) GetId() string {
@@ -2408,7 +2566,7 @@ type DownloadFileResponse struct {
 
 func (x *DownloadFileResponse) Reset() {
 	*x = DownloadFileResponse{}
-	mi := &file_v1_command_proto_msgTypes[24]
+	mi := &file_v1_command_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2420,7 +2578,7 @@ func (x *DownloadFileResponse) String() string {
 func (*DownloadFileResponse) ProtoMessage() {}
 
 func (x *DownloadFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[24]
+	mi := &file_v1_command_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2433,7 +2591,7 @@ func (x *DownloadFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadFileResponse.ProtoReflect.Descriptor instead.
 func (*DownloadFileResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{24}
+	return file_v1_command_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *DownloadFileResponse) GetFile() *File {
@@ -2459,7 +2617,7 @@ type ListFilesRequest struct {
 
 func (x *ListFilesRequest) Reset() {
 	*x = ListFilesRequest{}
-	mi := &file_v1_command_proto_msgTypes[25]
+	mi := &file_v1_command_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2471,7 +2629,7 @@ func (x *ListFilesRequest) String() string {
 func (*ListFilesRequest) ProtoMessage() {}
 
 func (x *ListFilesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[25]
+	mi := &file_v1_command_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2484,7 +2642,7 @@ func (x *ListFilesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListFilesRequest.ProtoReflect.Descriptor instead.
 func (*ListFilesRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{25}
+	return file_v1_command_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ListFilesRequest) GetConversation() string {
@@ -2503,7 +2661,7 @@ type ListFilesResponse struct {
 
 func (x *ListFilesResponse) Reset() {
 	*x = ListFilesResponse{}
-	mi := &file_v1_command_proto_msgTypes[26]
+	mi := &file_v1_command_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2515,7 +2673,7 @@ func (x *ListFilesResponse) String() string {
 func (*ListFilesResponse) ProtoMessage() {}
 
 func (x *ListFilesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[26]
+	mi := &file_v1_command_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2528,7 +2686,7 @@ func (x *ListFilesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListFilesResponse.ProtoReflect.Descriptor instead.
 func (*ListFilesResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{26}
+	return file_v1_command_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ListFilesResponse) GetFiles() []*File {
@@ -2594,7 +2752,7 @@ type ChatMessage struct {
 
 func (x *ChatMessage) Reset() {
 	*x = ChatMessage{}
-	mi := &file_v1_command_proto_msgTypes[27]
+	mi := &file_v1_command_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2606,7 +2764,7 @@ func (x *ChatMessage) String() string {
 func (*ChatMessage) ProtoMessage() {}
 
 func (x *ChatMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[27]
+	mi := &file_v1_command_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2619,7 +2777,7 @@ func (x *ChatMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatMessage.ProtoReflect.Descriptor instead.
 func (*ChatMessage) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{27}
+	return file_v1_command_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ChatMessage) GetName() string {
@@ -2792,7 +2950,7 @@ type Conversation struct {
 
 func (x *Conversation) Reset() {
 	*x = Conversation{}
-	mi := &file_v1_command_proto_msgTypes[28]
+	mi := &file_v1_command_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2804,7 +2962,7 @@ func (x *Conversation) String() string {
 func (*Conversation) ProtoMessage() {}
 
 func (x *Conversation) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[28]
+	mi := &file_v1_command_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2817,7 +2975,7 @@ func (x *Conversation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Conversation.ProtoReflect.Descriptor instead.
 func (*Conversation) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{28}
+	return file_v1_command_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *Conversation) GetName() string {
@@ -2934,7 +3092,7 @@ type ChannelMember struct {
 
 func (x *ChannelMember) Reset() {
 	*x = ChannelMember{}
-	mi := &file_v1_command_proto_msgTypes[29]
+	mi := &file_v1_command_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2946,7 +3104,7 @@ func (x *ChannelMember) String() string {
 func (*ChannelMember) ProtoMessage() {}
 
 func (x *ChannelMember) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[29]
+	mi := &file_v1_command_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2959,7 +3117,7 @@ func (x *ChannelMember) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChannelMember.ProtoReflect.Descriptor instead.
 func (*ChannelMember) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{29}
+	return file_v1_command_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ChannelMember) GetMemberType() int32 {
@@ -3024,7 +3182,7 @@ type ListConversationMessagesRequest struct {
 
 func (x *ListConversationMessagesRequest) Reset() {
 	*x = ListConversationMessagesRequest{}
-	mi := &file_v1_command_proto_msgTypes[30]
+	mi := &file_v1_command_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3036,7 +3194,7 @@ func (x *ListConversationMessagesRequest) String() string {
 func (*ListConversationMessagesRequest) ProtoMessage() {}
 
 func (x *ListConversationMessagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[30]
+	mi := &file_v1_command_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3049,7 +3207,7 @@ func (x *ListConversationMessagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListConversationMessagesRequest.ProtoReflect.Descriptor instead.
 func (*ListConversationMessagesRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{30}
+	return file_v1_command_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ListConversationMessagesRequest) GetConversation() string {
@@ -3098,7 +3256,7 @@ type ListConversationMessagesResponse struct {
 
 func (x *ListConversationMessagesResponse) Reset() {
 	*x = ListConversationMessagesResponse{}
-	mi := &file_v1_command_proto_msgTypes[31]
+	mi := &file_v1_command_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3110,7 +3268,7 @@ func (x *ListConversationMessagesResponse) String() string {
 func (*ListConversationMessagesResponse) ProtoMessage() {}
 
 func (x *ListConversationMessagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[31]
+	mi := &file_v1_command_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3123,7 +3281,7 @@ func (x *ListConversationMessagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListConversationMessagesResponse.ProtoReflect.Descriptor instead.
 func (*ListConversationMessagesResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{31}
+	return file_v1_command_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *ListConversationMessagesResponse) GetMessages() []*ChatMessage {
@@ -3169,7 +3327,7 @@ type ListThreadMessagesRequest struct {
 
 func (x *ListThreadMessagesRequest) Reset() {
 	*x = ListThreadMessagesRequest{}
-	mi := &file_v1_command_proto_msgTypes[32]
+	mi := &file_v1_command_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3181,7 +3339,7 @@ func (x *ListThreadMessagesRequest) String() string {
 func (*ListThreadMessagesRequest) ProtoMessage() {}
 
 func (x *ListThreadMessagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[32]
+	mi := &file_v1_command_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3194,7 +3352,7 @@ func (x *ListThreadMessagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListThreadMessagesRequest.ProtoReflect.Descriptor instead.
 func (*ListThreadMessagesRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{32}
+	return file_v1_command_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ListThreadMessagesRequest) GetConversation() string {
@@ -3251,7 +3409,7 @@ type ListThreadMessagesResponse struct {
 
 func (x *ListThreadMessagesResponse) Reset() {
 	*x = ListThreadMessagesResponse{}
-	mi := &file_v1_command_proto_msgTypes[33]
+	mi := &file_v1_command_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3263,7 +3421,7 @@ func (x *ListThreadMessagesResponse) String() string {
 func (*ListThreadMessagesResponse) ProtoMessage() {}
 
 func (x *ListThreadMessagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[33]
+	mi := &file_v1_command_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3276,7 +3434,7 @@ func (x *ListThreadMessagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListThreadMessagesResponse.ProtoReflect.Descriptor instead.
 func (*ListThreadMessagesResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{33}
+	return file_v1_command_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *ListThreadMessagesResponse) GetMessages() []*ChatMessage {
@@ -3317,7 +3475,7 @@ type ListChannelThreadsRequest struct {
 
 func (x *ListChannelThreadsRequest) Reset() {
 	*x = ListChannelThreadsRequest{}
-	mi := &file_v1_command_proto_msgTypes[34]
+	mi := &file_v1_command_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3329,7 +3487,7 @@ func (x *ListChannelThreadsRequest) String() string {
 func (*ListChannelThreadsRequest) ProtoMessage() {}
 
 func (x *ListChannelThreadsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[34]
+	mi := &file_v1_command_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3342,7 +3500,7 @@ func (x *ListChannelThreadsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChannelThreadsRequest.ProtoReflect.Descriptor instead.
 func (*ListChannelThreadsRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{34}
+	return file_v1_command_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ListChannelThreadsRequest) GetConversation() string {
@@ -3372,7 +3530,7 @@ type ChannelThread struct {
 
 func (x *ChannelThread) Reset() {
 	*x = ChannelThread{}
-	mi := &file_v1_command_proto_msgTypes[35]
+	mi := &file_v1_command_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3384,7 +3542,7 @@ func (x *ChannelThread) String() string {
 func (*ChannelThread) ProtoMessage() {}
 
 func (x *ChannelThread) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[35]
+	mi := &file_v1_command_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3397,7 +3555,7 @@ func (x *ChannelThread) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChannelThread.ProtoReflect.Descriptor instead.
 func (*ChannelThread) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{35}
+	return file_v1_command_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *ChannelThread) GetRootMessage() string {
@@ -3437,7 +3595,7 @@ type ListChannelThreadsResponse struct {
 
 func (x *ListChannelThreadsResponse) Reset() {
 	*x = ListChannelThreadsResponse{}
-	mi := &file_v1_command_proto_msgTypes[36]
+	mi := &file_v1_command_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3449,7 +3607,7 @@ func (x *ListChannelThreadsResponse) String() string {
 func (*ListChannelThreadsResponse) ProtoMessage() {}
 
 func (x *ListChannelThreadsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[36]
+	mi := &file_v1_command_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3462,7 +3620,7 @@ func (x *ListChannelThreadsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChannelThreadsResponse.ProtoReflect.Descriptor instead.
 func (*ListChannelThreadsResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{36}
+	return file_v1_command_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *ListChannelThreadsResponse) GetThreads() []*ChannelThread {
@@ -3485,7 +3643,7 @@ type ListThreadUpdatesRequest struct {
 
 func (x *ListThreadUpdatesRequest) Reset() {
 	*x = ListThreadUpdatesRequest{}
-	mi := &file_v1_command_proto_msgTypes[37]
+	mi := &file_v1_command_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3497,7 +3655,7 @@ func (x *ListThreadUpdatesRequest) String() string {
 func (*ListThreadUpdatesRequest) ProtoMessage() {}
 
 func (x *ListThreadUpdatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[37]
+	mi := &file_v1_command_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3510,7 +3668,7 @@ func (x *ListThreadUpdatesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListThreadUpdatesRequest.ProtoReflect.Descriptor instead.
 func (*ListThreadUpdatesRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{37}
+	return file_v1_command_proto_rawDescGZIP(), []int{39}
 }
 
 // ThreadUpdate describes one subscribed thread with unread replies.
@@ -3531,7 +3689,7 @@ type ThreadUpdate struct {
 
 func (x *ThreadUpdate) Reset() {
 	*x = ThreadUpdate{}
-	mi := &file_v1_command_proto_msgTypes[38]
+	mi := &file_v1_command_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3543,7 +3701,7 @@ func (x *ThreadUpdate) String() string {
 func (*ThreadUpdate) ProtoMessage() {}
 
 func (x *ThreadUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[38]
+	mi := &file_v1_command_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3556,7 +3714,7 @@ func (x *ThreadUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThreadUpdate.ProtoReflect.Descriptor instead.
 func (*ThreadUpdate) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{38}
+	return file_v1_command_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ThreadUpdate) GetConversation() string {
@@ -3596,7 +3754,7 @@ type ListThreadUpdatesResponse struct {
 
 func (x *ListThreadUpdatesResponse) Reset() {
 	*x = ListThreadUpdatesResponse{}
-	mi := &file_v1_command_proto_msgTypes[39]
+	mi := &file_v1_command_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3608,7 +3766,7 @@ func (x *ListThreadUpdatesResponse) String() string {
 func (*ListThreadUpdatesResponse) ProtoMessage() {}
 
 func (x *ListThreadUpdatesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[39]
+	mi := &file_v1_command_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3621,7 +3779,7 @@ func (x *ListThreadUpdatesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListThreadUpdatesResponse.ProtoReflect.Descriptor instead.
 func (*ListThreadUpdatesResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{39}
+	return file_v1_command_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *ListThreadUpdatesResponse) GetUpdates() []*ThreadUpdate {
@@ -3640,7 +3798,7 @@ type GetOrCreateConversationRequest struct {
 
 func (x *GetOrCreateConversationRequest) Reset() {
 	*x = GetOrCreateConversationRequest{}
-	mi := &file_v1_command_proto_msgTypes[40]
+	mi := &file_v1_command_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3652,7 +3810,7 @@ func (x *GetOrCreateConversationRequest) String() string {
 func (*GetOrCreateConversationRequest) ProtoMessage() {}
 
 func (x *GetOrCreateConversationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[40]
+	mi := &file_v1_command_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3665,7 +3823,7 @@ func (x *GetOrCreateConversationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOrCreateConversationRequest.ProtoReflect.Descriptor instead.
 func (*GetOrCreateConversationRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{40}
+	return file_v1_command_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *GetOrCreateConversationRequest) GetAgent() string {
@@ -3684,7 +3842,7 @@ type GetOrCreateConversationResponse struct {
 
 func (x *GetOrCreateConversationResponse) Reset() {
 	*x = GetOrCreateConversationResponse{}
-	mi := &file_v1_command_proto_msgTypes[41]
+	mi := &file_v1_command_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3696,7 +3854,7 @@ func (x *GetOrCreateConversationResponse) String() string {
 func (*GetOrCreateConversationResponse) ProtoMessage() {}
 
 func (x *GetOrCreateConversationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[41]
+	mi := &file_v1_command_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3709,7 +3867,7 @@ func (x *GetOrCreateConversationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOrCreateConversationResponse.ProtoReflect.Descriptor instead.
 func (*GetOrCreateConversationResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{41}
+	return file_v1_command_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *GetOrCreateConversationResponse) GetName() string {
@@ -3733,7 +3891,7 @@ type GetOrCreateUserUserDMRequest struct {
 
 func (x *GetOrCreateUserUserDMRequest) Reset() {
 	*x = GetOrCreateUserUserDMRequest{}
-	mi := &file_v1_command_proto_msgTypes[42]
+	mi := &file_v1_command_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3745,7 +3903,7 @@ func (x *GetOrCreateUserUserDMRequest) String() string {
 func (*GetOrCreateUserUserDMRequest) ProtoMessage() {}
 
 func (x *GetOrCreateUserUserDMRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[42]
+	mi := &file_v1_command_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3758,7 +3916,7 @@ func (x *GetOrCreateUserUserDMRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOrCreateUserUserDMRequest.ProtoReflect.Descriptor instead.
 func (*GetOrCreateUserUserDMRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{42}
+	return file_v1_command_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *GetOrCreateUserUserDMRequest) GetPeerUser() string {
@@ -3777,7 +3935,7 @@ type GetOrCreateUserUserDMResponse struct {
 
 func (x *GetOrCreateUserUserDMResponse) Reset() {
 	*x = GetOrCreateUserUserDMResponse{}
-	mi := &file_v1_command_proto_msgTypes[43]
+	mi := &file_v1_command_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3789,7 +3947,7 @@ func (x *GetOrCreateUserUserDMResponse) String() string {
 func (*GetOrCreateUserUserDMResponse) ProtoMessage() {}
 
 func (x *GetOrCreateUserUserDMResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[43]
+	mi := &file_v1_command_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3802,7 +3960,7 @@ func (x *GetOrCreateUserUserDMResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOrCreateUserUserDMResponse.ProtoReflect.Descriptor instead.
 func (*GetOrCreateUserUserDMResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{43}
+	return file_v1_command_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *GetOrCreateUserUserDMResponse) GetName() string {
@@ -3825,7 +3983,7 @@ type ResolveChannelByTitleRequest struct {
 
 func (x *ResolveChannelByTitleRequest) Reset() {
 	*x = ResolveChannelByTitleRequest{}
-	mi := &file_v1_command_proto_msgTypes[44]
+	mi := &file_v1_command_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3837,7 +3995,7 @@ func (x *ResolveChannelByTitleRequest) String() string {
 func (*ResolveChannelByTitleRequest) ProtoMessage() {}
 
 func (x *ResolveChannelByTitleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[44]
+	mi := &file_v1_command_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3850,7 +4008,7 @@ func (x *ResolveChannelByTitleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveChannelByTitleRequest.ProtoReflect.Descriptor instead.
 func (*ResolveChannelByTitleRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{44}
+	return file_v1_command_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ResolveChannelByTitleRequest) GetTitle() string {
@@ -3869,7 +4027,7 @@ type ResolveChannelByTitleResponse struct {
 
 func (x *ResolveChannelByTitleResponse) Reset() {
 	*x = ResolveChannelByTitleResponse{}
-	mi := &file_v1_command_proto_msgTypes[45]
+	mi := &file_v1_command_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3881,7 +4039,7 @@ func (x *ResolveChannelByTitleResponse) String() string {
 func (*ResolveChannelByTitleResponse) ProtoMessage() {}
 
 func (x *ResolveChannelByTitleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[45]
+	mi := &file_v1_command_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3894,7 +4052,7 @@ func (x *ResolveChannelByTitleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveChannelByTitleResponse.ProtoReflect.Descriptor instead.
 func (*ResolveChannelByTitleResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{45}
+	return file_v1_command_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *ResolveChannelByTitleResponse) GetConversation() *Conversation {
@@ -3917,7 +4075,7 @@ type GetOrCreateUserDMRequest struct {
 
 func (x *GetOrCreateUserDMRequest) Reset() {
 	*x = GetOrCreateUserDMRequest{}
-	mi := &file_v1_command_proto_msgTypes[46]
+	mi := &file_v1_command_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3929,7 +4087,7 @@ func (x *GetOrCreateUserDMRequest) String() string {
 func (*GetOrCreateUserDMRequest) ProtoMessage() {}
 
 func (x *GetOrCreateUserDMRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[46]
+	mi := &file_v1_command_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3942,7 +4100,7 @@ func (x *GetOrCreateUserDMRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOrCreateUserDMRequest.ProtoReflect.Descriptor instead.
 func (*GetOrCreateUserDMRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{46}
+	return file_v1_command_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *GetOrCreateUserDMRequest) GetPeerUserName() string {
@@ -3961,7 +4119,7 @@ type GetOrCreateUserDMResponse struct {
 
 func (x *GetOrCreateUserDMResponse) Reset() {
 	*x = GetOrCreateUserDMResponse{}
-	mi := &file_v1_command_proto_msgTypes[47]
+	mi := &file_v1_command_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3973,7 +4131,7 @@ func (x *GetOrCreateUserDMResponse) String() string {
 func (*GetOrCreateUserDMResponse) ProtoMessage() {}
 
 func (x *GetOrCreateUserDMResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[47]
+	mi := &file_v1_command_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3986,7 +4144,7 @@ func (x *GetOrCreateUserDMResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOrCreateUserDMResponse.ProtoReflect.Descriptor instead.
 func (*GetOrCreateUserDMResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{47}
+	return file_v1_command_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *GetOrCreateUserDMResponse) GetConversation() *Conversation {
@@ -4009,7 +4167,7 @@ type GetOrCreateAgentDMRequest struct {
 
 func (x *GetOrCreateAgentDMRequest) Reset() {
 	*x = GetOrCreateAgentDMRequest{}
-	mi := &file_v1_command_proto_msgTypes[48]
+	mi := &file_v1_command_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4021,7 +4179,7 @@ func (x *GetOrCreateAgentDMRequest) String() string {
 func (*GetOrCreateAgentDMRequest) ProtoMessage() {}
 
 func (x *GetOrCreateAgentDMRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[48]
+	mi := &file_v1_command_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4034,7 +4192,7 @@ func (x *GetOrCreateAgentDMRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOrCreateAgentDMRequest.ProtoReflect.Descriptor instead.
 func (*GetOrCreateAgentDMRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{48}
+	return file_v1_command_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *GetOrCreateAgentDMRequest) GetPeerAgent() string {
@@ -4053,7 +4211,7 @@ type GetOrCreateAgentDMResponse struct {
 
 func (x *GetOrCreateAgentDMResponse) Reset() {
 	*x = GetOrCreateAgentDMResponse{}
-	mi := &file_v1_command_proto_msgTypes[49]
+	mi := &file_v1_command_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4065,7 +4223,7 @@ func (x *GetOrCreateAgentDMResponse) String() string {
 func (*GetOrCreateAgentDMResponse) ProtoMessage() {}
 
 func (x *GetOrCreateAgentDMResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[49]
+	mi := &file_v1_command_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4078,7 +4236,7 @@ func (x *GetOrCreateAgentDMResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOrCreateAgentDMResponse.ProtoReflect.Descriptor instead.
 func (*GetOrCreateAgentDMResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{49}
+	return file_v1_command_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *GetOrCreateAgentDMResponse) GetConversation() *Conversation {
@@ -4103,7 +4261,7 @@ type PeerAgent struct {
 
 func (x *PeerAgent) Reset() {
 	*x = PeerAgent{}
-	mi := &file_v1_command_proto_msgTypes[50]
+	mi := &file_v1_command_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4115,7 +4273,7 @@ func (x *PeerAgent) String() string {
 func (*PeerAgent) ProtoMessage() {}
 
 func (x *PeerAgent) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[50]
+	mi := &file_v1_command_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4128,7 +4286,7 @@ func (x *PeerAgent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PeerAgent.ProtoReflect.Descriptor instead.
 func (*PeerAgent) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{50}
+	return file_v1_command_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *PeerAgent) GetName() string {
@@ -4170,7 +4328,7 @@ type ListPeerAgentsRequest struct {
 
 func (x *ListPeerAgentsRequest) Reset() {
 	*x = ListPeerAgentsRequest{}
-	mi := &file_v1_command_proto_msgTypes[51]
+	mi := &file_v1_command_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4182,7 +4340,7 @@ func (x *ListPeerAgentsRequest) String() string {
 func (*ListPeerAgentsRequest) ProtoMessage() {}
 
 func (x *ListPeerAgentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[51]
+	mi := &file_v1_command_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4195,7 +4353,7 @@ func (x *ListPeerAgentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPeerAgentsRequest.ProtoReflect.Descriptor instead.
 func (*ListPeerAgentsRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{51}
+	return file_v1_command_proto_rawDescGZIP(), []int{53}
 }
 
 type ListPeerAgentsResponse struct {
@@ -4207,7 +4365,7 @@ type ListPeerAgentsResponse struct {
 
 func (x *ListPeerAgentsResponse) Reset() {
 	*x = ListPeerAgentsResponse{}
-	mi := &file_v1_command_proto_msgTypes[52]
+	mi := &file_v1_command_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4219,7 +4377,7 @@ func (x *ListPeerAgentsResponse) String() string {
 func (*ListPeerAgentsResponse) ProtoMessage() {}
 
 func (x *ListPeerAgentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[52]
+	mi := &file_v1_command_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4232,7 +4390,7 @@ func (x *ListPeerAgentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPeerAgentsResponse.ProtoReflect.Descriptor instead.
 func (*ListPeerAgentsResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{52}
+	return file_v1_command_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *ListPeerAgentsResponse) GetAgents() []*PeerAgent {
@@ -4251,7 +4409,7 @@ type CreateChannelRequest struct {
 
 func (x *CreateChannelRequest) Reset() {
 	*x = CreateChannelRequest{}
-	mi := &file_v1_command_proto_msgTypes[53]
+	mi := &file_v1_command_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4263,7 +4421,7 @@ func (x *CreateChannelRequest) String() string {
 func (*CreateChannelRequest) ProtoMessage() {}
 
 func (x *CreateChannelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[53]
+	mi := &file_v1_command_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4276,7 +4434,7 @@ func (x *CreateChannelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateChannelRequest.ProtoReflect.Descriptor instead.
 func (*CreateChannelRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{53}
+	return file_v1_command_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *CreateChannelRequest) GetTitle() string {
@@ -4296,7 +4454,7 @@ type ListChannelsRequest struct {
 
 func (x *ListChannelsRequest) Reset() {
 	*x = ListChannelsRequest{}
-	mi := &file_v1_command_proto_msgTypes[54]
+	mi := &file_v1_command_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4308,7 +4466,7 @@ func (x *ListChannelsRequest) String() string {
 func (*ListChannelsRequest) ProtoMessage() {}
 
 func (x *ListChannelsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[54]
+	mi := &file_v1_command_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4321,7 +4479,7 @@ func (x *ListChannelsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChannelsRequest.ProtoReflect.Descriptor instead.
 func (*ListChannelsRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{54}
+	return file_v1_command_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *ListChannelsRequest) GetPageSize() int32 {
@@ -4348,7 +4506,7 @@ type ListChannelsResponse struct {
 
 func (x *ListChannelsResponse) Reset() {
 	*x = ListChannelsResponse{}
-	mi := &file_v1_command_proto_msgTypes[55]
+	mi := &file_v1_command_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4360,7 +4518,7 @@ func (x *ListChannelsResponse) String() string {
 func (*ListChannelsResponse) ProtoMessage() {}
 
 func (x *ListChannelsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[55]
+	mi := &file_v1_command_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4373,7 +4531,7 @@ func (x *ListChannelsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChannelsResponse.ProtoReflect.Descriptor instead.
 func (*ListChannelsResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{55}
+	return file_v1_command_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *ListChannelsResponse) GetChannels() []*Conversation {
@@ -4401,7 +4559,7 @@ type ListChannelsForAgentRequest struct {
 
 func (x *ListChannelsForAgentRequest) Reset() {
 	*x = ListChannelsForAgentRequest{}
-	mi := &file_v1_command_proto_msgTypes[56]
+	mi := &file_v1_command_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4413,7 +4571,7 @@ func (x *ListChannelsForAgentRequest) String() string {
 func (*ListChannelsForAgentRequest) ProtoMessage() {}
 
 func (x *ListChannelsForAgentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[56]
+	mi := &file_v1_command_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4426,7 +4584,7 @@ func (x *ListChannelsForAgentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChannelsForAgentRequest.ProtoReflect.Descriptor instead.
 func (*ListChannelsForAgentRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{56}
+	return file_v1_command_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *ListChannelsForAgentRequest) GetName() string {
@@ -4460,7 +4618,7 @@ type ListChannelsForAgentResponse struct {
 
 func (x *ListChannelsForAgentResponse) Reset() {
 	*x = ListChannelsForAgentResponse{}
-	mi := &file_v1_command_proto_msgTypes[57]
+	mi := &file_v1_command_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4472,7 +4630,7 @@ func (x *ListChannelsForAgentResponse) String() string {
 func (*ListChannelsForAgentResponse) ProtoMessage() {}
 
 func (x *ListChannelsForAgentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[57]
+	mi := &file_v1_command_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4485,7 +4643,7 @@ func (x *ListChannelsForAgentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChannelsForAgentResponse.ProtoReflect.Descriptor instead.
 func (*ListChannelsForAgentResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{57}
+	return file_v1_command_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *ListChannelsForAgentResponse) GetChannels() []*Conversation {
@@ -4511,7 +4669,7 @@ type GetChannelRequest struct {
 
 func (x *GetChannelRequest) Reset() {
 	*x = GetChannelRequest{}
-	mi := &file_v1_command_proto_msgTypes[58]
+	mi := &file_v1_command_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4523,7 +4681,7 @@ func (x *GetChannelRequest) String() string {
 func (*GetChannelRequest) ProtoMessage() {}
 
 func (x *GetChannelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[58]
+	mi := &file_v1_command_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4536,7 +4694,7 @@ func (x *GetChannelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChannelRequest.ProtoReflect.Descriptor instead.
 func (*GetChannelRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{58}
+	return file_v1_command_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *GetChannelRequest) GetName() string {
@@ -4556,7 +4714,7 @@ type UpdateChannelRequest struct {
 
 func (x *UpdateChannelRequest) Reset() {
 	*x = UpdateChannelRequest{}
-	mi := &file_v1_command_proto_msgTypes[59]
+	mi := &file_v1_command_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4568,7 +4726,7 @@ func (x *UpdateChannelRequest) String() string {
 func (*UpdateChannelRequest) ProtoMessage() {}
 
 func (x *UpdateChannelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[59]
+	mi := &file_v1_command_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4581,7 +4739,7 @@ func (x *UpdateChannelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateChannelRequest.ProtoReflect.Descriptor instead.
 func (*UpdateChannelRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{59}
+	return file_v1_command_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *UpdateChannelRequest) GetConversation() *Conversation {
@@ -4607,7 +4765,7 @@ type DeleteChannelRequest struct {
 
 func (x *DeleteChannelRequest) Reset() {
 	*x = DeleteChannelRequest{}
-	mi := &file_v1_command_proto_msgTypes[60]
+	mi := &file_v1_command_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4619,7 +4777,7 @@ func (x *DeleteChannelRequest) String() string {
 func (*DeleteChannelRequest) ProtoMessage() {}
 
 func (x *DeleteChannelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[60]
+	mi := &file_v1_command_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4632,7 +4790,7 @@ func (x *DeleteChannelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteChannelRequest.ProtoReflect.Descriptor instead.
 func (*DeleteChannelRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{60}
+	return file_v1_command_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *DeleteChannelRequest) GetName() string {
@@ -4653,7 +4811,7 @@ type AddChannelMemberRequest struct {
 
 func (x *AddChannelMemberRequest) Reset() {
 	*x = AddChannelMemberRequest{}
-	mi := &file_v1_command_proto_msgTypes[61]
+	mi := &file_v1_command_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4665,7 +4823,7 @@ func (x *AddChannelMemberRequest) String() string {
 func (*AddChannelMemberRequest) ProtoMessage() {}
 
 func (x *AddChannelMemberRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[61]
+	mi := &file_v1_command_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4678,7 +4836,7 @@ func (x *AddChannelMemberRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddChannelMemberRequest.ProtoReflect.Descriptor instead.
 func (*AddChannelMemberRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{61}
+	return file_v1_command_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *AddChannelMemberRequest) GetConversation() string {
@@ -4713,7 +4871,7 @@ type RemoveChannelMemberRequest struct {
 
 func (x *RemoveChannelMemberRequest) Reset() {
 	*x = RemoveChannelMemberRequest{}
-	mi := &file_v1_command_proto_msgTypes[62]
+	mi := &file_v1_command_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4725,7 +4883,7 @@ func (x *RemoveChannelMemberRequest) String() string {
 func (*RemoveChannelMemberRequest) ProtoMessage() {}
 
 func (x *RemoveChannelMemberRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[62]
+	mi := &file_v1_command_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4738,7 +4896,7 @@ func (x *RemoveChannelMemberRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveChannelMemberRequest.ProtoReflect.Descriptor instead.
 func (*RemoveChannelMemberRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{62}
+	return file_v1_command_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *RemoveChannelMemberRequest) GetConversation() string {
@@ -4771,7 +4929,7 @@ type ListChannelMembersRequest struct {
 
 func (x *ListChannelMembersRequest) Reset() {
 	*x = ListChannelMembersRequest{}
-	mi := &file_v1_command_proto_msgTypes[63]
+	mi := &file_v1_command_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4783,7 +4941,7 @@ func (x *ListChannelMembersRequest) String() string {
 func (*ListChannelMembersRequest) ProtoMessage() {}
 
 func (x *ListChannelMembersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[63]
+	mi := &file_v1_command_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4796,7 +4954,7 @@ func (x *ListChannelMembersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChannelMembersRequest.ProtoReflect.Descriptor instead.
 func (*ListChannelMembersRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{63}
+	return file_v1_command_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *ListChannelMembersRequest) GetConversation() string {
@@ -4815,7 +4973,7 @@ type ListChannelMembersResponse struct {
 
 func (x *ListChannelMembersResponse) Reset() {
 	*x = ListChannelMembersResponse{}
-	mi := &file_v1_command_proto_msgTypes[64]
+	mi := &file_v1_command_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4827,7 +4985,7 @@ func (x *ListChannelMembersResponse) String() string {
 func (*ListChannelMembersResponse) ProtoMessage() {}
 
 func (x *ListChannelMembersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[64]
+	mi := &file_v1_command_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4840,7 +4998,7 @@ func (x *ListChannelMembersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChannelMembersResponse.ProtoReflect.Descriptor instead.
 func (*ListChannelMembersResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{64}
+	return file_v1_command_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *ListChannelMembersResponse) GetMembers() []*ChannelMember {
@@ -4863,7 +5021,7 @@ type TransferChannelOwnershipRequest struct {
 
 func (x *TransferChannelOwnershipRequest) Reset() {
 	*x = TransferChannelOwnershipRequest{}
-	mi := &file_v1_command_proto_msgTypes[65]
+	mi := &file_v1_command_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4875,7 +5033,7 @@ func (x *TransferChannelOwnershipRequest) String() string {
 func (*TransferChannelOwnershipRequest) ProtoMessage() {}
 
 func (x *TransferChannelOwnershipRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[65]
+	mi := &file_v1_command_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4888,7 +5046,7 @@ func (x *TransferChannelOwnershipRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferChannelOwnershipRequest.ProtoReflect.Descriptor instead.
 func (*TransferChannelOwnershipRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{65}
+	return file_v1_command_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *TransferChannelOwnershipRequest) GetConversation() string {
@@ -4921,7 +5079,7 @@ type TransferChannelOwnershipResponse struct {
 
 func (x *TransferChannelOwnershipResponse) Reset() {
 	*x = TransferChannelOwnershipResponse{}
-	mi := &file_v1_command_proto_msgTypes[66]
+	mi := &file_v1_command_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4933,7 +5091,7 @@ func (x *TransferChannelOwnershipResponse) String() string {
 func (*TransferChannelOwnershipResponse) ProtoMessage() {}
 
 func (x *TransferChannelOwnershipResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[66]
+	mi := &file_v1_command_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4946,7 +5104,7 @@ func (x *TransferChannelOwnershipResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferChannelOwnershipResponse.ProtoReflect.Descriptor instead.
 func (*TransferChannelOwnershipResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{66}
+	return file_v1_command_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *TransferChannelOwnershipResponse) GetConversation() *Conversation {
@@ -4971,7 +5129,7 @@ type UpdateChannelMemberRoleRequest struct {
 
 func (x *UpdateChannelMemberRoleRequest) Reset() {
 	*x = UpdateChannelMemberRoleRequest{}
-	mi := &file_v1_command_proto_msgTypes[67]
+	mi := &file_v1_command_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4983,7 +5141,7 @@ func (x *UpdateChannelMemberRoleRequest) String() string {
 func (*UpdateChannelMemberRoleRequest) ProtoMessage() {}
 
 func (x *UpdateChannelMemberRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[67]
+	mi := &file_v1_command_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4996,7 +5154,7 @@ func (x *UpdateChannelMemberRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateChannelMemberRoleRequest.ProtoReflect.Descriptor instead.
 func (*UpdateChannelMemberRoleRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{67}
+	return file_v1_command_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *UpdateChannelMemberRoleRequest) GetConversation() string {
@@ -5038,7 +5196,7 @@ type LeaveChannelRequest struct {
 
 func (x *LeaveChannelRequest) Reset() {
 	*x = LeaveChannelRequest{}
-	mi := &file_v1_command_proto_msgTypes[68]
+	mi := &file_v1_command_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5050,7 +5208,7 @@ func (x *LeaveChannelRequest) String() string {
 func (*LeaveChannelRequest) ProtoMessage() {}
 
 func (x *LeaveChannelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[68]
+	mi := &file_v1_command_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5063,7 +5221,7 @@ func (x *LeaveChannelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaveChannelRequest.ProtoReflect.Descriptor instead.
 func (*LeaveChannelRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{68}
+	return file_v1_command_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *LeaveChannelRequest) GetConversation() string {
@@ -5089,7 +5247,7 @@ type ListThreadParticipantsRequest struct {
 
 func (x *ListThreadParticipantsRequest) Reset() {
 	*x = ListThreadParticipantsRequest{}
-	mi := &file_v1_command_proto_msgTypes[69]
+	mi := &file_v1_command_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5101,7 +5259,7 @@ func (x *ListThreadParticipantsRequest) String() string {
 func (*ListThreadParticipantsRequest) ProtoMessage() {}
 
 func (x *ListThreadParticipantsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[69]
+	mi := &file_v1_command_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5114,7 +5272,7 @@ func (x *ListThreadParticipantsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListThreadParticipantsRequest.ProtoReflect.Descriptor instead.
 func (*ListThreadParticipantsRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{69}
+	return file_v1_command_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *ListThreadParticipantsRequest) GetConversation() string {
@@ -5142,7 +5300,7 @@ type ListThreadParticipantsResponse struct {
 
 func (x *ListThreadParticipantsResponse) Reset() {
 	*x = ListThreadParticipantsResponse{}
-	mi := &file_v1_command_proto_msgTypes[70]
+	mi := &file_v1_command_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5154,7 +5312,7 @@ func (x *ListThreadParticipantsResponse) String() string {
 func (*ListThreadParticipantsResponse) ProtoMessage() {}
 
 func (x *ListThreadParticipantsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[70]
+	mi := &file_v1_command_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5167,7 +5325,7 @@ func (x *ListThreadParticipantsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListThreadParticipantsResponse.ProtoReflect.Descriptor instead.
 func (*ListThreadParticipantsResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{70}
+	return file_v1_command_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *ListThreadParticipantsResponse) GetMembers() []*ChannelMember {
@@ -5197,7 +5355,7 @@ type SendMessageRequest struct {
 
 func (x *SendMessageRequest) Reset() {
 	*x = SendMessageRequest{}
-	mi := &file_v1_command_proto_msgTypes[71]
+	mi := &file_v1_command_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5209,7 +5367,7 @@ func (x *SendMessageRequest) String() string {
 func (*SendMessageRequest) ProtoMessage() {}
 
 func (x *SendMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[71]
+	mi := &file_v1_command_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5222,7 +5380,7 @@ func (x *SendMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendMessageRequest.ProtoReflect.Descriptor instead.
 func (*SendMessageRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{71}
+	return file_v1_command_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *SendMessageRequest) GetConversation() string {
@@ -5276,7 +5434,7 @@ type GetCommandContextRequest struct {
 
 func (x *GetCommandContextRequest) Reset() {
 	*x = GetCommandContextRequest{}
-	mi := &file_v1_command_proto_msgTypes[72]
+	mi := &file_v1_command_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5288,7 +5446,7 @@ func (x *GetCommandContextRequest) String() string {
 func (*GetCommandContextRequest) ProtoMessage() {}
 
 func (x *GetCommandContextRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[72]
+	mi := &file_v1_command_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5301,7 +5459,7 @@ func (x *GetCommandContextRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCommandContextRequest.ProtoReflect.Descriptor instead.
 func (*GetCommandContextRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{72}
+	return file_v1_command_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *GetCommandContextRequest) GetName() string {
@@ -5322,7 +5480,7 @@ type GetCommandContextResponse struct {
 
 func (x *GetCommandContextResponse) Reset() {
 	*x = GetCommandContextResponse{}
-	mi := &file_v1_command_proto_msgTypes[73]
+	mi := &file_v1_command_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5334,7 +5492,7 @@ func (x *GetCommandContextResponse) String() string {
 func (*GetCommandContextResponse) ProtoMessage() {}
 
 func (x *GetCommandContextResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[73]
+	mi := &file_v1_command_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5347,7 +5505,7 @@ func (x *GetCommandContextResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCommandContextResponse.ProtoReflect.Descriptor instead.
 func (*GetCommandContextResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{73}
+	return file_v1_command_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *GetCommandContextResponse) GetCommand() *Command {
@@ -5387,7 +5545,7 @@ type PostMessageRequest struct {
 
 func (x *PostMessageRequest) Reset() {
 	*x = PostMessageRequest{}
-	mi := &file_v1_command_proto_msgTypes[74]
+	mi := &file_v1_command_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5399,7 +5557,7 @@ func (x *PostMessageRequest) String() string {
 func (*PostMessageRequest) ProtoMessage() {}
 
 func (x *PostMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[74]
+	mi := &file_v1_command_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5412,7 +5570,7 @@ func (x *PostMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PostMessageRequest.ProtoReflect.Descriptor instead.
 func (*PostMessageRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{74}
+	return file_v1_command_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *PostMessageRequest) GetConversation() string {
@@ -5470,7 +5628,7 @@ type PostMessageResponse struct {
 
 func (x *PostMessageResponse) Reset() {
 	*x = PostMessageResponse{}
-	mi := &file_v1_command_proto_msgTypes[75]
+	mi := &file_v1_command_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5482,7 +5640,7 @@ func (x *PostMessageResponse) String() string {
 func (*PostMessageResponse) ProtoMessage() {}
 
 func (x *PostMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[75]
+	mi := &file_v1_command_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5495,7 +5653,7 @@ func (x *PostMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PostMessageResponse.ProtoReflect.Descriptor instead.
 func (*PostMessageResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{75}
+	return file_v1_command_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *PostMessageResponse) GetCommitted() bool {
@@ -5545,7 +5703,7 @@ type ConvertMessageToTaskRequest struct {
 
 func (x *ConvertMessageToTaskRequest) Reset() {
 	*x = ConvertMessageToTaskRequest{}
-	mi := &file_v1_command_proto_msgTypes[76]
+	mi := &file_v1_command_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5557,7 +5715,7 @@ func (x *ConvertMessageToTaskRequest) String() string {
 func (*ConvertMessageToTaskRequest) ProtoMessage() {}
 
 func (x *ConvertMessageToTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[76]
+	mi := &file_v1_command_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5570,7 +5728,7 @@ func (x *ConvertMessageToTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConvertMessageToTaskRequest.ProtoReflect.Descriptor instead.
 func (*ConvertMessageToTaskRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{76}
+	return file_v1_command_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *ConvertMessageToTaskRequest) GetMessage() string {
@@ -5591,7 +5749,7 @@ type ConvertMessageToTaskResponse struct {
 
 func (x *ConvertMessageToTaskResponse) Reset() {
 	*x = ConvertMessageToTaskResponse{}
-	mi := &file_v1_command_proto_msgTypes[77]
+	mi := &file_v1_command_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5603,7 +5761,7 @@ func (x *ConvertMessageToTaskResponse) String() string {
 func (*ConvertMessageToTaskResponse) ProtoMessage() {}
 
 func (x *ConvertMessageToTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[77]
+	mi := &file_v1_command_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5616,7 +5774,7 @@ func (x *ConvertMessageToTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConvertMessageToTaskResponse.ProtoReflect.Descriptor instead.
 func (*ConvertMessageToTaskResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{77}
+	return file_v1_command_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *ConvertMessageToTaskResponse) GetMessage() *ChatMessage {
@@ -5644,7 +5802,7 @@ type ListTasksRequest struct {
 
 func (x *ListTasksRequest) Reset() {
 	*x = ListTasksRequest{}
-	mi := &file_v1_command_proto_msgTypes[78]
+	mi := &file_v1_command_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5656,7 +5814,7 @@ func (x *ListTasksRequest) String() string {
 func (*ListTasksRequest) ProtoMessage() {}
 
 func (x *ListTasksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[78]
+	mi := &file_v1_command_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5669,7 +5827,7 @@ func (x *ListTasksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTasksRequest.ProtoReflect.Descriptor instead.
 func (*ListTasksRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{78}
+	return file_v1_command_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *ListTasksRequest) GetConversation() string {
@@ -5714,7 +5872,7 @@ type ListTasksResponse struct {
 
 func (x *ListTasksResponse) Reset() {
 	*x = ListTasksResponse{}
-	mi := &file_v1_command_proto_msgTypes[79]
+	mi := &file_v1_command_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5726,7 +5884,7 @@ func (x *ListTasksResponse) String() string {
 func (*ListTasksResponse) ProtoMessage() {}
 
 func (x *ListTasksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[79]
+	mi := &file_v1_command_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5739,7 +5897,7 @@ func (x *ListTasksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTasksResponse.ProtoReflect.Descriptor instead.
 func (*ListTasksResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{79}
+	return file_v1_command_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *ListTasksResponse) GetTasks() []*ChatMessage {
@@ -5768,7 +5926,7 @@ type ListTaskCountsRequest struct {
 
 func (x *ListTaskCountsRequest) Reset() {
 	*x = ListTaskCountsRequest{}
-	mi := &file_v1_command_proto_msgTypes[80]
+	mi := &file_v1_command_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5780,7 +5938,7 @@ func (x *ListTaskCountsRequest) String() string {
 func (*ListTaskCountsRequest) ProtoMessage() {}
 
 func (x *ListTaskCountsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[80]
+	mi := &file_v1_command_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5793,7 +5951,7 @@ func (x *ListTaskCountsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTaskCountsRequest.ProtoReflect.Descriptor instead.
 func (*ListTaskCountsRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{80}
+	return file_v1_command_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *ListTaskCountsRequest) GetConversation() string {
@@ -5815,7 +5973,7 @@ type ListTaskCountsResponse struct {
 
 func (x *ListTaskCountsResponse) Reset() {
 	*x = ListTaskCountsResponse{}
-	mi := &file_v1_command_proto_msgTypes[81]
+	mi := &file_v1_command_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5827,7 +5985,7 @@ func (x *ListTaskCountsResponse) String() string {
 func (*ListTaskCountsResponse) ProtoMessage() {}
 
 func (x *ListTaskCountsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[81]
+	mi := &file_v1_command_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5840,7 +5998,7 @@ func (x *ListTaskCountsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTaskCountsResponse.ProtoReflect.Descriptor instead.
 func (*ListTaskCountsResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{81}
+	return file_v1_command_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *ListTaskCountsResponse) GetTodoCount() int32 {
@@ -5882,7 +6040,7 @@ type ClaimTaskRequest struct {
 
 func (x *ClaimTaskRequest) Reset() {
 	*x = ClaimTaskRequest{}
-	mi := &file_v1_command_proto_msgTypes[82]
+	mi := &file_v1_command_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5894,7 +6052,7 @@ func (x *ClaimTaskRequest) String() string {
 func (*ClaimTaskRequest) ProtoMessage() {}
 
 func (x *ClaimTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[82]
+	mi := &file_v1_command_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5907,7 +6065,7 @@ func (x *ClaimTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClaimTaskRequest.ProtoReflect.Descriptor instead.
 func (*ClaimTaskRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{82}
+	return file_v1_command_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *ClaimTaskRequest) GetMessage() string {
@@ -5930,7 +6088,7 @@ type ClaimTaskResponse struct {
 
 func (x *ClaimTaskResponse) Reset() {
 	*x = ClaimTaskResponse{}
-	mi := &file_v1_command_proto_msgTypes[83]
+	mi := &file_v1_command_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5942,7 +6100,7 @@ func (x *ClaimTaskResponse) String() string {
 func (*ClaimTaskResponse) ProtoMessage() {}
 
 func (x *ClaimTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[83]
+	mi := &file_v1_command_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5955,7 +6113,7 @@ func (x *ClaimTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClaimTaskResponse.ProtoReflect.Descriptor instead.
 func (*ClaimTaskResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{83}
+	return file_v1_command_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *ClaimTaskResponse) GetMessage() *ChatMessage {
@@ -5974,7 +6132,7 @@ type UnclaimTaskRequest struct {
 
 func (x *UnclaimTaskRequest) Reset() {
 	*x = UnclaimTaskRequest{}
-	mi := &file_v1_command_proto_msgTypes[84]
+	mi := &file_v1_command_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5986,7 +6144,7 @@ func (x *UnclaimTaskRequest) String() string {
 func (*UnclaimTaskRequest) ProtoMessage() {}
 
 func (x *UnclaimTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[84]
+	mi := &file_v1_command_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5999,7 +6157,7 @@ func (x *UnclaimTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnclaimTaskRequest.ProtoReflect.Descriptor instead.
 func (*UnclaimTaskRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{84}
+	return file_v1_command_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *UnclaimTaskRequest) GetMessage() string {
@@ -6018,7 +6176,7 @@ type UnclaimTaskResponse struct {
 
 func (x *UnclaimTaskResponse) Reset() {
 	*x = UnclaimTaskResponse{}
-	mi := &file_v1_command_proto_msgTypes[85]
+	mi := &file_v1_command_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6030,7 +6188,7 @@ func (x *UnclaimTaskResponse) String() string {
 func (*UnclaimTaskResponse) ProtoMessage() {}
 
 func (x *UnclaimTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[85]
+	mi := &file_v1_command_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6043,7 +6201,7 @@ func (x *UnclaimTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnclaimTaskResponse.ProtoReflect.Descriptor instead.
 func (*UnclaimTaskResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{85}
+	return file_v1_command_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *UnclaimTaskResponse) GetMessage() *ChatMessage {
@@ -6068,7 +6226,7 @@ type UpdateTaskStatusRequest struct {
 
 func (x *UpdateTaskStatusRequest) Reset() {
 	*x = UpdateTaskStatusRequest{}
-	mi := &file_v1_command_proto_msgTypes[86]
+	mi := &file_v1_command_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6080,7 +6238,7 @@ func (x *UpdateTaskStatusRequest) String() string {
 func (*UpdateTaskStatusRequest) ProtoMessage() {}
 
 func (x *UpdateTaskStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[86]
+	mi := &file_v1_command_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6093,7 +6251,7 @@ func (x *UpdateTaskStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTaskStatusRequest.ProtoReflect.Descriptor instead.
 func (*UpdateTaskStatusRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{86}
+	return file_v1_command_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *UpdateTaskStatusRequest) GetMessage() string {
@@ -6119,7 +6277,7 @@ type UpdateTaskStatusResponse struct {
 
 func (x *UpdateTaskStatusResponse) Reset() {
 	*x = UpdateTaskStatusResponse{}
-	mi := &file_v1_command_proto_msgTypes[87]
+	mi := &file_v1_command_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6131,7 +6289,7 @@ func (x *UpdateTaskStatusResponse) String() string {
 func (*UpdateTaskStatusResponse) ProtoMessage() {}
 
 func (x *UpdateTaskStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[87]
+	mi := &file_v1_command_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6144,7 +6302,7 @@ func (x *UpdateTaskStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTaskStatusResponse.ProtoReflect.Descriptor instead.
 func (*UpdateTaskStatusResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{87}
+	return file_v1_command_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *UpdateTaskStatusResponse) GetMessage() *ChatMessage {
@@ -6166,7 +6324,7 @@ type CreateTaskRequest struct {
 
 func (x *CreateTaskRequest) Reset() {
 	*x = CreateTaskRequest{}
-	mi := &file_v1_command_proto_msgTypes[88]
+	mi := &file_v1_command_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6178,7 +6336,7 @@ func (x *CreateTaskRequest) String() string {
 func (*CreateTaskRequest) ProtoMessage() {}
 
 func (x *CreateTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[88]
+	mi := &file_v1_command_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6191,7 +6349,7 @@ func (x *CreateTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTaskRequest.ProtoReflect.Descriptor instead.
 func (*CreateTaskRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{88}
+	return file_v1_command_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *CreateTaskRequest) GetConversation() string {
@@ -6234,7 +6392,7 @@ type CreateTaskResponse struct {
 
 func (x *CreateTaskResponse) Reset() {
 	*x = CreateTaskResponse{}
-	mi := &file_v1_command_proto_msgTypes[89]
+	mi := &file_v1_command_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6246,7 +6404,7 @@ func (x *CreateTaskResponse) String() string {
 func (*CreateTaskResponse) ProtoMessage() {}
 
 func (x *CreateTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[89]
+	mi := &file_v1_command_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6259,7 +6417,7 @@ func (x *CreateTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTaskResponse.ProtoReflect.Descriptor instead.
 func (*CreateTaskResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{89}
+	return file_v1_command_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *CreateTaskResponse) GetMessage() *ChatMessage {
@@ -6317,7 +6475,7 @@ type Reminder struct {
 
 func (x *Reminder) Reset() {
 	*x = Reminder{}
-	mi := &file_v1_command_proto_msgTypes[90]
+	mi := &file_v1_command_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6329,7 +6487,7 @@ func (x *Reminder) String() string {
 func (*Reminder) ProtoMessage() {}
 
 func (x *Reminder) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[90]
+	mi := &file_v1_command_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6342,7 +6500,7 @@ func (x *Reminder) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reminder.ProtoReflect.Descriptor instead.
 func (*Reminder) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{90}
+	return file_v1_command_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *Reminder) GetName() string {
@@ -6493,7 +6651,7 @@ type ConvertMessageToReminderRequest struct {
 
 func (x *ConvertMessageToReminderRequest) Reset() {
 	*x = ConvertMessageToReminderRequest{}
-	mi := &file_v1_command_proto_msgTypes[91]
+	mi := &file_v1_command_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6505,7 +6663,7 @@ func (x *ConvertMessageToReminderRequest) String() string {
 func (*ConvertMessageToReminderRequest) ProtoMessage() {}
 
 func (x *ConvertMessageToReminderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[91]
+	mi := &file_v1_command_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6518,7 +6676,7 @@ func (x *ConvertMessageToReminderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConvertMessageToReminderRequest.ProtoReflect.Descriptor instead.
 func (*ConvertMessageToReminderRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{91}
+	return file_v1_command_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *ConvertMessageToReminderRequest) GetMessage() string {
@@ -6565,7 +6723,7 @@ type ConvertMessageToReminderResponse struct {
 
 func (x *ConvertMessageToReminderResponse) Reset() {
 	*x = ConvertMessageToReminderResponse{}
-	mi := &file_v1_command_proto_msgTypes[92]
+	mi := &file_v1_command_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6577,7 +6735,7 @@ func (x *ConvertMessageToReminderResponse) String() string {
 func (*ConvertMessageToReminderResponse) ProtoMessage() {}
 
 func (x *ConvertMessageToReminderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[92]
+	mi := &file_v1_command_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6590,7 +6748,7 @@ func (x *ConvertMessageToReminderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConvertMessageToReminderResponse.ProtoReflect.Descriptor instead.
 func (*ConvertMessageToReminderResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{92}
+	return file_v1_command_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *ConvertMessageToReminderResponse) GetReminder() *Reminder {
@@ -6618,7 +6776,7 @@ type ListRemindersRequest struct {
 
 func (x *ListRemindersRequest) Reset() {
 	*x = ListRemindersRequest{}
-	mi := &file_v1_command_proto_msgTypes[93]
+	mi := &file_v1_command_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6630,7 +6788,7 @@ func (x *ListRemindersRequest) String() string {
 func (*ListRemindersRequest) ProtoMessage() {}
 
 func (x *ListRemindersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[93]
+	mi := &file_v1_command_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6643,7 +6801,7 @@ func (x *ListRemindersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRemindersRequest.ProtoReflect.Descriptor instead.
 func (*ListRemindersRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{93}
+	return file_v1_command_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *ListRemindersRequest) GetAgent() string {
@@ -6691,7 +6849,7 @@ type ListRemindersResponse struct {
 
 func (x *ListRemindersResponse) Reset() {
 	*x = ListRemindersResponse{}
-	mi := &file_v1_command_proto_msgTypes[94]
+	mi := &file_v1_command_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6703,7 +6861,7 @@ func (x *ListRemindersResponse) String() string {
 func (*ListRemindersResponse) ProtoMessage() {}
 
 func (x *ListRemindersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[94]
+	mi := &file_v1_command_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6716,7 +6874,7 @@ func (x *ListRemindersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRemindersResponse.ProtoReflect.Descriptor instead.
 func (*ListRemindersResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{94}
+	return file_v1_command_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *ListRemindersResponse) GetReminders() []*Reminder {
@@ -6743,7 +6901,7 @@ type GetReminderRequest struct {
 
 func (x *GetReminderRequest) Reset() {
 	*x = GetReminderRequest{}
-	mi := &file_v1_command_proto_msgTypes[95]
+	mi := &file_v1_command_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6755,7 +6913,7 @@ func (x *GetReminderRequest) String() string {
 func (*GetReminderRequest) ProtoMessage() {}
 
 func (x *GetReminderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[95]
+	mi := &file_v1_command_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6768,7 +6926,7 @@ func (x *GetReminderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReminderRequest.ProtoReflect.Descriptor instead.
 func (*GetReminderRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{95}
+	return file_v1_command_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *GetReminderRequest) GetName() string {
@@ -6787,7 +6945,7 @@ type GetReminderResponse struct {
 
 func (x *GetReminderResponse) Reset() {
 	*x = GetReminderResponse{}
-	mi := &file_v1_command_proto_msgTypes[96]
+	mi := &file_v1_command_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6799,7 +6957,7 @@ func (x *GetReminderResponse) String() string {
 func (*GetReminderResponse) ProtoMessage() {}
 
 func (x *GetReminderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[96]
+	mi := &file_v1_command_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6812,7 +6970,7 @@ func (x *GetReminderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReminderResponse.ProtoReflect.Descriptor instead.
 func (*GetReminderResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{96}
+	return file_v1_command_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *GetReminderResponse) GetReminder() *Reminder {
@@ -6839,7 +6997,7 @@ type UpdateReminderRequest struct {
 
 func (x *UpdateReminderRequest) Reset() {
 	*x = UpdateReminderRequest{}
-	mi := &file_v1_command_proto_msgTypes[97]
+	mi := &file_v1_command_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6851,7 +7009,7 @@ func (x *UpdateReminderRequest) String() string {
 func (*UpdateReminderRequest) ProtoMessage() {}
 
 func (x *UpdateReminderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[97]
+	mi := &file_v1_command_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6864,7 +7022,7 @@ func (x *UpdateReminderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateReminderRequest.ProtoReflect.Descriptor instead.
 func (*UpdateReminderRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{97}
+	return file_v1_command_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *UpdateReminderRequest) GetName() string {
@@ -6911,7 +7069,7 @@ type UpdateReminderResponse struct {
 
 func (x *UpdateReminderResponse) Reset() {
 	*x = UpdateReminderResponse{}
-	mi := &file_v1_command_proto_msgTypes[98]
+	mi := &file_v1_command_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6923,7 +7081,7 @@ func (x *UpdateReminderResponse) String() string {
 func (*UpdateReminderResponse) ProtoMessage() {}
 
 func (x *UpdateReminderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[98]
+	mi := &file_v1_command_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6936,7 +7094,7 @@ func (x *UpdateReminderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateReminderResponse.ProtoReflect.Descriptor instead.
 func (*UpdateReminderResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{98}
+	return file_v1_command_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *UpdateReminderResponse) GetReminder() *Reminder {
@@ -6955,7 +7113,7 @@ type CancelReminderRequest struct {
 
 func (x *CancelReminderRequest) Reset() {
 	*x = CancelReminderRequest{}
-	mi := &file_v1_command_proto_msgTypes[99]
+	mi := &file_v1_command_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6967,7 +7125,7 @@ func (x *CancelReminderRequest) String() string {
 func (*CancelReminderRequest) ProtoMessage() {}
 
 func (x *CancelReminderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[99]
+	mi := &file_v1_command_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6980,7 +7138,7 @@ func (x *CancelReminderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelReminderRequest.ProtoReflect.Descriptor instead.
 func (*CancelReminderRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{99}
+	return file_v1_command_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *CancelReminderRequest) GetName() string {
@@ -6999,7 +7157,7 @@ type CancelReminderResponse struct {
 
 func (x *CancelReminderResponse) Reset() {
 	*x = CancelReminderResponse{}
-	mi := &file_v1_command_proto_msgTypes[100]
+	mi := &file_v1_command_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7011,7 +7169,7 @@ func (x *CancelReminderResponse) String() string {
 func (*CancelReminderResponse) ProtoMessage() {}
 
 func (x *CancelReminderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[100]
+	mi := &file_v1_command_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7024,7 +7182,7 @@ func (x *CancelReminderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelReminderResponse.ProtoReflect.Descriptor instead.
 func (*CancelReminderResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{100}
+	return file_v1_command_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *CancelReminderResponse) GetReminder() *Reminder {
@@ -7049,7 +7207,7 @@ type CompleteReminderRequest struct {
 
 func (x *CompleteReminderRequest) Reset() {
 	*x = CompleteReminderRequest{}
-	mi := &file_v1_command_proto_msgTypes[101]
+	mi := &file_v1_command_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7061,7 +7219,7 @@ func (x *CompleteReminderRequest) String() string {
 func (*CompleteReminderRequest) ProtoMessage() {}
 
 func (x *CompleteReminderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[101]
+	mi := &file_v1_command_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7074,7 +7232,7 @@ func (x *CompleteReminderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteReminderRequest.ProtoReflect.Descriptor instead.
 func (*CompleteReminderRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{101}
+	return file_v1_command_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *CompleteReminderRequest) GetName() string {
@@ -7100,7 +7258,7 @@ type CompleteReminderResponse struct {
 
 func (x *CompleteReminderResponse) Reset() {
 	*x = CompleteReminderResponse{}
-	mi := &file_v1_command_proto_msgTypes[102]
+	mi := &file_v1_command_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7112,7 +7270,7 @@ func (x *CompleteReminderResponse) String() string {
 func (*CompleteReminderResponse) ProtoMessage() {}
 
 func (x *CompleteReminderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[102]
+	mi := &file_v1_command_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7125,7 +7283,7 @@ func (x *CompleteReminderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteReminderResponse.ProtoReflect.Descriptor instead.
 func (*CompleteReminderResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{102}
+	return file_v1_command_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *CompleteReminderResponse) GetReminder() *Reminder {
@@ -7146,7 +7304,7 @@ type FailReminderRequest struct {
 
 func (x *FailReminderRequest) Reset() {
 	*x = FailReminderRequest{}
-	mi := &file_v1_command_proto_msgTypes[103]
+	mi := &file_v1_command_proto_msgTypes[105]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7158,7 +7316,7 @@ func (x *FailReminderRequest) String() string {
 func (*FailReminderRequest) ProtoMessage() {}
 
 func (x *FailReminderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[103]
+	mi := &file_v1_command_proto_msgTypes[105]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7171,7 +7329,7 @@ func (x *FailReminderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FailReminderRequest.ProtoReflect.Descriptor instead.
 func (*FailReminderRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{103}
+	return file_v1_command_proto_rawDescGZIP(), []int{105}
 }
 
 func (x *FailReminderRequest) GetName() string {
@@ -7197,7 +7355,7 @@ type FailReminderResponse struct {
 
 func (x *FailReminderResponse) Reset() {
 	*x = FailReminderResponse{}
-	mi := &file_v1_command_proto_msgTypes[104]
+	mi := &file_v1_command_proto_msgTypes[106]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7209,7 +7367,7 @@ func (x *FailReminderResponse) String() string {
 func (*FailReminderResponse) ProtoMessage() {}
 
 func (x *FailReminderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[104]
+	mi := &file_v1_command_proto_msgTypes[106]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7222,7 +7380,7 @@ func (x *FailReminderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FailReminderResponse.ProtoReflect.Descriptor instead.
 func (*FailReminderResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{104}
+	return file_v1_command_proto_rawDescGZIP(), []int{106}
 }
 
 func (x *FailReminderResponse) GetReminder() *Reminder {
@@ -7240,7 +7398,7 @@ type ListDueRemindersRequest struct {
 
 func (x *ListDueRemindersRequest) Reset() {
 	*x = ListDueRemindersRequest{}
-	mi := &file_v1_command_proto_msgTypes[105]
+	mi := &file_v1_command_proto_msgTypes[107]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7252,7 +7410,7 @@ func (x *ListDueRemindersRequest) String() string {
 func (*ListDueRemindersRequest) ProtoMessage() {}
 
 func (x *ListDueRemindersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[105]
+	mi := &file_v1_command_proto_msgTypes[107]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7265,7 +7423,7 @@ func (x *ListDueRemindersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDueRemindersRequest.ProtoReflect.Descriptor instead.
 func (*ListDueRemindersRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{105}
+	return file_v1_command_proto_rawDescGZIP(), []int{107}
 }
 
 type ListDueRemindersResponse struct {
@@ -7280,7 +7438,7 @@ type ListDueRemindersResponse struct {
 
 func (x *ListDueRemindersResponse) Reset() {
 	*x = ListDueRemindersResponse{}
-	mi := &file_v1_command_proto_msgTypes[106]
+	mi := &file_v1_command_proto_msgTypes[108]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7292,7 +7450,7 @@ func (x *ListDueRemindersResponse) String() string {
 func (*ListDueRemindersResponse) ProtoMessage() {}
 
 func (x *ListDueRemindersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[106]
+	mi := &file_v1_command_proto_msgTypes[108]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7305,7 +7463,7 @@ func (x *ListDueRemindersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDueRemindersResponse.ProtoReflect.Descriptor instead.
 func (*ListDueRemindersResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{106}
+	return file_v1_command_proto_rawDescGZIP(), []int{108}
 }
 
 func (x *ListDueRemindersResponse) GetReminders() []*Reminder {
@@ -7328,7 +7486,7 @@ type ListChannelUpdatesRequest struct {
 
 func (x *ListChannelUpdatesRequest) Reset() {
 	*x = ListChannelUpdatesRequest{}
-	mi := &file_v1_command_proto_msgTypes[107]
+	mi := &file_v1_command_proto_msgTypes[109]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7340,7 +7498,7 @@ func (x *ListChannelUpdatesRequest) String() string {
 func (*ListChannelUpdatesRequest) ProtoMessage() {}
 
 func (x *ListChannelUpdatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[107]
+	mi := &file_v1_command_proto_msgTypes[109]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7353,7 +7511,7 @@ func (x *ListChannelUpdatesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChannelUpdatesRequest.ProtoReflect.Descriptor instead.
 func (*ListChannelUpdatesRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{107}
+	return file_v1_command_proto_rawDescGZIP(), []int{109}
 }
 
 // ChannelUpdate describes one conversation that has unread messages for the
@@ -7371,7 +7529,7 @@ type ChannelUpdate struct {
 
 func (x *ChannelUpdate) Reset() {
 	*x = ChannelUpdate{}
-	mi := &file_v1_command_proto_msgTypes[108]
+	mi := &file_v1_command_proto_msgTypes[110]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7383,7 +7541,7 @@ func (x *ChannelUpdate) String() string {
 func (*ChannelUpdate) ProtoMessage() {}
 
 func (x *ChannelUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[108]
+	mi := &file_v1_command_proto_msgTypes[110]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7396,7 +7554,7 @@ func (x *ChannelUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChannelUpdate.ProtoReflect.Descriptor instead.
 func (*ChannelUpdate) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{108}
+	return file_v1_command_proto_rawDescGZIP(), []int{110}
 }
 
 func (x *ChannelUpdate) GetConversation() string {
@@ -7436,7 +7594,7 @@ type ListChannelUpdatesResponse struct {
 
 func (x *ListChannelUpdatesResponse) Reset() {
 	*x = ListChannelUpdatesResponse{}
-	mi := &file_v1_command_proto_msgTypes[109]
+	mi := &file_v1_command_proto_msgTypes[111]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7448,7 +7606,7 @@ func (x *ListChannelUpdatesResponse) String() string {
 func (*ListChannelUpdatesResponse) ProtoMessage() {}
 
 func (x *ListChannelUpdatesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[109]
+	mi := &file_v1_command_proto_msgTypes[111]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7461,7 +7619,7 @@ func (x *ListChannelUpdatesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChannelUpdatesResponse.ProtoReflect.Descriptor instead.
 func (*ListChannelUpdatesResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{109}
+	return file_v1_command_proto_rawDescGZIP(), []int{111}
 }
 
 func (x *ListChannelUpdatesResponse) GetUpdates() []*ChannelUpdate {
@@ -7487,7 +7645,7 @@ type AckProcessedVersionRequest struct {
 
 func (x *AckProcessedVersionRequest) Reset() {
 	*x = AckProcessedVersionRequest{}
-	mi := &file_v1_command_proto_msgTypes[110]
+	mi := &file_v1_command_proto_msgTypes[112]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7499,7 +7657,7 @@ func (x *AckProcessedVersionRequest) String() string {
 func (*AckProcessedVersionRequest) ProtoMessage() {}
 
 func (x *AckProcessedVersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[110]
+	mi := &file_v1_command_proto_msgTypes[112]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7512,7 +7670,7 @@ func (x *AckProcessedVersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckProcessedVersionRequest.ProtoReflect.Descriptor instead.
 func (*AckProcessedVersionRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{110}
+	return file_v1_command_proto_rawDescGZIP(), []int{112}
 }
 
 func (x *AckProcessedVersionRequest) GetConversation() string {
@@ -7545,7 +7703,7 @@ type AckProcessedVersionResponse struct {
 
 func (x *AckProcessedVersionResponse) Reset() {
 	*x = AckProcessedVersionResponse{}
-	mi := &file_v1_command_proto_msgTypes[111]
+	mi := &file_v1_command_proto_msgTypes[113]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7557,7 +7715,7 @@ func (x *AckProcessedVersionResponse) String() string {
 func (*AckProcessedVersionResponse) ProtoMessage() {}
 
 func (x *AckProcessedVersionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[111]
+	mi := &file_v1_command_proto_msgTypes[113]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7570,7 +7728,7 @@ func (x *AckProcessedVersionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckProcessedVersionResponse.ProtoReflect.Descriptor instead.
 func (*AckProcessedVersionResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{111}
+	return file_v1_command_proto_rawDescGZIP(), []int{113}
 }
 
 func (x *AckProcessedVersionResponse) GetProcessedVersion() int64 {
@@ -7594,7 +7752,7 @@ type MarkConversationReadRequest struct {
 
 func (x *MarkConversationReadRequest) Reset() {
 	*x = MarkConversationReadRequest{}
-	mi := &file_v1_command_proto_msgTypes[112]
+	mi := &file_v1_command_proto_msgTypes[114]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7606,7 +7764,7 @@ func (x *MarkConversationReadRequest) String() string {
 func (*MarkConversationReadRequest) ProtoMessage() {}
 
 func (x *MarkConversationReadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[112]
+	mi := &file_v1_command_proto_msgTypes[114]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7619,7 +7777,7 @@ func (x *MarkConversationReadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkConversationReadRequest.ProtoReflect.Descriptor instead.
 func (*MarkConversationReadRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{112}
+	return file_v1_command_proto_rawDescGZIP(), []int{114}
 }
 
 func (x *MarkConversationReadRequest) GetConversation() string {
@@ -7638,7 +7796,7 @@ type MarkConversationReadResponse struct {
 
 func (x *MarkConversationReadResponse) Reset() {
 	*x = MarkConversationReadResponse{}
-	mi := &file_v1_command_proto_msgTypes[113]
+	mi := &file_v1_command_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7650,7 +7808,7 @@ func (x *MarkConversationReadResponse) String() string {
 func (*MarkConversationReadResponse) ProtoMessage() {}
 
 func (x *MarkConversationReadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[113]
+	mi := &file_v1_command_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7663,7 +7821,7 @@ func (x *MarkConversationReadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkConversationReadResponse.ProtoReflect.Descriptor instead.
 func (*MarkConversationReadResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{113}
+	return file_v1_command_proto_rawDescGZIP(), []int{115}
 }
 
 func (x *MarkConversationReadResponse) GetReadVersion() int64 {
@@ -7688,7 +7846,7 @@ type SetConversationPinnedRequest struct {
 
 func (x *SetConversationPinnedRequest) Reset() {
 	*x = SetConversationPinnedRequest{}
-	mi := &file_v1_command_proto_msgTypes[114]
+	mi := &file_v1_command_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7700,7 +7858,7 @@ func (x *SetConversationPinnedRequest) String() string {
 func (*SetConversationPinnedRequest) ProtoMessage() {}
 
 func (x *SetConversationPinnedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[114]
+	mi := &file_v1_command_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7713,7 +7871,7 @@ func (x *SetConversationPinnedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetConversationPinnedRequest.ProtoReflect.Descriptor instead.
 func (*SetConversationPinnedRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{114}
+	return file_v1_command_proto_rawDescGZIP(), []int{116}
 }
 
 func (x *SetConversationPinnedRequest) GetConversation() string {
@@ -7738,7 +7896,7 @@ type SetConversationPinnedResponse struct {
 
 func (x *SetConversationPinnedResponse) Reset() {
 	*x = SetConversationPinnedResponse{}
-	mi := &file_v1_command_proto_msgTypes[115]
+	mi := &file_v1_command_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7750,7 +7908,7 @@ func (x *SetConversationPinnedResponse) String() string {
 func (*SetConversationPinnedResponse) ProtoMessage() {}
 
 func (x *SetConversationPinnedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[115]
+	mi := &file_v1_command_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7763,7 +7921,7 @@ func (x *SetConversationPinnedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetConversationPinnedResponse.ProtoReflect.Descriptor instead.
 func (*SetConversationPinnedResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{115}
+	return file_v1_command_proto_rawDescGZIP(), []int{117}
 }
 
 // Activity is one item in a user's per-user activity feed. Each item corresponds
@@ -7805,7 +7963,7 @@ type Activity struct {
 
 func (x *Activity) Reset() {
 	*x = Activity{}
-	mi := &file_v1_command_proto_msgTypes[116]
+	mi := &file_v1_command_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7817,7 +7975,7 @@ func (x *Activity) String() string {
 func (*Activity) ProtoMessage() {}
 
 func (x *Activity) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[116]
+	mi := &file_v1_command_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7830,7 +7988,7 @@ func (x *Activity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Activity.ProtoReflect.Descriptor instead.
 func (*Activity) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{116}
+	return file_v1_command_proto_rawDescGZIP(), []int{118}
 }
 
 func (x *Activity) GetName() string {
@@ -7942,7 +8100,7 @@ type ListActivitiesRequest struct {
 
 func (x *ListActivitiesRequest) Reset() {
 	*x = ListActivitiesRequest{}
-	mi := &file_v1_command_proto_msgTypes[117]
+	mi := &file_v1_command_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7954,7 +8112,7 @@ func (x *ListActivitiesRequest) String() string {
 func (*ListActivitiesRequest) ProtoMessage() {}
 
 func (x *ListActivitiesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[117]
+	mi := &file_v1_command_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7967,7 +8125,7 @@ func (x *ListActivitiesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListActivitiesRequest.ProtoReflect.Descriptor instead.
 func (*ListActivitiesRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{117}
+	return file_v1_command_proto_rawDescGZIP(), []int{119}
 }
 
 func (x *ListActivitiesRequest) GetFilter() []ActivityCategory {
@@ -8008,7 +8166,7 @@ type ListActivitiesResponse struct {
 
 func (x *ListActivitiesResponse) Reset() {
 	*x = ListActivitiesResponse{}
-	mi := &file_v1_command_proto_msgTypes[118]
+	mi := &file_v1_command_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8020,7 +8178,7 @@ func (x *ListActivitiesResponse) String() string {
 func (*ListActivitiesResponse) ProtoMessage() {}
 
 func (x *ListActivitiesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[118]
+	mi := &file_v1_command_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8033,7 +8191,7 @@ func (x *ListActivitiesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListActivitiesResponse.ProtoReflect.Descriptor instead.
 func (*ListActivitiesResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{118}
+	return file_v1_command_proto_rawDescGZIP(), []int{120}
 }
 
 func (x *ListActivitiesResponse) GetActivities() []*Activity {
@@ -8062,7 +8220,7 @@ type MarkActivityDoneRequest struct {
 
 func (x *MarkActivityDoneRequest) Reset() {
 	*x = MarkActivityDoneRequest{}
-	mi := &file_v1_command_proto_msgTypes[119]
+	mi := &file_v1_command_proto_msgTypes[121]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8074,7 +8232,7 @@ func (x *MarkActivityDoneRequest) String() string {
 func (*MarkActivityDoneRequest) ProtoMessage() {}
 
 func (x *MarkActivityDoneRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[119]
+	mi := &file_v1_command_proto_msgTypes[121]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8087,7 +8245,7 @@ func (x *MarkActivityDoneRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkActivityDoneRequest.ProtoReflect.Descriptor instead.
 func (*MarkActivityDoneRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{119}
+	return file_v1_command_proto_rawDescGZIP(), []int{121}
 }
 
 func (x *MarkActivityDoneRequest) GetName() string {
@@ -8106,7 +8264,7 @@ type MarkActivityDoneResponse struct {
 
 func (x *MarkActivityDoneResponse) Reset() {
 	*x = MarkActivityDoneResponse{}
-	mi := &file_v1_command_proto_msgTypes[120]
+	mi := &file_v1_command_proto_msgTypes[122]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8118,7 +8276,7 @@ func (x *MarkActivityDoneResponse) String() string {
 func (*MarkActivityDoneResponse) ProtoMessage() {}
 
 func (x *MarkActivityDoneResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[120]
+	mi := &file_v1_command_proto_msgTypes[122]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8131,7 +8289,7 @@ func (x *MarkActivityDoneResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkActivityDoneResponse.ProtoReflect.Descriptor instead.
 func (*MarkActivityDoneResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{120}
+	return file_v1_command_proto_rawDescGZIP(), []int{122}
 }
 
 func (x *MarkActivityDoneResponse) GetActivity() *Activity {
@@ -8159,7 +8317,7 @@ type AgentStreamMessage struct {
 
 func (x *AgentStreamMessage) Reset() {
 	*x = AgentStreamMessage{}
-	mi := &file_v1_command_proto_msgTypes[121]
+	mi := &file_v1_command_proto_msgTypes[123]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8171,7 +8329,7 @@ func (x *AgentStreamMessage) String() string {
 func (*AgentStreamMessage) ProtoMessage() {}
 
 func (x *AgentStreamMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[121]
+	mi := &file_v1_command_proto_msgTypes[123]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8184,7 +8342,7 @@ func (x *AgentStreamMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentStreamMessage.ProtoReflect.Descriptor instead.
 func (*AgentStreamMessage) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{121}
+	return file_v1_command_proto_rawDescGZIP(), []int{123}
 }
 
 func (x *AgentStreamMessage) GetMessage() isAgentStreamMessage_Message {
@@ -8320,7 +8478,7 @@ type ManagerStreamMessage struct {
 
 func (x *ManagerStreamMessage) Reset() {
 	*x = ManagerStreamMessage{}
-	mi := &file_v1_command_proto_msgTypes[122]
+	mi := &file_v1_command_proto_msgTypes[124]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8332,7 +8490,7 @@ func (x *ManagerStreamMessage) String() string {
 func (*ManagerStreamMessage) ProtoMessage() {}
 
 func (x *ManagerStreamMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[122]
+	mi := &file_v1_command_proto_msgTypes[124]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8345,7 +8503,7 @@ func (x *ManagerStreamMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ManagerStreamMessage.ProtoReflect.Descriptor instead.
 func (*ManagerStreamMessage) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{122}
+	return file_v1_command_proto_rawDescGZIP(), []int{124}
 }
 
 func (x *ManagerStreamMessage) GetMessage() isManagerStreamMessage_Message {
@@ -8465,7 +8623,7 @@ type AgentReady struct {
 
 func (x *AgentReady) Reset() {
 	*x = AgentReady{}
-	mi := &file_v1_command_proto_msgTypes[123]
+	mi := &file_v1_command_proto_msgTypes[125]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8477,7 +8635,7 @@ func (x *AgentReady) String() string {
 func (*AgentReady) ProtoMessage() {}
 
 func (x *AgentReady) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[123]
+	mi := &file_v1_command_proto_msgTypes[125]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8490,7 +8648,7 @@ func (x *AgentReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentReady.ProtoReflect.Descriptor instead.
 func (*AgentReady) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{123}
+	return file_v1_command_proto_rawDescGZIP(), []int{125}
 }
 
 func (x *AgentReady) GetSessionId() string {
@@ -8540,7 +8698,7 @@ type DiscoverProviders struct {
 
 func (x *DiscoverProviders) Reset() {
 	*x = DiscoverProviders{}
-	mi := &file_v1_command_proto_msgTypes[124]
+	mi := &file_v1_command_proto_msgTypes[126]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8552,7 +8710,7 @@ func (x *DiscoverProviders) String() string {
 func (*DiscoverProviders) ProtoMessage() {}
 
 func (x *DiscoverProviders) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[124]
+	mi := &file_v1_command_proto_msgTypes[126]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8565,7 +8723,7 @@ func (x *DiscoverProviders) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiscoverProviders.ProtoReflect.Descriptor instead.
 func (*DiscoverProviders) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{124}
+	return file_v1_command_proto_rawDescGZIP(), []int{126}
 }
 
 func (x *DiscoverProviders) GetRequestId() string {
@@ -8588,7 +8746,7 @@ type ProvidersDiscovered struct {
 
 func (x *ProvidersDiscovered) Reset() {
 	*x = ProvidersDiscovered{}
-	mi := &file_v1_command_proto_msgTypes[125]
+	mi := &file_v1_command_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8600,7 +8758,7 @@ func (x *ProvidersDiscovered) String() string {
 func (*ProvidersDiscovered) ProtoMessage() {}
 
 func (x *ProvidersDiscovered) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[125]
+	mi := &file_v1_command_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8613,7 +8771,7 @@ func (x *ProvidersDiscovered) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProvidersDiscovered.ProtoReflect.Descriptor instead.
 func (*ProvidersDiscovered) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{125}
+	return file_v1_command_proto_rawDescGZIP(), []int{127}
 }
 
 func (x *ProvidersDiscovered) GetRequestId() string {
@@ -8649,7 +8807,7 @@ type CommandRequest struct {
 
 func (x *CommandRequest) Reset() {
 	*x = CommandRequest{}
-	mi := &file_v1_command_proto_msgTypes[126]
+	mi := &file_v1_command_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8661,7 +8819,7 @@ func (x *CommandRequest) String() string {
 func (*CommandRequest) ProtoMessage() {}
 
 func (x *CommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[126]
+	mi := &file_v1_command_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8674,7 +8832,7 @@ func (x *CommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandRequest.ProtoReflect.Descriptor instead.
 func (*CommandRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{126}
+	return file_v1_command_proto_rawDescGZIP(), []int{128}
 }
 
 func (x *CommandRequest) GetCommandId() string {
@@ -8766,7 +8924,7 @@ type CommandProgress struct {
 
 func (x *CommandProgress) Reset() {
 	*x = CommandProgress{}
-	mi := &file_v1_command_proto_msgTypes[127]
+	mi := &file_v1_command_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8778,7 +8936,7 @@ func (x *CommandProgress) String() string {
 func (*CommandProgress) ProtoMessage() {}
 
 func (x *CommandProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[127]
+	mi := &file_v1_command_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8791,7 +8949,7 @@ func (x *CommandProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandProgress.ProtoReflect.Descriptor instead.
 func (*CommandProgress) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{127}
+	return file_v1_command_proto_rawDescGZIP(), []int{129}
 }
 
 func (x *CommandProgress) GetCommandId() string {
@@ -8837,7 +8995,7 @@ type CommandResult struct {
 
 func (x *CommandResult) Reset() {
 	*x = CommandResult{}
-	mi := &file_v1_command_proto_msgTypes[128]
+	mi := &file_v1_command_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8849,7 +9007,7 @@ func (x *CommandResult) String() string {
 func (*CommandResult) ProtoMessage() {}
 
 func (x *CommandResult) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[128]
+	mi := &file_v1_command_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8862,7 +9020,7 @@ func (x *CommandResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandResult.ProtoReflect.Descriptor instead.
 func (*CommandResult) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{128}
+	return file_v1_command_proto_rawDescGZIP(), []int{130}
 }
 
 func (x *CommandResult) GetCommandId() string {
@@ -8923,7 +9081,7 @@ type CancelMessage struct {
 
 func (x *CancelMessage) Reset() {
 	*x = CancelMessage{}
-	mi := &file_v1_command_proto_msgTypes[129]
+	mi := &file_v1_command_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8935,7 +9093,7 @@ func (x *CancelMessage) String() string {
 func (*CancelMessage) ProtoMessage() {}
 
 func (x *CancelMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[129]
+	mi := &file_v1_command_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8948,7 +9106,7 @@ func (x *CancelMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelMessage.ProtoReflect.Descriptor instead.
 func (*CancelMessage) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{129}
+	return file_v1_command_proto_rawDescGZIP(), []int{131}
 }
 
 func (x *CancelMessage) GetCommandId() string {
@@ -8968,7 +9126,7 @@ type Ping struct {
 
 func (x *Ping) Reset() {
 	*x = Ping{}
-	mi := &file_v1_command_proto_msgTypes[130]
+	mi := &file_v1_command_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8980,7 +9138,7 @@ func (x *Ping) String() string {
 func (*Ping) ProtoMessage() {}
 
 func (x *Ping) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[130]
+	mi := &file_v1_command_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8993,7 +9151,7 @@ func (x *Ping) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ping.ProtoReflect.Descriptor instead.
 func (*Ping) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{130}
+	return file_v1_command_proto_rawDescGZIP(), []int{132}
 }
 
 func (x *Ping) GetSeq() int64 {
@@ -9020,7 +9178,7 @@ type Pong struct {
 
 func (x *Pong) Reset() {
 	*x = Pong{}
-	mi := &file_v1_command_proto_msgTypes[131]
+	mi := &file_v1_command_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9032,7 +9190,7 @@ func (x *Pong) String() string {
 func (*Pong) ProtoMessage() {}
 
 func (x *Pong) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[131]
+	mi := &file_v1_command_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9045,7 +9203,7 @@ func (x *Pong) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Pong.ProtoReflect.Descriptor instead.
 func (*Pong) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{131}
+	return file_v1_command_proto_rawDescGZIP(), []int{133}
 }
 
 func (x *Pong) GetSeq() int64 {
@@ -9074,7 +9232,7 @@ type ListCommandsRequest struct {
 
 func (x *ListCommandsRequest) Reset() {
 	*x = ListCommandsRequest{}
-	mi := &file_v1_command_proto_msgTypes[132]
+	mi := &file_v1_command_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9086,7 +9244,7 @@ func (x *ListCommandsRequest) String() string {
 func (*ListCommandsRequest) ProtoMessage() {}
 
 func (x *ListCommandsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[132]
+	mi := &file_v1_command_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9099,7 +9257,7 @@ func (x *ListCommandsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCommandsRequest.ProtoReflect.Descriptor instead.
 func (*ListCommandsRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{132}
+	return file_v1_command_proto_rawDescGZIP(), []int{134}
 }
 
 func (x *ListCommandsRequest) GetAgent() string {
@@ -9140,7 +9298,7 @@ type ListCommandsResponse struct {
 
 func (x *ListCommandsResponse) Reset() {
 	*x = ListCommandsResponse{}
-	mi := &file_v1_command_proto_msgTypes[133]
+	mi := &file_v1_command_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9152,7 +9310,7 @@ func (x *ListCommandsResponse) String() string {
 func (*ListCommandsResponse) ProtoMessage() {}
 
 func (x *ListCommandsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[133]
+	mi := &file_v1_command_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9165,7 +9323,7 @@ func (x *ListCommandsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCommandsResponse.ProtoReflect.Descriptor instead.
 func (*ListCommandsResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{133}
+	return file_v1_command_proto_rawDescGZIP(), []int{135}
 }
 
 func (x *ListCommandsResponse) GetCommands() []*Command {
@@ -9191,7 +9349,7 @@ type GetCommandRequest struct {
 
 func (x *GetCommandRequest) Reset() {
 	*x = GetCommandRequest{}
-	mi := &file_v1_command_proto_msgTypes[134]
+	mi := &file_v1_command_proto_msgTypes[136]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9203,7 +9361,7 @@ func (x *GetCommandRequest) String() string {
 func (*GetCommandRequest) ProtoMessage() {}
 
 func (x *GetCommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[134]
+	mi := &file_v1_command_proto_msgTypes[136]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9216,7 +9374,7 @@ func (x *GetCommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCommandRequest.ProtoReflect.Descriptor instead.
 func (*GetCommandRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{134}
+	return file_v1_command_proto_rawDescGZIP(), []int{136}
 }
 
 func (x *GetCommandRequest) GetName() string {
@@ -9236,7 +9394,7 @@ type CancelCommandRequest struct {
 
 func (x *CancelCommandRequest) Reset() {
 	*x = CancelCommandRequest{}
-	mi := &file_v1_command_proto_msgTypes[135]
+	mi := &file_v1_command_proto_msgTypes[137]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9248,7 +9406,7 @@ func (x *CancelCommandRequest) String() string {
 func (*CancelCommandRequest) ProtoMessage() {}
 
 func (x *CancelCommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[135]
+	mi := &file_v1_command_proto_msgTypes[137]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9261,7 +9419,7 @@ func (x *CancelCommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelCommandRequest.ProtoReflect.Descriptor instead.
 func (*CancelCommandRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{135}
+	return file_v1_command_proto_rawDescGZIP(), []int{137}
 }
 
 func (x *CancelCommandRequest) GetName() string {
@@ -9288,7 +9446,7 @@ type WatchCommandRequest struct {
 
 func (x *WatchCommandRequest) Reset() {
 	*x = WatchCommandRequest{}
-	mi := &file_v1_command_proto_msgTypes[136]
+	mi := &file_v1_command_proto_msgTypes[138]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9300,7 +9458,7 @@ func (x *WatchCommandRequest) String() string {
 func (*WatchCommandRequest) ProtoMessage() {}
 
 func (x *WatchCommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[136]
+	mi := &file_v1_command_proto_msgTypes[138]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9313,7 +9471,7 @@ func (x *WatchCommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchCommandRequest.ProtoReflect.Descriptor instead.
 func (*WatchCommandRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{136}
+	return file_v1_command_proto_rawDescGZIP(), []int{138}
 }
 
 func (x *WatchCommandRequest) GetName() string {
@@ -9340,7 +9498,7 @@ type WatchCommandEventsRequest struct {
 
 func (x *WatchCommandEventsRequest) Reset() {
 	*x = WatchCommandEventsRequest{}
-	mi := &file_v1_command_proto_msgTypes[137]
+	mi := &file_v1_command_proto_msgTypes[139]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9352,7 +9510,7 @@ func (x *WatchCommandEventsRequest) String() string {
 func (*WatchCommandEventsRequest) ProtoMessage() {}
 
 func (x *WatchCommandEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[137]
+	mi := &file_v1_command_proto_msgTypes[139]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9365,7 +9523,7 @@ func (x *WatchCommandEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchCommandEventsRequest.ProtoReflect.Descriptor instead.
 func (*WatchCommandEventsRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{137}
+	return file_v1_command_proto_rawDescGZIP(), []int{139}
 }
 
 func (x *WatchCommandEventsRequest) GetName() string {
@@ -9392,7 +9550,7 @@ type PermissionDecision struct {
 
 func (x *PermissionDecision) Reset() {
 	*x = PermissionDecision{}
-	mi := &file_v1_command_proto_msgTypes[138]
+	mi := &file_v1_command_proto_msgTypes[140]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9404,7 +9562,7 @@ func (x *PermissionDecision) String() string {
 func (*PermissionDecision) ProtoMessage() {}
 
 func (x *PermissionDecision) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[138]
+	mi := &file_v1_command_proto_msgTypes[140]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9417,7 +9575,7 @@ func (x *PermissionDecision) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionDecision.ProtoReflect.Descriptor instead.
 func (*PermissionDecision) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{138}
+	return file_v1_command_proto_rawDescGZIP(), []int{140}
 }
 
 func (x *PermissionDecision) GetCommandId() string {
@@ -9444,7 +9602,7 @@ type RespondPermissionRequest struct {
 
 func (x *RespondPermissionRequest) Reset() {
 	*x = RespondPermissionRequest{}
-	mi := &file_v1_command_proto_msgTypes[139]
+	mi := &file_v1_command_proto_msgTypes[141]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9456,7 +9614,7 @@ func (x *RespondPermissionRequest) String() string {
 func (*RespondPermissionRequest) ProtoMessage() {}
 
 func (x *RespondPermissionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[139]
+	mi := &file_v1_command_proto_msgTypes[141]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9469,7 +9627,7 @@ func (x *RespondPermissionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RespondPermissionRequest.ProtoReflect.Descriptor instead.
 func (*RespondPermissionRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{139}
+	return file_v1_command_proto_rawDescGZIP(), []int{141}
 }
 
 func (x *RespondPermissionRequest) GetName() string {
@@ -9508,7 +9666,7 @@ type NewMessagesAvailable struct {
 
 func (x *NewMessagesAvailable) Reset() {
 	*x = NewMessagesAvailable{}
-	mi := &file_v1_command_proto_msgTypes[140]
+	mi := &file_v1_command_proto_msgTypes[142]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9520,7 +9678,7 @@ func (x *NewMessagesAvailable) String() string {
 func (*NewMessagesAvailable) ProtoMessage() {}
 
 func (x *NewMessagesAvailable) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[140]
+	mi := &file_v1_command_proto_msgTypes[142]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9533,7 +9691,7 @@ func (x *NewMessagesAvailable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NewMessagesAvailable.ProtoReflect.Descriptor instead.
 func (*NewMessagesAvailable) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{140}
+	return file_v1_command_proto_rawDescGZIP(), []int{142}
 }
 
 func (x *NewMessagesAvailable) GetConversationIds() []string {
@@ -9571,7 +9729,7 @@ type BeginSession struct {
 
 func (x *BeginSession) Reset() {
 	*x = BeginSession{}
-	mi := &file_v1_command_proto_msgTypes[141]
+	mi := &file_v1_command_proto_msgTypes[143]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9583,7 +9741,7 @@ func (x *BeginSession) String() string {
 func (*BeginSession) ProtoMessage() {}
 
 func (x *BeginSession) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[141]
+	mi := &file_v1_command_proto_msgTypes[143]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9596,7 +9754,7 @@ func (x *BeginSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginSession.ProtoReflect.Descriptor instead.
 func (*BeginSession) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{141}
+	return file_v1_command_proto_rawDescGZIP(), []int{143}
 }
 
 type BeginSessionResponse struct {
@@ -9614,7 +9772,7 @@ type BeginSessionResponse struct {
 
 func (x *BeginSessionResponse) Reset() {
 	*x = BeginSessionResponse{}
-	mi := &file_v1_command_proto_msgTypes[142]
+	mi := &file_v1_command_proto_msgTypes[144]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9626,7 +9784,7 @@ func (x *BeginSessionResponse) String() string {
 func (*BeginSessionResponse) ProtoMessage() {}
 
 func (x *BeginSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[142]
+	mi := &file_v1_command_proto_msgTypes[144]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9639,7 +9797,7 @@ func (x *BeginSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginSessionResponse.ProtoReflect.Descriptor instead.
 func (*BeginSessionResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{142}
+	return file_v1_command_proto_rawDescGZIP(), []int{144}
 }
 
 func (x *BeginSessionResponse) GetCommandId() string {
@@ -9675,7 +9833,7 @@ type FetchConversationActivityRequest struct {
 
 func (x *FetchConversationActivityRequest) Reset() {
 	*x = FetchConversationActivityRequest{}
-	mi := &file_v1_command_proto_msgTypes[143]
+	mi := &file_v1_command_proto_msgTypes[145]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9687,7 +9845,7 @@ func (x *FetchConversationActivityRequest) String() string {
 func (*FetchConversationActivityRequest) ProtoMessage() {}
 
 func (x *FetchConversationActivityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[143]
+	mi := &file_v1_command_proto_msgTypes[145]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9700,7 +9858,7 @@ func (x *FetchConversationActivityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchConversationActivityRequest.ProtoReflect.Descriptor instead.
 func (*FetchConversationActivityRequest) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{143}
+	return file_v1_command_proto_rawDescGZIP(), []int{145}
 }
 
 func (x *FetchConversationActivityRequest) GetConversation() string {
@@ -9719,7 +9877,7 @@ type FetchConversationActivityResponse struct {
 
 func (x *FetchConversationActivityResponse) Reset() {
 	*x = FetchConversationActivityResponse{}
-	mi := &file_v1_command_proto_msgTypes[144]
+	mi := &file_v1_command_proto_msgTypes[146]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9731,7 +9889,7 @@ func (x *FetchConversationActivityResponse) String() string {
 func (*FetchConversationActivityResponse) ProtoMessage() {}
 
 func (x *FetchConversationActivityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[144]
+	mi := &file_v1_command_proto_msgTypes[146]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9744,7 +9902,7 @@ func (x *FetchConversationActivityResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use FetchConversationActivityResponse.ProtoReflect.Descriptor instead.
 func (*FetchConversationActivityResponse) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{144}
+	return file_v1_command_proto_rawDescGZIP(), []int{146}
 }
 
 func (x *FetchConversationActivityResponse) GetActivities() []*AgentActivity {
@@ -9766,7 +9924,7 @@ type AgentActivity struct {
 
 func (x *AgentActivity) Reset() {
 	*x = AgentActivity{}
-	mi := &file_v1_command_proto_msgTypes[145]
+	mi := &file_v1_command_proto_msgTypes[147]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9778,7 +9936,7 @@ func (x *AgentActivity) String() string {
 func (*AgentActivity) ProtoMessage() {}
 
 func (x *AgentActivity) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_command_proto_msgTypes[145]
+	mi := &file_v1_command_proto_msgTypes[147]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9791,7 +9949,7 @@ func (x *AgentActivity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentActivity.ProtoReflect.Descriptor instead.
 func (*AgentActivity) Descriptor() ([]byte, []int) {
-	return file_v1_command_proto_rawDescGZIP(), []int{145}
+	return file_v1_command_proto_rawDescGZIP(), []int{147}
 }
 
 func (x *AgentActivity) GetAgentId() string {
@@ -9879,7 +10037,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\n" +
 	"\x06STDERR\x10\x02\x12\n" +
 	"\n" +
-	"\x06SYSTEM\x10\x03\"\x86\b\n" +
+	"\x06SYSTEM\x10\x03\"\xa3\t\n" +
 	"\fCommandEvent\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12\x15\n" +
@@ -9899,7 +10057,9 @@ const file_v1_command_proto_rawDesc = "" +
 	"\rfinal_summary\x18\x11 \x01(\v2\x1e.laelia.v1.FinalSummaryPayloadH\x00R\ffinalSummary\x12Z\n" +
 	"\x14permission_requested\x18\x12 \x01(\v2%.laelia.v1.PermissionRequestedPayloadH\x00R\x13permissionRequested\x12X\n" +
 	"\x14permission_timed_out\x18\x13 \x01(\v2$.laelia.v1.PermissionTimedOutPayloadH\x00R\x12permissionTimedOut\x12T\n" +
-	"\x12permission_decided\x18\x14 \x01(\v2#.laelia.v1.PermissionDecidedPayloadH\x00R\x11permissionDecidedB\t\n" +
+	"\x12permission_decided\x18\x14 \x01(\v2#.laelia.v1.PermissionDecidedPayloadH\x00R\x11permissionDecided\x12T\n" +
+	"\x12context_compaction\x18\x15 \x01(\v2#.laelia.v1.ContextCompactionPayloadH\x00R\x11contextCompaction\x12E\n" +
+	"\rcontext_usage\x18\x16 \x01(\v2\x1e.laelia.v1.ContextUsagePayloadH\x00R\fcontextUsageB\t\n" +
 	"\apayloadJ\x04\b\x05\x10\x06R\apayload\"Q\n" +
 	"\x10LifecyclePayload\x12#\n" +
 	"\rexecutor_kind\x18\x01 \x01(\tR\fexecutorKind\x12\x18\n" +
@@ -9950,7 +10110,15 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x1b\n" +
 	"\toption_id\x18\x03 \x01(\tR\boptionId\x12\x1f\n" +
 	"\voption_kind\x18\x04 \x01(\tR\n" +
-	"optionKind\"\x9f\x02\n" +
+	"optionKind\"N\n" +
+	"\x18ContextCompactionPayload\x12\x16\n" +
+	"\x06reason\x18\x01 \x01(\tR\x06reason\x12\x1a\n" +
+	"\binferred\x18\x02 \x01(\bR\binferred\"^\n" +
+	"\x13ContextUsagePayload\x12\x12\n" +
+	"\x04size\x18\x01 \x01(\x03R\x04size\x12\x12\n" +
+	"\x04used\x18\x02 \x01(\x03R\x04used\x12\x1f\n" +
+	"\vusage_ratio\x18\x03 \x01(\x01R\n" +
+	"usageRatio\"\x9f\x02\n" +
 	"\x18SearchChatHistoryRequest\x12*\n" +
 	"\x05agent\x18\x01 \x01(\tB\x14\xe0A\x02\xfaA\x0e\n" +
 	"\flaelia/AgentR\x05agent\x12\x14\n" +
@@ -10589,7 +10757,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x10TASK_STATUS_TODO\x10\x01\x12\x1b\n" +
 	"\x17TASK_STATUS_IN_PROGRESS\x10\x02\x12\x19\n" +
 	"\x15TASK_STATUS_IN_REVIEW\x10\x03\x12\x14\n" +
-	"\x10TASK_STATUS_DONE\x10\x04*\x8f\x02\n" +
+	"\x10TASK_STATUS_DONE\x10\x04*\xea\x02\n" +
 	"\x10CommandEventType\x12\"\n" +
 	"\x1eCOMMAND_EVENT_TYPE_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tLIFECYCLE\x10\x01\x12\x0e\n" +
@@ -10604,7 +10772,10 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x14PERMISSION_REQUESTED\x10\t\x12\x18\n" +
 	"\x14PERMISSION_TIMED_OUT\x10\n" +
 	"\x12\x16\n" +
-	"\x12PERMISSION_DECIDED\x10\v*\xdd\x01\n" +
+	"\x12PERMISSION_DECIDED\x10\v\x12\x1e\n" +
+	"\x1aCONTEXT_COMPACTION_STARTED\x10\f\x12\x1f\n" +
+	"\x1bCONTEXT_COMPACTION_FINISHED\x10\r\x12\x18\n" +
+	"\x14CONTEXT_USAGE_UPDATE\x10\x0e*\xdd\x01\n" +
 	"\x0eReminderStatus\x12\x1f\n" +
 	"\x1bREMINDER_STATUS_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17REMINDER_STATUS_PENDING\x10\x01\x12\x17\n" +
@@ -10704,7 +10875,7 @@ func file_v1_command_proto_rawDescGZIP() []byte {
 }
 
 var file_v1_command_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
-var file_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 148)
+var file_v1_command_proto_msgTypes = make([]protoimpl.MessageInfo, 150)
 var file_v1_command_proto_goTypes = []any{
 	(CommandStatus)(0),                        // 0: laelia.v1.CommandStatus
 	(SenderType)(0),                           // 1: laelia.v1.SenderType
@@ -10730,157 +10901,159 @@ var file_v1_command_proto_goTypes = []any{
 	(*PermissionOptionPayload)(nil),           // 21: laelia.v1.PermissionOptionPayload
 	(*PermissionTimedOutPayload)(nil),         // 22: laelia.v1.PermissionTimedOutPayload
 	(*PermissionDecidedPayload)(nil),          // 23: laelia.v1.PermissionDecidedPayload
-	(*SearchChatHistoryRequest)(nil),          // 24: laelia.v1.SearchChatHistoryRequest
-	(*SearchChatHistoryResponse)(nil),         // 25: laelia.v1.SearchChatHistoryResponse
-	(*ChatHistoryEntry)(nil),                  // 26: laelia.v1.ChatHistoryEntry
-	(*Mention)(nil),                           // 27: laelia.v1.Mention
-	(*Attachment)(nil),                        // 28: laelia.v1.Attachment
-	(*File)(nil),                              // 29: laelia.v1.File
-	(*UploadFileRequest)(nil),                 // 30: laelia.v1.UploadFileRequest
-	(*DownloadFileRequest)(nil),               // 31: laelia.v1.DownloadFileRequest
-	(*DownloadFileResponse)(nil),              // 32: laelia.v1.DownloadFileResponse
-	(*ListFilesRequest)(nil),                  // 33: laelia.v1.ListFilesRequest
-	(*ListFilesResponse)(nil),                 // 34: laelia.v1.ListFilesResponse
-	(*ChatMessage)(nil),                       // 35: laelia.v1.ChatMessage
-	(*Conversation)(nil),                      // 36: laelia.v1.Conversation
-	(*ChannelMember)(nil),                     // 37: laelia.v1.ChannelMember
-	(*ListConversationMessagesRequest)(nil),   // 38: laelia.v1.ListConversationMessagesRequest
-	(*ListConversationMessagesResponse)(nil),  // 39: laelia.v1.ListConversationMessagesResponse
-	(*ListThreadMessagesRequest)(nil),         // 40: laelia.v1.ListThreadMessagesRequest
-	(*ListThreadMessagesResponse)(nil),        // 41: laelia.v1.ListThreadMessagesResponse
-	(*ListChannelThreadsRequest)(nil),         // 42: laelia.v1.ListChannelThreadsRequest
-	(*ChannelThread)(nil),                     // 43: laelia.v1.ChannelThread
-	(*ListChannelThreadsResponse)(nil),        // 44: laelia.v1.ListChannelThreadsResponse
-	(*ListThreadUpdatesRequest)(nil),          // 45: laelia.v1.ListThreadUpdatesRequest
-	(*ThreadUpdate)(nil),                      // 46: laelia.v1.ThreadUpdate
-	(*ListThreadUpdatesResponse)(nil),         // 47: laelia.v1.ListThreadUpdatesResponse
-	(*GetOrCreateConversationRequest)(nil),    // 48: laelia.v1.GetOrCreateConversationRequest
-	(*GetOrCreateConversationResponse)(nil),   // 49: laelia.v1.GetOrCreateConversationResponse
-	(*GetOrCreateUserUserDMRequest)(nil),      // 50: laelia.v1.GetOrCreateUserUserDMRequest
-	(*GetOrCreateUserUserDMResponse)(nil),     // 51: laelia.v1.GetOrCreateUserUserDMResponse
-	(*ResolveChannelByTitleRequest)(nil),      // 52: laelia.v1.ResolveChannelByTitleRequest
-	(*ResolveChannelByTitleResponse)(nil),     // 53: laelia.v1.ResolveChannelByTitleResponse
-	(*GetOrCreateUserDMRequest)(nil),          // 54: laelia.v1.GetOrCreateUserDMRequest
-	(*GetOrCreateUserDMResponse)(nil),         // 55: laelia.v1.GetOrCreateUserDMResponse
-	(*GetOrCreateAgentDMRequest)(nil),         // 56: laelia.v1.GetOrCreateAgentDMRequest
-	(*GetOrCreateAgentDMResponse)(nil),        // 57: laelia.v1.GetOrCreateAgentDMResponse
-	(*PeerAgent)(nil),                         // 58: laelia.v1.PeerAgent
-	(*ListPeerAgentsRequest)(nil),             // 59: laelia.v1.ListPeerAgentsRequest
-	(*ListPeerAgentsResponse)(nil),            // 60: laelia.v1.ListPeerAgentsResponse
-	(*CreateChannelRequest)(nil),              // 61: laelia.v1.CreateChannelRequest
-	(*ListChannelsRequest)(nil),               // 62: laelia.v1.ListChannelsRequest
-	(*ListChannelsResponse)(nil),              // 63: laelia.v1.ListChannelsResponse
-	(*ListChannelsForAgentRequest)(nil),       // 64: laelia.v1.ListChannelsForAgentRequest
-	(*ListChannelsForAgentResponse)(nil),      // 65: laelia.v1.ListChannelsForAgentResponse
-	(*GetChannelRequest)(nil),                 // 66: laelia.v1.GetChannelRequest
-	(*UpdateChannelRequest)(nil),              // 67: laelia.v1.UpdateChannelRequest
-	(*DeleteChannelRequest)(nil),              // 68: laelia.v1.DeleteChannelRequest
-	(*AddChannelMemberRequest)(nil),           // 69: laelia.v1.AddChannelMemberRequest
-	(*RemoveChannelMemberRequest)(nil),        // 70: laelia.v1.RemoveChannelMemberRequest
-	(*ListChannelMembersRequest)(nil),         // 71: laelia.v1.ListChannelMembersRequest
-	(*ListChannelMembersResponse)(nil),        // 72: laelia.v1.ListChannelMembersResponse
-	(*TransferChannelOwnershipRequest)(nil),   // 73: laelia.v1.TransferChannelOwnershipRequest
-	(*TransferChannelOwnershipResponse)(nil),  // 74: laelia.v1.TransferChannelOwnershipResponse
-	(*UpdateChannelMemberRoleRequest)(nil),    // 75: laelia.v1.UpdateChannelMemberRoleRequest
-	(*LeaveChannelRequest)(nil),               // 76: laelia.v1.LeaveChannelRequest
-	(*ListThreadParticipantsRequest)(nil),     // 77: laelia.v1.ListThreadParticipantsRequest
-	(*ListThreadParticipantsResponse)(nil),    // 78: laelia.v1.ListThreadParticipantsResponse
-	(*SendMessageRequest)(nil),                // 79: laelia.v1.SendMessageRequest
-	(*GetCommandContextRequest)(nil),          // 80: laelia.v1.GetCommandContextRequest
-	(*GetCommandContextResponse)(nil),         // 81: laelia.v1.GetCommandContextResponse
-	(*PostMessageRequest)(nil),                // 82: laelia.v1.PostMessageRequest
-	(*PostMessageResponse)(nil),               // 83: laelia.v1.PostMessageResponse
-	(*ConvertMessageToTaskRequest)(nil),       // 84: laelia.v1.ConvertMessageToTaskRequest
-	(*ConvertMessageToTaskResponse)(nil),      // 85: laelia.v1.ConvertMessageToTaskResponse
-	(*ListTasksRequest)(nil),                  // 86: laelia.v1.ListTasksRequest
-	(*ListTasksResponse)(nil),                 // 87: laelia.v1.ListTasksResponse
-	(*ListTaskCountsRequest)(nil),             // 88: laelia.v1.ListTaskCountsRequest
-	(*ListTaskCountsResponse)(nil),            // 89: laelia.v1.ListTaskCountsResponse
-	(*ClaimTaskRequest)(nil),                  // 90: laelia.v1.ClaimTaskRequest
-	(*ClaimTaskResponse)(nil),                 // 91: laelia.v1.ClaimTaskResponse
-	(*UnclaimTaskRequest)(nil),                // 92: laelia.v1.UnclaimTaskRequest
-	(*UnclaimTaskResponse)(nil),               // 93: laelia.v1.UnclaimTaskResponse
-	(*UpdateTaskStatusRequest)(nil),           // 94: laelia.v1.UpdateTaskStatusRequest
-	(*UpdateTaskStatusResponse)(nil),          // 95: laelia.v1.UpdateTaskStatusResponse
-	(*CreateTaskRequest)(nil),                 // 96: laelia.v1.CreateTaskRequest
-	(*CreateTaskResponse)(nil),                // 97: laelia.v1.CreateTaskResponse
-	(*Reminder)(nil),                          // 98: laelia.v1.Reminder
-	(*ConvertMessageToReminderRequest)(nil),   // 99: laelia.v1.ConvertMessageToReminderRequest
-	(*ConvertMessageToReminderResponse)(nil),  // 100: laelia.v1.ConvertMessageToReminderResponse
-	(*ListRemindersRequest)(nil),              // 101: laelia.v1.ListRemindersRequest
-	(*ListRemindersResponse)(nil),             // 102: laelia.v1.ListRemindersResponse
-	(*GetReminderRequest)(nil),                // 103: laelia.v1.GetReminderRequest
-	(*GetReminderResponse)(nil),               // 104: laelia.v1.GetReminderResponse
-	(*UpdateReminderRequest)(nil),             // 105: laelia.v1.UpdateReminderRequest
-	(*UpdateReminderResponse)(nil),            // 106: laelia.v1.UpdateReminderResponse
-	(*CancelReminderRequest)(nil),             // 107: laelia.v1.CancelReminderRequest
-	(*CancelReminderResponse)(nil),            // 108: laelia.v1.CancelReminderResponse
-	(*CompleteReminderRequest)(nil),           // 109: laelia.v1.CompleteReminderRequest
-	(*CompleteReminderResponse)(nil),          // 110: laelia.v1.CompleteReminderResponse
-	(*FailReminderRequest)(nil),               // 111: laelia.v1.FailReminderRequest
-	(*FailReminderResponse)(nil),              // 112: laelia.v1.FailReminderResponse
-	(*ListDueRemindersRequest)(nil),           // 113: laelia.v1.ListDueRemindersRequest
-	(*ListDueRemindersResponse)(nil),          // 114: laelia.v1.ListDueRemindersResponse
-	(*ListChannelUpdatesRequest)(nil),         // 115: laelia.v1.ListChannelUpdatesRequest
-	(*ChannelUpdate)(nil),                     // 116: laelia.v1.ChannelUpdate
-	(*ListChannelUpdatesResponse)(nil),        // 117: laelia.v1.ListChannelUpdatesResponse
-	(*AckProcessedVersionRequest)(nil),        // 118: laelia.v1.AckProcessedVersionRequest
-	(*AckProcessedVersionResponse)(nil),       // 119: laelia.v1.AckProcessedVersionResponse
-	(*MarkConversationReadRequest)(nil),       // 120: laelia.v1.MarkConversationReadRequest
-	(*MarkConversationReadResponse)(nil),      // 121: laelia.v1.MarkConversationReadResponse
-	(*SetConversationPinnedRequest)(nil),      // 122: laelia.v1.SetConversationPinnedRequest
-	(*SetConversationPinnedResponse)(nil),     // 123: laelia.v1.SetConversationPinnedResponse
-	(*Activity)(nil),                          // 124: laelia.v1.Activity
-	(*ListActivitiesRequest)(nil),             // 125: laelia.v1.ListActivitiesRequest
-	(*ListActivitiesResponse)(nil),            // 126: laelia.v1.ListActivitiesResponse
-	(*MarkActivityDoneRequest)(nil),           // 127: laelia.v1.MarkActivityDoneRequest
-	(*MarkActivityDoneResponse)(nil),          // 128: laelia.v1.MarkActivityDoneResponse
-	(*AgentStreamMessage)(nil),                // 129: laelia.v1.AgentStreamMessage
-	(*ManagerStreamMessage)(nil),              // 130: laelia.v1.ManagerStreamMessage
-	(*AgentReady)(nil),                        // 131: laelia.v1.AgentReady
-	(*DiscoverProviders)(nil),                 // 132: laelia.v1.DiscoverProviders
-	(*ProvidersDiscovered)(nil),               // 133: laelia.v1.ProvidersDiscovered
-	(*CommandRequest)(nil),                    // 134: laelia.v1.CommandRequest
-	(*CommandProgress)(nil),                   // 135: laelia.v1.CommandProgress
-	(*CommandResult)(nil),                     // 136: laelia.v1.CommandResult
-	(*CancelMessage)(nil),                     // 137: laelia.v1.CancelMessage
-	(*Ping)(nil),                              // 138: laelia.v1.Ping
-	(*Pong)(nil),                              // 139: laelia.v1.Pong
-	(*ListCommandsRequest)(nil),               // 140: laelia.v1.ListCommandsRequest
-	(*ListCommandsResponse)(nil),              // 141: laelia.v1.ListCommandsResponse
-	(*GetCommandRequest)(nil),                 // 142: laelia.v1.GetCommandRequest
-	(*CancelCommandRequest)(nil),              // 143: laelia.v1.CancelCommandRequest
-	(*WatchCommandRequest)(nil),               // 144: laelia.v1.WatchCommandRequest
-	(*WatchCommandEventsRequest)(nil),         // 145: laelia.v1.WatchCommandEventsRequest
-	(*PermissionDecision)(nil),                // 146: laelia.v1.PermissionDecision
-	(*RespondPermissionRequest)(nil),          // 147: laelia.v1.RespondPermissionRequest
-	(*NewMessagesAvailable)(nil),              // 148: laelia.v1.NewMessagesAvailable
-	(*BeginSession)(nil),                      // 149: laelia.v1.BeginSession
-	(*BeginSessionResponse)(nil),              // 150: laelia.v1.BeginSessionResponse
-	(*FetchConversationActivityRequest)(nil),  // 151: laelia.v1.FetchConversationActivityRequest
-	(*FetchConversationActivityResponse)(nil), // 152: laelia.v1.FetchConversationActivityResponse
-	(*AgentActivity)(nil),                     // 153: laelia.v1.AgentActivity
-	nil,                                       // 154: laelia.v1.Command.EnvEntry
-	nil,                                       // 155: laelia.v1.CommandRequest.EnvEntry
-	(*timestamppb.Timestamp)(nil),             // 156: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),                   // 157: google.protobuf.Struct
-	(AgentStatus_ConnectionState)(0),          // 158: laelia.v1.AgentStatus.ConnectionState
-	(*fieldmaskpb.FieldMask)(nil),             // 159: google.protobuf.FieldMask
-	(*AgentProviderInfo)(nil),                 // 160: laelia.v1.AgentProviderInfo
-	(*emptypb.Empty)(nil),                     // 161: google.protobuf.Empty
+	(*ContextCompactionPayload)(nil),          // 24: laelia.v1.ContextCompactionPayload
+	(*ContextUsagePayload)(nil),               // 25: laelia.v1.ContextUsagePayload
+	(*SearchChatHistoryRequest)(nil),          // 26: laelia.v1.SearchChatHistoryRequest
+	(*SearchChatHistoryResponse)(nil),         // 27: laelia.v1.SearchChatHistoryResponse
+	(*ChatHistoryEntry)(nil),                  // 28: laelia.v1.ChatHistoryEntry
+	(*Mention)(nil),                           // 29: laelia.v1.Mention
+	(*Attachment)(nil),                        // 30: laelia.v1.Attachment
+	(*File)(nil),                              // 31: laelia.v1.File
+	(*UploadFileRequest)(nil),                 // 32: laelia.v1.UploadFileRequest
+	(*DownloadFileRequest)(nil),               // 33: laelia.v1.DownloadFileRequest
+	(*DownloadFileResponse)(nil),              // 34: laelia.v1.DownloadFileResponse
+	(*ListFilesRequest)(nil),                  // 35: laelia.v1.ListFilesRequest
+	(*ListFilesResponse)(nil),                 // 36: laelia.v1.ListFilesResponse
+	(*ChatMessage)(nil),                       // 37: laelia.v1.ChatMessage
+	(*Conversation)(nil),                      // 38: laelia.v1.Conversation
+	(*ChannelMember)(nil),                     // 39: laelia.v1.ChannelMember
+	(*ListConversationMessagesRequest)(nil),   // 40: laelia.v1.ListConversationMessagesRequest
+	(*ListConversationMessagesResponse)(nil),  // 41: laelia.v1.ListConversationMessagesResponse
+	(*ListThreadMessagesRequest)(nil),         // 42: laelia.v1.ListThreadMessagesRequest
+	(*ListThreadMessagesResponse)(nil),        // 43: laelia.v1.ListThreadMessagesResponse
+	(*ListChannelThreadsRequest)(nil),         // 44: laelia.v1.ListChannelThreadsRequest
+	(*ChannelThread)(nil),                     // 45: laelia.v1.ChannelThread
+	(*ListChannelThreadsResponse)(nil),        // 46: laelia.v1.ListChannelThreadsResponse
+	(*ListThreadUpdatesRequest)(nil),          // 47: laelia.v1.ListThreadUpdatesRequest
+	(*ThreadUpdate)(nil),                      // 48: laelia.v1.ThreadUpdate
+	(*ListThreadUpdatesResponse)(nil),         // 49: laelia.v1.ListThreadUpdatesResponse
+	(*GetOrCreateConversationRequest)(nil),    // 50: laelia.v1.GetOrCreateConversationRequest
+	(*GetOrCreateConversationResponse)(nil),   // 51: laelia.v1.GetOrCreateConversationResponse
+	(*GetOrCreateUserUserDMRequest)(nil),      // 52: laelia.v1.GetOrCreateUserUserDMRequest
+	(*GetOrCreateUserUserDMResponse)(nil),     // 53: laelia.v1.GetOrCreateUserUserDMResponse
+	(*ResolveChannelByTitleRequest)(nil),      // 54: laelia.v1.ResolveChannelByTitleRequest
+	(*ResolveChannelByTitleResponse)(nil),     // 55: laelia.v1.ResolveChannelByTitleResponse
+	(*GetOrCreateUserDMRequest)(nil),          // 56: laelia.v1.GetOrCreateUserDMRequest
+	(*GetOrCreateUserDMResponse)(nil),         // 57: laelia.v1.GetOrCreateUserDMResponse
+	(*GetOrCreateAgentDMRequest)(nil),         // 58: laelia.v1.GetOrCreateAgentDMRequest
+	(*GetOrCreateAgentDMResponse)(nil),        // 59: laelia.v1.GetOrCreateAgentDMResponse
+	(*PeerAgent)(nil),                         // 60: laelia.v1.PeerAgent
+	(*ListPeerAgentsRequest)(nil),             // 61: laelia.v1.ListPeerAgentsRequest
+	(*ListPeerAgentsResponse)(nil),            // 62: laelia.v1.ListPeerAgentsResponse
+	(*CreateChannelRequest)(nil),              // 63: laelia.v1.CreateChannelRequest
+	(*ListChannelsRequest)(nil),               // 64: laelia.v1.ListChannelsRequest
+	(*ListChannelsResponse)(nil),              // 65: laelia.v1.ListChannelsResponse
+	(*ListChannelsForAgentRequest)(nil),       // 66: laelia.v1.ListChannelsForAgentRequest
+	(*ListChannelsForAgentResponse)(nil),      // 67: laelia.v1.ListChannelsForAgentResponse
+	(*GetChannelRequest)(nil),                 // 68: laelia.v1.GetChannelRequest
+	(*UpdateChannelRequest)(nil),              // 69: laelia.v1.UpdateChannelRequest
+	(*DeleteChannelRequest)(nil),              // 70: laelia.v1.DeleteChannelRequest
+	(*AddChannelMemberRequest)(nil),           // 71: laelia.v1.AddChannelMemberRequest
+	(*RemoveChannelMemberRequest)(nil),        // 72: laelia.v1.RemoveChannelMemberRequest
+	(*ListChannelMembersRequest)(nil),         // 73: laelia.v1.ListChannelMembersRequest
+	(*ListChannelMembersResponse)(nil),        // 74: laelia.v1.ListChannelMembersResponse
+	(*TransferChannelOwnershipRequest)(nil),   // 75: laelia.v1.TransferChannelOwnershipRequest
+	(*TransferChannelOwnershipResponse)(nil),  // 76: laelia.v1.TransferChannelOwnershipResponse
+	(*UpdateChannelMemberRoleRequest)(nil),    // 77: laelia.v1.UpdateChannelMemberRoleRequest
+	(*LeaveChannelRequest)(nil),               // 78: laelia.v1.LeaveChannelRequest
+	(*ListThreadParticipantsRequest)(nil),     // 79: laelia.v1.ListThreadParticipantsRequest
+	(*ListThreadParticipantsResponse)(nil),    // 80: laelia.v1.ListThreadParticipantsResponse
+	(*SendMessageRequest)(nil),                // 81: laelia.v1.SendMessageRequest
+	(*GetCommandContextRequest)(nil),          // 82: laelia.v1.GetCommandContextRequest
+	(*GetCommandContextResponse)(nil),         // 83: laelia.v1.GetCommandContextResponse
+	(*PostMessageRequest)(nil),                // 84: laelia.v1.PostMessageRequest
+	(*PostMessageResponse)(nil),               // 85: laelia.v1.PostMessageResponse
+	(*ConvertMessageToTaskRequest)(nil),       // 86: laelia.v1.ConvertMessageToTaskRequest
+	(*ConvertMessageToTaskResponse)(nil),      // 87: laelia.v1.ConvertMessageToTaskResponse
+	(*ListTasksRequest)(nil),                  // 88: laelia.v1.ListTasksRequest
+	(*ListTasksResponse)(nil),                 // 89: laelia.v1.ListTasksResponse
+	(*ListTaskCountsRequest)(nil),             // 90: laelia.v1.ListTaskCountsRequest
+	(*ListTaskCountsResponse)(nil),            // 91: laelia.v1.ListTaskCountsResponse
+	(*ClaimTaskRequest)(nil),                  // 92: laelia.v1.ClaimTaskRequest
+	(*ClaimTaskResponse)(nil),                 // 93: laelia.v1.ClaimTaskResponse
+	(*UnclaimTaskRequest)(nil),                // 94: laelia.v1.UnclaimTaskRequest
+	(*UnclaimTaskResponse)(nil),               // 95: laelia.v1.UnclaimTaskResponse
+	(*UpdateTaskStatusRequest)(nil),           // 96: laelia.v1.UpdateTaskStatusRequest
+	(*UpdateTaskStatusResponse)(nil),          // 97: laelia.v1.UpdateTaskStatusResponse
+	(*CreateTaskRequest)(nil),                 // 98: laelia.v1.CreateTaskRequest
+	(*CreateTaskResponse)(nil),                // 99: laelia.v1.CreateTaskResponse
+	(*Reminder)(nil),                          // 100: laelia.v1.Reminder
+	(*ConvertMessageToReminderRequest)(nil),   // 101: laelia.v1.ConvertMessageToReminderRequest
+	(*ConvertMessageToReminderResponse)(nil),  // 102: laelia.v1.ConvertMessageToReminderResponse
+	(*ListRemindersRequest)(nil),              // 103: laelia.v1.ListRemindersRequest
+	(*ListRemindersResponse)(nil),             // 104: laelia.v1.ListRemindersResponse
+	(*GetReminderRequest)(nil),                // 105: laelia.v1.GetReminderRequest
+	(*GetReminderResponse)(nil),               // 106: laelia.v1.GetReminderResponse
+	(*UpdateReminderRequest)(nil),             // 107: laelia.v1.UpdateReminderRequest
+	(*UpdateReminderResponse)(nil),            // 108: laelia.v1.UpdateReminderResponse
+	(*CancelReminderRequest)(nil),             // 109: laelia.v1.CancelReminderRequest
+	(*CancelReminderResponse)(nil),            // 110: laelia.v1.CancelReminderResponse
+	(*CompleteReminderRequest)(nil),           // 111: laelia.v1.CompleteReminderRequest
+	(*CompleteReminderResponse)(nil),          // 112: laelia.v1.CompleteReminderResponse
+	(*FailReminderRequest)(nil),               // 113: laelia.v1.FailReminderRequest
+	(*FailReminderResponse)(nil),              // 114: laelia.v1.FailReminderResponse
+	(*ListDueRemindersRequest)(nil),           // 115: laelia.v1.ListDueRemindersRequest
+	(*ListDueRemindersResponse)(nil),          // 116: laelia.v1.ListDueRemindersResponse
+	(*ListChannelUpdatesRequest)(nil),         // 117: laelia.v1.ListChannelUpdatesRequest
+	(*ChannelUpdate)(nil),                     // 118: laelia.v1.ChannelUpdate
+	(*ListChannelUpdatesResponse)(nil),        // 119: laelia.v1.ListChannelUpdatesResponse
+	(*AckProcessedVersionRequest)(nil),        // 120: laelia.v1.AckProcessedVersionRequest
+	(*AckProcessedVersionResponse)(nil),       // 121: laelia.v1.AckProcessedVersionResponse
+	(*MarkConversationReadRequest)(nil),       // 122: laelia.v1.MarkConversationReadRequest
+	(*MarkConversationReadResponse)(nil),      // 123: laelia.v1.MarkConversationReadResponse
+	(*SetConversationPinnedRequest)(nil),      // 124: laelia.v1.SetConversationPinnedRequest
+	(*SetConversationPinnedResponse)(nil),     // 125: laelia.v1.SetConversationPinnedResponse
+	(*Activity)(nil),                          // 126: laelia.v1.Activity
+	(*ListActivitiesRequest)(nil),             // 127: laelia.v1.ListActivitiesRequest
+	(*ListActivitiesResponse)(nil),            // 128: laelia.v1.ListActivitiesResponse
+	(*MarkActivityDoneRequest)(nil),           // 129: laelia.v1.MarkActivityDoneRequest
+	(*MarkActivityDoneResponse)(nil),          // 130: laelia.v1.MarkActivityDoneResponse
+	(*AgentStreamMessage)(nil),                // 131: laelia.v1.AgentStreamMessage
+	(*ManagerStreamMessage)(nil),              // 132: laelia.v1.ManagerStreamMessage
+	(*AgentReady)(nil),                        // 133: laelia.v1.AgentReady
+	(*DiscoverProviders)(nil),                 // 134: laelia.v1.DiscoverProviders
+	(*ProvidersDiscovered)(nil),               // 135: laelia.v1.ProvidersDiscovered
+	(*CommandRequest)(nil),                    // 136: laelia.v1.CommandRequest
+	(*CommandProgress)(nil),                   // 137: laelia.v1.CommandProgress
+	(*CommandResult)(nil),                     // 138: laelia.v1.CommandResult
+	(*CancelMessage)(nil),                     // 139: laelia.v1.CancelMessage
+	(*Ping)(nil),                              // 140: laelia.v1.Ping
+	(*Pong)(nil),                              // 141: laelia.v1.Pong
+	(*ListCommandsRequest)(nil),               // 142: laelia.v1.ListCommandsRequest
+	(*ListCommandsResponse)(nil),              // 143: laelia.v1.ListCommandsResponse
+	(*GetCommandRequest)(nil),                 // 144: laelia.v1.GetCommandRequest
+	(*CancelCommandRequest)(nil),              // 145: laelia.v1.CancelCommandRequest
+	(*WatchCommandRequest)(nil),               // 146: laelia.v1.WatchCommandRequest
+	(*WatchCommandEventsRequest)(nil),         // 147: laelia.v1.WatchCommandEventsRequest
+	(*PermissionDecision)(nil),                // 148: laelia.v1.PermissionDecision
+	(*RespondPermissionRequest)(nil),          // 149: laelia.v1.RespondPermissionRequest
+	(*NewMessagesAvailable)(nil),              // 150: laelia.v1.NewMessagesAvailable
+	(*BeginSession)(nil),                      // 151: laelia.v1.BeginSession
+	(*BeginSessionResponse)(nil),              // 152: laelia.v1.BeginSessionResponse
+	(*FetchConversationActivityRequest)(nil),  // 153: laelia.v1.FetchConversationActivityRequest
+	(*FetchConversationActivityResponse)(nil), // 154: laelia.v1.FetchConversationActivityResponse
+	(*AgentActivity)(nil),                     // 155: laelia.v1.AgentActivity
+	nil,                                       // 156: laelia.v1.Command.EnvEntry
+	nil,                                       // 157: laelia.v1.CommandRequest.EnvEntry
+	(*timestamppb.Timestamp)(nil),             // 158: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                   // 159: google.protobuf.Struct
+	(AgentStatus_ConnectionState)(0),          // 160: laelia.v1.AgentStatus.ConnectionState
+	(*fieldmaskpb.FieldMask)(nil),             // 161: google.protobuf.FieldMask
+	(*AgentProviderInfo)(nil),                 // 162: laelia.v1.AgentProviderInfo
+	(*emptypb.Empty)(nil),                     // 163: google.protobuf.Empty
 }
 var file_v1_command_proto_depIdxs = []int32{
 	2,   // 0: laelia.v1.TaskInfo.status:type_name -> laelia.v1.TaskStatus
 	0,   // 1: laelia.v1.Command.status:type_name -> laelia.v1.CommandStatus
-	156, // 2: laelia.v1.Command.created_at:type_name -> google.protobuf.Timestamp
-	156, // 3: laelia.v1.Command.started_at:type_name -> google.protobuf.Timestamp
-	156, // 4: laelia.v1.Command.completed_at:type_name -> google.protobuf.Timestamp
-	154, // 5: laelia.v1.Command.env:type_name -> laelia.v1.Command.EnvEntry
-	157, // 6: laelia.v1.Command.result:type_name -> google.protobuf.Struct
+	158, // 2: laelia.v1.Command.created_at:type_name -> google.protobuf.Timestamp
+	158, // 3: laelia.v1.Command.started_at:type_name -> google.protobuf.Timestamp
+	158, // 4: laelia.v1.Command.completed_at:type_name -> google.protobuf.Timestamp
+	156, // 5: laelia.v1.Command.env:type_name -> laelia.v1.Command.EnvEntry
+	159, // 6: laelia.v1.Command.result:type_name -> google.protobuf.Struct
 	7,   // 7: laelia.v1.CommandOutput.type:type_name -> laelia.v1.CommandOutput.StreamType
-	156, // 8: laelia.v1.CommandOutput.timestamp:type_name -> google.protobuf.Timestamp
+	158, // 8: laelia.v1.CommandOutput.timestamp:type_name -> google.protobuf.Timestamp
 	3,   // 9: laelia.v1.CommandEvent.type:type_name -> laelia.v1.CommandEventType
-	156, // 10: laelia.v1.CommandEvent.timestamp:type_name -> google.protobuf.Timestamp
+	158, // 10: laelia.v1.CommandEvent.timestamp:type_name -> google.protobuf.Timestamp
 	12,  // 11: laelia.v1.CommandEvent.lifecycle:type_name -> laelia.v1.LifecyclePayload
 	13,  // 12: laelia.v1.CommandEvent.text_delta:type_name -> laelia.v1.TextDeltaPayload
 	14,  // 13: laelia.v1.CommandEvent.tool_call_started:type_name -> laelia.v1.ToolCallStartedPayload
@@ -10892,232 +11065,234 @@ var file_v1_command_proto_depIdxs = []int32{
 	20,  // 19: laelia.v1.CommandEvent.permission_requested:type_name -> laelia.v1.PermissionRequestedPayload
 	22,  // 20: laelia.v1.CommandEvent.permission_timed_out:type_name -> laelia.v1.PermissionTimedOutPayload
 	23,  // 21: laelia.v1.CommandEvent.permission_decided:type_name -> laelia.v1.PermissionDecidedPayload
-	157, // 22: laelia.v1.ToolCallStartedPayload.raw_input:type_name -> google.protobuf.Struct
-	157, // 23: laelia.v1.ToolCallFinishedPayload.raw_output:type_name -> google.protobuf.Struct
-	157, // 24: laelia.v1.RawAcpPayload.data:type_name -> google.protobuf.Struct
-	21,  // 25: laelia.v1.PermissionRequestedPayload.options:type_name -> laelia.v1.PermissionOptionPayload
-	156, // 26: laelia.v1.SearchChatHistoryRequest.since:type_name -> google.protobuf.Timestamp
-	156, // 27: laelia.v1.SearchChatHistoryRequest.until:type_name -> google.protobuf.Timestamp
-	35,  // 28: laelia.v1.SearchChatHistoryResponse.entries:type_name -> laelia.v1.ChatMessage
-	156, // 29: laelia.v1.ChatHistoryEntry.created_at:type_name -> google.protobuf.Timestamp
-	156, // 30: laelia.v1.File.created_at:type_name -> google.protobuf.Timestamp
-	29,  // 31: laelia.v1.DownloadFileResponse.file:type_name -> laelia.v1.File
-	29,  // 32: laelia.v1.ListFilesResponse.files:type_name -> laelia.v1.File
-	156, // 33: laelia.v1.ChatMessage.created_at:type_name -> google.protobuf.Timestamp
-	1,   // 34: laelia.v1.ChatMessage.sender_type:type_name -> laelia.v1.SenderType
-	27,  // 35: laelia.v1.ChatMessage.mentions:type_name -> laelia.v1.Mention
-	28,  // 36: laelia.v1.ChatMessage.attachments:type_name -> laelia.v1.Attachment
-	8,   // 37: laelia.v1.ChatMessage.task:type_name -> laelia.v1.TaskInfo
-	156, // 38: laelia.v1.Conversation.created_at:type_name -> google.protobuf.Timestamp
-	156, // 39: laelia.v1.Conversation.updated_at:type_name -> google.protobuf.Timestamp
-	156, // 40: laelia.v1.ChannelMember.joined_at:type_name -> google.protobuf.Timestamp
-	35,  // 41: laelia.v1.ListConversationMessagesResponse.messages:type_name -> laelia.v1.ChatMessage
-	35,  // 42: laelia.v1.ListThreadMessagesResponse.messages:type_name -> laelia.v1.ChatMessage
-	156, // 43: laelia.v1.ChannelThread.latest_reply_at:type_name -> google.protobuf.Timestamp
-	43,  // 44: laelia.v1.ListChannelThreadsResponse.threads:type_name -> laelia.v1.ChannelThread
-	46,  // 45: laelia.v1.ListThreadUpdatesResponse.updates:type_name -> laelia.v1.ThreadUpdate
-	36,  // 46: laelia.v1.ResolveChannelByTitleResponse.conversation:type_name -> laelia.v1.Conversation
-	36,  // 47: laelia.v1.GetOrCreateUserDMResponse.conversation:type_name -> laelia.v1.Conversation
-	36,  // 48: laelia.v1.GetOrCreateAgentDMResponse.conversation:type_name -> laelia.v1.Conversation
-	158, // 49: laelia.v1.PeerAgent.connection_state:type_name -> laelia.v1.AgentStatus.ConnectionState
-	58,  // 50: laelia.v1.ListPeerAgentsResponse.agents:type_name -> laelia.v1.PeerAgent
-	36,  // 51: laelia.v1.ListChannelsResponse.channels:type_name -> laelia.v1.Conversation
-	36,  // 52: laelia.v1.ListChannelsForAgentResponse.channels:type_name -> laelia.v1.Conversation
-	36,  // 53: laelia.v1.UpdateChannelRequest.conversation:type_name -> laelia.v1.Conversation
-	159, // 54: laelia.v1.UpdateChannelRequest.update_mask:type_name -> google.protobuf.FieldMask
-	37,  // 55: laelia.v1.ListChannelMembersResponse.members:type_name -> laelia.v1.ChannelMember
-	36,  // 56: laelia.v1.TransferChannelOwnershipResponse.conversation:type_name -> laelia.v1.Conversation
-	37,  // 57: laelia.v1.ListThreadParticipantsResponse.members:type_name -> laelia.v1.ChannelMember
-	27,  // 58: laelia.v1.SendMessageRequest.mentions:type_name -> laelia.v1.Mention
-	28,  // 59: laelia.v1.SendMessageRequest.attachments:type_name -> laelia.v1.Attachment
-	9,   // 60: laelia.v1.GetCommandContextResponse.command:type_name -> laelia.v1.Command
-	10,  // 61: laelia.v1.GetCommandContextResponse.outputs:type_name -> laelia.v1.CommandOutput
-	11,  // 62: laelia.v1.GetCommandContextResponse.events:type_name -> laelia.v1.CommandEvent
-	28,  // 63: laelia.v1.PostMessageRequest.attachments:type_name -> laelia.v1.Attachment
-	35,  // 64: laelia.v1.PostMessageResponse.message:type_name -> laelia.v1.ChatMessage
-	35,  // 65: laelia.v1.PostMessageResponse.new_messages:type_name -> laelia.v1.ChatMessage
-	35,  // 66: laelia.v1.ConvertMessageToTaskResponse.message:type_name -> laelia.v1.ChatMessage
-	2,   // 67: laelia.v1.ListTasksRequest.status_filter:type_name -> laelia.v1.TaskStatus
-	35,  // 68: laelia.v1.ListTasksResponse.tasks:type_name -> laelia.v1.ChatMessage
-	35,  // 69: laelia.v1.ClaimTaskResponse.message:type_name -> laelia.v1.ChatMessage
-	35,  // 70: laelia.v1.UnclaimTaskResponse.message:type_name -> laelia.v1.ChatMessage
-	2,   // 71: laelia.v1.UpdateTaskStatusRequest.status:type_name -> laelia.v1.TaskStatus
-	35,  // 72: laelia.v1.UpdateTaskStatusResponse.message:type_name -> laelia.v1.ChatMessage
-	27,  // 73: laelia.v1.CreateTaskRequest.mentions:type_name -> laelia.v1.Mention
-	28,  // 74: laelia.v1.CreateTaskRequest.attachments:type_name -> laelia.v1.Attachment
-	35,  // 75: laelia.v1.CreateTaskResponse.message:type_name -> laelia.v1.ChatMessage
-	156, // 76: laelia.v1.Reminder.fire_at:type_name -> google.protobuf.Timestamp
-	4,   // 77: laelia.v1.Reminder.status:type_name -> laelia.v1.ReminderStatus
-	156, // 78: laelia.v1.Reminder.next_retry_at:type_name -> google.protobuf.Timestamp
-	156, // 79: laelia.v1.Reminder.last_attempt_at:type_name -> google.protobuf.Timestamp
-	156, // 80: laelia.v1.Reminder.last_fired_at:type_name -> google.protobuf.Timestamp
-	156, // 81: laelia.v1.Reminder.last_completed_at:type_name -> google.protobuf.Timestamp
-	156, // 82: laelia.v1.Reminder.created_at:type_name -> google.protobuf.Timestamp
-	156, // 83: laelia.v1.Reminder.updated_at:type_name -> google.protobuf.Timestamp
-	156, // 84: laelia.v1.ConvertMessageToReminderRequest.fire_at:type_name -> google.protobuf.Timestamp
-	98,  // 85: laelia.v1.ConvertMessageToReminderResponse.reminder:type_name -> laelia.v1.Reminder
-	4,   // 86: laelia.v1.ListRemindersRequest.status_filter:type_name -> laelia.v1.ReminderStatus
-	98,  // 87: laelia.v1.ListRemindersResponse.reminders:type_name -> laelia.v1.Reminder
-	98,  // 88: laelia.v1.GetReminderResponse.reminder:type_name -> laelia.v1.Reminder
-	156, // 89: laelia.v1.UpdateReminderRequest.fire_at:type_name -> google.protobuf.Timestamp
-	98,  // 90: laelia.v1.UpdateReminderResponse.reminder:type_name -> laelia.v1.Reminder
-	98,  // 91: laelia.v1.CancelReminderResponse.reminder:type_name -> laelia.v1.Reminder
-	98,  // 92: laelia.v1.CompleteReminderResponse.reminder:type_name -> laelia.v1.Reminder
-	98,  // 93: laelia.v1.FailReminderResponse.reminder:type_name -> laelia.v1.Reminder
-	98,  // 94: laelia.v1.ListDueRemindersResponse.reminders:type_name -> laelia.v1.Reminder
-	116, // 95: laelia.v1.ListChannelUpdatesResponse.updates:type_name -> laelia.v1.ChannelUpdate
-	6,   // 96: laelia.v1.Activity.state:type_name -> laelia.v1.ActivityState
-	156, // 97: laelia.v1.Activity.created_at:type_name -> google.protobuf.Timestamp
-	156, // 98: laelia.v1.Activity.read_at:type_name -> google.protobuf.Timestamp
-	156, // 99: laelia.v1.Activity.done_at:type_name -> google.protobuf.Timestamp
-	1,   // 100: laelia.v1.Activity.sender_type:type_name -> laelia.v1.SenderType
-	5,   // 101: laelia.v1.ListActivitiesRequest.filter:type_name -> laelia.v1.ActivityCategory
-	6,   // 102: laelia.v1.ListActivitiesRequest.read_state_filter:type_name -> laelia.v1.ActivityState
-	124, // 103: laelia.v1.ListActivitiesResponse.activities:type_name -> laelia.v1.Activity
-	124, // 104: laelia.v1.MarkActivityDoneResponse.activity:type_name -> laelia.v1.Activity
-	131, // 105: laelia.v1.AgentStreamMessage.agent_ready:type_name -> laelia.v1.AgentReady
-	149, // 106: laelia.v1.AgentStreamMessage.begin_session:type_name -> laelia.v1.BeginSession
-	135, // 107: laelia.v1.AgentStreamMessage.progress:type_name -> laelia.v1.CommandProgress
-	136, // 108: laelia.v1.AgentStreamMessage.result:type_name -> laelia.v1.CommandResult
-	11,  // 109: laelia.v1.AgentStreamMessage.event:type_name -> laelia.v1.CommandEvent
-	138, // 110: laelia.v1.AgentStreamMessage.ping:type_name -> laelia.v1.Ping
-	133, // 111: laelia.v1.AgentStreamMessage.providers_discovered:type_name -> laelia.v1.ProvidersDiscovered
-	148, // 112: laelia.v1.ManagerStreamMessage.new_messages:type_name -> laelia.v1.NewMessagesAvailable
-	150, // 113: laelia.v1.ManagerStreamMessage.begin_session_response:type_name -> laelia.v1.BeginSessionResponse
-	137, // 114: laelia.v1.ManagerStreamMessage.cancel:type_name -> laelia.v1.CancelMessage
-	139, // 115: laelia.v1.ManagerStreamMessage.pong:type_name -> laelia.v1.Pong
-	146, // 116: laelia.v1.ManagerStreamMessage.permission_decision:type_name -> laelia.v1.PermissionDecision
-	132, // 117: laelia.v1.ManagerStreamMessage.discover_providers:type_name -> laelia.v1.DiscoverProviders
-	160, // 118: laelia.v1.ProvidersDiscovered.providers:type_name -> laelia.v1.AgentProviderInfo
-	155, // 119: laelia.v1.CommandRequest.env:type_name -> laelia.v1.CommandRequest.EnvEntry
-	7,   // 120: laelia.v1.CommandProgress.type:type_name -> laelia.v1.CommandOutput.StreamType
-	157, // 121: laelia.v1.CommandResult.result:type_name -> google.protobuf.Struct
-	0,   // 122: laelia.v1.ListCommandsRequest.status:type_name -> laelia.v1.CommandStatus
-	9,   // 123: laelia.v1.ListCommandsResponse.commands:type_name -> laelia.v1.Command
-	153, // 124: laelia.v1.FetchConversationActivityResponse.activities:type_name -> laelia.v1.AgentActivity
-	140, // 125: laelia.v1.CommandService.ListCommands:input_type -> laelia.v1.ListCommandsRequest
-	142, // 126: laelia.v1.CommandService.GetCommand:input_type -> laelia.v1.GetCommandRequest
-	143, // 127: laelia.v1.CommandService.CancelCommand:input_type -> laelia.v1.CancelCommandRequest
-	144, // 128: laelia.v1.CommandService.WatchCommand:input_type -> laelia.v1.WatchCommandRequest
-	145, // 129: laelia.v1.CommandService.WatchCommandEvents:input_type -> laelia.v1.WatchCommandEventsRequest
-	147, // 130: laelia.v1.CommandService.RespondPermission:input_type -> laelia.v1.RespondPermissionRequest
-	24,  // 131: laelia.v1.CommandService.SearchChatHistory:input_type -> laelia.v1.SearchChatHistoryRequest
-	80,  // 132: laelia.v1.CommandService.GetCommandContext:input_type -> laelia.v1.GetCommandContextRequest
-	48,  // 133: laelia.v1.CommandService.GetOrCreateConversation:input_type -> laelia.v1.GetOrCreateConversationRequest
-	50,  // 134: laelia.v1.CommandService.GetOrCreateUserUserDM:input_type -> laelia.v1.GetOrCreateUserUserDMRequest
-	52,  // 135: laelia.v1.CommandService.ResolveChannelByTitle:input_type -> laelia.v1.ResolveChannelByTitleRequest
-	54,  // 136: laelia.v1.CommandService.GetOrCreateUserDM:input_type -> laelia.v1.GetOrCreateUserDMRequest
-	56,  // 137: laelia.v1.CommandService.GetOrCreateAgentDM:input_type -> laelia.v1.GetOrCreateAgentDMRequest
-	59,  // 138: laelia.v1.CommandService.ListPeerAgents:input_type -> laelia.v1.ListPeerAgentsRequest
-	38,  // 139: laelia.v1.CommandService.ListConversationMessages:input_type -> laelia.v1.ListConversationMessagesRequest
-	40,  // 140: laelia.v1.CommandService.ListThreadMessages:input_type -> laelia.v1.ListThreadMessagesRequest
-	42,  // 141: laelia.v1.CommandService.ListChannelThreads:input_type -> laelia.v1.ListChannelThreadsRequest
-	61,  // 142: laelia.v1.CommandService.CreateChannel:input_type -> laelia.v1.CreateChannelRequest
-	62,  // 143: laelia.v1.CommandService.ListChannels:input_type -> laelia.v1.ListChannelsRequest
-	64,  // 144: laelia.v1.CommandService.ListChannelsForAgent:input_type -> laelia.v1.ListChannelsForAgentRequest
-	66,  // 145: laelia.v1.CommandService.GetChannel:input_type -> laelia.v1.GetChannelRequest
-	67,  // 146: laelia.v1.CommandService.UpdateChannel:input_type -> laelia.v1.UpdateChannelRequest
-	68,  // 147: laelia.v1.CommandService.DeleteChannel:input_type -> laelia.v1.DeleteChannelRequest
-	69,  // 148: laelia.v1.CommandService.AddChannelMember:input_type -> laelia.v1.AddChannelMemberRequest
-	70,  // 149: laelia.v1.CommandService.RemoveChannelMember:input_type -> laelia.v1.RemoveChannelMemberRequest
-	73,  // 150: laelia.v1.CommandService.TransferChannelOwnership:input_type -> laelia.v1.TransferChannelOwnershipRequest
-	75,  // 151: laelia.v1.CommandService.UpdateChannelMemberRole:input_type -> laelia.v1.UpdateChannelMemberRoleRequest
-	76,  // 152: laelia.v1.CommandService.LeaveChannel:input_type -> laelia.v1.LeaveChannelRequest
-	71,  // 153: laelia.v1.CommandService.ListChannelMembers:input_type -> laelia.v1.ListChannelMembersRequest
-	77,  // 154: laelia.v1.CommandService.ListThreadParticipants:input_type -> laelia.v1.ListThreadParticipantsRequest
-	79,  // 155: laelia.v1.CommandService.SendMessage:input_type -> laelia.v1.SendMessageRequest
-	82,  // 156: laelia.v1.CommandService.PostMessage:input_type -> laelia.v1.PostMessageRequest
-	84,  // 157: laelia.v1.CommandService.ConvertMessageToTask:input_type -> laelia.v1.ConvertMessageToTaskRequest
-	86,  // 158: laelia.v1.CommandService.ListTasks:input_type -> laelia.v1.ListTasksRequest
-	88,  // 159: laelia.v1.CommandService.ListTaskCounts:input_type -> laelia.v1.ListTaskCountsRequest
-	96,  // 160: laelia.v1.CommandService.CreateTask:input_type -> laelia.v1.CreateTaskRequest
-	90,  // 161: laelia.v1.CommandService.ClaimTask:input_type -> laelia.v1.ClaimTaskRequest
-	92,  // 162: laelia.v1.CommandService.UnclaimTask:input_type -> laelia.v1.UnclaimTaskRequest
-	94,  // 163: laelia.v1.CommandService.UpdateTaskStatus:input_type -> laelia.v1.UpdateTaskStatusRequest
-	99,  // 164: laelia.v1.CommandService.ConvertMessageToReminder:input_type -> laelia.v1.ConvertMessageToReminderRequest
-	101, // 165: laelia.v1.CommandService.ListReminders:input_type -> laelia.v1.ListRemindersRequest
-	103, // 166: laelia.v1.CommandService.GetReminder:input_type -> laelia.v1.GetReminderRequest
-	105, // 167: laelia.v1.CommandService.UpdateReminder:input_type -> laelia.v1.UpdateReminderRequest
-	107, // 168: laelia.v1.CommandService.CancelReminder:input_type -> laelia.v1.CancelReminderRequest
-	109, // 169: laelia.v1.CommandService.CompleteReminder:input_type -> laelia.v1.CompleteReminderRequest
-	111, // 170: laelia.v1.CommandService.FailReminder:input_type -> laelia.v1.FailReminderRequest
-	113, // 171: laelia.v1.CommandService.ListDueReminders:input_type -> laelia.v1.ListDueRemindersRequest
-	115, // 172: laelia.v1.CommandService.ListChannelUpdates:input_type -> laelia.v1.ListChannelUpdatesRequest
-	45,  // 173: laelia.v1.CommandService.ListThreadUpdates:input_type -> laelia.v1.ListThreadUpdatesRequest
-	118, // 174: laelia.v1.CommandService.AckProcessedVersion:input_type -> laelia.v1.AckProcessedVersionRequest
-	151, // 175: laelia.v1.CommandService.FetchConversationActivity:input_type -> laelia.v1.FetchConversationActivityRequest
-	120, // 176: laelia.v1.CommandService.MarkConversationRead:input_type -> laelia.v1.MarkConversationReadRequest
-	122, // 177: laelia.v1.CommandService.SetConversationPinned:input_type -> laelia.v1.SetConversationPinnedRequest
-	30,  // 178: laelia.v1.CommandService.UploadFile:input_type -> laelia.v1.UploadFileRequest
-	31,  // 179: laelia.v1.CommandService.DownloadFile:input_type -> laelia.v1.DownloadFileRequest
-	33,  // 180: laelia.v1.CommandService.ListFiles:input_type -> laelia.v1.ListFilesRequest
-	125, // 181: laelia.v1.CommandService.ListActivities:input_type -> laelia.v1.ListActivitiesRequest
-	127, // 182: laelia.v1.CommandService.MarkActivityDone:input_type -> laelia.v1.MarkActivityDoneRequest
-	129, // 183: laelia.v1.AgentStreamService.AgentChannel:input_type -> laelia.v1.AgentStreamMessage
-	141, // 184: laelia.v1.CommandService.ListCommands:output_type -> laelia.v1.ListCommandsResponse
-	9,   // 185: laelia.v1.CommandService.GetCommand:output_type -> laelia.v1.Command
-	9,   // 186: laelia.v1.CommandService.CancelCommand:output_type -> laelia.v1.Command
-	10,  // 187: laelia.v1.CommandService.WatchCommand:output_type -> laelia.v1.CommandOutput
-	11,  // 188: laelia.v1.CommandService.WatchCommandEvents:output_type -> laelia.v1.CommandEvent
-	161, // 189: laelia.v1.CommandService.RespondPermission:output_type -> google.protobuf.Empty
-	25,  // 190: laelia.v1.CommandService.SearchChatHistory:output_type -> laelia.v1.SearchChatHistoryResponse
-	81,  // 191: laelia.v1.CommandService.GetCommandContext:output_type -> laelia.v1.GetCommandContextResponse
-	49,  // 192: laelia.v1.CommandService.GetOrCreateConversation:output_type -> laelia.v1.GetOrCreateConversationResponse
-	51,  // 193: laelia.v1.CommandService.GetOrCreateUserUserDM:output_type -> laelia.v1.GetOrCreateUserUserDMResponse
-	53,  // 194: laelia.v1.CommandService.ResolveChannelByTitle:output_type -> laelia.v1.ResolveChannelByTitleResponse
-	55,  // 195: laelia.v1.CommandService.GetOrCreateUserDM:output_type -> laelia.v1.GetOrCreateUserDMResponse
-	57,  // 196: laelia.v1.CommandService.GetOrCreateAgentDM:output_type -> laelia.v1.GetOrCreateAgentDMResponse
-	60,  // 197: laelia.v1.CommandService.ListPeerAgents:output_type -> laelia.v1.ListPeerAgentsResponse
-	39,  // 198: laelia.v1.CommandService.ListConversationMessages:output_type -> laelia.v1.ListConversationMessagesResponse
-	41,  // 199: laelia.v1.CommandService.ListThreadMessages:output_type -> laelia.v1.ListThreadMessagesResponse
-	44,  // 200: laelia.v1.CommandService.ListChannelThreads:output_type -> laelia.v1.ListChannelThreadsResponse
-	36,  // 201: laelia.v1.CommandService.CreateChannel:output_type -> laelia.v1.Conversation
-	63,  // 202: laelia.v1.CommandService.ListChannels:output_type -> laelia.v1.ListChannelsResponse
-	65,  // 203: laelia.v1.CommandService.ListChannelsForAgent:output_type -> laelia.v1.ListChannelsForAgentResponse
-	36,  // 204: laelia.v1.CommandService.GetChannel:output_type -> laelia.v1.Conversation
-	36,  // 205: laelia.v1.CommandService.UpdateChannel:output_type -> laelia.v1.Conversation
-	161, // 206: laelia.v1.CommandService.DeleteChannel:output_type -> google.protobuf.Empty
-	37,  // 207: laelia.v1.CommandService.AddChannelMember:output_type -> laelia.v1.ChannelMember
-	161, // 208: laelia.v1.CommandService.RemoveChannelMember:output_type -> google.protobuf.Empty
-	74,  // 209: laelia.v1.CommandService.TransferChannelOwnership:output_type -> laelia.v1.TransferChannelOwnershipResponse
-	37,  // 210: laelia.v1.CommandService.UpdateChannelMemberRole:output_type -> laelia.v1.ChannelMember
-	161, // 211: laelia.v1.CommandService.LeaveChannel:output_type -> google.protobuf.Empty
-	72,  // 212: laelia.v1.CommandService.ListChannelMembers:output_type -> laelia.v1.ListChannelMembersResponse
-	78,  // 213: laelia.v1.CommandService.ListThreadParticipants:output_type -> laelia.v1.ListThreadParticipantsResponse
-	35,  // 214: laelia.v1.CommandService.SendMessage:output_type -> laelia.v1.ChatMessage
-	83,  // 215: laelia.v1.CommandService.PostMessage:output_type -> laelia.v1.PostMessageResponse
-	85,  // 216: laelia.v1.CommandService.ConvertMessageToTask:output_type -> laelia.v1.ConvertMessageToTaskResponse
-	87,  // 217: laelia.v1.CommandService.ListTasks:output_type -> laelia.v1.ListTasksResponse
-	89,  // 218: laelia.v1.CommandService.ListTaskCounts:output_type -> laelia.v1.ListTaskCountsResponse
-	97,  // 219: laelia.v1.CommandService.CreateTask:output_type -> laelia.v1.CreateTaskResponse
-	91,  // 220: laelia.v1.CommandService.ClaimTask:output_type -> laelia.v1.ClaimTaskResponse
-	93,  // 221: laelia.v1.CommandService.UnclaimTask:output_type -> laelia.v1.UnclaimTaskResponse
-	95,  // 222: laelia.v1.CommandService.UpdateTaskStatus:output_type -> laelia.v1.UpdateTaskStatusResponse
-	100, // 223: laelia.v1.CommandService.ConvertMessageToReminder:output_type -> laelia.v1.ConvertMessageToReminderResponse
-	102, // 224: laelia.v1.CommandService.ListReminders:output_type -> laelia.v1.ListRemindersResponse
-	104, // 225: laelia.v1.CommandService.GetReminder:output_type -> laelia.v1.GetReminderResponse
-	106, // 226: laelia.v1.CommandService.UpdateReminder:output_type -> laelia.v1.UpdateReminderResponse
-	108, // 227: laelia.v1.CommandService.CancelReminder:output_type -> laelia.v1.CancelReminderResponse
-	110, // 228: laelia.v1.CommandService.CompleteReminder:output_type -> laelia.v1.CompleteReminderResponse
-	112, // 229: laelia.v1.CommandService.FailReminder:output_type -> laelia.v1.FailReminderResponse
-	114, // 230: laelia.v1.CommandService.ListDueReminders:output_type -> laelia.v1.ListDueRemindersResponse
-	117, // 231: laelia.v1.CommandService.ListChannelUpdates:output_type -> laelia.v1.ListChannelUpdatesResponse
-	47,  // 232: laelia.v1.CommandService.ListThreadUpdates:output_type -> laelia.v1.ListThreadUpdatesResponse
-	119, // 233: laelia.v1.CommandService.AckProcessedVersion:output_type -> laelia.v1.AckProcessedVersionResponse
-	152, // 234: laelia.v1.CommandService.FetchConversationActivity:output_type -> laelia.v1.FetchConversationActivityResponse
-	121, // 235: laelia.v1.CommandService.MarkConversationRead:output_type -> laelia.v1.MarkConversationReadResponse
-	123, // 236: laelia.v1.CommandService.SetConversationPinned:output_type -> laelia.v1.SetConversationPinnedResponse
-	29,  // 237: laelia.v1.CommandService.UploadFile:output_type -> laelia.v1.File
-	32,  // 238: laelia.v1.CommandService.DownloadFile:output_type -> laelia.v1.DownloadFileResponse
-	34,  // 239: laelia.v1.CommandService.ListFiles:output_type -> laelia.v1.ListFilesResponse
-	126, // 240: laelia.v1.CommandService.ListActivities:output_type -> laelia.v1.ListActivitiesResponse
-	128, // 241: laelia.v1.CommandService.MarkActivityDone:output_type -> laelia.v1.MarkActivityDoneResponse
-	130, // 242: laelia.v1.AgentStreamService.AgentChannel:output_type -> laelia.v1.ManagerStreamMessage
-	184, // [184:243] is the sub-list for method output_type
-	125, // [125:184] is the sub-list for method input_type
-	125, // [125:125] is the sub-list for extension type_name
-	125, // [125:125] is the sub-list for extension extendee
-	0,   // [0:125] is the sub-list for field type_name
+	24,  // 22: laelia.v1.CommandEvent.context_compaction:type_name -> laelia.v1.ContextCompactionPayload
+	25,  // 23: laelia.v1.CommandEvent.context_usage:type_name -> laelia.v1.ContextUsagePayload
+	159, // 24: laelia.v1.ToolCallStartedPayload.raw_input:type_name -> google.protobuf.Struct
+	159, // 25: laelia.v1.ToolCallFinishedPayload.raw_output:type_name -> google.protobuf.Struct
+	159, // 26: laelia.v1.RawAcpPayload.data:type_name -> google.protobuf.Struct
+	21,  // 27: laelia.v1.PermissionRequestedPayload.options:type_name -> laelia.v1.PermissionOptionPayload
+	158, // 28: laelia.v1.SearchChatHistoryRequest.since:type_name -> google.protobuf.Timestamp
+	158, // 29: laelia.v1.SearchChatHistoryRequest.until:type_name -> google.protobuf.Timestamp
+	37,  // 30: laelia.v1.SearchChatHistoryResponse.entries:type_name -> laelia.v1.ChatMessage
+	158, // 31: laelia.v1.ChatHistoryEntry.created_at:type_name -> google.protobuf.Timestamp
+	158, // 32: laelia.v1.File.created_at:type_name -> google.protobuf.Timestamp
+	31,  // 33: laelia.v1.DownloadFileResponse.file:type_name -> laelia.v1.File
+	31,  // 34: laelia.v1.ListFilesResponse.files:type_name -> laelia.v1.File
+	158, // 35: laelia.v1.ChatMessage.created_at:type_name -> google.protobuf.Timestamp
+	1,   // 36: laelia.v1.ChatMessage.sender_type:type_name -> laelia.v1.SenderType
+	29,  // 37: laelia.v1.ChatMessage.mentions:type_name -> laelia.v1.Mention
+	30,  // 38: laelia.v1.ChatMessage.attachments:type_name -> laelia.v1.Attachment
+	8,   // 39: laelia.v1.ChatMessage.task:type_name -> laelia.v1.TaskInfo
+	158, // 40: laelia.v1.Conversation.created_at:type_name -> google.protobuf.Timestamp
+	158, // 41: laelia.v1.Conversation.updated_at:type_name -> google.protobuf.Timestamp
+	158, // 42: laelia.v1.ChannelMember.joined_at:type_name -> google.protobuf.Timestamp
+	37,  // 43: laelia.v1.ListConversationMessagesResponse.messages:type_name -> laelia.v1.ChatMessage
+	37,  // 44: laelia.v1.ListThreadMessagesResponse.messages:type_name -> laelia.v1.ChatMessage
+	158, // 45: laelia.v1.ChannelThread.latest_reply_at:type_name -> google.protobuf.Timestamp
+	45,  // 46: laelia.v1.ListChannelThreadsResponse.threads:type_name -> laelia.v1.ChannelThread
+	48,  // 47: laelia.v1.ListThreadUpdatesResponse.updates:type_name -> laelia.v1.ThreadUpdate
+	38,  // 48: laelia.v1.ResolveChannelByTitleResponse.conversation:type_name -> laelia.v1.Conversation
+	38,  // 49: laelia.v1.GetOrCreateUserDMResponse.conversation:type_name -> laelia.v1.Conversation
+	38,  // 50: laelia.v1.GetOrCreateAgentDMResponse.conversation:type_name -> laelia.v1.Conversation
+	160, // 51: laelia.v1.PeerAgent.connection_state:type_name -> laelia.v1.AgentStatus.ConnectionState
+	60,  // 52: laelia.v1.ListPeerAgentsResponse.agents:type_name -> laelia.v1.PeerAgent
+	38,  // 53: laelia.v1.ListChannelsResponse.channels:type_name -> laelia.v1.Conversation
+	38,  // 54: laelia.v1.ListChannelsForAgentResponse.channels:type_name -> laelia.v1.Conversation
+	38,  // 55: laelia.v1.UpdateChannelRequest.conversation:type_name -> laelia.v1.Conversation
+	161, // 56: laelia.v1.UpdateChannelRequest.update_mask:type_name -> google.protobuf.FieldMask
+	39,  // 57: laelia.v1.ListChannelMembersResponse.members:type_name -> laelia.v1.ChannelMember
+	38,  // 58: laelia.v1.TransferChannelOwnershipResponse.conversation:type_name -> laelia.v1.Conversation
+	39,  // 59: laelia.v1.ListThreadParticipantsResponse.members:type_name -> laelia.v1.ChannelMember
+	29,  // 60: laelia.v1.SendMessageRequest.mentions:type_name -> laelia.v1.Mention
+	30,  // 61: laelia.v1.SendMessageRequest.attachments:type_name -> laelia.v1.Attachment
+	9,   // 62: laelia.v1.GetCommandContextResponse.command:type_name -> laelia.v1.Command
+	10,  // 63: laelia.v1.GetCommandContextResponse.outputs:type_name -> laelia.v1.CommandOutput
+	11,  // 64: laelia.v1.GetCommandContextResponse.events:type_name -> laelia.v1.CommandEvent
+	30,  // 65: laelia.v1.PostMessageRequest.attachments:type_name -> laelia.v1.Attachment
+	37,  // 66: laelia.v1.PostMessageResponse.message:type_name -> laelia.v1.ChatMessage
+	37,  // 67: laelia.v1.PostMessageResponse.new_messages:type_name -> laelia.v1.ChatMessage
+	37,  // 68: laelia.v1.ConvertMessageToTaskResponse.message:type_name -> laelia.v1.ChatMessage
+	2,   // 69: laelia.v1.ListTasksRequest.status_filter:type_name -> laelia.v1.TaskStatus
+	37,  // 70: laelia.v1.ListTasksResponse.tasks:type_name -> laelia.v1.ChatMessage
+	37,  // 71: laelia.v1.ClaimTaskResponse.message:type_name -> laelia.v1.ChatMessage
+	37,  // 72: laelia.v1.UnclaimTaskResponse.message:type_name -> laelia.v1.ChatMessage
+	2,   // 73: laelia.v1.UpdateTaskStatusRequest.status:type_name -> laelia.v1.TaskStatus
+	37,  // 74: laelia.v1.UpdateTaskStatusResponse.message:type_name -> laelia.v1.ChatMessage
+	29,  // 75: laelia.v1.CreateTaskRequest.mentions:type_name -> laelia.v1.Mention
+	30,  // 76: laelia.v1.CreateTaskRequest.attachments:type_name -> laelia.v1.Attachment
+	37,  // 77: laelia.v1.CreateTaskResponse.message:type_name -> laelia.v1.ChatMessage
+	158, // 78: laelia.v1.Reminder.fire_at:type_name -> google.protobuf.Timestamp
+	4,   // 79: laelia.v1.Reminder.status:type_name -> laelia.v1.ReminderStatus
+	158, // 80: laelia.v1.Reminder.next_retry_at:type_name -> google.protobuf.Timestamp
+	158, // 81: laelia.v1.Reminder.last_attempt_at:type_name -> google.protobuf.Timestamp
+	158, // 82: laelia.v1.Reminder.last_fired_at:type_name -> google.protobuf.Timestamp
+	158, // 83: laelia.v1.Reminder.last_completed_at:type_name -> google.protobuf.Timestamp
+	158, // 84: laelia.v1.Reminder.created_at:type_name -> google.protobuf.Timestamp
+	158, // 85: laelia.v1.Reminder.updated_at:type_name -> google.protobuf.Timestamp
+	158, // 86: laelia.v1.ConvertMessageToReminderRequest.fire_at:type_name -> google.protobuf.Timestamp
+	100, // 87: laelia.v1.ConvertMessageToReminderResponse.reminder:type_name -> laelia.v1.Reminder
+	4,   // 88: laelia.v1.ListRemindersRequest.status_filter:type_name -> laelia.v1.ReminderStatus
+	100, // 89: laelia.v1.ListRemindersResponse.reminders:type_name -> laelia.v1.Reminder
+	100, // 90: laelia.v1.GetReminderResponse.reminder:type_name -> laelia.v1.Reminder
+	158, // 91: laelia.v1.UpdateReminderRequest.fire_at:type_name -> google.protobuf.Timestamp
+	100, // 92: laelia.v1.UpdateReminderResponse.reminder:type_name -> laelia.v1.Reminder
+	100, // 93: laelia.v1.CancelReminderResponse.reminder:type_name -> laelia.v1.Reminder
+	100, // 94: laelia.v1.CompleteReminderResponse.reminder:type_name -> laelia.v1.Reminder
+	100, // 95: laelia.v1.FailReminderResponse.reminder:type_name -> laelia.v1.Reminder
+	100, // 96: laelia.v1.ListDueRemindersResponse.reminders:type_name -> laelia.v1.Reminder
+	118, // 97: laelia.v1.ListChannelUpdatesResponse.updates:type_name -> laelia.v1.ChannelUpdate
+	6,   // 98: laelia.v1.Activity.state:type_name -> laelia.v1.ActivityState
+	158, // 99: laelia.v1.Activity.created_at:type_name -> google.protobuf.Timestamp
+	158, // 100: laelia.v1.Activity.read_at:type_name -> google.protobuf.Timestamp
+	158, // 101: laelia.v1.Activity.done_at:type_name -> google.protobuf.Timestamp
+	1,   // 102: laelia.v1.Activity.sender_type:type_name -> laelia.v1.SenderType
+	5,   // 103: laelia.v1.ListActivitiesRequest.filter:type_name -> laelia.v1.ActivityCategory
+	6,   // 104: laelia.v1.ListActivitiesRequest.read_state_filter:type_name -> laelia.v1.ActivityState
+	126, // 105: laelia.v1.ListActivitiesResponse.activities:type_name -> laelia.v1.Activity
+	126, // 106: laelia.v1.MarkActivityDoneResponse.activity:type_name -> laelia.v1.Activity
+	133, // 107: laelia.v1.AgentStreamMessage.agent_ready:type_name -> laelia.v1.AgentReady
+	151, // 108: laelia.v1.AgentStreamMessage.begin_session:type_name -> laelia.v1.BeginSession
+	137, // 109: laelia.v1.AgentStreamMessage.progress:type_name -> laelia.v1.CommandProgress
+	138, // 110: laelia.v1.AgentStreamMessage.result:type_name -> laelia.v1.CommandResult
+	11,  // 111: laelia.v1.AgentStreamMessage.event:type_name -> laelia.v1.CommandEvent
+	140, // 112: laelia.v1.AgentStreamMessage.ping:type_name -> laelia.v1.Ping
+	135, // 113: laelia.v1.AgentStreamMessage.providers_discovered:type_name -> laelia.v1.ProvidersDiscovered
+	150, // 114: laelia.v1.ManagerStreamMessage.new_messages:type_name -> laelia.v1.NewMessagesAvailable
+	152, // 115: laelia.v1.ManagerStreamMessage.begin_session_response:type_name -> laelia.v1.BeginSessionResponse
+	139, // 116: laelia.v1.ManagerStreamMessage.cancel:type_name -> laelia.v1.CancelMessage
+	141, // 117: laelia.v1.ManagerStreamMessage.pong:type_name -> laelia.v1.Pong
+	148, // 118: laelia.v1.ManagerStreamMessage.permission_decision:type_name -> laelia.v1.PermissionDecision
+	134, // 119: laelia.v1.ManagerStreamMessage.discover_providers:type_name -> laelia.v1.DiscoverProviders
+	162, // 120: laelia.v1.ProvidersDiscovered.providers:type_name -> laelia.v1.AgentProviderInfo
+	157, // 121: laelia.v1.CommandRequest.env:type_name -> laelia.v1.CommandRequest.EnvEntry
+	7,   // 122: laelia.v1.CommandProgress.type:type_name -> laelia.v1.CommandOutput.StreamType
+	159, // 123: laelia.v1.CommandResult.result:type_name -> google.protobuf.Struct
+	0,   // 124: laelia.v1.ListCommandsRequest.status:type_name -> laelia.v1.CommandStatus
+	9,   // 125: laelia.v1.ListCommandsResponse.commands:type_name -> laelia.v1.Command
+	155, // 126: laelia.v1.FetchConversationActivityResponse.activities:type_name -> laelia.v1.AgentActivity
+	142, // 127: laelia.v1.CommandService.ListCommands:input_type -> laelia.v1.ListCommandsRequest
+	144, // 128: laelia.v1.CommandService.GetCommand:input_type -> laelia.v1.GetCommandRequest
+	145, // 129: laelia.v1.CommandService.CancelCommand:input_type -> laelia.v1.CancelCommandRequest
+	146, // 130: laelia.v1.CommandService.WatchCommand:input_type -> laelia.v1.WatchCommandRequest
+	147, // 131: laelia.v1.CommandService.WatchCommandEvents:input_type -> laelia.v1.WatchCommandEventsRequest
+	149, // 132: laelia.v1.CommandService.RespondPermission:input_type -> laelia.v1.RespondPermissionRequest
+	26,  // 133: laelia.v1.CommandService.SearchChatHistory:input_type -> laelia.v1.SearchChatHistoryRequest
+	82,  // 134: laelia.v1.CommandService.GetCommandContext:input_type -> laelia.v1.GetCommandContextRequest
+	50,  // 135: laelia.v1.CommandService.GetOrCreateConversation:input_type -> laelia.v1.GetOrCreateConversationRequest
+	52,  // 136: laelia.v1.CommandService.GetOrCreateUserUserDM:input_type -> laelia.v1.GetOrCreateUserUserDMRequest
+	54,  // 137: laelia.v1.CommandService.ResolveChannelByTitle:input_type -> laelia.v1.ResolveChannelByTitleRequest
+	56,  // 138: laelia.v1.CommandService.GetOrCreateUserDM:input_type -> laelia.v1.GetOrCreateUserDMRequest
+	58,  // 139: laelia.v1.CommandService.GetOrCreateAgentDM:input_type -> laelia.v1.GetOrCreateAgentDMRequest
+	61,  // 140: laelia.v1.CommandService.ListPeerAgents:input_type -> laelia.v1.ListPeerAgentsRequest
+	40,  // 141: laelia.v1.CommandService.ListConversationMessages:input_type -> laelia.v1.ListConversationMessagesRequest
+	42,  // 142: laelia.v1.CommandService.ListThreadMessages:input_type -> laelia.v1.ListThreadMessagesRequest
+	44,  // 143: laelia.v1.CommandService.ListChannelThreads:input_type -> laelia.v1.ListChannelThreadsRequest
+	63,  // 144: laelia.v1.CommandService.CreateChannel:input_type -> laelia.v1.CreateChannelRequest
+	64,  // 145: laelia.v1.CommandService.ListChannels:input_type -> laelia.v1.ListChannelsRequest
+	66,  // 146: laelia.v1.CommandService.ListChannelsForAgent:input_type -> laelia.v1.ListChannelsForAgentRequest
+	68,  // 147: laelia.v1.CommandService.GetChannel:input_type -> laelia.v1.GetChannelRequest
+	69,  // 148: laelia.v1.CommandService.UpdateChannel:input_type -> laelia.v1.UpdateChannelRequest
+	70,  // 149: laelia.v1.CommandService.DeleteChannel:input_type -> laelia.v1.DeleteChannelRequest
+	71,  // 150: laelia.v1.CommandService.AddChannelMember:input_type -> laelia.v1.AddChannelMemberRequest
+	72,  // 151: laelia.v1.CommandService.RemoveChannelMember:input_type -> laelia.v1.RemoveChannelMemberRequest
+	75,  // 152: laelia.v1.CommandService.TransferChannelOwnership:input_type -> laelia.v1.TransferChannelOwnershipRequest
+	77,  // 153: laelia.v1.CommandService.UpdateChannelMemberRole:input_type -> laelia.v1.UpdateChannelMemberRoleRequest
+	78,  // 154: laelia.v1.CommandService.LeaveChannel:input_type -> laelia.v1.LeaveChannelRequest
+	73,  // 155: laelia.v1.CommandService.ListChannelMembers:input_type -> laelia.v1.ListChannelMembersRequest
+	79,  // 156: laelia.v1.CommandService.ListThreadParticipants:input_type -> laelia.v1.ListThreadParticipantsRequest
+	81,  // 157: laelia.v1.CommandService.SendMessage:input_type -> laelia.v1.SendMessageRequest
+	84,  // 158: laelia.v1.CommandService.PostMessage:input_type -> laelia.v1.PostMessageRequest
+	86,  // 159: laelia.v1.CommandService.ConvertMessageToTask:input_type -> laelia.v1.ConvertMessageToTaskRequest
+	88,  // 160: laelia.v1.CommandService.ListTasks:input_type -> laelia.v1.ListTasksRequest
+	90,  // 161: laelia.v1.CommandService.ListTaskCounts:input_type -> laelia.v1.ListTaskCountsRequest
+	98,  // 162: laelia.v1.CommandService.CreateTask:input_type -> laelia.v1.CreateTaskRequest
+	92,  // 163: laelia.v1.CommandService.ClaimTask:input_type -> laelia.v1.ClaimTaskRequest
+	94,  // 164: laelia.v1.CommandService.UnclaimTask:input_type -> laelia.v1.UnclaimTaskRequest
+	96,  // 165: laelia.v1.CommandService.UpdateTaskStatus:input_type -> laelia.v1.UpdateTaskStatusRequest
+	101, // 166: laelia.v1.CommandService.ConvertMessageToReminder:input_type -> laelia.v1.ConvertMessageToReminderRequest
+	103, // 167: laelia.v1.CommandService.ListReminders:input_type -> laelia.v1.ListRemindersRequest
+	105, // 168: laelia.v1.CommandService.GetReminder:input_type -> laelia.v1.GetReminderRequest
+	107, // 169: laelia.v1.CommandService.UpdateReminder:input_type -> laelia.v1.UpdateReminderRequest
+	109, // 170: laelia.v1.CommandService.CancelReminder:input_type -> laelia.v1.CancelReminderRequest
+	111, // 171: laelia.v1.CommandService.CompleteReminder:input_type -> laelia.v1.CompleteReminderRequest
+	113, // 172: laelia.v1.CommandService.FailReminder:input_type -> laelia.v1.FailReminderRequest
+	115, // 173: laelia.v1.CommandService.ListDueReminders:input_type -> laelia.v1.ListDueRemindersRequest
+	117, // 174: laelia.v1.CommandService.ListChannelUpdates:input_type -> laelia.v1.ListChannelUpdatesRequest
+	47,  // 175: laelia.v1.CommandService.ListThreadUpdates:input_type -> laelia.v1.ListThreadUpdatesRequest
+	120, // 176: laelia.v1.CommandService.AckProcessedVersion:input_type -> laelia.v1.AckProcessedVersionRequest
+	153, // 177: laelia.v1.CommandService.FetchConversationActivity:input_type -> laelia.v1.FetchConversationActivityRequest
+	122, // 178: laelia.v1.CommandService.MarkConversationRead:input_type -> laelia.v1.MarkConversationReadRequest
+	124, // 179: laelia.v1.CommandService.SetConversationPinned:input_type -> laelia.v1.SetConversationPinnedRequest
+	32,  // 180: laelia.v1.CommandService.UploadFile:input_type -> laelia.v1.UploadFileRequest
+	33,  // 181: laelia.v1.CommandService.DownloadFile:input_type -> laelia.v1.DownloadFileRequest
+	35,  // 182: laelia.v1.CommandService.ListFiles:input_type -> laelia.v1.ListFilesRequest
+	127, // 183: laelia.v1.CommandService.ListActivities:input_type -> laelia.v1.ListActivitiesRequest
+	129, // 184: laelia.v1.CommandService.MarkActivityDone:input_type -> laelia.v1.MarkActivityDoneRequest
+	131, // 185: laelia.v1.AgentStreamService.AgentChannel:input_type -> laelia.v1.AgentStreamMessage
+	143, // 186: laelia.v1.CommandService.ListCommands:output_type -> laelia.v1.ListCommandsResponse
+	9,   // 187: laelia.v1.CommandService.GetCommand:output_type -> laelia.v1.Command
+	9,   // 188: laelia.v1.CommandService.CancelCommand:output_type -> laelia.v1.Command
+	10,  // 189: laelia.v1.CommandService.WatchCommand:output_type -> laelia.v1.CommandOutput
+	11,  // 190: laelia.v1.CommandService.WatchCommandEvents:output_type -> laelia.v1.CommandEvent
+	163, // 191: laelia.v1.CommandService.RespondPermission:output_type -> google.protobuf.Empty
+	27,  // 192: laelia.v1.CommandService.SearchChatHistory:output_type -> laelia.v1.SearchChatHistoryResponse
+	83,  // 193: laelia.v1.CommandService.GetCommandContext:output_type -> laelia.v1.GetCommandContextResponse
+	51,  // 194: laelia.v1.CommandService.GetOrCreateConversation:output_type -> laelia.v1.GetOrCreateConversationResponse
+	53,  // 195: laelia.v1.CommandService.GetOrCreateUserUserDM:output_type -> laelia.v1.GetOrCreateUserUserDMResponse
+	55,  // 196: laelia.v1.CommandService.ResolveChannelByTitle:output_type -> laelia.v1.ResolveChannelByTitleResponse
+	57,  // 197: laelia.v1.CommandService.GetOrCreateUserDM:output_type -> laelia.v1.GetOrCreateUserDMResponse
+	59,  // 198: laelia.v1.CommandService.GetOrCreateAgentDM:output_type -> laelia.v1.GetOrCreateAgentDMResponse
+	62,  // 199: laelia.v1.CommandService.ListPeerAgents:output_type -> laelia.v1.ListPeerAgentsResponse
+	41,  // 200: laelia.v1.CommandService.ListConversationMessages:output_type -> laelia.v1.ListConversationMessagesResponse
+	43,  // 201: laelia.v1.CommandService.ListThreadMessages:output_type -> laelia.v1.ListThreadMessagesResponse
+	46,  // 202: laelia.v1.CommandService.ListChannelThreads:output_type -> laelia.v1.ListChannelThreadsResponse
+	38,  // 203: laelia.v1.CommandService.CreateChannel:output_type -> laelia.v1.Conversation
+	65,  // 204: laelia.v1.CommandService.ListChannels:output_type -> laelia.v1.ListChannelsResponse
+	67,  // 205: laelia.v1.CommandService.ListChannelsForAgent:output_type -> laelia.v1.ListChannelsForAgentResponse
+	38,  // 206: laelia.v1.CommandService.GetChannel:output_type -> laelia.v1.Conversation
+	38,  // 207: laelia.v1.CommandService.UpdateChannel:output_type -> laelia.v1.Conversation
+	163, // 208: laelia.v1.CommandService.DeleteChannel:output_type -> google.protobuf.Empty
+	39,  // 209: laelia.v1.CommandService.AddChannelMember:output_type -> laelia.v1.ChannelMember
+	163, // 210: laelia.v1.CommandService.RemoveChannelMember:output_type -> google.protobuf.Empty
+	76,  // 211: laelia.v1.CommandService.TransferChannelOwnership:output_type -> laelia.v1.TransferChannelOwnershipResponse
+	39,  // 212: laelia.v1.CommandService.UpdateChannelMemberRole:output_type -> laelia.v1.ChannelMember
+	163, // 213: laelia.v1.CommandService.LeaveChannel:output_type -> google.protobuf.Empty
+	74,  // 214: laelia.v1.CommandService.ListChannelMembers:output_type -> laelia.v1.ListChannelMembersResponse
+	80,  // 215: laelia.v1.CommandService.ListThreadParticipants:output_type -> laelia.v1.ListThreadParticipantsResponse
+	37,  // 216: laelia.v1.CommandService.SendMessage:output_type -> laelia.v1.ChatMessage
+	85,  // 217: laelia.v1.CommandService.PostMessage:output_type -> laelia.v1.PostMessageResponse
+	87,  // 218: laelia.v1.CommandService.ConvertMessageToTask:output_type -> laelia.v1.ConvertMessageToTaskResponse
+	89,  // 219: laelia.v1.CommandService.ListTasks:output_type -> laelia.v1.ListTasksResponse
+	91,  // 220: laelia.v1.CommandService.ListTaskCounts:output_type -> laelia.v1.ListTaskCountsResponse
+	99,  // 221: laelia.v1.CommandService.CreateTask:output_type -> laelia.v1.CreateTaskResponse
+	93,  // 222: laelia.v1.CommandService.ClaimTask:output_type -> laelia.v1.ClaimTaskResponse
+	95,  // 223: laelia.v1.CommandService.UnclaimTask:output_type -> laelia.v1.UnclaimTaskResponse
+	97,  // 224: laelia.v1.CommandService.UpdateTaskStatus:output_type -> laelia.v1.UpdateTaskStatusResponse
+	102, // 225: laelia.v1.CommandService.ConvertMessageToReminder:output_type -> laelia.v1.ConvertMessageToReminderResponse
+	104, // 226: laelia.v1.CommandService.ListReminders:output_type -> laelia.v1.ListRemindersResponse
+	106, // 227: laelia.v1.CommandService.GetReminder:output_type -> laelia.v1.GetReminderResponse
+	108, // 228: laelia.v1.CommandService.UpdateReminder:output_type -> laelia.v1.UpdateReminderResponse
+	110, // 229: laelia.v1.CommandService.CancelReminder:output_type -> laelia.v1.CancelReminderResponse
+	112, // 230: laelia.v1.CommandService.CompleteReminder:output_type -> laelia.v1.CompleteReminderResponse
+	114, // 231: laelia.v1.CommandService.FailReminder:output_type -> laelia.v1.FailReminderResponse
+	116, // 232: laelia.v1.CommandService.ListDueReminders:output_type -> laelia.v1.ListDueRemindersResponse
+	119, // 233: laelia.v1.CommandService.ListChannelUpdates:output_type -> laelia.v1.ListChannelUpdatesResponse
+	49,  // 234: laelia.v1.CommandService.ListThreadUpdates:output_type -> laelia.v1.ListThreadUpdatesResponse
+	121, // 235: laelia.v1.CommandService.AckProcessedVersion:output_type -> laelia.v1.AckProcessedVersionResponse
+	154, // 236: laelia.v1.CommandService.FetchConversationActivity:output_type -> laelia.v1.FetchConversationActivityResponse
+	123, // 237: laelia.v1.CommandService.MarkConversationRead:output_type -> laelia.v1.MarkConversationReadResponse
+	125, // 238: laelia.v1.CommandService.SetConversationPinned:output_type -> laelia.v1.SetConversationPinnedResponse
+	31,  // 239: laelia.v1.CommandService.UploadFile:output_type -> laelia.v1.File
+	34,  // 240: laelia.v1.CommandService.DownloadFile:output_type -> laelia.v1.DownloadFileResponse
+	36,  // 241: laelia.v1.CommandService.ListFiles:output_type -> laelia.v1.ListFilesResponse
+	128, // 242: laelia.v1.CommandService.ListActivities:output_type -> laelia.v1.ListActivitiesResponse
+	130, // 243: laelia.v1.CommandService.MarkActivityDone:output_type -> laelia.v1.MarkActivityDoneResponse
+	132, // 244: laelia.v1.AgentStreamService.AgentChannel:output_type -> laelia.v1.ManagerStreamMessage
+	186, // [186:245] is the sub-list for method output_type
+	127, // [127:186] is the sub-list for method input_type
+	127, // [127:127] is the sub-list for extension type_name
+	127, // [127:127] is the sub-list for extension extendee
+	0,   // [0:127] is the sub-list for field type_name
 }
 
 func init() { file_v1_command_proto_init() }
@@ -11139,8 +11314,10 @@ func file_v1_command_proto_init() {
 		(*CommandEvent_PermissionRequested)(nil),
 		(*CommandEvent_PermissionTimedOut)(nil),
 		(*CommandEvent_PermissionDecided)(nil),
+		(*CommandEvent_ContextCompaction)(nil),
+		(*CommandEvent_ContextUsage)(nil),
 	}
-	file_v1_command_proto_msgTypes[121].OneofWrappers = []any{
+	file_v1_command_proto_msgTypes[123].OneofWrappers = []any{
 		(*AgentStreamMessage_AgentReady)(nil),
 		(*AgentStreamMessage_BeginSession)(nil),
 		(*AgentStreamMessage_Progress)(nil),
@@ -11149,7 +11326,7 @@ func file_v1_command_proto_init() {
 		(*AgentStreamMessage_Ping)(nil),
 		(*AgentStreamMessage_ProvidersDiscovered)(nil),
 	}
-	file_v1_command_proto_msgTypes[122].OneofWrappers = []any{
+	file_v1_command_proto_msgTypes[124].OneofWrappers = []any{
 		(*ManagerStreamMessage_NewMessages)(nil),
 		(*ManagerStreamMessage_BeginSessionResponse)(nil),
 		(*ManagerStreamMessage_Cancel)(nil),
@@ -11163,7 +11340,7 @@ func file_v1_command_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_command_proto_rawDesc), len(file_v1_command_proto_rawDesc)),
 			NumEnums:      8,
-			NumMessages:   148,
+			NumMessages:   150,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

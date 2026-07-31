@@ -134,6 +134,8 @@
     - [CommandResult](#laelia-v1-CommandResult)
     - [CompleteReminderRequest](#laelia-v1-CompleteReminderRequest)
     - [CompleteReminderResponse](#laelia-v1-CompleteReminderResponse)
+    - [ContextCompactionPayload](#laelia-v1-ContextCompactionPayload)
+    - [ContextUsagePayload](#laelia-v1-ContextUsagePayload)
     - [Conversation](#laelia-v1-Conversation)
     - [ConvertMessageToReminderRequest](#laelia-v1-ConvertMessageToReminderRequest)
     - [ConvertMessageToReminderResponse](#laelia-v1-ConvertMessageToReminderResponse)
@@ -2272,6 +2274,8 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | permission_requested | [PermissionRequestedPayload](#laelia-v1-PermissionRequestedPayload) |  |  |
 | permission_timed_out | [PermissionTimedOutPayload](#laelia-v1-PermissionTimedOutPayload) |  |  |
 | permission_decided | [PermissionDecidedPayload](#laelia-v1-PermissionDecidedPayload) |  |  |
+| context_compaction | [ContextCompactionPayload](#laelia-v1-ContextCompactionPayload) |  |  |
+| context_usage | [ContextUsagePayload](#laelia-v1-ContextUsagePayload) |  |  |
 
 
 
@@ -2402,6 +2406,42 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | reminder | [Reminder](#laelia-v1-Reminder) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ContextCompactionPayload"></a>
+
+### ContextCompactionPayload
+ContextCompactionPayload describes a context-window compaction observed on
+the agent runtime. inferred is true when the compaction was detected
+indirectly (e.g. a usage drop) rather than reported by the agent.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reason | [string](#string) |  |  |
+| inferred | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ContextUsagePayload"></a>
+
+### ContextUsagePayload
+ContextUsagePayload is a point-in-time snapshot of the session context
+window. usage_ratio is used/size.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| size | [int64](#int64) |  |  |
+| used | [int64](#int64) |  |  |
+| usage_ratio | [double](#double) |  |  |
 
 
 
@@ -4443,6 +4483,9 @@ and Unread. The ACTIVITY_STATE prefix satisfies protobuf C&#43;&#43; scoping rul
 | PERMISSION_REQUESTED | 9 |  |
 | PERMISSION_TIMED_OUT | 10 |  |
 | PERMISSION_DECIDED | 11 |  |
+| CONTEXT_COMPACTION_STARTED | 12 |  |
+| CONTEXT_COMPACTION_FINISHED | 13 |  |
+| CONTEXT_USAGE_UPDATE | 14 |  |
 
 
 

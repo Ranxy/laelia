@@ -705,6 +705,10 @@ func sendCommandEvent(stream *connect.BidiStreamForClient[v1pb.AgentStreamMessag
 		ce.Payload = &v1pb.CommandEvent_PermissionTimedOut{PermissionTimedOut: event.PermissionTimedOut}
 	case v1pb.CommandEventType_PERMISSION_DECIDED:
 		ce.Payload = &v1pb.CommandEvent_PermissionDecided{PermissionDecided: event.PermissionDecided}
+	case v1pb.CommandEventType_CONTEXT_COMPACTION_STARTED, v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED:
+		ce.Payload = &v1pb.CommandEvent_ContextCompaction{ContextCompaction: event.ContextCompaction}
+	case v1pb.CommandEventType_CONTEXT_USAGE_UPDATE:
+		ce.Payload = &v1pb.CommandEvent_ContextUsage{ContextUsage: event.ContextUsage}
 	default:
 	}
 

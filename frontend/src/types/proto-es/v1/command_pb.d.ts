@@ -331,6 +331,18 @@ export declare type CommandEvent = Message<"laelia.v1.CommandEvent"> & {
      */
     value: PermissionDecidedPayload;
     case: "permissionDecided";
+  } | {
+    /**
+     * @generated from field: laelia.v1.ContextCompactionPayload context_compaction = 21;
+     */
+    value: ContextCompactionPayload;
+    case: "contextCompaction";
+  } | {
+    /**
+     * @generated from field: laelia.v1.ContextUsagePayload context_usage = 22;
+     */
+    value: ContextUsagePayload;
+    case: "contextUsage";
   } | { case: undefined; value?: undefined };
 };
 
@@ -616,6 +628,60 @@ export declare type PermissionDecidedPayload = Message<"laelia.v1.PermissionDeci
  * Use `create(PermissionDecidedPayloadSchema)` to create a new message.
  */
 export declare const PermissionDecidedPayloadSchema: GenMessage<PermissionDecidedPayload>;
+
+/**
+ * ContextCompactionPayload describes a context-window compaction observed on
+ * the agent runtime. inferred is true when the compaction was detected
+ * indirectly (e.g. a usage drop) rather than reported by the agent.
+ *
+ * @generated from message laelia.v1.ContextCompactionPayload
+ */
+export declare type ContextCompactionPayload = Message<"laelia.v1.ContextCompactionPayload"> & {
+  /**
+   * @generated from field: string reason = 1;
+   */
+  reason: string;
+
+  /**
+   * @generated from field: bool inferred = 2;
+   */
+  inferred: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.ContextCompactionPayload.
+ * Use `create(ContextCompactionPayloadSchema)` to create a new message.
+ */
+export declare const ContextCompactionPayloadSchema: GenMessage<ContextCompactionPayload>;
+
+/**
+ * ContextUsagePayload is a point-in-time snapshot of the session context
+ * window. usage_ratio is used/size.
+ *
+ * @generated from message laelia.v1.ContextUsagePayload
+ */
+export declare type ContextUsagePayload = Message<"laelia.v1.ContextUsagePayload"> & {
+  /**
+   * @generated from field: int64 size = 1;
+   */
+  size: bigint;
+
+  /**
+   * @generated from field: int64 used = 2;
+   */
+  used: bigint;
+
+  /**
+   * @generated from field: double usage_ratio = 3;
+   */
+  usageRatio: number;
+};
+
+/**
+ * Describes the message laelia.v1.ContextUsagePayload.
+ * Use `create(ContextUsagePayloadSchema)` to create a new message.
+ */
+export declare const ContextUsagePayloadSchema: GenMessage<ContextUsagePayload>;
 
 /**
  * @generated from message laelia.v1.SearchChatHistoryRequest
@@ -4504,6 +4570,21 @@ export enum CommandEventType {
    * @generated from enum value: PERMISSION_DECIDED = 11;
    */
   PERMISSION_DECIDED = 11,
+
+  /**
+   * @generated from enum value: CONTEXT_COMPACTION_STARTED = 12;
+   */
+  CONTEXT_COMPACTION_STARTED = 12,
+
+  /**
+   * @generated from enum value: CONTEXT_COMPACTION_FINISHED = 13;
+   */
+  CONTEXT_COMPACTION_FINISHED = 13,
+
+  /**
+   * @generated from enum value: CONTEXT_USAGE_UPDATE = 14;
+   */
+  CONTEXT_USAGE_UPDATE = 14,
 }
 
 /**

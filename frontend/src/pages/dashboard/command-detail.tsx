@@ -33,6 +33,9 @@ const eventTypeColors: Record<number, string> = {
   [CommandEventType.PERMISSION_REQUESTED]: "text-warning",
   [CommandEventType.PERMISSION_TIMED_OUT]: "text-error",
   [CommandEventType.PERMISSION_DECIDED]: "text-success",
+  [CommandEventType.CONTEXT_COMPACTION_STARTED]: "text-warning",
+  [CommandEventType.CONTEXT_COMPACTION_FINISHED]: "text-success",
+  [CommandEventType.CONTEXT_USAGE_UPDATE]: "text-info",
 };
 
 function isVisibleEvent(event: CommandEvent): boolean {

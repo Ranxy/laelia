@@ -221,8 +221,22 @@ func (e *PiExecutor) handleEvent(ev *event) bool {
 		if ev.WillRetry {
 			e.sendWarning(fmt.Sprintf("pi agent will retry: %s", strings.TrimSpace(ev.Reason)))
 		}
-	case eventCompactionStart, eventCompactionEnd:
-		e.sendWarning("pi compaction: " + strings.TrimSpace(ev.Reason))
+	case eventCompactionStart:
+		e.sendEvent(executor.Event{
+			Type:    v1pb.CommandEventType_CONTEXT_COMPACTION_STARTED,
+			Summary: "Context compaction started",
+			ContextCompaction: &v1pb.ContextCompactionPayload{
+				Reason: strings.TrimSpace(ev.Reason),
+			},
+		})
+	case eventCompactionEnd:
+		e.sendEvent(executor.Event{
+			Type:    v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED,
+			Summary: "Context compaction finished",
+			ContextCompaction: &v1pb.ContextCompactionPayload{
+				Reason: strings.TrimSpace(ev.Reason),
+			},
+		})
 	case eventAutoRetryStart, eventAutoRetryEnd:
 		e.sendWarning("pi auto-retry: " + strings.TrimSpace(ev.Reason))
 	case eventExtensionError:

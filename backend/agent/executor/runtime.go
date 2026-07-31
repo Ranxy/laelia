@@ -71,6 +71,8 @@ type Event struct {
 	PermissionRequested *v1pb.PermissionRequestedPayload
 	PermissionTimedOut  *v1pb.PermissionTimedOutPayload
 	PermissionDecided   *v1pb.PermissionDecidedPayload
+	ContextCompaction   *v1pb.ContextCompactionPayload
+	ContextUsage        *v1pb.ContextUsagePayload
 }
 
 type Runtime interface {
