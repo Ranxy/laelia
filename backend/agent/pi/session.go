@@ -26,15 +26,16 @@ import (
 
 // turnEventBuffer bounds the per-turn event channel. The drain loop consumes
 // continuously during a turn, so this only needs to absorb bursts (e.g. many
-// tool_execution_update chunks). Overflow drops events to never block the pi
-// stdout pipe (which would stall the subprocess); the critical terminal event
-// agent_settled is always delivered last and the consumer keeps up.
+// tool_execution_update chunks). Overflow drops non-terminal events to never
+// block the pi stdout pipe (which would stall the subprocess); the terminal
+// agent_settled is sent with a blocking send (see sendEvent) so it is never
+// dropped — a dropped settled would hang the turn to its timeout.
 const turnEventBuffer = 256
 
-// readTimeout bounds a single get_state/switch_session round trip at session
-// start. A slow pi startup that never responds is surfaced as a start error
-// rather than an indefinite hang.
-const readTimeout = 30 * time.Second
+// defaultStartupTimeout (declared in config.go) bounds the single
+// get_state/switch_session round trip at session start; it is the fallback when
+// PiConfig.StartupTimeout is unset. See Session.Start for the wedged-startup
+// kill path.
 
 // Session owns one long-lived `pi --mode rpc` subprocess for a pi agent. Turns
 // are serialized by the drain loop (one BeginSession at a time), so the session
@@ -100,17 +101,28 @@ func NewSession(ctx context.Context, cancel context.CancelFunc, cfg *PiConfig) *
 // LAELIA_COMMAND for the persistent process (see PiConfig.buildPiEnv). The
 // subprocess is bound to s.ctx (the session ctx), NOT the caller's turn ctx, so
 // the process survives across turns.
+//
+// The startup RPC (resumeOrCapture) runs OUTSIDE startMu so a wedged startup
+// does not hold the lock across the whole StartupTimeout window (Stop must be
+// able to act on the process meanwhile). A startup that times out (pi spawned
+// but never answered get_state/switch_session) is fatal: the wedged process is
+// killed so the next turn respawns, and the error is returned so this turn
+// fails at ~StartupTimeout instead of hanging to the turn timeout. A fast
+// startup failure (e.g. a corrupt saved-session file) is non-fatal: the turn
+// degrades to a cold init prompt.
 func (s *Session) Start(commandID string) error {
 	s.startMu.Lock()
-	defer s.startMu.Unlock()
 	if s.started {
+		s.startMu.Unlock()
 		return nil
 	}
 
 	if s.cfg == nil || s.cfg.PiBinaryPath == "" {
+		s.startMu.Unlock()
 		return errors.New("pi: binary path not configured")
 	}
 	if err := os.MkdirAll(s.cfg.WorkingDir, 0o700); err != nil {
+		s.startMu.Unlock()
 		return pkgerrors.Wrap(err, "pi: create working dir")
 	}
 
@@ -123,16 +135,19 @@ func (s *Session) Start(commandID string) error {
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
+		s.startMu.Unlock()
 		return pkgerrors.Wrap(err, "pi: stdin pipe")
 	}
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
+		s.startMu.Unlock()
 		return pkgerrors.Wrap(err, "pi: stdout pipe")
 	}
 	// Stderr is logged for diagnostics; it is not part of the JSONL protocol.
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Start(); err != nil {
+		s.startMu.Unlock()
 		return pkgerrors.Wrap(err, "pi: start subprocess")
 	}
 	s.cmd = cmd
@@ -144,17 +159,58 @@ func (s *Session) Start(commandID string) error {
 
 	go s.readPump()
 	go s.waitPump()
+	s.startMu.Unlock()
 
 	// Resume the prior session if one was persisted and the config fingerprint
 	// still matches; otherwise pi has already created a fresh session. Either
-	// way, capture the session file for the next resume.
+	// way, capture the session file for the next resume. This is the startup
+	// RPC round trip, bounded by StartupTimeout and run outside startMu.
 	if err := s.resumeOrCapture(); err != nil {
-		// Non-fatal: a failed resume falls back to a fresh session. The first
-		// turn re-sends the init prompt (cold), which is the correct degraded
-		// mode. Log and continue rather than killing the process.
+		if errors.Is(err, context.DeadlineExceeded) {
+			// pi spawned but never answered the startup RPC: it is wedged. Kill
+			// it so the next turn respawns, and fail this turn fast at
+			// ~StartupTimeout rather than hanging to MaxTimeoutSeconds. The
+			// session ctx is left intact so the next Start re-spawns on it.
+			slog.Warn("pi: startup timed out; killing wedged process",
+				"agent", s.cfg.AgentID, "startup_timeout", s.startupTimeout(), "error", err)
+			s.killProcess()
+			return pkgerrors.Wrap(err, "pi: startup timed out")
+		}
+		// Non-fatal: a fast failure (corrupt saved session) falls back to a
+		// fresh session. The first turn re-sends the init prompt (cold), the
+		// correct degraded mode. Log and continue rather than killing the process.
 		slog.Warn("pi: session resume/capture failed; starting cold", "agent", s.cfg.AgentID, "error", err)
 	}
 	return nil
+}
+
+// startupTimeout returns the configured startup RPC timeout, falling back to
+// the default when unset (e.g. a test-built PiConfig that omits it).
+func (s *Session) startupTimeout() time.Duration {
+	if s.cfg != nil && s.cfg.StartupTimeout > 0 {
+		return s.cfg.StartupTimeout
+	}
+	return defaultStartupTimeout
+}
+
+// killProcess kills the subprocess and its process group and blocks until
+// waitPump has reaped it and reset started, WITHOUT cancelling the session ctx.
+// The session can therefore be re-spawned on the next turn (exec.CommandContext
+// over a still-alive s.ctx). Used for a wedged startup: the process is running
+// but not responding, so the next turn should respawn rather than reuse it.
+func (s *Session) killProcess() {
+	s.startMu.Lock()
+	started := s.started
+	waitDone := s.waitDone
+	cmd := s.cmd
+	s.startMu.Unlock()
+	if !started || cmd == nil || cmd.Process == nil {
+		return
+	}
+	_ = executor.KillGroup(cmd, syscall.SIGKILL)
+	if waitDone != nil {
+		<-waitDone
+	}
 }
 
 // readPump decodes LF-delimited JSONL from stdout for the process lifetime. It
@@ -264,18 +320,35 @@ func (s *Session) routeResponse(r response) {
 	}
 }
 
-// sendEvent fans an event to the active turn channel, dropping if no turn is
-// active or the buffer is full. Dropping protects the subprocess from a stalled
-// stdout pipe; the drain loop keeps up during a turn so drops are unexpected then.
-// The lock is held across the (non-blocking) send so that waitPump's close of the
-// channel cannot race this send — once waitPump sets active=nil under turnMu, a
-// concurrent sendEvent observes nil and returns, and any in-flight send has
-// completed before waitPump unlocks and closes.
+// sendEvent fans an event to the active turn channel. Non-terminal events drop
+// on a full buffer (default) — dropping protects the subprocess from a stalled
+// stdout pipe, and the drain loop keeps up during a turn so drops are unexpected.
+// The terminal event (agent_settled) is the one event the drain loop strictly
+// waits for: a dropped settled would leave the turn hung to its timeout. It is
+// therefore sent with a BLOCKING send — no default drop — so it is delivered once
+// the drain loop catches up, bounded by s.ctx.Done (the session torn down by
+// Stop, which also lets waitPump close the channel). The drain loop consumes the
+// channel without turnMu, so a blocked terminal send unblocks as soon as the
+// loop drains the buffer; s.ctx.Done bounds the block if the consumer is wedged.
+//
+// The lock is held across the send so waitPump's close of the channel cannot race
+// it: once waitPump sets active=nil under turnMu, a concurrent sendEvent observes
+// nil and returns, and any in-flight send has completed before waitPump unlocks
+// and closes. Stop cancels s.ctx before waitPump acquires turnMu, so a blocked
+// terminal send unblocks (via s.ctx.Done) and releases the lock before waitPump
+// needs it — no deadlock between a wedged consumer and process teardown.
 func (s *Session) sendEvent(ev *event) {
 	s.turnMu.Lock()
 	defer s.turnMu.Unlock()
 	ch := s.active
 	if ch == nil {
+		return
+	}
+	if ev.Type == eventAgentSettled {
+		select {
+		case ch <- ev:
+		case <-s.ctx.Done():
+		}
 		return
 	}
 	select {
@@ -432,7 +505,7 @@ func (s *Session) SessionFile() string {
 // resumeOrCapture loads the persisted session file, switches to it if the
 // fingerprint matches, and captures the current session file for next time.
 func (s *Session) resumeOrCapture() error {
-	ctx, cancel := context.WithTimeout(s.ctx, readTimeout)
+	ctx, cancel := context.WithTimeout(s.ctx, s.startupTimeout())
 	defer cancel()
 
 	saved, err := loadPiSession(s.cfg.MachineID, s.cfg.AgentID)

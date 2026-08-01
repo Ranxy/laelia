@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
@@ -15,6 +16,13 @@ const (
 	defaultMaxEventCount     = 10000
 	defaultMaxOutputBytes    = 1 << 20
 	defaultOutputFlushBytes  = 4096
+
+	// defaultStartupTimeout bounds the pi startup RPC round trip (spawn + first
+	// get_state / switch_session). A pi that spawns but never answers within
+	// this window is wedged (bad config, stuck download) and the turn fails fast
+	// at ~StartupTimeout instead of hanging to MaxTimeoutSeconds. Overridable
+	// per-agent via PiConfig.StartupTimeout.
+	defaultStartupTimeout = 30 * time.Second
 
 	// APIProviderDeepseek and APIProviderOpenRouter are the LLM API providers
 	// supported in phase 1. Each maps to a pi provider id + the env var pi reads
@@ -93,6 +101,12 @@ type PiConfig struct {
 	MaxEventCount     int32
 	MaxOutputBytes    int64
 	OutputFlushBytes  int32
+
+	// StartupTimeout bounds the spawn + first get_state / switch_session round
+	// trip. A pi that never answers within it is treated as wedged: the turn is
+	// killed and failed at ~StartupTimeout rather than hanging to
+	// MaxTimeoutSeconds. Defaults to defaultStartupTimeout when zero.
+	StartupTimeout time.Duration
 }
 
 // BuildPiConfig resolves the user-configurable AgentACPConfig into a PiConfig
@@ -130,6 +144,7 @@ func BuildPiConfig(
 		MaxEventCount:     defaultMaxEventCount,
 		MaxOutputBytes:    defaultMaxOutputBytes,
 		OutputFlushBytes:  defaultOutputFlushBytes,
+		StartupTimeout:    defaultStartupTimeout,
 	}
 }
 

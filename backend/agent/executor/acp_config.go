@@ -3,6 +3,7 @@ package executor
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -13,6 +14,14 @@ const (
 	defaultACPMaxEventCount     = 10000
 	defaultACPMaxOutputBytes    = 1 << 20
 	defaultOutputFlushBytes     = 4096
+
+	// defaultACPStartupTimeout bounds the ACP startup handshake (Initialize +
+	// ResumeSession / NewSession): the window before the agent accepts its first
+	// turn. A server that spawns but never completes the handshake within it (a
+	// slow npx download, a bad config that hangs init, an unresponsive server)
+	// is failed fast at ~StartupTimeout instead of hanging to MaxTimeoutSeconds.
+	// Overridable per-agent via ACPConfig.StartupTimeout.
+	defaultACPStartupTimeout = 60 * time.Second
 )
 
 // DefaultAllowEnv is the env var whitelist seeded onto every newly created
@@ -47,6 +56,13 @@ type ACPConfig struct {
 	MaxEventCount     int32 `yaml:"max_event_count"`
 	MaxOutputBytes    int64 `yaml:"max_output_bytes"`
 	OutputFlushBytes  int32 `yaml:"output_flush_bytes"`
+
+	// StartupTimeout bounds the Initialize + ResumeSession/NewSession
+	// handshake. A server that does not complete it within this window is
+	// failed fast at ~StartupTimeout instead of hanging to MaxTimeoutSeconds
+	// (the Prompt call stays on the turn ctx). Defaults to
+	// defaultACPStartupTimeout when zero.
+	StartupTimeout time.Duration `yaml:"startup_timeout"`
 
 	Provider      string   `yaml:"provider"`
 	Model         string   `yaml:"model"`
@@ -99,6 +115,7 @@ func BuildACPConfig(user *v1pb.AgentACPConfig, machineID, agentID string) *ACPCo
 		MaxEventCount:     defaultACPMaxEventCount,
 		MaxOutputBytes:    defaultACPMaxOutputBytes,
 		OutputFlushBytes:  defaultOutputFlushBytes,
+		StartupTimeout:    defaultACPStartupTimeout,
 
 		Provider:             user.Provider,
 		Model:                user.Model,

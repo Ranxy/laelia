@@ -14,6 +14,9 @@ import (
 // keeps a turn in flight so lifecycle tests can cancel it mid-turn. "die"
 // accepts the prompt, emits a text delta, then exits so the subprocess dies
 // mid-turn (exercises the waitPump close-active-channel fast-failure path).
+// "stuck" reads stdin but never answers get_state, simulating a pi that spawned
+// but is wedged at startup (no response to the first RPC) — exercises the
+// Phase 5 startup-timeout fast-failure + wedged-process kill path.
 const fakePiModeFile = "fake-pi-mode"
 
 // This file's init() turns the test binary into a fake pi subprocess when it is
@@ -66,6 +69,11 @@ func fakePiMain() {
 		}
 		switch head.Type {
 		case "get_state":
+			if readFakePiMode() == "stuck" {
+				// Wedged startup: keep reading stdin but never answer get_state,
+				// so resumeOrCapture's send blocks until the startup timeout.
+				continue
+			}
 			writeJSONL(w, response{
 				Type:    "response",
 				ID:      head.ID,
@@ -121,7 +129,7 @@ func readFakePiMode() string {
 		return "settle"
 	}
 	switch strings.TrimSpace(string(b)) {
-	case "wait", "die":
+	case "wait", "die", "stuck":
 		return strings.TrimSpace(string(b))
 	default:
 		return "settle"

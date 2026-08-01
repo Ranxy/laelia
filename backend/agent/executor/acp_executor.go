@@ -413,7 +413,20 @@ func (e *ACPExecutor) run() {
 	go e.scanACPStderr(stderr)
 	go e.startFlushTimer()
 
-	initResp, err := e.conn.Initialize(e.ctx, acp.InitializeRequest{
+	// The startup handshake (Initialize + ResumeSession / NewSession) is bounded
+	// by its own timeout, NOT the turn ctx: a server that spawns but never
+	// completes the handshake (a slow npx download, a bad config that hangs
+	// init, an unresponsive server) is failed fast at ~StartupTimeout instead
+	// of hanging to MaxTimeoutSeconds. The Prompt call below stays on e.ctx so a
+	// slow turn still respects the turn timeout.
+	startupTimeout := e.config.StartupTimeout
+	if startupTimeout <= 0 {
+		startupTimeout = defaultACPStartupTimeout
+	}
+	startupCtx, cancelStartup := context.WithTimeout(e.ctx, startupTimeout)
+	defer cancelStartup()
+
+	initResp, err := e.conn.Initialize(startupCtx, acp.InitializeRequest{
 		ProtocolVersion: acp.ProtocolVersionNumber,
 		ClientCapabilities: acp.ClientCapabilities{
 			Fs: acp.FileSystemCapabilities{
@@ -455,7 +468,7 @@ func (e *ACPExecutor) run() {
 		// opencode replays the prior conversation as session/update during this
 		// call; suppress forwarding that history into the current command.
 		e.replayingHistory.Store(true)
-		resumeResp, resumeErr := e.conn.ResumeSession(e.ctx, acp.ResumeSessionRequest{
+		resumeResp, resumeErr := e.conn.ResumeSession(startupCtx, acp.ResumeSessionRequest{
 			SessionId:             acp.SessionId(existing.SessionID),
 			Cwd:                   e.workingDir,
 			AdditionalDirectories: extraDirs,
@@ -488,7 +501,7 @@ func (e *ACPExecutor) run() {
 	}
 
 	if !resumed {
-		sessionResp, newErr := e.conn.NewSession(e.ctx, acp.NewSessionRequest{
+		sessionResp, newErr := e.conn.NewSession(startupCtx, acp.NewSessionRequest{
 			Cwd:                   e.workingDir,
 			AdditionalDirectories: extraDirs,
 			McpServers:            mcpServers,

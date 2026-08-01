@@ -402,6 +402,60 @@ func TestACPExecutorWithOpencodeWriteFile(t *testing.T) {
 	assert.True(t, hasEventType(obs.events, v1pb.CommandEventType_TOOL_CALL_STARTED) || hasEventType(obs.events, v1pb.CommandEventType_TOOL_CALL_FINISHED))
 }
 
+// TestACPExecutor_WedgedStartupFailsFast (T2): when the ACP subprocess spawns
+// but never completes the Initialize handshake (here `sleep 9999` produces no
+// JSON-RPC), the turn must fail at ~StartupTimeout — not hang to the turn
+// timeout (MaxTimeoutSeconds). Before Phase 5 Initialize used the turn ctx, so a
+// wedged startup (slow npx download, bad config, unresponsive server) hung for
+// the whole turn. Phase 5 bounds Initialize/ResumeSession/NewSession with a
+// dedicated startupCtx; the Prompt call stays on the turn ctx.
+func TestACPExecutor_WedgedStartupFailsFast(t *testing.T) {
+	sleep, err := exec.LookPath("sleep")
+	if err != nil {
+		t.Skip("sleep binary not found in PATH")
+	}
+	workspace := t.TempDir()
+
+	// A small startup timeout so the test is fast; the turn timeout stays
+	// generous so a regression (Initialize on the turn ctx) hangs past the
+	// runACPTestRuntime deadline below, not masked by it.
+	cfg := &ACPConfig{
+		MaxTimeoutSeconds: 1800,
+		MaxEventCount:     10000,
+		MaxOutputBytes:    1 << 20,
+		OutputFlushBytes:  defaultOutputFlushBytes,
+		StartupTimeout:    500 * time.Millisecond,
+		Provider:          "custom",
+		Executable:        sleep,
+		Args:              []string{"9999"},
+		WorkingDir:        workspace,
+		ReadTextFiles:     true,
+		WriteTextFiles:    true,
+		AllowEnv:          []string{"PATH", "HOME"},
+	}
+
+	runtime, err := NewACP(Request{
+		CommandID:      "wedged-startup",
+		TurnPrompt:     "noop",
+		WorkingDir:     workspace,
+		TimeoutSeconds: 30,
+	}, cfg)
+	require.NoError(t, err)
+
+	start := time.Now()
+	// 8s bounds the whole drive: a Phase-5 turn finishes at ~500ms; a
+	// pre-Phase-5 regression (Initialize on the 30s turn ctx) hits this and fatals.
+	obs := runACPTestRuntime(t, runtime, 8*time.Second, 0)
+	elapsed := time.Since(start)
+
+	require.NotZero(t, obs.result.ExitCode, "a wedged startup must fail the turn")
+	require.NotEmpty(t, obs.result.ErrorMessage, "the startup timeout must surface an error")
+	// ~StartupTimeout (500ms) plus spawn/drain slack; well under the 30s turn
+	// timeout a pre-Phase-5 regression would hit (which runACPTestRuntime would
+	// catch as a timeout fatality at 8s).
+	require.Less(t, elapsed, 5*time.Second, "wedged startup must fail at ~StartupTimeout, not the turn timeout")
+}
+
 type acpTestObservation struct {
 	outputs   []OutputChunk
 	events    []Event
