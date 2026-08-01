@@ -639,11 +639,13 @@ export function MachineProfilePage() {
                             "group flex cursor-pointer items-center gap-2 -mx-2 px-2 py-2 rounded-md transition-colors",
                             "hover:bg-control-bg/60"
                           )}
-                          onClick={() => navigate(`/agents/${resourceId}`)}
+                          onClick={() =>
+                            navigate(`/members/agents/${resourceId}`)
+                          }
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
-                              navigate(`/agents/${resourceId}`);
+                              navigate(`/members/agents/${resourceId}`);
                             }
                           }}
                         >

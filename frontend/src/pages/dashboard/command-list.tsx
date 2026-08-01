@@ -128,7 +128,9 @@ export function CommandListPage() {
 
   function handleRowClick(cmd: Command) {
     if (!cmd.name) return;
-    navigate(`/agents/${agentId}/commands/${cmd.name.split("/").pop()}`);
+    navigate(
+      `/members/agents/${agentId}/commands/${cmd.name.split("/").pop()}`
+    );
   }
 
   return (
@@ -168,9 +170,6 @@ export function CommandListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-20 whitespace-nowrap">
-                    {t("tasks.header-type")}
-                  </TableHead>
                   <TableHead className="w-24 whitespace-nowrap">
                     {t("tasks.header-status")}
                   </TableHead>
@@ -187,7 +186,7 @@ export function CommandListPage() {
                 {loading && (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={4}
                       className="text-center text-control-light py-8"
                     >
                       {t("common.loading")}
@@ -196,7 +195,7 @@ export function CommandListPage() {
                 )}
                 {!loading && commands.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12">
+                    <TableCell colSpan={4} className="text-center py-12">
                       <div className="flex flex-col items-center gap-3">
                         <p className="text-control-light text-sm">
                           {t("tasks.empty")}
@@ -228,11 +227,6 @@ export function CommandListPage() {
                         }
                       }}
                     >
-                      <TableCell className="whitespace-nowrap">
-                        <span className="text-xs text-control-light">
-                          {t("command.executor-acp")}
-                        </span>
-                      </TableCell>
                       <TableCell className="whitespace-nowrap">
                         <CommandStatusBadge status={cmd.status} />
                       </TableCell>

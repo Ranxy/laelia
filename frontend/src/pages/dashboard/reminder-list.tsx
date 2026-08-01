@@ -127,7 +127,7 @@ export function ReminderListPage() {
 
   function handleRowClick(r: Reminder) {
     if (!r.name) return;
-    navigate(`/agents/${agentId}/reminders/${r.name.split("/").pop()}`);
+    navigate(`/members/agents/${agentId}/reminders/${r.name.split("/").pop()}`);
   }
 
   return (

@@ -249,7 +249,7 @@ export interface MembersSlice {
   // shows an error + retry instead of an empty list.
   membersError: boolean;
 
-  fetchMembers: () => Promise<
+  fetchMembers: (params?: { silent?: boolean }) => Promise<
     | {
         usersNextPageToken: string;
         agentsNextPageToken: string;
@@ -270,8 +270,11 @@ export interface CommandSlice {
     params?: { pageSize?: number; pageToken?: string; status?: number }
   ) => Promise<{ commands: Command[]; nextPageToken: string } | undefined>;
   getCommand: (name: string) => Promise<Command | undefined>;
-  watchCommand: (name: string, signal?: AbortSignal) => Promise<void>;
-  watchCommandEvents: (name: string, signal?: AbortSignal) => Promise<void>;
+  // watchCommand/watchCommandEvents resolve with true when the server closed
+  // the stream normally (e.g. the command finished), false when the stream was
+  // aborted by the caller or failed with an error.
+  watchCommand: (name: string, signal?: AbortSignal) => Promise<boolean>;
+  watchCommandEvents: (name: string, signal?: AbortSignal) => Promise<boolean>;
   respondPermission: (name: string, optionId: string) => Promise<void>;
 }
 

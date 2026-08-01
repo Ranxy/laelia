@@ -670,7 +670,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // streaming slices. The shared MessageRow still accepts them.
   const handleViewDetails = useCallback(
     (commandId: string, agentId: string) => {
-      navigate(`/agents/${agentId}/commands/${commandId}`);
+      navigate(`/members/agents/${agentId}/commands/${commandId}`);
     },
     [navigate]
   );

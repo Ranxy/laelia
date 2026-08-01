@@ -72,8 +72,10 @@ export const createCommandSlice: AppSliceCreator<CommandSlice> = (
           },
         });
       }
+      return !signal?.aborted;
     } catch {
       // stream cancelled or network error
+      return false;
     }
   },
 
@@ -102,8 +104,10 @@ export const createCommandSlice: AppSliceCreator<CommandSlice> = (
           },
         });
       }
+      return !signal?.aborted;
     } catch {
       // stream cancelled or network error
+      return false;
     }
   },
 

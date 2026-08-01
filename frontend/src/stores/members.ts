@@ -21,8 +21,11 @@ export const createMembersSlice: AppSliceCreator<MembersSlice> = (
   membersLoading: false,
   membersError: false,
 
-  async fetchMembers() {
-    set({ membersLoading: true, membersError: false });
+  async fetchMembers(params) {
+    const silent = params?.silent;
+    // Silent (background) refreshes keep the cached roster visible instead of
+    // swapping the rail to a "Loading…" state on every re-entry.
+    if (!silent) set({ membersLoading: true, membersError: false });
     try {
       const users = await drainRoster(
         (pageToken) => get().fetchUsers({ pageSize: 100, pageToken }),
@@ -38,7 +41,9 @@ export const createMembersSlice: AppSliceCreator<MembersSlice> = (
       // their slice to []; either roster failing means the directory is not
       // trustworthy, so we surface a load error rather than a partial list.
       if (users === undefined || agents === undefined) {
-        set({ members: [], membersLoading: false, membersError: true });
+        if (!silent) {
+          set({ members: [], membersLoading: false, membersError: true });
+        }
         return undefined;
       }
 
@@ -61,7 +66,9 @@ export const createMembersSlice: AppSliceCreator<MembersSlice> = (
       set({ members, membersLoading: false });
       return { usersNextPageToken: "", agentsNextPageToken: "" };
     } catch {
-      set({ members: [], membersLoading: false, membersError: true });
+      if (!silent) {
+        set({ members: [], membersLoading: false, membersError: true });
+      }
       return undefined;
     }
   },

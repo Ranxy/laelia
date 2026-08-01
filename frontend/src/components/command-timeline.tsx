@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { ChatToolCall } from "@/components/chat-events/tool-call";
 import { pairToolCallEvents, type ToolCallPair } from "@/lib/tool-call-events";
 import { useAutoScroll } from "@/lib/use-auto-scroll";
@@ -13,6 +13,16 @@ interface CommandTimelineProps {
   outputs: CommandOutput[];
   events: CommandEvent[];
   className?: string;
+  // scrollToSeqNo jumps the timeline to the tool card whose started event has
+  // this seq_no (used by the events panel to locate the corresponding output).
+  scrollToSeqNo?: number | null;
+  // activeSeqNo highlights the tool card with the matching started seq_no.
+  activeSeqNo?: number | null;
+  onToolCardClick?: (seqNo: number) => void;
+  // active is false while the containing tab is hidden (keepMounted). When the
+  // panel becomes visible again, re-apply the auto-scroll position so content
+  // that arrived while hidden does not leave the user at the top.
+  active?: boolean;
 }
 
 type TimelineItem =
@@ -48,9 +58,41 @@ export function CommandTimeline({
   outputs,
   events,
   className,
+  scrollToSeqNo,
+  activeSeqNo,
+  onToolCardClick,
+  active = true,
 }: CommandTimelineProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { onScroll } = useAutoScroll(scrollRef, [outputs, events]);
+  const { onScroll, autoScrollRef } = useAutoScroll(scrollRef, [
+    outputs,
+    events,
+  ]);
+
+  useEffect(() => {
+    if (!active || !scrollRef.current || !autoScrollRef.current) return;
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [active, autoScrollRef]);
+
+  useEffect(() => {
+    if (scrollToSeqNo == null || !scrollRef.current) return;
+    const el = scrollRef.current.querySelector<HTMLElement>(
+      `[data-tool-seq="${scrollToSeqNo}"]`
+    );
+    if (!el) return;
+    // Jumping is a user-initiated navigation: stop pinning to the bottom so
+    // subsequent output chunks do not yank the viewport back.
+    autoScrollRef.current = false;
+    const container = scrollRef.current;
+    const targetTop =
+      el.getBoundingClientRect().top -
+      container.getBoundingClientRect().top +
+      container.scrollTop;
+    container.scrollTo({
+      top: Math.max(0, targetTop - 12),
+      behavior: "smooth",
+    });
+  }, [scrollToSeqNo, autoScrollRef]);
 
   const items = useMemo<TimelineItem[]>(() => {
     const pairs = pairToolCallEvents(events);
@@ -133,7 +175,18 @@ export function CommandTimeline({
         return (
           <div
             key={`tool-${item.pair.started.seqNo}`}
-            className="my-2 not-italic"
+            data-tool-seq={item.pair.started.seqNo}
+            onClick={
+              onToolCardClick
+                ? () => onToolCardClick(item.pair.started.seqNo)
+                : undefined
+            }
+            className={cn(
+              "my-2 not-italic",
+              onToolCardClick && "cursor-pointer",
+              activeSeqNo === item.pair.started.seqNo &&
+                "ring-2 ring-accent rounded-lg"
+            )}
           >
             <ChatToolCall
               startedEvent={item.pair.started}

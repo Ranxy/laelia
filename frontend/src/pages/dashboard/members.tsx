@@ -35,14 +35,17 @@ export function MembersPage() {
   // useMatch reads the child-route params so the parent layout can highlight
   // the selected row (parent route elements don't receive child params via
   // useParams).
-  const agentMatch = useMatch("/members/agents/:agentId");
-  const userMatch = useMatch("/members/users/:userId");
+  const agentMatch = useMatch("/members/agents/:agentId/*");
+  const userMatch = useMatch("/members/users/:userId/*");
   const selectedAgentId = agentMatch?.params.agentId;
   const selectedUserId = userMatch?.params.userId;
   const hasSelection = !!(selectedAgentId || selectedUserId);
 
   useEffect(() => {
-    void fetchMembers();
+    // Keep the already-rendered roster visible when returning to this page:
+    // refresh silently when a cached roster exists, otherwise show loading.
+    const hasCached = useAppStore.getState().members.length > 0;
+    void fetchMembers({ silent: hasCached });
   }, [fetchMembers]);
 
   // Load the machine roster so agent rows can show the owning machine's title

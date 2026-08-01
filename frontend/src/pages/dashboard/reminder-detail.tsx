@@ -207,7 +207,7 @@ export function ReminderDetailPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate(`/agents/${agentId}/reminders`)}
+          onClick={() => navigate(`/members/agents/${agentId}/reminders`)}
         >
           &larr; {t("reminders.back")}
         </Button>
@@ -229,7 +229,7 @@ export function ReminderDetailPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate(`/agents/${agentId}/reminders`)}
+          onClick={() => navigate(`/members/agents/${agentId}/reminders`)}
         >
           &larr; {t("reminders.back")}
         </Button>
@@ -343,7 +343,7 @@ export function ReminderDetailPage() {
                 channelTitle={channelTitle}
                 rootMessageId={rootId}
                 fluid
-                onClose={() => navigate(`/agents/${agentId}/reminders`)}
+                onClose={() => navigate(`/members/agents/${agentId}/reminders`)}
                 onViewInChannel={() => {
                   // Jump to the trigger message's channel and open its thread
                   // there. The chat page reads ?thread= on mount.
