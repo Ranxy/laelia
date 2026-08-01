@@ -19,6 +19,12 @@ import (
 // Phase 5 startup-timeout fast-failure + wedged-process kill path.
 const fakePiModeFile = "fake-pi-mode"
 
+// fakePiPromptsFile receives one JSON line per prompt command the fake pi
+// accepts, recording the prompt message. Lifecycle tests read it back to
+// assert which prompt text a turn sent — e.g. the cold init prompt vs. a
+// warm-turn-only batch (the Phase 6 amnesia regression).
+const fakePiPromptsFile = "fake-pi-prompts.log"
+
 // This file's init() turns the test binary into a fake pi subprocess when it is
 // re-exec'd by a lifecycle test. The runner spawns pi as `testbin --mode rpc
 // --provider ...` (the pi launchArgs); a real `go test` run never passes a bare
@@ -92,6 +98,11 @@ func fakePiMain() {
 				Data:    json.RawMessage(`{"contextUsage":{"tokens":1000,"contextWindow":200000,"percent":0.5}}`),
 			})
 		case "prompt":
+			var pc struct {
+				Message string `json:"message"`
+			}
+			_ = json.Unmarshal([]byte(line), &pc)
+			appendFakePiPrompt(pc.Message)
 			writeJSONL(w, response{Type: "response", ID: head.ID, Command: "prompt", Success: true})
 			writeJSONL(w, event{Type: eventMessageUpdate, AssistantMessageEvent: &assistantMessageEvent{
 				Type:         assistantEventTextDelta,
@@ -144,4 +155,18 @@ func writeJSONL(w *bufio.Writer, v any) {
 	_, _ = w.Write(b)
 	_ = w.WriteByte('\n')
 	_ = w.Flush()
+}
+
+// appendFakePiPrompt appends one prompt message (newline-delimited JSON) to the
+// prompts log in the fake pi's CWD (the session working dir), so a lifecycle
+// test can inspect which prompt each turn sent.
+func appendFakePiPrompt(msg string) {
+	f, err := os.OpenFile(fakePiPromptsFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_ = json.NewEncoder(f).Encode(struct {
+		Message string `json:"message"`
+	}{Message: msg})
 }

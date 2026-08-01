@@ -2,8 +2,10 @@ package pi
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -196,6 +198,76 @@ func TestPiSession_MidTurnDeathFailsFast(t *testing.T) {
 	require.Contains(t, result.ErrorMessage, "session exited mid-turn",
 		"failure must come from the closed turn channel, not the turn timeout")
 	require.Less(t, elapsed, 10*time.Second, "mid-turn death must fail fast, not hang to the turn timeout")
+}
+
+// readFakePiPrompts returns the prompt messages the fake pi logged (one per
+// accepted prompt command), in send order. The fake pi appends each prompt's
+// message to fakePiPromptsFile in its CWD (the session working dir).
+func readFakePiPrompts(t *testing.T, work string) []string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(work, fakePiPromptsFile))
+	if err != nil {
+		return nil
+	}
+	var prompts []string
+	for line := range strings.SplitSeq(strings.TrimRight(string(data), "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		var rec struct {
+			Message string `json:"message"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(line), &rec))
+		prompts = append(prompts, rec.Message)
+	}
+	return prompts
+}
+
+// TestPiSession_PrimedResetOnExit_ColdRestartSendsInitPrompt (T8 / Phase 6): when
+// the pi process dies and a subsequent turn cannot resume from disk (a
+// switch_session failure or no resumable session), the next turn must re-send
+// the cold init prompt — not just the batch. Before Phase 6, waitPump did NOT
+// reset primed, so IsWarm() stayed true from the dead process and
+// turnPromptText sent only the batch to a FRESH session that had never seen the
+// init prompt → the agent lost its persona ("amnesia"). Phase 6 resets primed
+// on exit so IsWarm() returns false and the restart is cold until its own init
+// prompt. This is the hard prerequisite for Phase 7 idle eviction, which will
+// restart processes frequently and thus hit this path often.
+func TestPiSession_PrimedResetOnExit_ColdRestartSendsInitPrompt(t *testing.T) {
+	sess, cfg := newFakePiSession(t, "die")
+
+	// Turn 1: cold start (no saved session) → init prompt sent + MarkPrimed, then
+	// "die" kills the process mid-turn. waitPump reaps it and (Phase 6) resets
+	// primed. The turn fails fast as "session exited mid-turn".
+	res1 := runTurn(t, sess, cfg, "cmd-1")
+	require.NotZero(t, res1.ExitCode, "die-mode turn must fail")
+	require.Contains(t, res1.ErrorMessage, "session exited mid-turn")
+
+	// The process is gone and — the Phase 6 fix — IsWarm() is false (primed was
+	// reset on exit, atomically with started). Before the fix IsWarm() stayed
+	// true from the dead process.
+	require.False(t, sess.Alive(), "process must be reaped after die")
+	require.False(t, sess.IsWarm(), "primed must reset on process exit so a restart is cold")
+
+	// Simulate a switch_session that cannot resume (the plan's cold-start
+	// branch): drop the persisted session so resumeOrCapture skips the switch
+	// and resumedFromDisk stays false on the next start.
+	require.NoError(t, os.Remove(piSessionPath(cfg.MachineID, cfg.AgentID)))
+
+	// Turn 2 on a fresh (settling) process. With primed reset, IsWarm()=false →
+	// the turn re-sends the cold init prompt instead of just the batch.
+	writeFakePiMode(t, cfg.WorkingDir, "settle")
+	res2 := runTurn(t, sess, cfg, "cmd-2")
+	require.Equal(t, int32(0), res2.ExitCode, "respawned cold turn must succeed")
+
+	prompts := readFakePiPrompts(t, cfg.WorkingDir)
+	require.Len(t, prompts, 2, "both turns must have sent a prompt")
+	require.Contains(t, prompts[0], "autonomous AI agent in Laelia",
+		"turn 1 was cold and must carry the init prompt")
+	require.Contains(t, prompts[1], "autonomous AI agent in Laelia",
+		"turn 2 must re-send the init prompt after the process died and the session could not resume (no amnesia)")
+	require.Contains(t, prompts[1], "do the thing",
+		"turn 2 must also carry the batch alongside the init prompt")
 }
 
 // TestPiSession_WedgedStartupFailsFast (T2): when the pi subprocess spawns but

@@ -77,8 +77,10 @@ type Session struct {
 
 	// resumedFromDisk records whether Start switched to a persisted session
 	// (warm history inherited across a machine restart). primed records
-	// whether a cold init prompt has already been sent on this process. A turn
-	// is warm (no init prompt) when either is true.
+	// whether a cold init prompt has already been sent on this process. Both
+	// are reset by waitPump on process exit, so a turn after a process death is
+	// cold until the new process either resumes from disk or sends its own init
+	// prompt. A turn is warm (no init prompt) when either is true.
 	resumedFromDisk bool
 	primed          atomic.Bool
 
@@ -265,12 +267,20 @@ func (s *Session) waitPump() {
 	}
 	s.respMu.Unlock()
 	// Reset start state so the next Start can re-spawn. resumedFromDisk is
-	// re-derived by resumeOrCapture on the new process; primed is irrelevant
-	// once the process is gone (a restart resumes from disk, which is warm).
+	// re-derived by resumeOrCapture on the new process. primed is per-process:
+	// reset on exit (under the same lock as started) so a restarted process is
+	// cold until its OWN init prompt is sent again. Without this, a
+	// switch_session failure that falls back to a cold start (resumedFromDisk
+	// =false) would still see primed=true from the dead process → IsWarm()=true
+	// → the turn sends only the batch, the fresh session never sees the init
+	// prompt, and the agent loses its persona. Resetting under startMu makes
+	// the reset atomic with started=false, so once Alive() is false IsWarm() is
+	// false too.
 	s.startMu.Lock()
 	s.started = false
 	s.startedAt = time.Time{}
 	s.resumedFromDisk = false
+	s.primed.Store(false)
 	s.startMu.Unlock()
 	// Signal Stop (and any future restart) that the subprocess is reaped and
 	// started is reset, so they can block until it is safe to spawn again.
