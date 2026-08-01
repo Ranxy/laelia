@@ -24,6 +24,16 @@ const (
 	// per-agent via PiConfig.StartupTimeout.
 	defaultStartupTimeout = 30 * time.Second
 
+	// defaultIdleTimeout is how long a pi session stays resident after its last
+	// turn ends before idle eviction tears down the subprocess to free memory.
+	// The conversation is preserved (pi-session.json), so the next turn resumes
+	// it via switch_session (warm, no init prompt) — the only cost is the 1-3s
+	// cold-start respawn. A chat agent with a ~2s median cold start tolerates
+	// 5min well; batch-heavy agents can lower it per-agent. Zero or negative
+	// disables eviction (process stays resident). Overridable via
+	// PiConfig.IdleTimeout.
+	defaultIdleTimeout = 5 * time.Minute
+
 	// APIProviderDeepseek and APIProviderOpenRouter are the LLM API providers
 	// supported in phase 1. Each maps to a pi provider id + the env var pi reads
 	// the API key from.
@@ -107,6 +117,14 @@ type PiConfig struct {
 	// killed and failed at ~StartupTimeout rather than hanging to
 	// MaxTimeoutSeconds. Defaults to defaultStartupTimeout when zero.
 	StartupTimeout time.Duration
+
+	// IdleTimeout is how long the subprocess stays resident after a turn ends
+	// before idle eviction tears it down to free memory. The conversation is
+	// preserved (pi-session.json), so the next turn resumes it warm via
+	// switch_session; the only cost is the cold-start respawn. Zero or negative
+	// disables eviction (the process stays resident, useful for debug or
+	// batch-dense agents). Defaults to defaultIdleTimeout.
+	IdleTimeout time.Duration
 }
 
 // BuildPiConfig resolves the user-configurable AgentACPConfig into a PiConfig
@@ -145,6 +163,7 @@ func BuildPiConfig(
 		MaxOutputBytes:    defaultMaxOutputBytes,
 		OutputFlushBytes:  defaultOutputFlushBytes,
 		StartupTimeout:    defaultStartupTimeout,
+		IdleTimeout:       defaultIdleTimeout,
 	}
 }
 

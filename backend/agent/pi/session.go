@@ -32,6 +32,11 @@ import (
 // dropped — a dropped settled would hang the turn to its timeout.
 const turnEventBuffer = 256
 
+// idleEvictGrace is how long evict waits after SIGTERM for pi to exit on its own
+// (and flush its session file) before escalating to SIGKILL. Bounded so an
+// unresponsive pi does not stall eviction.
+const idleEvictGrace = 3 * time.Second
+
 // defaultStartupTimeout (declared in config.go) bounds the single
 // get_state/switch_session round trip at session start; it is the fallback when
 // PiConfig.StartupTimeout is unset. See Session.Start for the wedged-startup
@@ -85,6 +90,14 @@ type Session struct {
 	primed          atomic.Bool
 
 	startedAt time.Time
+
+	// idleTimer, when non-nil, is armed by endTurn to fire evict after idleTimeout
+	// of turn inactivity, freeing the subprocess while the session stays
+	// resumable (pi-session.json is preserved). beginTurn stops it. Protected by
+	// startMu so evict's go/no-go decision serializes with Start/Stop. idleTimeout
+	// <= 0 disables eviction (idleTimer is never armed).
+	idleTimer   *time.Timer
+	idleTimeout time.Duration
 }
 
 // NewSession constructs a (not-yet-started) Session bound to a runner-level
@@ -96,7 +109,11 @@ type Session struct {
 // runner starts the session lazily on the first turn so the opening turn's
 // command id can seed LAELIA_COMMAND.
 func NewSession(ctx context.Context, cancel context.CancelFunc, cfg *PiConfig) *Session {
-	return &Session{cfg: cfg, ctx: ctx, cancel: cancel, resp: map[string]chan response{}}
+	s := &Session{cfg: cfg, ctx: ctx, cancel: cancel, resp: map[string]chan response{}}
+	if cfg != nil {
+		s.idleTimeout = cfg.IdleTimeout
+	}
+	return s
 }
 
 // Start spawns the pi subprocess and primes session resume. commandID seeds
@@ -428,21 +445,100 @@ func (s *Session) send(ctx context.Context, cmd any) (response, error) {
 }
 
 // beginTurn opens a fresh event channel for this turn and registers it as the
-// active destination. The caller drains it until agent_settled, then endTurn.
+// active destination. The caller drains it until agent_settled, then endTurn. It
+// also stops any armed idle-eviction timer: a turn starting means the session is
+// active again, so a pending eviction must be cancelled (and evict itself
+// double-checks under startMu in case the timer already fired).
 func (s *Session) beginTurn() chan *event {
 	ch := make(chan *event, turnEventBuffer)
 	s.turnMu.Lock()
 	s.active = ch
 	s.turnMu.Unlock()
+	s.stopIdleTimer()
 	return ch
 }
 
 // endTurn clears the active channel. Any events still buffered are discarded by
-// the caller dropping the reference; the next beginTurn starts clean.
+// the caller dropping the reference; the next beginTurn starts clean. It also
+// (re)arms the idle-eviction timer: once the turn is over and the process is
+// still alive, the subprocess is eligible for eviction after idleTimeout of
+// further inactivity.
 func (s *Session) endTurn() {
 	s.turnMu.Lock()
 	s.active = nil
 	s.turnMu.Unlock()
+	s.armIdleTimer()
+}
+
+// stopIdleTimer cancels any armed idle eviction. Called by beginTurn (a turn is
+// starting, keep the process resident) and by Stop (teardown). Idempotent.
+func (s *Session) stopIdleTimer() {
+	s.startMu.Lock()
+	if s.idleTimer != nil {
+		s.idleTimer.Stop()
+		s.idleTimer = nil
+	}
+	s.startMu.Unlock()
+}
+
+// armIdleTimer (re)arms the idle-eviction timer when eviction is enabled and the
+// process is alive. Called by endTurn. A consecutive turn's beginTurn stops it
+// first, so rapid turns never evict (no thrash).
+func (s *Session) armIdleTimer() {
+	if s.idleTimeout <= 0 {
+		return
+	}
+	s.startMu.Lock()
+	defer s.startMu.Unlock()
+	if !s.started {
+		return
+	}
+	if s.idleTimer != nil {
+		s.idleTimer.Stop()
+	}
+	s.idleTimer = time.AfterFunc(s.idleTimeout, s.evict)
+}
+
+// evict is the idle-eviction callback armed by endTurn. After idleTimeout of
+// turn inactivity it tears down the subprocess to free resources while keeping
+// the session resumable: pi-session.json is preserved, so the next turn's Start
+// resumes the conversation via switch_session (warm, no init prompt). Unlike
+// Stop it does NOT cancel s.ctx, so the session re-spawns on the next turn over
+// the same ctx.
+//
+// beginTurn stops the timer (nils s.idleTimer) before a turn uses the process,
+// so if a turn arrived after the timer fired but before evict ran, s.idleTimer
+// is nil and evict aborts — the turn proceeds on the live process. The go/no-go
+// decision is under startMu (serialized with Start/Stop); the reap waits outside
+// the lock because waitPump needs startMu to reset started (holding it across the
+// wait would deadlock). evict SIGTERMs the process group so pi can flush its
+// session file, then SIGKILLs after idleEvictGrace if it lingers.
+func (s *Session) evict() {
+	s.startMu.Lock()
+	if !s.started || s.idleTimer == nil {
+		// Process already gone, or beginTurn already stopped the timer (a turn is
+		// in flight) — abort the eviction.
+		s.startMu.Unlock()
+		return
+	}
+	s.idleTimer = nil
+	cmd := s.cmd
+	waitDone := s.waitDone
+	s.startMu.Unlock()
+	if cmd == nil || cmd.Process == nil {
+		return
+	}
+	slog.Info("pi: idle-evicting subprocess", "agent", s.cfg.AgentID, "idle_timeout", s.idleTimeout)
+	// Graceful: SIGTERM the process group so pi can flush, then SIGKILL after a
+	// short grace if it lingers. Both paths wait on waitDone for the reap so
+	// started is reset before evict returns.
+	_ = executor.KillGroup(cmd, syscall.SIGTERM)
+	select {
+	case <-waitDone:
+	case <-time.After(idleEvictGrace):
+		_ = executor.KillGroup(cmd, syscall.SIGKILL)
+		<-waitDone
+	}
 }
 
 // prompt sends a prompt and waits for its acceptance response. Events stream to
@@ -561,6 +657,10 @@ func (s *Session) Stop() {
 	s.startMu.Lock()
 	started := s.started
 	waitDone := s.waitDone
+	if s.idleTimer != nil {
+		s.idleTimer.Stop()
+		s.idleTimer = nil
+	}
 	s.startMu.Unlock()
 	if s.cancel != nil {
 		s.cancel()

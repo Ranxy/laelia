@@ -270,6 +270,118 @@ func TestPiSession_PrimedResetOnExit_ColdRestartSendsInitPrompt(t *testing.T) {
 		"turn 2 must also carry the batch alongside the init prompt")
 }
 
+// waitForEviction polls until the session's subprocess is no longer alive (idle
+// eviction reaped it), failing the test on timeout. The idle timer is armed by
+// endTurn when the turn exits, so this is called after a turn completes.
+func waitForEviction(t *testing.T, sess *Session, timeout time.Duration) {
+	t.Helper()
+	deadline := time.After(timeout)
+	for {
+		if !sess.Alive() {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("subprocess was not idle-evicted within %s", timeout)
+		default:
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// TestPiSession_IdleEvictionPreservesConversation (T10 / Phase 7): after a turn
+// ends and IdleTimeout elapses with no further turn, the subprocess is evicted
+// (memory freed) but pi-session.json is preserved; the next turn re-spawns a new
+// process, resumes via switch_session (warm — no init prompt), and the
+// conversation continues. Before Phase 7 the process stayed resident forever.
+func TestPiSession_IdleEvictionPreservesConversation(t *testing.T) {
+	sess, cfg := newFakePiSession(t, "settle")
+	// Short idle timeout so the test is fast; the turn timeout stays generous so
+	// a regression (no eviction) is caught by the wait deadline, not masked.
+	sess.idleTimeout = 100 * time.Millisecond
+
+	// Turn 1: cold start, sends the init prompt + batch, settles, succeeds.
+	res1 := runTurn(t, sess, cfg, "cmd-1")
+	require.Equal(t, int32(0), res1.ExitCode, "turn 1 must succeed")
+	pid1 := sessPID(t, sess)
+	require.True(t, sess.Alive(), "process must be alive after turn 1")
+
+	// endTurn (run on turn exit) armed the idle timer; wait for eviction.
+	waitForEviction(t, sess, 3*time.Second)
+	require.False(t, sess.Alive(), "subprocess must be evicted after the idle timeout")
+
+	// The resume state file is preserved (NOT deleted) so the next turn resumes.
+	_, err := os.Stat(piSessionPath(cfg.MachineID, cfg.AgentID))
+	require.NoError(t, err, "pi-session.json must survive eviction so the conversation resumes")
+
+	// Turn 2: re-spawns a NEW process, resumes via switch_session (warm), and
+	// succeeds. The conversation is continuous: no init prompt, only the batch.
+	res2 := runTurn(t, sess, cfg, "cmd-2")
+	require.Equal(t, int32(0), res2.ExitCode, "turn 2 must respawn and succeed after eviction")
+	require.True(t, sess.Alive(), "respawned process must be alive")
+	require.NotEqual(t, pid1, sessPID(t, sess), "turn 2 must spawn a new process after eviction")
+
+	prompts := readFakePiPrompts(t, cfg.WorkingDir)
+	require.Len(t, prompts, 2, "both turns must have sent a prompt")
+	require.Contains(t, prompts[0], "autonomous AI agent in Laelia",
+		"turn 1 was cold and must carry the init prompt")
+	require.NotContains(t, prompts[1], "autonomous AI agent in Laelia",
+		"turn 2 must resume warm (no init prompt) — conversation continuous")
+	require.Contains(t, prompts[1], "do the thing", "turn 2 must carry the batch")
+}
+
+// TestPiSession_IdleEvictionNoDoubleSpawn (T11 / Phase 7): after eviction reaps
+// the subprocess, a follow-up turn re-spawns exactly once, and the next turn
+// reuses that live process — no double-spawn / thrash. Start's started-guard
+// (under startMu) is the single source of truth, and a consecutive turn's
+// beginTurn stops the idle timer so rapid turns never evict.
+func TestPiSession_IdleEvictionNoDoubleSpawn(t *testing.T) {
+	sess, cfg := newFakePiSession(t, "settle")
+	sess.idleTimeout = 100 * time.Millisecond
+
+	require.Equal(t, int32(0), runTurn(t, sess, cfg, "cmd-1").ExitCode)
+	waitForEviction(t, sess, 3*time.Second)
+
+	// Turn 2 respawns once after the eviction.
+	require.Equal(t, int32(0), runTurn(t, sess, cfg, "cmd-2").ExitCode)
+	require.True(t, sess.Alive(), "turn 2 must respawn the subprocess")
+	pid2 := sessPID(t, sess)
+
+	// Turn 3 reuses turn 2's live process (no idle elapsed between them).
+	require.Equal(t, int32(0), runTurn(t, sess, cfg, "cmd-3").ExitCode)
+	require.True(t, sess.Alive(), "turn 3 must keep the subprocess alive")
+	require.Equal(t, pid2, sessPID(t, sess), "turn 3 must reuse turn 2's process — no double-spawn")
+}
+
+// TestPiSession_IdleEvictionThenColdRestartSendsInitPrompt (T12 / Phase 6+7):
+// eviction restarts the process frequently; when a post-eviction turn cannot
+// resume (no resumable session → cold-start branch), Phase 6's primed reset
+// ensures the turn re-sends the init prompt — no amnesia. This is the Phase 7
+// hot-restart path exercising the Phase 6 invariant.
+func TestPiSession_IdleEvictionThenColdRestartSendsInitPrompt(t *testing.T) {
+	sess, cfg := newFakePiSession(t, "settle")
+	sess.idleTimeout = 100 * time.Millisecond
+
+	require.Equal(t, int32(0), runTurn(t, sess, cfg, "cmd-1").ExitCode)
+	waitForEviction(t, sess, 3*time.Second)
+	require.False(t, sess.Alive(), "subprocess must be evicted")
+
+	// Simulate an unresumable session (the plan's cold-start branch): drop
+	// pi-session.json so resumeOrCapture skips switch_session and the next turn
+	// is cold.
+	require.NoError(t, os.Remove(piSessionPath(cfg.MachineID, cfg.AgentID)))
+
+	// Turn 2 re-spawns cold and MUST re-send the init prompt (primed was reset on
+	// the eviction-driven exit), not just the batch.
+	require.Equal(t, int32(0), runTurn(t, sess, cfg, "cmd-2").ExitCode)
+
+	prompts := readFakePiPrompts(t, cfg.WorkingDir)
+	require.Len(t, prompts, 2)
+	require.Contains(t, prompts[1], "autonomous AI agent in Laelia",
+		"post-eviction cold turn must re-send the init prompt (no amnesia)")
+	require.Contains(t, prompts[1], "do the thing", "turn 2 must also carry the batch")
+}
+
 // TestPiSession_WedgedStartupFailsFast (T2): when the pi subprocess spawns but
 // never answers the startup RPC (get_state) within StartupTimeout, the turn must
 // fail at ~StartupTimeout — not hang to the turn timeout (MaxTimeoutSeconds).
