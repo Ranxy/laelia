@@ -2034,6 +2034,27 @@ export declare type DeleteChannelRequest = Message<"laelia.v1.DeleteChannelReque
 export declare const DeleteChannelRequestSchema: GenMessage<DeleteChannelRequest>;
 
 /**
+ * @generated from message laelia.v1.AddChannelMemberInput
+ */
+export declare type AddChannelMemberInput = Message<"laelia.v1.AddChannelMemberInput"> & {
+  /**
+   * @generated from field: int32 member_type = 1;
+   */
+  memberType: number;
+
+  /**
+   * @generated from field: string member_id = 2;
+   */
+  memberId: string;
+};
+
+/**
+ * Describes the message laelia.v1.AddChannelMemberInput.
+ * Use `create(AddChannelMemberInputSchema)` to create a new message.
+ */
+export declare const AddChannelMemberInputSchema: GenMessage<AddChannelMemberInput>;
+
+/**
  * @generated from message laelia.v1.AddChannelMemberRequest
  */
 export declare type AddChannelMemberRequest = Message<"laelia.v1.AddChannelMemberRequest"> & {
@@ -2043,14 +2064,9 @@ export declare type AddChannelMemberRequest = Message<"laelia.v1.AddChannelMembe
   conversation: string;
 
   /**
-   * @generated from field: int32 member_type = 2;
+   * @generated from field: repeated laelia.v1.AddChannelMemberInput members = 2;
    */
-  memberType: number;
-
-  /**
-   * @generated from field: string member_id = 3;
-   */
-  memberId: string;
+  members: AddChannelMemberInput[];
 };
 
 /**
@@ -2058,6 +2074,22 @@ export declare type AddChannelMemberRequest = Message<"laelia.v1.AddChannelMembe
  * Use `create(AddChannelMemberRequestSchema)` to create a new message.
  */
 export declare const AddChannelMemberRequestSchema: GenMessage<AddChannelMemberRequest>;
+
+/**
+ * @generated from message laelia.v1.AddChannelMemberResponse
+ */
+export declare type AddChannelMemberResponse = Message<"laelia.v1.AddChannelMemberResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.ChannelMember members = 1;
+   */
+  members: ChannelMember[];
+};
+
+/**
+ * Describes the message laelia.v1.AddChannelMemberResponse.
+ * Use `create(AddChannelMemberResponseSchema)` to create a new message.
+ */
+export declare const AddChannelMemberResponseSchema: GenMessage<AddChannelMemberResponse>;
 
 /**
  * @generated from message laelia.v1.RemoveChannelMemberRequest
@@ -4952,7 +4984,7 @@ export declare const CommandService: GenService<{
   addChannelMember: {
     methodKind: "unary";
     input: typeof AddChannelMemberRequestSchema;
-    output: typeof ChannelMemberSchema;
+    output: typeof AddChannelMemberResponseSchema;
   },
   /**
    * @generated from rpc laelia.v1.CommandService.RemoveChannelMember

@@ -44,16 +44,28 @@ type ConversationMemberFilter struct {
 	MemberID   string
 }
 
-func (s *Store) AddConversationMember(ctx context.Context, convID uuid.UUID, memberType int32, memberID string, role int32) error {
-	_, err := s.GetDB().ExecContext(ctx, `
-		INSERT INTO conversation_member (conversation_id, member_type, member_id, member_role)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (conversation_id, member_type, member_id) DO UPDATE SET member_role = $4
-	`, convID, memberType, memberID, role)
+// ConversationMemberInput identifies a member to add to a conversation.
+type ConversationMemberInput struct {
+	MemberType int32
+	MemberID   string
+}
+
+// AddConversationMembers inserts several members into a conversation in one
+// transaction, so a batch add is all-or-nothing: a failure mid-list rolls back
+// every insertion. The caller is responsible for validating each member
+// (ownership/existence/already-a-member) beforehand; this only persists.
+func (s *Store) AddConversationMembers(ctx context.Context, convID uuid.UUID, members []ConversationMemberInput) error {
+	tx, err := s.GetDB().BeginTx(ctx, nil)
 	if err != nil {
-		return errors.Wrapf(err, "failed to add conversation member")
+		return errors.Wrap(err, "failed to begin add members transaction")
 	}
-	return nil
+	defer tx.Rollback()
+	for _, m := range members {
+		if err := addConversationMemberTx(ctx, tx, convID, m.MemberType, m.MemberID, MemberRoleMember); err != nil {
+			return err
+		}
+	}
+	return errors.Wrap(tx.Commit(), "failed to commit add members transaction")
 }
 
 func addConversationMemberTx(ctx context.Context, tx *sql.Tx, convID uuid.UUID, memberType int32, memberID string, role int32) error {

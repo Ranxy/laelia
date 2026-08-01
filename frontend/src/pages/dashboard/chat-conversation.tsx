@@ -194,7 +194,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const [membersOpen, setMembersOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [addMemberType, setAddMemberType] = useState<MemberPickerType>(2); // default AGENT
-  const [addMemberId, setAddMemberId] = useState("");
+  const [addMemberIds, setAddMemberIds] = useState<string[]>([]);
   const [addingMember, setAddingMember] = useState(false);
 
   const [mentionState, setMentionState] = useState<{
@@ -629,22 +629,32 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     [input, cursorPos, mentionState]
   );
 
+  // toggleAddMemberId adds/removes a memberId from the pending batch selection.
+  // The picker stays open between toggles so several members can be chosen
+  // before the single batch add is submitted.
+  const toggleAddMemberId = useCallback((memberId: string) => {
+    setAddMemberIds((prev) =>
+      prev.includes(memberId)
+        ? prev.filter((id) => id !== memberId)
+        : [...prev, memberId]
+    );
+  }, []);
+
   const handleAddMember = useCallback(async () => {
-    const memberId = addMemberId.trim();
-    if (!memberId || addingMember || !channelId) return;
+    if (addMemberIds.length === 0 || addingMember || !channelId) return;
     setAddingMember(true);
     try {
-      await addChannelMember(channelId, addMemberType, memberId);
-      setAddMemberId("");
+      await addChannelMember(channelId, addMemberType, addMemberIds);
+      setAddMemberIds([]);
       setAddMemberOpen(false);
       listChannelMembers(channelId);
     } catch {
-      // add failed
+      // add failed — keep the selection so the user can retry
     } finally {
       setAddingMember(false);
     }
   }, [
-    addMemberId,
+    addMemberIds,
     addMemberType,
     addingMember,
     channelId,
@@ -1233,7 +1243,10 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                         <Button
                           variant={addMemberType === 1 ? "default" : "outline"}
                           size="sm"
-                          onClick={() => setAddMemberType(1)}
+                          onClick={() => {
+                            setAddMemberType(1);
+                            setAddMemberIds([]);
+                          }}
                           className="flex-1"
                         >
                           {t("channel.member-type-user")}
@@ -1241,7 +1254,10 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                         <Button
                           variant={addMemberType === 2 ? "default" : "outline"}
                           size="sm"
-                          onClick={() => setAddMemberType(2)}
+                          onClick={() => {
+                            setAddMemberType(2);
+                            setAddMemberIds([]);
+                          }}
                           className="flex-1"
                         >
                           {t("channel.member-type-agent")}
@@ -1257,8 +1273,8 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                           key={addMemberType}
                           memberType={addMemberType}
                           existingMemberIds={existingMemberIds}
-                          value={addMemberId}
-                          onPick={setAddMemberId}
+                          value={addMemberIds}
+                          onToggle={toggleAddMemberId}
                           placeholder={t("channel.member-id-placeholder")}
                         />
                         <Button
@@ -1266,7 +1282,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                           size="sm"
                           onClick={() => {
                             setAddMemberOpen(false);
-                            setAddMemberId("");
+                            setAddMemberIds([]);
                           }}
                           className="size-7 p-0"
                         >
@@ -1276,12 +1292,16 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                     </div>
                     <Button
                       onClick={handleAddMember}
-                      disabled={!addMemberId.trim() || addingMember}
+                      disabled={addMemberIds.length === 0 || addingMember}
                       className="w-full"
                     >
                       {addingMember
                         ? t("common.creating")
-                        : t("channel.add-member")}
+                        : addMemberIds.length > 0
+                          ? t("channel.add-member-batch", {
+                              count: addMemberIds.length,
+                            })
+                          : t("channel.add-member")}
                     </Button>
                   </div>
                 ) : (

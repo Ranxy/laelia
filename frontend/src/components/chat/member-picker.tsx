@@ -1,7 +1,8 @@
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { ChevronsUpDown, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
   PopoverContent,
@@ -27,9 +28,11 @@ export interface MemberPickerProps {
   memberType: MemberPickerType;
   /** memberIds already in the channel for this memberType — disabled + badged. */
   existingMemberIds: Set<string>;
-  /** Currently selected memberId ("" = nothing selected). */
-  value: string;
-  onPick: (memberId: string) => void;
+  /** Currently selected memberIds ([] = nothing selected). */
+  value: string[];
+  /** Toggle a memberId in the parent's selection; the popover stays open so
+   *  several members can be picked before the add is submitted. */
+  onToggle: (memberId: string) => void;
   disabled?: boolean;
   placeholder: string;
 }
@@ -60,7 +63,7 @@ export function MemberPicker({
   memberType,
   existingMemberIds,
   value,
-  onPick,
+  onToggle,
   disabled,
   placeholder,
 }: MemberPickerProps) {
@@ -106,16 +109,9 @@ export function MemberPicker({
       );
   }, [isUser, users, agents, query]);
 
-  const selectedLabel = useMemo(() => {
-    if (!value) return "";
-    const found = options.find((o) => o.memberId === value);
-    return found?.label ?? value;
-  }, [options, value]);
-
-  function handlePick(o: Option) {
+  function handleToggle(o: Option) {
     if (existingMemberIds.has(o.memberId)) return;
-    onPick(o.memberId);
-    setOpen(false);
+    onToggle(o.memberId);
   }
 
   return (
@@ -129,9 +125,14 @@ export function MemberPicker({
             className="flex-1 h-auto justify-between rounded-md border border-control-border bg-background px-2.5 py-1.5 text-xs text-main font-normal"
           >
             <span
-              className={cn("truncate", !value && "text-control-placeholder")}
+              className={cn(
+                "truncate",
+                value.length === 0 && "text-control-placeholder"
+              )}
             >
-              {value ? selectedLabel : placeholder}
+              {value.length > 0
+                ? t("channel.selected-count", { count: value.length })
+                : placeholder}
             </span>
             <ChevronsUpDown className="size-3.5 shrink-0 text-control-placeholder" />
           </Button>
@@ -166,13 +167,13 @@ export function MemberPicker({
           {!(isUser ? usersLoading : false) &&
             options.map((o) => {
               const joined = existingMemberIds.has(o.memberId);
-              const selected = o.memberId === value;
+              const selected = value.includes(o.memberId);
               return (
                 <button
                   key={o.memberId}
                   type="button"
                   disabled={joined}
-                  onClick={() => handlePick(o)}
+                  onClick={() => handleToggle(o)}
                   className={cn(
                     "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
                     joined
@@ -180,6 +181,9 @@ export function MemberPicker({
                       : "hover:bg-accent/10 text-main"
                   )}
                 >
+                  <span className="pointer-events-none flex shrink-0 items-center">
+                    <Checkbox checked={selected} size="sm" tabIndex={-1} />
+                  </span>
                   <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-control-bg text-[10px] font-medium">
                     {o.label.charAt(0).toUpperCase()}
                   </div>
@@ -195,9 +199,6 @@ export function MemberPicker({
                     <span className="rounded bg-control-bg px-1.5 py-0 text-[10px] font-medium text-control">
                       {t("channel.member-joined")}
                     </span>
-                  )}
-                  {selected && !joined && (
-                    <Check className="size-3.5 shrink-0 text-accent" />
                   )}
                 </button>
               );

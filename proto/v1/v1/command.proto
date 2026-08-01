@@ -672,13 +672,21 @@ message DeleteChannelRequest {
   ];
 }
 
+message AddChannelMemberInput {
+  int32 member_type = 1;
+  string member_id = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
 message AddChannelMemberRequest {
   string conversation = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "laelia/Conversation"}
   ];
-  int32 member_type = 2;
-  string member_id = 3 [(google.api.field_behavior) = REQUIRED];
+  repeated AddChannelMemberInput members = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message AddChannelMemberResponse {
+  repeated ChannelMember members = 1;
 }
 
 message RemoveChannelMemberRequest {
@@ -1430,7 +1438,7 @@ service CommandService {
     option (laelia.v1.audit) = true;
   }
 
-  rpc AddChannelMember(AddChannelMemberRequest) returns (ChannelMember) {
+  rpc AddChannelMember(AddChannelMemberRequest) returns (AddChannelMemberResponse) {
     option (google.api.http) = {
       post: "/v1/{conversation=conversations/*}/members"
       body: "*"

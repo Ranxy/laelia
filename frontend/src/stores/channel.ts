@@ -2,6 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import { commandServiceClient } from "@/connect";
 import type { Conversation } from "@/types/proto-es/v1/command_pb";
 import {
+  AddChannelMemberInputSchema,
   AddChannelMemberRequestSchema,
   CreateChannelRequestSchema,
   FetchConversationActivityRequestSchema,
@@ -320,22 +321,24 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
     }
   },
 
-  async addChannelMember(conversationId, memberType, memberId) {
+  async addChannelMember(conversationId, memberType, memberIds) {
     const convName = `conversations/${conversationId}`;
-    const newMember = await commandServiceClient.addChannelMember(
+    const res = await commandServiceClient.addChannelMember(
       create(AddChannelMemberRequestSchema, {
         conversation: convName,
-        memberType,
-        memberId,
+        members: memberIds.map((memberId) =>
+          create(AddChannelMemberInputSchema, { memberType, memberId })
+        ),
       })
     );
+    const added = res.members ?? [];
     set((s) => ({
       channelMembersByConv: {
         ...s.channelMembersByConv,
-        [convName]: [...(s.channelMembersByConv[convName] ?? []), newMember],
+        [convName]: [...(s.channelMembersByConv[convName] ?? []), ...added],
       },
     }));
-    return newMember;
+    return added;
   },
 
   async removeChannelMember(conversationId, memberType, memberId) {

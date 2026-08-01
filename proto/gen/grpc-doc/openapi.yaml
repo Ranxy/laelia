@@ -1331,7 +1331,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/ChannelMember'
+                                $ref: '#/components/schemas/AddChannelMemberResponse'
                 default:
                     description: Default error response
                     content:
@@ -3593,19 +3593,35 @@ components:
                  that made it relevant. The message itself is the source of truth for
                  content/sender; this row carries the per-user read/done state and category
                  flags. The resource name is "users/{user}/activities/{message}".
-        AddChannelMemberRequest:
+        AddChannelMemberInput:
             required:
-                - conversation
                 - memberId
             type: object
             properties:
-                conversation:
-                    type: string
                 memberType:
                     type: integer
                     format: int32
                 memberId:
                     type: string
+        AddChannelMemberRequest:
+            required:
+                - conversation
+                - members
+            type: object
+            properties:
+                conversation:
+                    type: string
+                members:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AddChannelMemberInput'
+        AddChannelMemberResponse:
+            type: object
+            properties:
+                members:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ChannelMember'
         Agent:
             required:
                 - machine

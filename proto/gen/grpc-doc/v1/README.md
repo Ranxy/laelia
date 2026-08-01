@@ -106,7 +106,9 @@
     - [AckProcessedVersionRequest](#laelia-v1-AckProcessedVersionRequest)
     - [AckProcessedVersionResponse](#laelia-v1-AckProcessedVersionResponse)
     - [Activity](#laelia-v1-Activity)
+    - [AddChannelMemberInput](#laelia-v1-AddChannelMemberInput)
     - [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest)
+    - [AddChannelMemberResponse](#laelia-v1-AddChannelMemberResponse)
     - [AgentActivity](#laelia-v1-AgentActivity)
     - [AgentReady](#laelia-v1-AgentReady)
     - [AgentStreamMessage](#laelia-v1-AgentStreamMessage)
@@ -1864,6 +1866,22 @@ flags. The resource name is &#34;users/{user}/activities/{message}&#34;.
 
 
 
+<a name="laelia-v1-AddChannelMemberInput"></a>
+
+### AddChannelMemberInput
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| member_type | [int32](#int32) |  |  |
+| member_id | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-AddChannelMemberRequest"></a>
 
 ### AddChannelMemberRequest
@@ -1873,8 +1891,22 @@ flags. The resource name is &#34;users/{user}/activities/{message}&#34;.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | conversation | [string](#string) |  |  |
-| member_type | [int32](#int32) |  |  |
-| member_id | [string](#string) |  |  |
+| members | [AddChannelMemberInput](#laelia-v1-AddChannelMemberInput) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-AddChannelMemberResponse"></a>
+
+### AddChannelMemberResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| members | [ChannelMember](#laelia-v1-ChannelMember) | repeated |  |
 
 
 
@@ -4620,7 +4652,7 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | GetChannel | [GetChannelRequest](#laelia-v1-GetChannelRequest) | [Conversation](#laelia-v1-Conversation) |  |
 | UpdateChannel | [UpdateChannelRequest](#laelia-v1-UpdateChannelRequest) | [Conversation](#laelia-v1-Conversation) |  |
 | DeleteChannel | [DeleteChannelRequest](#laelia-v1-DeleteChannelRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
-| AddChannelMember | [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest) | [ChannelMember](#laelia-v1-ChannelMember) |  |
+| AddChannelMember | [AddChannelMemberRequest](#laelia-v1-AddChannelMemberRequest) | [AddChannelMemberResponse](#laelia-v1-AddChannelMemberResponse) |  |
 | RemoveChannelMember | [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 | TransferChannelOwnership | [TransferChannelOwnershipRequest](#laelia-v1-TransferChannelOwnershipRequest) | [TransferChannelOwnershipResponse](#laelia-v1-TransferChannelOwnershipResponse) | TransferChannelOwnership hands channel ownership from the calling owner to another member: the target is promoted to Owner and the caller demoted to Member, atomically. The interceptor gates the call with conversations.manage (Admin&#43;Owner); the handler additionally enforces that the caller is the current Owner. Only channels (type 2) support ownership transfer. |
 | UpdateChannelMemberRole | [UpdateChannelMemberRoleRequest](#laelia-v1-UpdateChannelMemberRoleRequest) | [ChannelMember](#laelia-v1-ChannelMember) | UpdateChannelMemberRole grants or revokes channel admin: the target member&#39;s role is set to the requested role (Member or Admin). The interceptor gates with conversations.manage (Admin&#43;Owner); the handler enforces that the caller is the Owner and the target role is Member or Admin (never Owner — ownership only moves via TransferChannelOwnership). |

@@ -574,7 +574,15 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.AddChannelMemberInput"><span class="badge">M</span>AddChannelMemberInput</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.AddChannelMemberRequest"><span class="badge">M</span>AddChannelMemberRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.AddChannelMemberResponse"><span class="badge">M</span>AddChannelMemberResponse</a>
                 </li>
               
                 <li>
@@ -5398,6 +5406,37 @@ comparison). </p></td>
 
         
       
+        <h3 id="laelia.v1.AddChannelMemberInput">AddChannelMemberInput</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>member_type</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.AddChannelMemberRequest">AddChannelMemberRequest</h3>
         <p></p>
 
@@ -5416,16 +5455,33 @@ comparison). </p></td>
                 </tr>
               
                 <tr>
-                  <td>member_type</td>
-                  <td><a href="#int32">int32</a></td>
-                  <td></td>
+                  <td>members</td>
+                  <td><a href="#laelia.v1.AddChannelMemberInput">AddChannelMemberInput</a></td>
+                  <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
               
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.AddChannelMemberResponse">AddChannelMemberResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
                 <tr>
-                  <td>member_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
+                  <td>members</td>
+                  <td><a href="#laelia.v1.ChannelMember">ChannelMember</a></td>
+                  <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
               
@@ -11567,7 +11623,7 @@ detail page&#39;s &#34;Chat&#34; tab. Admin-scoped: gated by laelia.agents.get.<
               <tr>
                 <td>AddChannelMember</td>
                 <td><a href="#laelia.v1.AddChannelMemberRequest">AddChannelMemberRequest</a></td>
-                <td><a href="#laelia.v1.ChannelMember">ChannelMember</a></td>
+                <td><a href="#laelia.v1.AddChannelMemberResponse">AddChannelMemberResponse</a></td>
                 <td><p></p></td>
               </tr>
             

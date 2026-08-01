@@ -129,7 +129,7 @@ type CommandServiceClient interface {
 	GetChannel(ctx context.Context, in *GetChannelRequest, opts ...grpc.CallOption) (*Conversation, error)
 	UpdateChannel(ctx context.Context, in *UpdateChannelRequest, opts ...grpc.CallOption) (*Conversation, error)
 	DeleteChannel(ctx context.Context, in *DeleteChannelRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	AddChannelMember(ctx context.Context, in *AddChannelMemberRequest, opts ...grpc.CallOption) (*ChannelMember, error)
+	AddChannelMember(ctx context.Context, in *AddChannelMemberRequest, opts ...grpc.CallOption) (*AddChannelMemberResponse, error)
 	RemoveChannelMember(ctx context.Context, in *RemoveChannelMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// TransferChannelOwnership hands channel ownership from the calling owner to
 	// another member: the target is promoted to Owner and the caller demoted to
@@ -501,9 +501,9 @@ func (c *commandServiceClient) DeleteChannel(ctx context.Context, in *DeleteChan
 	return out, nil
 }
 
-func (c *commandServiceClient) AddChannelMember(ctx context.Context, in *AddChannelMemberRequest, opts ...grpc.CallOption) (*ChannelMember, error) {
+func (c *commandServiceClient) AddChannelMember(ctx context.Context, in *AddChannelMemberRequest, opts ...grpc.CallOption) (*AddChannelMemberResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ChannelMember)
+	out := new(AddChannelMemberResponse)
 	err := c.cc.Invoke(ctx, CommandService_AddChannelMember_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -900,7 +900,7 @@ type CommandServiceServer interface {
 	GetChannel(context.Context, *GetChannelRequest) (*Conversation, error)
 	UpdateChannel(context.Context, *UpdateChannelRequest) (*Conversation, error)
 	DeleteChannel(context.Context, *DeleteChannelRequest) (*emptypb.Empty, error)
-	AddChannelMember(context.Context, *AddChannelMemberRequest) (*ChannelMember, error)
+	AddChannelMember(context.Context, *AddChannelMemberRequest) (*AddChannelMemberResponse, error)
 	RemoveChannelMember(context.Context, *RemoveChannelMemberRequest) (*emptypb.Empty, error)
 	// TransferChannelOwnership hands channel ownership from the calling owner to
 	// another member: the target is promoted to Owner and the caller demoted to
@@ -1093,7 +1093,7 @@ func (UnimplementedCommandServiceServer) UpdateChannel(context.Context, *UpdateC
 func (UnimplementedCommandServiceServer) DeleteChannel(context.Context, *DeleteChannelRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteChannel not implemented")
 }
-func (UnimplementedCommandServiceServer) AddChannelMember(context.Context, *AddChannelMemberRequest) (*ChannelMember, error) {
+func (UnimplementedCommandServiceServer) AddChannelMember(context.Context, *AddChannelMemberRequest) (*AddChannelMemberResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AddChannelMember not implemented")
 }
 func (UnimplementedCommandServiceServer) RemoveChannelMember(context.Context, *RemoveChannelMemberRequest) (*emptypb.Empty, error) {

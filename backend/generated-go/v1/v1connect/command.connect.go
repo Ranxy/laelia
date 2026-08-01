@@ -262,7 +262,7 @@ type CommandServiceClient interface {
 	GetChannel(context.Context, *connect.Request[v1.GetChannelRequest]) (*connect.Response[v1.Conversation], error)
 	UpdateChannel(context.Context, *connect.Request[v1.UpdateChannelRequest]) (*connect.Response[v1.Conversation], error)
 	DeleteChannel(context.Context, *connect.Request[v1.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error)
-	AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.ChannelMember], error)
+	AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.AddChannelMemberResponse], error)
 	RemoveChannelMember(context.Context, *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error)
 	// TransferChannelOwnership hands channel ownership from the calling owner to
 	// another member: the target is promoted to Owner and the caller demoted to
@@ -527,7 +527,7 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("DeleteChannel")),
 			connect.WithClientOptions(opts...),
 		),
-		addChannelMember: connect.NewClient[v1.AddChannelMemberRequest, v1.ChannelMember](
+		addChannelMember: connect.NewClient[v1.AddChannelMemberRequest, v1.AddChannelMemberResponse](
 			httpClient,
 			baseURL+CommandServiceAddChannelMemberProcedure,
 			connect.WithSchema(commandServiceMethods.ByName("AddChannelMember")),
@@ -765,7 +765,7 @@ type commandServiceClient struct {
 	getChannel                *connect.Client[v1.GetChannelRequest, v1.Conversation]
 	updateChannel             *connect.Client[v1.UpdateChannelRequest, v1.Conversation]
 	deleteChannel             *connect.Client[v1.DeleteChannelRequest, emptypb.Empty]
-	addChannelMember          *connect.Client[v1.AddChannelMemberRequest, v1.ChannelMember]
+	addChannelMember          *connect.Client[v1.AddChannelMemberRequest, v1.AddChannelMemberResponse]
 	removeChannelMember       *connect.Client[v1.RemoveChannelMemberRequest, emptypb.Empty]
 	transferChannelOwnership  *connect.Client[v1.TransferChannelOwnershipRequest, v1.TransferChannelOwnershipResponse]
 	updateChannelMemberRole   *connect.Client[v1.UpdateChannelMemberRoleRequest, v1.ChannelMember]
@@ -918,7 +918,7 @@ func (c *commandServiceClient) DeleteChannel(ctx context.Context, req *connect.R
 }
 
 // AddChannelMember calls laelia.v1.CommandService.AddChannelMember.
-func (c *commandServiceClient) AddChannelMember(ctx context.Context, req *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.ChannelMember], error) {
+func (c *commandServiceClient) AddChannelMember(ctx context.Context, req *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.AddChannelMemberResponse], error) {
 	return c.addChannelMember.CallUnary(ctx, req)
 }
 
@@ -1139,7 +1139,7 @@ type CommandServiceHandler interface {
 	GetChannel(context.Context, *connect.Request[v1.GetChannelRequest]) (*connect.Response[v1.Conversation], error)
 	UpdateChannel(context.Context, *connect.Request[v1.UpdateChannelRequest]) (*connect.Response[v1.Conversation], error)
 	DeleteChannel(context.Context, *connect.Request[v1.DeleteChannelRequest]) (*connect.Response[emptypb.Empty], error)
-	AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.ChannelMember], error)
+	AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.AddChannelMemberResponse], error)
 	RemoveChannelMember(context.Context, *connect.Request[v1.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error)
 	// TransferChannelOwnership hands channel ownership from the calling owner to
 	// another member: the target is promoted to Owner and the caller demoted to
@@ -1829,7 +1829,7 @@ func (UnimplementedCommandServiceHandler) DeleteChannel(context.Context, *connec
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.DeleteChannel is not implemented"))
 }
 
-func (UnimplementedCommandServiceHandler) AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.ChannelMember], error) {
+func (UnimplementedCommandServiceHandler) AddChannelMember(context.Context, *connect.Request[v1.AddChannelMemberRequest]) (*connect.Response[v1.AddChannelMemberResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.AddChannelMember is not implemented"))
 }
 

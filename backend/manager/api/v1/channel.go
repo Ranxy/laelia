@@ -290,7 +290,7 @@ func (s *CommandService) DeleteChannel(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
-func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Request[v1pb.AddChannelMemberRequest]) (*connect.Response[v1pb.ChannelMember], error) {
+func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Request[v1pb.AddChannelMemberRequest]) (*connect.Response[v1pb.AddChannelMemberResponse], error) {
 	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
@@ -301,64 +301,76 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
 
-	memberType := req.Msg.MemberType
-	memberID := req.Msg.MemberId
-
-	// Refuse to re-add an existing member: AddConversationMember upserts
-	// member_role=Member, which would silently downgrade an Admin (or the Owner)
-	// to Member. The owner-of-record check below covers the Owner; the membership
-	// check covers Admins and plain members — re-inviting someone who is already
-	// in the channel is a no-op at best and a privilege strip at worst, so reject
-	// it and direct the caller to UpdateChannelMemberRole for a role change.
-	if memberType == store.MemberTypeUser && memberID == fmt.Sprintf("%d", conv.OwnerID) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("cannot add the channel owner as a member"))
-	}
-	existingRole, _, err := s.store.GetConversationMembership(ctx, convID, memberType, memberID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check existing membership"))
-	}
-	if existingRole != 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("user is already a member of this channel"))
+	if len(req.Msg.Members) == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("at least one member must be specified"))
 	}
 
-	var addedAgent *store.AgentMessage
-	if memberType == store.MemberTypeAgent {
-		agent, agentErr := s.store.GetAgentByResourceID(ctx, memberID)
-		if agentErr != nil || agent == nil {
-			return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", memberID))
+	// Reject duplicate (member_type, member_id) pairs in one request — adding
+	// the same member twice is a caller bug and would silently upsert twice.
+	seen := make(map[string]bool, len(req.Msg.Members))
+	inputs := make([]store.ConversationMemberInput, 0, len(req.Msg.Members))
+	for _, m := range req.Msg.Members {
+		memberType := m.MemberType
+		memberID := m.MemberId
+		key := fmt.Sprintf("%d:%s", memberType, memberID)
+		if seen[key] {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("duplicate member %d:%s in request", memberType, memberID))
 		}
-		addedAgent = agent
-	}
-	if memberType == store.MemberTypeUser {
-		if _, uidErr := strconv.Atoi(memberID); uidErr != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user member_id, must be principal id"))
+		seen[key] = true
+
+		// Refuse to re-add an existing member: the batch insert upserts
+		// member_role=Member, which would silently downgrade an Admin (or the
+		// Owner) to Member. The owner-of-record check below covers the Owner; the
+		// membership check covers Admins and plain members — re-inviting someone
+		// who is already in the channel is a no-op at best and a privilege strip
+		// at worst, so reject it and direct the caller to
+		// UpdateChannelMemberRole for a role change.
+		if memberType == store.MemberTypeUser && memberID == fmt.Sprintf("%d", conv.OwnerID) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("cannot add the channel owner as a member"))
 		}
-	}
-
-	if err := s.store.AddConversationMember(ctx, convID, memberType, memberID, store.MemberRoleMember); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to add member"))
-	}
-
-	// Seed the agent's per-channel cursor to the current room version so a
-	// newly joined agent starts "caught up" and only sees future messages.
-	// SeedCursorOnJoin is monotonic, so re-adding an agent never rewinds an
-	// existing cursor.
-	if addedAgent != nil {
-		if seedErr := s.store.SeedCursorOnJoin(ctx, addedAgent.ID, convID); seedErr != nil {
-			slog.Warn("failed to seed agent channel cursor on join", "agent", addedAgent.ResourceID, "conversationID", convID, "error", seedErr)
+		existingRole, _, err := s.store.GetConversationMembership(ctx, convID, memberType, memberID)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check existing membership"))
 		}
+		if existingRole != 0 {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("%s is already a member of this channel", memberID))
+		}
+
+		if memberType == store.MemberTypeAgent {
+			agent, agentErr := s.store.GetAgentByResourceID(ctx, memberID)
+			if agentErr != nil || agent == nil {
+				return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", memberID))
+			}
+		}
+		if memberType == store.MemberTypeUser {
+			if _, uidErr := strconv.Atoi(memberID); uidErr != nil {
+				return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user member_id, must be principal id"))
+			}
+		}
+		inputs = append(inputs, store.ConversationMemberInput{MemberType: memberType, MemberID: memberID})
 	}
 
-	displayName := resolveMemberDisplayName(ctx, s.store, memberType, memberID)
-	_, avatar := resolveMemberDescriptionAndAvatar(ctx, s.store, memberType, memberID)
-	return connect.NewResponse(&v1pb.ChannelMember{
-		MemberType:  memberType,
-		MemberId:    memberID,
-		DisplayName: displayName,
-		MemberRole:  store.MemberRoleMember,
-		Avatar:      avatar,
-		JoinedAt:    timestamppb.Now(),
-	}), nil
+	if err := s.store.AddConversationMembers(ctx, convID, inputs); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to add members"))
+	}
+
+	// Seed each newly added agent's per-channel cursor to the current room
+	// version so it starts "caught up" and only sees future messages.
+	// SeedCursorOnJoin is monotonic, so a re-added agent never rewinds an
+	// existing cursor. Best-effort: a seed failure does not fail the add.
+	members := make([]*v1pb.ChannelMember, 0, len(inputs))
+	for _, m := range inputs {
+		if m.MemberType == store.MemberTypeAgent {
+			if agent, agentErr := s.store.GetAgentByResourceID(ctx, m.MemberID); agentErr == nil && agent != nil {
+				if seedErr := s.store.SeedCursorOnJoin(ctx, agent.ID, convID); seedErr != nil {
+					slog.Warn("failed to seed agent channel cursor on join", "agent", agent.ResourceID, "conversationID", convID, "error", seedErr)
+				}
+			}
+		}
+		members = append(members, buildChannelMember(ctx, s.store, m.MemberType, m.MemberID, store.MemberRoleMember, time.Now()))
+	}
+
+	return connect.NewResponse(&v1pb.AddChannelMemberResponse{Members: members}), nil
 }
 
 func (s *CommandService) RemoveChannelMember(ctx context.Context, req *connect.Request[v1pb.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error) {
