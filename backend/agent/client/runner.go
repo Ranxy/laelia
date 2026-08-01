@@ -90,15 +90,18 @@ func (r *agentRunner) buildPiConfig(assignment *v1pb.AgentAssignment) *pi.PiConf
 // agent, an unchanged launch fingerprint keeps the warm session; a changed one
 // restarts the subprocess so the new launch shape (provider/model/key/binary)
 // takes effect. The non-active side is always torn down so the two runtimes
-// never coexist.
+// never coexist. Every teardown that SIGKILLs a pi process under a possibly
+// in-flight turn first coordinates that turn (cancel + wait) so the restart
+// never races the dying turn's session access and the turn reports an explicit
+// reload cause instead of a generic "session exited mid-turn".
 func (r *agentRunner) applyAssignment(a *v1pb.AgentAssignment) {
 	acp := a.GetAcpConfig()
 	if acp != nil && acp.GetProvider() == pi.BuiltinPiProvider {
 		r.setConfig(nil)
 		newPi := r.buildPiConfig(a)
 		if newPi == nil {
+			r.coordinateInFlightTurn()
 			r.stopPiSession()
-			r.setPiConfig(nil)
 			return
 		}
 		prev := r.currentPiConfig()
@@ -109,15 +112,20 @@ func (r *agentRunner) applyAssignment(a *v1pb.AgentAssignment) {
 			// the manager (not a mid-flight "session exited mid-turn") and the
 			// wait guarantees the restart never races the dying turn's session
 			// access. No-op when no turn is in flight (e.g. the first config).
-			r.coordinateInFlightTurn("config reloaded mid-turn")
+			r.coordinateInFlightTurn()
 			r.restartPiSession(newPi)
+			return
 		}
+		// Unchanged launch shape: keep the warm session, just refresh the config
+		// (e.g. a persona_prompt change). The session's launch shape still
+		// matches, so it stays valid for the new config.
 		r.setPiConfig(newPi)
 		return
 	}
-	// ACP (or unconfigured): tear down any pi session and load the ACP config.
+	// ACP (or unconfigured): coordinate any in-flight pi turn, then tear down
+	// the pi session and load the ACP config.
+	r.coordinateInFlightTurn()
 	r.stopPiSession()
-	r.setPiConfig(nil)
 	r.setConfig(r.buildAcpConfig(a))
 }
 
@@ -145,25 +153,39 @@ func (r *agentRunner) currentPiConfig() *pi.PiConfig {
 	return r.piConfig
 }
 
-// restartPiSession stops any existing pi session and starts a fresh one bound
-// to cfg. The session is started lazily on the first turn (so the opening
-// turn's command id seeds LAELIA_COMMAND), so this only constructs it. The
-// session ctx is derived from context.Background (NOT the runner's stream ctx)
-// so a turn-end cancel or a transient stream drop never SIGKILLs the persistent
-// subprocess; only an explicit stopPiSession/Stop cancels it.
+// restartPiSession swaps the pi session for a fresh one bound to cfg. The new
+// session object is built first (cheap — no process spawn; Start is lazy on the
+// first turn so the opening turn's command id seeds LAELIA_COMMAND), then piConfig
+// and piSession are swapped together under one r.mu critical section, and the
+// OLD session is stopped outside the lock. This leaves no window where a
+// concurrent drain turn could see piSession==nil with a stale piConfig and lazily
+// create a session bound to the OLD config that this swap would then orphan (its
+// Background-derived ctx never cancelled → a stale-shape subprocess runs
+// forever). The session ctx is derived from context.Background (NOT the runner's
+// stream ctx) so a turn-end cancel or a transient stream drop never SIGKILLs the
+// persistent subprocess; only an explicit stopPiSession/Stop cancels it.
 func (r *agentRunner) restartPiSession(cfg *pi.PiConfig) {
-	r.stopPiSession()
 	ctx, cancel := context.WithCancel(context.Background())
+	newSess := pi.NewSession(ctx, cancel, cfg)
 	r.mu.Lock()
-	r.piSession = pi.NewSession(ctx, cancel, cfg)
+	old := r.piSession
+	r.piSession = newSess
+	r.piConfig = cfg
 	r.mu.Unlock()
+	if old != nil {
+		old.Stop()
+	}
 }
 
-// stopPiSession tears down the pi subprocess if one is running.
+// stopPiSession tears down the pi subprocess and clears the pi config. The
+// config and session are cleared together under r.mu BEFORE the blocking Stop so
+// a concurrent drain turn cannot see piSession==nil with a stale piConfig and
+// lazily create a session that this teardown would orphan.
 func (r *agentRunner) stopPiSession() {
 	r.mu.Lock()
 	sess := r.piSession
 	r.piSession = nil
+	r.piConfig = nil
 	r.mu.Unlock()
 	if sess != nil {
 		sess.Stop()
@@ -227,16 +249,18 @@ func (r *agentRunner) currentCommandStream() *commandStream {
 const inFlightTurnTimeout = 5 * time.Second
 
 // coordinateInFlightTurn cancels any in-flight drain turn and waits (bounded)
-// for it to end. applyAssignment calls this before restarting the pi session on
-// a launch-fingerprint change so the restart never races a dying turn's session
-// access; the cancelled turn reports an explicit failure reason instead of a
-// mid-flight "session exited mid-turn". No-op when no turn is in flight.
-func (r *agentRunner) coordinateInFlightTurn(reason string) {
+// for it to end. applyAssignment calls this before every teardown that would
+// SIGKILL a pi process under a possibly in-flight turn (a launch-fingerprint
+// change, a pi agent becoming unconfigured, or a pi→ACP switch) so the restart
+// never races the dying turn's session access and the turn reports an explicit
+// "config reloaded mid-turn" failure instead of a mid-flight "session exited
+// mid-turn". No-op when no turn is in flight.
+func (r *agentRunner) coordinateInFlightTurn() {
 	cs := r.currentCommandStream()
 	if cs == nil {
 		return
 	}
-	done, cancelled := cs.CancelInFlight(reason)
+	done, cancelled := cs.CancelInFlight("config reloaded mid-turn")
 	if !cancelled {
 		return
 	}
@@ -261,17 +285,23 @@ func (r *agentRunner) buildRuntimeForAgent(req executor.Request) (executor.Runti
 	ereq.DaemonSocket = r.daemon.SocketPath()
 	ereq.SessionToken = r.daemon.SessionToken()
 	ereq.BinaryDir = r.machine.binaryDir
-	if piCfg := r.currentPiConfig(); piCfg != nil {
-		r.mu.Lock()
-		sess := r.piSession
-		r.mu.Unlock()
-		if sess == nil {
-			ctx, cancel := context.WithCancel(context.Background())
-			sess = pi.NewSession(ctx, cancel, piCfg)
-			r.mu.Lock()
-			r.piSession = sess
-			r.mu.Unlock()
-		}
+	// Snapshot piConfig and piSession together under one lock so a concurrent
+	// restart's atomic swap can't split them: the turn either sees the old pair
+	// or the new pair, never a stale config with the wrong session. The invariant
+	// (piConfig != nil ⟺ piSession != nil) is maintained by restartPiSession /
+	// stopPiSession, so the lazy-create branch is unreachable in normal flow;
+	// if it ever fires it binds a session to the CURRENT config and stores it
+	// under the same lock, so it can never be orphaned by an overwrite.
+	r.mu.Lock()
+	piCfg := r.piConfig
+	sess := r.piSession
+	if piCfg != nil && sess == nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		sess = pi.NewSession(ctx, cancel, piCfg)
+		r.piSession = sess
+	}
+	r.mu.Unlock()
+	if piCfg != nil {
 		return pi.NewPi(ereq, sess, piCfg)
 	}
 	return executor.NewACP(ereq, r.currentConfig())

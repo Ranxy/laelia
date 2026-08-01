@@ -469,7 +469,11 @@ func TestPiSession_WedgedStartupFailsFast(t *testing.T) {
 // sendEvent against a manually filled channel — no subprocess needed.
 func TestPiSession_TerminalDeliveredUnderBackpressure(t *testing.T) {
 	sess, _ := newFakePiSession(t, "settle")
-	events := sess.beginTurn()
+	// context.Background() has no Done channel, so the terminal send's
+	// turn-ctx bound (added so a cancelled turn unblocks it) does not fire
+	// here — the send blocks on the full buffer until drained, exactly the
+	// backpressure behavior this test asserts.
+	events := sess.beginTurn(context.Background())
 
 	// Fill the 256-buffer so the next send would drop under the pre-Phase-3 code.
 	filler := &event{Type: eventMessageUpdate, AssistantMessageEvent: &assistantMessageEvent{
@@ -525,4 +529,63 @@ func TestPiSession_TerminalDeliveredUnderBackpressure(t *testing.T) {
 	// turnMu held by the still-blocked sendEvent; sess.Stop in t.Cleanup cancels
 	// s.ctx and unblocks the goroutine on any failure path.
 	sess.endTurn()
+}
+
+// TestPiSession_TerminalUnblocksOnTurnCancel (F1 regression): a turn cancelled
+// while the per-turn event buffer is full must not leave the terminal
+// agent_settled send blocked on turnMu — that would wedge the turn's deferred
+// endTurn and every later turn's beginTurn until an explicit Stop (a silent wedge
+// no turn timeout escapes). The terminal send is bounded by the turn ctx (set in
+// beginTurn), so cancelling the turn unblocks it promptly WITHOUT draining the
+// buffer. Before the fix the send was bounded only by s.ctx (Stop), so a
+// cancelled-but-not-stopped session wedged indefinitely.
+func TestPiSession_TerminalUnblocksOnTurnCancel(t *testing.T) {
+	sess, _ := newFakePiSession(t, "settle")
+	ctx, cancel := context.WithCancel(context.Background())
+	events := sess.beginTurn(ctx)
+
+	// Fill the 256-buffer so the terminal send would block on a full channel.
+	filler := &event{Type: eventMessageUpdate, AssistantMessageEvent: &assistantMessageEvent{
+		Type:  assistantEventTextDelta,
+		Delta: "x",
+	}}
+	for range turnEventBuffer {
+		events <- filler
+	}
+
+	// The terminal send blocks (buffer full) holding turnMu.
+	delivered := make(chan struct{})
+	go func() {
+		sess.sendEvent(&event{Type: eventAgentSettled})
+		close(delivered)
+	}()
+
+	// Confirmed blocked while the turn is alive.
+	select {
+	case <-delivered:
+		t.Fatal("terminal send returned before cancel with a full buffer")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	// Cancel the TURN (not the session). The send must unblock via turnCtx.Done
+	// without the buffer being drained. Before the fix this hung until Stop.
+	cancel()
+	select {
+	case <-delivered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("terminal send did not unblock on turn cancel — turn-ctx bound missing (wedge)")
+	}
+
+	// turnMu must be free for endTurn now (the send released it); a regression
+	// that kept it held would deadlock this call until the test deadline.
+	done := make(chan struct{})
+	go func() {
+		sess.endTurn()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("endTurn blocked on turnMu — the terminal send never released it (wedge)")
+	}
 }

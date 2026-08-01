@@ -540,8 +540,11 @@ func (e *ACPExecutor) run() {
 	if promptText == "" {
 		// Defensive: a warm turn should always carry a batch. If it does not,
 		// do not send an empty Prompt — finish cleanly and let the drain loop
-		// re-gate. The session is already persisted for the next turn.
-		_ = e.cmd.Process.Kill()
+		// re-gate. The session is already persisted for the next turn. Kill the
+		// whole process group (not just the direct child) so MCP/node children
+		// the subprocess already launched do not outlive it orphaned to init —
+		// the same invariant the three sibling teardown sites uphold.
+		_ = KillGroup(e.cmd, syscall.SIGKILL)
 		_ = e.cmd.Wait()
 		e.buffer.flush(e)
 		e.rawEvents.flush(e)

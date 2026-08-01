@@ -163,15 +163,14 @@ func (e *PiExecutor) run() {
 	go e.startFlushTimer()
 
 	// Lazy-start: the first turn seeds LAELIA_COMMAND with its command id. A
-	// session that died between turns is restarted the same way. The session
-	// binds the subprocess to its own ctx (independent of this turn's ctx), so
-	// the deferred e.cancel() below tears down the turn but leaves the process
-	// alive for the next turn.
-	if !e.session.Alive() {
-		if err := e.session.Start(e.req.CommandID); err != nil {
-			e.finish(err, false)
-			return
-		}
+	// session that died between turns is restarted the same way. ensureStarted
+	// also waits out any in-progress idle eviction and claims the process so the
+	// turn runs on a live subprocess. The session binds the subprocess to its own
+	// ctx (independent of this turn's ctx), so the deferred e.cancel() below
+	// tears down the turn but leaves the process alive for the next turn.
+	if err := e.session.ensureStarted(e.req.CommandID); err != nil {
+		e.finish(err, false)
+		return
 	}
 
 	resumed := e.session.IsWarm()
@@ -182,7 +181,7 @@ func (e *PiExecutor) run() {
 	e.emitSessionUsage()
 	e.startUsagePoller()
 
-	events := e.session.beginTurn()
+	events := e.session.beginTurn(e.ctx)
 	defer e.session.endTurn()
 
 	promptText := e.turnPromptText(resumed)

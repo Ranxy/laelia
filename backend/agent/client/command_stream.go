@@ -738,6 +738,10 @@ func (c *commandStream) beginInFlight() {
 	c.inFlightDone = make(chan struct{})
 	c.inFlightMu.Unlock()
 	c.isExecuting.Store(true)
+	// Clear any cancel reason left over from a prior turn that ended via a path
+	// which never consumed takeCancelReason (ctx.Done / send-error early
+	// returns), so a stale reason cannot mislabel THIS turn's result.
+	c.setCancelReason("")
 }
 
 // endInFlight clears the in-flight mark and closes the inFlightDone channel so
@@ -876,8 +880,12 @@ func (c *commandStream) runCommand(
 			result.LastSeqNo = state.LastSeqSent
 			// A coordinated cancel (e.g. config hot-reload) overrides the
 			// runtime's generic cancellation error with an explicit cause so
-			// the manager reports the reload, not "context canceled".
-			if reason := c.takeCancelReason(); reason != "" {
+			// the manager reports the reload, not "context canceled". Only
+			// override a FAILED turn: a turn that finished successfully
+			// (ExitCode 0) before the cancel took effect must not be mislabeled
+			// as a reload failure (which could trigger a retry and duplicate
+			// side effects).
+			if reason := c.takeCancelReason(); reason != "" && result.ExitCode != 0 {
 				result.ErrorMessage = reason
 			}
 			resultSent = true

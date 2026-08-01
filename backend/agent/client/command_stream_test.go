@@ -463,7 +463,7 @@ func TestRunnerCoordinatesInFlightTurnOnReload(t *testing.T) {
 	// Hot-reload: cancel the in-flight turn and wait for it to end. This must
 	// return quickly (bounded by inFlightTurnTimeout, here near-instant once
 	// the runtime unblocks on cancel), not hang to the turn timeout.
-	r.coordinateInFlightTurn("config reloaded mid-turn")
+	r.coordinateInFlightTurn()
 	elapsed := time.Since(start)
 
 	assert.GreaterOrEqual(t, runtime.cancelCount.Load(), int32(1), "in-flight turn must be cancelled")
@@ -477,6 +477,56 @@ func TestRunnerCoordinatesInFlightTurnOnReload(t *testing.T) {
 	require.NotNil(t, result, "expected a CommandResult carrying the reload reason")
 	assert.Equal(t, "drain-reload", result.CommandId)
 	assert.Equal(t, "config reloaded mid-turn", result.ErrorMessage, "manager must see the explicit reload reason, not a generic cancel")
+}
+
+// TestRunCommand_DoesNotOverrideSuccessfulResultWithStaleCancelReason (F3
+// regression): a config hot-reload can set the cancel reason AFTER a turn already
+// finished successfully but BEFORE runCommand consumes takeCancelReason (the
+// window between runtime.Done and the result read is wide — drainOutput runs
+// first). The reason must NOT overwrite an ExitCode-0 result: mislabeling a
+// completed turn as "config reloaded mid-turn" could make the manager retry it
+// and duplicate side effects. The override is reserved for turns that actually
+// failed (ExitCode != 0), which TestRunnerCoordinatesInFlightTurnOnReload covers.
+func TestRunCommand_DoesNotOverrideSuccessfulResultWithStaleCancelReason(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	stream, recorder, cleanup := newTestCommandChannel(t)
+	defer cleanup()
+
+	// A turn that completes successfully.
+	runtime := newScriptedRuntime(func(r *scriptedRuntime) {
+		close(r.outputCh)
+		close(r.eventCh)
+		r.resultCh <- executor.Result{ExitCode: 0, FinalSummary: "done"}
+		close(r.resultCh)
+		close(r.doneCh)
+	})
+
+	cs := &commandStream{}
+	// Simulate the reload racing in after the turn already succeeded: the reason
+	// is set but the turn's own result is a success.
+	cs.setCancelReason("config reloaded mid-turn")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		cs.runCommand(ctx, runtime, stream, executor.Request{CommandID: "cmd-ok"}, nil)
+		close(done)
+	}()
+	require.Eventually(t, func() bool {
+		select {
+		case <-done:
+			return true
+		default:
+			return false
+		}
+	}, 5*time.Second, 10*time.Millisecond, "runCommand should finish")
+
+	require.NoError(t, stream.CloseRequest())
+	result := recorder.Messages()[len(recorder.Messages())-1].GetResult()
+	require.NotNil(t, result)
+	assert.Equal(t, int32(0), result.ExitCode, "turn succeeded")
+	assert.Empty(t, result.ErrorMessage, "a successful turn must not be mislabeled with the stale reload reason")
 }
 
 // TestDrainOutput_SequenceMonotonic guards the T15 drainOutput rewrite: with

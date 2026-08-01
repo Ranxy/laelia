@@ -75,6 +75,12 @@ type Session struct {
 
 	turnMu sync.Mutex
 	active chan *event // nil between turns; events dropped while nil
+	// turnCtx is the current turn's ctx, set by beginTurn and cleared by
+	// endTurn/waitPump. The terminal agent_settled send selects on it (see
+	// sendEvent) so a turn cancelled or timed out with a full event buffer
+	// unblocks the send WITHOUT waiting for Stop — otherwise the blocking
+	// terminal send would hold turnMu, wedging endTurn and every later turn.
+	turnCtx context.Context
 
 	// sessionFile is the pi session .jsonl path, captured from get_state and
 	// persisted for resume across machine restarts.
@@ -98,6 +104,11 @@ type Session struct {
 	// <= 0 disables eviction (idleTimer is never armed).
 	idleTimer   *time.Timer
 	idleTimeout time.Duration
+	// evicting is set by evict once it commits to tearing the subprocess down
+	// (under startMu) and cleared after the reap. ensureStarted waits on it so a
+	// turn arriving in the SIGTERM grace window does not see Alive()=true and
+	// prompt against a dying process. Protected by startMu.
+	evicting bool
 }
 
 // NewSession constructs a (not-yet-started) Session bound to a runner-level
@@ -272,6 +283,7 @@ func (s *Session) waitPump() {
 	s.turnMu.Lock()
 	ch := s.active
 	s.active = nil
+	s.turnCtx = nil
 	s.turnMu.Unlock()
 	if ch != nil {
 		close(ch)
@@ -298,10 +310,15 @@ func (s *Session) waitPump() {
 	s.startedAt = time.Time{}
 	s.resumedFromDisk = false
 	s.primed.Store(false)
+	// Capture this process's waitDone under the lock and close the captured
+	// channel after unlock. A concurrent next-turn Start (which only proceeds
+	// once started==false) could otherwise install a fresh s.waitDone in the
+	// unlock→close gap, and this stale waitPump would close the NEW process's
+	// channel — a later reap would double-close it (panic). Each waitPump closes
+	// its own process's channel.
+	waitDone := s.waitDone
 	s.startMu.Unlock()
-	// Signal Stop (and any future restart) that the subprocess is reaped and
-	// started is reset, so they can block until it is safe to spawn again.
-	close(s.waitDone)
+	close(waitDone)
 }
 
 // dispatch decodes one JSONL line and routes it.
@@ -353,17 +370,20 @@ func (s *Session) routeResponse(r response) {
 // The terminal event (agent_settled) is the one event the drain loop strictly
 // waits for: a dropped settled would leave the turn hung to its timeout. It is
 // therefore sent with a BLOCKING send — no default drop — so it is delivered once
-// the drain loop catches up, bounded by s.ctx.Done (the session torn down by
-// Stop, which also lets waitPump close the channel). The drain loop consumes the
-// channel without turnMu, so a blocked terminal send unblocks as soon as the
-// loop drains the buffer; s.ctx.Done bounds the block if the consumer is wedged.
+// the drain loop catches up. The block is bounded by BOTH s.ctx.Done (the session
+// torn down by Stop, which also lets waitPump close the channel) AND the current
+// turn's ctx: a turn cancelled or timed out while the 256-buffer is full has
+// already stopped draining, so the terminal send must give up when that turn ends
+// — otherwise it would block on the full buffer holding turnMu, and the turn's
+// deferred endTurn (and every later turn's beginTurn) would wedge on turnMu until
+// an explicit Stop, a silent wedge no turn timeout can escape.
 //
 // The lock is held across the send so waitPump's close of the channel cannot race
 // it: once waitPump sets active=nil under turnMu, a concurrent sendEvent observes
 // nil and returns, and any in-flight send has completed before waitPump unlocks
 // and closes. Stop cancels s.ctx before waitPump acquires turnMu, so a blocked
-// terminal send unblocks (via s.ctx.Done) and releases the lock before waitPump
-// needs it — no deadlock between a wedged consumer and process teardown.
+// terminal send unblocks (via s.ctx.Done or turnCtx.Done) and releases the lock
+// before waitPump needs it — no deadlock between a wedged consumer and teardown.
 func (s *Session) sendEvent(ev *event) {
 	s.turnMu.Lock()
 	defer s.turnMu.Unlock()
@@ -372,9 +392,19 @@ func (s *Session) sendEvent(ev *event) {
 		return
 	}
 	if ev.Type == eventAgentSettled {
+		// turnCtx is non-nil while a turn is active (set by beginTurn, cleared
+		// by endTurn/waitPump, both under turnMu alongside active). A nil turnDone
+		// (defensive, if beginTurn was called with no ctx) blocks forever in the
+		// select, so the send is then bounded only by s.ctx — preserving the
+		// backpressure-blocking behavior the terminal-delivery test relies on.
+		var turnDone <-chan struct{}
+		if s.turnCtx != nil {
+			turnDone = s.turnCtx.Done()
+		}
 		select {
 		case ch <- ev:
 		case <-s.ctx.Done():
+		case <-turnDone:
 		}
 		return
 	}
@@ -444,28 +474,32 @@ func (s *Session) send(ctx context.Context, cmd any) (response, error) {
 	}
 }
 
-// beginTurn opens a fresh event channel for this turn and registers it as the
-// active destination. The caller drains it until agent_settled, then endTurn. It
-// also stops any armed idle-eviction timer: a turn starting means the session is
-// active again, so a pending eviction must be cancelled (and evict itself
-// double-checks under startMu in case the timer already fired).
-func (s *Session) beginTurn() chan *event {
+// beginTurn opens a fresh event channel for this turn, registers it as the
+// active destination, and records turnCtx so the terminal agent_settled send can
+// be bounded by the turn's lifetime (not just the session's). The caller drains
+// the channel until agent_settled, then endTurn. It also stops any armed
+// idle-eviction timer: a turn starting means the session is active again, so a
+// pending eviction must be cancelled (and evict itself double-checks under
+// startMu in case the timer already fired).
+func (s *Session) beginTurn(turnCtx context.Context) chan *event {
 	ch := make(chan *event, turnEventBuffer)
 	s.turnMu.Lock()
 	s.active = ch
+	s.turnCtx = turnCtx
 	s.turnMu.Unlock()
 	s.stopIdleTimer()
 	return ch
 }
 
-// endTurn clears the active channel. Any events still buffered are discarded by
-// the caller dropping the reference; the next beginTurn starts clean. It also
-// (re)arms the idle-eviction timer: once the turn is over and the process is
-// still alive, the subprocess is eligible for eviction after idleTimeout of
-// further inactivity.
+// endTurn clears the active channel and turn ctx. Any events still buffered are
+// discarded by the caller dropping the reference; the next beginTurn starts
+// clean. It also (re)arms the idle-eviction timer: once the turn is over and the
+// process is still alive, the subprocess is eligible for eviction after
+// idleTimeout of further inactivity.
 func (s *Session) endTurn() {
 	s.turnMu.Lock()
 	s.active = nil
+	s.turnCtx = nil
 	s.turnMu.Unlock()
 	s.armIdleTimer()
 }
@@ -506,13 +540,16 @@ func (s *Session) armIdleTimer() {
 // Stop it does NOT cancel s.ctx, so the session re-spawns on the next turn over
 // the same ctx.
 //
-// beginTurn stops the timer (nils s.idleTimer) before a turn uses the process,
-// so if a turn arrived after the timer fired but before evict ran, s.idleTimer
-// is nil and evict aborts — the turn proceeds on the live process. The go/no-go
-// decision is under startMu (serialized with Start/Stop); the reap waits outside
-// the lock because waitPump needs startMu to reset started (holding it across the
-// wait would deadlock). evict SIGTERMs the process group so pi can flush its
-// session file, then SIGKILLs after idleEvictGrace if it lingers.
+// ensureStarted (called by the executor before each turn) stops the timer and
+// waits on evicting before a turn uses the process. If a turn arrived after the
+// timer fired but before evict acquired startMu, s.idleTimer is nil and evict
+// aborts — the turn proceeds on the live process. If evict already committed
+// (set evicting and SIGTERM'd), ensureStarted waits for the reap and respawns so
+// the turn never prompts against a dying process. The go/no-go decision is under
+// startMu (serialized with Start/Stop); the reap waits outside the lock because
+// waitPump needs startMu to reset started (holding it across the wait would
+// deadlock). evict SIGTERMs the group so pi can flush, then SIGKILLs the group to
+// reap it and any descendant that ignored SIGTERM.
 func (s *Session) evict() {
 	s.startMu.Lock()
 	if !s.started || s.idleTimer == nil {
@@ -522,23 +559,69 @@ func (s *Session) evict() {
 		return
 	}
 	s.idleTimer = nil
+	s.evicting = true
 	cmd := s.cmd
 	waitDone := s.waitDone
 	s.startMu.Unlock()
 	if cmd == nil || cmd.Process == nil {
+		s.clearEvicting()
 		return
 	}
 	slog.Info("pi: idle-evicting subprocess", "agent", s.cfg.AgentID, "idle_timeout", s.idleTimeout)
-	// Graceful: SIGTERM the process group so pi can flush, then SIGKILL after a
-	// short grace if it lingers. Both paths wait on waitDone for the reap so
-	// started is reset before evict returns.
+	// Graceful: SIGTERM the group so pi can flush, then SIGKILL the group after a
+	// short grace (or once pi exits) so a descendant that ignored SIGTERM cannot
+	// outlive eviction orphaned to init — the same group-reap invariant Stop
+	// relies on. The SIGKILL mop-up after waitDone targets the dying group (a
+	// reused PID would not join a dead group's pgid), so it is safe.
 	_ = executor.KillGroup(cmd, syscall.SIGTERM)
 	select {
 	case <-waitDone:
+		_ = executor.KillGroup(cmd, syscall.SIGKILL)
 	case <-time.After(idleEvictGrace):
 		_ = executor.KillGroup(cmd, syscall.SIGKILL)
 		<-waitDone
 	}
+	s.clearEvicting()
+}
+
+// clearEvicting clears the in-progress eviction flag after the reap.
+func (s *Session) clearEvicting() {
+	s.startMu.Lock()
+	s.evicting = false
+	s.startMu.Unlock()
+}
+
+// ensureStarted claims the process for an incoming turn: it waits for any
+// in-progress idle eviction to finish (so a turn arriving while evict is
+// SIGTERMing the process does not see Alive()=true, skip the respawn, and prompt
+// against a dying process with a spurious "session exited mid-turn"), stops any
+// pending idle-eviction timer (a turn is in flight, so the process must stay
+// resident — a timer that already fired but whose evict callback hasn't acquired
+// startMu sees idleTimer==nil and aborts), then starts the process if it is not
+// alive. Start is idempotent (returns nil if already started), so the alive fast
+// path is unchanged when no eviction is in flight.
+func (s *Session) ensureStarted(commandID string) error {
+	s.startMu.Lock()
+	for s.evicting {
+		// Eviction is tearing the process down; wait for the reap (waitDone
+		// closes) before re-checking, then fall through to Start which respawns.
+		waitDone := s.waitDone
+		s.startMu.Unlock()
+		if waitDone != nil {
+			<-waitDone
+		}
+		s.startMu.Lock()
+	}
+	if s.idleTimer != nil {
+		s.idleTimer.Stop()
+		s.idleTimer = nil
+	}
+	alive := s.started && !s.startedAt.IsZero()
+	s.startMu.Unlock()
+	if alive {
+		return nil
+	}
+	return s.Start(commandID)
 }
 
 // prompt sends a prompt and waits for its acceptance response. Events stream to
