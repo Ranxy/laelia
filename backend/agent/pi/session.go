@@ -84,15 +84,23 @@ type Session struct {
 	startedAt time.Time
 }
 
-// NewSession constructs a (not-yet-started) Session. The runner starts it lazily
-// on the first turn so the opening turn's command id can seed LAELIA_COMMAND.
-func NewSession(cfg *PiConfig) *Session {
-	return &Session{cfg: cfg, resp: map[string]chan response{}}
+// NewSession constructs a (not-yet-started) Session bound to a runner-level
+// ctx. The ctx MUST be independent of any single turn's ctx: the subprocess is
+// spawned with exec.CommandContext(s.ctx, ...), so cancelling a turn ctx must
+// NOT cancel s.ctx (that would SIGKILL the persistent process at every turn
+// end). The runner derives ctx from context.Background() and cancels it only on
+// explicit teardown (runner stop, launch-fingerprint change, RemoveAgent). The
+// runner starts the session lazily on the first turn so the opening turn's
+// command id can seed LAELIA_COMMAND.
+func NewSession(ctx context.Context, cancel context.CancelFunc, cfg *PiConfig) *Session {
+	return &Session{cfg: cfg, ctx: ctx, cancel: cancel, resp: map[string]chan response{}}
 }
 
 // Start spawns the pi subprocess and primes session resume. commandID seeds
-// LAELIA_COMMAND for the persistent process (see PiConfig.buildPiEnv).
-func (s *Session) Start(ctx context.Context, commandID string) error {
+// LAELIA_COMMAND for the persistent process (see PiConfig.buildPiEnv). The
+// subprocess is bound to s.ctx (the session ctx), NOT the caller's turn ctx, so
+// the process survives across turns.
+func (s *Session) Start(commandID string) error {
 	s.startMu.Lock()
 	defer s.startMu.Unlock()
 	if s.started {
@@ -106,11 +114,7 @@ func (s *Session) Start(ctx context.Context, commandID string) error {
 		return pkgerrors.Wrap(err, "pi: create working dir")
 	}
 
-	sessionCtx, cancel := context.WithCancel(ctx)
-	s.ctx = sessionCtx
-	s.cancel = cancel
-
-	cmd := exec.CommandContext(sessionCtx, s.cfg.PiBinaryPath, s.cfg.launchArgs()...)
+	cmd := exec.CommandContext(s.ctx, s.cfg.PiBinaryPath, s.cfg.launchArgs()...)
 	cmd.Dir = s.cfg.WorkingDir
 	cmd.Env = s.cfg.buildPiEnv(commandID)
 	// Own process group so Stop/KillGroup reaps the whole tree (pi may spawn
@@ -119,19 +123,16 @@ func (s *Session) Start(ctx context.Context, commandID string) error {
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		cancel()
 		return pkgerrors.Wrap(err, "pi: stdin pipe")
 	}
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		cancel()
 		return pkgerrors.Wrap(err, "pi: stdout pipe")
 	}
 	// Stderr is logged for diagnostics; it is not part of the JSONL protocol.
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Start(); err != nil {
-		cancel()
 		return pkgerrors.Wrap(err, "pi: start subprocess")
 	}
 	s.cmd = cmd
@@ -182,13 +183,28 @@ func (s *Session) readPump() {
 }
 
 // waitPump reaps the subprocess and signals completion so the runner can mark
-// the session dead (the next turn restarts it).
+// the session dead (the next turn restarts it). It closes the active turn
+// channel so a drain loop blocked waiting for the next event unblocks
+// immediately — its !ok branch surfaces a fast "session exited mid-turn"
+// failure instead of hanging to the turn timeout.
 func (s *Session) waitPump() {
 	_ = s.cmd.Wait()
+	// Close the active turn channel first so a mid-turn drain loop fails fast.
+	// sendEvent holds turnMu for its (non-blocking) send, so this close cannot
+	// race a send that would panic on a closed channel: once we set active=nil
+	// under the lock, any concurrent sendEvent observes nil and returns, and
+	// any in-flight send has already completed before we unlock.
+	s.turnMu.Lock()
+	ch := s.active
+	s.active = nil
+	s.turnMu.Unlock()
+	if ch != nil {
+		close(ch)
+	}
 	// Unblock any Send in flight.
 	s.respMu.Lock()
-	for id, ch := range s.resp {
-		close(ch)
+	for id, respCh := range s.resp {
+		close(respCh)
 		delete(s.resp, id)
 	}
 	s.respMu.Unlock()
@@ -251,10 +267,14 @@ func (s *Session) routeResponse(r response) {
 // sendEvent fans an event to the active turn channel, dropping if no turn is
 // active or the buffer is full. Dropping protects the subprocess from a stalled
 // stdout pipe; the drain loop keeps up during a turn so drops are unexpected then.
+// The lock is held across the (non-blocking) send so that waitPump's close of the
+// channel cannot race this send — once waitPump sets active=nil under turnMu, a
+// concurrent sendEvent observes nil and returns, and any in-flight send has
+// completed before waitPump unlocks and closes.
 func (s *Session) sendEvent(ev *event) {
 	s.turnMu.Lock()
+	defer s.turnMu.Unlock()
 	ch := s.active
-	s.turnMu.Unlock()
 	if ch == nil {
 		return
 	}
@@ -447,10 +467,13 @@ func (s *Session) resumeOrCapture() error {
 	return nil
 }
 
-// Stop tears down the subprocess: cancel its context, kill the whole process
-// group (so pi's tool subprocesses do not survive as orphans), and block
-// until waitPump has reaped it. Only waitPump resets started (after cmd.Wait
-// returns), so a subsequent Start never races a dying process.
+// Stop tears down the subprocess: cancel the session ctx (which
+// exec.CommandContext translates to a SIGKILL of the direct child), kill the
+// whole process group (so pi's tool subprocesses do not survive as orphans),
+// and block until waitPump has reaped it. s.ctx is the session ctx (independent
+// of any turn ctx), so this is the ONLY path that cancels it. Only waitPump
+// resets started (after cmd.Wait returns), so a subsequent Start never races a
+// dying process.
 func (s *Session) Stop() {
 	s.startMu.Lock()
 	started := s.started

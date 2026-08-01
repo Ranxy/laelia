@@ -133,7 +133,9 @@ func (e *PiExecutor) Start() {
 func (e *PiExecutor) Cancel() {
 	e.cancelled.Store(true)
 	e.cancel()
-	// abort is fire-and-forget; the session process stays alive for the next turn.
+	// e.cancel() tears down only this turn's ctx; the session ctx is independent
+	// (s.ctx, derived from Background by the runner), so abort is fire-and-forget
+	// and the session process stays alive for the next turn.
 	e.session.abort()
 }
 
@@ -161,9 +163,12 @@ func (e *PiExecutor) run() {
 	go e.startFlushTimer()
 
 	// Lazy-start: the first turn seeds LAELIA_COMMAND with its command id. A
-	// session that died between turns is restarted the same way.
+	// session that died between turns is restarted the same way. The session
+	// binds the subprocess to its own ctx (independent of this turn's ctx), so
+	// the deferred e.cancel() below tears down the turn but leaves the process
+	// alive for the next turn.
 	if !e.session.Alive() {
-		if err := e.session.Start(e.ctx, e.req.CommandID); err != nil {
+		if err := e.session.Start(e.req.CommandID); err != nil {
 			e.finish(err, false)
 			return
 		}

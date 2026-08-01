@@ -138,11 +138,15 @@ func (r *agentRunner) currentPiConfig() *pi.PiConfig {
 
 // restartPiSession stops any existing pi session and starts a fresh one bound
 // to cfg. The session is started lazily on the first turn (so the opening
-// turn's command id seeds LAELIA_COMMAND), so this only constructs it.
+// turn's command id seeds LAELIA_COMMAND), so this only constructs it. The
+// session ctx is derived from context.Background (NOT the runner's stream ctx)
+// so a turn-end cancel or a transient stream drop never SIGKILLs the persistent
+// subprocess; only an explicit stopPiSession/Stop cancels it.
 func (r *agentRunner) restartPiSession(cfg *pi.PiConfig) {
 	r.stopPiSession()
+	ctx, cancel := context.WithCancel(context.Background())
 	r.mu.Lock()
-	r.piSession = pi.NewSession(cfg)
+	r.piSession = pi.NewSession(ctx, cancel, cfg)
 	r.mu.Unlock()
 }
 
@@ -215,7 +219,8 @@ func (r *agentRunner) buildRuntimeForAgent(req executor.Request) (executor.Runti
 		sess := r.piSession
 		r.mu.Unlock()
 		if sess == nil {
-			sess = pi.NewSession(piCfg)
+			ctx, cancel := context.WithCancel(context.Background())
+			sess = pi.NewSession(ctx, cancel, piCfg)
 			r.mu.Lock()
 			r.piSession = sess
 			r.mu.Unlock()
