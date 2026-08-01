@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/Ranxy/laelia/backend/agent/atomicfile"
 )
 
 // ContextState tracks one agent's session context across drain turns: observed
@@ -105,27 +107,5 @@ func SaveContextState(machineID, agentID string, state *ContextState) error {
 	if err != nil {
 		return err
 	}
-	path := contextStatePath(machineID, agentID)
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(dir, "context-state-*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
-	if err := tmp.Chmod(0o600); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmpName, path)
+	return atomicfile.WriteFileAtomic(contextStatePath(machineID, agentID), data, 0o600)
 }

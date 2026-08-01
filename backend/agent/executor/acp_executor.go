@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	acp "github.com/coder/acp-go-sdk"
@@ -262,6 +263,9 @@ func NewACP(req Request, cfg *ACPConfig) (Runtime, error) {
 	cmd := exec.CommandContext(ctx, cfg.Executable, cfg.Args...)
 	cmd.Dir = workingDir
 	cmd.Env = buildACPEnv(cfg, req.Env, req)
+	// Own process group so KillGroup reaps the whole tree (npx/node, MCP servers);
+	// on Linux also kill on parent death so a SIGKILL'd manager leaves no orphans.
+	SetProcessGroup(cmd)
 
 	exec := &ACPExecutor{
 		ctx:              ctx,
@@ -349,7 +353,7 @@ func (e *ACPExecutor) Cancel() {
 		_ = e.conn.Cancel(context.Background(), acp.CancelNotification{SessionId: acp.SessionId(e.sessionID)})
 	}
 	if e.cmd != nil && e.cmd.Process != nil {
-		_ = e.cmd.Process.Kill()
+		_ = KillGroup(e.cmd, syscall.SIGKILL)
 	}
 }
 
@@ -547,7 +551,7 @@ func (e *ACPExecutor) run() {
 		return
 	}
 
-	_ = e.cmd.Process.Kill()
+	_ = KillGroup(e.cmd, syscall.SIGKILL)
 	_ = e.cmd.Wait()
 
 	e.buffer.flush(e)
@@ -624,7 +628,7 @@ func (e *ACPExecutor) turnPromptText(resumed bool) string {
 
 func (e *ACPExecutor) finishACPProcess(err error) {
 	if e.cmd != nil && e.cmd.Process != nil {
-		_ = e.cmd.Process.Kill()
+		_ = KillGroup(e.cmd, syscall.SIGKILL)
 	}
 	_ = e.cmd.Wait()
 	e.buffer.flush(e)

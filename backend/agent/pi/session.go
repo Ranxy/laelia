@@ -15,9 +15,13 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	pkgerrors "github.com/pkg/errors"
+
+	"github.com/Ranxy/laelia/backend/agent/atomicfile"
+	"github.com/Ranxy/laelia/backend/agent/executor"
 )
 
 // turnEventBuffer bounds the per-turn event channel. The drain loop consumes
@@ -53,6 +57,10 @@ type Session struct {
 
 	startMu sync.Mutex
 	started bool
+	// waitDone is closed by waitPump once the subprocess is reaped, so Stop can
+	// block until the process is truly gone (and started is reset) before
+	// returning. Created fresh on each successful Start.
+	waitDone chan struct{}
 
 	writeMu sync.Mutex
 
@@ -105,6 +113,9 @@ func (s *Session) Start(ctx context.Context, commandID string) error {
 	cmd := exec.CommandContext(sessionCtx, s.cfg.PiBinaryPath, s.cfg.launchArgs()...)
 	cmd.Dir = s.cfg.WorkingDir
 	cmd.Env = s.cfg.buildPiEnv(commandID)
+	// Own process group so Stop/KillGroup reaps the whole tree (pi may spawn
+	// bash/tool subprocesses under --approve); on Linux also kill on parent death.
+	executor.SetProcessGroup(cmd)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -128,6 +139,7 @@ func (s *Session) Start(ctx context.Context, commandID string) error {
 	s.stdout = bufio.NewReader(stdoutPipe)
 	s.started = true
 	s.startedAt = time.Now()
+	s.waitDone = make(chan struct{})
 
 	go s.readPump()
 	go s.waitPump()
@@ -188,6 +200,9 @@ func (s *Session) waitPump() {
 	s.startedAt = time.Time{}
 	s.resumedFromDisk = false
 	s.startMu.Unlock()
+	// Signal Stop (and any future restart) that the subprocess is reaped and
+	// started is reset, so they can block until it is safe to spawn again.
+	close(s.waitDone)
 }
 
 // dispatch decodes one JSONL line and routes it.
@@ -432,17 +447,23 @@ func (s *Session) resumeOrCapture() error {
 	return nil
 }
 
-// Stop tears down the subprocess.
+// Stop tears down the subprocess: cancel its context, kill the whole process
+// group (so pi's tool subprocesses do not survive as orphans), and block
+// until waitPump has reaped it. Only waitPump resets started (after cmd.Wait
+// returns), so a subsequent Start never races a dying process.
 func (s *Session) Stop() {
 	s.startMu.Lock()
 	started := s.started
-	s.started = false
+	waitDone := s.waitDone
 	s.startMu.Unlock()
 	if s.cancel != nil {
 		s.cancel()
 	}
 	if started && s.cmd != nil && s.cmd.Process != nil {
-		_ = s.cmd.Process.Kill()
+		_ = executor.KillGroup(s.cmd, syscall.SIGKILL)
+	}
+	if started && waitDone != nil {
+		<-waitDone
 	}
 }
 
@@ -484,11 +505,7 @@ func savePiSession(machineID, agentID string, s *piSessionState) error {
 	if err != nil {
 		return err
 	}
-	dir := filepath.Dir(piSessionPath(machineID, agentID))
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
-	}
-	return os.WriteFile(piSessionPath(machineID, agentID), data, 0o600)
+	return atomicfile.WriteFileAtomic(piSessionPath(machineID, agentID), data, 0o600)
 }
 
 var requestIDCounter atomic.Int64

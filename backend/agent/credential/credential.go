@@ -2,9 +2,10 @@ package credential
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/Ranxy/laelia/backend/agent/atomicfile"
 )
 
 type Manager struct {
@@ -65,9 +66,8 @@ func (cm *Manager) DeleteRefreshToken() {
 }
 
 func (cm *Manager) writeToFile(token string) {
-	dir := filepath.Dir(cm.tokenFilePath)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return
-	}
-	_ = os.WriteFile(cm.tokenFilePath, []byte(token), 0o600)
+	// Atomic + fsync: a truncated refresh token file bricks reconnection (the
+	// single-use bootstrap token is already consumed), so durability matters
+	// more than the tiny fsync cost on this low-frequency write.
+	_ = atomicfile.WriteFileAtomicSync(cm.tokenFilePath, []byte(token), 0o600)
 }

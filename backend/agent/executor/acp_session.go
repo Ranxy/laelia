@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+
+	"github.com/Ranxy/laelia/backend/agent/atomicfile"
 )
 
 // maxResumeFailuresBeforeWarning is the consecutive ResumeSession failure count
@@ -72,11 +74,7 @@ func saveACPSession(machineID, agentID string, state *acpSessionState) error {
 	if err != nil {
 		return err
 	}
-	dir := filepath.Dir(acpSessionPath(machineID, agentID))
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
-	}
-	return os.WriteFile(acpSessionPath(machineID, agentID), data, 0o600)
+	return atomicfile.WriteFileAtomic(acpSessionPath(machineID, agentID), data, 0o600)
 }
 
 // clearACPSession drops the persisted ACP session so the next turn cold-starts.

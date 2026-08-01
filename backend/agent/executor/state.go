@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+
+	"github.com/Ranxy/laelia/backend/agent/atomicfile"
 )
 
 type LocalState struct {
@@ -38,13 +40,7 @@ func SaveLocalState(machineID, agentID string, state *LocalState) error {
 	if err != nil {
 		return err
 	}
-
-	dir := filepath.Dir(statePath(machineID, agentID))
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
-	}
-
-	return os.WriteFile(statePath(machineID, agentID), data, 0o600)
+	return atomicfile.WriteFileAtomic(statePath(machineID, agentID), data, 0o600)
 }
 
 func ClearLocalState(machineID, agentID string) error {
