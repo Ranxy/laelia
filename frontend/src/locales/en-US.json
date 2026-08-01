@@ -223,6 +223,7 @@
   },
   "user": {
     "title": "Users",
+    "search-placeholder": "Search by email or title…",
     "tab-active": "Active",
     "tab-trash": "Recycle bin",
     "create": "Create user",

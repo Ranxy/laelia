@@ -1,5 +1,5 @@
 import { Loader2, Users } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert } from "@/components/ui/alert";
 import {
@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FieldRow } from "@/components/ui/field-row";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import {
   Sheet,
   SheetBody,
@@ -35,6 +36,7 @@ import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { formatTimestamp } from "@/lib/command-status";
 import { toastManager } from "@/lib/toast";
+import { buildUserFilter } from "@/lib/user-filter";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/auth";
 import { State } from "@/types/proto-es/v1/common_pb";
@@ -60,6 +62,7 @@ export function UserListPage() {
   const deletedUsers = useAppStore((s) => s.deletedUsers);
   const deletedUsersLoading = useAppStore((s) => s.deletedUsersLoading);
   const [tab, setTab] = useState<Tab>("active");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Create-user sheet
   const [createOpen, setCreateOpen] = useState(false);
@@ -108,25 +111,44 @@ export function UserListPage() {
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const loadActive = useCallback(() => {
-    useAppStore.getState().fetchUsers({ showDeleted: false, pageSize: 100 });
+  // silent skips the loading flag so a refetch swaps the rows in place without
+  // unmounting the table (headers/frame) to show the spinner.
+  const loadActive = useCallback((filter: string, silent = false) => {
+    useAppStore
+      .getState()
+      .fetchUsers({ showDeleted: false, pageSize: 100, filter }, { silent });
   }, []);
-  const loadTrash = useCallback(() => {
-    useAppStore.getState().fetchUsers({ showDeleted: true, pageSize: 100 });
+  const loadTrash = useCallback((filter: string, silent = false) => {
+    useAppStore
+      .getState()
+      .fetchUsers({ showDeleted: true, pageSize: 100, filter }, { silent });
   }, []);
 
+  // Debounced load of the visible tab. The first call runs immediately so the
+  // list appears without waiting for the debounce; later typing or tab changes
+  // refetch once the query settles. Every refetch after the initial mount is
+  // silent so the table frame stays put and only the rows update.
+  const initialLoadDone = useRef(false);
   useEffect(() => {
-    loadActive();
-  }, [loadActive]);
-
-  useEffect(() => {
-    if (tab === "trash") loadTrash();
-  }, [tab, loadTrash]);
+    const run = () => {
+      const filter = buildUserFilter(searchQuery);
+      if (tab === "trash") loadTrash(filter, initialLoadDone.current);
+      else loadActive(filter, initialLoadDone.current);
+    };
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true;
+      run();
+      return;
+    }
+    const timer = setTimeout(run, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery, tab, loadActive, loadTrash]);
 
   const refreshBoth = useCallback(() => {
-    loadActive();
-    if (tab === "trash") loadTrash();
-  }, [loadActive, loadTrash, tab]);
+    const filter = buildUserFilter(searchQuery);
+    loadActive(filter, true);
+    if (tab === "trash") loadTrash(filter, true);
+  }, [loadActive, loadTrash, searchQuery, tab]);
 
   function resetCreateForm() {
     setEmail("");
@@ -305,6 +327,14 @@ export function UserListPage() {
             {t("user.create")}
           </Button>
         )}
+      </div>
+
+      <div className="max-w-sm">
+        <SearchInput
+          placeholder={t("user.search-placeholder")}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>

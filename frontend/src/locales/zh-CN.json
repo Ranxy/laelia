@@ -223,6 +223,7 @@
   },
   "user": {
     "title": "用户管理",
+    "search-placeholder": "按邮箱或名称搜索…",
     "tab-active": "活跃用户",
     "tab-trash": "回收站",
     "create": "创建用户",

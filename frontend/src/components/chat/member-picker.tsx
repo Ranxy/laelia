@@ -8,6 +8,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { SearchInput } from "@/components/ui/search-input";
+import { buildUserFilter } from "@/lib/user-filter";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
@@ -53,19 +54,6 @@ function userOption(u: User): Option {
 function agentOption(a: AgentSummary): Option {
   const id = memberIdOf(a.name);
   return { memberId: id, label: a.title || id, sublabel: undefined };
-}
-
-// The backend turns `name.matches(q)` / `email.matches(q)` into
-// `LOWER(principal.<col>) LIKE %q%`. Strip CEL string delimiters and LIKE
-// wildcards so the user's typed query can't break the parse or over-match.
-function escapeFilterQuery(raw: string): string {
-  return raw.replace(/[\\"]|%|_/g, "").trim();
-}
-
-function buildUserFilter(query: string): string {
-  const q = escapeFilterQuery(query);
-  if (q === "") return "";
-  return `name.matches("${q}") || email.matches("${q}")`;
 }
 
 export function MemberPicker({
