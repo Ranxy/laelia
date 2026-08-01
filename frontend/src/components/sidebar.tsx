@@ -115,15 +115,15 @@ function useSidebarItems(): SidebarItem[] {
         type: "route",
       },
       {
-        title: t("sidebar.machines"),
-        icon: Monitor,
-        name: MACHINE_ROUTE_LIST,
-        type: "route",
-      },
-      {
         title: t("sidebar.members"),
         icon: Users,
         name: MEMBERS_ROUTE,
+        type: "route",
+      },
+      {
+        title: t("sidebar.machines"),
+        icon: Monitor,
+        name: MACHINE_ROUTE_LIST,
         type: "route",
       },
       {
