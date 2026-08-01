@@ -382,6 +382,37 @@ func TestPiSession_IdleEvictionThenColdRestartSendsInitPrompt(t *testing.T) {
 	require.Contains(t, prompts[1], "do the thing", "turn 2 must also carry the batch")
 }
 
+// TestPiSession_TruncatedSessionFileFallsBackCold (T9 / Phase 0): a truncated
+// pi-session.json (the half-written file a non-atomic write would leave behind
+// on a crash mid-write) must NOT crash or hang the turn. loadPiSession returns a
+// JSON decode error, resumeOrCapture surfaces it, and Start degrades to a clean
+// cold start (init prompt) instead of failing. The atomic write (atomicfile)
+// prevents truncation in the first place; this test guards the load-side
+// fallback so a corrupt file from an older version or external corruption still
+// degrades gracefully.
+func TestPiSession_TruncatedSessionFileFallsBackCold(t *testing.T) {
+	sess, cfg := newFakePiSession(t, "settle")
+
+	// Write a truncated pi-session.json — valid prefix, cut mid-field, exactly
+	// what a crashed non-atomic write would leave.
+	path := piSessionPath(cfg.MachineID, cfg.AgentID)
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+	require.NoError(t, os.WriteFile(path, []byte(`{"session_path":"/tmp/fake-pi-session.jsonl","finger`), 0o600))
+
+	// The turn must succeed (cold start), not return the decode error or hang.
+	res := runTurn(t, sess, cfg, "cmd-1")
+	require.Equal(t, int32(0), res.ExitCode, "truncated session file must degrade to a successful cold start, not fail the turn")
+
+	// Despite a "saved" session existing, the decode error forced a cold start,
+	// so the init prompt was sent (no amnesia from trying to resume a corrupt
+	// file).
+	prompts := readFakePiPrompts(t, cfg.WorkingDir)
+	require.Len(t, prompts, 1)
+	require.Contains(t, prompts[0], "autonomous AI agent in Laelia",
+		"a truncated session file must fall back to the cold init prompt")
+	require.Contains(t, prompts[0], "do the thing", "the batch must still be carried")
+}
+
 // TestPiSession_WedgedStartupFailsFast (T2): when the pi subprocess spawns but
 // never answers the startup RPC (get_state) within StartupTimeout, the turn must
 // fail at ~StartupTimeout — not hang to the turn timeout (MaxTimeoutSeconds).

@@ -17,9 +17,13 @@ We want to add a third runtime, **pi** (`github.com/earendil-works/pi`), with di
   host-side binary detection, no `ANTHROPIC_API_KEY`-in-env ceremony.
 
 Decisions confirmed with the user:
-1. **Subprocess model:** persistent `pi --mode rpc` subprocess, one long-lived process per pi
+1. **Subprocess model:** a `pi --mode rpc` subprocess is **long-lived while in use** per pi
    agent (not per-turn spawn). Per-turn work is a `prompt` command streamed over the same
-   process.
+   process. After `IdleTimeout` (default 5min) of no turns, the subprocess is **idle-evicted**
+   to free memory — but the conversation lives on in `pi-session.json`, so the next turn resumes
+   it via `switch_session` (warm, no init prompt); the only cost is the 1-3s respawn. There is
+   no cold restart during active use; idle eviction is expected, recoverable, and never loses
+   the conversation.
 2. **Built-in = a provider option, not auto-create.** `builtin-pi` appears in the provider
    dropdown on every agent (always available, not host-detected). Selecting it reveals
    API-provider + model + api-key fields. The agent is still created normally and bound to a
@@ -128,7 +132,31 @@ carries `acp_config`). Run `cd proto && buf format -w proto && buf lint proto &&
     - `agent_end` → `FinalSummary` event + `Result` + close `Done()`
     - `compaction_*`/`auto_retry_*` → `Warning`/`RawAcp`-equivalent raw event
   - `Cancel()`: send `abort` command (graceful); fall back to process kill if unresponsive.
+    Implemented in Phase 1 — the session ctx is decoupled from the turn ctx, so the `abort`
+    (or its fallback kill) only ends the current turn; it does **not** cancel the session ctx,
+    so the underlying process survives an in-flight cancel and a follow-up turn reuses it.
   - Channels/`Done()` are per-turn; the underlying `Session`/process outlives the turn.
+
+#### 空闲回收 (idle eviction)
+
+The subprocess is **long-lived while in use**, not permanently resident. After a turn ends,
+`Session.armIdleTimer()` (called from `endTurn`) arms a `time.AfterFunc(IdleTimeout, evict)`.
+`beginTurn` stops the timer, so an active session never thrashes. When it fires:
+
+- `evict()` SIGTERMs the process group (`executor.KillGroup`), waits up to
+  `idleEvictGrace = 3s` on `waitDone`, then SIGKILLs + reaps. It does **not** cancel the
+  session ctx (so the runner re-spawns next turn) and does **not** delete `pi-session.json`.
+- The go/no-go decision is under `startMu` (aborts if `beginTurn` already stopped the timer);
+  the reap waits **outside** the lock (waitPump needs `startMu` to reset `started`, so holding
+  it across the wait would deadlock).
+
+**Config:** `PiConfig.IdleTimeout`, defaulted to `defaultIdleTimeout = 5 * time.Minute` by
+`BuildPiConfig`. **Rationale:** a chat agent with a ~2s median cold-start respawn tolerates a
+5min idle window well — memory is freed between conversation bursts while the warm-resume cost
+stays bounded. Batch-dense agents can lower it per-agent; **zero or negative disables
+eviction** (process stays resident — useful for debug or a tight batch loop). It is
+internal-only for now (mirroring `StartupTimeout`); a per-agent proto surface and Prometheus
+metrics (`pi_idle_evictions`, `pi_cold_start_seconds`) are deferred.
 
 ### 3. Executor + capability dispatch (`backend/agent/executor/`)
 
@@ -248,7 +276,9 @@ a wrapper) keeps the `BinaryPath()` contract intact.
    - streaming text appears token-by-token;
    - a tool call (e.g. `bash` invoking `laelia-agent message ...`) emits
      `ToolCallStarted`/`ToolCallFinished` and the message lands in the channel;
-   - a second turn resumes the same pi session (no cold restart) and the agent retains context;
+   - a second turn resumes the same pi session (no cold restart during active use — the
+     conversation is warm) and the agent retains context; an idle-evicted session respawns once
+     and resumes from `pi-session.json`, still no amnesia;
    - Cancel mid-turn stops the turn (abort) without killing the persistent process;
    - machine restart resumes the pi session from `pi-session.json`.
 5. **Frontend:** create a pi agent on a machine, switch API provider, paste key, save; verify
