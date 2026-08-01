@@ -3,6 +3,8 @@ import {
   ArrowLeft,
   ExternalLink,
   Loader2,
+  Maximize2,
+  Minimize2,
   Paperclip,
   Send,
   X,
@@ -69,6 +71,12 @@ export interface ThreadPanelProps {
   // references (a @mention reply, or the latest reply of a folded task/reminder
   // thread). Runs at most once per id so it does not fight the user's scrolling.
   scrollToMessageId?: string;
+  // expanded + onToggleExpand render an expand/collapse toggle in the header:
+  // expanded makes the panel fill the full chat area (the channel page hides
+  // its main pane behind it). Omitted in standalone/embedded contexts
+  // (activity/reminder detail) that already render full-width via fluid.
+  expanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 export function ThreadPanel({
@@ -83,6 +91,8 @@ export function ThreadPanel({
   fluid,
   readOnly,
   scrollToMessageId,
+  expanded,
+  onToggleExpand,
 }: ThreadPanelProps) {
   const { t } = useTranslation();
   const conversationName = `conversations/${channelId}`;
@@ -296,6 +306,8 @@ export function ThreadPanel({
           rootMsg={null}
           onClose={onClose}
           onViewInChannel={onViewInChannel}
+          expanded={expanded}
+          onToggleExpand={onToggleExpand}
         />
         <LoadingState />
       </aside>
@@ -311,6 +323,8 @@ export function ThreadPanel({
         rootMsg={rootMsg}
         onClose={onClose}
         onViewInChannel={onViewInChannel}
+        expanded={expanded}
+        onToggleExpand={onToggleExpand}
       />
 
       {/* Scroll area: root context + replies + composer. */}
@@ -617,6 +631,8 @@ function ThreadHeader({
   rootMsg,
   onClose,
   onViewInChannel,
+  expanded,
+  onToggleExpand,
 }: {
   title: string;
   channelName: string;
@@ -628,6 +644,10 @@ function ThreadHeader({
   // jump is only meaningful from a standalone/embedded context (activity detail,
   // reminder detail) that is not the channel itself.
   onViewInChannel?: () => void;
+  // onToggleExpand renders the expand/collapse toggle; expanded selects the
+  // icon shown. Both omitted outside the channel page.
+  expanded?: boolean;
+  onToggleExpand?: () => void;
 }) {
   const { t } = useTranslation();
   const closeThread = useAppStore((s) => s.closeThread);
@@ -668,6 +688,23 @@ function ThreadHeader({
           <span className="hidden sm:inline">
             {t("chat.thread-view-in-channel")}
           </span>
+        </button>
+      )}
+      {onToggleExpand && (
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors"
+          aria-label={t(
+            expanded ? "chat.thread-collapse" : "chat.thread-expand"
+          )}
+          title={t(expanded ? "chat.thread-collapse" : "chat.thread-expand")}
+        >
+          {expanded ? (
+            <Minimize2 className="size-4" />
+          ) : (
+            <Maximize2 className="size-4" />
+          )}
         </button>
       )}
       <button

@@ -596,6 +596,8 @@
     "thread-placeholder": "Reply in thread…",
     "thread-empty": "No replies yet",
     "thread-close": "Close thread",
+    "thread-expand": "Expand thread",
+    "thread-collapse": "Collapse thread",
     "agent-dm-view-only": "This is a direct message between two agents. Admins can view it but cannot send messages here."
   },
   "preview": {

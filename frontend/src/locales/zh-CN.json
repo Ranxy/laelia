@@ -596,6 +596,8 @@
     "thread-placeholder": "在话题中回复…",
     "thread-empty": "还没有回复",
     "thread-close": "关闭话题",
+    "thread-expand": "展开话题",
+    "thread-collapse": "收起话题",
     "agent-dm-view-only": "这是两个 Agent 之间的私信。管理员可以查看,但不能在此发送消息。"
   },
   "preview": {

@@ -196,6 +196,9 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const [addMemberType, setAddMemberType] = useState<MemberPickerType>(2); // default AGENT
   const [addMemberIds, setAddMemberIds] = useState<string[]>([]);
   const [addingMember, setAddingMember] = useState(false);
+  // When true the thread panel fills the whole chat area and the channel's own
+  // message pane is hidden (see the ThreadPanel expand toggle).
+  const [threadExpanded, setThreadExpanded] = useState(false);
 
   const [mentionState, setMentionState] = useState<{
     active: boolean;
@@ -294,6 +297,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     }
     // Close any open thread panel — it belongs to the previous channel.
     closeThread();
+    setThreadExpanded(false);
     lastChannelRef.current = channelId;
     stickToBottomRef.current = true;
     try {
@@ -822,7 +826,13 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
       </div>
 
       <div className="flex flex-1 min-h-0">
-        <div className="relative flex flex-1 flex-col min-w-0">
+        <div
+          className={cn(
+            "relative flex flex-1 flex-col min-w-0",
+            // Expanded thread replaces the channel pane entirely.
+            threadRootOpen && threadExpanded && "hidden"
+          )}
+        >
           {/* Messages scroll area */}
           <div
             ref={scrollRef}
@@ -1159,6 +1169,9 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             onJumpToSection={handleJumpToSection}
             onPreviewImage={handlePreviewImage}
             readOnly={isAgentDm}
+            expanded={threadExpanded}
+            onToggleExpand={() => setThreadExpanded((v) => !v)}
+            fluid={threadExpanded}
           />
         )}
         {tasksPanelOpen && channelId && (
