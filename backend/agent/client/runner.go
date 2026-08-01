@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/Ranxy/laelia/backend/agent/chattools"
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
@@ -36,8 +37,11 @@ type agentRunner struct {
 	acpConfig *executor.ACPConfig
 	piConfig  *pi.PiConfig
 	piSession *pi.Session
-	cancel    context.CancelFunc
-	done      chan struct{}
+	// cs is this runner's command stream, set in start and read by applyAssignment
+	// to coordinate an in-flight drain turn on a config hot-reload.
+	cs     *commandStream
+	cancel context.CancelFunc
+	done   chan struct{}
 }
 
 // buildAcpConfig resolves the server-owned AgentACPConfig into a runnable
@@ -99,8 +103,13 @@ func (r *agentRunner) applyAssignment(a *v1pb.AgentAssignment) {
 		}
 		prev := r.currentPiConfig()
 		if prev == nil || prev.LaunchFingerprint() != newPi.LaunchFingerprint() {
-			// Launch shape changed (or first pi config): restart the subprocess.
-			// An unchanged fingerprint keeps the warm session and its conversation.
+			// Launch shape changed (or first pi config): cancel any in-flight
+			// drain turn and wait for it to end, THEN restart the subprocess. The
+			// cancel surfaces an explicit "config reloaded mid-turn" failure to
+			// the manager (not a mid-flight "session exited mid-turn") and the
+			// wait guarantees the restart never races the dying turn's session
+			// access. No-op when no turn is in flight (e.g. the first config).
+			r.coordinateInFlightTurn("config reloaded mid-turn")
 			r.restartPiSession(newPi)
 		}
 		r.setPiConfig(newPi)
@@ -192,6 +201,10 @@ func (r *agentRunner) start(ctx context.Context) {
 		return chattools.BuildTurnBatch(ctx, r.daemon.BatchDeps(r.agentID))
 	}
 
+	r.mu.Lock()
+	r.cs = cs
+	r.mu.Unlock()
+
 	go func() {
 		defer close(r.done)
 		if err := cs.Start(streamCtx); err != nil {
@@ -199,6 +212,40 @@ func (r *agentRunner) start(ctx context.Context) {
 		}
 	}()
 	slog.Info("opened AgentChannel for agent", "agent", r.agentName, "displayName", r.displayName)
+}
+
+func (r *agentRunner) currentCommandStream() *commandStream {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.cs
+}
+
+// inFlightTurnTimeout bounds how long coordinateInFlightTurn waits for an
+// in-flight turn to end after cancelling it. A runtime that ignores Cancel is
+// reaped by the subsequent restartPiSession's stopPiSession (the safe Stop
+// blocks on the process reap), so the wait is best-effort and bounded.
+const inFlightTurnTimeout = 5 * time.Second
+
+// coordinateInFlightTurn cancels any in-flight drain turn and waits (bounded)
+// for it to end. applyAssignment calls this before restarting the pi session on
+// a launch-fingerprint change so the restart never races a dying turn's session
+// access; the cancelled turn reports an explicit failure reason instead of a
+// mid-flight "session exited mid-turn". No-op when no turn is in flight.
+func (r *agentRunner) coordinateInFlightTurn(reason string) {
+	cs := r.currentCommandStream()
+	if cs == nil {
+		return
+	}
+	done, cancelled := cs.CancelInFlight(reason)
+	if !cancelled {
+		return
+	}
+	select {
+	case <-done:
+	case <-time.After(inFlightTurnTimeout):
+		slog.Warn("in-flight turn did not end after cancel; restarting anyway",
+			"agent", r.agentName, "timeout", inFlightTurnTimeout)
+	}
 }
 
 // buildRuntimeForAgent is the per-turn runtime branch point, overriding the
@@ -239,6 +286,9 @@ func (r *agentRunner) stop() {
 	if r.done != nil {
 		<-r.done
 	}
+	r.mu.Lock()
+	r.cs = nil
+	r.mu.Unlock()
 	r.stopPiSession()
 	slog.Info("tore down agent runner", "agent", r.agentName)
 }

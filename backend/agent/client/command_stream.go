@@ -142,6 +142,20 @@ type commandStream struct {
 	currentExecutor   executor.Runtime
 	currentExecutorMu sync.Mutex
 
+	// inFlightDone is non-nil while a drain turn is executing and is closed by
+	// endInFlight when the turn ends. CancelInFlight snapshots it so a caller
+	// (the runner's config hot-reload) can wait for the dying turn to finish
+	// before an action that would race it (e.g. restarting the pi session).
+	inFlightMu   sync.Mutex
+	inFlightDone chan struct{}
+
+	// cancelReason, when set by CancelInFlight, overrides the runtime's generic
+	// cancellation error in the result the manager receives, so a coordinated
+	// cancel surfaces an explicit cause (e.g. "config reloaded mid-turn")
+	// instead of "context canceled".
+	cancelReasonMu sync.Mutex
+	cancelReason   string
+
 	// newSessionRuntime builds the runtime for a drain session. It defaults to
 	// buildRuntime (real ACP) and is overridable in tests and by the runner
 	// (pi / ACP branch).
@@ -188,7 +202,7 @@ func (c *commandStream) wake() {
 // exited, so replacing the channel fields is safe.
 func (c *commandStream) resetCrossConnectionState() {
 	c.setCurrentExecutor(nil)
-	c.isExecuting.Store(false)
+	c.endInFlight()
 	c.beginRespCh = make(chan *v1pb.BeginSessionResponse, 1)
 	c.wakeCh = make(chan struct{}, 1)
 }
@@ -696,8 +710,8 @@ func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStre
 
 	c.setCurrentExecutor(runtime)
 	defer c.setCurrentExecutor(nil)
-	c.isExecuting.Store(true)
-	defer c.isExecuting.Store(false)
+	c.beginInFlight()
+	defer c.endInFlight()
 
 	result := c.runCommand(ctx, runtime, stream, req, ctxState)
 	c.persistContextState(ctxState, result)
@@ -713,6 +727,77 @@ func (c *commandStream) getCurrentExecutor() executor.Runtime {
 	c.currentExecutorMu.Lock()
 	defer c.currentExecutorMu.Unlock()
 	return c.currentExecutor
+}
+
+// beginInFlight marks a drain turn as executing: it raises isExecuting (kept
+// for the existing idle probe) and installs a fresh inFlightDone that
+// endInFlight closes when the turn ends. Callers pair every begin with a defer
+// to endInFlight.
+func (c *commandStream) beginInFlight() {
+	c.inFlightMu.Lock()
+	c.inFlightDone = make(chan struct{})
+	c.inFlightMu.Unlock()
+	c.isExecuting.Store(true)
+}
+
+// endInFlight clears the in-flight mark and closes the inFlightDone channel so
+// any CancelInFlight waiter unblocks. Idempotent: a second call (e.g.
+// resetCrossConnectionState after the turn already ended) finds no done and is
+// a no-op.
+func (c *commandStream) endInFlight() {
+	c.isExecuting.Store(false)
+	c.inFlightMu.Lock()
+	done := c.inFlightDone
+	c.inFlightDone = nil
+	c.inFlightMu.Unlock()
+	if done != nil {
+		close(done)
+	}
+}
+
+// InFlight reports whether a drain turn is currently executing.
+func (c *commandStream) InFlight() bool {
+	return c.isExecuting.Load()
+}
+
+// CancelInFlight cancels the in-flight drain turn, recording reason as the
+// failure cause so the manager sees an explicit error instead of a generic
+// cancellation. It returns the turn's done channel (closed when the turn ends)
+// and whether a turn was actually in flight and cancelled. The caller may wait
+// on the channel (bounded) before taking an action that would race the dying
+// turn. No-op (returns false) when no turn is in flight.
+func (c *commandStream) CancelInFlight(reason string) (<-chan struct{}, bool) {
+	if !c.isExecuting.Load() {
+		return nil, false
+	}
+	c.inFlightMu.Lock()
+	done := c.inFlightDone
+	c.inFlightMu.Unlock()
+	if done == nil {
+		return nil, false
+	}
+	c.setCancelReason(reason)
+	if ex := c.getCurrentExecutor(); ex != nil {
+		ex.Cancel()
+	}
+	return done, true
+}
+
+func (c *commandStream) setCancelReason(reason string) {
+	c.cancelReasonMu.Lock()
+	c.cancelReason = reason
+	c.cancelReasonMu.Unlock()
+}
+
+// takeCancelReason returns and clears the pending cancel reason. runCommand
+// consumes it after the runtime reports its result, overriding a generic
+// cancellation error with the coordinated cause.
+func (c *commandStream) takeCancelReason() string {
+	c.cancelReasonMu.Lock()
+	reason := c.cancelReason
+	c.cancelReason = ""
+	c.cancelReasonMu.Unlock()
+	return reason
 }
 
 func (c *commandStream) runCommand(
@@ -789,6 +874,12 @@ func (c *commandStream) runCommand(
 
 			result := <-runtime.ResultChannel()
 			result.LastSeqNo = state.LastSeqSent
+			// A coordinated cancel (e.g. config hot-reload) overrides the
+			// runtime's generic cancellation error with an explicit cause so
+			// the manager reports the reload, not "context canceled".
+			if reason := c.takeCancelReason(); reason != "" {
+				result.ErrorMessage = reason
+			}
 			resultSent = true
 			if err := sendCommandResult(stream, &v1pb.CommandResult{
 				CommandId:    commandID,

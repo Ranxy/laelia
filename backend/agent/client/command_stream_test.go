@@ -183,6 +183,12 @@ type scriptedRuntime struct {
 	script       func(*scriptedRuntime)
 	cancelCount  atomic.Int32
 	startInvoked atomic.Int32
+
+	// cancelCh is closed the first time Cancel is called, so a script can block
+	// on Canceled() until the runtime is cancelled (mimicking a real runtime's
+	// Cancel-unblocks-the-turn path).
+	cancelCh   chan struct{}
+	cancelOnce sync.Once
 }
 
 func newScriptedRuntime(script func(*scriptedRuntime)) *scriptedRuntime {
@@ -191,6 +197,7 @@ func newScriptedRuntime(script func(*scriptedRuntime)) *scriptedRuntime {
 		eventCh:  make(chan executor.Event),
 		resultCh: make(chan executor.Result, 1),
 		doneCh:   make(chan struct{}),
+		cancelCh: make(chan struct{}),
 		script:   script,
 	}
 }
@@ -204,6 +211,12 @@ func (r *scriptedRuntime) Start() {
 
 func (r *scriptedRuntime) Cancel() {
 	r.cancelCount.Add(1)
+	r.cancelOnce.Do(func() { close(r.cancelCh) })
+}
+
+// Canceled returns a channel closed the first time Cancel is called.
+func (r *scriptedRuntime) Canceled() <-chan struct{} {
+	return r.cancelCh
 }
 
 func (r *scriptedRuntime) OutputChannel() <-chan executor.OutputChunk {
@@ -407,6 +420,63 @@ func TestRunSessionExecutesRuntime(t *testing.T) {
 
 	assert.Equal(t, int32(1), runtime.startInvoked.Load())
 	assert.False(t, cs.isExecuting.Load(), "isExecuting must be cleared after the session")
+}
+
+// TestRunnerCoordinatesInFlightTurnOnReload is the Phase 4 / T6 acceptance
+// test: a config hot-reload mid-turn must cancel the in-flight turn, wait for
+// it to end, and surface an explicit "config reloaded mid-turn" failure to the
+// manager (not a generic "context canceled" and not a 30-min hang). It
+// exercises the commandStream InFlight/CancelInFlight mechanism end-to-end
+// through the runner's coordinateInFlightTurn glue.
+func TestRunnerCoordinatesInFlightTurnOnReload(t *testing.T) {
+	stream, recorder, cleanup := newTestCommandChannel(t)
+	defer cleanup()
+
+	// A runtime that blocks until cancelled, then finishes with a generic
+	// "context canceled" result — exactly what a pi/ACP executor reports when
+	// its turn ctx is cancelled mid-flight.
+	runtime := newScriptedRuntime(func(r *scriptedRuntime) {
+		<-r.Canceled() // block until CancelInFlight cancels the turn
+		close(r.outputCh)
+		close(r.eventCh)
+		r.resultCh <- executor.Result{ExitCode: -1, ErrorMessage: "context canceled"}
+		close(r.resultCh)
+		close(r.doneCh)
+	})
+
+	cs := &commandStream{
+		newSessionRuntime: func(_ executor.Request) (executor.Runtime, error) {
+			return runtime, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	go cs.runSession(ctx, stream, "drain-reload", "TestAgent")
+
+	// Wait until the turn is in flight before reloading.
+	require.Eventually(t, cs.InFlight, 2*time.Second, 5*time.Millisecond, "turn must become in flight")
+
+	r := &agentRunner{agentName: "agents/x", cs: cs}
+	start := time.Now()
+	// Hot-reload: cancel the in-flight turn and wait for it to end. This must
+	// return quickly (bounded by inFlightTurnTimeout, here near-instant once
+	// the runtime unblocks on cancel), not hang to the turn timeout.
+	r.coordinateInFlightTurn("config reloaded mid-turn")
+	elapsed := time.Since(start)
+
+	assert.GreaterOrEqual(t, runtime.cancelCount.Load(), int32(1), "in-flight turn must be cancelled")
+	assert.Less(t, elapsed, 2*time.Second, "coordination must end fast after cancel, not hang")
+	assert.False(t, cs.InFlight(), "turn must no longer be in flight after coordination")
+
+	require.NoError(t, stream.CloseRequest())
+	msgs := recorder.Messages()
+	require.NotEmpty(t, msgs)
+	result := msgs[len(msgs)-1].GetResult()
+	require.NotNil(t, result, "expected a CommandResult carrying the reload reason")
+	assert.Equal(t, "drain-reload", result.CommandId)
+	assert.Equal(t, "config reloaded mid-turn", result.ErrorMessage, "manager must see the explicit reload reason, not a generic cancel")
 }
 
 // TestDrainOutput_SequenceMonotonic guards the T15 drainOutput rewrite: with
