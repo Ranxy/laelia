@@ -137,6 +137,20 @@ message DeleteGroupRequest {
   ];
 }
 
+// GroupReference is one policy (workspace, agent, or conversation) that binds
+// the group as a member.
+message GroupReference {
+  // The resource name of the policy, e.g. "workspaces/-", "agents/{id}", or
+  // "conversations/{id}".
+  string resource = 1;
+  // The policy resource type: WORKSPACE, AGENT, or CONVERSATION.
+  string resource_type = 2;
+}
+
+message GroupReferences {
+  repeated GroupReference references = 1;
+}
+
 // GroupService manages user groups. Groups are bindable in IAM policies;
 // group owners can manage their own groups without workspace-level group
 // permissions. Groups synced from an external source (SCIM/IdP) are read-only.
@@ -197,5 +211,13 @@ service GroupService {
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.groups.delete";
     option (laelia.v1.audit) = true;
+  }
+
+  // List the policies that bind this group as a member, so owners/admins can
+  // see the impact of deleting it.
+  rpc GetGroupReferences(GetGroupRequest) returns (GroupReferences) {
+    option (google.api.http) = {get: "/v1/{name=groups/*}:references"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.groups.get";
   }
 }

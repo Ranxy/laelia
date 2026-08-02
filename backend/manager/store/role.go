@@ -86,6 +86,44 @@ func (s *Store) GetResourcesUsedByRole(ctx context.Context, role string) ([]*Rol
 	return used, nil
 }
 
+// GetPoliciesUsingMember returns every resource whose IAM policy binds the
+// given member (e.g. "groups/{id}" or "groups/{email}"). It backs the group
+// references display so admins can see which policies a group affects before
+// deleting it.
+func (s *Store) GetPoliciesUsingMember(ctx context.Context, member string) ([]*RoleUsedByResource, error) {
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT resource, resource_type
+		FROM policy
+		CROSS JOIN LATERAL jsonb_array_elements(payload->'bindings') AS binding
+		CROSS JOIN LATERAL jsonb_array_elements_text(binding->'members') AS member
+		WHERE type = $1 AND member = $2
+		GROUP BY resource, resource_type
+	`, models.Policy_IAM.String(), member)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var used []*RoleUsedByResource
+	for rows.Next() {
+		u := &RoleUsedByResource{}
+		var resourceType string
+		if err := rows.Scan(&u.Resource, &resourceType); err != nil {
+			return nil, err
+		}
+		resourceTypeValue, ok := models.Policy_Resource_value[resourceType]
+		if !ok {
+			return nil, errors.Errorf("invalid policy resource type string: %s", resourceType)
+		}
+		u.ResourceType = models.Policy_Resource(resourceTypeValue)
+		used = append(used, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return used, nil
+}
+
 // CreateRole creates a new custom role.
 func (s *Store) CreateRole(ctx context.Context, create *RoleMessage) (*RoleMessage, error) {
 	p := &models.RolePermissions{}

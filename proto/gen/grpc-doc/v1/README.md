@@ -289,6 +289,8 @@
     - [GetGroupRequest](#laelia-v1-GetGroupRequest)
     - [Group](#laelia-v1-Group)
     - [GroupMember](#laelia-v1-GroupMember)
+    - [GroupReference](#laelia-v1-GroupReference)
+    - [GroupReferences](#laelia-v1-GroupReferences)
     - [ListGroupsRequest](#laelia-v1-ListGroupsRequest)
     - [ListGroupsResponse](#laelia-v1-ListGroupsResponse)
     - [UpdateGroupRequest](#laelia-v1-UpdateGroupRequest)
@@ -5048,6 +5050,38 @@ The IAM engine expands a group&#39;s members at authorization time.
 
 
 
+<a name="laelia-v1-GroupReference"></a>
+
+### GroupReference
+GroupReference is one policy (workspace, agent, or conversation) that binds
+the group as a member.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| resource | [string](#string) |  | The resource name of the policy, e.g. &#34;workspaces/-&#34;, &#34;agents/{id}&#34;, or &#34;conversations/{id}&#34;. |
+| resource_type | [string](#string) |  | The policy resource type: WORKSPACE, AGENT, or CONVERSATION. |
+
+
+
+
+
+
+<a name="laelia-v1-GroupReferences"></a>
+
+### GroupReferences
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| references | [GroupReference](#laelia-v1-GroupReference) | repeated |  |
+
+
+
+
+
+
 <a name="laelia-v1-ListGroupsRequest"></a>
 
 ### ListGroupsRequest
@@ -5131,6 +5165,7 @@ permissions. Groups synced from an external source (SCIM/IdP) are read-only.
 | CreateGroup | [CreateGroupRequest](#laelia-v1-CreateGroupRequest) | [Group](#laelia-v1-Group) | Create a group. Any authenticated member can create a group; the creator is not automatically added (the request must carry at least one OWNER). |
 | UpdateGroup | [UpdateGroupRequest](#laelia-v1-UpdateGroupRequest) | [Group](#laelia-v1-Group) | Update a group (title, description, members). The group owner or a caller holding laelia.groups.update may update. |
 | DeleteGroup | [DeleteGroupRequest](#laelia-v1-DeleteGroupRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Delete a group. The group owner or a caller holding laelia.groups.delete may delete. Existing IAM bindings referencing the group become no-ops. |
+| GetGroupReferences | [GetGroupRequest](#laelia-v1-GetGroupRequest) | [GroupReferences](#laelia-v1-GroupReferences) | List the policies that bind this group as a member, so owners/admins can see the impact of deleting it. |
 
  
 

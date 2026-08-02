@@ -1,5 +1,5 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertDialog,
@@ -45,6 +45,7 @@ import { State } from "@/types/proto-es/v1/common_pb";
 import {
   type Group,
   GroupMemberRole,
+  type GroupReference,
 } from "@/types/proto-es/v1/group_service_pb";
 import { type User } from "@/types/proto-es/v1/user_service_pb";
 
@@ -101,6 +102,10 @@ export function SettingsGroupsPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Group | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [refsByGroup, setRefsByGroup] = useState<Map<string, GroupReference[]>>(
+    new Map()
+  );
+  const [expandedRefs, setExpandedRefs] = useState<Set<string>>(new Set());
 
   const activeUsers = useMemo(
     () => users.filter((u) => u.state === State.ACTIVE),
@@ -116,6 +121,22 @@ export function SettingsGroupsPage() {
       ]);
       setGroups(groupRes.groups ?? []);
       setUsers(userRes.users ?? []);
+      // Fetch references for every group in parallel so the table can show
+      // how many policies bind each group before deletion.
+      const refs = new Map<string, GroupReference[]>();
+      await Promise.all(
+        (groupRes.groups ?? []).map(async (g) => {
+          try {
+            const res = await groupServiceClient.getGroupReferences({
+              name: g.name ?? "",
+            });
+            refs.set(g.name ?? "", res.references ?? []);
+          } catch {
+            refs.set(g.name ?? "", []);
+          }
+        })
+      );
+      setRefsByGroup(refs);
     } catch (err) {
       toastManager.add({
         type: "error",
@@ -300,66 +321,113 @@ export function SettingsGroupsPage() {
             <TableHead>{t("settings.groups.header-email")}</TableHead>
             <TableHead>{t("settings.groups.header-members")}</TableHead>
             <TableHead>{t("settings.groups.header-source")}</TableHead>
+            <TableHead>{t("settings.groups.header-references")}</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
-          {groups.map((group) => (
-            <TableRow key={group.name}>
-              <TableCell className="font-medium text-main">
-                {group.title}
-              </TableCell>
-              <TableCell className="text-control-light">
-                {group.email}
-              </TableCell>
-              <TableCell>{group.members?.length ?? 0}</TableCell>
-              <TableCell>
-                {group.source ? (
-                  <Badge variant="secondary">
-                    {t("settings.groups.source-external")}
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary">
-                    {t("settings.groups.source-manual")}
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex justify-end gap-2">
-                  {group.canManage && !group.source && (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditTarget(group);
-                          setEditForm(groupToForm(group));
-                          setEditOpen(true);
-                        }}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
+          {groups.map((group) => {
+            const refs = refsByGroup.get(group.name ?? "") ?? [];
+            const expanded = expandedRefs.has(group.name ?? "");
+            return (
+              <Fragment key={group.name}>
+                <TableRow>
+                  <TableCell className="font-medium text-main">
+                    {group.title}
+                  </TableCell>
+                  <TableCell className="text-control-light">
+                    {group.email}
+                  </TableCell>
+                  <TableCell>{group.members?.length ?? 0}</TableCell>
+                  <TableCell>
+                    {group.source ? (
+                      <Badge variant="secondary">
+                        {t("settings.groups.source-external")}
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">
+                        {t("settings.groups.source-manual")}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {refs.length > 0 ? (
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-danger"
-                        onClick={() => {
-                          setDeleteTarget(group);
-                          setDeleteOpen(true);
-                        }}
+                        onClick={() =>
+                          setExpandedRefs((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(group.name ?? ""))
+                              next.delete(group.name ?? "");
+                            else next.add(group.name ?? "");
+                            return next;
+                          })
+                        }
+                        aria-expanded={expanded}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        {t("settings.groups.references-count", {
+                          count: refs.length,
+                        })}
                       </Button>
-                    </>
-                  )}
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
+                    ) : (
+                      <span className="text-control-placeholder">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      {group.canManage && !group.source && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditTarget(group);
+                              setEditForm(groupToForm(group));
+                              setEditOpen(true);
+                            }}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-danger"
+                            onClick={() => {
+                              setDeleteTarget(group);
+                              setDeleteOpen(true);
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+                {expanded && refs.length > 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6}>
+                      <div className="flex flex-col gap-1 py-1">
+                        {refs.map((r) => (
+                          <span
+                            key={`${r.resourceType}-${r.resource}`}
+                            className="font-mono text-xs text-control-light"
+                          >
+                            {r.resource} ({r.resourceType})
+                          </span>
+                        ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </Fragment>
+            );
+          })}
           {groups.length === 0 && !loading && (
             <TableRow>
               <TableCell
-                colSpan={5}
+                colSpan={6}
                 className="text-center text-control-light py-8"
               >
                 {t("settings.groups.no-groups")}

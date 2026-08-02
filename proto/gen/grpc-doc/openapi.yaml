@@ -2496,6 +2496,34 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/groups/{group}:references:
+        get:
+            tags:
+                - GroupService
+            description: |-
+                List the policies that bind this group as a member, so owners/admins can
+                 see the impact of deleting it.
+            operationId: GroupService_GetGroupReferences
+            parameters:
+                - name: group
+                  in: path
+                  description: The group id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GroupReferences'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/groups:batchGet:
         get:
             tags:
@@ -5445,6 +5473,27 @@ components:
                     type: string
                     description: The member's role in the group.
                     format: enum
+        GroupReference:
+            type: object
+            properties:
+                resource:
+                    type: string
+                    description: |-
+                        The resource name of the policy, e.g. "workspaces/-", "agents/{id}", or
+                         "conversations/{id}".
+                resourceType:
+                    type: string
+                    description: 'The policy resource type: WORKSPACE, AGENT, or CONVERSATION.'
+            description: |-
+                GroupReference is one policy (workspace, agent, or conversation) that binds
+                 the group as a member.
+        GroupReferences:
+            type: object
+            properties:
+                references:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/GroupReference'
         HelloRequest:
             type: object
             properties: {}

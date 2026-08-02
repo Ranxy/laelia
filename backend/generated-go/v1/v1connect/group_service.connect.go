@@ -50,6 +50,9 @@ const (
 	// GroupServiceDeleteGroupProcedure is the fully-qualified name of the GroupService's DeleteGroup
 	// RPC.
 	GroupServiceDeleteGroupProcedure = "/laelia.v1.GroupService/DeleteGroup"
+	// GroupServiceGetGroupReferencesProcedure is the fully-qualified name of the GroupService's
+	// GetGroupReferences RPC.
+	GroupServiceGetGroupReferencesProcedure = "/laelia.v1.GroupService/GetGroupReferences"
 )
 
 // GroupServiceClient is a client for the laelia.v1.GroupService service.
@@ -69,6 +72,9 @@ type GroupServiceClient interface {
 	// Delete a group. The group owner or a caller holding laelia.groups.delete
 	// may delete. Existing IAM bindings referencing the group become no-ops.
 	DeleteGroup(context.Context, *connect.Request[v1.DeleteGroupRequest]) (*connect.Response[emptypb.Empty], error)
+	// List the policies that bind this group as a member, so owners/admins can
+	// see the impact of deleting it.
+	GetGroupReferences(context.Context, *connect.Request[v1.GetGroupRequest]) (*connect.Response[v1.GroupReferences], error)
 }
 
 // NewGroupServiceClient constructs a client for the laelia.v1.GroupService service. By default, it
@@ -118,17 +124,24 @@ func NewGroupServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(groupServiceMethods.ByName("DeleteGroup")),
 			connect.WithClientOptions(opts...),
 		),
+		getGroupReferences: connect.NewClient[v1.GetGroupRequest, v1.GroupReferences](
+			httpClient,
+			baseURL+GroupServiceGetGroupReferencesProcedure,
+			connect.WithSchema(groupServiceMethods.ByName("GetGroupReferences")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // groupServiceClient implements GroupServiceClient.
 type groupServiceClient struct {
-	getGroup       *connect.Client[v1.GetGroupRequest, v1.Group]
-	batchGetGroups *connect.Client[v1.BatchGetGroupsRequest, v1.BatchGetGroupsResponse]
-	listGroups     *connect.Client[v1.ListGroupsRequest, v1.ListGroupsResponse]
-	createGroup    *connect.Client[v1.CreateGroupRequest, v1.Group]
-	updateGroup    *connect.Client[v1.UpdateGroupRequest, v1.Group]
-	deleteGroup    *connect.Client[v1.DeleteGroupRequest, emptypb.Empty]
+	getGroup           *connect.Client[v1.GetGroupRequest, v1.Group]
+	batchGetGroups     *connect.Client[v1.BatchGetGroupsRequest, v1.BatchGetGroupsResponse]
+	listGroups         *connect.Client[v1.ListGroupsRequest, v1.ListGroupsResponse]
+	createGroup        *connect.Client[v1.CreateGroupRequest, v1.Group]
+	updateGroup        *connect.Client[v1.UpdateGroupRequest, v1.Group]
+	deleteGroup        *connect.Client[v1.DeleteGroupRequest, emptypb.Empty]
+	getGroupReferences *connect.Client[v1.GetGroupRequest, v1.GroupReferences]
 }
 
 // GetGroup calls laelia.v1.GroupService.GetGroup.
@@ -161,6 +174,11 @@ func (c *groupServiceClient) DeleteGroup(ctx context.Context, req *connect.Reque
 	return c.deleteGroup.CallUnary(ctx, req)
 }
 
+// GetGroupReferences calls laelia.v1.GroupService.GetGroupReferences.
+func (c *groupServiceClient) GetGroupReferences(ctx context.Context, req *connect.Request[v1.GetGroupRequest]) (*connect.Response[v1.GroupReferences], error) {
+	return c.getGroupReferences.CallUnary(ctx, req)
+}
+
 // GroupServiceHandler is an implementation of the laelia.v1.GroupService service.
 type GroupServiceHandler interface {
 	// Get a group. Group members and callers holding laelia.groups.get can read.
@@ -178,6 +196,9 @@ type GroupServiceHandler interface {
 	// Delete a group. The group owner or a caller holding laelia.groups.delete
 	// may delete. Existing IAM bindings referencing the group become no-ops.
 	DeleteGroup(context.Context, *connect.Request[v1.DeleteGroupRequest]) (*connect.Response[emptypb.Empty], error)
+	// List the policies that bind this group as a member, so owners/admins can
+	// see the impact of deleting it.
+	GetGroupReferences(context.Context, *connect.Request[v1.GetGroupRequest]) (*connect.Response[v1.GroupReferences], error)
 }
 
 // NewGroupServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -223,6 +244,12 @@ func NewGroupServiceHandler(svc GroupServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(groupServiceMethods.ByName("DeleteGroup")),
 		connect.WithHandlerOptions(opts...),
 	)
+	groupServiceGetGroupReferencesHandler := connect.NewUnaryHandler(
+		GroupServiceGetGroupReferencesProcedure,
+		svc.GetGroupReferences,
+		connect.WithSchema(groupServiceMethods.ByName("GetGroupReferences")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/laelia.v1.GroupService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case GroupServiceGetGroupProcedure:
@@ -237,6 +264,8 @@ func NewGroupServiceHandler(svc GroupServiceHandler, opts ...connect.HandlerOpti
 			groupServiceUpdateGroupHandler.ServeHTTP(w, r)
 		case GroupServiceDeleteGroupProcedure:
 			groupServiceDeleteGroupHandler.ServeHTTP(w, r)
+		case GroupServiceGetGroupReferencesProcedure:
+			groupServiceGetGroupReferencesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -268,4 +297,8 @@ func (UnimplementedGroupServiceHandler) UpdateGroup(context.Context, *connect.Re
 
 func (UnimplementedGroupServiceHandler) DeleteGroup(context.Context, *connect.Request[v1.DeleteGroupRequest]) (*connect.Response[emptypb.Empty], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.GroupService.DeleteGroup is not implemented"))
+}
+
+func (UnimplementedGroupServiceHandler) GetGroupReferences(context.Context, *connect.Request[v1.GetGroupRequest]) (*connect.Response[v1.GroupReferences], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.GroupService.GetGroupReferences is not implemented"))
 }

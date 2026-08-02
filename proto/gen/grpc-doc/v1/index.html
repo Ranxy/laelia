@@ -1300,6 +1300,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.GroupReference"><span class="badge">M</span>GroupReference</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GroupReferences"><span class="badge">M</span>GroupReferences</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ListGroupsRequest"><span class="badge">M</span>ListGroupsRequest</a>
                 </li>
               
@@ -13436,6 +13444,62 @@ group OWNER or holds laelia.groups.update. Populated for the caller only. </p></
 
         
       
+        <h3 id="laelia.v1.GroupReference">GroupReference</h3>
+        <p>GroupReference is one policy (workspace, agent, or conversation) that binds</p><p>the group as a member.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>resource</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The resource name of the policy, e.g. &#34;workspaces/-&#34;, &#34;agents/{id}&#34;, or
+&#34;conversations/{id}&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>resource_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The policy resource type: WORKSPACE, AGENT, or CONVERSATION. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GroupReferences">GroupReferences</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>references</td>
+                  <td><a href="#laelia.v1.GroupReference">GroupReference</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ListGroupsRequest">ListGroupsRequest</h3>
         <p></p>
 
@@ -13628,6 +13692,14 @@ holding laelia.groups.update may update.</p></td>
 may delete. Existing IAM bindings referencing the group become no-ops.</p></td>
               </tr>
             
+              <tr>
+                <td>GetGroupReferences</td>
+                <td><a href="#laelia.v1.GetGroupRequest">GetGroupRequest</a></td>
+                <td><a href="#laelia.v1.GroupReferences">GroupReferences</a></td>
+                <td><p>List the policies that bind this group as a member, so owners/admins can
+see the impact of deleting it.</p></td>
+              </tr>
+            
           </tbody>
         </table>
 
@@ -13702,6 +13774,16 @@ may delete. Existing IAM bindings referencing the group become no-ops.</p></td>
                 <td>DeleteGroup</td>
                 <td>DELETE</td>
                 <td>/v1/{name=groups/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetGroupReferences</td>
+                <td>GET</td>
+                <td>/v1/{name=groups/*}:references</td>
                 <td></td>
               </tr>
               

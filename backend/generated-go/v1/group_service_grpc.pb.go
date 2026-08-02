@@ -20,12 +20,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GroupService_GetGroup_FullMethodName       = "/laelia.v1.GroupService/GetGroup"
-	GroupService_BatchGetGroups_FullMethodName = "/laelia.v1.GroupService/BatchGetGroups"
-	GroupService_ListGroups_FullMethodName     = "/laelia.v1.GroupService/ListGroups"
-	GroupService_CreateGroup_FullMethodName    = "/laelia.v1.GroupService/CreateGroup"
-	GroupService_UpdateGroup_FullMethodName    = "/laelia.v1.GroupService/UpdateGroup"
-	GroupService_DeleteGroup_FullMethodName    = "/laelia.v1.GroupService/DeleteGroup"
+	GroupService_GetGroup_FullMethodName           = "/laelia.v1.GroupService/GetGroup"
+	GroupService_BatchGetGroups_FullMethodName     = "/laelia.v1.GroupService/BatchGetGroups"
+	GroupService_ListGroups_FullMethodName         = "/laelia.v1.GroupService/ListGroups"
+	GroupService_CreateGroup_FullMethodName        = "/laelia.v1.GroupService/CreateGroup"
+	GroupService_UpdateGroup_FullMethodName        = "/laelia.v1.GroupService/UpdateGroup"
+	GroupService_DeleteGroup_FullMethodName        = "/laelia.v1.GroupService/DeleteGroup"
+	GroupService_GetGroupReferences_FullMethodName = "/laelia.v1.GroupService/GetGroupReferences"
 )
 
 // GroupServiceClient is the client API for GroupService service.
@@ -51,6 +52,9 @@ type GroupServiceClient interface {
 	// Delete a group. The group owner or a caller holding laelia.groups.delete
 	// may delete. Existing IAM bindings referencing the group become no-ops.
 	DeleteGroup(ctx context.Context, in *DeleteGroupRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// List the policies that bind this group as a member, so owners/admins can
+	// see the impact of deleting it.
+	GetGroupReferences(ctx context.Context, in *GetGroupRequest, opts ...grpc.CallOption) (*GroupReferences, error)
 }
 
 type groupServiceClient struct {
@@ -121,6 +125,16 @@ func (c *groupServiceClient) DeleteGroup(ctx context.Context, in *DeleteGroupReq
 	return out, nil
 }
 
+func (c *groupServiceClient) GetGroupReferences(ctx context.Context, in *GetGroupRequest, opts ...grpc.CallOption) (*GroupReferences, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GroupReferences)
+	err := c.cc.Invoke(ctx, GroupService_GetGroupReferences_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GroupServiceServer is the server API for GroupService service.
 // All implementations must embed UnimplementedGroupServiceServer
 // for forward compatibility.
@@ -144,6 +158,9 @@ type GroupServiceServer interface {
 	// Delete a group. The group owner or a caller holding laelia.groups.delete
 	// may delete. Existing IAM bindings referencing the group become no-ops.
 	DeleteGroup(context.Context, *DeleteGroupRequest) (*emptypb.Empty, error)
+	// List the policies that bind this group as a member, so owners/admins can
+	// see the impact of deleting it.
+	GetGroupReferences(context.Context, *GetGroupRequest) (*GroupReferences, error)
 	mustEmbedUnimplementedGroupServiceServer()
 }
 
@@ -171,6 +188,9 @@ func (UnimplementedGroupServiceServer) UpdateGroup(context.Context, *UpdateGroup
 }
 func (UnimplementedGroupServiceServer) DeleteGroup(context.Context, *DeleteGroupRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteGroup not implemented")
+}
+func (UnimplementedGroupServiceServer) GetGroupReferences(context.Context, *GetGroupRequest) (*GroupReferences, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetGroupReferences not implemented")
 }
 func (UnimplementedGroupServiceServer) mustEmbedUnimplementedGroupServiceServer() {}
 func (UnimplementedGroupServiceServer) testEmbeddedByValue()                      {}
@@ -301,6 +321,24 @@ func _GroupService_DeleteGroup_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GroupService_GetGroupReferences_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).GetGroupReferences(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_GetGroupReferences_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).GetGroupReferences(ctx, req.(*GetGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GroupService_ServiceDesc is the grpc.ServiceDesc for GroupService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -331,6 +369,10 @@ var GroupService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteGroup",
 			Handler:    _GroupService_DeleteGroup_Handler,
+		},
+		{
+			MethodName: "GetGroupReferences",
+			Handler:    _GroupService_GetGroupReferences_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

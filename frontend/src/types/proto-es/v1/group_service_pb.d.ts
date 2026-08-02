@@ -289,6 +289,51 @@ export declare type DeleteGroupRequest = Message<"laelia.v1.DeleteGroupRequest">
 export declare const DeleteGroupRequestSchema: GenMessage<DeleteGroupRequest>;
 
 /**
+ * GroupReference is one policy (workspace, agent, or conversation) that binds
+ * the group as a member.
+ *
+ * @generated from message laelia.v1.GroupReference
+ */
+export declare type GroupReference = Message<"laelia.v1.GroupReference"> & {
+  /**
+   * The resource name of the policy, e.g. "workspaces/-", "agents/{id}", or
+   * "conversations/{id}".
+   *
+   * @generated from field: string resource = 1;
+   */
+  resource: string;
+
+  /**
+   * The policy resource type: WORKSPACE, AGENT, or CONVERSATION.
+   *
+   * @generated from field: string resource_type = 2;
+   */
+  resourceType: string;
+};
+
+/**
+ * Describes the message laelia.v1.GroupReference.
+ * Use `create(GroupReferenceSchema)` to create a new message.
+ */
+export declare const GroupReferenceSchema: GenMessage<GroupReference>;
+
+/**
+ * @generated from message laelia.v1.GroupReferences
+ */
+export declare type GroupReferences = Message<"laelia.v1.GroupReferences"> & {
+  /**
+   * @generated from field: repeated laelia.v1.GroupReference references = 1;
+   */
+  references: GroupReference[];
+};
+
+/**
+ * Describes the message laelia.v1.GroupReferences.
+ * Use `create(GroupReferencesSchema)` to create a new message.
+ */
+export declare const GroupReferencesSchema: GenMessage<GroupReferences>;
+
+/**
  * @generated from enum laelia.v1.GroupMemberRole
  */
 export enum GroupMemberRole {
@@ -386,6 +431,17 @@ export declare const GroupService: GenService<{
     methodKind: "unary";
     input: typeof DeleteGroupRequestSchema;
     output: typeof EmptySchema;
+  },
+  /**
+   * List the policies that bind this group as a member, so owners/admins can
+   * see the impact of deleting it.
+   *
+   * @generated from rpc laelia.v1.GroupService.GetGroupReferences
+   */
+  getGroupReferences: {
+    methodKind: "unary";
+    input: typeof GetGroupRequestSchema;
+    output: typeof GroupReferencesSchema;
   },
 }>;
 

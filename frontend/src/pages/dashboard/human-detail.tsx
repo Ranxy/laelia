@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  groupServiceClient,
   iamServiceClient,
   roleServiceClient,
   userServiceClient,
@@ -31,6 +32,7 @@ import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/auth";
 import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
+import { type Group } from "@/types/proto-es/v1/group_service_pb";
 import type { Role } from "@/types/proto-es/v1/role_service_pb";
 import {
   DeleteAvatarRequestSchema,
@@ -107,9 +109,40 @@ export function HumanDetailPage() {
     }
   }
 
-  // Role badges from the workspace IAM policy. Fetched only when the caller
+  // Role bindings from the workspace IAM policy with their source: held
+  // directly or via a group the user belongs to. Fetched only when the caller
   // may read the policy; otherwise the Role row is hidden.
-  const [roleTitles, setRoleTitles] = useState<string[]>([]);
+  interface RoleBindingInfo {
+    role: string;
+    title: string;
+    source: "direct" | "group";
+    sourceName: string;
+  }
+  const [roleBindings, setRoleBindings] = useState<RoleBindingInfo[]>([]);
+  // groups/{id} and groups/{email} -> group, for titles.
+  const [groupByMember, setGroupByMember] = useState<Map<string, Group>>(
+    new Map()
+  );
+
+  useEffect(() => {
+    let active = true;
+    groupServiceClient
+      .listGroups({ pageSize: 1000 })
+      .then((res) => {
+        if (!active) return;
+        const byMember = new Map<string, Group>();
+        for (const g of res.groups ?? []) {
+          byMember.set(g.name ?? "", g);
+          if (g.email) byMember.set(`groups/${g.email}`, g);
+        }
+        setGroupByMember(byMember);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
   useEffect(() => {
     if (!canGetPolicy || !user) return;
     let active = true;
@@ -122,16 +155,36 @@ export function HumanDetailPage() {
         if (!active) return;
         const roleById = new Map<string, Role>();
         for (const r of rolesRes.roles ?? []) roleById.set(r.name, r);
-        const titles: string[] = [];
+        const userGroups = new Set(user.groups ?? []);
+        const bindings: RoleBindingInfo[] = [];
         for (const binding of policyRes.policy?.bindings ?? []) {
+          const title =
+            roleById.get(binding.role)?.title ||
+            binding.role.replace(/^roles\//, "");
           if (binding.members.includes(user.name)) {
-            const role = roleById.get(binding.role);
-            titles.push(role?.title || binding.role.replace(/^roles\//, ""));
+            bindings.push({
+              role: binding.role,
+              title,
+              source: "direct",
+              sourceName: "",
+            });
+            continue;
+          }
+          for (const member of binding.members) {
+            if (member.startsWith("groups/") && userGroups.has(member)) {
+              bindings.push({
+                role: binding.role,
+                title,
+                source: "group",
+                sourceName: member,
+              });
+              break;
+            }
           }
         }
-        setRoleTitles(titles);
+        setRoleBindings(bindings);
       } catch {
-        if (active) setRoleTitles([]);
+        if (active) setRoleBindings([]);
       }
     })();
     return () => {
@@ -382,19 +435,51 @@ export function HumanDetailPage() {
               <div className="mb-1 text-xs text-control-light">
                 {t("members.human.role")}
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {roleTitles.length === 0 ? (
+              <div className="flex flex-col gap-1.5">
+                {roleBindings.length === 0 ? (
                   <span className="text-sm text-control-light">—</span>
                 ) : (
-                  roleTitles.map((title) => (
-                    <Badge key={title} variant="secondary">
-                      {title}
-                    </Badge>
+                  roleBindings.map((rb) => (
+                    <div
+                      key={`${rb.role}-${rb.source}-${rb.sourceName}`}
+                      className="flex flex-wrap items-center gap-1.5"
+                    >
+                      <Badge variant="secondary">{rb.title}</Badge>
+                      {rb.source === "direct" ? (
+                        <Badge variant="default" className="text-xs">
+                          {t("members.human.role-source-direct")}
+                        </Badge>
+                      ) : (
+                        <Badge variant="warning" className="text-xs">
+                          {t("members.human.role-source-group", {
+                            group:
+                              groupByMember.get(rb.sourceName)?.title ||
+                              rb.sourceName.replace(/^groups\//, ""),
+                          })}
+                        </Badge>
+                      )}
+                    </div>
                   ))
                 )}
               </div>
             </div>
           )}
+          <div>
+            <div className="mb-1 text-xs text-control-light">
+              {t("members.human.groups")}
+            </div>
+            {user.groups?.length ? (
+              <div className="flex flex-wrap gap-1.5">
+                {user.groups.map((g) => (
+                  <Badge key={g} variant="secondary">
+                    {groupByMember.get(g)?.title || g.replace(/^groups\//, "")}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <span className="text-sm text-control-light">—</span>
+            )}
+          </div>
           <div>
             <div className="mb-1 text-xs text-control-light">
               {t("members.human.email")}

@@ -652,6 +652,107 @@ func (x *DeleteGroupRequest) GetName() string {
 	return ""
 }
 
+// GroupReference is one policy (workspace, agent, or conversation) that binds
+// the group as a member.
+type GroupReference struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The resource name of the policy, e.g. "workspaces/-", "agents/{id}", or
+	// "conversations/{id}".
+	Resource string `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	// The policy resource type: WORKSPACE, AGENT, or CONVERSATION.
+	ResourceType  string `protobuf:"bytes,2,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GroupReference) Reset() {
+	*x = GroupReference{}
+	mi := &file_v1_group_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GroupReference) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GroupReference) ProtoMessage() {}
+
+func (x *GroupReference) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_group_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GroupReference.ProtoReflect.Descriptor instead.
+func (*GroupReference) Descriptor() ([]byte, []int) {
+	return file_v1_group_service_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GroupReference) GetResource() string {
+	if x != nil {
+		return x.Resource
+	}
+	return ""
+}
+
+func (x *GroupReference) GetResourceType() string {
+	if x != nil {
+		return x.ResourceType
+	}
+	return ""
+}
+
+type GroupReferences struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	References    []*GroupReference      `protobuf:"bytes,1,rep,name=references,proto3" json:"references,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GroupReferences) Reset() {
+	*x = GroupReferences{}
+	mi := &file_v1_group_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GroupReferences) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GroupReferences) ProtoMessage() {}
+
+func (x *GroupReferences) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_group_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GroupReferences.ProtoReflect.Descriptor instead.
+func (*GroupReferences) Descriptor() ([]byte, []int) {
+	return file_v1_group_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GroupReferences) GetReferences() []*GroupReference {
+	if x != nil {
+		return x.References
+	}
+	return nil
+}
+
 var File_v1_group_service_proto protoreflect.FileDescriptor
 
 const file_v1_group_service_proto_rawDesc = "" +
@@ -698,12 +799,19 @@ const file_v1_group_service_proto_rawDesc = "" +
 	"updateMask\">\n" +
 	"\x12DeleteGroupRequest\x12(\n" +
 	"\x04name\x18\x01 \x01(\tB\x14\xe0A\x02\xfaA\x0e\n" +
-	"\flaelia/GroupR\x04name*K\n" +
+	"\flaelia/GroupR\x04name\"Q\n" +
+	"\x0eGroupReference\x12\x1a\n" +
+	"\bresource\x18\x01 \x01(\tR\bresource\x12#\n" +
+	"\rresource_type\x18\x02 \x01(\tR\fresourceType\"L\n" +
+	"\x0fGroupReferences\x129\n" +
+	"\n" +
+	"references\x18\x01 \x03(\v2\x19.laelia.v1.GroupReferenceR\n" +
+	"references*K\n" +
 	"\x0fGroupMemberRole\x12!\n" +
 	"\x1dGROUP_MEMBER_ROLE_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05OWNER\x10\x01\x12\n" +
 	"\n" +
-	"\x06MEMBER\x10\x022\xc2\x06\n" +
+	"\x06MEMBER\x10\x022\xd2\a\n" +
 	"\fGroupService\x12u\n" +
 	"\bGetGroup\x12\x1a.laelia.v1.GetGroupRequest\x1a\x10.laelia.v1.Group\";\xdaA\x04name\x8a\xea0\x11laelia.groups.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/{name=groups/*}\x12\x8b\x01\n" +
 	"\x0eBatchGetGroups\x12 .laelia.v1.BatchGetGroupsRequest\x1a!.laelia.v1.BatchGetGroupsResponse\"4\x8a\xea0\x11laelia.groups.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/groups:batchGet\x12w\n" +
@@ -713,7 +821,8 @@ const file_v1_group_service_proto_rawDesc = "" +
 	"\vCreateGroup\x12\x1d.laelia.v1.CreateGroupRequest\x1a\x10.laelia.v1.Group\"I\xdaA\x11group_email,group\x8a\xea0\x14laelia.groups.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x0f:\x01*\"\n" +
 	"/v1/groups\x12\x9c\x01\n" +
 	"\vUpdateGroup\x12\x1d.laelia.v1.UpdateGroupRequest\x1a\x10.laelia.v1.Group\"\\\xdaA\x11group,update_mask\x8a\xea0\x14laelia.groups.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\":\x05group2\x19/v1/{group.name=groups/*}\x12\x88\x01\n" +
-	"\vDeleteGroup\x12\x1d.laelia.v1.DeleteGroupRequest\x1a\x16.google.protobuf.Empty\"B\xdaA\x04name\x8a\xea0\x14laelia.groups.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x15*\x13/v1/{name=groups/*}B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"\vDeleteGroup\x12\x1d.laelia.v1.DeleteGroupRequest\x1a\x16.google.protobuf.Empty\"B\xdaA\x04name\x8a\xea0\x14laelia.groups.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x15*\x13/v1/{name=groups/*}\x12\x8d\x01\n" +
+	"\x12GetGroupReferences\x12\x1a.laelia.v1.GetGroupRequest\x1a\x1a.laelia.v1.GroupReferences\"?\x8a\xea0\x11laelia.groups.get\x90\xea0\x01\x82\xd3\xe4\x93\x02 \x12\x1e/v1/{name=groups/*}:referencesB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_group_service_proto_rawDescOnce sync.Once
@@ -728,7 +837,7 @@ func file_v1_group_service_proto_rawDescGZIP() []byte {
 }
 
 var file_v1_group_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_v1_group_service_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_v1_group_service_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_v1_group_service_proto_goTypes = []any{
 	(GroupMemberRole)(0),           // 0: laelia.v1.GroupMemberRole
 	(*Group)(nil),                  // 1: laelia.v1.Group
@@ -741,8 +850,10 @@ var file_v1_group_service_proto_goTypes = []any{
 	(*CreateGroupRequest)(nil),     // 8: laelia.v1.CreateGroupRequest
 	(*UpdateGroupRequest)(nil),     // 9: laelia.v1.UpdateGroupRequest
 	(*DeleteGroupRequest)(nil),     // 10: laelia.v1.DeleteGroupRequest
-	(*fieldmaskpb.FieldMask)(nil),  // 11: google.protobuf.FieldMask
-	(*emptypb.Empty)(nil),          // 12: google.protobuf.Empty
+	(*GroupReference)(nil),         // 11: laelia.v1.GroupReference
+	(*GroupReferences)(nil),        // 12: laelia.v1.GroupReferences
+	(*fieldmaskpb.FieldMask)(nil),  // 13: google.protobuf.FieldMask
+	(*emptypb.Empty)(nil),          // 14: google.protobuf.Empty
 }
 var file_v1_group_service_proto_depIdxs = []int32{
 	2,  // 0: laelia.v1.Group.members:type_name -> laelia.v1.GroupMember
@@ -751,24 +862,27 @@ var file_v1_group_service_proto_depIdxs = []int32{
 	1,  // 3: laelia.v1.ListGroupsResponse.groups:type_name -> laelia.v1.Group
 	1,  // 4: laelia.v1.CreateGroupRequest.group:type_name -> laelia.v1.Group
 	1,  // 5: laelia.v1.UpdateGroupRequest.group:type_name -> laelia.v1.Group
-	11, // 6: laelia.v1.UpdateGroupRequest.update_mask:type_name -> google.protobuf.FieldMask
-	3,  // 7: laelia.v1.GroupService.GetGroup:input_type -> laelia.v1.GetGroupRequest
-	4,  // 8: laelia.v1.GroupService.BatchGetGroups:input_type -> laelia.v1.BatchGetGroupsRequest
-	6,  // 9: laelia.v1.GroupService.ListGroups:input_type -> laelia.v1.ListGroupsRequest
-	8,  // 10: laelia.v1.GroupService.CreateGroup:input_type -> laelia.v1.CreateGroupRequest
-	9,  // 11: laelia.v1.GroupService.UpdateGroup:input_type -> laelia.v1.UpdateGroupRequest
-	10, // 12: laelia.v1.GroupService.DeleteGroup:input_type -> laelia.v1.DeleteGroupRequest
-	1,  // 13: laelia.v1.GroupService.GetGroup:output_type -> laelia.v1.Group
-	5,  // 14: laelia.v1.GroupService.BatchGetGroups:output_type -> laelia.v1.BatchGetGroupsResponse
-	7,  // 15: laelia.v1.GroupService.ListGroups:output_type -> laelia.v1.ListGroupsResponse
-	1,  // 16: laelia.v1.GroupService.CreateGroup:output_type -> laelia.v1.Group
-	1,  // 17: laelia.v1.GroupService.UpdateGroup:output_type -> laelia.v1.Group
-	12, // 18: laelia.v1.GroupService.DeleteGroup:output_type -> google.protobuf.Empty
-	13, // [13:19] is the sub-list for method output_type
-	7,  // [7:13] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	13, // 6: laelia.v1.UpdateGroupRequest.update_mask:type_name -> google.protobuf.FieldMask
+	11, // 7: laelia.v1.GroupReferences.references:type_name -> laelia.v1.GroupReference
+	3,  // 8: laelia.v1.GroupService.GetGroup:input_type -> laelia.v1.GetGroupRequest
+	4,  // 9: laelia.v1.GroupService.BatchGetGroups:input_type -> laelia.v1.BatchGetGroupsRequest
+	6,  // 10: laelia.v1.GroupService.ListGroups:input_type -> laelia.v1.ListGroupsRequest
+	8,  // 11: laelia.v1.GroupService.CreateGroup:input_type -> laelia.v1.CreateGroupRequest
+	9,  // 12: laelia.v1.GroupService.UpdateGroup:input_type -> laelia.v1.UpdateGroupRequest
+	10, // 13: laelia.v1.GroupService.DeleteGroup:input_type -> laelia.v1.DeleteGroupRequest
+	3,  // 14: laelia.v1.GroupService.GetGroupReferences:input_type -> laelia.v1.GetGroupRequest
+	1,  // 15: laelia.v1.GroupService.GetGroup:output_type -> laelia.v1.Group
+	5,  // 16: laelia.v1.GroupService.BatchGetGroups:output_type -> laelia.v1.BatchGetGroupsResponse
+	7,  // 17: laelia.v1.GroupService.ListGroups:output_type -> laelia.v1.ListGroupsResponse
+	1,  // 18: laelia.v1.GroupService.CreateGroup:output_type -> laelia.v1.Group
+	1,  // 19: laelia.v1.GroupService.UpdateGroup:output_type -> laelia.v1.Group
+	14, // 20: laelia.v1.GroupService.DeleteGroup:output_type -> google.protobuf.Empty
+	12, // 21: laelia.v1.GroupService.GetGroupReferences:output_type -> laelia.v1.GroupReferences
+	15, // [15:22] is the sub-list for method output_type
+	8,  // [8:15] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_v1_group_service_proto_init() }
@@ -783,7 +897,7 @@ func file_v1_group_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_group_service_proto_rawDesc), len(file_v1_group_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

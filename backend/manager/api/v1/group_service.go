@@ -253,6 +253,54 @@ func (s *GroupService) DeleteGroup(ctx context.Context, req *connect.Request[v1p
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
+// GetGroupReferences lists the policies that bind this group as a member.
+// Both identifier forms (groups/{id} and, when present, groups/{email}) are
+// matched because older bindings may use either.
+func (s *GroupService) GetGroupReferences(ctx context.Context, req *connect.Request[v1pb.GetGroupRequest]) (*connect.Response[v1pb.GroupReferences], error) {
+	group, err := s.store.GetGroupByName(ctx, req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get group"))
+	}
+	if group == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("group %q not found", req.Msg.Name))
+	}
+
+	seen := map[string]bool{}
+	var references []*v1pb.GroupReference
+	collect := func(member string) error {
+		used, err := s.store.GetPoliciesUsingMember(ctx, member)
+		if err != nil {
+			return err
+		}
+		for _, u := range used {
+			resource := u.Resource
+			if u.ResourceType == storepb.Policy_WORKSPACE {
+				resource = "workspaces/-"
+			}
+			key := resource + "|" + u.ResourceType.String()
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			references = append(references, &v1pb.GroupReference{
+				Resource:     resource,
+				ResourceType: u.ResourceType.String(),
+			})
+		}
+		return nil
+	}
+
+	if err := collect(common.FormatGroupName(group.ID)); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to list group references"))
+	}
+	if group.Email != "" {
+		if err := collect(common.FormatGroupName(group.Email)); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to list group references"))
+		}
+	}
+	return connect.NewResponse(&v1pb.GroupReferences{References: references}), nil
+}
+
 // canManageGroup reports whether the caller may manage the group: a group
 // OWNER, or a caller holding the given workspace-level group permission.
 func (s *GroupService) canManageGroup(ctx context.Context, user *store.UserMessage, group *store.GroupMessage, perm permission.Permission) (bool, error) {
