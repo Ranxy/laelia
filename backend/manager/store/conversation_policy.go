@@ -3,9 +3,11 @@ package store
 import (
 	"context"
 	"database/sql"
+	"slices"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	exprpb "google.golang.org/genproto/googleapis/type/expr"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/Ranxy/laelia/backend/common"
@@ -121,6 +123,63 @@ func patchConversationMemberRolesTx(ctx context.Context, tx *sql.Tx, convID uuid
 		Roles:  roles,
 	})
 	return upsertConversationPolicyTx(ctx, tx, resource, policy)
+}
+
+// addConversationMemberWithConditionTx adds the member to the role's binding,
+// attaching condition when set. The member is first removed from any other
+// binding of the same role (so re-adding never leaves stale role bindings),
+// then appended to an existing binding with the same role+condition, or to a
+// new binding when none matches. Bindings left empty are reaped.
+func addConversationMemberWithConditionTx(ctx context.Context, tx *sql.Tx, convID uuid.UUID, memberType int32, memberID string, role string, condition *exprpb.Expr) error {
+	resource := conversationPolicyResource(convID)
+	policy, err := getConversationPolicyForUpdate(ctx, tx, resource)
+	if err != nil {
+		return err
+	}
+	member := conversationMemberName(memberType, memberID)
+
+	// Drop the member from every binding with the target role first.
+	for _, b := range policy.Bindings {
+		if b.GetRole() == role {
+			b.Members = slices.DeleteFunc(b.Members, func(m string) bool { return m == member })
+		}
+	}
+
+	// Append to a matching role+condition binding, or create one.
+	added := false
+	for _, b := range policy.Bindings {
+		if b.GetRole() == role && sameBindingCondition(b.GetCondition(), condition) {
+			b.Members = append(b.Members, member)
+			added = true
+			break
+		}
+	}
+	if !added {
+		policy.Bindings = append(policy.Bindings, &models.Binding{
+			Role:      role,
+			Members:   []string{member},
+			Condition: condition,
+		})
+	}
+
+	// Reap bindings that lost their last member.
+	kept := policy.Bindings[:0]
+	for _, b := range policy.Bindings {
+		if len(b.GetMembers()) > 0 {
+			kept = append(kept, b)
+		}
+	}
+	policy.Bindings = kept
+	return upsertConversationPolicyTx(ctx, tx, resource, policy)
+}
+
+// sameBindingCondition reports whether two binding conditions are equivalent
+// for grouping: both nil, or identical expression strings.
+func sameBindingCondition(a, b *exprpb.Expr) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.GetExpression() == b.GetExpression()
 }
 
 // conversationPolicyCacheKey is the policy-cache key for a conversation.

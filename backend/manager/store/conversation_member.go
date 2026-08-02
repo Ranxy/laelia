@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	exprpb "google.golang.org/genproto/googleapis/type/expr"
 )
 
 const (
@@ -45,6 +46,9 @@ type ConversationMemberFilter struct {
 type ConversationMemberInput struct {
 	MemberType int32
 	MemberID   string
+	// ExpireAt, when set, makes the membership temporary: the policy binding
+	// carries a request.time < expire condition.
+	ExpireAt *time.Time
 }
 
 // AddConversationMembers inserts several members into a conversation in one
@@ -60,7 +64,7 @@ func (s *Store) AddConversationMembers(ctx context.Context, convID uuid.UUID, me
 	}
 	defer tx.Rollback()
 	for _, m := range members {
-		if err := addConversationMemberTx(ctx, tx, convID, m.MemberType, m.MemberID, MemberRoleMember); err != nil {
+		if err := addConversationMemberTx(ctx, tx, convID, m.MemberType, m.MemberID, MemberRoleMember, m.ExpireAt); err != nil {
 			return err
 		}
 	}
@@ -71,11 +75,23 @@ func (s *Store) AddConversationMembers(ctx context.Context, convID uuid.UUID, me
 	return nil
 }
 
-func addConversationMemberTx(ctx context.Context, tx *sql.Tx, convID uuid.UUID, memberType int32, memberID string, role int32) error {
-	if err := patchConversationMemberRolesTx(ctx, tx, convID, memberType, memberID, []string{conversationRoleName(role)}); err != nil {
+func addConversationMemberTx(ctx context.Context, tx *sql.Tx, convID uuid.UUID, memberType int32, memberID string, role int32, expireAt *time.Time) error {
+	condition := memberExpirationCondition(expireAt)
+	if err := addConversationMemberWithConditionTx(ctx, tx, convID, memberType, memberID, conversationRoleName(role), condition); err != nil {
 		return err
 	}
 	return upsertConversationMemberMetaTx(ctx, tx, convID, memberType, memberID)
+}
+
+// memberExpirationCondition builds the binding condition for a temporary
+// membership: request.time < timestamp("<expire>"). A nil expireAt yields nil.
+func memberExpirationCondition(expireAt *time.Time) *exprpb.Expr {
+	if expireAt == nil {
+		return nil
+	}
+	return &exprpb.Expr{
+		Expression: fmt.Sprintf(`request.time < timestamp(%q)`, expireAt.UTC().Format(time.RFC3339)),
+	}
 }
 
 func (s *Store) RemoveConversationMember(ctx context.Context, convID uuid.UUID, memberType int32, memberID string) error {

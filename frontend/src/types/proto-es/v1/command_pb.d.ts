@@ -2046,6 +2046,16 @@ export declare type AddChannelMemberInput = Message<"laelia.v1.AddChannelMemberI
    * @generated from field: string member_id = 2;
    */
   memberId: string;
+
+  /**
+   * expire_time, when set, makes this a temporary member: the conversation
+   * policy binding carries a `request.time < timestamp("...")` condition and
+   * the caller's access expires automatically at the given instant. Must be in
+   * the future.
+   *
+   * @generated from field: google.protobuf.Timestamp expire_time = 3;
+   */
+  expireTime?: Timestamp | undefined;
 };
 
 /**

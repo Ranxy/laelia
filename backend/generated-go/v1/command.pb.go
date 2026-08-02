@@ -4801,9 +4801,14 @@ func (x *DeleteChannelRequest) GetName() string {
 }
 
 type AddChannelMemberInput struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	MemberType    int32                  `protobuf:"varint,1,opt,name=member_type,json=memberType,proto3" json:"member_type,omitempty"`
-	MemberId      string                 `protobuf:"bytes,2,opt,name=member_id,json=memberId,proto3" json:"member_id,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	MemberType int32                  `protobuf:"varint,1,opt,name=member_type,json=memberType,proto3" json:"member_type,omitempty"`
+	MemberId   string                 `protobuf:"bytes,2,opt,name=member_id,json=memberId,proto3" json:"member_id,omitempty"`
+	// expire_time, when set, makes this a temporary member: the conversation
+	// policy binding carries a `request.time < timestamp("...")` condition and
+	// the caller's access expires automatically at the given instant. Must be in
+	// the future.
+	ExpireTime    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expire_time,json=expireTime,proto3" json:"expire_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4850,6 +4855,13 @@ func (x *AddChannelMemberInput) GetMemberId() string {
 		return x.MemberId
 	}
 	return ""
+}
+
+func (x *AddChannelMemberInput) GetExpireTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpireTime
+	}
+	return nil
 }
 
 type AddChannelMemberRequest struct {
@@ -10446,11 +10458,13 @@ const file_v1_command_proto_rawDesc = "" +
 	"updateMask\"G\n" +
 	"\x14DeleteChannelRequest\x12/\n" +
 	"\x04name\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
-	"\x13laelia/ConversationR\x04name\"Z\n" +
+	"\x13laelia/ConversationR\x04name\"\x97\x01\n" +
 	"\x15AddChannelMemberInput\x12\x1f\n" +
 	"\vmember_type\x18\x01 \x01(\x05R\n" +
 	"memberType\x12 \n" +
-	"\tmember_id\x18\x02 \x01(\tB\x03\xe0A\x02R\bmemberId\"\x9b\x01\n" +
+	"\tmember_id\x18\x02 \x01(\tB\x03\xe0A\x02R\bmemberId\x12;\n" +
+	"\vexpire_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"expireTime\"\x9b\x01\n" +
 	"\x17AddChannelMemberRequest\x12?\n" +
 	"\fconversation\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
 	"\x13laelia/ConversationR\fconversation\x12?\n" +
@@ -11217,201 +11231,202 @@ var file_v1_command_proto_depIdxs = []int32{
 	38,  // 54: laelia.v1.ListChannelsForAgentResponse.channels:type_name -> laelia.v1.Conversation
 	38,  // 55: laelia.v1.UpdateChannelRequest.conversation:type_name -> laelia.v1.Conversation
 	163, // 56: laelia.v1.UpdateChannelRequest.update_mask:type_name -> google.protobuf.FieldMask
-	71,  // 57: laelia.v1.AddChannelMemberRequest.members:type_name -> laelia.v1.AddChannelMemberInput
-	39,  // 58: laelia.v1.AddChannelMemberResponse.members:type_name -> laelia.v1.ChannelMember
-	39,  // 59: laelia.v1.ListChannelMembersResponse.members:type_name -> laelia.v1.ChannelMember
-	38,  // 60: laelia.v1.TransferChannelOwnershipResponse.conversation:type_name -> laelia.v1.Conversation
-	39,  // 61: laelia.v1.ListThreadParticipantsResponse.members:type_name -> laelia.v1.ChannelMember
-	29,  // 62: laelia.v1.SendMessageRequest.mentions:type_name -> laelia.v1.Mention
-	30,  // 63: laelia.v1.SendMessageRequest.attachments:type_name -> laelia.v1.Attachment
-	9,   // 64: laelia.v1.GetCommandContextResponse.command:type_name -> laelia.v1.Command
-	10,  // 65: laelia.v1.GetCommandContextResponse.outputs:type_name -> laelia.v1.CommandOutput
-	11,  // 66: laelia.v1.GetCommandContextResponse.events:type_name -> laelia.v1.CommandEvent
-	30,  // 67: laelia.v1.PostMessageRequest.attachments:type_name -> laelia.v1.Attachment
-	37,  // 68: laelia.v1.PostMessageResponse.message:type_name -> laelia.v1.ChatMessage
-	37,  // 69: laelia.v1.PostMessageResponse.new_messages:type_name -> laelia.v1.ChatMessage
-	37,  // 70: laelia.v1.ConvertMessageToTaskResponse.message:type_name -> laelia.v1.ChatMessage
-	2,   // 71: laelia.v1.ListTasksRequest.status_filter:type_name -> laelia.v1.TaskStatus
-	37,  // 72: laelia.v1.ListTasksResponse.tasks:type_name -> laelia.v1.ChatMessage
-	37,  // 73: laelia.v1.ClaimTaskResponse.message:type_name -> laelia.v1.ChatMessage
-	37,  // 74: laelia.v1.UnclaimTaskResponse.message:type_name -> laelia.v1.ChatMessage
-	2,   // 75: laelia.v1.UpdateTaskStatusRequest.status:type_name -> laelia.v1.TaskStatus
-	37,  // 76: laelia.v1.UpdateTaskStatusResponse.message:type_name -> laelia.v1.ChatMessage
-	29,  // 77: laelia.v1.CreateTaskRequest.mentions:type_name -> laelia.v1.Mention
-	30,  // 78: laelia.v1.CreateTaskRequest.attachments:type_name -> laelia.v1.Attachment
-	37,  // 79: laelia.v1.CreateTaskResponse.message:type_name -> laelia.v1.ChatMessage
-	160, // 80: laelia.v1.Reminder.fire_at:type_name -> google.protobuf.Timestamp
-	4,   // 81: laelia.v1.Reminder.status:type_name -> laelia.v1.ReminderStatus
-	160, // 82: laelia.v1.Reminder.next_retry_at:type_name -> google.protobuf.Timestamp
-	160, // 83: laelia.v1.Reminder.last_attempt_at:type_name -> google.protobuf.Timestamp
-	160, // 84: laelia.v1.Reminder.last_fired_at:type_name -> google.protobuf.Timestamp
-	160, // 85: laelia.v1.Reminder.last_completed_at:type_name -> google.protobuf.Timestamp
-	160, // 86: laelia.v1.Reminder.created_at:type_name -> google.protobuf.Timestamp
-	160, // 87: laelia.v1.Reminder.updated_at:type_name -> google.protobuf.Timestamp
-	160, // 88: laelia.v1.ConvertMessageToReminderRequest.fire_at:type_name -> google.protobuf.Timestamp
-	102, // 89: laelia.v1.ConvertMessageToReminderResponse.reminder:type_name -> laelia.v1.Reminder
-	4,   // 90: laelia.v1.ListRemindersRequest.status_filter:type_name -> laelia.v1.ReminderStatus
-	102, // 91: laelia.v1.ListRemindersResponse.reminders:type_name -> laelia.v1.Reminder
-	102, // 92: laelia.v1.GetReminderResponse.reminder:type_name -> laelia.v1.Reminder
-	160, // 93: laelia.v1.UpdateReminderRequest.fire_at:type_name -> google.protobuf.Timestamp
-	102, // 94: laelia.v1.UpdateReminderResponse.reminder:type_name -> laelia.v1.Reminder
-	102, // 95: laelia.v1.CancelReminderResponse.reminder:type_name -> laelia.v1.Reminder
-	102, // 96: laelia.v1.CompleteReminderResponse.reminder:type_name -> laelia.v1.Reminder
-	102, // 97: laelia.v1.FailReminderResponse.reminder:type_name -> laelia.v1.Reminder
-	102, // 98: laelia.v1.ListDueRemindersResponse.reminders:type_name -> laelia.v1.Reminder
-	120, // 99: laelia.v1.ListChannelUpdatesResponse.updates:type_name -> laelia.v1.ChannelUpdate
-	6,   // 100: laelia.v1.Activity.state:type_name -> laelia.v1.ActivityState
-	160, // 101: laelia.v1.Activity.created_at:type_name -> google.protobuf.Timestamp
-	160, // 102: laelia.v1.Activity.read_at:type_name -> google.protobuf.Timestamp
-	160, // 103: laelia.v1.Activity.done_at:type_name -> google.protobuf.Timestamp
-	1,   // 104: laelia.v1.Activity.sender_type:type_name -> laelia.v1.SenderType
-	5,   // 105: laelia.v1.ListActivitiesRequest.filter:type_name -> laelia.v1.ActivityCategory
-	6,   // 106: laelia.v1.ListActivitiesRequest.read_state_filter:type_name -> laelia.v1.ActivityState
-	128, // 107: laelia.v1.ListActivitiesResponse.activities:type_name -> laelia.v1.Activity
-	128, // 108: laelia.v1.MarkActivityDoneResponse.activity:type_name -> laelia.v1.Activity
-	135, // 109: laelia.v1.AgentStreamMessage.agent_ready:type_name -> laelia.v1.AgentReady
-	153, // 110: laelia.v1.AgentStreamMessage.begin_session:type_name -> laelia.v1.BeginSession
-	139, // 111: laelia.v1.AgentStreamMessage.progress:type_name -> laelia.v1.CommandProgress
-	140, // 112: laelia.v1.AgentStreamMessage.result:type_name -> laelia.v1.CommandResult
-	11,  // 113: laelia.v1.AgentStreamMessage.event:type_name -> laelia.v1.CommandEvent
-	142, // 114: laelia.v1.AgentStreamMessage.ping:type_name -> laelia.v1.Ping
-	137, // 115: laelia.v1.AgentStreamMessage.providers_discovered:type_name -> laelia.v1.ProvidersDiscovered
-	152, // 116: laelia.v1.ManagerStreamMessage.new_messages:type_name -> laelia.v1.NewMessagesAvailable
-	154, // 117: laelia.v1.ManagerStreamMessage.begin_session_response:type_name -> laelia.v1.BeginSessionResponse
-	141, // 118: laelia.v1.ManagerStreamMessage.cancel:type_name -> laelia.v1.CancelMessage
-	143, // 119: laelia.v1.ManagerStreamMessage.pong:type_name -> laelia.v1.Pong
-	150, // 120: laelia.v1.ManagerStreamMessage.permission_decision:type_name -> laelia.v1.PermissionDecision
-	136, // 121: laelia.v1.ManagerStreamMessage.discover_providers:type_name -> laelia.v1.DiscoverProviders
-	164, // 122: laelia.v1.ProvidersDiscovered.providers:type_name -> laelia.v1.AgentProviderInfo
-	159, // 123: laelia.v1.CommandRequest.env:type_name -> laelia.v1.CommandRequest.EnvEntry
-	7,   // 124: laelia.v1.CommandProgress.type:type_name -> laelia.v1.CommandOutput.StreamType
-	161, // 125: laelia.v1.CommandResult.result:type_name -> google.protobuf.Struct
-	0,   // 126: laelia.v1.ListCommandsRequest.status:type_name -> laelia.v1.CommandStatus
-	9,   // 127: laelia.v1.ListCommandsResponse.commands:type_name -> laelia.v1.Command
-	157, // 128: laelia.v1.FetchConversationActivityResponse.activities:type_name -> laelia.v1.AgentActivity
-	144, // 129: laelia.v1.CommandService.ListCommands:input_type -> laelia.v1.ListCommandsRequest
-	146, // 130: laelia.v1.CommandService.GetCommand:input_type -> laelia.v1.GetCommandRequest
-	147, // 131: laelia.v1.CommandService.CancelCommand:input_type -> laelia.v1.CancelCommandRequest
-	148, // 132: laelia.v1.CommandService.WatchCommand:input_type -> laelia.v1.WatchCommandRequest
-	149, // 133: laelia.v1.CommandService.WatchCommandEvents:input_type -> laelia.v1.WatchCommandEventsRequest
-	151, // 134: laelia.v1.CommandService.RespondPermission:input_type -> laelia.v1.RespondPermissionRequest
-	26,  // 135: laelia.v1.CommandService.SearchChatHistory:input_type -> laelia.v1.SearchChatHistoryRequest
-	84,  // 136: laelia.v1.CommandService.GetCommandContext:input_type -> laelia.v1.GetCommandContextRequest
-	50,  // 137: laelia.v1.CommandService.GetOrCreateConversation:input_type -> laelia.v1.GetOrCreateConversationRequest
-	52,  // 138: laelia.v1.CommandService.GetOrCreateUserUserDM:input_type -> laelia.v1.GetOrCreateUserUserDMRequest
-	54,  // 139: laelia.v1.CommandService.ResolveChannelByTitle:input_type -> laelia.v1.ResolveChannelByTitleRequest
-	56,  // 140: laelia.v1.CommandService.GetOrCreateUserDM:input_type -> laelia.v1.GetOrCreateUserDMRequest
-	58,  // 141: laelia.v1.CommandService.GetOrCreateAgentDM:input_type -> laelia.v1.GetOrCreateAgentDMRequest
-	61,  // 142: laelia.v1.CommandService.ListPeerAgents:input_type -> laelia.v1.ListPeerAgentsRequest
-	40,  // 143: laelia.v1.CommandService.ListConversationMessages:input_type -> laelia.v1.ListConversationMessagesRequest
-	42,  // 144: laelia.v1.CommandService.ListThreadMessages:input_type -> laelia.v1.ListThreadMessagesRequest
-	44,  // 145: laelia.v1.CommandService.ListChannelThreads:input_type -> laelia.v1.ListChannelThreadsRequest
-	63,  // 146: laelia.v1.CommandService.CreateChannel:input_type -> laelia.v1.CreateChannelRequest
-	64,  // 147: laelia.v1.CommandService.ListChannels:input_type -> laelia.v1.ListChannelsRequest
-	66,  // 148: laelia.v1.CommandService.ListChannelsForAgent:input_type -> laelia.v1.ListChannelsForAgentRequest
-	68,  // 149: laelia.v1.CommandService.GetChannel:input_type -> laelia.v1.GetChannelRequest
-	69,  // 150: laelia.v1.CommandService.UpdateChannel:input_type -> laelia.v1.UpdateChannelRequest
-	70,  // 151: laelia.v1.CommandService.DeleteChannel:input_type -> laelia.v1.DeleteChannelRequest
-	72,  // 152: laelia.v1.CommandService.AddChannelMember:input_type -> laelia.v1.AddChannelMemberRequest
-	74,  // 153: laelia.v1.CommandService.RemoveChannelMember:input_type -> laelia.v1.RemoveChannelMemberRequest
-	77,  // 154: laelia.v1.CommandService.TransferChannelOwnership:input_type -> laelia.v1.TransferChannelOwnershipRequest
-	79,  // 155: laelia.v1.CommandService.UpdateChannelMemberRole:input_type -> laelia.v1.UpdateChannelMemberRoleRequest
-	80,  // 156: laelia.v1.CommandService.LeaveChannel:input_type -> laelia.v1.LeaveChannelRequest
-	75,  // 157: laelia.v1.CommandService.ListChannelMembers:input_type -> laelia.v1.ListChannelMembersRequest
-	81,  // 158: laelia.v1.CommandService.ListThreadParticipants:input_type -> laelia.v1.ListThreadParticipantsRequest
-	83,  // 159: laelia.v1.CommandService.SendMessage:input_type -> laelia.v1.SendMessageRequest
-	86,  // 160: laelia.v1.CommandService.PostMessage:input_type -> laelia.v1.PostMessageRequest
-	88,  // 161: laelia.v1.CommandService.ConvertMessageToTask:input_type -> laelia.v1.ConvertMessageToTaskRequest
-	90,  // 162: laelia.v1.CommandService.ListTasks:input_type -> laelia.v1.ListTasksRequest
-	92,  // 163: laelia.v1.CommandService.ListTaskCounts:input_type -> laelia.v1.ListTaskCountsRequest
-	100, // 164: laelia.v1.CommandService.CreateTask:input_type -> laelia.v1.CreateTaskRequest
-	94,  // 165: laelia.v1.CommandService.ClaimTask:input_type -> laelia.v1.ClaimTaskRequest
-	96,  // 166: laelia.v1.CommandService.UnclaimTask:input_type -> laelia.v1.UnclaimTaskRequest
-	98,  // 167: laelia.v1.CommandService.UpdateTaskStatus:input_type -> laelia.v1.UpdateTaskStatusRequest
-	103, // 168: laelia.v1.CommandService.ConvertMessageToReminder:input_type -> laelia.v1.ConvertMessageToReminderRequest
-	105, // 169: laelia.v1.CommandService.ListReminders:input_type -> laelia.v1.ListRemindersRequest
-	107, // 170: laelia.v1.CommandService.GetReminder:input_type -> laelia.v1.GetReminderRequest
-	109, // 171: laelia.v1.CommandService.UpdateReminder:input_type -> laelia.v1.UpdateReminderRequest
-	111, // 172: laelia.v1.CommandService.CancelReminder:input_type -> laelia.v1.CancelReminderRequest
-	113, // 173: laelia.v1.CommandService.CompleteReminder:input_type -> laelia.v1.CompleteReminderRequest
-	115, // 174: laelia.v1.CommandService.FailReminder:input_type -> laelia.v1.FailReminderRequest
-	117, // 175: laelia.v1.CommandService.ListDueReminders:input_type -> laelia.v1.ListDueRemindersRequest
-	119, // 176: laelia.v1.CommandService.ListChannelUpdates:input_type -> laelia.v1.ListChannelUpdatesRequest
-	47,  // 177: laelia.v1.CommandService.ListThreadUpdates:input_type -> laelia.v1.ListThreadUpdatesRequest
-	122, // 178: laelia.v1.CommandService.AckProcessedVersion:input_type -> laelia.v1.AckProcessedVersionRequest
-	155, // 179: laelia.v1.CommandService.FetchConversationActivity:input_type -> laelia.v1.FetchConversationActivityRequest
-	124, // 180: laelia.v1.CommandService.MarkConversationRead:input_type -> laelia.v1.MarkConversationReadRequest
-	126, // 181: laelia.v1.CommandService.SetConversationPinned:input_type -> laelia.v1.SetConversationPinnedRequest
-	32,  // 182: laelia.v1.CommandService.UploadFile:input_type -> laelia.v1.UploadFileRequest
-	33,  // 183: laelia.v1.CommandService.DownloadFile:input_type -> laelia.v1.DownloadFileRequest
-	35,  // 184: laelia.v1.CommandService.ListFiles:input_type -> laelia.v1.ListFilesRequest
-	129, // 185: laelia.v1.CommandService.ListActivities:input_type -> laelia.v1.ListActivitiesRequest
-	131, // 186: laelia.v1.CommandService.MarkActivityDone:input_type -> laelia.v1.MarkActivityDoneRequest
-	133, // 187: laelia.v1.AgentStreamService.AgentChannel:input_type -> laelia.v1.AgentStreamMessage
-	145, // 188: laelia.v1.CommandService.ListCommands:output_type -> laelia.v1.ListCommandsResponse
-	9,   // 189: laelia.v1.CommandService.GetCommand:output_type -> laelia.v1.Command
-	9,   // 190: laelia.v1.CommandService.CancelCommand:output_type -> laelia.v1.Command
-	10,  // 191: laelia.v1.CommandService.WatchCommand:output_type -> laelia.v1.CommandOutput
-	11,  // 192: laelia.v1.CommandService.WatchCommandEvents:output_type -> laelia.v1.CommandEvent
-	165, // 193: laelia.v1.CommandService.RespondPermission:output_type -> google.protobuf.Empty
-	27,  // 194: laelia.v1.CommandService.SearchChatHistory:output_type -> laelia.v1.SearchChatHistoryResponse
-	85,  // 195: laelia.v1.CommandService.GetCommandContext:output_type -> laelia.v1.GetCommandContextResponse
-	51,  // 196: laelia.v1.CommandService.GetOrCreateConversation:output_type -> laelia.v1.GetOrCreateConversationResponse
-	53,  // 197: laelia.v1.CommandService.GetOrCreateUserUserDM:output_type -> laelia.v1.GetOrCreateUserUserDMResponse
-	55,  // 198: laelia.v1.CommandService.ResolveChannelByTitle:output_type -> laelia.v1.ResolveChannelByTitleResponse
-	57,  // 199: laelia.v1.CommandService.GetOrCreateUserDM:output_type -> laelia.v1.GetOrCreateUserDMResponse
-	59,  // 200: laelia.v1.CommandService.GetOrCreateAgentDM:output_type -> laelia.v1.GetOrCreateAgentDMResponse
-	62,  // 201: laelia.v1.CommandService.ListPeerAgents:output_type -> laelia.v1.ListPeerAgentsResponse
-	41,  // 202: laelia.v1.CommandService.ListConversationMessages:output_type -> laelia.v1.ListConversationMessagesResponse
-	43,  // 203: laelia.v1.CommandService.ListThreadMessages:output_type -> laelia.v1.ListThreadMessagesResponse
-	46,  // 204: laelia.v1.CommandService.ListChannelThreads:output_type -> laelia.v1.ListChannelThreadsResponse
-	38,  // 205: laelia.v1.CommandService.CreateChannel:output_type -> laelia.v1.Conversation
-	65,  // 206: laelia.v1.CommandService.ListChannels:output_type -> laelia.v1.ListChannelsResponse
-	67,  // 207: laelia.v1.CommandService.ListChannelsForAgent:output_type -> laelia.v1.ListChannelsForAgentResponse
-	38,  // 208: laelia.v1.CommandService.GetChannel:output_type -> laelia.v1.Conversation
-	38,  // 209: laelia.v1.CommandService.UpdateChannel:output_type -> laelia.v1.Conversation
-	165, // 210: laelia.v1.CommandService.DeleteChannel:output_type -> google.protobuf.Empty
-	73,  // 211: laelia.v1.CommandService.AddChannelMember:output_type -> laelia.v1.AddChannelMemberResponse
-	165, // 212: laelia.v1.CommandService.RemoveChannelMember:output_type -> google.protobuf.Empty
-	78,  // 213: laelia.v1.CommandService.TransferChannelOwnership:output_type -> laelia.v1.TransferChannelOwnershipResponse
-	39,  // 214: laelia.v1.CommandService.UpdateChannelMemberRole:output_type -> laelia.v1.ChannelMember
-	165, // 215: laelia.v1.CommandService.LeaveChannel:output_type -> google.protobuf.Empty
-	76,  // 216: laelia.v1.CommandService.ListChannelMembers:output_type -> laelia.v1.ListChannelMembersResponse
-	82,  // 217: laelia.v1.CommandService.ListThreadParticipants:output_type -> laelia.v1.ListThreadParticipantsResponse
-	37,  // 218: laelia.v1.CommandService.SendMessage:output_type -> laelia.v1.ChatMessage
-	87,  // 219: laelia.v1.CommandService.PostMessage:output_type -> laelia.v1.PostMessageResponse
-	89,  // 220: laelia.v1.CommandService.ConvertMessageToTask:output_type -> laelia.v1.ConvertMessageToTaskResponse
-	91,  // 221: laelia.v1.CommandService.ListTasks:output_type -> laelia.v1.ListTasksResponse
-	93,  // 222: laelia.v1.CommandService.ListTaskCounts:output_type -> laelia.v1.ListTaskCountsResponse
-	101, // 223: laelia.v1.CommandService.CreateTask:output_type -> laelia.v1.CreateTaskResponse
-	95,  // 224: laelia.v1.CommandService.ClaimTask:output_type -> laelia.v1.ClaimTaskResponse
-	97,  // 225: laelia.v1.CommandService.UnclaimTask:output_type -> laelia.v1.UnclaimTaskResponse
-	99,  // 226: laelia.v1.CommandService.UpdateTaskStatus:output_type -> laelia.v1.UpdateTaskStatusResponse
-	104, // 227: laelia.v1.CommandService.ConvertMessageToReminder:output_type -> laelia.v1.ConvertMessageToReminderResponse
-	106, // 228: laelia.v1.CommandService.ListReminders:output_type -> laelia.v1.ListRemindersResponse
-	108, // 229: laelia.v1.CommandService.GetReminder:output_type -> laelia.v1.GetReminderResponse
-	110, // 230: laelia.v1.CommandService.UpdateReminder:output_type -> laelia.v1.UpdateReminderResponse
-	112, // 231: laelia.v1.CommandService.CancelReminder:output_type -> laelia.v1.CancelReminderResponse
-	114, // 232: laelia.v1.CommandService.CompleteReminder:output_type -> laelia.v1.CompleteReminderResponse
-	116, // 233: laelia.v1.CommandService.FailReminder:output_type -> laelia.v1.FailReminderResponse
-	118, // 234: laelia.v1.CommandService.ListDueReminders:output_type -> laelia.v1.ListDueRemindersResponse
-	121, // 235: laelia.v1.CommandService.ListChannelUpdates:output_type -> laelia.v1.ListChannelUpdatesResponse
-	49,  // 236: laelia.v1.CommandService.ListThreadUpdates:output_type -> laelia.v1.ListThreadUpdatesResponse
-	123, // 237: laelia.v1.CommandService.AckProcessedVersion:output_type -> laelia.v1.AckProcessedVersionResponse
-	156, // 238: laelia.v1.CommandService.FetchConversationActivity:output_type -> laelia.v1.FetchConversationActivityResponse
-	125, // 239: laelia.v1.CommandService.MarkConversationRead:output_type -> laelia.v1.MarkConversationReadResponse
-	127, // 240: laelia.v1.CommandService.SetConversationPinned:output_type -> laelia.v1.SetConversationPinnedResponse
-	31,  // 241: laelia.v1.CommandService.UploadFile:output_type -> laelia.v1.File
-	34,  // 242: laelia.v1.CommandService.DownloadFile:output_type -> laelia.v1.DownloadFileResponse
-	36,  // 243: laelia.v1.CommandService.ListFiles:output_type -> laelia.v1.ListFilesResponse
-	130, // 244: laelia.v1.CommandService.ListActivities:output_type -> laelia.v1.ListActivitiesResponse
-	132, // 245: laelia.v1.CommandService.MarkActivityDone:output_type -> laelia.v1.MarkActivityDoneResponse
-	134, // 246: laelia.v1.AgentStreamService.AgentChannel:output_type -> laelia.v1.ManagerStreamMessage
-	188, // [188:247] is the sub-list for method output_type
-	129, // [129:188] is the sub-list for method input_type
-	129, // [129:129] is the sub-list for extension type_name
-	129, // [129:129] is the sub-list for extension extendee
-	0,   // [0:129] is the sub-list for field type_name
+	160, // 57: laelia.v1.AddChannelMemberInput.expire_time:type_name -> google.protobuf.Timestamp
+	71,  // 58: laelia.v1.AddChannelMemberRequest.members:type_name -> laelia.v1.AddChannelMemberInput
+	39,  // 59: laelia.v1.AddChannelMemberResponse.members:type_name -> laelia.v1.ChannelMember
+	39,  // 60: laelia.v1.ListChannelMembersResponse.members:type_name -> laelia.v1.ChannelMember
+	38,  // 61: laelia.v1.TransferChannelOwnershipResponse.conversation:type_name -> laelia.v1.Conversation
+	39,  // 62: laelia.v1.ListThreadParticipantsResponse.members:type_name -> laelia.v1.ChannelMember
+	29,  // 63: laelia.v1.SendMessageRequest.mentions:type_name -> laelia.v1.Mention
+	30,  // 64: laelia.v1.SendMessageRequest.attachments:type_name -> laelia.v1.Attachment
+	9,   // 65: laelia.v1.GetCommandContextResponse.command:type_name -> laelia.v1.Command
+	10,  // 66: laelia.v1.GetCommandContextResponse.outputs:type_name -> laelia.v1.CommandOutput
+	11,  // 67: laelia.v1.GetCommandContextResponse.events:type_name -> laelia.v1.CommandEvent
+	30,  // 68: laelia.v1.PostMessageRequest.attachments:type_name -> laelia.v1.Attachment
+	37,  // 69: laelia.v1.PostMessageResponse.message:type_name -> laelia.v1.ChatMessage
+	37,  // 70: laelia.v1.PostMessageResponse.new_messages:type_name -> laelia.v1.ChatMessage
+	37,  // 71: laelia.v1.ConvertMessageToTaskResponse.message:type_name -> laelia.v1.ChatMessage
+	2,   // 72: laelia.v1.ListTasksRequest.status_filter:type_name -> laelia.v1.TaskStatus
+	37,  // 73: laelia.v1.ListTasksResponse.tasks:type_name -> laelia.v1.ChatMessage
+	37,  // 74: laelia.v1.ClaimTaskResponse.message:type_name -> laelia.v1.ChatMessage
+	37,  // 75: laelia.v1.UnclaimTaskResponse.message:type_name -> laelia.v1.ChatMessage
+	2,   // 76: laelia.v1.UpdateTaskStatusRequest.status:type_name -> laelia.v1.TaskStatus
+	37,  // 77: laelia.v1.UpdateTaskStatusResponse.message:type_name -> laelia.v1.ChatMessage
+	29,  // 78: laelia.v1.CreateTaskRequest.mentions:type_name -> laelia.v1.Mention
+	30,  // 79: laelia.v1.CreateTaskRequest.attachments:type_name -> laelia.v1.Attachment
+	37,  // 80: laelia.v1.CreateTaskResponse.message:type_name -> laelia.v1.ChatMessage
+	160, // 81: laelia.v1.Reminder.fire_at:type_name -> google.protobuf.Timestamp
+	4,   // 82: laelia.v1.Reminder.status:type_name -> laelia.v1.ReminderStatus
+	160, // 83: laelia.v1.Reminder.next_retry_at:type_name -> google.protobuf.Timestamp
+	160, // 84: laelia.v1.Reminder.last_attempt_at:type_name -> google.protobuf.Timestamp
+	160, // 85: laelia.v1.Reminder.last_fired_at:type_name -> google.protobuf.Timestamp
+	160, // 86: laelia.v1.Reminder.last_completed_at:type_name -> google.protobuf.Timestamp
+	160, // 87: laelia.v1.Reminder.created_at:type_name -> google.protobuf.Timestamp
+	160, // 88: laelia.v1.Reminder.updated_at:type_name -> google.protobuf.Timestamp
+	160, // 89: laelia.v1.ConvertMessageToReminderRequest.fire_at:type_name -> google.protobuf.Timestamp
+	102, // 90: laelia.v1.ConvertMessageToReminderResponse.reminder:type_name -> laelia.v1.Reminder
+	4,   // 91: laelia.v1.ListRemindersRequest.status_filter:type_name -> laelia.v1.ReminderStatus
+	102, // 92: laelia.v1.ListRemindersResponse.reminders:type_name -> laelia.v1.Reminder
+	102, // 93: laelia.v1.GetReminderResponse.reminder:type_name -> laelia.v1.Reminder
+	160, // 94: laelia.v1.UpdateReminderRequest.fire_at:type_name -> google.protobuf.Timestamp
+	102, // 95: laelia.v1.UpdateReminderResponse.reminder:type_name -> laelia.v1.Reminder
+	102, // 96: laelia.v1.CancelReminderResponse.reminder:type_name -> laelia.v1.Reminder
+	102, // 97: laelia.v1.CompleteReminderResponse.reminder:type_name -> laelia.v1.Reminder
+	102, // 98: laelia.v1.FailReminderResponse.reminder:type_name -> laelia.v1.Reminder
+	102, // 99: laelia.v1.ListDueRemindersResponse.reminders:type_name -> laelia.v1.Reminder
+	120, // 100: laelia.v1.ListChannelUpdatesResponse.updates:type_name -> laelia.v1.ChannelUpdate
+	6,   // 101: laelia.v1.Activity.state:type_name -> laelia.v1.ActivityState
+	160, // 102: laelia.v1.Activity.created_at:type_name -> google.protobuf.Timestamp
+	160, // 103: laelia.v1.Activity.read_at:type_name -> google.protobuf.Timestamp
+	160, // 104: laelia.v1.Activity.done_at:type_name -> google.protobuf.Timestamp
+	1,   // 105: laelia.v1.Activity.sender_type:type_name -> laelia.v1.SenderType
+	5,   // 106: laelia.v1.ListActivitiesRequest.filter:type_name -> laelia.v1.ActivityCategory
+	6,   // 107: laelia.v1.ListActivitiesRequest.read_state_filter:type_name -> laelia.v1.ActivityState
+	128, // 108: laelia.v1.ListActivitiesResponse.activities:type_name -> laelia.v1.Activity
+	128, // 109: laelia.v1.MarkActivityDoneResponse.activity:type_name -> laelia.v1.Activity
+	135, // 110: laelia.v1.AgentStreamMessage.agent_ready:type_name -> laelia.v1.AgentReady
+	153, // 111: laelia.v1.AgentStreamMessage.begin_session:type_name -> laelia.v1.BeginSession
+	139, // 112: laelia.v1.AgentStreamMessage.progress:type_name -> laelia.v1.CommandProgress
+	140, // 113: laelia.v1.AgentStreamMessage.result:type_name -> laelia.v1.CommandResult
+	11,  // 114: laelia.v1.AgentStreamMessage.event:type_name -> laelia.v1.CommandEvent
+	142, // 115: laelia.v1.AgentStreamMessage.ping:type_name -> laelia.v1.Ping
+	137, // 116: laelia.v1.AgentStreamMessage.providers_discovered:type_name -> laelia.v1.ProvidersDiscovered
+	152, // 117: laelia.v1.ManagerStreamMessage.new_messages:type_name -> laelia.v1.NewMessagesAvailable
+	154, // 118: laelia.v1.ManagerStreamMessage.begin_session_response:type_name -> laelia.v1.BeginSessionResponse
+	141, // 119: laelia.v1.ManagerStreamMessage.cancel:type_name -> laelia.v1.CancelMessage
+	143, // 120: laelia.v1.ManagerStreamMessage.pong:type_name -> laelia.v1.Pong
+	150, // 121: laelia.v1.ManagerStreamMessage.permission_decision:type_name -> laelia.v1.PermissionDecision
+	136, // 122: laelia.v1.ManagerStreamMessage.discover_providers:type_name -> laelia.v1.DiscoverProviders
+	164, // 123: laelia.v1.ProvidersDiscovered.providers:type_name -> laelia.v1.AgentProviderInfo
+	159, // 124: laelia.v1.CommandRequest.env:type_name -> laelia.v1.CommandRequest.EnvEntry
+	7,   // 125: laelia.v1.CommandProgress.type:type_name -> laelia.v1.CommandOutput.StreamType
+	161, // 126: laelia.v1.CommandResult.result:type_name -> google.protobuf.Struct
+	0,   // 127: laelia.v1.ListCommandsRequest.status:type_name -> laelia.v1.CommandStatus
+	9,   // 128: laelia.v1.ListCommandsResponse.commands:type_name -> laelia.v1.Command
+	157, // 129: laelia.v1.FetchConversationActivityResponse.activities:type_name -> laelia.v1.AgentActivity
+	144, // 130: laelia.v1.CommandService.ListCommands:input_type -> laelia.v1.ListCommandsRequest
+	146, // 131: laelia.v1.CommandService.GetCommand:input_type -> laelia.v1.GetCommandRequest
+	147, // 132: laelia.v1.CommandService.CancelCommand:input_type -> laelia.v1.CancelCommandRequest
+	148, // 133: laelia.v1.CommandService.WatchCommand:input_type -> laelia.v1.WatchCommandRequest
+	149, // 134: laelia.v1.CommandService.WatchCommandEvents:input_type -> laelia.v1.WatchCommandEventsRequest
+	151, // 135: laelia.v1.CommandService.RespondPermission:input_type -> laelia.v1.RespondPermissionRequest
+	26,  // 136: laelia.v1.CommandService.SearchChatHistory:input_type -> laelia.v1.SearchChatHistoryRequest
+	84,  // 137: laelia.v1.CommandService.GetCommandContext:input_type -> laelia.v1.GetCommandContextRequest
+	50,  // 138: laelia.v1.CommandService.GetOrCreateConversation:input_type -> laelia.v1.GetOrCreateConversationRequest
+	52,  // 139: laelia.v1.CommandService.GetOrCreateUserUserDM:input_type -> laelia.v1.GetOrCreateUserUserDMRequest
+	54,  // 140: laelia.v1.CommandService.ResolveChannelByTitle:input_type -> laelia.v1.ResolveChannelByTitleRequest
+	56,  // 141: laelia.v1.CommandService.GetOrCreateUserDM:input_type -> laelia.v1.GetOrCreateUserDMRequest
+	58,  // 142: laelia.v1.CommandService.GetOrCreateAgentDM:input_type -> laelia.v1.GetOrCreateAgentDMRequest
+	61,  // 143: laelia.v1.CommandService.ListPeerAgents:input_type -> laelia.v1.ListPeerAgentsRequest
+	40,  // 144: laelia.v1.CommandService.ListConversationMessages:input_type -> laelia.v1.ListConversationMessagesRequest
+	42,  // 145: laelia.v1.CommandService.ListThreadMessages:input_type -> laelia.v1.ListThreadMessagesRequest
+	44,  // 146: laelia.v1.CommandService.ListChannelThreads:input_type -> laelia.v1.ListChannelThreadsRequest
+	63,  // 147: laelia.v1.CommandService.CreateChannel:input_type -> laelia.v1.CreateChannelRequest
+	64,  // 148: laelia.v1.CommandService.ListChannels:input_type -> laelia.v1.ListChannelsRequest
+	66,  // 149: laelia.v1.CommandService.ListChannelsForAgent:input_type -> laelia.v1.ListChannelsForAgentRequest
+	68,  // 150: laelia.v1.CommandService.GetChannel:input_type -> laelia.v1.GetChannelRequest
+	69,  // 151: laelia.v1.CommandService.UpdateChannel:input_type -> laelia.v1.UpdateChannelRequest
+	70,  // 152: laelia.v1.CommandService.DeleteChannel:input_type -> laelia.v1.DeleteChannelRequest
+	72,  // 153: laelia.v1.CommandService.AddChannelMember:input_type -> laelia.v1.AddChannelMemberRequest
+	74,  // 154: laelia.v1.CommandService.RemoveChannelMember:input_type -> laelia.v1.RemoveChannelMemberRequest
+	77,  // 155: laelia.v1.CommandService.TransferChannelOwnership:input_type -> laelia.v1.TransferChannelOwnershipRequest
+	79,  // 156: laelia.v1.CommandService.UpdateChannelMemberRole:input_type -> laelia.v1.UpdateChannelMemberRoleRequest
+	80,  // 157: laelia.v1.CommandService.LeaveChannel:input_type -> laelia.v1.LeaveChannelRequest
+	75,  // 158: laelia.v1.CommandService.ListChannelMembers:input_type -> laelia.v1.ListChannelMembersRequest
+	81,  // 159: laelia.v1.CommandService.ListThreadParticipants:input_type -> laelia.v1.ListThreadParticipantsRequest
+	83,  // 160: laelia.v1.CommandService.SendMessage:input_type -> laelia.v1.SendMessageRequest
+	86,  // 161: laelia.v1.CommandService.PostMessage:input_type -> laelia.v1.PostMessageRequest
+	88,  // 162: laelia.v1.CommandService.ConvertMessageToTask:input_type -> laelia.v1.ConvertMessageToTaskRequest
+	90,  // 163: laelia.v1.CommandService.ListTasks:input_type -> laelia.v1.ListTasksRequest
+	92,  // 164: laelia.v1.CommandService.ListTaskCounts:input_type -> laelia.v1.ListTaskCountsRequest
+	100, // 165: laelia.v1.CommandService.CreateTask:input_type -> laelia.v1.CreateTaskRequest
+	94,  // 166: laelia.v1.CommandService.ClaimTask:input_type -> laelia.v1.ClaimTaskRequest
+	96,  // 167: laelia.v1.CommandService.UnclaimTask:input_type -> laelia.v1.UnclaimTaskRequest
+	98,  // 168: laelia.v1.CommandService.UpdateTaskStatus:input_type -> laelia.v1.UpdateTaskStatusRequest
+	103, // 169: laelia.v1.CommandService.ConvertMessageToReminder:input_type -> laelia.v1.ConvertMessageToReminderRequest
+	105, // 170: laelia.v1.CommandService.ListReminders:input_type -> laelia.v1.ListRemindersRequest
+	107, // 171: laelia.v1.CommandService.GetReminder:input_type -> laelia.v1.GetReminderRequest
+	109, // 172: laelia.v1.CommandService.UpdateReminder:input_type -> laelia.v1.UpdateReminderRequest
+	111, // 173: laelia.v1.CommandService.CancelReminder:input_type -> laelia.v1.CancelReminderRequest
+	113, // 174: laelia.v1.CommandService.CompleteReminder:input_type -> laelia.v1.CompleteReminderRequest
+	115, // 175: laelia.v1.CommandService.FailReminder:input_type -> laelia.v1.FailReminderRequest
+	117, // 176: laelia.v1.CommandService.ListDueReminders:input_type -> laelia.v1.ListDueRemindersRequest
+	119, // 177: laelia.v1.CommandService.ListChannelUpdates:input_type -> laelia.v1.ListChannelUpdatesRequest
+	47,  // 178: laelia.v1.CommandService.ListThreadUpdates:input_type -> laelia.v1.ListThreadUpdatesRequest
+	122, // 179: laelia.v1.CommandService.AckProcessedVersion:input_type -> laelia.v1.AckProcessedVersionRequest
+	155, // 180: laelia.v1.CommandService.FetchConversationActivity:input_type -> laelia.v1.FetchConversationActivityRequest
+	124, // 181: laelia.v1.CommandService.MarkConversationRead:input_type -> laelia.v1.MarkConversationReadRequest
+	126, // 182: laelia.v1.CommandService.SetConversationPinned:input_type -> laelia.v1.SetConversationPinnedRequest
+	32,  // 183: laelia.v1.CommandService.UploadFile:input_type -> laelia.v1.UploadFileRequest
+	33,  // 184: laelia.v1.CommandService.DownloadFile:input_type -> laelia.v1.DownloadFileRequest
+	35,  // 185: laelia.v1.CommandService.ListFiles:input_type -> laelia.v1.ListFilesRequest
+	129, // 186: laelia.v1.CommandService.ListActivities:input_type -> laelia.v1.ListActivitiesRequest
+	131, // 187: laelia.v1.CommandService.MarkActivityDone:input_type -> laelia.v1.MarkActivityDoneRequest
+	133, // 188: laelia.v1.AgentStreamService.AgentChannel:input_type -> laelia.v1.AgentStreamMessage
+	145, // 189: laelia.v1.CommandService.ListCommands:output_type -> laelia.v1.ListCommandsResponse
+	9,   // 190: laelia.v1.CommandService.GetCommand:output_type -> laelia.v1.Command
+	9,   // 191: laelia.v1.CommandService.CancelCommand:output_type -> laelia.v1.Command
+	10,  // 192: laelia.v1.CommandService.WatchCommand:output_type -> laelia.v1.CommandOutput
+	11,  // 193: laelia.v1.CommandService.WatchCommandEvents:output_type -> laelia.v1.CommandEvent
+	165, // 194: laelia.v1.CommandService.RespondPermission:output_type -> google.protobuf.Empty
+	27,  // 195: laelia.v1.CommandService.SearchChatHistory:output_type -> laelia.v1.SearchChatHistoryResponse
+	85,  // 196: laelia.v1.CommandService.GetCommandContext:output_type -> laelia.v1.GetCommandContextResponse
+	51,  // 197: laelia.v1.CommandService.GetOrCreateConversation:output_type -> laelia.v1.GetOrCreateConversationResponse
+	53,  // 198: laelia.v1.CommandService.GetOrCreateUserUserDM:output_type -> laelia.v1.GetOrCreateUserUserDMResponse
+	55,  // 199: laelia.v1.CommandService.ResolveChannelByTitle:output_type -> laelia.v1.ResolveChannelByTitleResponse
+	57,  // 200: laelia.v1.CommandService.GetOrCreateUserDM:output_type -> laelia.v1.GetOrCreateUserDMResponse
+	59,  // 201: laelia.v1.CommandService.GetOrCreateAgentDM:output_type -> laelia.v1.GetOrCreateAgentDMResponse
+	62,  // 202: laelia.v1.CommandService.ListPeerAgents:output_type -> laelia.v1.ListPeerAgentsResponse
+	41,  // 203: laelia.v1.CommandService.ListConversationMessages:output_type -> laelia.v1.ListConversationMessagesResponse
+	43,  // 204: laelia.v1.CommandService.ListThreadMessages:output_type -> laelia.v1.ListThreadMessagesResponse
+	46,  // 205: laelia.v1.CommandService.ListChannelThreads:output_type -> laelia.v1.ListChannelThreadsResponse
+	38,  // 206: laelia.v1.CommandService.CreateChannel:output_type -> laelia.v1.Conversation
+	65,  // 207: laelia.v1.CommandService.ListChannels:output_type -> laelia.v1.ListChannelsResponse
+	67,  // 208: laelia.v1.CommandService.ListChannelsForAgent:output_type -> laelia.v1.ListChannelsForAgentResponse
+	38,  // 209: laelia.v1.CommandService.GetChannel:output_type -> laelia.v1.Conversation
+	38,  // 210: laelia.v1.CommandService.UpdateChannel:output_type -> laelia.v1.Conversation
+	165, // 211: laelia.v1.CommandService.DeleteChannel:output_type -> google.protobuf.Empty
+	73,  // 212: laelia.v1.CommandService.AddChannelMember:output_type -> laelia.v1.AddChannelMemberResponse
+	165, // 213: laelia.v1.CommandService.RemoveChannelMember:output_type -> google.protobuf.Empty
+	78,  // 214: laelia.v1.CommandService.TransferChannelOwnership:output_type -> laelia.v1.TransferChannelOwnershipResponse
+	39,  // 215: laelia.v1.CommandService.UpdateChannelMemberRole:output_type -> laelia.v1.ChannelMember
+	165, // 216: laelia.v1.CommandService.LeaveChannel:output_type -> google.protobuf.Empty
+	76,  // 217: laelia.v1.CommandService.ListChannelMembers:output_type -> laelia.v1.ListChannelMembersResponse
+	82,  // 218: laelia.v1.CommandService.ListThreadParticipants:output_type -> laelia.v1.ListThreadParticipantsResponse
+	37,  // 219: laelia.v1.CommandService.SendMessage:output_type -> laelia.v1.ChatMessage
+	87,  // 220: laelia.v1.CommandService.PostMessage:output_type -> laelia.v1.PostMessageResponse
+	89,  // 221: laelia.v1.CommandService.ConvertMessageToTask:output_type -> laelia.v1.ConvertMessageToTaskResponse
+	91,  // 222: laelia.v1.CommandService.ListTasks:output_type -> laelia.v1.ListTasksResponse
+	93,  // 223: laelia.v1.CommandService.ListTaskCounts:output_type -> laelia.v1.ListTaskCountsResponse
+	101, // 224: laelia.v1.CommandService.CreateTask:output_type -> laelia.v1.CreateTaskResponse
+	95,  // 225: laelia.v1.CommandService.ClaimTask:output_type -> laelia.v1.ClaimTaskResponse
+	97,  // 226: laelia.v1.CommandService.UnclaimTask:output_type -> laelia.v1.UnclaimTaskResponse
+	99,  // 227: laelia.v1.CommandService.UpdateTaskStatus:output_type -> laelia.v1.UpdateTaskStatusResponse
+	104, // 228: laelia.v1.CommandService.ConvertMessageToReminder:output_type -> laelia.v1.ConvertMessageToReminderResponse
+	106, // 229: laelia.v1.CommandService.ListReminders:output_type -> laelia.v1.ListRemindersResponse
+	108, // 230: laelia.v1.CommandService.GetReminder:output_type -> laelia.v1.GetReminderResponse
+	110, // 231: laelia.v1.CommandService.UpdateReminder:output_type -> laelia.v1.UpdateReminderResponse
+	112, // 232: laelia.v1.CommandService.CancelReminder:output_type -> laelia.v1.CancelReminderResponse
+	114, // 233: laelia.v1.CommandService.CompleteReminder:output_type -> laelia.v1.CompleteReminderResponse
+	116, // 234: laelia.v1.CommandService.FailReminder:output_type -> laelia.v1.FailReminderResponse
+	118, // 235: laelia.v1.CommandService.ListDueReminders:output_type -> laelia.v1.ListDueRemindersResponse
+	121, // 236: laelia.v1.CommandService.ListChannelUpdates:output_type -> laelia.v1.ListChannelUpdatesResponse
+	49,  // 237: laelia.v1.CommandService.ListThreadUpdates:output_type -> laelia.v1.ListThreadUpdatesResponse
+	123, // 238: laelia.v1.CommandService.AckProcessedVersion:output_type -> laelia.v1.AckProcessedVersionResponse
+	156, // 239: laelia.v1.CommandService.FetchConversationActivity:output_type -> laelia.v1.FetchConversationActivityResponse
+	125, // 240: laelia.v1.CommandService.MarkConversationRead:output_type -> laelia.v1.MarkConversationReadResponse
+	127, // 241: laelia.v1.CommandService.SetConversationPinned:output_type -> laelia.v1.SetConversationPinnedResponse
+	31,  // 242: laelia.v1.CommandService.UploadFile:output_type -> laelia.v1.File
+	34,  // 243: laelia.v1.CommandService.DownloadFile:output_type -> laelia.v1.DownloadFileResponse
+	36,  // 244: laelia.v1.CommandService.ListFiles:output_type -> laelia.v1.ListFilesResponse
+	130, // 245: laelia.v1.CommandService.ListActivities:output_type -> laelia.v1.ListActivitiesResponse
+	132, // 246: laelia.v1.CommandService.MarkActivityDone:output_type -> laelia.v1.MarkActivityDoneResponse
+	134, // 247: laelia.v1.AgentStreamService.AgentChannel:output_type -> laelia.v1.ManagerStreamMessage
+	189, // [189:248] is the sub-list for method output_type
+	130, // [130:189] is the sub-list for method input_type
+	130, // [130:130] is the sub-list for extension type_name
+	130, // [130:130] is the sub-list for extension extendee
+	0,   // [0:130] is the sub-list for field type_name
 }
 
 func init() { file_v1_command_proto_init() }

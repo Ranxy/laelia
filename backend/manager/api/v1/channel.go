@@ -356,7 +356,15 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 				return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user member_id, must be principal id"))
 			}
 		}
-		inputs = append(inputs, store.ConversationMemberInput{MemberType: memberType, MemberID: memberID})
+		var expireAt *time.Time
+		if m.ExpireTime != nil {
+			t := m.ExpireTime.AsTime()
+			if !t.After(time.Now()) {
+				return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("expire_time must be in the future"))
+			}
+			expireAt = &t
+		}
+		inputs = append(inputs, store.ConversationMemberInput{MemberType: memberType, MemberID: memberID, ExpireAt: expireAt})
 	}
 
 	if err := s.store.AddConversationMembers(ctx, convID, inputs); err != nil {

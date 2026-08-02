@@ -3862,6 +3862,14 @@ components:
                     format: int32
                 memberId:
                     type: string
+                expireTime:
+                    type: string
+                    description: |-
+                        expire_time, when set, makes this a temporary member: the conversation
+                         policy binding carries a `request.time < timestamp("...")` condition and
+                         the caller's access expires automatically at the given instant. Must be in
+                         the future.
+                    format: date-time
         AddChannelMemberRequest:
             required:
                 - conversation

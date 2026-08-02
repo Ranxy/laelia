@@ -1976,6 +1976,7 @@ flags. The resource name is &#34;users/{user}/activities/{message}&#34;.
 | ----- | ---- | ----- | ----------- |
 | member_type | [int32](#int32) |  |  |
 | member_id | [string](#string) |  |  |
+| expire_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | expire_time, when set, makes this a temporary member: the conversation policy binding carries a `request.time &lt; timestamp(&#34;...&#34;)` condition and the caller&#39;s access expires automatically at the given instant. Must be in the future. |
 
 
 

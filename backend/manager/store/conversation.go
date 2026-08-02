@@ -89,10 +89,10 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 		return nil, errors.Wrapf(err, "failed to insert conversation")
 	}
 
-	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, fmt.Sprintf("%d", principalID), MemberRoleOwner); err != nil {
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, fmt.Sprintf("%d", principalID), MemberRoleOwner, nil); err != nil {
 		return nil, err
 	}
-	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeAgent, agent, MemberRoleMember); err != nil {
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeAgent, agent, MemberRoleMember, nil); err != nil {
 		return nil, err
 	}
 
@@ -208,10 +208,10 @@ func (s *Store) GetOrCreateAgentDM(ctx context.Context, agentAID, agentBID int) 
 		return nil, errors.Wrap(err, "failed to insert agent DM")
 	}
 
-	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeAgent, resA, MemberRoleMember); err != nil {
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeAgent, resA, MemberRoleMember, nil); err != nil {
 		return nil, err
 	}
-	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeAgent, resB, MemberRoleMember); err != nil {
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeAgent, resB, MemberRoleMember, nil); err != nil {
 		return nil, err
 	}
 
@@ -309,10 +309,10 @@ func (s *Store) GetOrCreateUserUserDM(ctx context.Context, callerID, peerID int)
 		return nil, errors.Wrap(err, "failed to insert user DM")
 	}
 
-	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, fmt.Sprintf("%d", callerID), MemberRoleOwner); err != nil {
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, fmt.Sprintf("%d", callerID), MemberRoleOwner, nil); err != nil {
 		return nil, err
 	}
-	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, fmt.Sprintf("%d", peerID), MemberRoleMember); err != nil {
+	if err := addConversationMemberTx(ctx, tx, newConv.ID, MemberTypeUser, fmt.Sprintf("%d", peerID), MemberRoleMember, nil); err != nil {
 		return nil, err
 	}
 
@@ -394,7 +394,7 @@ func (s *Store) CreateChannel(ctx context.Context, title string, ownerID int) (*
 		return nil, errors.Wrapf(err, "failed to create channel")
 	}
 
-	if err := addConversationMemberTx(ctx, tx, conv.ID, MemberTypeUser, fmt.Sprintf("%d", ownerID), MemberRoleOwner); err != nil {
+	if err := addConversationMemberTx(ctx, tx, conv.ID, MemberTypeUser, fmt.Sprintf("%d", ownerID), MemberRoleOwner, nil); err != nil {
 		return nil, err
 	}
 

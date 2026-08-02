@@ -5746,6 +5746,16 @@ comparison). </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>expire_time</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p>expire_time, when set, makes this a temporary member: the conversation
+policy binding carries a `request.time &lt; timestamp(&#34;...&#34;)` condition and
+the caller&#39;s access expires automatically at the given instant. Must be in
+the future. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 

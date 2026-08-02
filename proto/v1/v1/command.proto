@@ -684,6 +684,11 @@ message DeleteChannelRequest {
 message AddChannelMemberInput {
   int32 member_type = 1;
   string member_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // expire_time, when set, makes this a temporary member: the conversation
+  // policy binding carries a `request.time < timestamp("...")` condition and
+  // the caller's access expires automatically at the given instant. Must be in
+  // the future.
+  google.protobuf.Timestamp expire_time = 3;
 }
 
 message AddChannelMemberRequest {
