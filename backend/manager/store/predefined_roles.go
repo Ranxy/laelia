@@ -40,40 +40,29 @@ var allPermissionSet = func() map[permission.Permission]bool {
 
 // memberBaselinePermissions is the permission set granted to any authenticated
 // principal (roles/workspaceMember). It carries only workspace-scope perms: the
-// discovery/list perms (conversations.list, commands.list, reminders.list,
-// files.list), creation perms, and the perms whose RPCs carry no single
-// conversation resource and so cannot be authorized per-conversation in the
-// interceptor — reminders.get/update/cancel, files.upload/download, and the
-// command perms. Those are gated per-object by the handler instead
-// (requireReminderAccess reads the chat-membership table; requireFileMember
-// checks conversation membership; requireCommandAccess reads the chat table +
-// owning agent + reviewAll). The per-conversation perms (conversations.
-// read/send/manage) and agents.edit are deliberately absent: they are
-// authorized per-resource — by the caller's chat role (conversation_member) for
-// conversations, and by the workspaceAdmin role (which holds agents.edit via the
-// all-permissions union) for agents. The review perms (reviewAgentDM, reviewAll)
-// are also absent: they are granted only via workspaceAdmin.
+// discovery/list perms (conversations.list, commands.list, reminders.list),
+// creation perms, and files.upload — the one per-object operation that may
+// legitimately target no resource (the agent file tool uploads
+// conversation-less blobs) and therefore cannot be authorized per-resource.
+// The per-object perms (conversations.read/send/manage, agents.edit,
+// commands.get/watch/cancel, reminders.get/update/cancel, files.download/list)
+// are deliberately absent: the IAM engine authorizes them per resource.
+// files.list is conversation-scoped (ListFilesRequest carries a conversation).
+// The review perms (reviewAgentDM, reviewAll) are also absent: they are granted
+// only via workspaceAdmin.
 var memberBaselinePermissions = permissionSet(
 	permission.AgentsGet,
 	permission.MachinesGet,
 	permission.ConversationsCreate,
 	permission.ConversationsList,
-	permission.CommandsGet,
 	permission.CommandsList,
-	permission.CommandsWatch,
-	permission.CommandsCancel,
-	permission.RemindersGet,
 	permission.RemindersList,
-	permission.RemindersUpdate,
-	permission.RemindersCancel,
 	permission.ActivitiesList,
 	permission.ActivitiesMarkDone,
 	permission.PushConfigGet,
 	permission.PushSubscriptionsCreate,
 	permission.PushSubscriptionsDelete,
 	permission.FilesUpload,
-	permission.FilesDownload,
-	permission.FilesList,
 )
 
 // PredefinedRoles are the read-only, Go-defined roles shown on the management

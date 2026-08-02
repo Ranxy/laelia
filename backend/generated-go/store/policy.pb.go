@@ -85,6 +85,12 @@ const (
 	// AGENT is a per-agent IAM policy. The agent's creator is bound to
 	// roles/agentEditor on agents/{resource_id}.
 	Policy_AGENT Policy_Resource = 5
+	// COMMAND / REMINDER / FILE are engine-only resource kinds: they are never
+	// stored in the policy table. The IAM engine resolves access to these
+	// objects from their owning agent / parent conversation membership.
+	Policy_COMMAND  Policy_Resource = 6
+	Policy_REMINDER Policy_Resource = 7
+	Policy_FILE     Policy_Resource = 8
 )
 
 // Enum value maps for Policy_Resource.
@@ -96,6 +102,9 @@ var (
 		3: "PROJECT",
 		4: "CONVERSATION",
 		5: "AGENT",
+		6: "COMMAND",
+		7: "REMINDER",
+		8: "FILE",
 	}
 	Policy_Resource_value = map[string]int32{
 		"RESOURCE_UNSPECIFIED": 0,
@@ -104,6 +113,9 @@ var (
 		"PROJECT":              3,
 		"CONVERSATION":         4,
 		"AGENT":                5,
+		"COMMAND":              6,
+		"REMINDER":             7,
+		"FILE":                 8,
 	}
 )
 
@@ -436,19 +448,22 @@ var File_store_policy_proto protoreflect.FileDescriptor
 
 const file_store_policy_proto_rawDesc = "" +
 	"\n" +
-	"\x12store/policy.proto\x12\flaelia.store\x1a\x16google/type/expr.proto\"\xa8\x01\n" +
+	"\x12store/policy.proto\x12\flaelia.store\x1a\x16google/type/expr.proto\"\xce\x01\n" +
 	"\x06Policy\".\n" +
 	"\x04Type\x12\x14\n" +
 	"\x10TYPE_UNSPECIFIED\x10\x00\x12\a\n" +
 	"\x03IAM\x10\x01\x12\a\n" +
-	"\x03TAG\x10\x02\"n\n" +
+	"\x03TAG\x10\x02\"\x93\x01\n" +
 	"\bResource\x12\x18\n" +
 	"\x14RESOURCE_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tWORKSPACE\x10\x01\x12\x0f\n" +
 	"\vENVIRONMENT\x10\x02\x12\v\n" +
 	"\aPROJECT\x10\x03\x12\x10\n" +
 	"\fCONVERSATION\x10\x04\x12\t\n" +
-	"\x05AGENT\x10\x05\"{\n" +
+	"\x05AGENT\x10\x05\x12\v\n" +
+	"\aCOMMAND\x10\x06\x12\f\n" +
+	"\bREMINDER\x10\a\x12\b\n" +
+	"\x04FILE\x10\b\"{\n" +
 	"\tTagPolicy\x125\n" +
 	"\x04tags\x18\x01 \x03(\v2!.laelia.store.TagPolicy.TagsEntryR\x04tags\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +

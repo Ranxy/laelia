@@ -97,9 +97,6 @@ func (s *CommandService) GetCommand(ctx context.Context, req *connect.Request[v1
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
-	if err := s.requireCommandAccess(ctx, cmd); err != nil {
-		return nil, err
-	}
 
 	return connect.NewResponse(convertToV1Command(cmd)), nil
 }
@@ -108,9 +105,6 @@ func (s *CommandService) CancelCommand(ctx context.Context, req *connect.Request
 	cmd, err := s.store.GetCommandByName(ctx, req.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
-	}
-	if err := s.requireCommandAccess(ctx, cmd); err != nil {
-		return nil, err
 	}
 
 	if cmd.Status != 1 && cmd.Status != 2 {
@@ -135,9 +129,6 @@ func (s *CommandService) WatchCommand(ctx context.Context, req *connect.Request[
 	cmd, err := s.store.GetCommandByName(ctx, req.Msg.Name)
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
-	}
-	if err := s.requireCommandAccess(ctx, cmd); err != nil {
-		return err
 	}
 
 	afterSeq := req.Msg.AfterSeqNo
@@ -189,9 +180,6 @@ func (s *CommandService) WatchCommandEvents(ctx context.Context, req *connect.Re
 	if err != nil {
 		return connect.NewError(connect.CodeNotFound, err)
 	}
-	if err := s.requireCommandAccess(ctx, cmd); err != nil {
-		return err
-	}
 
 	user, _ := GetUserFromContext(ctx)
 	if err := s.validateRawEventAccess(ctx, user); err != nil {
@@ -241,9 +229,6 @@ func (s *CommandService) RespondPermission(ctx context.Context, req *connect.Req
 	}
 	if cmd == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("command %s not found", req.Msg.Name))
-	}
-	if err := s.requireCommandAccess(ctx, cmd); err != nil {
-		return nil, err
 	}
 
 	if cmd.Status != 2 {
@@ -497,9 +482,6 @@ func (s *CommandService) GetCommandContext(ctx context.Context, req *connect.Req
 	cmd, err := s.store.GetCommandByName(ctx, req.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
-	}
-	if err := s.requireCommandAccess(ctx, cmd); err != nil {
-		return nil, err
 	}
 
 	outputs, err := s.store.GetCommandOutput(ctx, cmd.ID, 0)

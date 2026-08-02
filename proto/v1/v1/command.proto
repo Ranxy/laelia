@@ -313,7 +313,10 @@ message UploadFileRequest {
 }
 
 message DownloadFileRequest {
-  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  string id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/File"
+  ];
 }
 
 message DownloadFileResponse {
@@ -448,7 +451,10 @@ message ChannelMember {
 }
 
 message ListConversationMessagesRequest {
-  string conversation = 1 [(google.api.field_behavior) = REQUIRED];
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
   int32 page_size = 2;
   string page_token = 3;
   int64 after_version = 4;
@@ -497,7 +503,10 @@ message ListThreadMessagesResponse {
 // the message watcher alone cannot observe a changed reply count.
 message ListChannelThreadsRequest {
   // The conversation whose active threads to summarize: "conversations/{id}".
-  string conversation = 1;
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
 }
 
 // ChannelThread is a summary of one active thread (a root with ≥1 reply) in a
@@ -661,7 +670,7 @@ message GetChannelRequest {
 }
 
 message UpdateChannelRequest {
-  Conversation conversation = 1;
+  Conversation conversation = 1 [(google.api.resource_reference) = {type: "laelia/Conversation"}];
   google.protobuf.FieldMask update_mask = 2;
 }
 
@@ -1038,7 +1047,10 @@ message ListRemindersResponse {
 
 message GetReminderRequest {
   // name is the reminder resource name ("reminders/{message_id}").
-  string name = 1 [(google.api.field_behavior) = REQUIRED];
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Reminder"
+  ];
 }
 message GetReminderResponse {
   Reminder reminder = 1;
@@ -1046,7 +1058,10 @@ message GetReminderResponse {
 
 message UpdateReminderRequest {
   // name is the reminder resource name ("reminders/{message_id}").
-  string name = 1 [(google.api.field_behavior) = REQUIRED];
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Reminder"
+  ];
   // fire_at, cron_expr, tz, task_content are the editable fields. At least one
   // must be set. Editing a DUE or MISSED reminder resets it to PENDING with the
   // new schedule. COMPLETED/CANCELLED/FAILED reminders cannot be edited.
@@ -1060,7 +1075,10 @@ message UpdateReminderResponse {
 }
 
 message CancelReminderRequest {
-  string name = 1 [(google.api.field_behavior) = REQUIRED];
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Reminder"
+  ];
 }
 message CancelReminderResponse {
   Reminder reminder = 1;
@@ -1069,7 +1087,10 @@ message CancelReminderResponse {
 message CompleteReminderRequest {
   // name is the reminder resource name ("reminders/{message_id}"). Only the
   // owning agent may call this, and only when the reminder is DUE.
-  string name = 1 [(google.api.field_behavior) = REQUIRED];
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Reminder"
+  ];
   // result is the agent's completion report, posted as a single system message
   // in the reminder's thread. The backend posts it atomically with the status
   // update so it never appears twice.
@@ -1080,7 +1101,10 @@ message CompleteReminderResponse {
 }
 
 message FailReminderRequest {
-  string name = 1 [(google.api.field_behavior) = REQUIRED];
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Reminder"
+  ];
   // error is the failure reason, posted as a system message in the thread.
   string error = 2 [(google.api.field_behavior) = REQUIRED];
 }
@@ -1529,6 +1553,8 @@ service CommandService {
       post: "/v1/{conversation=conversations/*}:postMessage"
       body: "*"
     };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.send";
   }
 
   // ConvertMessageToTask turns an existing top-level message into a task by
@@ -1665,6 +1691,8 @@ service CommandService {
       post: "/v1/{name=reminders/*}:complete"
       body: "*"
     };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.reminders.update";
   }
 
   // FailReminder marks a DUE reminder failed with the given error and posts it
@@ -1675,6 +1703,8 @@ service CommandService {
       post: "/v1/{name=reminders/*}:fail"
       body: "*"
     };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.reminders.update";
   }
 
   // ListDueReminders returns the DUE reminders owned by the calling agent, for

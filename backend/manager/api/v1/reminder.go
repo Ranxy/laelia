@@ -68,40 +68,6 @@ func storeToV1Reminder(r *store.Reminder) *v1pb.Reminder {
 	return rem
 }
 
-// requireReminderAccess gates object-level access to a reminder. Access is
-// granted to the owning agent (the assignee), a user holding
-// conversations.reviewAll (cross-conversation oversight), or any member of the
-// reminder's conversation (the reminder's trigger message lives there, and its
-// thread is the discussion channel). Mirrors requireCommandAccess.
-func (s *CommandService) requireReminderAccess(ctx context.Context, r *store.Reminder) error {
-	if agent, ok := GetAgentFromContext(ctx); ok && agent != nil && agent.ID == r.AssigneeAgentID {
-		return nil
-	}
-	user, _ := GetUserFromContext(ctx)
-	if user != nil {
-		reviewAll, err := s.iam.CheckPermission(ctx, permission.ConversationsReviewAll, user, nil, nil)
-		if err != nil {
-			return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve reviewAll permission"))
-		}
-		if reviewAll {
-			return nil
-		}
-	}
-	memberType, memberID, ok := callerMemberInfo(user, nil)
-	if !ok {
-		// Agent caller that is not the owner: deny.
-		return connect.NewError(connect.CodePermissionDenied, errors.New("no access to reminder"))
-	}
-	isMember, err := s.store.IsConversationMember(ctx, r.ConversationID, memberType, memberID)
-	if err != nil {
-		return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check conversation membership"))
-	}
-	if isMember {
-		return nil
-	}
-	return connect.NewError(connect.CodePermissionDenied, errors.New("no access to reminder"))
-}
-
 // requireReminderOwner gates mutations that only the owning agent may perform
 // (CompleteReminder, FailReminder). A workspace admin may not complete an
 // agent's reminder on its behalf — the work is the agent's to report.
@@ -253,9 +219,6 @@ func (s *CommandService) GetReminder(ctx context.Context, req *connect.Request[v
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get reminder"))
 		}
 	}
-	if err := s.requireReminderAccess(ctx, r); err != nil {
-		return nil, err
-	}
 	return connect.NewResponse(&v1pb.GetReminderResponse{Reminder: storeToV1Reminder(r)}), nil
 }
 
@@ -270,7 +233,7 @@ func (s *CommandService) UpdateReminder(ctx context.Context, req *connect.Reques
 	if err != nil {
 		return nil, err
 	}
-	r, err := s.store.GetReminder(ctx, msgID)
+	_, err = s.store.GetReminder(ctx, msgID)
 	if err != nil {
 		switch {
 		case errors.Is(err, store.ErrReminderNotFound):
@@ -278,9 +241,6 @@ func (s *CommandService) UpdateReminder(ctx context.Context, req *connect.Reques
 		default:
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get reminder"))
 		}
-	}
-	if err := s.requireReminderAccess(ctx, r); err != nil {
-		return nil, err
 	}
 	if strings.TrimSpace(req.Msg.TaskContent) == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("task_content must not be empty"))
@@ -336,7 +296,7 @@ func (s *CommandService) CancelReminder(ctx context.Context, req *connect.Reques
 	if err != nil {
 		return nil, err
 	}
-	r, err := s.store.GetReminder(ctx, msgID)
+	_, err = s.store.GetReminder(ctx, msgID)
 	if err != nil {
 		switch {
 		case errors.Is(err, store.ErrReminderNotFound):
@@ -344,9 +304,6 @@ func (s *CommandService) CancelReminder(ctx context.Context, req *connect.Reques
 		default:
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get reminder"))
 		}
-	}
-	if err := s.requireReminderAccess(ctx, r); err != nil {
-		return nil, err
 	}
 	updated, err := s.store.CancelReminder(ctx, msgID)
 	if err != nil {

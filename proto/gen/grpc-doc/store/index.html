@@ -2405,6 +2405,26 @@ on conversations/{id}.</p></td>
 roles/agentEditor on agents/{resource_id}.</p></td>
               </tr>
             
+              <tr>
+                <td>COMMAND</td>
+                <td>6</td>
+                <td><p>COMMAND / REMINDER / FILE are engine-only resource kinds: they are never
+stored in the policy table. The IAM engine resolves access to these
+objects from their owning agent / parent conversation membership.</p></td>
+              </tr>
+            
+              <tr>
+                <td>REMINDER</td>
+                <td>7</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>FILE</td>
+                <td>8</td>
+                <td><p></p></td>
+              </tr>
+            
           </tbody>
         </table>
       

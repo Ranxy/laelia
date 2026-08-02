@@ -10275,9 +10275,10 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x13laelia/ConversationR\fconversation\x12(\n" +
 	"\roriginal_name\x18\x02 \x01(\tB\x03\xe0A\x02R\foriginalName\x12\x1b\n" +
 	"\tmime_type\x18\x03 \x01(\tR\bmimeType\x12\x17\n" +
-	"\x04data\x18\x04 \x01(\fB\x03\xe0A\x02R\x04data\"*\n" +
-	"\x13DownloadFileRequest\x12\x13\n" +
-	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\"O\n" +
+	"\x04data\x18\x04 \x01(\fB\x03\xe0A\x02R\x04data\":\n" +
+	"\x13DownloadFileRequest\x12#\n" +
+	"\x02id\x18\x01 \x01(\tB\x13\xe0A\x02\xfaA\r\n" +
+	"\vlaelia/FileR\x02id\"O\n" +
 	"\x14DownloadFileResponse\x12#\n" +
 	"\x04file\x18\x01 \x01(\v2\x0f.laelia.v1.FileR\x04file\x12\x12\n" +
 	"\x04data\x18\x02 \x01(\fR\x04data\"S\n" +
@@ -10338,9 +10339,10 @@ const file_v1_command_proto_rawDesc = "" +
 	"memberRole\x127\n" +
 	"\tjoined_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bjoinedAt\x12 \n" +
 	"\vdescription\x18\x06 \x01(\tR\vdescription\x12\x16\n" +
-	"\x06avatar\x18\a \x01(\tR\x06avatar\"\xd2\x01\n" +
-	"\x1fListConversationMessagesRequest\x12'\n" +
-	"\fconversation\x18\x01 \x01(\tB\x03\xe0A\x02R\fconversation\x12\x1b\n" +
+	"\x06avatar\x18\a \x01(\tR\x06avatar\"\xea\x01\n" +
+	"\x1fListConversationMessagesRequest\x12?\n" +
+	"\fconversation\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
+	"\x13laelia/ConversationR\fconversation\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tR\tpageToken\x12#\n" +
@@ -10363,9 +10365,10 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x1aListThreadMessagesResponse\x122\n" +
 	"\bmessages\x18\x01 \x03(\v2\x16.laelia.v1.ChatMessageR\bmessages\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12'\n" +
-	"\x0fcurrent_version\x18\x03 \x01(\x03R\x0ecurrentVersion\"?\n" +
-	"\x19ListChannelThreadsRequest\x12\"\n" +
-	"\fconversation\x18\x01 \x01(\tR\fconversation\"\xc9\x01\n" +
+	"\x0fcurrent_version\x18\x03 \x01(\x03R\x0ecurrentVersion\"\\\n" +
+	"\x19ListChannelThreadsRequest\x12?\n" +
+	"\fconversation\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
+	"\x13laelia/ConversationR\fconversation\"\xc9\x01\n" +
 	"\rChannelThread\x12!\n" +
 	"\froot_message\x18\x01 \x01(\tR\vrootMessage\x12\x1f\n" +
 	"\vreply_count\x18\x02 \x01(\x05R\n" +
@@ -10435,9 +10438,10 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"D\n" +
 	"\x11GetChannelRequest\x12/\n" +
 	"\x04name\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
-	"\x13laelia/ConversationR\x04name\"\x90\x01\n" +
-	"\x14UpdateChannelRequest\x12;\n" +
-	"\fconversation\x18\x01 \x01(\v2\x17.laelia.v1.ConversationR\fconversation\x12;\n" +
+	"\x13laelia/ConversationR\x04name\"\xaa\x01\n" +
+	"\x14UpdateChannelRequest\x12U\n" +
+	"\fconversation\x18\x01 \x01(\v2\x17.laelia.v1.ConversationB\x18\xfaA\x15\n" +
+	"\x13laelia/ConversationR\fconversation\x12;\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
 	"updateMask\"G\n" +
 	"\x14DeleteChannelRequest\x12/\n" +
@@ -10611,30 +10615,35 @@ const file_v1_command_proto_rawDesc = "" +
 	"page_token\x18\x05 \x01(\tR\tpageToken\"r\n" +
 	"\x15ListRemindersResponse\x121\n" +
 	"\treminders\x18\x01 \x03(\v2\x13.laelia.v1.ReminderR\treminders\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"-\n" +
-	"\x12GetReminderRequest\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x02R\x04name\"F\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"A\n" +
+	"\x12GetReminderRequest\x12+\n" +
+	"\x04name\x18\x01 \x01(\tB\x17\xe0A\x02\xfaA\x11\n" +
+	"\x0flaelia/ReminderR\x04name\"F\n" +
 	"\x13GetReminderResponse\x12/\n" +
-	"\breminder\x18\x01 \x01(\v2\x13.laelia.v1.ReminderR\breminder\"\xb5\x01\n" +
-	"\x15UpdateReminderRequest\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x02R\x04name\x123\n" +
+	"\breminder\x18\x01 \x01(\v2\x13.laelia.v1.ReminderR\breminder\"\xc9\x01\n" +
+	"\x15UpdateReminderRequest\x12+\n" +
+	"\x04name\x18\x01 \x01(\tB\x17\xe0A\x02\xfaA\x11\n" +
+	"\x0flaelia/ReminderR\x04name\x123\n" +
 	"\afire_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x06fireAt\x12\x1b\n" +
 	"\tcron_expr\x18\x03 \x01(\tR\bcronExpr\x12\x0e\n" +
 	"\x02tz\x18\x04 \x01(\tR\x02tz\x12!\n" +
 	"\ftask_content\x18\x05 \x01(\tR\vtaskContent\"I\n" +
 	"\x16UpdateReminderResponse\x12/\n" +
-	"\breminder\x18\x01 \x01(\v2\x13.laelia.v1.ReminderR\breminder\"0\n" +
-	"\x15CancelReminderRequest\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x02R\x04name\"I\n" +
+	"\breminder\x18\x01 \x01(\v2\x13.laelia.v1.ReminderR\breminder\"D\n" +
+	"\x15CancelReminderRequest\x12+\n" +
+	"\x04name\x18\x01 \x01(\tB\x17\xe0A\x02\xfaA\x11\n" +
+	"\x0flaelia/ReminderR\x04name\"I\n" +
 	"\x16CancelReminderResponse\x12/\n" +
-	"\breminder\x18\x01 \x01(\v2\x13.laelia.v1.ReminderR\breminder\"O\n" +
-	"\x17CompleteReminderRequest\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x02R\x04name\x12\x1b\n" +
+	"\breminder\x18\x01 \x01(\v2\x13.laelia.v1.ReminderR\breminder\"c\n" +
+	"\x17CompleteReminderRequest\x12+\n" +
+	"\x04name\x18\x01 \x01(\tB\x17\xe0A\x02\xfaA\x11\n" +
+	"\x0flaelia/ReminderR\x04name\x12\x1b\n" +
 	"\x06result\x18\x02 \x01(\tB\x03\xe0A\x02R\x06result\"K\n" +
 	"\x18CompleteReminderResponse\x12/\n" +
-	"\breminder\x18\x01 \x01(\v2\x13.laelia.v1.ReminderR\breminder\"I\n" +
-	"\x13FailReminderRequest\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x02R\x04name\x12\x19\n" +
+	"\breminder\x18\x01 \x01(\v2\x13.laelia.v1.ReminderR\breminder\"]\n" +
+	"\x13FailReminderRequest\x12+\n" +
+	"\x04name\x18\x01 \x01(\tB\x17\xe0A\x02\xfaA\x11\n" +
+	"\x0flaelia/ReminderR\x04name\x12\x19\n" +
 	"\x05error\x18\x02 \x01(\tB\x03\xe0A\x02R\x05error\"G\n" +
 	"\x14FailReminderResponse\x12/\n" +
 	"\breminder\x18\x01 \x01(\v2\x13.laelia.v1.ReminderR\breminder\"\x19\n" +
@@ -10901,7 +10910,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x1aACTIVITY_STATE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15ACTIVITY_STATE_UNREAD\x10\x01\x12\x17\n" +
 	"\x13ACTIVITY_STATE_READ\x10\x02\x12\x17\n" +
-	"\x13ACTIVITY_STATE_DONE\x10\x032\xaaI\n" +
+	"\x13ACTIVITY_STATE_DONE\x10\x032\x8aJ\n" +
 	"\x0eCommandService\x12\x91\x01\n" +
 	"\fListCommands\x12\x1e.laelia.v1.ListCommandsRequest\x1a\x1f.laelia.v1.ListCommandsResponse\"@\x8a\xea0\x13laelia.commands.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1f\x12\x1d/v1/{agent=agents/*}/commands\x12\x81\x01\n" +
 	"\n" +
@@ -10935,8 +10944,8 @@ const file_v1_command_proto_rawDesc = "" +
 	"\fLeaveChannel\x12\x1e.laelia.v1.LeaveChannelRequest\x1a\x16.google.protobuf.Empty\"X\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02-:\x01*\"(/v1/{conversation=conversations/*}:leave\x12\xb6\x01\n" +
 	"\x12ListChannelMembers\x12$.laelia.v1.ListChannelMembersRequest\x1a%.laelia.v1.ListChannelMembersResponse\"S\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02,\x12*/v1/{conversation=conversations/*}/members\x12\xd1\x01\n" +
 	"\x16ListThreadParticipants\x12(.laelia.v1.ListThreadParticipantsRequest\x1a).laelia.v1.ListThreadParticipantsResponse\"b\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02;\x129/v1/{conversation=conversations/*}:listThreadParticipants\x12\xa6\x01\n" +
-	"\vSendMessage\x12\x1d.laelia.v1.SendMessageRequest\x1a\x16.laelia.v1.ChatMessage\"`\x8a\xea0\x19laelia.conversations.send\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x025:\x01*\"0/v1/{conversation=conversations/*}/messages:send\x12\x87\x01\n" +
-	"\vPostMessage\x12\x1d.laelia.v1.PostMessageRequest\x1a\x1e.laelia.v1.PostMessageResponse\"9\x82\xd3\xe4\x93\x023:\x01*\"./v1/{conversation=conversations/*}:postMessage\x12\xcf\x01\n" +
+	"\vSendMessage\x12\x1d.laelia.v1.SendMessageRequest\x1a\x16.laelia.v1.ChatMessage\"`\x8a\xea0\x19laelia.conversations.send\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x025:\x01*\"0/v1/{conversation=conversations/*}/messages:send\x12\xa8\x01\n" +
+	"\vPostMessage\x12\x1d.laelia.v1.PostMessageRequest\x1a\x1e.laelia.v1.PostMessageResponse\"Z\x8a\xea0\x19laelia.conversations.send\x90\xea0\x01\x82\xd3\xe4\x93\x023:\x01*\"./v1/{conversation=conversations/*}:postMessage\x12\xcf\x01\n" +
 	"\x14ConvertMessageToTask\x12&.laelia.v1.ConvertMessageToTaskRequest\x1a'.laelia.v1.ConvertMessageToTaskResponse\"f\x8a\xea0\x19laelia.conversations.send\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/{message=conversations/*/messages/*}:convertToTask\x12\x99\x01\n" +
 	"\tListTasks\x12\x1b.laelia.v1.ListTasksRequest\x1a\x1c.laelia.v1.ListTasksResponse\"Q\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02*\x12(/v1/{conversation=conversations/*}/tasks\x12\xaf\x01\n" +
 	"\x0eListTaskCounts\x12 .laelia.v1.ListTaskCountsRequest\x1a!.laelia.v1.ListTaskCountsResponse\"X\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x021\x12//v1/{conversation=conversations/*}/tasks:counts\x12\x83\x01\n" +
@@ -10949,9 +10958,9 @@ const file_v1_command_proto_rawDesc = "" +
 	"\rListReminders\x12\x1f.laelia.v1.ListRemindersRequest\x1a .laelia.v1.ListRemindersResponse\"2\x8a\xea0\x15laelia.reminders.list\x90\xea0\x01\x82\xd3\xe4\x93\x02\x0f\x12\r/v1/reminders\x12\x88\x01\n" +
 	"\vGetReminder\x12\x1d.laelia.v1.GetReminderRequest\x1a\x1e.laelia.v1.GetReminderResponse\":\x8a\xea0\x14laelia.reminders.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x18\x12\x16/v1/{name=reminders/*}\x12\x9b\x01\n" +
 	"\x0eUpdateReminder\x12 .laelia.v1.UpdateReminderRequest\x1a!.laelia.v1.UpdateReminderResponse\"D\x8a\xea0\x17laelia.reminders.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1b:\x01*2\x16/v1/{name=reminders/*}\x12\xa2\x01\n" +
-	"\x0eCancelReminder\x12 .laelia.v1.CancelReminderRequest\x1a!.laelia.v1.CancelReminderResponse\"K\x8a\xea0\x17laelia.reminders.cancel\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/v1/{name=reminders/*}:cancel\x12\x87\x01\n" +
-	"\x10CompleteReminder\x12\".laelia.v1.CompleteReminderRequest\x1a#.laelia.v1.CompleteReminderResponse\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/{name=reminders/*}:complete\x12w\n" +
-	"\fFailReminder\x12\x1e.laelia.v1.FailReminderRequest\x1a\x1f.laelia.v1.FailReminderResponse\"&\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/v1/{name=reminders/*}:fail\x12~\n" +
+	"\x0eCancelReminder\x12 .laelia.v1.CancelReminderRequest\x1a!.laelia.v1.CancelReminderResponse\"K\x8a\xea0\x17laelia.reminders.cancel\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/v1/{name=reminders/*}:cancel\x12\xa6\x01\n" +
+	"\x10CompleteReminder\x12\".laelia.v1.CompleteReminderRequest\x1a#.laelia.v1.CompleteReminderResponse\"I\x8a\xea0\x17laelia.reminders.update\x90\xea0\x01\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/{name=reminders/*}:complete\x12\x96\x01\n" +
+	"\fFailReminder\x12\x1e.laelia.v1.FailReminderRequest\x1a\x1f.laelia.v1.FailReminderResponse\"E\x8a\xea0\x17laelia.reminders.update\x90\xea0\x01\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/v1/{name=reminders/*}:fail\x12~\n" +
 	"\x10ListDueReminders\x12\".laelia.v1.ListDueRemindersRequest\x1a#.laelia.v1.ListDueRemindersResponse\"!\x82\xd3\xe4\x93\x02\x1b\x12\x19/v1/agents/-/dueReminders\x12\x86\x01\n" +
 	"\x12ListChannelUpdates\x12$.laelia.v1.ListChannelUpdatesRequest\x1a%.laelia.v1.ListChannelUpdatesResponse\"#\x82\xd3\xe4\x93\x02\x1d\x12\x1b/v1/agents/-/channelUpdates\x12\x82\x01\n" +
 	"\x11ListThreadUpdates\x12#.laelia.v1.ListThreadUpdatesRequest\x1a$.laelia.v1.ListThreadUpdatesResponse\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/v1/agents/-/threadUpdates\x12\xa7\x01\n" +

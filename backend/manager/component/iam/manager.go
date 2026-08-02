@@ -120,6 +120,12 @@ func (m *Manager) checkResourcePermission(ctx context.Context, perm permission.P
 			}
 		}
 		return false, nil
+	case models.Policy_COMMAND:
+		return m.checkCommandPermission(ctx, perm, user, agent, resource.Name)
+	case models.Policy_REMINDER:
+		return m.checkReminderPermission(ctx, perm, user, agent, resource.Name)
+	case models.Policy_FILE:
+		return m.checkFilePermission(ctx, perm, user, agent, resource.Name)
 	default:
 		return false, nil
 	}
@@ -206,6 +212,7 @@ var (
 		permission.ConversationsSend,
 		permission.CommandsGet,
 		permission.CommandsWatch,
+		permission.FilesList,
 	)
 	chatAdminPermissions = permSet(
 		permission.ConversationsRead,
@@ -213,6 +220,7 @@ var (
 		permission.ConversationsManage,
 		permission.CommandsGet,
 		permission.CommandsWatch,
+		permission.FilesList,
 	)
 	chatOwnerPermissions = permSet(
 		permission.ConversationsRead,
@@ -220,6 +228,7 @@ var (
 		permission.ConversationsManage,
 		permission.CommandsGet,
 		permission.CommandsWatch,
+		permission.FilesList,
 	)
 )
 

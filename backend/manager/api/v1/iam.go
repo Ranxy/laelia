@@ -26,11 +26,12 @@ type PermissionChecker interface {
 //
 // The interceptor delegates to a PermissionChecker (iam.Manager in production),
 // which resolves the caller's effective permission set from the IAM model
-// (roles + workspace IAM policy). Phase 1 passes a nil resource
-// (workspace-scoped checks only); the handler-level helpers in authz_helper.go
-// continue to enforce per-resource access (conversation membership, agent
-// ownership, channel ownership, command access) until Phase 2 routes those
-// through per-resource IAM policies.
+// (roles + workspace IAM policy). Resource-scoped permissions (conversations,
+// agents, commands, reminders, files) resolve the request's resources via
+// resource_reference annotations and require the permission on every one.
+// Handler-level checks remain only for owner-of-record operations that are not
+// expressible as catalog permissions (channel ownership, agent ownership,
+// reminder assignee).
 type IAMInterceptor struct {
 	iam PermissionChecker
 }
@@ -46,10 +47,12 @@ func newIAMInterceptorWithChecker(checker PermissionChecker) *IAMInterceptor {
 
 // authorize enforces the RPC's declared permission against the caller's
 // effective permission set. RPCs without an IAM auth method or without a
-// permission string are not gated here (the handler remains responsible). When
-// the request carries a recognizable resource (resolveResource), it is passed
-// to CheckPermission so per-resource IAM policies are consulted too.
-func (in *IAMInterceptor) authorize(ctx context.Context, req connect.AnyRequest, fullMethod string) error {
+// permission string are not gated here (the handler remains responsible).
+// When the request carries recognizable resources (resolveResources), the
+// caller must hold the permission on every one of them; otherwise the
+// workspace-scope check applies. The resolved resources are also recorded on
+// the auth context for audit and error detail.
+func (in *IAMInterceptor) authorize(ctx context.Context, msg any, fullMethod string) error {
 	authCtx, ok := common.GetAuthContextFromContext(ctx)
 	if !ok {
 		// No auth context: the request did not pass through the auth interceptor
@@ -71,30 +74,46 @@ func (in *IAMInterceptor) authorize(ctx context.Context, req connect.AnyRequest,
 		return connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
 
-	var resource *iam.ResourceRef
+	var refs []*iam.ResourceRef
 	// Resolve the request's resource only for permissions the IAM engine
 	// authorizes via a per-resource policy. For everything else (list/create,
 	// handler-gated command perms, workspace-scope perms) resolution is wasted
 	// work and — for non-baseline perms — a per-resource policy lookup could
 	// turn a transient DB error into a 500 where the baseline path returned
 	// PermissionDenied.
-	if req != nil && permission.IsResourceScoped(permission.Permission(authCtx.Permission)) {
-		resource = resolveResource(req)
+	if permission.IsResourceScoped(permission.Permission(authCtx.Permission)) {
+		refs = resolveResources(msg)
 	}
-	ok, err := in.iam.CheckPermission(ctx, permission.Permission(authCtx.Permission), user, agent, resource)
-	if err != nil {
-		return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check permission"))
+	authCtx.Resources = authCtx.Resources[:0]
+	for _, ref := range refs {
+		authCtx.Resources = append(authCtx.Resources, &common.Resource{Name: ref.Name})
 	}
-	if !ok {
-		err := connect.NewError(connect.CodePermissionDenied, errors.Errorf("permission %q denied", authCtx.Permission))
-		var resources []string
-		if resource != nil {
-			resources = append(resources, resource.Name)
+
+	var deniedResources []string
+	if len(refs) == 0 {
+		refs = []*iam.ResourceRef{nil}
+	}
+	allOK := true
+	for _, ref := range refs {
+		ok, err := in.iam.CheckPermission(ctx, permission.Permission(authCtx.Permission), user, agent, ref)
+		if err != nil {
+			return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check permission"))
 		}
+		if !ok {
+			allOK = false
+			if ref != nil {
+				deniedResources = append(deniedResources, ref.Name)
+			} else {
+				deniedResources = append(deniedResources, "workspaces/-")
+			}
+		}
+	}
+	if !allOK {
+		err := connect.NewError(connect.CodePermissionDenied, errors.Errorf("permission %q denied", authCtx.Permission))
 		if detail, detailErr := connect.NewErrorDetail(&v1pb.PermissionDeniedDetail{
 			Method:              fullMethod,
 			RequiredPermissions: []string{authCtx.Permission},
-			Resources:           resources,
+			Resources:           deniedResources,
 		}); detailErr == nil {
 			err.AddDetail(detail)
 		}
@@ -105,7 +124,7 @@ func (in *IAMInterceptor) authorize(ctx context.Context, req connect.AnyRequest,
 
 func (in *IAMInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		if err := in.authorize(ctx, req, req.Spec().Procedure); err != nil {
+		if err := in.authorize(ctx, req.Any(), req.Spec().Procedure); err != nil {
 			return nil, err
 		}
 		return next(ctx, req)
@@ -120,13 +139,43 @@ func (*IAMInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) con
 
 func (in *IAMInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-		// The streaming request body is not visible here (it arrives on the first
-		// Receive); per-resource authorization for streaming RPCs is deferred to
-		// Phase 3's first-Receive wrapper. Workspace-scoped authorization still
-		// applies.
-		if err := in.authorize(ctx, nil, conn.Spec().Procedure); err != nil {
-			return err
+		// Workspace-scoped authorization applies up front. For resource-scoped
+		// permissions (e.g. commands.watch on WatchCommand) the resource only
+		// arrives in the first message, so the check is deferred to the wrapped
+		// conn's Receive — an up-front nil-resource check would deny members
+		// whose access is granted per resource.
+		skipUpfront := false
+		if authCtx, ok := common.GetAuthContextFromContext(ctx); ok {
+			skipUpfront = authCtx.AuthMethod == common.AuthMethodIAM &&
+				authCtx.Permission != "" &&
+				permission.IsResourceScoped(permission.Permission(authCtx.Permission))
 		}
-		return next(ctx, conn)
+		if !skipUpfront {
+			if err := in.authorize(ctx, nil, conn.Spec().Procedure); err != nil {
+				return err
+			}
+		}
+		return next(ctx, &iamStreamingConn{
+			StreamingHandlerConn: conn,
+			interceptor:          in,
+			fullMethod:           conn.Spec().Procedure,
+			ctx:                  ctx,
+		})
 	}
+}
+
+// iamStreamingConn wraps a streaming handler connection so every received
+// message is authorized before it reaches the handler.
+type iamStreamingConn struct {
+	connect.StreamingHandlerConn
+	interceptor *IAMInterceptor
+	fullMethod  string
+	ctx         context.Context
+}
+
+func (c *iamStreamingConn) Receive(msg any) error {
+	if err := c.interceptor.authorize(c.ctx, msg, c.fullMethod); err != nil {
+		return err
+	}
+	return c.StreamingHandlerConn.Receive(msg)
 }

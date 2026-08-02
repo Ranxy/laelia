@@ -29,17 +29,18 @@ func TestCheckPermissionAgentBaseline(t *testing.T) {
 		{permission.ConversationsList, true},
 		{permission.ConversationsCreate, true},
 		{permission.AgentsGet, true},
-		{permission.CommandsWatch, true},
-		{permission.CommandsCancel, true},
 		{permission.RemindersList, true},
-		{permission.FilesDownload, true},
 		// Per-resource perms are NOT in the baseline: conversations.read/send are
 		// granted by the caller's chat role on a specific conversation, and
-		// agents.edit by the workspaceAdmin role (or a custom role bound on the
-		// agent). With no resource ref they are denied.
+		// agents.edit / commands.* / reminders.get-update-cancel / files.download
+		// by the engine's per-object branches. With no resource ref they are
+		// denied.
 		{permission.ConversationsRead, false},
 		{permission.ConversationsSend, false},
 		{permission.AgentsEdit, false},
+		{permission.CommandsWatch, false},
+		{permission.CommandsCancel, false},
+		{permission.FilesDownload, false},
 		// Review perms are not baseline; only via workspaceAdmin.
 		{permission.ConversationsReviewAll, false},
 		// Admin-tier workspace perms are not baseline.

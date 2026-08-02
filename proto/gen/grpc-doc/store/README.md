@@ -881,6 +881,9 @@ EnvironmentTierPolicy is the tier of an environment.
 | PROJECT | 3 |  |
 | CONVERSATION | 4 | CONVERSATION is a per-conversation IAM policy. Members/owners are expressed as bindings (roles/conversationMember, roles/conversationOwner) on conversations/{id}. |
 | AGENT | 5 | AGENT is a per-agent IAM policy. The agent&#39;s creator is bound to roles/agentEditor on agents/{resource_id}. |
+| COMMAND | 6 | COMMAND / REMINDER / FILE are engine-only resource kinds: they are never stored in the policy table. The IAM engine resolves access to these objects from their owning agent / parent conversation membership. |
+| REMINDER | 7 |  |
+| FILE | 8 |  |
 
 
 

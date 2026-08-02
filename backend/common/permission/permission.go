@@ -209,20 +209,28 @@ func Exists(permissions ...string) bool {
 }
 
 // resourceScopedPermissions are the permissions the IAM engine authorizes via a
-// per-resource lookup rather than the workspace baseline or handler-level
-// helpers. For conversations the lookup reads the caller's chat role
-// (member/admin/owner) from conversation_member; for agents it reads the
-// agentEditor IAM binding. The interceptor resolves the request's resource only
-// for these, so list/create, the review perms, and handler-gated RPCs pay no
-// resource-resolution cost and never hit a per-resource lookup (which would
-// otherwise turn a DB error into a 500 where the baseline path returned
-// PermissionDenied). The review perms (reviewAgentDM, reviewAll) are
-// workspace-scope and intentionally NOT in this set.
+// per-resource lookup rather than the workspace baseline. For conversations the
+// lookup reads the caller's chat role (member/admin/owner) from
+// conversation_member; for agents it reads the agent IAM policy; for commands,
+// reminders, and files it resolves the object's owning agent / parent
+// conversation. The interceptor resolves the request's resource only for
+// these. files.upload stays workspace-baseline + handler-gated because the
+// agent file tool can upload a conversation-less blob. The review perms
+// (reviewAgentDM, reviewAll) are workspace-scope and intentionally NOT in this
+// set.
 var resourceScopedPermissions = map[Permission]bool{
 	ConversationsRead:   true,
 	ConversationsSend:   true,
 	ConversationsManage: true,
 	AgentsEdit:          true,
+	CommandsGet:         true,
+	CommandsWatch:       true,
+	CommandsCancel:      true,
+	RemindersGet:        true,
+	RemindersUpdate:     true,
+	RemindersCancel:     true,
+	FilesDownload:       true,
+	FilesList:           true,
 }
 
 // IsResourceScoped reports whether perm is authorized by a per-resource IAM

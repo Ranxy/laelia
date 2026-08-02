@@ -38,43 +38,6 @@ func resolveFileCaller(ctx context.Context) (*store.UserMessage, *store.AgentMes
 	return user, agent, nil
 }
 
-// requireFileMember parses the conversation id and checks the caller is a
-// member, using the right MemberType for a user vs agent caller.
-func requireFileMember(
-	ctx context.Context,
-	stores *store.Store,
-	conversation string,
-	user *store.UserMessage,
-	agent *store.AgentMessage,
-) (uuid.UUID, error) {
-	convID, err := parseConversationID(conversation)
-	if err != nil {
-		return uuid.Nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation id"))
-	}
-	var (
-		memberID   string
-		memberType int32
-	)
-	switch {
-	case user != nil:
-		memberType = store.MemberTypeUser
-		memberID = fmt.Sprintf("%d", user.ID)
-	case agent != nil:
-		memberType = store.MemberTypeAgent
-		memberID = agent.ResourceID
-	default:
-		return uuid.Nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
-	}
-	ok, err := stores.IsConversationMember(ctx, convID, memberType, memberID)
-	if err != nil {
-		return uuid.Nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check conversation membership"))
-	}
-	if !ok {
-		return uuid.Nil, connect.NewError(connect.CodePermissionDenied, errors.New("not a conversation member"))
-	}
-	return convID, nil
-}
-
 // sniffMimeType returns the request's declared mime type, or — when empty —
 // the type detected from the first 512 bytes of the file content.
 func sniffMimeType(declared string, data []byte) string {
@@ -95,7 +58,7 @@ func sniffMimeType(declared string, data []byte) string {
 // and agents call this; the caller must be a member of the conversation when
 // one is supplied.
 func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1pb.UploadFileRequest]) (*connect.Response[v1pb.File], error) {
-	user, agent, err := resolveFileCaller(ctx)
+	user, _, err := resolveFileCaller(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -130,9 +93,9 @@ func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1
 		SizeBytes:           int64(len(req.Msg.Data)),
 	}
 	if req.Msg.Conversation != "" {
-		convID, err := requireFileMember(ctx, s.store, req.Msg.Conversation, user, agent)
+		convID, err := parseConversationID(req.Msg.Conversation)
 		if err != nil {
-			return nil, err
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation id"))
 		}
 		// Agent-DM conversations (type 3) are agent-only. Agents exchange
 		// files in their own DMs; users — including workspace admins, who can
@@ -186,11 +149,6 @@ func (s *CommandService) UploadFile(ctx context.Context, req *connect.Request[v1
 // the file's conversation; untied files are uploader-only (agents are denied,
 // since they don't own untied user files).
 func (s *CommandService) DownloadFile(ctx context.Context, req *connect.Request[v1pb.DownloadFileRequest]) (*connect.Response[v1pb.DownloadFileResponse], error) {
-	user, agent, err := resolveFileCaller(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	id, err := uuid.Parse(req.Msg.Id)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid file id"))
@@ -202,14 +160,6 @@ func (s *CommandService) DownloadFile(ctx context.Context, req *connect.Request[
 	}
 	if fileRow == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("file not found"))
-	}
-
-	if fileRow.ConversationID.Valid {
-		if _, err := requireFileMember(ctx, s.store, "conversations/"+fileRow.ConversationID.UUID.String(), user, agent); err != nil {
-			return nil, err
-		}
-	} else if user == nil || fileRow.UploaderPrincipalID != user.ID {
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("not the file owner"))
 	}
 
 	s3Cli, cfg, err := s.s3clientManager.Get(ctx)
@@ -243,13 +193,9 @@ func (s *CommandService) DownloadFile(ctx context.Context, req *connect.Request[
 // ListFiles returns the files attached to a conversation. The caller must be a
 // member.
 func (s *CommandService) ListFiles(ctx context.Context, req *connect.Request[v1pb.ListFilesRequest]) (*connect.Response[v1pb.ListFilesResponse], error) {
-	user, agent, err := resolveFileCaller(ctx)
+	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
-		return nil, err
-	}
-	convID, err := requireFileMember(ctx, s.store, req.Msg.Conversation, user, agent)
-	if err != nil {
-		return nil, err
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation id"))
 	}
 
 	files, err := s.store.ListFilesByConversation(ctx, convID)
