@@ -9,7 +9,7 @@ import {
   Send,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { MentionBadge } from "@/components/chat/mention-badge";
@@ -40,6 +40,85 @@ import type { Attachment } from "@/types/proto-es/v1/command_pb";
 import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
 
 const MENTION_POPUP_ID = "thread-mention-popup";
+
+// ThreadReplies renders the beginning-of-replies divider + the reply list. It
+// is memoized so typing a reply (which re-renders the panel's header/composer
+// state) does not rebuild every reply row; its props are stable store refs,
+// callbacks, and the memoized replies array, so it bails out unless a reply
+// actually changed.
+const ThreadReplies = memo(function ThreadReplies({
+  replies,
+  loading,
+  agentTitleFor,
+  onViewDetails,
+  onPreviewAttachment,
+  onJumpToSection,
+  onPreviewImage,
+  debugMode,
+  currentPrincipalId,
+}: {
+  replies: ChatMessageUI[];
+  loading: boolean;
+  agentTitleFor: (msg: ChatMessageUI) => string;
+  onViewDetails: (commandId: string, agentId: string) => void;
+  onPreviewAttachment?: (attachment: Attachment, rootMessageId: string) => void;
+  onJumpToSection?: (
+    attachment: Attachment,
+    sectionId: string,
+    rootMessageId: string
+  ) => void;
+  onPreviewImage?: (attachment: Attachment) => void;
+  debugMode: boolean;
+  currentPrincipalId?: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {/* Beginning-of-replies divider. */}
+      <div className="flex items-center gap-2 py-1">
+        <div className="h-px flex-1 bg-control-border" />
+        <span className="text-[11px] text-control-light">
+          {t("chat.thread-beginning")}
+        </span>
+        <div className="h-px flex-1 bg-control-border" />
+      </div>
+
+      {/* Replies. */}
+      {replies.length === 0 && !loading && (
+        <EmptyState icon={Send} message={t("chat.thread-empty")} />
+      )}
+      {replies.map((msg, idx) => {
+        const prev = idx > 0 ? replies[idx - 1] : null;
+        const showAvatar =
+          !prev || senderKeyForMessage(prev) !== senderKeyForMessage(msg);
+        const rowProps = rowStreamingProps(msg, false, "", EMPTY_EVENTS);
+        return (
+          <div key={msg.id} data-msg-id={msg.id}>
+            <MessageRow
+              msg={msg}
+              showAvatar={showAvatar}
+              agentTitle={agentTitleFor(msg)}
+              streamingContent={rowProps.streamingContent}
+              streamingEvents={rowProps.streamingEvents}
+              onViewDetails={onViewDetails}
+              MentionBadge={MentionBadge}
+              markdownCustomId="thread-chat"
+              onPreviewAttachment={onPreviewAttachment}
+              onJumpToSection={onJumpToSection}
+              onPreviewImage={onPreviewImage}
+              debugMode={debugMode}
+              currentPrincipalId={currentPrincipalId}
+              // Small threads render markdown synchronously to avoid the
+              // per-row fallback→swap flash on open; large threads keep the
+              // lazy gate so off-screen replies stay cheap.
+              eager={replies.length <= 40}
+            />
+          </div>
+        );
+      })}
+    </>
+  );
+});
 
 export interface ThreadPanelProps {
   channelId: string;
@@ -112,8 +191,13 @@ export function ThreadPanel({
   const messages = thread?.messages ?? EMPTY_THREAD;
   const loading = thread?.loading ?? false;
   // The first message is always the root (context); the rest are replies.
+  // Memoized so the slice reference is stable across composer re-renders —
+  // otherwise ThreadReplies' memo below would never bail out.
   const rootMsg = messages.length > 0 ? messages[0] : null;
-  const replies = rootMsg ? messages.slice(1) : messages;
+  const replies = useMemo(
+    () => (rootMsg ? messages.slice(1) : messages),
+    [messages, rootMsg]
+  );
 
   const mentionTargets = useMentionTargets(channelId);
 
@@ -138,16 +222,27 @@ export function ThreadPanel({
   const [mentionMap, setMentionMap] = useState<MentionTarget[]>([]);
   const [cursorPos, setCursorPos] = useState(0);
 
+  // Keyed by both the agent's resource name and its title so sender-title
+  // lookup is O(1) instead of a linear scan per message (a thread with many
+  // replies × a large roster previously scanned agents on every render).
+  const agentsByKey = useMemo(() => {
+    const map = new Map<string, (typeof agents)[number]>();
+    for (const a of agents) {
+      map.set(a.name, a);
+      if (a.title) map.set(a.title, a);
+    }
+    return map;
+  }, [agents]);
+
   const agentTitleFor = useCallback(
     (msg: ChatMessageUI) => {
       if (msg.role === "user") return "";
-      const agent = agents.find(
-        (a) =>
-          a.name === `agents/${msg.senderName}` || a.title === msg.senderName
-      );
+      const agent =
+        agentsByKey.get(`agents/${msg.senderName}`) ??
+        agentsByKey.get(msg.senderName ?? "");
       return agent?.title ?? msg.senderName ?? "";
     },
-    [agents]
+    [agentsByKey]
   );
 
   // Auto-stick to bottom as replies arrive.
@@ -361,48 +456,17 @@ export function ThreadPanel({
             </div>
           )}
 
-          {/* Beginning-of-replies divider. */}
-          <div className="flex items-center gap-2 py-1">
-            <div className="h-px flex-1 bg-control-border" />
-            <span className="text-[11px] text-control-light">
-              {t("chat.thread-beginning")}
-            </span>
-            <div className="h-px flex-1 bg-control-border" />
-          </div>
-
-          {/* Replies. */}
-          {replies.length === 0 && !loading && (
-            <EmptyState icon={Send} message={t("chat.thread-empty")} />
-          )}
-          {replies.map((msg, idx) => {
-            const prev = idx > 0 ? replies[idx - 1] : null;
-            const showAvatar =
-              !prev || senderKeyForMessage(prev) !== senderKeyForMessage(msg);
-            const rowProps = rowStreamingProps(msg, false, "", EMPTY_EVENTS);
-            return (
-              <div key={msg.id} data-msg-id={msg.id}>
-                <MessageRow
-                  msg={msg}
-                  showAvatar={showAvatar}
-                  agentTitle={agentTitleFor(msg)}
-                  streamingContent={rowProps.streamingContent}
-                  streamingEvents={rowProps.streamingEvents}
-                  onViewDetails={handleViewDetails}
-                  MentionBadge={MentionBadge}
-                  markdownCustomId="thread-chat"
-                  onPreviewAttachment={onPreviewAttachment}
-                  onJumpToSection={onJumpToSection}
-                  onPreviewImage={onPreviewImage}
-                  debugMode={currentUser?.debugMode ?? false}
-                  currentPrincipalId={currentUser?.name.split("/").pop()}
-                  // Small threads render markdown synchronously to avoid the
-                  // per-row fallback→swap flash on open; large threads keep the
-                  // lazy gate so off-screen replies stay cheap.
-                  eager={replies.length <= 40}
-                />
-              </div>
-            );
-          })}
+          <ThreadReplies
+            replies={replies}
+            loading={loading}
+            agentTitleFor={agentTitleFor}
+            onViewDetails={handleViewDetails}
+            onPreviewAttachment={onPreviewAttachment}
+            onJumpToSection={onJumpToSection}
+            onPreviewImage={onPreviewImage}
+            debugMode={currentUser?.debugMode ?? false}
+            currentPrincipalId={currentUser?.name.split("/").pop()}
+          />
         </div>
       </div>
 

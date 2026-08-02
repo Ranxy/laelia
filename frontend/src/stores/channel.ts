@@ -1,6 +1,9 @@
 import { create } from "@bufbuild/protobuf";
 import { commandServiceClient } from "@/connect";
-import type { Conversation } from "@/types/proto-es/v1/command_pb";
+import type {
+  AgentActivity,
+  Conversation,
+} from "@/types/proto-es/v1/command_pb";
 import {
   AddChannelMemberInputSchema,
   AddChannelMemberRequestSchema,
@@ -20,7 +23,26 @@ import {
 import { appendNewMessages, toUiMessage } from "./chat";
 import type { AppSliceCreator, ChannelSlice, ChatMessageUI } from "./types";
 
-const WATCHER_POLL_INTERVAL_MS = 2000;
+const WATCHER_POLL_INTERVAL_MS = 5000;
+
+// agentActivitiesEqual reports whether two activity arrays are visually
+// identical (the fields AgentStatusBar renders: id + display name + status).
+// fetchConversationActivity uses it to keep the same array reference when a
+// poll returned nothing new — otherwise every tick mints a fresh array and
+// re-renders the whole conversation page even while the user is idle.
+function agentActivitiesEqual(a: AgentActivity[], b: AgentActivity[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (
+      a[i].agentId !== b[i].agentId ||
+      a[i].displayName !== b[i].displayName ||
+      a[i].status !== b[i].status
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
 
 // reorderChannels sorts the list the way the backend does: pinned items first
 // (preserving their existing relative order, which mirrors the server's
@@ -190,12 +212,19 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
           conversation: conversationName,
         })
       );
-      set((state) => ({
-        agentActivities: {
-          ...state.agentActivities,
-          [conversationName]: res.activities ?? [],
-        },
-      }));
+      const activities = res.activities ?? [];
+      set((state) => {
+        // Keep the previous array reference when nothing changed so
+        // subscribers bail out and the page doesn't re-render every tick.
+        const prev = state.agentActivities[conversationName] ?? [];
+        if (agentActivitiesEqual(prev, activities)) return {};
+        return {
+          agentActivities: {
+            ...state.agentActivities,
+            [conversationName]: activities,
+          },
+        };
+      });
     } catch {
       // network error — will retry on next poll
     }

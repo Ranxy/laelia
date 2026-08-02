@@ -1,5 +1,5 @@
 import { Hash, Loader2, Pin, PinOff, Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { Avatar } from "@/components/chat/avatar";
@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { useAvatar } from "@/lib/avatar-cache";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
-import type { Conversation } from "@/types/proto-es/v1/command_pb";
 
 // Conversation type values mirror Conversation.type: 1 = user↔agent DM,
 // 2 = channel, 4 = user↔user DM.
@@ -63,6 +62,24 @@ export function ConversationList() {
       setCreating(false);
     }
   }, [newTitle, createChannel, navigate]);
+
+  // Stable per-row handlers (the id is threaded through the row's own
+  // onClick) so ConversationRow's memo can bail out on unrelated re-renders —
+  // e.g. an unread-badge change on another conversation must not re-render
+  // every row in the rail.
+  const handleOpen = useCallback(
+    (id: string) => {
+      navigate(`/${id}`);
+    },
+    [navigate]
+  );
+
+  const handleTogglePin = useCallback(
+    (id: string, pinned: boolean) => {
+      setConversationPinned(id, pinned);
+    },
+    [setConversationPinned]
+  );
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
@@ -118,13 +135,16 @@ export function ConversationList() {
           return (
             <ConversationRow
               key={conv.name}
-              conv={conv}
-              isDm={isDm}
-              isUserDm={isUserDm}
+              id={id}
+              title={conv.title || conv.name}
+              peer={conv.peer}
+              pinned={conv.pinned ?? false}
+              memberCount={conv.memberCount}
+              isDirect={isDm || isUserDm}
               active={active}
               unread={unread}
-              onClick={() => navigate(`/${id}`)}
-              onTogglePin={(pinned) => setConversationPinned(id, pinned)}
+              onOpen={handleOpen}
+              onTogglePin={handleTogglePin}
             />
           );
         })}
@@ -168,44 +188,52 @@ export function ConversationList() {
   );
 }
 
-function ConversationRow({
-  conv,
-  isDm,
-  isUserDm,
+// ConversationRow is memoized and receives only primitive props (plus stable
+// id-threaded handlers), so a re-render of the parent — an unread-badge change
+// on one conversation, or a fetchChannels poll — does not re-render every row:
+// rows whose title/unread/active/pinned are unchanged bail out.
+const ConversationRow = memo(function ConversationRow({
+  id,
+  title,
+  peer,
+  pinned,
+  memberCount,
+  isDirect,
   active,
   unread,
-  onClick,
+  onOpen,
   onTogglePin,
 }: {
-  conv: Conversation;
-  isDm: boolean;
-  isUserDm: boolean;
-  active: boolean;
-  unread: number;
-  onClick: () => void;
-  onTogglePin: (pinned: boolean) => void;
-}) {
-  const { t } = useTranslation();
-  const isDirect = isDm || isUserDm;
-  // conv.peer is the DM peer's resource name ("users/<id>" or "agents/<id>");
+  id: string;
+  title: string;
+  // peer is the DM peer's resource name ("users/<id>" or "agents/<id>");
   // appending "/avatar" yields the avatar resource name the cache dispatches by
   // prefix. Undefined for channels (no peer), which keep the Hash icon below.
-  const avatarName = conv.peer ? `${conv.peer}/avatar` : undefined;
+  peer?: string;
+  pinned: boolean;
+  memberCount: number;
+  isDirect: boolean;
+  active: boolean;
+  unread: number;
+  onOpen: (id: string) => void;
+  onTogglePin: (id: string, pinned: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const avatarName = peer ? `${peer}/avatar` : undefined;
   const avatarSrc = useAvatar(avatarName);
-  const peerId = conv.peer ? (conv.peer.split("/").pop() ?? "") : "";
-  const pinned = conv.pinned ?? false;
+  const peerId = peer ? (peer.split("/").pop() ?? "") : "";
   return (
     <div className="group relative flex w-full items-center">
       <button
         type="button"
-        onClick={onClick}
+        onClick={() => onOpen(id)}
         className={cn(
           "flex w-full items-center gap-3 px-3 py-2.5 pr-10 text-left transition-colors",
           active ? "bg-accent/10" : "hover:bg-control-bg/40"
         )}
       >
         {isDirect ? (
-          <Avatar src={avatarSrc} seed={peerId || conv.title || conv.name} />
+          <Avatar src={avatarSrc} seed={peerId || title} />
         ) : (
           <div
             className={cn(
@@ -223,11 +251,11 @@ function ConversationRow({
               unread > 0 ? "font-semibold text-main" : "font-medium text-main"
             )}
           >
-            {conv.title || conv.name}
+            {title}
           </p>
           {!isDirect && (
             <p className="text-xs text-control-placeholder mt-0.5">
-              {conv.memberCount} {conv.memberCount === 1 ? "member" : "members"}
+              {memberCount} {memberCount === 1 ? "member" : "members"}
             </p>
           )}
         </div>
@@ -252,7 +280,7 @@ function ConversationRow({
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          onTogglePin(!pinned);
+          onTogglePin(id, !pinned);
         }}
         aria-label={pinned ? t("channel.unpin") : t("channel.pin")}
         className={cn(
@@ -270,4 +298,4 @@ function ConversationRow({
       </button>
     </div>
   );
-}
+});

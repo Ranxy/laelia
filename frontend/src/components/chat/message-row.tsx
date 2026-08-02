@@ -74,6 +74,52 @@ import { pairToolCallEvents } from "@/lib/tool-call-events";
 
 export { pairToolCallEvents };
 
+// MemoMarkdown isolates the markstream/LazyMarkdown subtree so it only
+// re-renders (and re-parses markdown) when the content or streaming state
+// actually changed. A row otherwise re-renders on cheap field patches — e.g.
+// the channel watcher replacing the msg object to update a reply-count or task
+// badge — and without this the unchanged (possibly long) markdown was re-parsed
+// on every such patch.
+const MemoMarkdown = memo(function MemoMarkdown({
+  content,
+  isStreaming,
+  eager,
+  scrollRoot,
+  markdownCustomId,
+  fade,
+  customHtmlTags,
+}: {
+  content: string;
+  isStreaming: boolean;
+  eager: boolean;
+  scrollRoot?: RefObject<HTMLElement | null>;
+  markdownCustomId: string;
+  fade: boolean;
+  customHtmlTags?: string[];
+}) {
+  return (
+    <LazyMarkdown
+      eager={isStreaming || eager}
+      scrollRoot={scrollRoot}
+      fallback={
+        <span className="whitespace-pre-wrap break-words">{content}</span>
+      }
+      render={() => (
+        <MarkdownRender
+          customId={markdownCustomId}
+          content={content}
+          customHtmlTags={customHtmlTags}
+          final={!isStreaming}
+          smoothStreaming={isStreaming ? "auto" : false}
+          fade={fade}
+          typewriter={isStreaming}
+          maxLiveNodes={isStreaming ? 0 : undefined}
+        />
+      )}
+    />
+  );
+});
+
 export interface MessageRowProps {
   msg: ChatMessageUI;
   showAvatar: boolean;
@@ -486,26 +532,14 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
               // the surrounding prose, so it flows inline instead of being
               // forced onto its own line by per-segment block <p> wrappers.
               <div className="markstream-chat break-words">
-                <LazyMarkdown
-                  eager={isStreaming || eager}
+                <MemoMarkdown
+                  content={agentMentionContent ?? ""}
+                  isStreaming={isStreaming ?? false}
+                  eager={eager}
                   scrollRoot={scrollRoot}
-                  fallback={
-                    <span className="whitespace-pre-wrap break-words">
-                      {displayContent}
-                    </span>
-                  }
-                  render={() => (
-                    <MarkdownRender
-                      customId={markdownCustomId}
-                      content={agentMentionContent ?? ""}
-                      customHtmlTags={["mention"]}
-                      final={!isStreaming}
-                      smoothStreaming={isStreaming ? "auto" : false}
-                      fade={fade}
-                      typewriter={isStreaming}
-                      maxLiveNodes={isStreaming ? 0 : undefined}
-                    />
-                  )}
+                  markdownCustomId={markdownCustomId}
+                  fade={fade ?? false}
+                  customHtmlTags={["mention"]}
                 />
               </div>
             )
@@ -515,25 +549,13 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
             </div>
           ) : displayContent ? (
             <div className="markstream-chat break-words">
-              <LazyMarkdown
-                eager={isStreaming || eager}
+              <MemoMarkdown
+                content={displayContent}
+                isStreaming={isStreaming ?? false}
+                eager={eager}
                 scrollRoot={scrollRoot}
-                fallback={
-                  <span className="whitespace-pre-wrap break-words">
-                    {displayContent}
-                  </span>
-                }
-                render={() => (
-                  <MarkdownRender
-                    customId={markdownCustomId}
-                    content={displayContent}
-                    final={!isStreaming}
-                    smoothStreaming={isStreaming ? "auto" : false}
-                    fade={fade}
-                    typewriter={isStreaming}
-                    maxLiveNodes={isStreaming ? 0 : undefined}
-                  />
-                )}
+                markdownCustomId={markdownCustomId}
+                fade={fade ?? false}
               />
             </div>
           ) : isStreaming ? (

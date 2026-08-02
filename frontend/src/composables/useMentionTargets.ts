@@ -1,7 +1,11 @@
 import { create } from "@bufbuild/protobuf";
 import { useMemo } from "react";
 import { useAppStore } from "@/stores";
-import { type Mention, MentionSchema } from "@/types/proto-es/v1/command_pb";
+import {
+  type ChannelMember,
+  type Mention,
+  MentionSchema,
+} from "@/types/proto-es/v1/command_pb";
 
 export interface MentionTarget {
   type: "user" | "agent";
@@ -9,22 +13,29 @@ export interface MentionTarget {
   name: string;
 }
 
+// Stable empty fallback so the per-conversation selector below returns a
+// consistent reference while the conversation's roster is unloaded.
+const EMPTY_MEMBERS: ChannelMember[] = [];
+
 export function useMentionTargets(channelId?: string): MentionTarget[] {
-  const membersByConv = useAppStore((s) => s.channelMembersByConv);
+  const conversationName = channelId ? `conversations/${channelId}` : "";
+  // Select only this conversation's member list (with a stable empty fallback)
+  // rather than the whole channelMembersByConv map, so a member change in any
+  // *other* conversation no longer re-renders consumers of this hook (the chat
+  // page and the thread panel) or recomputes the targets array.
+  const members =
+    useAppStore((s) =>
+      conversationName ? s.channelMembersByConv[conversationName] : undefined
+    ) ?? EMPTY_MEMBERS;
 
   return useMemo(() => {
-    if (!channelId) return [];
-
-    const conversationName = `conversations/${channelId}`;
-    const members = membersByConv[conversationName];
-    if (!members) return [];
-
+    if (members.length === 0) return [];
     return members.map((m) => ({
       type: m.memberType === 2 ? "agent" : "user",
       id: m.memberId,
       name: m.displayName,
     }));
-  }, [channelId, membersByConv]);
+  }, [members]);
 }
 
 export function targetToMention(target: MentionTarget): Mention {

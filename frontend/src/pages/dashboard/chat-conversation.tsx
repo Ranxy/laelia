@@ -15,7 +15,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
@@ -119,6 +119,80 @@ export interface ChannelConversationViewProps {
   scrollToReadVersion?: bigint;
   onViewInChannel?: () => void;
 }
+
+interface MessageListProps {
+  messages: ChatMessageUI[];
+  onViewDetails: (commandId: string, agentId: string) => void;
+  onMentionClick: (type: string, id: string, name: string) => void;
+  onOpenThread: (msg: ChatMessageUI) => void;
+  onPreviewAttachment: (attachment: Attachment, rootMessageId: string) => void;
+  onJumpToSection: (
+    attachment: Attachment,
+    sectionId: string,
+    rootMessageId: string
+  ) => void;
+  onPreviewImage: (attachment: Attachment) => void;
+  debugMode: boolean;
+  currentPrincipalId?: string;
+  scrollRoot: React.RefObject<HTMLDivElement | null>;
+}
+
+// MessageList is memoized so typing in the composer (which re-renders the
+// header + input state of the page) does not rebuild the whole message list on
+// every keystroke. Its props are either stable store refs/callbacks or
+// primitives, so it bails out unless a message actually changed — MessageRow's
+// own memo then skips rows whose msg object is untouched.
+const MessageList = memo(function MessageList({
+  messages,
+  onViewDetails,
+  onMentionClick,
+  onOpenThread,
+  onPreviewAttachment,
+  onJumpToSection,
+  onPreviewImage,
+  debugMode,
+  currentPrincipalId,
+  scrollRoot,
+}: MessageListProps) {
+  return (
+    <div className="flex flex-col gap-4 px-6 pt-6 pb-4">
+      {messages.map((msg, idx) => {
+        const prevMsg = idx > 0 ? messages[idx - 1] : null;
+        const showAvatar =
+          !prevMsg || senderKeyForMessage(prevMsg) !== senderKeyForMessage(msg);
+        const rowProps = rowStreamingProps(msg, false, "", EMPTY_EVENTS);
+        return (
+          <div key={msg.id} data-msg-id={msg.id}>
+            <MessageRow
+              msg={msg}
+              showAvatar={showAvatar}
+              agentTitle={msg.senderName ?? ""}
+              streamingContent={rowProps.streamingContent}
+              streamingEvents={rowProps.streamingEvents}
+              onViewDetails={onViewDetails}
+              onMentionClick={onMentionClick}
+              MentionBadge={MentionBadge}
+              markdownCustomId="channel-chat"
+              onOpenThread={onOpenThread}
+              onPreviewAttachment={onPreviewAttachment}
+              onJumpToSection={onJumpToSection}
+              onPreviewImage={onPreviewImage}
+              debugMode={debugMode}
+              currentPrincipalId={currentPrincipalId}
+              scrollRoot={scrollRoot}
+              // For small/medium chats, render markdown synchronously on first
+              // paint so entering the conversation doesn't flash as each visible
+              // row swaps its inline raw-text placeholder for block markdown a
+              // frame later. Large histories keep the lazy gate so off-screen
+              // rows stay cheap to mount.
+              eager={messages.length <= 40}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+});
 
 export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const { t } = useTranslation();
@@ -241,6 +315,13 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     null
   );
 
+  // True only while the open conversation is present in the user's left-rail
+  // list. Derived as a boolean (not the array) so the metadata effect below
+  // re-runs on a membership change but not on every fetchChannels poll that
+  // replaces the array with equivalent content — that would otherwise re-fire
+  // GetChannel every 5s for conversations outside the list (e.g. agent-DMs).
+  const channelInList = channels.some((c) => c.name === conversationName);
+
   const channel =
     channels.find((c) => c.name === conversationName) ??
     fetchedChannel ??
@@ -264,7 +345,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // is denied and the fetch fails silently (they cannot view the DM at all).
   useEffect(() => {
     if (!channelId || !conversationName) return;
-    if (channels.some((c) => c.name === conversationName)) {
+    if (channelInList) {
       setFetchedChannel(null);
       return;
     }
@@ -280,7 +361,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [channelId, conversationName, channels]);
+  }, [channelId, conversationName, channelInList]);
 
   // The thread panel is open only when it belongs to the currently-viewed
   // channel; switching channels closes it (see init()).
@@ -946,56 +1027,26 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             onScroll={handleScroll}
             className="flex-1 overflow-y-auto"
           >
-            <div className="flex flex-col gap-4 px-6 pt-6 pb-4">
-              {/* LoadingState only when there's genuinely nothing to show yet.
-                  On a revisit cached messages are already in the store, so a
-                  background refetch (which flips chatLoading true) must NOT hide
-                  them behind a spinner — that was the per-revisit flash. */}
-              {loading && messages.length === 0 && <LoadingState />}
-              {!loading && messages.length === 0 && (
-                <EmptyState icon={Send} message={t("chat.empty")} />
-              )}
-              {messages.map((msg, idx) => {
-                const prevMsg = idx > 0 ? messages[idx - 1] : null;
-                const showAvatar =
-                  !prevMsg ||
-                  senderKeyForMessage(prevMsg) !== senderKeyForMessage(msg);
-                const rowProps = rowStreamingProps(
-                  msg,
-                  false,
-                  "",
-                  EMPTY_EVENTS
-                );
-                return (
-                  <div key={msg.id} data-msg-id={msg.id}>
-                    <MessageRow
-                      msg={msg}
-                      showAvatar={showAvatar}
-                      agentTitle={msg.senderName ?? ""}
-                      streamingContent={rowProps.streamingContent}
-                      streamingEvents={rowProps.streamingEvents}
-                      onViewDetails={handleViewDetails}
-                      onMentionClick={handleMentionClick}
-                      MentionBadge={MentionBadge}
-                      markdownCustomId="channel-chat"
-                      onOpenThread={handleOpenThread}
-                      onPreviewAttachment={handlePreviewAttachment}
-                      onJumpToSection={handleJumpToSection}
-                      onPreviewImage={handlePreviewImage}
-                      debugMode={currentUser?.debugMode ?? false}
-                      currentPrincipalId={currentUser?.name.split("/").pop()}
-                      scrollRoot={scrollRef}
-                      // For small/medium chats, render markdown synchronously on
-                      // first paint so entering the conversation doesn't flash as
-                      // each visible row swaps its inline raw-text placeholder for
-                      // block markdown a frame later. Large histories keep the
-                      // lazy gate so off-screen rows stay cheap to mount.
-                      eager={messages.length <= 40}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+            {/* LoadingState only when there's genuinely nothing to show yet.
+                On a revisit cached messages are already in the store, so a
+                background refetch (which flips chatLoading true) must NOT hide
+                them behind a spinner — that was the per-revisit flash. */}
+            {loading && messages.length === 0 && <LoadingState />}
+            {!loading && messages.length === 0 && (
+              <EmptyState icon={Send} message={t("chat.empty")} />
+            )}
+            <MessageList
+              messages={messages}
+              onViewDetails={handleViewDetails}
+              onMentionClick={handleMentionClick}
+              onOpenThread={handleOpenThread}
+              onPreviewAttachment={handlePreviewAttachment}
+              onJumpToSection={handleJumpToSection}
+              onPreviewImage={handlePreviewImage}
+              debugMode={currentUser?.debugMode ?? false}
+              currentPrincipalId={currentUser?.name.split("/").pop()}
+              scrollRoot={scrollRef}
+            />
           </div>
 
           {/* Scroll to bottom button */}
