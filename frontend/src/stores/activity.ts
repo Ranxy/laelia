@@ -84,7 +84,12 @@ export const createActivitySlice: AppSliceCreator<ActivitySlice> = (set) => ({
       }));
       return { activities: res.activities, nextPageToken: res.nextPageToken };
     } catch {
-      set({ activities: [], activitiesLoading: false });
+      // A silent background poll (the activity feed polls every 5s) must keep
+      // the existing list on a transient error — only an explicit load reports
+      // failure and clears. Mirrors agent.ts's fetchAgents.
+      if (!params?.silent) {
+        set({ activities: [], activitiesLoading: false });
+      }
       return undefined;
     }
   },

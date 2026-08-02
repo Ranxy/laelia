@@ -20,6 +20,15 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     ],
   },
   {
+    resource: "machines",
+    permissions: [
+      "laelia.machines.create",
+      "laelia.machines.get",
+      "laelia.machines.edit",
+      "laelia.machines.delete",
+    ],
+  },
+  {
     resource: "commands",
     permissions: [
       "laelia.commands.get",
@@ -58,6 +67,10 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     ],
   },
   {
+    resource: "activities",
+    permissions: ["laelia.activities.list", "laelia.activities.markDone"],
+  },
+  {
     resource: "files",
     permissions: [
       "laelia.files.upload",
@@ -73,6 +86,16 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       "laelia.users.list",
       "laelia.users.update",
       "laelia.users.delete",
+    ],
+  },
+  {
+    resource: "groups",
+    permissions: [
+      "laelia.groups.create",
+      "laelia.groups.get",
+      "laelia.groups.list",
+      "laelia.groups.update",
+      "laelia.groups.delete",
     ],
   },
   {
@@ -101,6 +124,10 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
   {
     resource: "iam",
     permissions: ["laelia.iam.getPolicy", "laelia.iam.setPolicy"],
+  },
+  {
+    resource: "auditLogs",
+    permissions: ["laelia.auditLogs.search", "laelia.auditLogs.export"],
   },
 ];
 

@@ -6,7 +6,7 @@ import {
   ListConversationMessagesRequestSchema,
   SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
-import { toUiMessage } from "./chat-helpers";
+import { appendNewMessages, toUiMessage } from "./chat-helpers";
 import type { AppSliceCreator, ChatMessageUI, ChatSlice } from "./types";
 
 // Re-export so existing `./chat` imports of these helpers keep working.
@@ -98,6 +98,21 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
         content: instruction,
       })
     );
+    if (conversation) {
+      // Reconcile the optimistic placeholder with the server echo: remove the
+      // temp row and add the committed message (deduped by id). Without this,
+      // the channel watcher's append-by-id dedup sees the echo as a new message
+      // (different id than the placeholder) and the DM shows the user's
+      // instruction twice.
+      set((state) => {
+        const current = state.chatMessages[conversation] ?? [];
+        const withoutTemp = current.filter((m) => m.id !== tempId);
+        const merged = appendNewMessages(withoutTemp, [toUiMessage(res)]);
+        return {
+          chatMessages: { ...state.chatMessages, [conversation]: merged },
+        };
+      });
+    }
     return res;
   },
 });

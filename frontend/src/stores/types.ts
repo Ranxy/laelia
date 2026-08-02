@@ -547,6 +547,11 @@ export type AppStoreState = AuthSlice &
   ActivitySlice &
   UserSlice &
   PreviewSlice &
-  ImagePreviewSlice;
+  ImagePreviewSlice & {
+    // reset restores every slice to its pristine initial state (clearing
+    // watcher intervals first) so a logout can never leak one principal's
+    // cached data to the next user signing in on the same tab.
+    reset: () => void;
+  };
 
 export type AppSliceCreator<Slice> = StateCreator<AppStoreState, [], [], Slice>;

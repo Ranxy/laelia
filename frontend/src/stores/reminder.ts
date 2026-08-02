@@ -63,7 +63,12 @@ export const createReminderSlice: AppSliceCreator<ReminderSlice> = (set) => ({
       }));
       return { reminders: res.reminders, nextPageToken: res.nextPageToken };
     } catch {
-      set({ reminders: [], remindersLoading: false });
+      // A silent background poll (the reminder list polls every 2s) must keep
+      // the existing list on a transient error — only an explicit load reports
+      // failure and clears. Mirrors agent.ts's fetchAgents.
+      if (!params?.silent) {
+        set({ reminders: [], remindersLoading: false });
+      }
       return undefined;
     }
   },

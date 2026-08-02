@@ -17,26 +17,25 @@ export const createImagePreviewSlice: AppSliceCreator<ImagePreviewSlice> = (
     if (prev?.blobUrl) URL.revokeObjectURL(prev.blobUrl);
     set({ activeImage: { attachment, blobUrl: null, status: "loading" } });
 
+    // requestId ties the in-flight download to the attachment it was opened
+    // for. If the user opens another image (or closes the lightbox) while this
+    // download is in flight, the stale response must not overwrite the newer
+    // active image — otherwise the lightbox shows A's bytes labeled as B.
+    const requestId = attachment.id;
     try {
       const res = await commandServiceClient.downloadFile({
         id: attachment.id,
       });
+      if (get().activeImage?.attachment.id !== requestId) return;
       const blob = new Blob([new Uint8Array(res.data)], {
         type: attachment.mimeType || undefined,
       });
       const blobUrl = URL.createObjectURL(blob);
-      set((s) =>
-        s.activeImage
-          ? { activeImage: { ...s.activeImage, blobUrl, status: "ready" } }
-          : {}
-      );
+      set({ activeImage: { attachment, blobUrl, status: "ready" } });
     } catch (err) {
       console.error("image preview fetch failed", err);
-      set((s) =>
-        s.activeImage
-          ? { activeImage: { ...s.activeImage, status: "error" } }
-          : {}
-      );
+      if (get().activeImage?.attachment.id !== requestId) return;
+      set({ activeImage: { attachment, blobUrl: null, status: "error" } });
     }
   },
 

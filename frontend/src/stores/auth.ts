@@ -1,5 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { authServiceClient, userServiceClient } from "@/connect";
+import { invalidateAvatar } from "@/lib/avatar-cache";
 import {
   LoginRequestSchema,
   LogoutRequestSchema,
@@ -45,7 +46,15 @@ export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
     try {
       await authServiceClient.logout(create(LogoutRequestSchema));
     } finally {
-      set({ currentUser: null, isLoggedIn: false });
+      // Wipe every slice so a different user signing in on the same tab never
+      // sees the previous principal's cached messages/channels/rosters.
+      get().reset();
+      // Keep sessionLoaded true so the router guard does not re-show the
+      // initial loading spinner on the way to the sign-in page.
+      set({ sessionLoaded: true });
+      // Avatar blob URLs and the "missing" set are module-level caches that a
+      // store reset cannot reach; clear them so they don't survive across users.
+      invalidateAvatar();
     }
   },
 
