@@ -479,8 +479,8 @@ type DownloadFileResult struct {
 }
 
 // DownloadFile fetches a file's bytes from S3 via the manager. The returned
-// Data is meant to be written to the agent's temp workspace by the daemon; the
-// caller does not print it.
+// Data is meant to be written to the agent's temp workspace (the temp/ subdir
+// of its working directory) by the daemon; the caller does not print it.
 func DownloadFile(ctx context.Context, d Deps, in DownloadFileInput) (*DownloadFileResult, error) {
 	if in.FileID == "" {
 		return nil, localError("INVALID_ARGUMENT_FAILED", "file_id is required", "")

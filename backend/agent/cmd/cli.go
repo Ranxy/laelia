@@ -82,6 +82,9 @@ func call(endpoint string, req daemonsrv.Request) bool {
 		return false
 	}
 	req.Agent, req.Command = id.agent, id.command
+	if cwd, err := os.Getwd(); err == nil {
+		req.Cwd = cwd
+	}
 
 	body, err := json.Marshal(req)
 	if err != nil {

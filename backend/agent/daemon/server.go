@@ -50,13 +50,10 @@ type Server struct {
 	machineResourceID string
 	getToken          func() string
 	httpClient        *http.Client
+	homeDir           string
 
 	socketPath   string
 	sessionToken string
-	// tempDir is the machine's temp workspace for file upload/download. It is a
-	// "temp" subdir of the per-machine working dir, shared by all agents on the
-	// machine. File commands confine all local paths to it.
-	tempDir string
 
 	listener   net.Listener
 	httpServer *http.Server
@@ -79,7 +76,6 @@ func New(managerURL, machineResourceID string, getToken func() string, httpClien
 		return nil, errors.Wrap(err, "resolve home dir")
 	}
 	socketPath := filepath.Join(home, ".laelia", machineResourceID, "daemon.sock")
-	tempDir := filepath.Join(home, ".laelia", machineResourceID, "temp")
 
 	token := make([]byte, 32)
 	if _, err := rand.Read(token); err != nil {
@@ -97,16 +93,15 @@ func New(managerURL, machineResourceID string, getToken func() string, httpClien
 		machineResourceID: machineResourceID,
 		getToken:          getToken,
 		httpClient:        httpClient,
+		homeDir:           home,
 		socketPath:        socketPath,
 		sessionToken:      sessionToken,
-		tempDir:           tempDir,
 		agentClients:      make(map[string]v1connect.CommandServiceClient),
 	}, nil
 }
 
 func (s *Server) SocketPath() string   { return s.socketPath }
 func (s *Server) SessionToken() string { return s.sessionToken }
-func (s *Server) TempDir() string      { return s.tempDir }
 
 // BatchDeps returns a Deps for the agent identified by agentBareID (the bare
 // agents/{id} tail), for in-process calls from that agent's drain loop (the
@@ -173,13 +168,49 @@ func agentResourceName(agentBareID string) string {
 	return "agents/" + agentBareID
 }
 
+// bareAgentID strips the agents/ prefix from an agent resource name, returning
+// the bare uuid used to namespace the agent's on-disk state.
+func bareAgentID(agent string) string {
+	return strings.TrimPrefix(agent, "agents/")
+}
+
+// workspaceFor returns the calling agent's persistent working directory
+// (~/.laelia/<machineID>/<agentID>/), the same directory the executor runs the
+// agent's shell in. File commands confine local paths to the temp subdirectory
+// of this workspace so transient upload/download files never clutter the
+// agent's persistent files.
+func (s *Server) workspaceFor(agent string) (string, error) {
+	agentID := bareAgentID(agent)
+	if agentID == "" || agentID == "." || agentID == ".." || strings.ContainsAny(agentID, `/\`) {
+		return "", errors.New("agent is required to resolve the file workspace")
+	}
+	return filepath.Join(s.homeDir, ".laelia", s.machineResourceID, agentID), nil
+}
+
+// fileWorkspace resolves the calling agent's working directory, its temp jail
+// (~/.laelia/<machineID>/<agentID>/temp/), and the base for relative paths:
+// the CLI process's cwd when available (normally the agent's working
+// directory), falling back to the working directory itself.
+func (s *Server) fileWorkspace(req Request) (tempDir, base string, err error) {
+	workspace, err := s.workspaceFor(req.Agent)
+	if err != nil {
+		return "", "", err
+	}
+	tempDir = filepath.Join(workspace, "temp")
+	if err := os.MkdirAll(tempDir, 0o700); err != nil {
+		return "", "", errors.Wrap(err, "create agent temp workspace")
+	}
+	base = req.Cwd
+	if base == "" || !filepath.IsAbs(base) {
+		base = workspace
+	}
+	return tempDir, base, nil
+}
+
 // Start binds the unix socket and serves HTTP/JSON in a background goroutine.
 func (s *Server) Start() error {
 	if err := os.MkdirAll(filepath.Dir(s.socketPath), 0o700); err != nil {
 		return errors.Wrap(err, "create daemon socket dir")
-	}
-	if err := os.MkdirAll(s.tempDir, 0o700); err != nil {
-		return errors.Wrap(err, "create agent temp workspace")
 	}
 	// If a leftover socket file exists, probe it before clobbering: a live
 	// socket means another daemon is already running on this resource ID, and
@@ -276,6 +307,7 @@ type Request struct {
 	PageSize int32 `json:"page_size,omitempty"`
 
 	// File command fields.
+	Cwd          string `json:"cwd,omitempty"`
 	LocalPath    string `json:"local_path,omitempty"`
 	FileID       string `json:"file_id,omitempty"`
 	OutPath      string `json:"out_path,omitempty"`
@@ -602,13 +634,14 @@ func asChatError(err error) *chattools.Error {
 	return &chattools.Error{Code: "SERVER_5XX", Message: err.Error()}
 }
 
-// validateWorkspacePath resolves path against the agent temp workspace and
-// ensures the symlink-resolved result stays inside tempDir. This prevents file
-// commands from reading/writing outside the workspace.
+// validateWorkspacePath resolves path against base (the calling CLI process's
+// cwd, normally the agent's working directory) and ensures the
+// symlink-resolved result stays inside jail (the agent's temp workspace). This
+// prevents file commands from reading/writing outside the temp jail.
 //
 // The previous version, when EvalSymlinks failed (a not-yet-existing download
 // target), fell back to the lexical cleaned path. A dangling symlink inside
-// tempDir pointing outside the jail (tempDir/evil → /etc/laelia-shell) then
+// the jail pointing outside it (jail/evil → /etc/laelia-shell) then
 // passed the ".." check (rel == "evil") and a subsequent os.WriteFile followed
 // the symlink out of the jail.
 //
@@ -620,12 +653,12 @@ func asChatError(err error) *chattools.Error {
 //   - If the final component does not exist (fresh target), resolve the parent
 //     directory's symlinks and confirm the parent is inside the jail; the leaf
 //     cannot itself be a symlink because it does not exist.
-func (s *Server) validateWorkspacePath(path string) (string, error) {
+func validateWorkspacePath(base, jail, path string) (string, error) {
 	if path == "" {
 		return "", errors.New("path is required")
 	}
 	if !filepath.IsAbs(path) {
-		path = filepath.Join(s.tempDir, path)
+		path = filepath.Join(base, path)
 	}
 	cleaned := filepath.Clean(path)
 
@@ -643,8 +676,8 @@ func (s *Server) validateWorkspacePath(path string) (string, error) {
 		if lerr != nil {
 			return "", errors.Errorf("failed to resolve path %q: %v", path, lerr)
 		}
-		if !insideWorkspace(s.tempDir, resolved) {
-			return "", errors.Errorf("path %q escapes the agent temp workspace", path)
+		if !insideWorkspace(jail, resolved) {
+			return "", errors.Errorf("path %q escapes the agent workspace", path)
 		}
 		return resolved, nil
 	case errors.Is(err, os.ErrNotExist):
@@ -656,8 +689,8 @@ func (s *Server) validateWorkspacePath(path string) (string, error) {
 		if perr != nil {
 			return "", errors.Errorf("failed to resolve parent directory %q: %v", parent, perr)
 		}
-		if !insideWorkspace(s.tempDir, parentResolved) {
-			return "", errors.Errorf("path %q escapes the agent temp workspace", path)
+		if !insideWorkspace(jail, parentResolved) {
+			return "", errors.Errorf("path %q escapes the agent workspace", path)
 		}
 		return filepath.Join(parentResolved, filepath.Base(cleaned)), nil
 	default:
@@ -679,7 +712,11 @@ func insideWorkspace(jail, target string) bool {
 
 func (s *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	s.run(w, r, func(req Request) (string, *chattools.Error) {
-		localPath, err := s.validateWorkspacePath(req.LocalPath)
+		tempDir, base, werr := s.fileWorkspace(req)
+		if werr != nil {
+			return "", &chattools.Error{Code: "INVALID_ARGUMENT_FAILED", Message: werr.Error()}
+		}
+		localPath, err := validateWorkspacePath(base, tempDir, req.LocalPath)
 		if err != nil {
 			return "", &chattools.Error{Code: "INVALID_ARGUMENT_FAILED", Message: err.Error()}
 		}
@@ -717,11 +754,16 @@ func (s *Server) handleFileDownload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, asChatError(err))
 		return
 	}
+	tempDir, base, werr := s.fileWorkspace(req)
+	if werr != nil {
+		writeError(w, &chattools.Error{Code: "INVALID_ARGUMENT_FAILED", Message: werr.Error()})
+		return
+	}
 	outPath := req.OutPath
 	if outPath == "" {
-		outPath = filepath.Join(s.tempDir, result.Name)
+		outPath = filepath.Join(tempDir, result.Name)
 	}
-	resolved, verr := s.validateWorkspacePath(outPath)
+	resolved, verr := validateWorkspacePath(base, tempDir, outPath)
 	if verr != nil {
 		writeError(w, &chattools.Error{Code: "INVALID_ARGUMENT_FAILED", Message: verr.Error()})
 		return

@@ -80,7 +80,7 @@ func init() {
 	fileUploadCmd.Flags().StringVar(&fileUploadConversation, "conversation", "", "conversation the file is attached to (the agent must be a member)")
 	fileUploadCmd.Flags().StringVar(&fileUploadMimeType, "mime-type", "", "MIME type (auto-detected if empty)")
 
-	fileDownloadCmd.Flags().StringVar(&fileDownloadOutPath, "out", "", "destination path inside the temp workspace (defaults to <temp>/<original-name>)")
+	fileDownloadCmd.Flags().StringVar(&fileDownloadOutPath, "out", "", "destination path inside your temp workspace (defaults to <temp-dir>/<original-name>)")
 
 	fileListCmd.Flags().StringVar(&fileListConversation, "conversation", "", "conversation to list files for (required)")
 }
