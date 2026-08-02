@@ -603,7 +603,7 @@ func (e *PiExecutor) turnPromptText(resumed bool) string {
 		}
 		return anchor + "\n\n" + batch
 	}
-	initPrompt := executor.BuildPrompt(e.identity, e.cfg.PersonaPrompt)
+	initPrompt := executor.BuildPrompt(e.identity, e.req.OwnerDisplayName, e.cfg.PersonaPrompt)
 	if batch == "" {
 		return initPrompt
 	}

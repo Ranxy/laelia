@@ -149,10 +149,15 @@ CREATE TABLE agent (
     -- Stored as AgentStatus (proto/store/store/agent.proto)
     status jsonb NOT NULL DEFAULT '{}',
     -- Principal id of the user who created the agent (0 = unknown/legacy).
-    -- Only the creator or a workspace admin may modify the agent.
+    -- Display-only; never authorizes anything (the agent's owner does).
     created_by int NOT NULL DEFAULT 0,
+    -- Principal id of the agent's owner (authorization authority). Backfilled
+    -- from created_by on migration; 0 = unknown/legacy (owner unset). Only the
+    -- owner or a workspace admin may modify the agent. Transferable via
+    -- TransferAgentOwnership.
+    owner_id int NOT NULL DEFAULT 0,
     -- allow_add_to_channel: whether other users may add this agent to a channel.
-    -- Default FALSE = only the agent's creator or a workspace admin may add it.
+    -- Default FALSE = only the agent's owner or a workspace admin may add it.
     allow_add_to_channel boolean NOT NULL DEFAULT FALSE,
     -- S3 object key of the agent's uploaded avatar image, empty when the agent
     -- has not uploaded one (frontend renders a deterministic pixel identicon instead).
@@ -166,8 +171,13 @@ CREATE UNIQUE INDEX idx_agent_unique_resource_id ON agent(resource_id);
 ALTER TABLE agent ADD COLUMN IF NOT EXISTS avatar_s3_key text NOT NULL DEFAULT '';
 
 -- allow_add_to_channel: whether other users may add this agent to a channel.
--- Default FALSE = only the agent's creator or a workspace admin may add it.
+-- Default FALSE = only the agent's owner or a workspace admin may add it.
 ALTER TABLE agent ADD COLUMN IF NOT EXISTS allow_add_to_channel boolean NOT NULL DEFAULT FALSE;
+
+-- owner_id: authorization authority for the agent, backfilled from created_by
+-- (mirrors the conversation table's created_by -> owner_id migration).
+ALTER TABLE agent ADD COLUMN IF NOT EXISTS owner_id int NOT NULL DEFAULT 0;
+UPDATE agent SET owner_id = created_by WHERE owner_id = 0;
 
 ALTER SEQUENCE agent_id_seq RESTART WITH 101;
 

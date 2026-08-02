@@ -417,6 +417,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.TransferAgentOwnershipRequest"><span class="badge">M</span>TransferAgentOwnershipRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.TransferAgentOwnershipResponse"><span class="badge">M</span>TransferAgentOwnershipResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.UpdateAgentACPConfigRequest"><span class="badge">M</span>UpdateAgentACPConfigRequest</a>
                 </li>
               
@@ -1881,17 +1889,17 @@
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>Creator&#39;s user resource name (users/{id}); empty for legacy agents with no
-recorded creator. Only the creator or a workspace admin may modify the agent. </p></td>
+recorded creator. Display-only: it never authorizes anything (the agent&#39;s
+owner does). Immutable after creation. </p></td>
                 </tr>
               
                 <tr>
                   <td>can_edit</td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
-                  <td><p>can_edit reports whether the current caller may modify this agent
-(laelia.agents.edit): true for the creator (via the agentEditor IAM binding)
-and for workspace admins (via the all-permissions union), false otherwise.
-Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths. </p></td>
+                  <td><p>can_edit reports whether the current caller may modify this agent: true for
+the agent&#39;s owner and for workspace admins, false otherwise. Populated per
+caller by GetAgent/ListAgents; not set on agent-daemon paths. </p></td>
                 </tr>
               
                 <tr>
@@ -1918,9 +1926,30 @@ and the machine app picks it up via the MachineChannel control stream. </p></td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
                   <td><p>allow_add_to_channel controls whether other users may add this agent to a
-channel. Default false: only the agent&#39;s creator or a workspace admin may
-add it. When true, the normal channel-side rule (conversations.manage =
-channel owner/admin) applies. </p></td>
+channel. Default false: only the agent&#39;s owner or a workspace admin may add
+it. When true, the normal channel-side rule (conversations.manage = channel
+owner/admin) applies. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>owner</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Owner&#39;s user resource name (users/{id}); empty for legacy agents with no
+recorded owner. The owner is the human responsible for the agent: only the
+owner or a workspace admin may modify it, the owner may transfer ownership
+to another user (TransferAgentOwnership), and non-owners&#39; high-risk
+requests to the agent require the owner&#39;s approval (see the agent prompt&#39;s
+Ownership &amp; Safety section). Defaults to the creator on CreateAgent and is
+backfilled from created_by for existing agents. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>owner_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Owner&#39;s display name — the name the agent writes `dm:@&lt;owner_name&gt;` to when
+requesting approval for a high-risk operation. Empty for legacy agents. </p></td>
                 </tr>
               
             </tbody>
@@ -2778,9 +2807,9 @@ Agent, surfaced top-level so list consumers don&#39;t pull in AgentInfo. </p></t
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>created_by is the creator&#39;s user resource name (users/{id}); empty for
-legacy agents with no recorded creator. Surfaced on the summary so list
-consumers (e.g. the Members page&#39;s per-user &#34;Created Agents&#34; view) can
-group agents by creator without an N&#43;1 of GetAgent. </p></td>
+legacy agents with no recorded creator. Display-only — grouping and
+authorization use owner. Surfaced on the summary so list consumers can
+show the creator without an N&#43;1 of GetAgent. </p></td>
                 </tr>
               
                 <tr>
@@ -2790,6 +2819,16 @@ group agents by creator without an N&#43;1 of GetAgent. </p></td>
                   <td><p>allow_add_to_channel mirrors Agent.allow_add_to_channel so list consumers
 (e.g. the channel member picker) can hide agents the current caller may
 not add. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>owner</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>owner is the owner&#39;s user resource name (users/{id}); empty for legacy
+agents with no recorded owner. Surfaced on the summary so list consumers
+(e.g. the Members page&#39;s per-user &#34;Owned Agents&#34; view and the channel
+member picker) can group agents by owner without an N&#43;1 of GetAgent. </p></td>
                 </tr>
               
             </tbody>
@@ -3693,6 +3732,68 @@ the list to agents bound to that machine. Empty lists all agents. </p></td>
 
         
       
+        <h3 id="laelia.v1.TransferAgentOwnershipRequest">TransferAgentOwnershipRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>new_owner</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>New owner&#39;s user resource name (users/{id}). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reason</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>audit purpose </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.TransferAgentOwnershipResponse">TransferAgentOwnershipResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>agent</td>
+                  <td><a href="#laelia.v1.Agent">Agent</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.UpdateAgentACPConfigRequest">UpdateAgentACPConfigRequest</h3>
         <p></p>
 
@@ -3875,9 +3976,21 @@ the list to agents bound to that machine. Empty lists all agents. </p></td>
                 <td><a href="#laelia.v1.Agent">Agent</a></td>
                 <td><p>UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
 is supported initially (any other update_mask path is rejected). Authorized
-in the handler for the agent&#39;s creator or a workspace admin; the IAM
+in the handler for the agent&#39;s owner or a workspace admin; the IAM
 interceptor&#39;s agents.edit is admin-only, so this RPC carries no permission
 annotation and is handler-gated.</p></td>
+              </tr>
+            
+              <tr>
+                <td>TransferAgentOwnership</td>
+                <td><a href="#laelia.v1.TransferAgentOwnershipRequest">TransferAgentOwnershipRequest</a></td>
+                <td><a href="#laelia.v1.TransferAgentOwnershipResponse">TransferAgentOwnershipResponse</a></td>
+                <td><p>TransferAgentOwnership reassigns the agent&#39;s owner to another user. The new
+owner takes effect immediately and unilaterally (no acceptance required);
+the previous owner loses owner authority at once. Authorized in the handler
+for the agent&#39;s current owner or a workspace admin; like UpdateAgent this
+RPC carries no permission annotation (agents.edit is admin-only) and is
+handler-gated via canEditAgent.</p></td>
               </tr>
             
               <tr>
@@ -4057,6 +4170,16 @@ Requires laelia.agents.edit on the agent.</p></td>
                 <td>PATCH</td>
                 <td>/v1/{agent.name=agents/*}</td>
                 <td>agent</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>TransferAgentOwnership</td>
+                <td>POST</td>
+                <td>/v1/{name=agents/*}:transferOwnership</td>
+                <td>*</td>
               </tr>
               
             
@@ -5839,6 +5962,17 @@ used to jump back to the section from a comment. </p></td>
 the manager (the source of truth for agent identity). The agent client injects
 it into its system prompt so it knows who it is and can recognize its own
 messages and @mentions of itself. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>owner_display_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>owner_display_name is the agent&#39;s owner&#39;s display name, sourced from the
+manager (the source of truth for ownership). The agent client injects it into
+its system prompt (the Ownership &amp; Safety section) so the agent knows whom to
+DM for approval of high-risk requests from non-owners. Empty for legacy
+agents with no recorded owner. </p></td>
                 </tr>
               
             </tbody>

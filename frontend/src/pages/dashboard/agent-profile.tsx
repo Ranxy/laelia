@@ -7,8 +7,23 @@ import { StringListEditor } from "@/components/agent/string-list-editor";
 import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { Alert } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { ModelCombobox } from "@/components/ui/combobox";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { FieldRow } from "@/components/ui/field-row";
 import { Input } from "@/components/ui/input";
 import {
@@ -110,9 +125,11 @@ export function AgentProfilePage() {
   const getAgent = useAppStore((s) => s.getAgent);
   const getMachine = useAppStore((s) => s.getMachine);
   const fetchAgents = useAppStore((s) => s.fetchAgents);
+  const users = useAppStore((s) => s.users);
+  const fetchUsers = useAppStore((s) => s.fetchUsers);
   // The ACP-config/avatar/persona editors hit admin-only RPCs (agents.edit), so
   // they are gated on canEditAdminOnly even when canEdit is true for the agent's
-  // creator. The allow_add_to_channel toggle below is gated on canEdit.
+  // owner. The allow_add_to_channel toggle below is gated on canEdit.
   const canEditAdminOnly = useHasPermission("laelia.agents.edit");
 
   const agentName = agentResourceName(agentId);
@@ -195,6 +212,17 @@ export function AgentProfilePage() {
   const [allowAddSaving, setAllowAddSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Ownership transfer state. The flow is deliberately two-step: the first
+  // dialog picks the target user (and optional audit reason), then a second
+  // AlertDialog confirms the risky, unilateral, immediately-effective transfer
+  // before it is sent.
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferTarget, setTransferTarget] = useState("");
+  const [transferReason, setTransferReason] = useState("");
+  const [transferConfirmOpen, setTransferConfirmOpen] = useState(false);
+  const [transferBusy, setTransferBusy] = useState(false);
+  const [transferError, setTransferError] = useState("");
+
   const agentAvatarName = agent?.avatar || undefined;
   const avatarSrc = useAvatar(agentAvatarName);
 
@@ -254,6 +282,15 @@ export function AgentProfilePage() {
     void loadAgent();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId, agentName, getAgent]);
+
+  // Load the user roster (once) so the ownership transfer target picker and the
+  // owner/creator display can resolve users/{id} → display title.
+  useEffect(() => {
+    if (users.length === 0) {
+      void fetchUsers({ pageSize: 100 }, { silent: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load the owning machine's available providers whenever the agent's machine
   // binding is known. Providers are machine-scoped (the machine probes its host);
@@ -338,9 +375,9 @@ export function AgentProfilePage() {
   }
 
   // canEdit is server-resolved per-agent (Agent.canEdit): true for the agent's
-  // creator or a workspace admin. It gates the allow_add_to_channel toggle.
+  // owner or a workspace admin. It gates the allow_add_to_channel toggle.
   // The ACP-config/avatar/persona editors hit admin-only RPCs (agents.edit), so
-  // they are gated on canEditAdminOnly to avoid offering a 403 to creators.
+  // they are gated on canEditAdminOnly to avoid offering a 403 to owners.
   const canEdit = agent.canEdit;
 
   // Fold the key-value editor entries into a map, dropping entries with empty
@@ -566,6 +603,53 @@ export function AgentProfilePage() {
     }
   }
 
+  // userTitle resolves a user resource name (users/{id}) to the roster's display
+  // title, falling back to the raw name so a stale/deleted user never renders
+  // empty. Used for the owner/creator display rows.
+  function userTitle(name: string): string {
+    if (!name) return "";
+    return users.find((u) => u.name === name)?.title || name;
+  }
+
+  // Transfer flow: first dialog picks the target + reason, then the second
+  // AlertDialog confirms. On confirm, TransferAgentOwnership reassigns the owner
+  // immediately and unilaterally; the profile and roster are refetched so the
+  // new owner's authority (and the old owner's loss of it) reflects at once.
+  function openTransferPicker() {
+    setTransferTarget("");
+    setTransferReason("");
+    setTransferError("");
+    setTransferOpen(true);
+  }
+
+  async function handleTransfer() {
+    if (!agentName || !transferTarget) return;
+    setTransferBusy(true);
+    setTransferError("");
+    try {
+      const transferAgentOwnership =
+        useAppStore.getState().transferAgentOwnership;
+      await transferAgentOwnership(agentName, transferTarget, transferReason);
+      setTransferConfirmOpen(false);
+      setTransferOpen(false);
+      setAgent(await getAgent(agentName));
+      fetchAgents({ pageSize: 100 }, { silent: true });
+      toastManager.add({
+        type: "success",
+        title: t("agent.transfer-owner-success"),
+      });
+    } catch (err) {
+      setTransferError(err instanceof Error ? err.message : String(err));
+      toastManager.add({
+        type: "error",
+        title: t("agent.transfer-owner-failed"),
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setTransferBusy(false);
+    }
+  }
+
   const lifecycle = agentLifecycle(agent);
 
   const machineResourceID = agent.machine
@@ -615,6 +699,27 @@ export function AgentProfilePage() {
                     >
                       {machineTitle || agent.machine}
                     </button>
+                  </Field>
+                )}
+                {agent.owner && (
+                  <Field label={t("agent.detail-owner")}>
+                    <span className="flex items-center gap-2">
+                      {userTitle(agent.ownerName || agent.owner)}
+                      {canEdit && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={openTransferPicker}
+                        >
+                          {t("agent.transfer-owner")}
+                        </Button>
+                      )}
+                    </span>
+                  </Field>
+                )}
+                {agent.createdBy && (
+                  <Field label={t("agent.detail-created-by")}>
+                    {userTitle(agent.createdBy)}
                   </Field>
                 )}
                 {agent.status?.connectedTime && (
@@ -1168,6 +1273,111 @@ export function AgentProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Ownership transfer: pick target + reason, then a second risky-action
+          confirm. The transfer is unilateral and effective immediately. */}
+      <Dialog
+        open={transferOpen}
+        onOpenChange={(next) => !next && setTransferOpen(false)}
+      >
+        <DialogContent>
+          <DialogTitle>{t("agent.transfer-owner-title")}</DialogTitle>
+          <DialogDescription>
+            {t("agent.transfer-owner-description")}
+          </DialogDescription>
+          <div className="mt-4 flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium">
+                {t("agent.transfer-owner-target")}
+              </label>
+              <Select
+                value={transferTarget}
+                onValueChange={(v) => v && setTransferTarget(v)}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={t("agent.transfer-owner-target-placeholder")}
+                  >
+                    {(v: string | null) => (v ? userTitle(v) : "")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {users
+                    .filter((u) => u.name !== agent.owner)
+                    .map((u) => (
+                      <SelectItem key={u.name} value={u.name}>
+                        {u.title}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium">
+                {t("agent.transfer-owner-reason")}
+              </label>
+              <Input
+                value={transferReason}
+                onChange={(e) => setTransferReason(e.target.value)}
+                placeholder={t("agent.transfer-owner-reason-placeholder")}
+              />
+            </div>
+            {transferError && (
+              <Alert variant="error" description={transferError} />
+            )}
+          </div>
+          <div className="mt-6 flex justify-end gap-2">
+            <DialogClose>
+              <Button variant="outline">{t("common.cancel")}</Button>
+            </DialogClose>
+            <Button
+              disabled={!transferTarget}
+              onClick={() => {
+                setTransferError("");
+                setTransferOpen(false);
+                setTransferConfirmOpen(true);
+              }}
+            >
+              {t("common.next")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={transferConfirmOpen}
+        onOpenChange={(next) => !next && setTransferConfirmOpen(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogTitle>
+            {t("agent.transfer-owner-confirm-title")}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("agent.transfer-owner-confirm-description", {
+              target: userTitle(transferTarget),
+            })}
+          </AlertDialogDescription>
+          {transferError && (
+            <Alert variant="error" description={transferError} />
+          )}
+          <AlertDialogFooter>
+            <AlertDialogClose>
+              <Button variant="outline" disabled={transferBusy}>
+                {t("common.cancel")}
+              </Button>
+            </AlertDialogClose>
+            <Button
+              variant="destructive"
+              disabled={transferBusy}
+              onClick={() => void handleTransfer()}
+            >
+              {transferBusy
+                ? t("common.saving")
+                : t("agent.transfer-owner-confirm")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -17,6 +17,7 @@ import {
   RefreshAgentProvidersRequestSchema,
   RevokeAgentTokenRequestSchema,
   RotateAgentTokenRequestSchema,
+  TransferAgentOwnershipRequestSchema,
   UpdateAgentACPConfigRequestSchema,
   UpdateAgentRequestSchema,
 } from "@/types/proto-es/v1/agent_pb";
@@ -144,6 +145,24 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
       create(UpdateAgentACPConfigRequestSchema, {
         name,
         acpConfig: create(AgentACPConfigSchema, acpConfig),
+      })
+    );
+  },
+
+  // transferAgentOwnership reassigns the agent's owner to another user. It is
+  // unilateral and effective immediately — the target user does not accept, and
+  // the previous owner loses owner authority at once. Authorized server-side for
+  // the current owner or a workspace admin.
+  async transferAgentOwnership(
+    name: string,
+    newOwner: string,
+    reason?: string
+  ) {
+    return agentServiceClient.transferAgentOwnership(
+      create(TransferAgentOwnershipRequestSchema, {
+        name,
+        newOwner,
+        reason: reason ?? "",
       })
     );
   },

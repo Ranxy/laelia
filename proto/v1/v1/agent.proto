@@ -42,7 +42,7 @@ service AgentService {
 
   // UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
   // is supported initially (any other update_mask path is rejected). Authorized
-  // in the handler for the agent's creator or a workspace admin; the IAM
+  // in the handler for the agent's owner or a workspace admin; the IAM
   // interceptor's agents.edit is admin-only, so this RPC carries no permission
   // annotation and is handler-gated.
   rpc UpdateAgent(UpdateAgentRequest) returns (Agent) {
@@ -51,6 +51,22 @@ service AgentService {
       body: "agent"
     };
     option (google.api.method_signature) = "agent,update_mask";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+
+  // TransferAgentOwnership reassigns the agent's owner to another user. The new
+  // owner takes effect immediately and unilaterally (no acceptance required);
+  // the previous owner loses owner authority at once. Authorized in the handler
+  // for the agent's current owner or a workspace admin; like UpdateAgent this
+  // RPC carries no permission annotation (agents.edit is admin-only) and is
+  // handler-gated via canEditAgent.
+  rpc TransferAgentOwnership(TransferAgentOwnershipRequest) returns (TransferAgentOwnershipResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=agents/*}:transferOwnership"
+      body: "*"
+    };
+    option (google.api.method_signature) = "name,new_owner";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -230,6 +246,22 @@ message CreateAgentResponse {
 message UpdateAgentRequest {
   Agent agent = 1 [(google.api.field_behavior) = REQUIRED];
   google.protobuf.FieldMask update_mask = 2;
+}
+
+// --- Ownership Transfer ---
+
+message TransferAgentOwnershipRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+  // New owner's user resource name (users/{id}).
+  string new_owner = 2 [(google.api.field_behavior) = REQUIRED];
+  string reason = 3; // audit purpose
+}
+
+message TransferAgentOwnershipResponse {
+  Agent agent = 1;
 }
 
 // --- Token Management ---
@@ -490,13 +522,13 @@ message Agent {
   google.protobuf.Timestamp last_token_rotated_at = 9;
   int32 token_version = 10;
   // Creator's user resource name (users/{id}); empty for legacy agents with no
-  // recorded creator. Only the creator or a workspace admin may modify the agent.
+  // recorded creator. Display-only: it never authorizes anything (the agent's
+  // owner does). Immutable after creation.
   string created_by = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // can_edit reports whether the current caller may modify this agent
-  // (laelia.agents.edit): true for the creator (via the agentEditor IAM binding)
-  // and for workspace admins (via the all-permissions union), false otherwise.
-  // Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths.
+  // can_edit reports whether the current caller may modify this agent: true for
+  // the agent's owner and for workspace admins, false otherwise. Populated per
+  // caller by GetAgent/ListAgents; not set on agent-daemon paths.
   bool can_edit = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // avatar is the resource name of the agent's uploaded avatar image, or empty
@@ -511,10 +543,23 @@ message Agent {
   string machine = 14 [(google.api.field_behavior) = REQUIRED];
 
   // allow_add_to_channel controls whether other users may add this agent to a
-  // channel. Default false: only the agent's creator or a workspace admin may
-  // add it. When true, the normal channel-side rule (conversations.manage =
-  // channel owner/admin) applies.
+  // channel. Default false: only the agent's owner or a workspace admin may add
+  // it. When true, the normal channel-side rule (conversations.manage = channel
+  // owner/admin) applies.
   bool allow_add_to_channel = 15;
+
+  // Owner's user resource name (users/{id}); empty for legacy agents with no
+  // recorded owner. The owner is the human responsible for the agent: only the
+  // owner or a workspace admin may modify it, the owner may transfer ownership
+  // to another user (TransferAgentOwnership), and non-owners' high-risk
+  // requests to the agent require the owner's approval (see the agent prompt's
+  // Ownership & Safety section). Defaults to the creator on CreateAgent and is
+  // backfilled from created_by for existing agents.
+  string owner = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Owner's display name — the name the agent writes `dm:@<owner_name>` to when
+  // requesting approval for a high-risk operation. Empty for legacy agents.
+  string owner_name = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // AgentSummary is the lightweight list-view projection of an Agent returned by
@@ -539,14 +584,19 @@ message AgentSummary {
   // (machines/{machine}).
   string machine = 7;
   // created_by is the creator's user resource name (users/{id}); empty for
-  // legacy agents with no recorded creator. Surfaced on the summary so list
-  // consumers (e.g. the Members page's per-user "Created Agents" view) can
-  // group agents by creator without an N+1 of GetAgent.
+  // legacy agents with no recorded creator. Display-only — grouping and
+  // authorization use owner. Surfaced on the summary so list consumers can
+  // show the creator without an N+1 of GetAgent.
   string created_by = 8;
   // allow_add_to_channel mirrors Agent.allow_add_to_channel so list consumers
   // (e.g. the channel member picker) can hide agents the current caller may
   // not add.
   bool allow_add_to_channel = 9;
+  // owner is the owner's user resource name (users/{id}); empty for legacy
+  // agents with no recorded owner. Surfaced on the summary so list consumers
+  // (e.g. the Members page's per-user "Owned Agents" view and the channel
+  // member picker) can group agents by owner without an N+1 of GetAgent.
+  string owner = 10;
 }
 
 message AgentInfo {

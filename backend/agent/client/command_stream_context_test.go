@@ -14,20 +14,24 @@ import (
 
 func TestReanchorPromptDecision(t *testing.T) {
 	state := &executor.ContextState{NeedsReanchor: true}
-	got := reanchorPrompt(state, "alice")
+	got := reanchorPrompt(state, "alice", "")
 	assert.Contains(t, got, "Re-anchor (context compaction recovery)")
 	assert.False(t, state.NeedsReanchor, "decision is consumed")
 	assert.Zero(t, state.Session.Turns)
 
 	state = &executor.ContextState{Session: executor.SessionHealth{Turns: reanchorEveryTurns}}
-	assert.NotEmpty(t, reanchorPrompt(state, "alice"), "periodic re-anchor fires at the warm-turn threshold")
+	assert.NotEmpty(t, reanchorPrompt(state, "alice", ""), "periodic re-anchor fires at the warm-turn threshold")
 	assert.Zero(t, state.Session.Turns)
 
 	state = &executor.ContextState{Session: executor.SessionHealth{Turns: reanchorEveryTurns - 1}}
-	assert.Empty(t, reanchorPrompt(state, "alice"))
+	assert.Empty(t, reanchorPrompt(state, "alice", ""))
 	assert.Equal(t, reanchorEveryTurns-1, state.Session.Turns, "below threshold leaves the counter alone")
 
-	assert.Empty(t, reanchorPrompt(nil, "alice"))
+	assert.Empty(t, reanchorPrompt(nil, "alice", ""))
+
+	// The owner is carried into the re-anchor prompt when present.
+	withOwner := reanchorPrompt(&executor.ContextState{NeedsReanchor: true}, "alice", "Alice Owner")
+	assert.Contains(t, withOwner, "dm:@Alice Owner", "re-anchor must carry the owner line")
 }
 
 func TestAppendContextWarning(t *testing.T) {
@@ -231,7 +235,7 @@ func TestRunSessionReanchorInjectionAndPersistence(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1", "TestAgent")
+		cs.runSession(ctx, stream, "drain-1", "TestAgent", "")
 		close(done)
 	}()
 	select {
@@ -249,6 +253,54 @@ func TestRunSessionReanchorInjectionAndPersistence(t *testing.T) {
 	assert.False(t, state.NeedsReanchor, "flag consumed by the injection")
 	assert.Equal(t, 1, state.Session.Turns, "warm anchored turn counts toward the next periodic re-anchor")
 	assert.Equal(t, "fp", state.Fingerprint)
+}
+
+func TestRunSessionOwnerChangeForcesReanchor(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	require.NoError(t, executor.SaveContextState("m", "a", &executor.ContextState{
+		Fingerprint:      "fp",
+		OwnerDisplayName: "Old Owner",
+	}))
+
+	stream, _, cleanup := newTestCommandChannel(t)
+	defer cleanup()
+
+	cs := &commandStream{machineID: "m", agentID: "a"}
+	var gotReq executor.Request
+	cs.newSessionRuntime = func(req executor.Request) (executor.Runtime, error) {
+		gotReq = req
+		runtime := newScriptedRuntime(func(r *scriptedRuntime) {
+			close(r.outputCh)
+			close(r.eventCh)
+			r.resultCh <- executor.Result{ExitCode: 0, FinalSummary: "done", Fingerprint: "fp", Resumed: true}
+			close(r.resultCh)
+			close(r.doneCh)
+		})
+		return runtime, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		cs.runSession(ctx, stream, "drain-1", "TestAgent", "New Owner")
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("runSession did not complete")
+	}
+
+	assert.NotEmpty(t, gotReq.ReanchorPrompt, "owner change must force a re-anchor on the next warm turn")
+	assert.Contains(t, gotReq.ReanchorPrompt, "New Owner", "re-anchor must name the new owner")
+	assert.Contains(t, gotReq.OwnerDisplayName, "New Owner")
+
+	state, err := executor.LoadContextState("m", "a")
+	require.NoError(t, err)
+	require.NotNil(t, state)
+	assert.Equal(t, "New Owner", state.OwnerDisplayName, "the new owner is persisted for the next owner-change comparison")
+	assert.False(t, state.NeedsReanchor, "flag consumed by the injection")
 }
 
 func TestRunSessionInitializesContextStateForFreshAgent(t *testing.T) {
@@ -272,7 +324,7 @@ func TestRunSessionInitializesContextStateForFreshAgent(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cs.runSession(ctx, stream, "drain-1", "FreshAgent")
+		cs.runSession(ctx, stream, "drain-1", "FreshAgent", "")
 		close(done)
 	}()
 	select {

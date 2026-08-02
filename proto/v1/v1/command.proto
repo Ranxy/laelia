@@ -1961,6 +1961,12 @@ message BeginSessionResponse {
   // it into its system prompt so it knows who it is and can recognize its own
   // messages and @mentions of itself.
   string agent_display_name = 3;
+  // owner_display_name is the agent's owner's display name, sourced from the
+  // manager (the source of truth for ownership). The agent client injects it into
+  // its system prompt (the Ownership & Safety section) so the agent knows whom to
+  // DM for approval of high-risk requests from non-owners. Empty for legacy
+  // agents with no recorded owner.
+  string owner_display_name = 4;
 }
 
 // FetchConversationActivity returns the execution status of each agent member

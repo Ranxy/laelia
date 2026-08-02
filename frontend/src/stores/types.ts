@@ -7,6 +7,7 @@ import type {
   CreateAgentResponse,
   PiModel,
   RotateAgentTokenResponse,
+  TransferAgentOwnershipResponse,
 } from "@/types/proto-es/v1/agent_pb";
 import type {
   Activity,
@@ -176,7 +177,7 @@ export interface AgentSlice {
   // creation time so the agent is fully configured without a second visit to the
   // agent profile; when omitted the agent is created with the server default.
   // allowAddToChannel controls whether other users may add this agent to a
-  // channel; when false (default) only the agent's creator or a workspace admin
+  // channel; when false (default) only the agent's owner or a workspace admin
   // may add it.
   createAgent: (
     title: string,
@@ -186,7 +187,7 @@ export interface AgentSlice {
     allowAddToChannel?: boolean
   ) => Promise<CreateAgentResponse>;
   // updateAgent patches a single mutable agent field. Only allow_add_to_channel
-  // is supported currently. Authorized server-side for the agent's creator or a
+  // is supported currently. Authorized server-side for the agent's owner or a
   // workspace admin.
   updateAgent: (name: string, allowAddToChannel: boolean) => Promise<Agent>;
   deleteAgent: (name: string) => Promise<void>;
@@ -199,6 +200,14 @@ export interface AgentSlice {
     name: string,
     acpConfig: AgentACPConfigInput
   ) => Promise<void>;
+  // transferAgentOwnership reassigns the agent's owner to another user.
+  // Unilateral and immediately effective (the target user does not accept);
+  // authorized server-side for the current owner or a workspace admin.
+  transferAgentOwnership: (
+    name: string,
+    newOwner: string,
+    reason?: string
+  ) => Promise<TransferAgentOwnershipResponse>;
   refreshAgentProviders: (name: string) => Promise<AgentProviderInfo[]>;
   // listPiModels proxies an LLM API provider's model-listing API through the
   // manager (CORS + key hygiene). Fetched dynamically so the model list is never

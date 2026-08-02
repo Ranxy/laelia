@@ -417,7 +417,7 @@ func (c *commandStream) drainLoop(ctx context.Context, stream *connect.BidiStrea
 			}
 
 			lastSessionStart = time.Now()
-			c.runSession(ctx, stream, resp.CommandId, resp.AgentDisplayName)
+			c.runSession(ctx, stream, resp.CommandId, resp.AgentDisplayName, resp.OwnerDisplayName)
 		}
 	}
 }
@@ -589,7 +589,7 @@ func (o *contextObserver) onWatchdog() error {
 // periodic warm-turn threshold. The anchor is only actually prepended on warm
 // turns by the executor; a cold turn re-sends the full init prompt, so
 // consuming the decision either way is correct.
-func reanchorPrompt(ctxState *executor.ContextState, name string) string {
+func reanchorPrompt(ctxState *executor.ContextState, name, ownerDisplayName string) string {
 	if ctxState == nil {
 		return ""
 	}
@@ -598,7 +598,7 @@ func reanchorPrompt(ctxState *executor.ContextState, name string) string {
 	}
 	ctxState.NeedsReanchor = false
 	ctxState.Session.Turns = 0
-	return executor.BuildReanchorPrompt(name)
+	return executor.BuildReanchorPrompt(name, ownerDisplayName)
 }
 
 // appendContextWarning appends the context-window warning to the turn batch
@@ -655,7 +655,7 @@ func (c *commandStream) persistContextState(ctxState *executor.ContextState, res
 // runCommand. The agent itself decides which channel to process and how, by
 // shelling out to the `laelia-agent` CLI over the local daemon. Blocking:
 // returns when the session finishes.
-func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, agentDisplayName string) {
+func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, agentDisplayName, ownerDisplayName string) {
 	// Per-agent context state drives re-anchor / usage-warning decisions for
 	// this turn and is updated from the events below. A load failure disables
 	// context tracking for the turn (never blocks work).
@@ -667,6 +667,18 @@ func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStre
 		// First observed turn: start with an empty state so observations and
 		// decisions below have a place to accumulate.
 		ctxState = &executor.ContextState{}
+	}
+
+	// Owner-change force re-anchor: a warm session's init prompt (which names the
+	// owner) lives in the session history, so an ownership transfer is invisible
+	// to the agent until a cold start or re-anchor. Comparing the manager's fresh
+	// owner against the last one this session re-anchored with catches the change
+	// on the very next warm turn, so the old owner's authority ends promptly.
+	if ctxState != nil && ownerDisplayName != "" && ctxState.OwnerDisplayName != ownerDisplayName {
+		ctxState.NeedsReanchor = true
+	}
+	if ctxState != nil {
+		ctxState.OwnerDisplayName = ownerDisplayName
 	}
 
 	// Build the "New messages received:" bounded batch that opens this turn. It
@@ -690,7 +702,8 @@ func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStre
 		CommandID:        commandID,
 		TurnPrompt:       turnPrompt,
 		AgentDisplayName: agentDisplayName,
-		ReanchorPrompt:   reanchorPrompt(ctxState, name),
+		OwnerDisplayName: ownerDisplayName,
+		ReanchorPrompt:   reanchorPrompt(ctxState, name, ownerDisplayName),
 	}
 
 	runtime, err := c.newSessionRuntime(req)

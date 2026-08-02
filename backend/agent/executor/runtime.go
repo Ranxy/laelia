@@ -20,6 +20,12 @@ type Request struct {
 	ConversationID   string
 	AgentResourceID  string
 	AgentDisplayName string
+	// OwnerDisplayName is the manager-sourced display name of the agent's owner
+	// (from BeginSessionResponse.owner_display_name), injected into the
+	// cold-start init prompt's Ownership & Safety section so the agent knows whom
+	// to DM for approval of high-risk requests from non-owners. Empty for legacy
+	// agents with no recorded owner.
+	OwnerDisplayName string
 	// AgentID is the agent's stable server-assigned UUID (parsed from the
 	// agents/{id} tail). It keys the per-agent working dir and the persistent
 	// ACP session-state file (acp-session.json) that lets drain turns resume

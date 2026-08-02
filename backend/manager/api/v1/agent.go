@@ -105,15 +105,16 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("parent machine %s not found", machineResourceID))
 	}
 
-	// Record the creator for display (Agent.created_by). CreateAgent is
-	// admin-tier (only workspaceAdmin holds laelia.agents.create), so a user is
-	// always present; guard defensively against a missing one. Editing the agent
-	// is authorized by the workspaceAdmin role (which holds agents.edit via the
-	// all-permissions union), not by a per-agent binding.
+	// Record the creator (display-only Agent.created_by) and default the owner to
+	// the same user (Agent.owner). CreateAgent is admin-tier (only workspaceAdmin
+	// holds laelia.agents.create), so a user is always present; guard defensively
+	// against a missing one. Editing the agent is authorized by the owner or the
+	// workspaceAdmin role (which holds agents.edit via the all-permissions union).
 	creatorID := 0
 	if user, _ := GetUserFromContext(ctx); user != nil {
 		creatorID = user.ID
 	}
+	ownerID := creatorID
 
 	// ACP config is admin-owned. CreateAgent may carry an initial acp_config
 	// (provider/model/persona/env) so an agent can be fully configured at
@@ -152,6 +153,7 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 		},
 		Status:    &storepb.AgentStatus{},
 		CreatedBy: creatorID,
+		OwnerID:   ownerID,
 	}
 
 	created, err := s.store.CreateAgent(ctx, agentMessage)
@@ -175,7 +177,7 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 	}
 
 	response := &v1pb.CreateAgentResponse{
-		Agent: convertToAgent(created, agentReachable(s.dispatcher, created.ID, created.MachineID)),
+		Agent: s.convertToAgent(ctx, created, agentReachable(s.dispatcher, created.ID, created.MachineID)),
 	}
 	return connect.NewResponse(response), nil
 }
@@ -239,7 +241,7 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
 	}
-	out := convertToAgent(agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
+	out := s.convertToAgent(ctx, agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
 	caller, _ := GetUserFromContext(ctx)
 	out.CanEdit = s.canEditAgent(ctx, caller, agent)
 	// The builtin-pi api_key is a plaintext secret. Redact it for callers who
@@ -256,7 +258,7 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 // UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
 // is supported initially; any other update_mask path is rejected. The IAM
 // interceptor skips this RPC (no permission annotation — agents.edit is
-// admin-only), so authorization is enforced here for the agent's creator or a
+// admin-only), so authorization is enforced here for the agent's owner or a
 // workspace admin.
 func (s *AgentService) UpdateAgent(ctx context.Context, req *connect.Request[v1pb.UpdateAgentRequest]) (*connect.Response[v1pb.Agent], error) {
 	if req.Msg.Agent == nil {
@@ -289,7 +291,7 @@ func (s *AgentService) UpdateAgent(ctx context.Context, req *connect.Request[v1p
 
 	user, _ := GetUserFromContext(ctx)
 	if !s.canEditAgent(ctx, user, agent) {
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's creator or a workspace admin can modify this agent"))
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a workspace admin can modify this agent"))
 	}
 
 	allowAdd := req.Msg.Agent.GetAllowAddToChannel()
@@ -298,13 +300,62 @@ func (s *AgentService) UpdateAgent(ctx context.Context, req *connect.Request[v1p
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent, error: %v", err))
 	}
 
-	out := convertToAgent(updated, agentReachable(s.dispatcher, updated.ID, updated.MachineID))
+	out := s.convertToAgent(ctx, updated, agentReachable(s.dispatcher, updated.ID, updated.MachineID))
 	out.CanEdit = true // caller just proved edit authorization
 	return connect.NewResponse(out), nil
 }
 
-// canEditAgent reports whether the caller may modify the agent: its creator, or
-// a holder of laelia.agents.edit on the agent. With the per-agent editor role
+// TransferAgentOwnership reassigns the agent's owner to another user. The
+// caller must be the agent's current owner or a workspace admin (canEditAgent);
+// the transfer is unilateral and effective immediately — the target user does
+// not accept, and the previous owner loses owner authority at once. The change
+// reaches the agent's prompt on its next drain session (BeginSession re-sends
+// the owner display name) and the runner force-re-anchors on a warm turn.
+func (s *AgentService) TransferAgentOwnership(ctx context.Context, req *connect.Request[v1pb.TransferAgentOwnershipRequest]) (*connect.Response[v1pb.TransferAgentOwnershipResponse], error) {
+	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get agent, error: %v", err))
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+
+	user, _ := GetUserFromContext(ctx)
+	if !s.canEditAgent(ctx, user, agent) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a workspace admin can transfer ownership"))
+	}
+
+	newOwnerID, err := common.GetUserID(req.Msg.NewOwner)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid new_owner %q: %v", req.Msg.NewOwner, err))
+	}
+	if newOwnerID == agent.OwnerID {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("new_owner is already the agent's owner"))
+	}
+	target, err := s.store.GetUserByID(ctx, newOwnerID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to look up new owner, error: %v", err))
+	}
+	if target == nil || target.MemberDeleted {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("new owner user %s not found", req.Msg.NewOwner))
+	}
+
+	updated, err := s.store.UpdateAgent(ctx, agent, &store.UpdateAgentMessage{OwnerID: &newOwnerID})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to transfer agent ownership, error: %v", err))
+	}
+
+	out := s.convertToAgent(ctx, updated, agentReachable(s.dispatcher, updated.ID, updated.MachineID))
+	out.CanEdit = true // caller just proved edit authorization
+	return connect.NewResponse(&v1pb.TransferAgentOwnershipResponse{Agent: out}), nil
+}
+
+// canEditAgent reports whether the caller may modify the agent: its owner, or a
+// holder of laelia.agents.edit on the agent. With the per-agent editor role
 // removed, agents.edit is granted only by the workspaceAdmin role (via the
 // all-permissions union) and by any custom role bound on the agent's IAM policy
 // that includes agents.edit. A lookup failure is treated as not-editable
@@ -314,8 +365,8 @@ func (s *AgentService) canEditAgent(ctx context.Context, user *store.UserMessage
 	if user == nil || s.iam == nil {
 		return false
 	}
-	// The creator may modify their own agent.
-	if agent.CreatedBy != 0 && agent.CreatedBy == user.ID {
+	// The owner may modify their own agent.
+	if agent.OwnerID != 0 && agent.OwnerID == user.ID {
 		return true
 	}
 	agentName := common.FormatAgentUID(agent.ResourceID)
@@ -1040,7 +1091,7 @@ func agentReachable(d *dispatcher.Dispatcher, agentID, machineID int) bool {
 	return d.IsAgentConnected(agentID) || d.IsMachineConnected(machineID)
 }
 
-func convertToAgent(agent *store.AgentMessage, connected bool) *v1pb.Agent {
+func (s *AgentService) convertToAgent(ctx context.Context, agent *store.AgentMessage, connected bool) *v1pb.Agent {
 	name := common.FormatAgentUID(agent.ResourceID)
 	state := v1pb.State_ACTIVE
 	if agent.Deleted {
@@ -1065,7 +1116,15 @@ func convertToAgent(agent *store.AgentMessage, connected bool) *v1pb.Agent {
 	}
 	if agent.CreatedBy != 0 {
 		// Creator's user resource name (users/{id}); empty for legacy agents.
+		// Display-only — authorization uses Owner.
 		result.CreatedBy = common.FormatUserUID(agent.CreatedBy)
+	}
+	if agent.OwnerID != 0 {
+		// Owner's user resource name (users/{id}) + display name; empty for
+		// legacy agents. The display name is what the agent's prompt tells it to
+		// write dm:@<owner_name> to for high-risk approvals.
+		result.Owner = common.FormatUserUID(agent.OwnerID)
+		result.OwnerName = resolveUserName(ctx, s.store, agent.OwnerID)
 	}
 	if agent.AvatarS3Key != "" {
 		result.Avatar = common.FormatAgentAvatar(agent.ResourceID)
@@ -1076,11 +1135,11 @@ func convertToAgent(agent *store.AgentMessage, connected bool) *v1pb.Agent {
 // convertToAgentSummary builds the lightweight ListAgents projection of an
 // agent: identity, lifecycle state, connection status, the
 // provider/executable signal that the frontend agentLifecycle() classifier
-// reads, and the creator (created_by) so list consumers can group agents by
-// owner without an N+1 of GetAgent. Heavy per-agent data (available_providers,
-// the rest of acp_config, capability, host info, token fields, can_edit) is
-// omitted — it is only returned by GetAgent. See ListAgents for the contract
-// rationale.
+// reads, and the creator/owner (created_by, owner) so list consumers can show
+// or group by them without an N+1 of GetAgent. Heavy per-agent data
+// (available_providers, the rest of acp_config, capability, host info, token
+// fields, can_edit) is omitted — it is only returned by GetAgent. See
+// ListAgents for the contract rationale.
 func convertToAgentSummary(agent *store.AgentMessage, connected bool) *v1pb.AgentSummary {
 	state := v1pb.State_ACTIVE
 	if agent.Deleted {
@@ -1098,10 +1157,16 @@ func convertToAgentSummary(agent *store.AgentMessage, connected bool) *v1pb.Agen
 		summary.Provider = agent.Info.AcpConfig.Provider
 		summary.Executable = agent.Info.AcpConfig.Executable
 	}
-	// Surface the creator on the summary (users/{id}) so list consumers can
-	// group agents by creator without an N+1 of GetAgent.
+	// Surface the creator on the summary (users/{id}) so list consumers can show
+	// it without an N+1 of GetAgent. Display-only — authorization uses Owner.
 	if agent.CreatedBy != 0 {
 		summary.CreatedBy = common.FormatUserUID(agent.CreatedBy)
+	}
+	// Surface the owner on the summary (users/{id}) so list consumers (the
+	// Members page's per-user "Owned Agents" view and the channel member picker)
+	// can group agents by owner without an N+1 of GetAgent.
+	if agent.OwnerID != 0 {
+		summary.Owner = common.FormatUserUID(agent.OwnerID)
 	}
 	return summary
 }

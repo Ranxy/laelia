@@ -27,11 +27,16 @@ type AgentMessage struct {
 	Status             *models.AgentStatus
 	LastTokenRotatedAt time.Time
 	// CreatedBy is the principal id of the user who created the agent (0 =
-	// unknown/legacy). Used to gate agent profile mutations to the creator or a
-	// workspace admin. Immutable after creation.
+	// unknown/legacy). Display-only: it never authorizes anything (OwnerID
+	// does). Immutable after creation.
 	CreatedBy int
+	// OwnerID is the principal id of the agent's owner (authorization
+	// authority; 0 = unknown/legacy). Gates profile mutations and channel-adds
+	// to the owner or a workspace admin, and defaults to the creator on
+	// creation. Transferable via TransferAgentOwnership.
+	OwnerID int
 	// AllowAddToChannel reports whether other users may add this agent to a
-	// channel. False (default) restricts adds to the agent's creator or a
+	// channel. False (default) restricts adds to the agent's owner or a
 	// workspace admin.
 	AllowAddToChannel bool
 	// AvatarS3Key is the S3 object key of the agent's uploaded avatar image,
@@ -72,6 +77,7 @@ type UpdateAgentMessage struct {
 	Delete             *bool
 	AvatarS3Key        *string
 	AllowAddToChannel  *bool
+	OwnerID            *int
 }
 
 func (s *Store) GetAgent(ctx context.Context, id int) (*AgentMessage, error) {
@@ -172,6 +178,7 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 		agent.status,
 		agent.last_token_rotated_at,
 		agent.created_by,
+		agent.owner_id,
 		agent.allow_add_to_channel,
 		agent.avatar_s3_key,
 		agent.machine_id,
@@ -211,6 +218,7 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 			&statusBytes,
 			&lastTokenRotatedAt,
 			&agentMessage.CreatedBy,
+			&agentMessage.OwnerID,
 			&agentMessage.AllowAddToChannel,
 			&agentMessage.AvatarS3Key,
 			&machineID,
@@ -284,9 +292,9 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 	var agentID int
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO agent (
-			resource_id, name, token_version, info, status, created_by, allow_add_to_channel, machine_id
+			resource_id, name, token_version, info, status, created_by, owner_id, allow_add_to_channel, machine_id
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at
 	`,
 		resourceID,
@@ -295,6 +303,7 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 		infoBytes,
 		statusBytes,
 		create.CreatedBy,
+		create.OwnerID,
 		create.AllowAddToChannel,
 		machineIDArg,
 	).Scan(&agentID, &create.CreatedAt); err != nil {
@@ -314,6 +323,7 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 		Info:              create.Info,
 		Status:            create.Status,
 		CreatedBy:         create.CreatedBy,
+		OwnerID:           create.OwnerID,
 		AllowAddToChannel: create.AllowAddToChannel,
 		MachineID:         create.MachineID,
 	}
@@ -358,6 +368,9 @@ func (s *Store) UpdateAgent(ctx context.Context, current *AgentMessage, patch *U
 	}
 	if v := patch.AllowAddToChannel; v != nil {
 		sets, args = append(sets, fmt.Sprintf("allow_add_to_channel = $%d", len(args)+1)), append(args, *v)
+	}
+	if v := patch.OwnerID; v != nil {
+		sets, args = append(sets, fmt.Sprintf("owner_id = $%d", len(args)+1)), append(args, *v)
 	}
 
 	if len(sets) == 0 {

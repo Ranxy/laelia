@@ -416,7 +416,7 @@ func TestPiTurnPromptText_ReanchorOnWarmTurn(t *testing.T) {
 	e := newTestExecutor(t)
 	e.req = executor.Request{
 		TurnPrompt:     "New messages received:\n\nwork",
-		ReanchorPrompt: executor.BuildReanchorPrompt("alice"),
+		ReanchorPrompt: executor.BuildReanchorPrompt("alice", ""),
 	}
 	got := e.turnPromptText(true)
 	assert.Contains(t, got, "Re-anchor (context compaction recovery)")
@@ -430,7 +430,7 @@ func TestPiTurnPromptText_ColdTurnIgnoresReanchor(t *testing.T) {
 	e.identity = "alice"
 	e.req = executor.Request{
 		TurnPrompt:     "batch",
-		ReanchorPrompt: executor.BuildReanchorPrompt("alice"),
+		ReanchorPrompt: executor.BuildReanchorPrompt("alice", ""),
 	}
 	got := e.turnPromptText(false)
 	assert.NotContains(t, got, "Re-anchor")

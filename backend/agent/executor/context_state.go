@@ -32,6 +32,13 @@ type ContextState struct {
 	// Fingerprint is the session fingerprint this state describes. A change
 	// resets the accumulated stats.
 	Fingerprint string `json:"fingerprint,omitempty"`
+	// OwnerDisplayName is the owner display name the last turn's init/re-anchor
+	// prompt carried. The runner compares it against the manager's fresh
+	// BeginSessionResponse owner on each turn and forces NeedsReanchor when the
+	// owner changed, so a warm session whose init prompt named the old owner
+	// re-anchors with the new owner before the old owner's authority could be
+	// relied on. Empty for legacy agents (no ownership section).
+	OwnerDisplayName string `json:"owner_display_name,omitempty"`
 }
 
 // ContextUsage is a point-in-time snapshot of the session context window.

@@ -64,6 +64,8 @@
     - [RevokeAgentTokenResponse](#laelia-v1-RevokeAgentTokenResponse)
     - [RotateAgentTokenRequest](#laelia-v1-RotateAgentTokenRequest)
     - [RotateAgentTokenResponse](#laelia-v1-RotateAgentTokenResponse)
+    - [TransferAgentOwnershipRequest](#laelia-v1-TransferAgentOwnershipRequest)
+    - [TransferAgentOwnershipResponse](#laelia-v1-TransferAgentOwnershipResponse)
     - [UpdateAgentACPConfigRequest](#laelia-v1-UpdateAgentACPConfigRequest)
     - [UpdateAgentRequest](#laelia-v1-UpdateAgentRequest)
     - [UploadAgentAvatarRequest](#laelia-v1-UploadAgentAvatarRequest)
@@ -502,11 +504,13 @@ RiskLevel is the risk level.
 | labels | [Agent.LabelsEntry](#laelia-v1-Agent-LabelsEntry) | repeated |  |
 | last_token_rotated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | token_version | [int32](#int32) |  |  |
-| created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}); empty for legacy agents with no recorded creator. Only the creator or a workspace admin may modify the agent. |
-| can_edit | [bool](#bool) |  | can_edit reports whether the current caller may modify this agent (laelia.agents.edit): true for the creator (via the agentEditor IAM binding) and for workspace admins (via the all-permissions union), false otherwise. Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths. |
+| created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}); empty for legacy agents with no recorded creator. Display-only: it never authorizes anything (the agent&#39;s owner does). Immutable after creation. |
+| can_edit | [bool](#bool) |  | can_edit reports whether the current caller may modify this agent: true for the agent&#39;s owner and for workspace admins, false otherwise. Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths. |
 | avatar | [string](#string) |  | avatar is the resource name of the agent&#39;s uploaded avatar image, or empty when the agent has not uploaded one (frontend renders a deterministic pixel identicon seeded by the agent id). Format: agents/{agent}/avatar. |
 | machine | [string](#string) |  | machine is the resource name of the machine this agent is bound to (machines/{machine}). Required on CreateAgent (the parent machine the agent runs on) and immutable thereafter; an agent runs on exactly one machine, and the machine app picks it up via the MachineChannel control stream. |
-| allow_add_to_channel | [bool](#bool) |  | allow_add_to_channel controls whether other users may add this agent to a channel. Default false: only the agent&#39;s creator or a workspace admin may add it. When true, the normal channel-side rule (conversations.manage = channel owner/admin) applies. |
+| allow_add_to_channel | [bool](#bool) |  | allow_add_to_channel controls whether other users may add this agent to a channel. Default false: only the agent&#39;s owner or a workspace admin may add it. When true, the normal channel-side rule (conversations.manage = channel owner/admin) applies. |
+| owner | [string](#string) |  | Owner&#39;s user resource name (users/{id}); empty for legacy agents with no recorded owner. The owner is the human responsible for the agent: only the owner or a workspace admin may modify it, the owner may transfer ownership to another user (TransferAgentOwnership), and non-owners&#39; high-risk requests to the agent require the owner&#39;s approval (see the agent prompt&#39;s Ownership &amp; Safety section). Defaults to the creator on CreateAgent and is backfilled from created_by for existing agents. |
+| owner_name | [string](#string) |  | Owner&#39;s display name — the name the agent writes `dm:@&lt;owner_name&gt;` to when requesting approval for a high-risk operation. Empty for legacy agents. |
 
 
 
@@ -814,8 +818,9 @@ view does not gate affordances on it (delete is enforced server-side).
 | provider | [string](#string) |  | provider/executable mirror acp_config.provider/executable on the full Agent, surfaced top-level so list consumers don&#39;t pull in AgentInfo. |
 | executable | [string](#string) |  |  |
 | machine | [string](#string) |  | machine is the resource name of the machine this agent is bound to (machines/{machine}). |
-| created_by | [string](#string) |  | created_by is the creator&#39;s user resource name (users/{id}); empty for legacy agents with no recorded creator. Surfaced on the summary so list consumers (e.g. the Members page&#39;s per-user &#34;Created Agents&#34; view) can group agents by creator without an N&#43;1 of GetAgent. |
+| created_by | [string](#string) |  | created_by is the creator&#39;s user resource name (users/{id}); empty for legacy agents with no recorded creator. Display-only — grouping and authorization use owner. Surfaced on the summary so list consumers can show the creator without an N&#43;1 of GetAgent. |
 | allow_add_to_channel | [bool](#bool) |  | allow_add_to_channel mirrors Agent.allow_add_to_channel so list consumers (e.g. the channel member picker) can hide agents the current caller may not add. |
+| owner | [string](#string) |  | owner is the owner&#39;s user resource name (users/{id}); empty for legacy agents with no recorded owner. Surfaced on the summary so list consumers (e.g. the Members page&#39;s per-user &#34;Owned Agents&#34; view and the channel member picker) can group agents by owner without an N&#43;1 of GetAgent. |
 
 
 
@@ -1280,6 +1285,38 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 
 
 
+<a name="laelia-v1-TransferAgentOwnershipRequest"></a>
+
+### TransferAgentOwnershipRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| new_owner | [string](#string) |  | New owner&#39;s user resource name (users/{id}). |
+| reason | [string](#string) |  | audit purpose |
+
+
+
+
+
+
+<a name="laelia-v1-TransferAgentOwnershipResponse"></a>
+
+### TransferAgentOwnershipResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent | [Agent](#laelia-v1-Agent) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-UpdateAgentACPConfigRequest"></a>
 
 ### UpdateAgentACPConfigRequest
@@ -1360,7 +1397,8 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 | CreateAgent | [CreateAgentRequest](#laelia-v1-CreateAgentRequest) | [CreateAgentResponse](#laelia-v1-CreateAgentResponse) |  |
 | ListAgents | [ListAgentsRequest](#laelia-v1-ListAgentsRequest) | [ListAgentsResponse](#laelia-v1-ListAgentsResponse) |  |
 | GetAgent | [GetAgentRequest](#laelia-v1-GetAgentRequest) | [Agent](#laelia-v1-Agent) |  |
-| UpdateAgent | [UpdateAgentRequest](#laelia-v1-UpdateAgentRequest) | [Agent](#laelia-v1-Agent) | UpdateAgent patches a single mutable agent field. Only allow_add_to_channel is supported initially (any other update_mask path is rejected). Authorized in the handler for the agent&#39;s creator or a workspace admin; the IAM interceptor&#39;s agents.edit is admin-only, so this RPC carries no permission annotation and is handler-gated. |
+| UpdateAgent | [UpdateAgentRequest](#laelia-v1-UpdateAgentRequest) | [Agent](#laelia-v1-Agent) | UpdateAgent patches a single mutable agent field. Only allow_add_to_channel is supported initially (any other update_mask path is rejected). Authorized in the handler for the agent&#39;s owner or a workspace admin; the IAM interceptor&#39;s agents.edit is admin-only, so this RPC carries no permission annotation and is handler-gated. |
+| TransferAgentOwnership | [TransferAgentOwnershipRequest](#laelia-v1-TransferAgentOwnershipRequest) | [TransferAgentOwnershipResponse](#laelia-v1-TransferAgentOwnershipResponse) | TransferAgentOwnership reassigns the agent&#39;s owner to another user. The new owner takes effect immediately and unilaterally (no acceptance required); the previous owner loses owner authority at once. Authorized in the handler for the agent&#39;s current owner or a workspace admin; like UpdateAgent this RPC carries no permission annotation (agents.edit is admin-only) and is handler-gated via canEditAgent. |
 | DeleteAgent | [DeleteAgentRequest](#laelia-v1-DeleteAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 | RotateAgentToken | [RotateAgentTokenRequest](#laelia-v1-RotateAgentTokenRequest) | [RotateAgentTokenResponse](#laelia-v1-RotateAgentTokenResponse) | Token rotation: generate a new bootstrap token, old token invalid after grace period |
 | RevokeAgentToken | [RevokeAgentTokenRequest](#laelia-v1-RevokeAgentTokenRequest) | [RevokeAgentTokenResponse](#laelia-v1-RevokeAgentTokenResponse) | Token revocation: revoke all tokens for the agent |
@@ -2044,6 +2082,7 @@ the agent uses to anchor its execution events and link any posted replies.
 | command_id | [string](#string) |  |  |
 | idle | [bool](#bool) |  |  |
 | agent_display_name | [string](#string) |  | agent_display_name is the posting agent&#39;s human-readable name, sourced from the manager (the source of truth for agent identity). The agent client injects it into its system prompt so it knows who it is and can recognize its own messages and @mentions of itself. |
+| owner_display_name | [string](#string) |  | owner_display_name is the agent&#39;s owner&#39;s display name, sourced from the manager (the source of truth for ownership). The agent client injects it into its system prompt (the Ownership &amp; Safety section) so the agent knows whom to DM for approval of high-risk requests from non-owners. Empty for legacy agents with no recorded owner. |
 
 
 

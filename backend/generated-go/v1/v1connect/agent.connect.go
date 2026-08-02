@@ -44,6 +44,9 @@ const (
 	// AgentServiceUpdateAgentProcedure is the fully-qualified name of the AgentService's UpdateAgent
 	// RPC.
 	AgentServiceUpdateAgentProcedure = "/laelia.v1.AgentService/UpdateAgent"
+	// AgentServiceTransferAgentOwnershipProcedure is the fully-qualified name of the AgentService's
+	// TransferAgentOwnership RPC.
+	AgentServiceTransferAgentOwnershipProcedure = "/laelia.v1.AgentService/TransferAgentOwnership"
 	// AgentServiceDeleteAgentProcedure is the fully-qualified name of the AgentService's DeleteAgent
 	// RPC.
 	AgentServiceDeleteAgentProcedure = "/laelia.v1.AgentService/DeleteAgent"
@@ -100,10 +103,17 @@ type AgentServiceClient interface {
 	GetAgent(context.Context, *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error)
 	// UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
 	// is supported initially (any other update_mask path is rejected). Authorized
-	// in the handler for the agent's creator or a workspace admin; the IAM
+	// in the handler for the agent's owner or a workspace admin; the IAM
 	// interceptor's agents.edit is admin-only, so this RPC carries no permission
 	// annotation and is handler-gated.
 	UpdateAgent(context.Context, *connect.Request[v1.UpdateAgentRequest]) (*connect.Response[v1.Agent], error)
+	// TransferAgentOwnership reassigns the agent's owner to another user. The new
+	// owner takes effect immediately and unilaterally (no acceptance required);
+	// the previous owner loses owner authority at once. Authorized in the handler
+	// for the agent's current owner or a workspace admin; like UpdateAgent this
+	// RPC carries no permission annotation (agents.edit is admin-only) and is
+	// handler-gated via canEditAgent.
+	TransferAgentOwnership(context.Context, *connect.Request[v1.TransferAgentOwnershipRequest]) (*connect.Response[v1.TransferAgentOwnershipResponse], error)
 	DeleteAgent(context.Context, *connect.Request[v1.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error)
 	// Token rotation: generate a new bootstrap token, old token invalid after grace period
 	RotateAgentToken(context.Context, *connect.Request[v1.RotateAgentTokenRequest]) (*connect.Response[v1.RotateAgentTokenResponse], error)
@@ -180,6 +190,12 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+AgentServiceUpdateAgentProcedure,
 			connect.WithSchema(agentServiceMethods.ByName("UpdateAgent")),
+			connect.WithClientOptions(opts...),
+		),
+		transferAgentOwnership: connect.NewClient[v1.TransferAgentOwnershipRequest, v1.TransferAgentOwnershipResponse](
+			httpClient,
+			baseURL+AgentServiceTransferAgentOwnershipProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("TransferAgentOwnership")),
 			connect.WithClientOptions(opts...),
 		),
 		deleteAgent: connect.NewClient[v1.DeleteAgentRequest, emptypb.Empty](
@@ -283,26 +299,27 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 
 // agentServiceClient implements AgentServiceClient.
 type agentServiceClient struct {
-	createAgent           *connect.Client[v1.CreateAgentRequest, v1.CreateAgentResponse]
-	listAgents            *connect.Client[v1.ListAgentsRequest, v1.ListAgentsResponse]
-	getAgent              *connect.Client[v1.GetAgentRequest, v1.Agent]
-	updateAgent           *connect.Client[v1.UpdateAgentRequest, v1.Agent]
-	deleteAgent           *connect.Client[v1.DeleteAgentRequest, emptypb.Empty]
-	rotateAgentToken      *connect.Client[v1.RotateAgentTokenRequest, v1.RotateAgentTokenResponse]
-	revokeAgentToken      *connect.Client[v1.RevokeAgentTokenRequest, v1.RevokeAgentTokenResponse]
-	forceDisconnectAgent  *connect.Client[v1.ForceDisconnectAgentRequest, emptypb.Empty]
-	listAgentSessions     *connect.Client[v1.ListAgentSessionsRequest, v1.ListAgentSessionsResponse]
-	updateAgentACPConfig  *connect.Client[v1.UpdateAgentACPConfigRequest, emptypb.Empty]
-	refreshAgentProviders *connect.Client[v1.RefreshAgentProvidersRequest, v1.RefreshAgentProvidersResponse]
-	listPiModels          *connect.Client[v1.ListPiModelsRequest, v1.ListPiModelsResponse]
-	connectAgent          *connect.Client[v1.ConnectAgentRequest, v1.ConnectAgentResponse]
-	agentHeartbeat        *connect.Client[v1.AgentHeartbeatRequest, v1.AgentHeartbeatResponse]
-	agentDisconnect       *connect.Client[v1.AgentDisconnectRequest, emptypb.Empty]
-	refreshAgentToken     *connect.Client[v1.RefreshAgentTokenRequest, v1.RefreshAgentTokenResponse]
-	uploadAgentAvatar     *connect.Client[v1.UploadAgentAvatarRequest, v1.Agent]
-	downloadAgentAvatar   *connect.Client[v1.DownloadAgentAvatarRequest, v1.DownloadAgentAvatarResponse]
-	deleteAgentAvatar     *connect.Client[v1.DeleteAgentAvatarRequest, v1.Agent]
-	hello                 *connect.Client[v1.HelloRequest, v1.HelloResponse]
+	createAgent            *connect.Client[v1.CreateAgentRequest, v1.CreateAgentResponse]
+	listAgents             *connect.Client[v1.ListAgentsRequest, v1.ListAgentsResponse]
+	getAgent               *connect.Client[v1.GetAgentRequest, v1.Agent]
+	updateAgent            *connect.Client[v1.UpdateAgentRequest, v1.Agent]
+	transferAgentOwnership *connect.Client[v1.TransferAgentOwnershipRequest, v1.TransferAgentOwnershipResponse]
+	deleteAgent            *connect.Client[v1.DeleteAgentRequest, emptypb.Empty]
+	rotateAgentToken       *connect.Client[v1.RotateAgentTokenRequest, v1.RotateAgentTokenResponse]
+	revokeAgentToken       *connect.Client[v1.RevokeAgentTokenRequest, v1.RevokeAgentTokenResponse]
+	forceDisconnectAgent   *connect.Client[v1.ForceDisconnectAgentRequest, emptypb.Empty]
+	listAgentSessions      *connect.Client[v1.ListAgentSessionsRequest, v1.ListAgentSessionsResponse]
+	updateAgentACPConfig   *connect.Client[v1.UpdateAgentACPConfigRequest, emptypb.Empty]
+	refreshAgentProviders  *connect.Client[v1.RefreshAgentProvidersRequest, v1.RefreshAgentProvidersResponse]
+	listPiModels           *connect.Client[v1.ListPiModelsRequest, v1.ListPiModelsResponse]
+	connectAgent           *connect.Client[v1.ConnectAgentRequest, v1.ConnectAgentResponse]
+	agentHeartbeat         *connect.Client[v1.AgentHeartbeatRequest, v1.AgentHeartbeatResponse]
+	agentDisconnect        *connect.Client[v1.AgentDisconnectRequest, emptypb.Empty]
+	refreshAgentToken      *connect.Client[v1.RefreshAgentTokenRequest, v1.RefreshAgentTokenResponse]
+	uploadAgentAvatar      *connect.Client[v1.UploadAgentAvatarRequest, v1.Agent]
+	downloadAgentAvatar    *connect.Client[v1.DownloadAgentAvatarRequest, v1.DownloadAgentAvatarResponse]
+	deleteAgentAvatar      *connect.Client[v1.DeleteAgentAvatarRequest, v1.Agent]
+	hello                  *connect.Client[v1.HelloRequest, v1.HelloResponse]
 }
 
 // CreateAgent calls laelia.v1.AgentService.CreateAgent.
@@ -323,6 +340,11 @@ func (c *agentServiceClient) GetAgent(ctx context.Context, req *connect.Request[
 // UpdateAgent calls laelia.v1.AgentService.UpdateAgent.
 func (c *agentServiceClient) UpdateAgent(ctx context.Context, req *connect.Request[v1.UpdateAgentRequest]) (*connect.Response[v1.Agent], error) {
 	return c.updateAgent.CallUnary(ctx, req)
+}
+
+// TransferAgentOwnership calls laelia.v1.AgentService.TransferAgentOwnership.
+func (c *agentServiceClient) TransferAgentOwnership(ctx context.Context, req *connect.Request[v1.TransferAgentOwnershipRequest]) (*connect.Response[v1.TransferAgentOwnershipResponse], error) {
+	return c.transferAgentOwnership.CallUnary(ctx, req)
 }
 
 // DeleteAgent calls laelia.v1.AgentService.DeleteAgent.
@@ -412,10 +434,17 @@ type AgentServiceHandler interface {
 	GetAgent(context.Context, *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error)
 	// UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
 	// is supported initially (any other update_mask path is rejected). Authorized
-	// in the handler for the agent's creator or a workspace admin; the IAM
+	// in the handler for the agent's owner or a workspace admin; the IAM
 	// interceptor's agents.edit is admin-only, so this RPC carries no permission
 	// annotation and is handler-gated.
 	UpdateAgent(context.Context, *connect.Request[v1.UpdateAgentRequest]) (*connect.Response[v1.Agent], error)
+	// TransferAgentOwnership reassigns the agent's owner to another user. The new
+	// owner takes effect immediately and unilaterally (no acceptance required);
+	// the previous owner loses owner authority at once. Authorized in the handler
+	// for the agent's current owner or a workspace admin; like UpdateAgent this
+	// RPC carries no permission annotation (agents.edit is admin-only) and is
+	// handler-gated via canEditAgent.
+	TransferAgentOwnership(context.Context, *connect.Request[v1.TransferAgentOwnershipRequest]) (*connect.Response[v1.TransferAgentOwnershipResponse], error)
 	DeleteAgent(context.Context, *connect.Request[v1.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error)
 	// Token rotation: generate a new bootstrap token, old token invalid after grace period
 	RotateAgentToken(context.Context, *connect.Request[v1.RotateAgentTokenRequest]) (*connect.Response[v1.RotateAgentTokenResponse], error)
@@ -488,6 +517,12 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 		AgentServiceUpdateAgentProcedure,
 		svc.UpdateAgent,
 		connect.WithSchema(agentServiceMethods.ByName("UpdateAgent")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceTransferAgentOwnershipHandler := connect.NewUnaryHandler(
+		AgentServiceTransferAgentOwnershipProcedure,
+		svc.TransferAgentOwnership,
+		connect.WithSchema(agentServiceMethods.ByName("TransferAgentOwnership")),
 		connect.WithHandlerOptions(opts...),
 	)
 	agentServiceDeleteAgentHandler := connect.NewUnaryHandler(
@@ -596,6 +631,8 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 			agentServiceGetAgentHandler.ServeHTTP(w, r)
 		case AgentServiceUpdateAgentProcedure:
 			agentServiceUpdateAgentHandler.ServeHTTP(w, r)
+		case AgentServiceTransferAgentOwnershipProcedure:
+			agentServiceTransferAgentOwnershipHandler.ServeHTTP(w, r)
 		case AgentServiceDeleteAgentProcedure:
 			agentServiceDeleteAgentHandler.ServeHTTP(w, r)
 		case AgentServiceRotateAgentTokenProcedure:
@@ -651,6 +688,10 @@ func (UnimplementedAgentServiceHandler) GetAgent(context.Context, *connect.Reque
 
 func (UnimplementedAgentServiceHandler) UpdateAgent(context.Context, *connect.Request[v1.UpdateAgentRequest]) (*connect.Response[v1.Agent], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.UpdateAgent is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) TransferAgentOwnership(context.Context, *connect.Request[v1.TransferAgentOwnershipRequest]) (*connect.Response[v1.TransferAgentOwnershipResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.TransferAgentOwnership is not implemented"))
 }
 
 func (UnimplementedAgentServiceHandler) DeleteAgent(context.Context, *connect.Request[v1.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error) {

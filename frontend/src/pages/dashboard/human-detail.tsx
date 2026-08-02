@@ -42,9 +42,9 @@ import {
 // the User comes from the drained `users` roster (no per-page GetUser), the
 // avatar from the shared avatar cache, description edits go through the
 // `updateUser` store mutation, and role badges come from the workspace IAM
-// policy + role list (same calls as settings-iam). The "Created Agents" list
-// filters the agent roster by `created_by`, which is now surfaced on
-// AgentSummary so this is an O(n) client-side filter, not an N+1 of GetAgent.
+// policy + role list (same calls as settings-iam). The "Owned Agents" list
+// filters the agent roster by `owner`, which is now surfaced on AgentSummary so
+// this is an O(n) client-side filter, not an N+1 of GetAgent.
 export function HumanDetailPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -150,7 +150,7 @@ export function HumanDetailPage() {
     );
   }
 
-  const createdAgents = agents.filter((a) => a.createdBy === user.name);
+  const ownedAgents = agents.filter((a) => a.owner === user.name);
 
   async function handleAvatarChange(file: File | undefined) {
     if (!file || !userId) return;
@@ -406,24 +406,24 @@ export function HumanDetailPage() {
         </div>
       </div>
 
-      {/* Created agents. */}
+      {/* Owned agents. */}
       <div className="border-t border-control-border px-5 py-4">
         <div className="mb-3 flex items-center gap-2">
           <div className="text-xs font-bold uppercase text-control tracking-widest">
-            {t("members.human.created-agents")}
+            {t("members.human.owned-agents")}
           </div>
           <span className="font-mono text-xs text-control-light">
-            {createdAgents.length}
+            {ownedAgents.length}
           </span>
         </div>
-        {createdAgents.length === 0 ? (
+        {ownedAgents.length === 0 ? (
           <p className="text-sm text-control-light">
-            {t("members.human.no-created-agents")}
+            {t("members.human.no-owned-agents")}
           </p>
         ) : (
           <div className="flex flex-col gap-2">
-            {createdAgents.map((agent) => (
-              <CreatedAgentRow key={agent.name} agent={agent} />
+            {ownedAgents.map((agent) => (
+              <OwnedAgentRow key={agent.name} agent={agent} />
             ))}
           </div>
         )}
@@ -432,9 +432,9 @@ export function HumanDetailPage() {
   );
 }
 
-// CreatedAgentRow is one row of the "Created Agents" sub-list. Extracted to its
-// own component so it can call useAvatar (hooks can't run inside a .map body).
-function CreatedAgentRow({ agent }: { agent: AgentSummary }) {
+// OwnedAgentRow is one row of the "Owned Agents" sub-list. Extracted to its own
+// component so it can call useAvatar (hooks can't run inside a .map body).
+function OwnedAgentRow({ agent }: { agent: AgentSummary }) {
   const navigate = useNavigate();
   const id = agent.name.replace(/^agents\//, "");
   const avatarSrc = useAvatar(avatarNameForAgentId(id));

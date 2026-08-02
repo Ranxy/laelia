@@ -4342,6 +4342,17 @@ export declare type BeginSessionResponse = Message<"laelia.v1.BeginSessionRespon
    * @generated from field: string agent_display_name = 3;
    */
   agentDisplayName: string;
+
+  /**
+   * owner_display_name is the agent's owner's display name, sourced from the
+   * manager (the source of truth for ownership). The agent client injects it into
+   * its system prompt (the Ownership & Safety section) so the agent knows whom to
+   * DM for approval of high-risk requests from non-owners. Empty for legacy
+   * agents with no recorded owner.
+   *
+   * @generated from field: string owner_display_name = 4;
+   */
+  ownerDisplayName: string;
 };
 
 /**

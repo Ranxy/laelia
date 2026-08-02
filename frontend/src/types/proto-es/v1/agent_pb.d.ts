@@ -73,6 +73,52 @@ export declare type UpdateAgentRequest = Message<"laelia.v1.UpdateAgentRequest">
 export declare const UpdateAgentRequestSchema: GenMessage<UpdateAgentRequest>;
 
 /**
+ * @generated from message laelia.v1.TransferAgentOwnershipRequest
+ */
+export declare type TransferAgentOwnershipRequest = Message<"laelia.v1.TransferAgentOwnershipRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * New owner's user resource name (users/{id}).
+   *
+   * @generated from field: string new_owner = 2;
+   */
+  newOwner: string;
+
+  /**
+   * audit purpose
+   *
+   * @generated from field: string reason = 3;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message laelia.v1.TransferAgentOwnershipRequest.
+ * Use `create(TransferAgentOwnershipRequestSchema)` to create a new message.
+ */
+export declare const TransferAgentOwnershipRequestSchema: GenMessage<TransferAgentOwnershipRequest>;
+
+/**
+ * @generated from message laelia.v1.TransferAgentOwnershipResponse
+ */
+export declare type TransferAgentOwnershipResponse = Message<"laelia.v1.TransferAgentOwnershipResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Agent agent = 1;
+   */
+  agent?: Agent | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.TransferAgentOwnershipResponse.
+ * Use `create(TransferAgentOwnershipResponseSchema)` to create a new message.
+ */
+export declare const TransferAgentOwnershipResponseSchema: GenMessage<TransferAgentOwnershipResponse>;
+
+/**
  * @generated from message laelia.v1.RotateAgentTokenRequest
  */
 export declare type RotateAgentTokenRequest = Message<"laelia.v1.RotateAgentTokenRequest"> & {
@@ -933,17 +979,17 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
 
   /**
    * Creator's user resource name (users/{id}); empty for legacy agents with no
-   * recorded creator. Only the creator or a workspace admin may modify the agent.
+   * recorded creator. Display-only: it never authorizes anything (the agent's
+   * owner does). Immutable after creation.
    *
    * @generated from field: string created_by = 11;
    */
   createdBy: string;
 
   /**
-   * can_edit reports whether the current caller may modify this agent
-   * (laelia.agents.edit): true for the creator (via the agentEditor IAM binding)
-   * and for workspace admins (via the all-permissions union), false otherwise.
-   * Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths.
+   * can_edit reports whether the current caller may modify this agent: true for
+   * the agent's owner and for workspace admins, false otherwise. Populated per
+   * caller by GetAgent/ListAgents; not set on agent-daemon paths.
    *
    * @generated from field: bool can_edit = 12;
    */
@@ -970,13 +1016,34 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
 
   /**
    * allow_add_to_channel controls whether other users may add this agent to a
-   * channel. Default false: only the agent's creator or a workspace admin may
-   * add it. When true, the normal channel-side rule (conversations.manage =
-   * channel owner/admin) applies.
+   * channel. Default false: only the agent's owner or a workspace admin may add
+   * it. When true, the normal channel-side rule (conversations.manage = channel
+   * owner/admin) applies.
    *
    * @generated from field: bool allow_add_to_channel = 15;
    */
   allowAddToChannel: boolean;
+
+  /**
+   * Owner's user resource name (users/{id}); empty for legacy agents with no
+   * recorded owner. The owner is the human responsible for the agent: only the
+   * owner or a workspace admin may modify it, the owner may transfer ownership
+   * to another user (TransferAgentOwnership), and non-owners' high-risk
+   * requests to the agent require the owner's approval (see the agent prompt's
+   * Ownership & Safety section). Defaults to the creator on CreateAgent and is
+   * backfilled from created_by for existing agents.
+   *
+   * @generated from field: string owner = 16;
+   */
+  owner: string;
+
+  /**
+   * Owner's display name — the name the agent writes `dm:@<owner_name>` to when
+   * requesting approval for a high-risk operation. Empty for legacy agents.
+   *
+   * @generated from field: string owner_name = 17;
+   */
+  ownerName: string;
 };
 
 /**
@@ -1042,9 +1109,9 @@ export declare type AgentSummary = Message<"laelia.v1.AgentSummary"> & {
 
   /**
    * created_by is the creator's user resource name (users/{id}); empty for
-   * legacy agents with no recorded creator. Surfaced on the summary so list
-   * consumers (e.g. the Members page's per-user "Created Agents" view) can
-   * group agents by creator without an N+1 of GetAgent.
+   * legacy agents with no recorded creator. Display-only — grouping and
+   * authorization use owner. Surfaced on the summary so list consumers can
+   * show the creator without an N+1 of GetAgent.
    *
    * @generated from field: string created_by = 8;
    */
@@ -1058,6 +1125,16 @@ export declare type AgentSummary = Message<"laelia.v1.AgentSummary"> & {
    * @generated from field: bool allow_add_to_channel = 9;
    */
   allowAddToChannel: boolean;
+
+  /**
+   * owner is the owner's user resource name (users/{id}); empty for legacy
+   * agents with no recorded owner. Surfaced on the summary so list consumers
+   * (e.g. the Members page's per-user "Owned Agents" view and the channel
+   * member picker) can group agents by owner without an N+1 of GetAgent.
+   *
+   * @generated from field: string owner = 10;
+   */
+  owner: string;
 };
 
 /**
@@ -1509,7 +1586,7 @@ export declare const AgentService: GenService<{
   /**
    * UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
    * is supported initially (any other update_mask path is rejected). Authorized
-   * in the handler for the agent's creator or a workspace admin; the IAM
+   * in the handler for the agent's owner or a workspace admin; the IAM
    * interceptor's agents.edit is admin-only, so this RPC carries no permission
    * annotation and is handler-gated.
    *
@@ -1519,6 +1596,21 @@ export declare const AgentService: GenService<{
     methodKind: "unary";
     input: typeof UpdateAgentRequestSchema;
     output: typeof AgentSchema;
+  },
+  /**
+   * TransferAgentOwnership reassigns the agent's owner to another user. The new
+   * owner takes effect immediately and unilaterally (no acceptance required);
+   * the previous owner loses owner authority at once. Authorized in the handler
+   * for the agent's current owner or a workspace admin; like UpdateAgent this
+   * RPC carries no permission annotation (agents.edit is admin-only) and is
+   * handler-gated via canEditAgent.
+   *
+   * @generated from rpc laelia.v1.AgentService.TransferAgentOwnership
+   */
+  transferAgentOwnership: {
+    methodKind: "unary";
+    input: typeof TransferAgentOwnershipRequestSchema;
+    output: typeof TransferAgentOwnershipResponseSchema;
   },
   /**
    * @generated from rpc laelia.v1.AgentService.DeleteAgent

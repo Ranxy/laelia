@@ -9854,6 +9854,12 @@ type BeginSessionResponse struct {
 	// it into its system prompt so it knows who it is and can recognize its own
 	// messages and @mentions of itself.
 	AgentDisplayName string `protobuf:"bytes,3,opt,name=agent_display_name,json=agentDisplayName,proto3" json:"agent_display_name,omitempty"`
+	// owner_display_name is the agent's owner's display name, sourced from the
+	// manager (the source of truth for ownership). The agent client injects it into
+	// its system prompt (the Ownership & Safety section) so the agent knows whom to
+	// DM for approval of high-risk requests from non-owners. Empty for legacy
+	// agents with no recorded owner.
+	OwnerDisplayName string `protobuf:"bytes,4,opt,name=owner_display_name,json=ownerDisplayName,proto3" json:"owner_display_name,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -9905,6 +9911,13 @@ func (x *BeginSessionResponse) GetIdle() bool {
 func (x *BeginSessionResponse) GetAgentDisplayName() string {
 	if x != nil {
 		return x.AgentDisplayName
+	}
+	return ""
+}
+
+func (x *BeginSessionResponse) GetOwnerDisplayName() string {
+	if x != nil {
+		return x.OwnerDisplayName
 	}
 	return ""
 }
@@ -10811,12 +10824,13 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x10conversation_ids\x18\x01 \x03(\tR\x0fconversationIds\x12\x1a\n" +
 	"\bversions\x18\x02 \x03(\x03R\bversions\x123\n" +
 	"\x16thread_root_message_id\x18\x03 \x01(\tR\x13threadRootMessageId\"\x0e\n" +
-	"\fBeginSession\"w\n" +
+	"\fBeginSession\"\xa5\x01\n" +
 	"\x14BeginSessionResponse\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12\x12\n" +
 	"\x04idle\x18\x02 \x01(\bR\x04idle\x12,\n" +
-	"\x12agent_display_name\x18\x03 \x01(\tR\x10agentDisplayName\"F\n" +
+	"\x12agent_display_name\x18\x03 \x01(\tR\x10agentDisplayName\x12,\n" +
+	"\x12owner_display_name\x18\x04 \x01(\tR\x10ownerDisplayName\"F\n" +
 	" FetchConversationActivityRequest\x12\"\n" +
 	"\fconversation\x18\x01 \x01(\tR\fconversation\"]\n" +
 	"!FetchConversationActivityResponse\x128\n" +

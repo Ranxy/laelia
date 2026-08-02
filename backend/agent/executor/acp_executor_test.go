@@ -302,7 +302,7 @@ func TestACPSessionUpdateSkipsUsageDuringReplay(t *testing.T) {
 func TestACPTurnPromptText_ReanchorOnWarmTurn(t *testing.T) {
 	exec := &ACPExecutor{request: Request{
 		TurnPrompt:     "New messages received:\n\nwork",
-		ReanchorPrompt: BuildReanchorPrompt("alice"),
+		ReanchorPrompt: BuildReanchorPrompt("alice", ""),
 	}}
 	got := exec.turnPromptText(true)
 	assert.Contains(t, got, "Re-anchor (context compaction recovery)")
@@ -315,7 +315,7 @@ func TestACPTurnPromptText_ColdTurnIgnoresReanchor(t *testing.T) {
 	exec := &ACPExecutor{
 		request: Request{
 			TurnPrompt:       "batch",
-			ReanchorPrompt:   BuildReanchorPrompt("alice"),
+			ReanchorPrompt:   BuildReanchorPrompt("alice", ""),
 			AgentDisplayName: "alice",
 		},
 		config: &ACPConfig{},

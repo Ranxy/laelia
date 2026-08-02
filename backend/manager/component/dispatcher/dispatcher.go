@@ -600,7 +600,20 @@ func (d *Dispatcher) HandleBeginSession(ctx context.Context, agentID int) (*v1pb
 	}
 
 	slog.Info("agent session begun", "commandID", cmd.ID, "agentID", agentID)
-	return &v1pb.BeginSessionResponse{CommandId: cmd.ID.String(), AgentDisplayName: agent.Name}, nil
+
+	// Resolve the owner display name (empty for legacy agents with no owner) so
+	// the agent client can inject it into the init/re-anchor prompt's Ownership &
+	// Safety section. Sourced fresh each session so an ownership transfer takes
+	// effect on the next drain turn.
+	ownerDisplayName := ""
+	if agent.OwnerID != 0 {
+		if owner, err := d.store.GetUserByID(ctx, agent.OwnerID); err == nil && owner != nil {
+			ownerDisplayName = owner.Name
+		} else if err != nil {
+			slog.Warn("failed to resolve agent owner", "agent", agent.ResourceID, "ownerID", agent.OwnerID, "error", err)
+		}
+	}
+	return &v1pb.BeginSessionResponse{CommandId: cmd.ID.String(), AgentDisplayName: agent.Name, OwnerDisplayName: ownerDisplayName}, nil
 }
 
 // NotifyNewMessages pushes a NewMessagesAvailable hint to a connected agent so

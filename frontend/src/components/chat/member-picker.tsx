@@ -109,7 +109,7 @@ export function MemberPicker({
         (a) =>
           a.allowAddToChannel ||
           isAdmin ||
-          (!!a.createdBy && a.createdBy === currentUser?.name)
+          (!!a.owner && a.owner === currentUser?.name)
       )
       .map(agentOption)
       .filter(

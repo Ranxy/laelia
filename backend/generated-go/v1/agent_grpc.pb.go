@@ -20,26 +20,27 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AgentService_CreateAgent_FullMethodName           = "/laelia.v1.AgentService/CreateAgent"
-	AgentService_ListAgents_FullMethodName            = "/laelia.v1.AgentService/ListAgents"
-	AgentService_GetAgent_FullMethodName              = "/laelia.v1.AgentService/GetAgent"
-	AgentService_UpdateAgent_FullMethodName           = "/laelia.v1.AgentService/UpdateAgent"
-	AgentService_DeleteAgent_FullMethodName           = "/laelia.v1.AgentService/DeleteAgent"
-	AgentService_RotateAgentToken_FullMethodName      = "/laelia.v1.AgentService/RotateAgentToken"
-	AgentService_RevokeAgentToken_FullMethodName      = "/laelia.v1.AgentService/RevokeAgentToken"
-	AgentService_ForceDisconnectAgent_FullMethodName  = "/laelia.v1.AgentService/ForceDisconnectAgent"
-	AgentService_ListAgentSessions_FullMethodName     = "/laelia.v1.AgentService/ListAgentSessions"
-	AgentService_UpdateAgentACPConfig_FullMethodName  = "/laelia.v1.AgentService/UpdateAgentACPConfig"
-	AgentService_RefreshAgentProviders_FullMethodName = "/laelia.v1.AgentService/RefreshAgentProviders"
-	AgentService_ListPiModels_FullMethodName          = "/laelia.v1.AgentService/ListPiModels"
-	AgentService_ConnectAgent_FullMethodName          = "/laelia.v1.AgentService/ConnectAgent"
-	AgentService_AgentHeartbeat_FullMethodName        = "/laelia.v1.AgentService/AgentHeartbeat"
-	AgentService_AgentDisconnect_FullMethodName       = "/laelia.v1.AgentService/AgentDisconnect"
-	AgentService_RefreshAgentToken_FullMethodName     = "/laelia.v1.AgentService/RefreshAgentToken"
-	AgentService_UploadAgentAvatar_FullMethodName     = "/laelia.v1.AgentService/UploadAgentAvatar"
-	AgentService_DownloadAgentAvatar_FullMethodName   = "/laelia.v1.AgentService/DownloadAgentAvatar"
-	AgentService_DeleteAgentAvatar_FullMethodName     = "/laelia.v1.AgentService/DeleteAgentAvatar"
-	AgentService_Hello_FullMethodName                 = "/laelia.v1.AgentService/Hello"
+	AgentService_CreateAgent_FullMethodName            = "/laelia.v1.AgentService/CreateAgent"
+	AgentService_ListAgents_FullMethodName             = "/laelia.v1.AgentService/ListAgents"
+	AgentService_GetAgent_FullMethodName               = "/laelia.v1.AgentService/GetAgent"
+	AgentService_UpdateAgent_FullMethodName            = "/laelia.v1.AgentService/UpdateAgent"
+	AgentService_TransferAgentOwnership_FullMethodName = "/laelia.v1.AgentService/TransferAgentOwnership"
+	AgentService_DeleteAgent_FullMethodName            = "/laelia.v1.AgentService/DeleteAgent"
+	AgentService_RotateAgentToken_FullMethodName       = "/laelia.v1.AgentService/RotateAgentToken"
+	AgentService_RevokeAgentToken_FullMethodName       = "/laelia.v1.AgentService/RevokeAgentToken"
+	AgentService_ForceDisconnectAgent_FullMethodName   = "/laelia.v1.AgentService/ForceDisconnectAgent"
+	AgentService_ListAgentSessions_FullMethodName      = "/laelia.v1.AgentService/ListAgentSessions"
+	AgentService_UpdateAgentACPConfig_FullMethodName   = "/laelia.v1.AgentService/UpdateAgentACPConfig"
+	AgentService_RefreshAgentProviders_FullMethodName  = "/laelia.v1.AgentService/RefreshAgentProviders"
+	AgentService_ListPiModels_FullMethodName           = "/laelia.v1.AgentService/ListPiModels"
+	AgentService_ConnectAgent_FullMethodName           = "/laelia.v1.AgentService/ConnectAgent"
+	AgentService_AgentHeartbeat_FullMethodName         = "/laelia.v1.AgentService/AgentHeartbeat"
+	AgentService_AgentDisconnect_FullMethodName        = "/laelia.v1.AgentService/AgentDisconnect"
+	AgentService_RefreshAgentToken_FullMethodName      = "/laelia.v1.AgentService/RefreshAgentToken"
+	AgentService_UploadAgentAvatar_FullMethodName      = "/laelia.v1.AgentService/UploadAgentAvatar"
+	AgentService_DownloadAgentAvatar_FullMethodName    = "/laelia.v1.AgentService/DownloadAgentAvatar"
+	AgentService_DeleteAgentAvatar_FullMethodName      = "/laelia.v1.AgentService/DeleteAgentAvatar"
+	AgentService_Hello_FullMethodName                  = "/laelia.v1.AgentService/Hello"
 )
 
 // AgentServiceClient is the client API for AgentService service.
@@ -51,10 +52,17 @@ type AgentServiceClient interface {
 	GetAgent(ctx context.Context, in *GetAgentRequest, opts ...grpc.CallOption) (*Agent, error)
 	// UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
 	// is supported initially (any other update_mask path is rejected). Authorized
-	// in the handler for the agent's creator or a workspace admin; the IAM
+	// in the handler for the agent's owner or a workspace admin; the IAM
 	// interceptor's agents.edit is admin-only, so this RPC carries no permission
 	// annotation and is handler-gated.
 	UpdateAgent(ctx context.Context, in *UpdateAgentRequest, opts ...grpc.CallOption) (*Agent, error)
+	// TransferAgentOwnership reassigns the agent's owner to another user. The new
+	// owner takes effect immediately and unilaterally (no acceptance required);
+	// the previous owner loses owner authority at once. Authorized in the handler
+	// for the agent's current owner or a workspace admin; like UpdateAgent this
+	// RPC carries no permission annotation (agents.edit is admin-only) and is
+	// handler-gated via canEditAgent.
+	TransferAgentOwnership(ctx context.Context, in *TransferAgentOwnershipRequest, opts ...grpc.CallOption) (*TransferAgentOwnershipResponse, error)
 	DeleteAgent(ctx context.Context, in *DeleteAgentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Token rotation: generate a new bootstrap token, old token invalid after grace period
 	RotateAgentToken(ctx context.Context, in *RotateAgentTokenRequest, opts ...grpc.CallOption) (*RotateAgentTokenResponse, error)
@@ -140,6 +148,16 @@ func (c *agentServiceClient) UpdateAgent(ctx context.Context, in *UpdateAgentReq
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Agent)
 	err := c.cc.Invoke(ctx, AgentService_UpdateAgent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentServiceClient) TransferAgentOwnership(ctx context.Context, in *TransferAgentOwnershipRequest, opts ...grpc.CallOption) (*TransferAgentOwnershipResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TransferAgentOwnershipResponse)
+	err := c.cc.Invoke(ctx, AgentService_TransferAgentOwnership_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -315,10 +333,17 @@ type AgentServiceServer interface {
 	GetAgent(context.Context, *GetAgentRequest) (*Agent, error)
 	// UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
 	// is supported initially (any other update_mask path is rejected). Authorized
-	// in the handler for the agent's creator or a workspace admin; the IAM
+	// in the handler for the agent's owner or a workspace admin; the IAM
 	// interceptor's agents.edit is admin-only, so this RPC carries no permission
 	// annotation and is handler-gated.
 	UpdateAgent(context.Context, *UpdateAgentRequest) (*Agent, error)
+	// TransferAgentOwnership reassigns the agent's owner to another user. The new
+	// owner takes effect immediately and unilaterally (no acceptance required);
+	// the previous owner loses owner authority at once. Authorized in the handler
+	// for the agent's current owner or a workspace admin; like UpdateAgent this
+	// RPC carries no permission annotation (agents.edit is admin-only) and is
+	// handler-gated via canEditAgent.
+	TransferAgentOwnership(context.Context, *TransferAgentOwnershipRequest) (*TransferAgentOwnershipResponse, error)
 	DeleteAgent(context.Context, *DeleteAgentRequest) (*emptypb.Empty, error)
 	// Token rotation: generate a new bootstrap token, old token invalid after grace period
 	RotateAgentToken(context.Context, *RotateAgentTokenRequest) (*RotateAgentTokenResponse, error)
@@ -381,6 +406,9 @@ func (UnimplementedAgentServiceServer) GetAgent(context.Context, *GetAgentReques
 }
 func (UnimplementedAgentServiceServer) UpdateAgent(context.Context, *UpdateAgentRequest) (*Agent, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateAgent not implemented")
+}
+func (UnimplementedAgentServiceServer) TransferAgentOwnership(context.Context, *TransferAgentOwnershipRequest) (*TransferAgentOwnershipResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TransferAgentOwnership not implemented")
 }
 func (UnimplementedAgentServiceServer) DeleteAgent(context.Context, *DeleteAgentRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteAgent not implemented")
@@ -519,6 +547,24 @@ func _AgentService_UpdateAgent_Handler(srv interface{}, ctx context.Context, dec
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AgentServiceServer).UpdateAgent(ctx, req.(*UpdateAgentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AgentService_TransferAgentOwnership_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TransferAgentOwnershipRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).TransferAgentOwnership(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_TransferAgentOwnership_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).TransferAgentOwnership(ctx, req.(*TransferAgentOwnershipRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -833,6 +879,10 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateAgent",
 			Handler:    _AgentService_UpdateAgent_Handler,
+		},
+		{
+			MethodName: "TransferAgentOwnership",
+			Handler:    _AgentService_TransferAgentOwnership_Handler,
 		},
 		{
 			MethodName: "DeleteAgent",
