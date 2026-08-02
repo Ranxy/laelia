@@ -1,0 +1,189 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "v1/annotation.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+// Group is a named collection of users that can be bound in IAM policies
+// (workspace, agent, and conversation bindings accept groups/{email} members).
+// The IAM engine expands a group's members at authorization time.
+message Group {
+  option (google.api.resource) = {
+    type: "laelia/Group"
+    pattern: "groups/{group}"
+  };
+
+  // The resource name of the group, in the form `groups/{email}`.
+  string name = 1 [
+    (google.api.field_behavior) = IDENTIFIER,
+    (google.api.field_behavior) = REQUIRED
+  ];
+
+  // The group email, e.g. "eng@example.com".
+  string email = 2 [(google.api.field_behavior) = IMMUTABLE];
+
+  // Human-readable title.
+  string title = 3;
+
+  // Longer description of the group.
+  string description = 4;
+
+  // The group's members. Each member is a user resource name ("users/{uid}")
+  // with a role: OWNER (may manage the group) or MEMBER.
+  repeated GroupMember members = 5;
+
+  // Output only. When non-empty, the group is synced from an external source
+  // (e.g. SCIM) and is read-only over this API.
+  string source = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message GroupMember {
+  // The member's user resource name, in the form `users/{uid}`.
+  string member = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/User"}
+  ];
+
+  // The member's role in the group.
+  GroupMemberRole role = 2;
+}
+
+enum GroupMemberRole {
+  GROUP_MEMBER_ROLE_UNSPECIFIED = 0;
+  // Owners manage the group (update/delete) without workspace-level group
+  // permissions.
+  OWNER = 1;
+  MEMBER = 2;
+}
+
+message GetGroupRequest {
+  // The group resource name, in the form `groups/{email}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Group"}
+  ];
+}
+
+message BatchGetGroupsRequest {
+  // The group resource names, in the form `groups/{email}`.
+  repeated string names = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Group"}
+  ];
+}
+
+message BatchGetGroupsResponse {
+  repeated Group groups = 1;
+}
+
+message ListGroupsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+
+  // Filter is used to filter groups returned in the list. Supported fields:
+  // - title: equality on the group title.
+  // - email: equality on the group email.
+  // Example: title == "Engineering"
+  string filter = 3;
+}
+
+message ListGroupsResponse {
+  repeated Group groups = 1;
+  string next_page_token = 2;
+}
+
+message CreateGroupRequest {
+  // The group email, e.g. "eng@example.com".
+  string group_email = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The group to create. The name field is ignored (the email is taken from
+  // group_email); title and members are required.
+  Group group = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateGroupRequest {
+  // The group to update. The `name` field identifies the group.
+  Group group = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The list of fields to update: "title", "description", "members".
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteGroupRequest {
+  // The group resource name, in the form `groups/{email}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Group"}
+  ];
+}
+
+// GroupService manages user groups. Groups are bindable in IAM policies;
+// group owners can manage their own groups without workspace-level group
+// permissions. Groups synced from an external source (SCIM/IdP) are read-only.
+service GroupService {
+  // Get a group. Group members and callers holding laelia.groups.get can read.
+  rpc GetGroup(GetGroupRequest) returns (Group) {
+    option (google.api.http) = {get: "/v1/{name=groups/*}"};
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.groups.get";
+  }
+
+  // Batch get groups.
+  rpc BatchGetGroups(BatchGetGroupsRequest) returns (BatchGetGroupsResponse) {
+    option (google.api.http) = {get: "/v1/groups:batchGet"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.groups.get";
+  }
+
+  // List all groups.
+  rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse) {
+    option (google.api.http) = {get: "/v1/groups"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.groups.list";
+  }
+
+  // Create a group. Any authenticated member can create a group; the creator
+  // is not automatically added (the request must carry at least one OWNER).
+  rpc CreateGroup(CreateGroupRequest) returns (Group) {
+    option (google.api.http) = {
+      post: "/v1/groups"
+      body: "*"
+    };
+    option (google.api.method_signature) = "group_email,group";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.groups.create";
+    option (laelia.v1.audit) = true;
+  }
+
+  // Update a group (title, description, members). The group owner or a caller
+  // holding laelia.groups.update may update.
+  rpc UpdateGroup(UpdateGroupRequest) returns (Group) {
+    option (google.api.http) = {
+      patch: "/v1/{group.name=groups/*}"
+      body: "group"
+    };
+    option (google.api.method_signature) = "group,update_mask";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.groups.update";
+    option (laelia.v1.audit) = true;
+  }
+
+  // Delete a group. The group owner or a caller holding laelia.groups.delete
+  // may delete. Existing IAM bindings referencing the group become no-ops.
+  rpc DeleteGroup(DeleteGroupRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/{name=groups/*}"};
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.groups.delete";
+    option (laelia.v1.audit) = true;
+  }
+}

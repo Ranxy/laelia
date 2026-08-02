@@ -205,7 +205,7 @@ func (s *Store) ListSubscribedThreadUpdates(ctx context.Context, agentID int) ([
 		JOIN chat_message r ON r.id = tp.thread_root_message_id
 		JOIN chat_message rep ON rep.thread_root_message_id = r.id
 		JOIN conversation cv ON cv.id = r.conversation_id
-		JOIN conversation_member cm
+		JOIN conversation_member_meta cm
 		  ON cm.conversation_id = r.conversation_id
 		 AND cm.member_type = $2
 		 AND cm.member_id = (SELECT resource_id FROM agent WHERE id = $1)

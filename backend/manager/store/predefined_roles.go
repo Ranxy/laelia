@@ -4,19 +4,17 @@ import "github.com/Ranxy/laelia/backend/common/permission"
 
 // Well-known role identifiers. Only WorkspaceAdminRole and WorkspaceMemberRole
 // are predefined roles (defined in Go, read-only over the API, resolvable
-// in-memory). The conversation* identifiers are chat-membership markers (not
-// IAM roles) used by component/iam.chatRolePermissions and rejected as IAM
-// bindings by the iam_service handler. The agentEditor / reviewer identifiers
-// are retained as constants for reference but are no longer predefined roles.
+// in-memory). The conversation* identifiers are the conversation-scope IAM
+// roles stored in conversation IAM policies (resource_type=CONVERSATION); they
+// are mapped to permission sets by component/iam.conversationRolePermissions
+// and rejected as bindings on workspace/agent policies by the iam_service
+// handler.
 const (
 	WorkspaceAdminRole     = "workspaceAdmin"
 	WorkspaceMemberRole    = "workspaceMember"
 	ConversationMemberRole = "conversationMember"
 	ConversationAdminRole  = "conversationAdmin"
 	ConversationOwnerRole  = "conversationOwner"
-	AgentEditorRole        = "agentEditor"
-	AgentDMReviewerRole    = "agentDMReviewer"
-	OversightReviewerRole  = "oversightReviewer"
 )
 
 func permissionSet(perms ...permission.Permission) map[permission.Permission]bool {
@@ -63,6 +61,9 @@ var memberBaselinePermissions = permissionSet(
 	permission.PushSubscriptionsCreate,
 	permission.PushSubscriptionsDelete,
 	permission.FilesUpload,
+	permission.GroupsGet,
+	permission.GroupsList,
+	permission.GroupsCreate,
 )
 
 // PredefinedRoles are the read-only, Go-defined roles shown on the management

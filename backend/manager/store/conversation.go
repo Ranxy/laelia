@@ -12,6 +12,9 @@ import (
 	"github.com/Ranxy/laelia/backend/common"
 )
 
+// ErrConversationNotFound is returned by GetConversation when no row exists.
+var ErrConversationNotFound = errors.New("conversation not found")
+
 // Conversation type values, mirrored by the laelia.v1.ConversationType enum.
 // 1 = DM (one user + one agent), 2 = channel (many members), 3 = AGENT_DM
 // (exactly two agents, no users; owner of record is the SYSTEM_BOT principal),
@@ -96,6 +99,7 @@ func (s *Store) GetOrCreateDirectConversation(ctx context.Context, agentID, prin
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.invalidateConversationPolicyCache(newConv.ID)
 
 	// Seed the agent's per-channel cursor to the new conversation's version so
 	// it starts caught up and only sees future messages. Seeding only on the
@@ -214,6 +218,7 @@ func (s *Store) GetOrCreateAgentDM(ctx context.Context, agentAID, agentBID int) 
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.invalidateConversationPolicyCache(newConv.ID)
 
 	// Seed both agents' cursors to the new conversation's version so they start
 	// caught up and only see future messages. Seeding only on the create path
@@ -314,6 +319,7 @@ func (s *Store) GetOrCreateUserUserDM(ctx context.Context, callerID, peerID int)
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.invalidateConversationPolicyCache(newConv.ID)
 
 	// Seed both users' read cursors to the new conversation's version so they
 	// start caught up and only see future messages. Seeding only on the create
@@ -362,7 +368,7 @@ func (s *Store) GetConversation(ctx context.Context, id uuid.UUID) (*Conversatio
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errors.Errorf("conversation %s not found", id)
+			return nil, errors.Wrapf(ErrConversationNotFound, "conversation %s", id)
 		}
 		return nil, errors.Wrapf(err, "failed to get conversation")
 	}
@@ -402,6 +408,7 @@ func (s *Store) CreateChannel(ctx context.Context, title string, ownerID int) (*
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.invalidateConversationPolicyCache(conv.ID)
 
 	return &conv, nil
 }
@@ -436,7 +443,7 @@ func (s *Store) ListUserConversations(ctx context.Context, principalID int, limi
 	rows, err := s.GetDB().QueryContext(ctx, `
 		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version
 		FROM conversation c
-		JOIN conversation_member cm ON cm.conversation_id = c.id
+		JOIN conversation_member_meta cm ON cm.conversation_id = c.id
 		WHERE cm.member_type = $1 AND cm.member_id = $2
 		ORDER BY c.updated_at DESC
 		LIMIT $3 OFFSET $4
@@ -467,7 +474,7 @@ type UserConversation struct {
 	Conversation ConversationMessage
 	UnreadCount  int32
 	// Pinned/PinnedAt are the requesting user's per-conversation pin state from
-	// conversation_member. Pinned items sort to the top of the list; PinnedAt
+	// conversation_member_meta. Pinned items sort to the top of the list; PinnedAt
 	// orders the pinned group (most-recently-pinned first), independent of
 	// Conversation.UpdatedAt so pinned items don't drift as new messages arrive.
 	Pinned   bool
@@ -499,7 +506,7 @@ func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID
 		       ), 0),
 		       cm.pinned, cm.pinned_at
 		FROM conversation c
-		JOIN conversation_member cm ON cm.conversation_id = c.id
+		JOIN conversation_member_meta cm ON cm.conversation_id = c.id
 		LEFT JOIN user_channel_cursor ucc ON ucc.principal_id = $3 AND ucc.conversation_id = c.id
 		WHERE cm.member_type = $1 AND cm.member_id = $2
 		ORDER BY cm.pinned DESC, cm.pinned_at DESC NULLS LAST, c.updated_at DESC
@@ -532,7 +539,8 @@ func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID
 
 // ListAgentConversations returns every conversation the given agent is a member
 // of, ordered by updated_at DESC. It mirrors ListUserConversationsWithUnread but
-// binds conversation_member to MemberTypeAgent + the agent's resource_id string
+// binds conversation_member_meta to MemberTypeAgent + the agent's resource_id
+// string
 // (which is how agent memberships are stored, see findDirectConversation).
 //
 // When viewer is non-nil, results are further restricted to conversations the
@@ -547,10 +555,10 @@ func (s *Store) ListAgentConversations(ctx context.Context, agentResourceID stri
 	query := `
 		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version
 		FROM conversation c
-		JOIN conversation_member cm ON cm.conversation_id = c.id
+		JOIN conversation_member_meta cm ON cm.conversation_id = c.id
 		WHERE cm.member_type = $1 AND cm.member_id = $2`
 	if viewer != nil {
-		query += ` AND EXISTS (SELECT 1 FROM conversation_member cmv WHERE cmv.conversation_id = c.id AND cmv.member_type = $3 AND cmv.member_id = $4)`
+		query += ` AND EXISTS (SELECT 1 FROM conversation_member_meta cmv WHERE cmv.conversation_id = c.id AND cmv.member_type = $3 AND cmv.member_id = $4)`
 		args = append(args, viewer.MemberType, viewer.MemberID)
 	}
 	args = append(args, limit, offset)
@@ -583,7 +591,7 @@ func (s *Store) ListAgentConversations(ctx context.Context, agentResourceID stri
 func (s *Store) GetConversationMemberCount(ctx context.Context, id uuid.UUID) (int, error) {
 	var count int
 	err := s.GetDB().QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM conversation_member WHERE conversation_id = $1
+		SELECT COUNT(*) FROM conversation_member_meta WHERE conversation_id = $1
 	`, id).Scan(&count)
 	if err != nil {
 		return 0, errors.Wrapf(err, "failed to get member count")

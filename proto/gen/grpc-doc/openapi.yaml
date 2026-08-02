@@ -2254,6 +2254,186 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/groups:
+        get:
+            tags:
+                - GroupService
+            description: List all groups.
+            operationId: GroupService_ListGroups
+            parameters:
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+                - name: filter
+                  in: query
+                  description: |-
+                    Filter is used to filter groups returned in the list. Supported fields:
+                     - title: equality on the group title.
+                     - email: equality on the group email.
+                     Example: title == "Engineering"
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListGroupsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - GroupService
+            description: |-
+                Create a group. Any authenticated member can create a group; the creator
+                 is not automatically added (the request must carry at least one OWNER).
+            operationId: GroupService_CreateGroup
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/CreateGroupRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Group'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/groups/{group}:
+        get:
+            tags:
+                - GroupService
+            description: Get a group. Group members and callers holding laelia.groups.get can read.
+            operationId: GroupService_GetGroup
+            parameters:
+                - name: group
+                  in: path
+                  description: The group id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Group'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        delete:
+            tags:
+                - GroupService
+            description: |-
+                Delete a group. The group owner or a caller holding laelia.groups.delete
+                 may delete. Existing IAM bindings referencing the group become no-ops.
+            operationId: GroupService_DeleteGroup
+            parameters:
+                - name: group
+                  in: path
+                  description: The group id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - GroupService
+            description: |-
+                Update a group (title, description, members). The group owner or a caller
+                 holding laelia.groups.update may update.
+            operationId: GroupService_UpdateGroup
+            parameters:
+                - name: group
+                  in: path
+                  description: The group id.
+                  required: true
+                  schema:
+                    type: string
+                - name: updateMask
+                  in: query
+                  description: 'The list of fields to update: "title", "description", "members".'
+                  schema:
+                    type: string
+                    format: field-mask
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/Group'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Group'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/groups:batchGet:
+        get:
+            tags:
+                - GroupService
+            description: Batch get groups.
+            operationId: GroupService_BatchGetGroups
+            parameters:
+                - name: names
+                  in: query
+                  description: The group resource names, in the form `groups/{email}`.
+                  schema:
+                    type: array
+                    items:
+                        type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BatchGetGroupsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/machines:
         get:
             tags:
@@ -4137,6 +4317,13 @@ components:
                  comment anchoring a span of a file (e.g. a markdown section) rather than a
                  whole-file upload. They are caller-supplied (the file row is not their
                  source of truth) and left empty for ordinary whole-file attachments.
+        BatchGetGroupsResponse:
+            type: object
+            properties:
+                groups:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Group'
         BatchGetUsersResponse:
             type: object
             properties:
@@ -4753,6 +4940,21 @@ components:
             properties:
                 title:
                     type: string
+        CreateGroupRequest:
+            required:
+                - groupEmail
+                - group
+            type: object
+            properties:
+                groupEmail:
+                    type: string
+                    description: The group email, e.g. "eng@example.com".
+                group:
+                    allOf:
+                        - $ref: '#/components/schemas/Group'
+                    description: |-
+                        The group to create. The name field is ignored (the email is taken from
+                         group_email); title and members are required.
         CreateMachineResponse:
             type: object
             properties:
@@ -5023,6 +5225,56 @@ components:
                     description: The type of the serialized message.
             additionalProperties: true
             description: Contains an arbitrary serialized message along with a @type that describes the type of the serialized message.
+        Group:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: The resource name of the group, in the form `groups/{email}`.
+                email:
+                    type: string
+                    description: The group email, e.g. "eng@example.com".
+                title:
+                    type: string
+                    description: Human-readable title.
+                description:
+                    type: string
+                    description: Longer description of the group.
+                members:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/GroupMember'
+                    description: |-
+                        The group's members. Each member is a user resource name ("users/{uid}")
+                         with a role: OWNER (may manage the group) or MEMBER.
+                source:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        Output only. When non-empty, the group is synced from an external source
+                         (e.g. SCIM) and is read-only over this API.
+            description: |-
+                Group is a named collection of users that can be bound in IAM policies
+                 (workspace, agent, and conversation bindings accept groups/{email} members).
+                 The IAM engine expands a group's members at authorization time.
+        GroupMember:
+            required:
+                - member
+            type: object
+            properties:
+                member:
+                    type: string
+                    description: The member's user resource name, in the form `users/{uid}`.
+                role:
+                    enum:
+                        - GROUP_MEMBER_ROLE_UNSPECIFIED
+                        - OWNER
+                        - MEMBER
+                    type: string
+                    description: The member's role in the group.
+                    format: enum
         HelloRequest:
             type: object
             properties: {}
@@ -5174,6 +5426,15 @@ components:
                         reminders are the DUE reminders owned by the calling agent, ordered by
                          fire_at ascending. The agent drain loop calls this each session to pick up
                          fired reminders and process them.
+        ListGroupsResponse:
+            type: object
+            properties:
+                groups:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Group'
+                nextPageToken:
+                    type: string
         ListMachineAgentsResponse:
             type: object
             properties:
@@ -6421,6 +6682,11 @@ tags:
     - name: AgentService
     - name: AuthService
     - name: CommandService
+    - name: GroupService
+      description: |-
+        GroupService manages user groups. Groups are bindable in IAM policies;
+         group owners can manage their own groups without workspace-level group
+         permissions. Groups synced from an external source (SCIM/IdP) are read-only.
     - name: IamService
       description: |-
         IamService exposes the workspace and per-agent IAM policies for management.

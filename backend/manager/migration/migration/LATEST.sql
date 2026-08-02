@@ -385,10 +385,17 @@ CREATE TABLE conversation (
 
 CREATE UNIQUE INDEX idx_conversation_agent_principal ON conversation(agent_id, created_by, type);
 
-CREATE TABLE conversation_member (
+-- conversation_member_meta is the relational read index and per-user UI
+-- metadata (join time, pinning) for conversation membership. Authorization
+-- lives in the conversation IAM policy (policy table, resource_type=
+-- CONVERSATION); every membership write touches both in one transaction.
+CREATE TABLE conversation_member_meta (
     conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
     member_type SMALLINT NOT NULL,
     member_id TEXT NOT NULL,
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    pinned BOOLEAN NOT NULL DEFAULT FALSE,
+    pinned_at TIMESTAMPTZ,
     PRIMARY KEY (conversation_id, member_type, member_id)
 );
 
@@ -433,15 +440,16 @@ ALTER TABLE conversation ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NUL
 UPDATE conversation SET owner_id = created_by WHERE owner_id IS NULL;
 ALTER TABLE conversation ALTER COLUMN owner_id SET NOT NULL;
 
--- 3. Drop old unique constraint (channel membership is tracked through conversation_member)
+-- 3. Drop old unique constraint (channel membership is tracked through the
+-- conversation IAM policy + conversation_member_meta index)
 DROP INDEX IF EXISTS idx_conversation_agent_principal;
 
--- 4. Populate conversation_member for existing direct conversations
-INSERT INTO conversation_member (conversation_id, member_type, member_id)
+-- 4. Populate conversation_member_meta for existing direct conversations
+INSERT INTO conversation_member_meta (conversation_id, member_type, member_id)
 SELECT id, 1, created_by::TEXT FROM conversation WHERE type = 1
 ON CONFLICT (conversation_id, member_type, member_id) DO NOTHING;
 
-INSERT INTO conversation_member (conversation_id, member_type, member_id)
+INSERT INTO conversation_member_meta (conversation_id, member_type, member_id)
 SELECT c.id, 2, a.resource_id
 FROM conversation c
 JOIN agent a ON a.id = c.agent_id
@@ -451,18 +459,8 @@ ON CONFLICT (conversation_id, member_type, member_id) DO NOTHING;
 -- 5. Add sender_agent_id to chat_message (distinguishes agent-sent messages)
 ALTER TABLE chat_message ADD COLUMN IF NOT EXISTS sender_agent_id INTEGER REFERENCES agent(id);
 
--- 6. Add joined_at and member_role to conversation_member
-ALTER TABLE conversation_member ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ NOT NULL DEFAULT now();
-ALTER TABLE conversation_member ADD COLUMN IF NOT EXISTS member_role SMALLINT NOT NULL DEFAULT 2;
-
--- 7. Add per-user pinned/pinned_at to conversation_member so a user can pin a
--- channel or DM to the top of their left-rail list. Per-(user,conversation) by
--- the table's PK; pinned_at drives stable ordering within the pinned group.
-ALTER TABLE conversation_member ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE conversation_member ADD COLUMN IF NOT EXISTS pinned_at TIMESTAMPTZ;
-
 CREATE INDEX IF NOT EXISTS idx_chat_message_sender_agent ON chat_message(sender_agent_id) WHERE sender_agent_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_conversation_member_lookup ON conversation_member(member_type, member_id);
+CREATE INDEX IF NOT EXISTS idx_conversation_member_meta_lookup ON conversation_member_meta(member_type, member_id);
 
 -- === Phase 1: Message-Driven Architecture ===
 -- Room version control: conversation.version increments on every new
@@ -621,7 +619,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_message_thread_root
 -- is subscribed once it is @mentioned in a thread reply or it posts a reply
 -- itself; thereafter every new reply in that thread wakes the agent (even
 -- without a fresh @mention). This table is only for agent wake routing;
--- thread access control still uses conversation_member.
+-- thread access control still uses the conversation IAM policy.
 CREATE TABLE IF NOT EXISTS thread_participant (
     thread_root_message_id UUID NOT NULL REFERENCES chat_message(id) ON DELETE CASCADE,
     agent_id INTEGER NOT NULL REFERENCES agent(id) ON DELETE CASCADE,
@@ -724,7 +722,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_agent_dm_unique
 -- === User-to-user DM (conversation type 4 = USER_DM) ===
 -- A type-4 conversation is a private 1:1 DM between exactly two users (no
 -- agents). The initiator (caller) is the owner of record; both users are
--- conversation_member rows. user_dm_a/user_dm_b carry the ordered (a < b)
+-- conversation policy members. user_dm_a/user_dm_b carry the ordered (a < b)
 -- pair of principal.id values for race-free dedup via a partial unique index,
 -- mirroring idx_conversation_agent_dm_unique for type-3 agent DMs. NULL for
 -- type 1/2/3. type: 1=DM(user+agent), 2=channel, 3=AGENT_DM, 4=USER_DM.
@@ -787,7 +785,7 @@ CREATE INDEX IF NOT EXISTS idx_activity_user_conv_version
 -- user_thread_participant mirrors thread_participant (agent-only) for users. A
 -- user is subscribed to a thread when they are @mentioned in it or they post a
 -- reply in it; thereafter every new reply in that thread generates a THREAD
--- activity for that user. Access control still uses conversation_member.
+-- activity for that user. Access control still uses the conversation IAM policy.
 CREATE TABLE IF NOT EXISTS user_thread_participant (
     thread_root_message_id UUID NOT NULL REFERENCES chat_message(id) ON DELETE CASCADE,
     principal_id INTEGER NOT NULL REFERENCES principal(id) ON DELETE CASCADE,

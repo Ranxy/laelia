@@ -768,7 +768,7 @@ func (s *CommandService) SendMessage(ctx context.Context, req *connect.Request[v
 		// Agent-first: the manager never dispatches work on a user message. It
 		// only notifies every agent member of the conversation that new messages
 		// are available; each agent's autonomous drain loop then decides whether
-		// and how to respond. (Agents are conversation_member rows of their
+		// and how to respond. (Agents are conversation policy members of their
 		// direct conversations too, so this covers 1:1 chats.)
 		s.notifyConversationAgents(ctx, convID, msg.RoomVersion, nil)
 	}

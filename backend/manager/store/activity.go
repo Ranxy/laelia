@@ -473,7 +473,7 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 	// applies only to USER-sent messages: their PrincipalID is the sender's own
 	// principal id. An AGENT/SYSTEM message carries the conversation owner (or the
 	// system bot) as PrincipalID — NOT the agent sender — and the owner IS a
-	// conversation_member, so deleting by PrincipalID there would wrongly drop the
+	// conversation member, so deleting by PrincipalID there would wrongly drop the
 	// owner from TASK/REMINDER/THREAD activity for agent replies in their own
 	// conversations. The agent sender is never in the user sets above (only
 	// type=="user" mentions and user members/participants are), so there is nothing

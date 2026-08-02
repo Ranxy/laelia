@@ -76,11 +76,14 @@ type Policy_Resource int32
 const (
 	Policy_RESOURCE_UNSPECIFIED Policy_Resource = 0
 	Policy_WORKSPACE            Policy_Resource = 1
-	Policy_ENVIRONMENT          Policy_Resource = 2
-	Policy_PROJECT              Policy_Resource = 3
-	// CONVERSATION is a per-conversation IAM policy. Members/owners are
-	// expressed as bindings (roles/conversationMember, roles/conversationOwner)
-	// on conversations/{id}.
+	// ENVIRONMENT and PROJECT are reserved for a future multi-tenant
+	// workspace model; the IM permission model does not implement them.
+	Policy_ENVIRONMENT Policy_Resource = 2
+	Policy_PROJECT     Policy_Resource = 3
+	// CONVERSATION is the per-conversation IAM policy: the single source of
+	// truth for chat membership. Members/owners are expressed as bindings
+	// (roles/conversationMember, roles/conversationAdmin,
+	// roles/conversationOwner) on conversations/{id}.
 	Policy_CONVERSATION Policy_Resource = 4
 	// AGENT is a per-agent IAM policy. The agent's creator is bound to
 	// roles/agentEditor on agents/{resource_id}.

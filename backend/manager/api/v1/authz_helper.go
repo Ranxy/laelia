@@ -11,10 +11,10 @@ import (
 )
 
 // callerMemberInfo resolves the caller (user or agent) into the
-// (memberType, memberID) pair used by the conversation_member table. Agents are
-// members by their resource ID; users by their principal ID. Used by the IAM
-// engine's object branches and by the remaining owner-of-record handler
-// checks.
+// (memberType, memberID) pair used by conversation membership (the
+// conversation IAM policy and its meta index). Agents are members by their
+// resource ID; users by their principal ID. Used by the IAM engine's object
+// branches and by the remaining owner-of-record handler checks.
 func callerMemberInfo(user *store.UserMessage, agent *store.AgentMessage) (memberType int32, memberID string, ok bool) {
 	switch {
 	case user != nil:

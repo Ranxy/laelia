@@ -105,7 +105,7 @@ func (s *Store) ListChannelsWithUpdates(ctx context.Context, agentID int) ([]*Ch
 			           AND (`+agentRelevantMessageCondition+`)
 			       )
 			FROM conversation c
-			JOIN conversation_member cm
+			JOIN conversation_member_meta cm
 			  ON cm.conversation_id = c.id
 			 AND cm.member_type = $2
 			 AND cm.member_id = (SELECT resource_id FROM agent WHERE id = $1)
@@ -150,7 +150,7 @@ func (s *Store) HasUpdates(ctx context.Context, agentID int) (bool, error) {
 		SELECT EXISTS (
 			SELECT 1
 			FROM conversation c
-			JOIN conversation_member cm
+			JOIN conversation_member_meta cm
 			  ON cm.conversation_id = c.id
 			 AND cm.member_type = $2
 			 AND cm.member_id = (SELECT resource_id FROM agent WHERE id = $1)

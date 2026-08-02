@@ -175,7 +175,7 @@ func (s *Store) IsCommandConversationMember(ctx context.Context, commandID uuid.
 		SELECT EXISTS(
 			SELECT 1
 			FROM command_conversation cc
-			JOIN conversation_member cm ON cm.conversation_id = cc.conversation_id
+			JOIN conversation_member_meta cm ON cm.conversation_id = cc.conversation_id
 			WHERE cc.command_id = $1 AND cm.member_type = $2 AND cm.member_id = $3
 		)
 	`, commandID, memberType, memberID).Scan(&exists)

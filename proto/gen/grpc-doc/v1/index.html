@@ -1233,6 +1233,65 @@
         
           
           <li>
+            <a href="#v1%2fgroup_service.proto">v1/group_service.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.v1.BatchGetGroupsRequest"><span class="badge">M</span>BatchGetGroupsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.BatchGetGroupsResponse"><span class="badge">M</span>BatchGetGroupsResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.CreateGroupRequest"><span class="badge">M</span>CreateGroupRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DeleteGroupRequest"><span class="badge">M</span>DeleteGroupRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetGroupRequest"><span class="badge">M</span>GetGroupRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.Group"><span class="badge">M</span>Group</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GroupMember"><span class="badge">M</span>GroupMember</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListGroupsRequest"><span class="badge">M</span>ListGroupsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListGroupsResponse"><span class="badge">M</span>ListGroupsResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateGroupRequest"><span class="badge">M</span>UpdateGroupRequest</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#laelia.v1.GroupMemberRole"><span class="badge">E</span>GroupMemberRole</a>
+                </li>
+              
+              
+              
+                <li>
+                  <a href="#laelia.v1.GroupService"><span class="badge">S</span>GroupService</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
             <a href="#v1%2fiam_service.proto">v1/iam_service.proto</a>
             <ul>
               
@@ -12753,6 +12812,508 @@ user, hiding it from All and Unread. The caller&#39;s own id must own the row.</
                 <td>POST</td>
                 <td>/v1/{name=users/*/activities/*}:markDone</td>
                 <td>*</td>
+              </tr>
+              
+            
+            </tbody>
+          </table>
+          
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="v1/group_service.proto">v1/group_service.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.v1.BatchGetGroupsRequest">BatchGetGroupsRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>names</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>The group resource names, in the form `groups/{email}`. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.BatchGetGroupsResponse">BatchGetGroupsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>groups</td>
+                  <td><a href="#laelia.v1.Group">Group</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.CreateGroupRequest">CreateGroupRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>group_email</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The group email, e.g. &#34;eng@example.com&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>group</td>
+                  <td><a href="#laelia.v1.Group">Group</a></td>
+                  <td></td>
+                  <td><p>The group to create. The name field is ignored (the email is taken from
+group_email); title and members are required. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DeleteGroupRequest">DeleteGroupRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The group resource name, in the form `groups/{email}`. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetGroupRequest">GetGroupRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The group resource name, in the form `groups/{email}`. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.Group">Group</h3>
+        <p>Group is a named collection of users that can be bound in IAM policies</p><p>(workspace, agent, and conversation bindings accept groups/{email} members).</p><p>The IAM engine expands a group's members at authorization time.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The resource name of the group, in the form `groups/{email}`. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>email</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The group email, e.g. &#34;eng@example.com&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Human-readable title. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Longer description of the group. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>members</td>
+                  <td><a href="#laelia.v1.GroupMember">GroupMember</a></td>
+                  <td>repeated</td>
+                  <td><p>The group&#39;s members. Each member is a user resource name (&#34;users/{uid}&#34;)
+with a role: OWNER (may manage the group) or MEMBER. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>source</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Output only. When non-empty, the group is synced from an external source
+(e.g. SCIM) and is read-only over this API. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GroupMember">GroupMember</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>member</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The member&#39;s user resource name, in the form `users/{uid}`. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>role</td>
+                  <td><a href="#laelia.v1.GroupMemberRole">GroupMemberRole</a></td>
+                  <td></td>
+                  <td><p>The member&#39;s role in the group. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListGroupsRequest">ListGroupsRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>filter</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Filter is used to filter groups returned in the list. Supported fields:
+- title: equality on the group title.
+- email: equality on the group email.
+Example: title == &#34;Engineering&#34; </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListGroupsResponse">ListGroupsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>groups</td>
+                  <td><a href="#laelia.v1.Group">Group</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateGroupRequest">UpdateGroupRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>group</td>
+                  <td><a href="#laelia.v1.Group">Group</a></td>
+                  <td></td>
+                  <td><p>The group to update. The `name` field identifies the group. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>update_mask</td>
+                  <td><a href="#google.protobuf.FieldMask">google.protobuf.FieldMask</a></td>
+                  <td></td>
+                  <td><p>The list of fields to update: &#34;title&#34;, &#34;description&#34;, &#34;members&#34;. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="laelia.v1.GroupMemberRole">GroupMemberRole</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GROUP_MEMBER_ROLE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>OWNER</td>
+                <td>1</td>
+                <td><p>Owners manage the group (update/delete) without workspace-level group
+permissions.</p></td>
+              </tr>
+            
+              <tr>
+                <td>MEMBER</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+        <h3 id="laelia.v1.GroupService">GroupService</h3>
+        <p>GroupService manages user groups. Groups are bindable in IAM policies;</p><p>group owners can manage their own groups without workspace-level group</p><p>permissions. Groups synced from an external source (SCIM/IdP) are read-only.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GetGroup</td>
+                <td><a href="#laelia.v1.GetGroupRequest">GetGroupRequest</a></td>
+                <td><a href="#laelia.v1.Group">Group</a></td>
+                <td><p>Get a group. Group members and callers holding laelia.groups.get can read.</p></td>
+              </tr>
+            
+              <tr>
+                <td>BatchGetGroups</td>
+                <td><a href="#laelia.v1.BatchGetGroupsRequest">BatchGetGroupsRequest</a></td>
+                <td><a href="#laelia.v1.BatchGetGroupsResponse">BatchGetGroupsResponse</a></td>
+                <td><p>Batch get groups.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ListGroups</td>
+                <td><a href="#laelia.v1.ListGroupsRequest">ListGroupsRequest</a></td>
+                <td><a href="#laelia.v1.ListGroupsResponse">ListGroupsResponse</a></td>
+                <td><p>List all groups.</p></td>
+              </tr>
+            
+              <tr>
+                <td>CreateGroup</td>
+                <td><a href="#laelia.v1.CreateGroupRequest">CreateGroupRequest</a></td>
+                <td><a href="#laelia.v1.Group">Group</a></td>
+                <td><p>Create a group. Any authenticated member can create a group; the creator
+is not automatically added (the request must carry at least one OWNER).</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateGroup</td>
+                <td><a href="#laelia.v1.UpdateGroupRequest">UpdateGroupRequest</a></td>
+                <td><a href="#laelia.v1.Group">Group</a></td>
+                <td><p>Update a group (title, description, members). The group owner or a caller
+holding laelia.groups.update may update.</p></td>
+              </tr>
+            
+              <tr>
+                <td>DeleteGroup</td>
+                <td><a href="#laelia.v1.DeleteGroupRequest">DeleteGroupRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p>Delete a group. The group owner or a caller holding laelia.groups.delete
+may delete. Existing IAM bindings referencing the group become no-ops.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+          
+          
+          <h4>Methods with HTTP bindings</h4>
+          <table>
+            <thead>
+              <tr>
+                <td>Method Name</td>
+                <td>Method</td>
+                <td>Pattern</td>
+                <td>Body</td>
+              </tr>
+            </thead>
+            <tbody>
+            
+              
+              
+              <tr>
+                <td>GetGroup</td>
+                <td>GET</td>
+                <td>/v1/{name=groups/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>BatchGetGroups</td>
+                <td>GET</td>
+                <td>/v1/groups:batchGet</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListGroups</td>
+                <td>GET</td>
+                <td>/v1/groups</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>CreateGroup</td>
+                <td>POST</td>
+                <td>/v1/groups</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateGroup</td>
+                <td>PATCH</td>
+                <td>/v1/{group.name=groups/*}</td>
+                <td>group</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>DeleteGroup</td>
+                <td>DELETE</td>
+                <td>/v1/{name=groups/*}</td>
+                <td></td>
               </tr>
               
             

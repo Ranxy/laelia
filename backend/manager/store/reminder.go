@@ -180,7 +180,7 @@ func (s *Store) ListReminders(ctx context.Context, agentID int, convID uuid.UUID
 		idx++
 	}
 	if viewer != nil {
-		where += " AND EXISTS (SELECT 1 FROM conversation_member cmv WHERE cmv.conversation_id = r.conversation_id AND cmv.member_type = $" + itoa(idx) + " AND cmv.member_id = $" + itoa(idx+1) + ")"
+		where += " AND EXISTS (SELECT 1 FROM conversation_member_meta cmv WHERE cmv.conversation_id = r.conversation_id AND cmv.member_type = $" + itoa(idx) + " AND cmv.member_id = $" + itoa(idx+1) + ")"
 		args = append(args, viewer.MemberType, viewer.MemberID)
 		idx += 2
 	}

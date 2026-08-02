@@ -272,6 +272,22 @@
     - [AgentStreamService](#laelia-v1-AgentStreamService)
     - [CommandService](#laelia-v1-CommandService)
   
+- [v1/group_service.proto](#v1_group_service-proto)
+    - [BatchGetGroupsRequest](#laelia-v1-BatchGetGroupsRequest)
+    - [BatchGetGroupsResponse](#laelia-v1-BatchGetGroupsResponse)
+    - [CreateGroupRequest](#laelia-v1-CreateGroupRequest)
+    - [DeleteGroupRequest](#laelia-v1-DeleteGroupRequest)
+    - [GetGroupRequest](#laelia-v1-GetGroupRequest)
+    - [Group](#laelia-v1-Group)
+    - [GroupMember](#laelia-v1-GroupMember)
+    - [ListGroupsRequest](#laelia-v1-ListGroupsRequest)
+    - [ListGroupsResponse](#laelia-v1-ListGroupsResponse)
+    - [UpdateGroupRequest](#laelia-v1-UpdateGroupRequest)
+  
+    - [GroupMemberRole](#laelia-v1-GroupMemberRole)
+  
+    - [GroupService](#laelia-v1-GroupService)
+  
 - [v1/iam_service.proto](#v1_iam_service-proto)
     - [BindingDelta](#laelia-v1-BindingDelta)
     - [GetAgentIamPolicyRequest](#laelia-v1-GetAgentIamPolicyRequest)
@@ -4772,6 +4788,215 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | ListFiles | [ListFilesRequest](#laelia-v1-ListFilesRequest) | [ListFilesResponse](#laelia-v1-ListFilesResponse) | ListFiles returns the files attached to a conversation. The caller must be a member. |
 | ListActivities | [ListActivitiesRequest](#laelia-v1-ListActivitiesRequest) | [ListActivitiesResponse](#laelia-v1-ListActivitiesResponse) | ListActivities returns the authenticated user&#39;s activity feed: chat messages relevant to them, tagged with category flags (mention/task/reminder/thread). The caller&#39;s own id is the implicit filter; default read_state_filter is UNREAD. |
 | MarkActivityDone | [MarkActivityDoneRequest](#laelia-v1-MarkActivityDoneRequest) | [MarkActivityDoneResponse](#laelia-v1-MarkActivityDoneResponse) | MarkActivityDone marks a single activity item DONE for the authenticated user, hiding it from All and Unread. The caller&#39;s own id must own the row. |
+
+ 
+
+
+
+<a name="v1_group_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/group_service.proto
+
+
+
+<a name="laelia-v1-BatchGetGroupsRequest"></a>
+
+### BatchGetGroupsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| names | [string](#string) | repeated | The group resource names, in the form `groups/{email}`. |
+
+
+
+
+
+
+<a name="laelia-v1-BatchGetGroupsResponse"></a>
+
+### BatchGetGroupsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| groups | [Group](#laelia-v1-Group) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-CreateGroupRequest"></a>
+
+### CreateGroupRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| group_email | [string](#string) |  | The group email, e.g. &#34;eng@example.com&#34;. |
+| group | [Group](#laelia-v1-Group) |  | The group to create. The name field is ignored (the email is taken from group_email); title and members are required. |
+
+
+
+
+
+
+<a name="laelia-v1-DeleteGroupRequest"></a>
+
+### DeleteGroupRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The group resource name, in the form `groups/{email}`. |
+
+
+
+
+
+
+<a name="laelia-v1-GetGroupRequest"></a>
+
+### GetGroupRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The group resource name, in the form `groups/{email}`. |
+
+
+
+
+
+
+<a name="laelia-v1-Group"></a>
+
+### Group
+Group is a named collection of users that can be bound in IAM policies
+(workspace, agent, and conversation bindings accept groups/{email} members).
+The IAM engine expands a group&#39;s members at authorization time.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The resource name of the group, in the form `groups/{email}`. |
+| email | [string](#string) |  | The group email, e.g. &#34;eng@example.com&#34;. |
+| title | [string](#string) |  | Human-readable title. |
+| description | [string](#string) |  | Longer description of the group. |
+| members | [GroupMember](#laelia-v1-GroupMember) | repeated | The group&#39;s members. Each member is a user resource name (&#34;users/{uid}&#34;) with a role: OWNER (may manage the group) or MEMBER. |
+| source | [string](#string) |  | Output only. When non-empty, the group is synced from an external source (e.g. SCIM) and is read-only over this API. |
+
+
+
+
+
+
+<a name="laelia-v1-GroupMember"></a>
+
+### GroupMember
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| member | [string](#string) |  | The member&#39;s user resource name, in the form `users/{uid}`. |
+| role | [GroupMemberRole](#laelia-v1-GroupMemberRole) |  | The member&#39;s role in the group. |
+
+
+
+
+
+
+<a name="laelia-v1-ListGroupsRequest"></a>
+
+### ListGroupsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+| filter | [string](#string) |  | Filter is used to filter groups returned in the list. Supported fields: - title: equality on the group title. - email: equality on the group email. Example: title == &#34;Engineering&#34; |
+
+
+
+
+
+
+<a name="laelia-v1-ListGroupsResponse"></a>
+
+### ListGroupsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| groups | [Group](#laelia-v1-Group) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateGroupRequest"></a>
+
+### UpdateGroupRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| group | [Group](#laelia-v1-Group) |  | The group to update. The `name` field identifies the group. |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | The list of fields to update: &#34;title&#34;, &#34;description&#34;, &#34;members&#34;. |
+
+
+
+
+
+ 
+
+
+<a name="laelia-v1-GroupMemberRole"></a>
+
+### GroupMemberRole
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| GROUP_MEMBER_ROLE_UNSPECIFIED | 0 |  |
+| OWNER | 1 | Owners manage the group (update/delete) without workspace-level group permissions. |
+| MEMBER | 2 |  |
+
+
+ 
+
+ 
+
+
+<a name="laelia-v1-GroupService"></a>
+
+### GroupService
+GroupService manages user groups. Groups are bindable in IAM policies;
+group owners can manage their own groups without workspace-level group
+permissions. Groups synced from an external source (SCIM/IdP) are read-only.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetGroup | [GetGroupRequest](#laelia-v1-GetGroupRequest) | [Group](#laelia-v1-Group) | Get a group. Group members and callers holding laelia.groups.get can read. |
+| BatchGetGroups | [BatchGetGroupsRequest](#laelia-v1-BatchGetGroupsRequest) | [BatchGetGroupsResponse](#laelia-v1-BatchGetGroupsResponse) | Batch get groups. |
+| ListGroups | [ListGroupsRequest](#laelia-v1-ListGroupsRequest) | [ListGroupsResponse](#laelia-v1-ListGroupsResponse) | List all groups. |
+| CreateGroup | [CreateGroupRequest](#laelia-v1-CreateGroupRequest) | [Group](#laelia-v1-Group) | Create a group. Any authenticated member can create a group; the creator is not automatically added (the request must carry at least one OWNER). |
+| UpdateGroup | [UpdateGroupRequest](#laelia-v1-UpdateGroupRequest) | [Group](#laelia-v1-Group) | Update a group (title, description, members). The group owner or a caller holding laelia.groups.update may update. |
+| DeleteGroup | [DeleteGroupRequest](#laelia-v1-DeleteGroupRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Delete a group. The group owner or a caller holding laelia.groups.delete may delete. Existing IAM bindings referencing the group become no-ops. |
 
  
 

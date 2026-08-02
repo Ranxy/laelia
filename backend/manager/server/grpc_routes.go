@@ -90,6 +90,7 @@ func configureGrpcRouters(
 	settingService := apiv1.NewSettingService(stores, s3clientmanager, profile)
 	roleService := apiv1.NewRoleService(stores)
 	iamService := apiv1.NewIamService(stores)
+	groupService := apiv1.NewGroupService(stores, iamManager)
 
 	// Web Push: load the auto-generated VAPID keypair from the setting table
 	// (initializeSetting guarantees a row exists by this point) and build the
@@ -162,6 +163,8 @@ func configureGrpcRouters(
 	connectHandlers[rolePath] = roleHandler
 	iamPath, iamHandler := v1connect.NewIamServiceHandler(iamService, handlerOpts)
 	connectHandlers[iamPath] = iamHandler
+	groupPath, groupHandler := v1connect.NewGroupServiceHandler(groupService, handlerOpts)
+	connectHandlers[groupPath] = groupHandler
 	notificationPath, notificationHandler := v1connect.NewNotificationServiceHandler(notificationService, handlerOpts)
 	connectHandlers[notificationPath] = notificationHandler
 
@@ -176,6 +179,7 @@ func configureGrpcRouters(
 		v1connect.SettingServiceName,
 		v1connect.RoleServiceName,
 		v1connect.IamServiceName,
+		v1connect.GroupServiceName,
 		v1connect.NotificationServiceName,
 	)
 	reflectPath, reflectHandler := grpcreflect.NewHandlerV1(reflector)
@@ -218,6 +222,9 @@ func configureGrpcRouters(
 		return err
 	}
 	if err := v1pb.RegisterIamServiceHandler(ctx, mux, grpcConn); err != nil {
+		return err
+	}
+	if err := v1pb.RegisterGroupServiceHandler(ctx, mux, grpcConn); err != nil {
 		return err
 	}
 	if err := v1pb.RegisterNotificationServiceHandler(ctx, mux, grpcConn); err != nil {

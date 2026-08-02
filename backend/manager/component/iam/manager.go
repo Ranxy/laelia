@@ -11,7 +11,6 @@ package iam
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -99,12 +98,11 @@ func (m *Manager) CheckPermission(ctx context.Context, perm permission.Permissio
 
 // checkResourcePermission authorizes a resource-scoped permission. For an
 // agent it consults the agent's IAM policy (custom roles bound on the agent).
-// For a conversation it does NOT use the IAM policy table — chat authorization
-// is membership-based: it reads the caller's chat role from conversation_member
-// and maps it to conversation permissions (member/admin/owner). A non-member
-// user may still read an agent-DM (type 3) if they hold the workspace-scope
-// conversations.reviewAgentDM permission. A resource type without a handler
-// here (e.g. commands, which stay handler-gated) yields no permissions.
+// For a conversation it reads the conversation IAM policy and maps the
+// caller's binding roles to conversation permissions (member/admin/owner). A
+// non-member user may still read an agent-DM (type 3) if they hold the
+// workspace-scope conversations.reviewAgentDM permission. A resource type
+// without a handler here yields no permissions.
 func (m *Manager) checkResourcePermission(ctx context.Context, perm permission.Permission, user *store.UserMessage, agent *store.AgentMessage, resource *ResourceRef) (bool, error) {
 	switch resource.ResourceType {
 	case models.Policy_CONVERSATION:
@@ -131,12 +129,14 @@ func (m *Manager) checkResourcePermission(ctx context.Context, perm permission.P
 	}
 }
 
-// checkConversationPermission maps the caller's chat role on the conversation
-// to its permission set and reports whether it grants perm. Agents resolve to
-// member_type=Agent/member_id=ResourceID; users to member_type=User/member_id
-// =principal id. A non-member user with conversations.reviewAgentDM may read
-// an agent-DM (type 3); agents are always members of their own agent-DMs so
-// they never need the review override.
+// checkConversationPermission authorizes a conversation-scoped permission via
+// the conversation's IAM policy. The caller's binding roles (the built-in
+// conversationMember/Admin/Owner roles, or custom roles) resolve to permission
+// sets; group members, allUsers, and binding conditions are honored by
+// GetCallerIAMPolicyBindings. A caller with no binding (a non-member user)
+// holding conversations.reviewAgentDM may still read an agent-DM (type 3);
+// agents are always members of their own agent-DMs so they never need the
+// review override.
 func (m *Manager) checkConversationPermission(ctx context.Context, perm permission.Permission, user *store.UserMessage, agent *store.AgentMessage, resource *ResourceRef) (bool, error) {
 	convIDStr, err := common.GetConversationResourceID(resource.Name)
 	if err != nil {
@@ -149,29 +149,32 @@ func (m *Manager) checkConversationPermission(ctx context.Context, perm permissi
 		return false, nil //nolint:nilerr
 	}
 
-	memberType, memberID, ok := callerMemberInfo(user, agent)
-	if !ok {
-		return false, nil
-	}
-
-	role, convType, err := m.store.GetConversationMembership(ctx, convID, memberType, memberID)
+	policy, err := m.store.GetConversationIamPolicy(ctx, convID)
 	if err != nil {
-		// A missing conversation (ErrNoRows) is a deny, not a 500: returning the
-		// error here would make the interceptor surface CodeInternal for a
-		// deleted/stale conversation ID. Fail-closed (403) avoids the 500 and does
-		// not leak the resource's existence.
-		if errors.Is(err, sql.ErrNoRows) {
-			return false, nil
-		}
 		return false, err
 	}
-	if rolePerms := chatRolePermissions(role); rolePerms != nil && rolePerms[perm] {
-		return true, nil
+	for _, binding := range utils.GetCallerIAMPolicyBindings(ctx, m.store, user, agent, policy.Policy) {
+		rolePerms := m.conversationRolePermissions(ctx, binding.GetRole())
+		if rolePerms != nil && rolePerms[perm] {
+			return true, nil
+		}
 	}
 
 	// Non-member override: a user holding the grantable reviewAgentDM workspace
 	// permission may read (not send/manage) an agent-to-agent DM.
-	if role == 0 && perm == permission.ConversationsRead && convType == store.ConversationTypeAgentDM && user != nil {
+	if perm == permission.ConversationsRead && user != nil {
+		conv, convErr := m.store.GetConversation(ctx, convID)
+		if convErr != nil {
+			// A missing conversation denies rather than 500s (fail-closed, no
+			// existence probing), matching the pre-migration behavior.
+			if errors.Is(convErr, store.ErrConversationNotFound) {
+				return false, nil
+			}
+			return false, convErr
+		}
+		if conv == nil || conv.Type != store.ConversationTypeAgentDM {
+			return false, nil
+		}
 		if ok, rErr := m.CheckPermission(ctx, permission.ConversationsReviewAgentDM, user, nil, nil); rErr == nil && ok {
 			return true, nil
 		}
@@ -179,16 +182,31 @@ func (m *Manager) checkConversationPermission(ctx context.Context, perm permissi
 	return false, nil
 }
 
-// chatRolePermissions maps a conversation_member chat role to its permission
-// set. These are chat-membership markers, not IAM roles: a caller's chat role
-// is read from conversation_member and mapped to one of these sets by the
-// engine's conversation branch. They are deliberately not in
-// store.PredefinedRoles (so they never appear on the management Roles page)
-// and the iam_service handler rejects them as IAM bindings. Owner-only
-// operations (delete channel, transfer ownership, grant/revoke admin) are gated
-// by an in-handler role==Owner check, so they need no separate catalog
-// permission. Any value other than member/admin/owner (including 0 = not a
-// member) yields nil.
+// conversationRolePermissions resolves an IAM binding role on a conversation to
+// its permission set: the built-in conversation roles map to the chat role
+// sets, any other role resolves through the normal role catalog (custom roles).
+func (m *Manager) conversationRolePermissions(ctx context.Context, role string) map[permission.Permission]bool {
+	switch role {
+	case common.FormatRole(store.ConversationOwnerRole):
+		return chatOwnerPermissions
+	case common.FormatRole(store.ConversationAdminRole):
+		return chatAdminPermissions
+	case common.FormatRole(store.ConversationMemberRole):
+		return chatMemberPermissions
+	default:
+		return m.rolePermissions(ctx, role)
+	}
+}
+
+// chatRolePermissions maps a conversation chat role value to its permission
+// set. The values come from the conversation IAM policy's built-in roles
+// (roles/conversationMember/Admin/Owner); custom roles resolve through the
+// normal role catalog. The built-in conversation roles are deliberately not in
+// store.PredefinedRoles (so they never appear on the management Roles page as
+// workspace-bindable roles). Owner-only operations (delete channel, transfer
+// ownership, grant/revoke admin) are gated by an in-handler role==Owner check,
+// so they need no separate catalog permission. Any value other than
+// member/admin/owner (including 0 = not a member) yields nil.
 func chatRolePermissions(role int32) map[permission.Permission]bool {
 	switch role {
 	case store.MemberRoleOwner:

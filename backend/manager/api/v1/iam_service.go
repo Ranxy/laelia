@@ -116,10 +116,10 @@ func translateSetIamError(err error) error {
 	return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to set iam policy"))
 }
 
-// chatRoleLabels are conversation_member chat-role-map markers. They are never
-// valid IAM bindings: chat access is membership-based, resolved from
-// conversation_member, not from the policy table. Rejecting them here keeps the
-// UI from corrupting the engine's chat-role map.
+// chatRoleLabels are the conversation-scope IAM roles. They are only valid on
+// conversation IAM policies (managed by the conversation membership APIs), so
+// workspace/agent policies reject them here to keep the UI from binding
+// conversation roles outside a conversation.
 var chatRoleLabels = map[string]bool{
 	store.ConversationMemberRole: true,
 	store.ConversationAdminRole:  true,

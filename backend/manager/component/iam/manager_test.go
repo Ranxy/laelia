@@ -73,16 +73,14 @@ func TestPredefinedRolesResolve(t *testing.T) {
 			t.Errorf("predefined role %q resolved nil permissions", role)
 		}
 	}
-	// The removed roles (agentEditor, the reviewers) and the chat-membership
-	// markers (conversation*) must NOT be predefined — they should not resolve
-	// in-memory. Checked via GetPredefinedRole so no store instance is needed.
+	// The conversation-scope roles must NOT be predefined workspace roles —
+	// they should not resolve in-memory via the role catalog (the engine maps
+	// them through conversationRolePermissions instead). Checked via
+	// GetPredefinedRole so no store instance is needed.
 	for _, role := range []string{
 		store.ConversationMemberRole,
 		store.ConversationAdminRole,
 		store.ConversationOwnerRole,
-		store.AgentEditorRole,
-		store.AgentDMReviewerRole,
-		store.OversightReviewerRole,
 	} {
 		if store.GetPredefinedRole(role) != nil {
 			t.Errorf("role %q must not be predefined", role)

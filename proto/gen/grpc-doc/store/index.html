@@ -2381,7 +2381,8 @@ for example, the environment resource can have the sql review config tag, like &
               <tr>
                 <td>ENVIRONMENT</td>
                 <td>2</td>
-                <td><p></p></td>
+                <td><p>ENVIRONMENT and PROJECT are reserved for a future multi-tenant
+workspace model; the IM permission model does not implement them.</p></td>
               </tr>
             
               <tr>
@@ -2393,9 +2394,10 @@ for example, the environment resource can have the sql review config tag, like &
               <tr>
                 <td>CONVERSATION</td>
                 <td>4</td>
-                <td><p>CONVERSATION is a per-conversation IAM policy. Members/owners are
-expressed as bindings (roles/conversationMember, roles/conversationOwner)
-on conversations/{id}.</p></td>
+                <td><p>CONVERSATION is the per-conversation IAM policy: the single source of
+truth for chat membership. Members/owners are expressed as bindings
+(roles/conversationMember, roles/conversationAdmin,
+roles/conversationOwner) on conversations/{id}.</p></td>
               </tr>
             
               <tr>

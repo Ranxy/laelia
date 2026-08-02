@@ -43,7 +43,7 @@ const (
 	// Conversations (channels are modeled as conversations). list is the
 	// workspace-scope discovery permission (any member can enumerate channels/
 	// commands); read/send/manage are per-conversation, granted by the caller's
-	// chat role (member/admin/owner) in conversation_member. reviewAgentDM and
+	// chat role (member/admin/owner) in the conversation IAM policy. reviewAgentDM and
 	// reviewAll are workspace-scope "review" permissions grantable to any user
 	// (admin or not): reviewAgentDM reads/lists agent-to-agent DMs; reviewAll is
 	// cross-conversation oversight (ListChannelsForAgent all, ListReminders
@@ -108,6 +108,13 @@ const (
 	// IAM policy management (workspace + per-resource bindings)
 	IAMGetPolicy Permission = "laelia.iam.getPolicy"
 	IAMSetPolicy Permission = "laelia.iam.setPolicy"
+
+	// Groups
+	GroupsCreate Permission = "laelia.groups.create"
+	GroupsGet    Permission = "laelia.groups.get"
+	GroupsList   Permission = "laelia.groups.list"
+	GroupsUpdate Permission = "laelia.groups.update"
+	GroupsDelete Permission = "laelia.groups.delete"
 )
 
 // allPermissions is the complete, authoritative list of valid permission
@@ -176,6 +183,12 @@ var allPermissions = []Permission{
 
 	IAMGetPolicy,
 	IAMSetPolicy,
+
+	GroupsCreate,
+	GroupsGet,
+	GroupsList,
+	GroupsUpdate,
+	GroupsDelete,
 }
 
 var allPermissionsMap = func() map[Permission]bool {
