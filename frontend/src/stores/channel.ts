@@ -341,6 +341,24 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
     return added;
   },
 
+  async addChannelGroup(conversationId, groupName) {
+    const convName = `conversations/${conversationId}`;
+    const res = await commandServiceClient.addChannelMember(
+      create(AddChannelMemberRequestSchema, {
+        conversation: convName,
+        members: [create(AddChannelMemberInputSchema, { group: groupName })],
+      })
+    );
+    const added = res.members ?? [];
+    set((s) => ({
+      channelMembersByConv: {
+        ...s.channelMembersByConv,
+        [convName]: [...(s.channelMembersByConv[convName] ?? []), ...added],
+      },
+    }));
+    return added;
+  },
+
   async removeChannelMember(conversationId, memberType, memberId) {
     const convName = `conversations/${conversationId}`;
     await commandServiceClient.removeChannelMember(

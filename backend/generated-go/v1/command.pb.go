@@ -4808,7 +4808,12 @@ type AddChannelMemberInput struct {
 	// policy binding carries a `request.time < timestamp("...")` condition and
 	// the caller's access expires automatically at the given instant. Must be in
 	// the future.
-	ExpireTime    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expire_time,json=expireTime,proto3" json:"expire_time,omitempty"`
+	ExpireTime *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expire_time,json=expireTime,proto3" json:"expire_time,omitempty"`
+	// group, when set, adds every current member of the group to the channel as
+	// real user members (a snapshot: later group membership changes do not
+	// sync). Mutually exclusive with member_type/member_id. Group members
+	// already in the channel are skipped, so re-adding a group is idempotent.
+	Group         string `protobuf:"bytes,4,opt,name=group,proto3" json:"group,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4862,6 +4867,13 @@ func (x *AddChannelMemberInput) GetExpireTime() *timestamppb.Timestamp {
 		return x.ExpireTime
 	}
 	return nil
+}
+
+func (x *AddChannelMemberInput) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
 }
 
 type AddChannelMemberRequest struct {
@@ -10458,13 +10470,15 @@ const file_v1_command_proto_rawDesc = "" +
 	"updateMask\"G\n" +
 	"\x14DeleteChannelRequest\x12/\n" +
 	"\x04name\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
-	"\x13laelia/ConversationR\x04name\"\x97\x01\n" +
+	"\x13laelia/ConversationR\x04name\"\xc0\x01\n" +
 	"\x15AddChannelMemberInput\x12\x1f\n" +
 	"\vmember_type\x18\x01 \x01(\x05R\n" +
 	"memberType\x12 \n" +
 	"\tmember_id\x18\x02 \x01(\tB\x03\xe0A\x02R\bmemberId\x12;\n" +
 	"\vexpire_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"expireTime\"\x9b\x01\n" +
+	"expireTime\x12'\n" +
+	"\x05group\x18\x04 \x01(\tB\x11\xfaA\x0e\n" +
+	"\flaelia/GroupR\x05group\"\x9b\x01\n" +
 	"\x17AddChannelMemberRequest\x12?\n" +
 	"\fconversation\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
 	"\x13laelia/ConversationR\fconversation\x12?\n" +

@@ -6105,6 +6105,16 @@ the caller&#39;s access expires automatically at the given instant. Must be in
 the future. </p></td>
                 </tr>
               
+                <tr>
+                  <td>group</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>group, when set, adds every current member of the group to the channel as
+real user members (a snapshot: later group membership changes do not
+sync). Mutually exclusive with member_type/member_id. Group members
+already in the channel are skipped, so re-adding a group is idempotent. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 

@@ -310,6 +310,62 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 	seen := make(map[string]bool, len(req.Msg.Members))
 	inputs := make([]store.ConversationMemberInput, 0, len(req.Msg.Members))
 	for _, m := range req.Msg.Members {
+		var expireAt *time.Time
+		if m.ExpireTime != nil {
+			t := m.ExpireTime.AsTime()
+			if !t.After(time.Now()) {
+				return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("expire_time must be in the future"))
+			}
+			expireAt = &t
+		}
+
+		// Group snapshot: add every current member of the group as a real user
+		// member. Users already in the channel (including the owner), deleted
+		// users, and users already added earlier in this request are skipped, so
+		// re-adding a group is idempotent and never downgrades an Admin/Owner.
+		if groupName := m.GetGroup(); groupName != "" {
+			if m.GetMemberType() != 0 || m.GetMemberId() != "" {
+				return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("group is mutually exclusive with member_type/member_id"))
+			}
+			group, groupErr := s.store.GetGroupByName(ctx, groupName)
+			if groupErr != nil {
+				return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(groupErr, "failed to get group %q", groupName))
+			}
+			if group == nil {
+				return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("group %q not found", groupName))
+			}
+			for _, gm := range group.Payload.GetMembers() {
+				userID, uidErr := common.GetUserID(gm.GetMember())
+				if uidErr != nil {
+					// Malformed member inside a group payload: skip, never fail
+					// the whole snapshot for one bad row.
+					continue
+				}
+				memberID := fmt.Sprintf("%d", userID)
+				key := fmt.Sprintf("%d:%s", store.MemberTypeUser, memberID)
+				if seen[key] || memberID == fmt.Sprintf("%d", conv.OwnerID) {
+					continue
+				}
+				existingRole, _, memErr := s.store.GetConversationMembership(ctx, convID, store.MemberTypeUser, memberID)
+				if memErr != nil {
+					return nil, connect.NewError(connect.CodeInternal, errors.Wrap(memErr, "failed to check existing membership"))
+				}
+				if existingRole != 0 {
+					continue
+				}
+				user, userErr := s.store.GetUserByID(ctx, userID)
+				if userErr != nil {
+					return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(userErr, "failed to look up user %d", userID))
+				}
+				if user == nil || user.MemberDeleted {
+					continue
+				}
+				seen[key] = true
+				inputs = append(inputs, store.ConversationMemberInput{MemberType: store.MemberTypeUser, MemberID: memberID, ExpireAt: expireAt})
+			}
+			continue
+		}
+
 		memberType := m.MemberType
 		memberID := m.MemberId
 		key := fmt.Sprintf("%d:%s", memberType, memberID)
@@ -356,15 +412,13 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 				return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user member_id, must be principal id"))
 			}
 		}
-		var expireAt *time.Time
-		if m.ExpireTime != nil {
-			t := m.ExpireTime.AsTime()
-			if !t.After(time.Now()) {
-				return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("expire_time must be in the future"))
-			}
-			expireAt = &t
-		}
 		inputs = append(inputs, store.ConversationMemberInput{MemberType: memberType, MemberID: memberID, ExpireAt: expireAt})
+	}
+
+	if len(inputs) == 0 {
+		// A group snapshot whose members are all already in the channel is an
+		// idempotent no-op, not an error.
+		return connect.NewResponse(&v1pb.AddChannelMemberResponse{}), nil
 	}
 
 	if err := s.store.AddConversationMembers(ctx, convID, inputs); err != nil {

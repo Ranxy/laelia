@@ -2056,6 +2056,16 @@ export declare type AddChannelMemberInput = Message<"laelia.v1.AddChannelMemberI
    * @generated from field: google.protobuf.Timestamp expire_time = 3;
    */
   expireTime?: Timestamp | undefined;
+
+  /**
+   * group, when set, adds every current member of the group to the channel as
+   * real user members (a snapshot: later group membership changes do not
+   * sync). Mutually exclusive with member_type/member_id. Group members
+   * already in the channel are skipped, so re-adding a group is idempotent.
+   *
+   * @generated from field: string group = 4;
+   */
+  group: string;
 };
 
 /**

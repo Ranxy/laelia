@@ -689,6 +689,11 @@ message AddChannelMemberInput {
   // the caller's access expires automatically at the given instant. Must be in
   // the future.
   google.protobuf.Timestamp expire_time = 3;
+  // group, when set, adds every current member of the group to the channel as
+  // real user members (a snapshot: later group membership changes do not
+  // sync). Mutually exclusive with member_type/member_id. Group members
+  // already in the channel are skipped, so re-adding a group is idempotent.
+  string group = 4 [(google.api.resource_reference) = {type: "laelia/Group"}];
 }
 
 message AddChannelMemberRequest {

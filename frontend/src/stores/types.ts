@@ -371,6 +371,10 @@ export interface ChannelSlice {
     memberType: number,
     memberIds: string[]
   ) => Promise<ChannelMember[]>;
+  addChannelGroup: (
+    conversationId: string,
+    groupName: string
+  ) => Promise<ChannelMember[]>;
   removeChannelMember: (
     conversationId: string,
     memberType: number,

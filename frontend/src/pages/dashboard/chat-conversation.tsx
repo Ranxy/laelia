@@ -19,10 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AgentStatusBar } from "@/components/agent-status-bar";
-import {
-  MemberPicker,
-  type MemberPickerType,
-} from "@/components/chat/member-picker";
+import { MemberPicker } from "@/components/chat/member-picker";
 import { MentionBadge } from "@/components/chat/mention-badge";
 import { MentionDetailSheet } from "@/components/chat/mention-detail-sheet";
 import { MentionPopup } from "@/components/chat/mention-popup";
@@ -35,6 +32,7 @@ import { RemoteImage } from "@/components/chat/remote-image";
 import { EmptyState, LoadingState } from "@/components/chat/states";
 import { TasksPanel } from "@/components/chat/tasks-panel";
 import { ThreadPanel } from "@/components/chat/thread-panel";
+import { MemberPicker as IamMemberPicker } from "@/components/member-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,7 +49,11 @@ import {
   targetToMention,
   useMentionTargets,
 } from "@/composables/useMentionTargets";
-import { commandServiceClient } from "@/connect";
+import {
+  commandServiceClient,
+  groupServiceClient,
+  userServiceClient,
+} from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
 import { isImageAttachment } from "@/lib/image-file";
 import "@/lib/markdown";
@@ -66,6 +68,12 @@ import type {
   Conversation,
 } from "@/types/proto-es/v1/command_pb";
 import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
+import { State } from "@/types/proto-es/v1/common_pb";
+import { type Group } from "@/types/proto-es/v1/group_service_pb";
+import { type User as UserMessage } from "@/types/proto-es/v1/user_service_pb";
+
+// Add-member mode: 1 = user, 2 = agent, 3 = group snapshot.
+type AddMemberType = 1 | 2 | 3;
 
 // Stable empty fallbacks so per-key selectors returning undefined for an
 // unloaded conversation don't mint a new array each run (which would defeat
@@ -126,6 +134,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const startWatchingChannel = useAppStore((s) => s.startWatchingChannel);
   const stopWatchingChannel = useAppStore((s) => s.stopWatchingChannel);
   const addChannelMember = useAppStore((s) => s.addChannelMember);
+  const addChannelGroup = useAppStore((s) => s.addChannelGroup);
   const removeChannelMember = useAppStore((s) => s.removeChannelMember);
   const markConversationRead = useAppStore((s) => s.markConversationRead);
   const currentUser = useAppStore((s) => s.currentUser);
@@ -193,8 +202,13 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
 
   const [membersOpen, setMembersOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
-  const [addMemberType, setAddMemberType] = useState<MemberPickerType>(2); // default AGENT
+  const [addMemberType, setAddMemberType] = useState<AddMemberType>(2); // default AGENT
   const [addMemberIds, setAddMemberIds] = useState<string[]>([]);
+  const [selectedGroupName, setSelectedGroupName] = useState("");
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [groupUsers, setGroupUsers] = useState<Map<string, UserMessage>>(
+    new Map()
+  );
   const [addingMember, setAddingMember] = useState(false);
   // When true the thread panel fills the whole chat area and the channel's own
   // message pane is hidden (see the ThreadPanel expand toggle).
@@ -644,8 +658,99 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     );
   }, []);
 
+  // Group snapshot mode loads the group list once the picker is open.
+  useEffect(() => {
+    if (addMemberType !== 3 || !addMemberOpen) return;
+    let cancelled = false;
+    groupServiceClient
+      .listGroups({ pageSize: 1000 })
+      .then((res) => {
+        if (!cancelled) setGroups(res.groups ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setGroups([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [addMemberType, addMemberOpen]);
+
+  // When a group is selected for a snapshot add, resolve its members' user
+  // records so the preview can show names and skip-deleted status.
+  const selectedGroup =
+    groups.find((g) => g.name === selectedGroupName) ?? null;
+  useEffect(() => {
+    if (addMemberType !== 3 || !selectedGroup) {
+      setGroupUsers(new Map());
+      return;
+    }
+    const names = (selectedGroup.members ?? [])
+      .map((m) => m.member)
+      .filter(Boolean);
+    if (names.length === 0) {
+      setGroupUsers(new Map());
+      return;
+    }
+    let cancelled = false;
+    userServiceClient
+      .batchGetUsers({ names })
+      .then((res) => {
+        if (cancelled) return;
+        const byName = new Map<string, UserMessage>();
+        for (const u of res.users ?? []) byName.set(u.name ?? "", u);
+        setGroupUsers(byName);
+      })
+      .catch(() => {
+        if (!cancelled) setGroupUsers(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [addMemberType, selectedGroup]);
+
+  // user ids already in the channel, for the group preview status badges.
+  const existingChannelUserIds = useMemo(
+    () =>
+      new Set(members.filter((m) => m.memberType === 1).map((m) => m.memberId)),
+    [members]
+  );
+
+  const groupPreview = useMemo(() => {
+    if (!selectedGroup) return null;
+    const rows = (selectedGroup.members ?? []).map((gm) => {
+      const uid = gm.member?.split("/").pop() ?? "";
+      const user = groupUsers.get(gm.member ?? "");
+      const inChannel = uid ? existingChannelUserIds.has(uid) : false;
+      const skipped = user?.state === State.DELETED;
+      return { member: gm.member ?? "", uid, user, inChannel, skipped };
+    });
+    return {
+      rows,
+      total: rows.length,
+      inChannel: rows.filter((r) => r.inChannel).length,
+      toAdd: rows.filter((r) => !r.inChannel && !r.skipped).length,
+    };
+  }, [selectedGroup, groupUsers, existingChannelUserIds]);
+
   const handleAddMember = useCallback(async () => {
-    if (addMemberIds.length === 0 || addingMember || !channelId) return;
+    if (addingMember || !channelId) return;
+    if (addMemberType === 3) {
+      if (!selectedGroupName) return;
+      setAddingMember(true);
+      try {
+        await addChannelGroup(channelId, selectedGroupName);
+        setSelectedGroupName("");
+        setAddMemberIds([]);
+        setAddMemberOpen(false);
+        listChannelMembers(channelId);
+      } catch {
+        // add failed — keep the selection so the user can retry
+      } finally {
+        setAddingMember(false);
+      }
+      return;
+    }
+    if (addMemberIds.length === 0) return;
     setAddingMember(true);
     try {
       await addChannelMember(channelId, addMemberType, addMemberIds);
@@ -660,9 +765,11 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   }, [
     addMemberIds,
     addMemberType,
+    selectedGroupName,
     addingMember,
     channelId,
     addChannelMember,
+    addChannelGroup,
     listChannelMembers,
   ]);
 
@@ -1259,6 +1366,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                           onClick={() => {
                             setAddMemberType(1);
                             setAddMemberIds([]);
+                            setSelectedGroupName("");
                           }}
                           className="flex-1"
                         >
@@ -1270,51 +1378,159 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                           onClick={() => {
                             setAddMemberType(2);
                             setAddMemberIds([]);
+                            setSelectedGroupName("");
                           }}
                           className="flex-1"
                         >
                           {t("channel.member-type-agent")}
                         </Button>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-control">
-                        {t("channel.member-id-label")}
-                      </span>
-                      <div className="flex gap-2">
-                        <MemberPicker
-                          key={addMemberType}
-                          memberType={addMemberType}
-                          existingMemberIds={existingMemberIds}
-                          value={addMemberIds}
-                          onToggle={toggleAddMemberId}
-                          placeholder={t("channel.member-id-placeholder")}
-                        />
                         <Button
-                          variant="ghost"
+                          variant={addMemberType === 3 ? "default" : "outline"}
                           size="sm"
                           onClick={() => {
-                            setAddMemberOpen(false);
+                            setAddMemberType(3);
                             setAddMemberIds([]);
+                            setSelectedGroupName("");
                           }}
-                          className="size-7 p-0"
+                          className="flex-1"
                         >
-                          <X className="size-3.5" />
+                          {t("channel.member-type-group")}
                         </Button>
                       </div>
                     </div>
+                    {addMemberType === 3 ? (
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-control">
+                          {t("channel.group-label")}
+                        </span>
+                        <p className="text-xs text-control-placeholder">
+                          {t("channel.add-group-hint")}
+                        </p>
+                        <IamMemberPicker
+                          users={[]}
+                          groups={groups}
+                          value={selectedGroupName}
+                          onSelect={setSelectedGroupName}
+                        />
+                        {selectedGroup && groupPreview && (
+                          <div className="flex flex-col gap-2 rounded-xs border border-control-border p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="min-w-0 truncate text-sm font-medium text-main">
+                                {selectedGroup.title || selectedGroup.name}
+                              </span>
+                              <span className="shrink-0 text-xs text-control-light">
+                                {t("channel.group-members-count", {
+                                  count: groupPreview.total,
+                                })}
+                              </span>
+                            </div>
+                            <div className="flex max-h-48 flex-col gap-1.5 overflow-y-auto pr-1">
+                              {groupPreview.rows.map((r) => {
+                                const label = r.user
+                                  ? r.user.title || r.user.email || r.member
+                                  : r.member;
+                                return (
+                                  <div
+                                    key={r.member}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent/10 text-xs font-medium text-accent">
+                                      {label.charAt(0).toUpperCase()}
+                                    </span>
+                                    <span className="min-w-0 flex-1 truncate text-sm text-main">
+                                      {label}
+                                    </span>
+                                    {r.inChannel ? (
+                                      <Badge
+                                        variant="secondary"
+                                        className="text-xs shrink-0"
+                                      >
+                                        {t("channel.group-status-in-channel")}
+                                      </Badge>
+                                    ) : r.skipped ? (
+                                      <Badge
+                                        variant="warning"
+                                        className="text-xs shrink-0"
+                                      >
+                                        {t("channel.group-status-skipped")}
+                                      </Badge>
+                                    ) : (
+                                      <Badge
+                                        variant="default"
+                                        className="text-xs shrink-0"
+                                      >
+                                        {t("channel.group-status-add")}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {groupPreview.toAdd === 0 ? (
+                              <p className="text-xs text-control-placeholder">
+                                {t("channel.add-group-all-in-channel")}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-control-light">
+                                {t("channel.add-group-summary", {
+                                  count: groupPreview.toAdd,
+                                  total: groupPreview.total,
+                                })}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-control">
+                          {t("channel.member-id-label")}
+                        </span>
+                        <div className="flex gap-2">
+                          <MemberPicker
+                            key={addMemberType}
+                            memberType={addMemberType}
+                            existingMemberIds={existingMemberIds}
+                            value={addMemberIds}
+                            onToggle={toggleAddMemberId}
+                            placeholder={t("channel.member-id-placeholder")}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setAddMemberOpen(false);
+                              setAddMemberIds([]);
+                            }}
+                            className="size-7 p-0"
+                          >
+                            <X className="size-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     <Button
                       onClick={handleAddMember}
-                      disabled={addMemberIds.length === 0 || addingMember}
+                      disabled={
+                        (addMemberType === 3
+                          ? !selectedGroup || (groupPreview?.toAdd ?? 0) === 0
+                          : addMemberIds.length === 0) || addingMember
+                      }
                       className="w-full"
                     >
                       {addingMember
                         ? t("common.creating")
-                        : addMemberIds.length > 0
-                          ? t("channel.add-member-batch", {
-                              count: addMemberIds.length,
-                            })
-                          : t("channel.add-member")}
+                        : addMemberType === 3
+                          ? selectedGroup
+                            ? t("channel.add-group-count", {
+                                count: groupPreview?.toAdd ?? 0,
+                              })
+                            : t("channel.add-group")
+                          : addMemberIds.length > 0
+                            ? t("channel.add-member-batch", {
+                                count: addMemberIds.length,
+                              })
+                            : t("channel.add-member")}
                     </Button>
                   </div>
                 ) : (
