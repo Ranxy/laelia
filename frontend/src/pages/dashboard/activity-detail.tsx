@@ -36,6 +36,8 @@ export function ActivityDetail() {
   const openThread = useAppStore((s) => s.openThread);
   const closeThread = useAppStore((s) => s.closeThread);
   const markConversationRead = useAppStore((s) => s.markConversationRead);
+  const openFilePreview = useAppStore((s) => s.openFilePreview);
+  const openImagePreview = useAppStore((s) => s.openImagePreview);
 
   const stateActivity = (location.state as { activity?: Activity } | null)
     ?.activity;
@@ -136,6 +138,13 @@ export function ActivityDetail() {
         onClose={() => navigate("/activity")}
         onViewInChannel={viewInChannel}
         scrollToMessageId={msgId}
+        onPreviewAttachment={(attachment, rootMessageId) =>
+          openFilePreview(convName, rootMessageId, attachment)
+        }
+        onJumpToSection={(attachment, sectionId, rootMessageId) =>
+          openFilePreview(convName, rootMessageId, attachment, sectionId)
+        }
+        onPreviewImage={openImagePreview}
       />
     );
   }
@@ -143,9 +152,11 @@ export function ActivityDetail() {
   // Top-level message: embed the full channel view, writable (mirroring
   // task/reminder — the user replies inline without leaving Activity). The
   // scroll target depends on the conversation:
-  //  - A DM (type 1 user↔agent or type 4 user↔user) is a single folded activity
-  //    row per chat; scroll to the user's last-read position (channel.readVersion)
-  //    so they resume reading where they left off, not at the latest message.
+  //  - A DM (type 1 user↔agent or type 4 user↔user) folds plain top-level
+  //    messages into one activity row per chat; scroll to the user's last-read
+  //    position (channel.readVersion) so they resume reading where they left
+  //    off, not at the latest message. (Task/reminder/thread items carry a
+  //    thread_root and take the ThreadPanel branch above instead.)
   //  - A channel (type 2) top-level mention scrolls to the mentioning message
   //    (the precise pointer the user was @mentioned at).
   // channel already falls back to fetchedChannel (see its declaration above),

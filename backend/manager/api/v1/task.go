@@ -84,6 +84,11 @@ func (s *CommandService) ConvertMessageToTask(ctx context.Context, req *connect.
 	}
 
 	s.postTaskSystemNotification(ctx, convID, fmt.Sprintf("📋 %s converted a message to task #%d %q", resolveActorName(ctx), msg.TaskInfo.TaskNumber, truncateContent(msg.Content)))
+
+	// A converted message is now a task root: every other user member of the
+	// conversation gets a TASK activity (best-effort), mirroring as_task sends
+	// and agent CreateTask. Mentions on the message additionally tag MENTION.
+	s.store.GenerateActivityForMessage(msg, true, false)
 	return connect.NewResponse(&v1pb.ConvertMessageToTaskResponse{Message: storeToV1ChatMessage(msg)}), nil
 }
 

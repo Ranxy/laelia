@@ -11,10 +11,22 @@ import {
 } from "@/types/proto-es/v1/command_pb";
 import type { ActivitySlice, AppSliceCreator } from "./types";
 
+// timestampEqual compares two protobuf Timestamps (seconds + nanos), treating
+// both-missing as equal.
+function timestampEqual(
+  a?: { seconds: bigint; nanos: number },
+  b?: { seconds: bigint; nanos: number }
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.seconds === b.seconds && a.nanos === b.nanos;
+}
+
 // activitiesEqual returns true when two activity arrays have the same names in
-// the same order and each activity is shallow-equal on the fields the list
-// renders. Used to skip replacing state with identical data from polling
-// refreshes, mirroring remindersEqual.
+// the same order and each activity is shallow-equal on every field the list and
+// the detail pane render (including message/thread_root, which decide whether
+// the detail opens a thread or the channel). Used to skip replacing state with
+// identical data from polling refreshes, mirroring remindersEqual.
 function activitiesEqual(a: Activity[], b: Activity[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
@@ -22,11 +34,18 @@ function activitiesEqual(a: Activity[], b: Activity[]): boolean {
     const y = b[i];
     if (
       x.name !== y.name ||
+      x.conversation !== y.conversation ||
+      x.message !== y.message ||
+      x.threadRoot !== y.threadRoot ||
       x.categories !== y.categories ||
       x.state !== y.state ||
+      x.roomVersion !== y.roomVersion ||
       x.summary !== y.summary ||
       x.senderName !== y.senderName ||
-      x.senderType !== y.senderType
+      x.senderType !== y.senderType ||
+      !timestampEqual(x.createdAt, y.createdAt) ||
+      !timestampEqual(x.readAt, y.readAt) ||
+      !timestampEqual(x.doneAt, y.doneAt)
     ) {
       return false;
     }

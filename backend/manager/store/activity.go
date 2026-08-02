@@ -298,6 +298,73 @@ func (s *Store) GenerateActivityForMessage(msg *ChatMessage, rootIsTask, rootIsR
 	}()
 }
 
+// activityUpsert is one activity row to write for a target user.
+type activityUpsert struct {
+	uid     int
+	key     uuid.UUID
+	message uuid.UUID
+	root    uuid.NullUUID
+	cats    int32
+}
+
+// planActivityUpserts computes the rows to upsert for the given category maps.
+// Plain top-level messages in a 1:1 DM fold into a single per-chat row keyed
+// by the conversation id, so the activity opens the whole chat. Thread-rooted
+// messages (task/reminder roots and every thread reply, including in DMs) fold
+// under the thread root instead, so the activity opens the thread where the
+// follow-up work actually happens. Mentions inside a thread are merged into
+// that folded row, so one task conversation stays one Activity record.
+func planActivityUpserts(isDM, inThread bool, messageID, conversationID, effectiveRoot uuid.UUID, mentionCats, threadCats map[int]int32) []activityUpsert {
+	// Union mention-only users into threadCats so every targeted user is
+	// visited exactly once by the emit loops below.
+	for uid := range mentionCats {
+		if _, ok := threadCats[uid]; ok {
+			continue
+		}
+		threadCats[uid] = 0
+	}
+
+	if isDM && !inThread {
+		// A 1:1 DM's plain top-level messages are one continuous chat, not a
+		// stream of independent notifications: fold every category for a user
+		// into ONE row keyed by the conversation id, bumped to the latest
+		// message. The row carries no thread_root so the activity opens the
+		// whole chat (scrolled to the user's last-read position), not a single
+		// message.
+		targets := make([]activityUpsert, 0, len(threadCats))
+		for uid, tc := range threadCats {
+			cats := tc | mentionCats[uid]
+			if cats == 0 {
+				continue
+			}
+			targets = append(targets, activityUpsert{
+				uid: uid, key: conversationID, message: messageID, cats: cats,
+			})
+		}
+		return targets
+	}
+
+	targets := make([]activityUpsert, 0, len(threadCats))
+	for uid, tc := range threadCats {
+		mc := mentionCats[uid]
+		if inThread {
+			// Folded thread row keyed by the root. Any @mention on the root or
+			// a reply is merged into this row instead of creating a separate
+			// MENTION record, so a task/thread stays a single activity.
+			targets = append(targets, activityUpsert{
+				uid: uid, key: effectiveRoot, message: messageID,
+				root: uuid.NullUUID{UUID: effectiveRoot, Valid: true}, cats: tc | mc,
+			})
+		} else if mc != 0 {
+			// No thread: a top-level mention is its own row keyed by the message.
+			targets = append(targets, activityUpsert{
+				uid: uid, key: messageID, message: messageID, cats: mc,
+			})
+		}
+	}
+	return targets
+}
+
 // generateActivityRows is the synchronous body of GenerateActivityForMessage.
 // See GenerateActivityForMessage for the dispatch policy and the doc below for
 // the targeting/folding contract.
@@ -307,19 +374,15 @@ func (s *Store) GenerateActivityForMessage(msg *ChatMessage, rootIsTask, rootIsR
 // helpers. The sender never gets activity for its own message.
 //
 // Row identity (activity_key) — the core folding rule:
-//   - MENTION is keyed by the mentioning message_id. Each @mention is its own
-//     precise pointer and is NEVER folded across messages, so three separate
-//     replies that each @mention a user yield three mention rows.
+//   - A top-level MENTION is keyed by the mentioning message_id. Each top-level
+//     @mention is its own precise pointer and is never folded across messages.
 //   - TASK/REMINDER/THREAD is keyed by the thread root, so the root and every
 //     later reply in that thread share ONE row bumped to the latest message (a
 //     task/reminder "is" its thread — the follow-up work happens there).
 //
-// A message that @mentions a user AND is a task/reminder/thread message can
-// produce TWO rows for that user: a mention row (keyed by the message) and a
-// folded thread row (keyed by the root). The exception is a mention ON the thread
-// root itself: there the mention's key (the message id) equals the folded key
-// (the root), so the mention is merged into the single thread row (MENTION|TASK)
-// rather than emitted twice.
+// A @mention inside a thread (on the root or on a reply) is merged into the
+// thread's folded row (MENTION|TASK|REMINDER|THREAD), so a task/thread stays a
+// single Activity record rather than spawning a second MENTION row.
 //
 // Category targeting:
 //   - MENTION:  each user mentioned in msg.Mentions (type=="user")
@@ -359,8 +422,8 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 
 	// mentionCats (MENTION) are emitted as their own rows; threadCats
 	// (TASK|REMINDER|THREAD) fold under the thread root. DIRECT (1:1 DMs) is
-	// folded into mentionCats too since it is keyed by the message id, never by
-	// the thread root — DMs are never inThread.
+	// folded into mentionCats for plain top-level messages only; task/reminder
+	// roots and thread replies get their own thread-rooted rows below.
 	mentionCats := make(map[int]int32)
 	for _, mn := range msg.Mentions {
 		if mn.Type != "user" || mn.Id == "" {
@@ -372,13 +435,14 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 		}
 		mentionCats[uid] |= ActivityCategoryMention
 	}
-	// DIRECT: a top-level message in a 1:1 DM (user<->user type=4 or
+	// DIRECT: a top-level plain message in a 1:1 DM (user<->user type=4 or
 	// user<->agent type=1) is addressed to the other user member even with no
 	// @mention. Without this, plain DM replies produce no activity row and the
 	// recipient gets no notification. Thread replies inside a DM still ride the
-	// THREAD category, so only top-level DM messages add DIRECT here. Agent
-	// senders are never in userMembers, so the user owner is targeted directly.
-	if !msg.ThreadRootMessageID.Valid && isDM {
+	// THREAD category, and a task/reminder root is its own thread workspace, so
+	// neither adds DIRECT here. Agent senders are never in userMembers, so the
+	// user owner is targeted directly.
+	if !msg.ThreadRootMessageID.Valid && !rootIsTask && !rootIsReminder && isDM {
 		for uid := range userMembers {
 			mentionCats[uid] |= ActivityCategoryDirect
 		}
@@ -432,10 +496,6 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 		effectiveRoot = msg.ID
 		inThread = true
 	}
-	threadRootNull := uuid.NullUUID{UUID: effectiveRoot, Valid: inThread}
-	// A mention ON the thread root shares the root's activity_key, so merge it
-	// into the folded thread row instead of emitting a duplicate mention row.
-	mentionOnRoot := inThread && msg.ID == effectiveRoot
 
 	// pushTargets collects the (user, categories) pairs for which an activity
 	// row was upserted, so a single detached goroutine can fan Web Push
@@ -464,48 +524,12 @@ func (s *Store) generateActivityRows(ctx context.Context, msg *ChatMessage, root
 		}
 	}
 
-	// Emit rows for every user with any category (union of mention and thread sets).
-	for uid := range mentionCats {
-		if _, ok := threadCats[uid]; ok {
-			continue
-		}
-		threadCats[uid] = 0
-	}
-	if isDM {
-		// A 1:1 DM is a single continuous chat, not a stream of independent
-		// notifications, so fold every category for a user in this conversation
-		// into ONE row keyed by the conversation id, bumped to the latest
-		// message. A plain reply, an @mention, and a thread reply in the same
-		// DM all merge into the same row (categories OR-merged) instead of
-		// spawning a row per message. The row carries no thread_root so the
-		// activity opens the whole chat (scrolled to the user's last-read
-		// position), not a single message.
-		for uid, tc := range threadCats {
-			cats := tc | mentionCats[uid]
-			if cats == 0 {
-				continue
-			}
-			upsert(uid, msg.ConversationID, msg.ID, uuid.NullUUID{}, cats)
-		}
-	} else {
-		for uid, tc := range threadCats {
-			mc := mentionCats[uid]
-			if inThread {
-				// Folded thread row keyed by the root. Merge a root-mention into it.
-				cats := tc
-				if mentionOnRoot {
-					cats |= mc
-				}
-				upsert(uid, effectiveRoot, msg.ID, uuid.NullUUID{UUID: effectiveRoot, Valid: true}, cats)
-				// A mention on a reply (not the root) gets its own row keyed by the message.
-				if mc != 0 && !mentionOnRoot {
-					upsert(uid, msg.ID, msg.ID, threadRootNull, mc)
-				}
-			} else {
-				// No thread: a top-level mention is its own row keyed by the message.
-				upsert(uid, msg.ID, msg.ID, threadRootNull, mc)
-			}
-		}
+	// Emit rows for every user with any category. The planner keeps plain DM
+	// messages folded per chat, but gives task/reminder/thread messages a
+	// thread-rooted row so Activity can open the thread (not just the channel);
+	// in-thread mentions merge into that row.
+	for _, target := range planActivityUpserts(isDM, inThread, msg.ID, msg.ConversationID, effectiveRoot, mentionCats, threadCats) {
+		upsert(target.uid, target.key, target.message, target.root, target.cats)
 	}
 
 	// Fan Web Push notifications out to every targeted user on a single detached

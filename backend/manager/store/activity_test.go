@@ -3,7 +3,9 @@ package store
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestUpsertActivityFolding locks in the thread-folding contract. The guard runs
@@ -79,4 +81,68 @@ func TestActivityReadStateClause(t *testing.T) {
 	for _, tc := range cases {
 		assert.Equal(t, tc.want, activityReadStateClause(tc.state))
 	}
+}
+
+// TestPlanActivityUpserts locks in how DM folding interacts with task/reminder
+// threads. Plain top-level DM messages keep the single per-chat row (keyed by
+// the conversation, no thread_root), but a task/reminder root or any thread
+// reply in a DM must get a thread-rooted row keyed by the thread root —
+// otherwise Activity opens the main channel list, which excludes thread
+// replies, and the user only sees the outer system notification instead of the
+// work happening inside the task.
+func TestPlanActivityUpserts(t *testing.T) {
+	msgID := uuid.New()
+	convID := uuid.New()
+	rootID := uuid.New()
+
+	t.Run("plain DM message folds into the per-chat row", func(t *testing.T) {
+		targets := planActivityUpserts(
+			true, false, msgID, convID, uuid.Nil,
+			map[int]int32{7: ActivityCategoryDirect},
+			map[int]int32{},
+		)
+		require.Len(t, targets, 1)
+		assert.Equal(t, convID, targets[0].key)
+		assert.False(t, targets[0].root.Valid)
+		assert.Equal(t, int32(ActivityCategoryDirect), targets[0].cats)
+	})
+
+	t.Run("DM task root gets a thread-rooted row", func(t *testing.T) {
+		targets := planActivityUpserts(
+			true, true, msgID, convID, msgID,
+			map[int]int32{7: ActivityCategoryMention},
+			map[int]int32{7: ActivityCategoryTask},
+		)
+		require.Len(t, targets, 1)
+		assert.Equal(t, msgID, targets[0].key)
+		assert.True(t, targets[0].root.Valid)
+		assert.Equal(t, msgID, targets[0].root.UUID)
+		assert.Equal(t, int32(ActivityCategoryTask|ActivityCategoryMention), targets[0].cats)
+	})
+
+	t.Run("DM thread reply merges a reply mention into the folded row", func(t *testing.T) {
+		targets := planActivityUpserts(
+			true, true, msgID, convID, rootID,
+			map[int]int32{7: ActivityCategoryMention},
+			map[int]int32{7: ActivityCategoryTask | ActivityCategoryThread},
+		)
+		require.Len(t, targets, 1)
+		assert.Equal(t, rootID, targets[0].key)
+		assert.True(t, targets[0].root.Valid)
+		assert.Equal(t, rootID, targets[0].root.UUID)
+		assert.Equal(t, int32(ActivityCategoryTask|ActivityCategoryThread|ActivityCategoryMention), targets[0].cats)
+	})
+
+	t.Run("channel task root keeps the same thread-rooted row shape", func(t *testing.T) {
+		targets := planActivityUpserts(
+			false, true, msgID, convID, msgID,
+			map[int]int32{},
+			map[int]int32{7: ActivityCategoryTask},
+		)
+		require.Len(t, targets, 1)
+		assert.Equal(t, msgID, targets[0].key)
+		assert.True(t, targets[0].root.Valid)
+		assert.Equal(t, msgID, targets[0].root.UUID)
+		assert.Equal(t, int32(ActivityCategoryTask), targets[0].cats)
+	})
 }
