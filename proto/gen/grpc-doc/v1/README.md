@@ -75,6 +75,15 @@
   
     - [AgentService](#laelia-v1-AgentService)
   
+- [v1/audit_log_service.proto](#v1_audit_log_service-proto)
+    - [AuditLog](#laelia-v1-AuditLog)
+    - [ExportAuditLogsRequest](#laelia-v1-ExportAuditLogsRequest)
+    - [ExportAuditLogsResponse](#laelia-v1-ExportAuditLogsResponse)
+    - [SearchAuditLogsRequest](#laelia-v1-SearchAuditLogsRequest)
+    - [SearchAuditLogsResponse](#laelia-v1-SearchAuditLogsResponse)
+  
+    - [AuditLogService](#laelia-v1-AuditLogService)
+  
 - [v1/user_service.proto](#v1_user_service-proto)
     - [BatchGetUsersRequest](#laelia-v1-BatchGetUsersRequest)
     - [BatchGetUsersResponse](#laelia-v1-BatchGetUsersResponse)
@@ -1457,6 +1466,127 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 | DownloadAgentAvatar | [DownloadAgentAvatarRequest](#laelia-v1-DownloadAgentAvatarRequest) | [DownloadAgentAvatarResponse](#laelia-v1-DownloadAgentAvatarResponse) | DownloadAgentAvatar fetches an agent&#39;s avatar image bytes. Any authenticated user may download any agent&#39;s avatar (workspace-internal profile image). |
 | DeleteAgentAvatar | [DeleteAgentAvatarRequest](#laelia-v1-DeleteAgentAvatarRequest) | [Agent](#laelia-v1-Agent) | DeleteAgentAvatar clears an agent&#39;s avatar, reverting to the pixel default. Requires laelia.agents.edit on the agent. |
 | Hello | [HelloRequest](#laelia-v1-HelloRequest) | [HelloResponse](#laelia-v1-HelloResponse) | Health check (no auth required) |
+
+ 
+
+
+
+<a name="v1_audit_log_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/audit_log_service.proto
+
+
+
+<a name="laelia-v1-AuditLog"></a>
+
+### AuditLog
+AuditLog is one audited API call: who did what, on which resource, with the
+structured change payload (e.g. IAM binding deltas) when the method records
+one. Audit logs are written by the audit interceptor for methods annotated
+with audit=true.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The audit log resource name, in the form &#34;auditLogs/{id}&#34;. |
+| method | [string](#string) |  | The RPC method, e.g. &#34;/laelia.v1.IamService/SetWorkspaceIamPolicy&#34;. |
+| actor_type | [string](#string) |  | The caller type: &#34;user&#34;, &#34;agent&#34;, or &#34;unknown&#34;. |
+| actor_id | [string](#string) |  | The caller identifier: user email or agent resource id. |
+| source_ip | [string](#string) |  | The caller&#39;s source IP. |
+| status | [string](#string) |  | The outcome status: &#34;ok&#34; or a connect code string. |
+| error | [string](#string) |  | The error message when the call failed. |
+| resource | [string](#string) |  | The target resource of the call, e.g. &#34;agents/{rid}&#34; or &#34;workspaces/-&#34;. |
+| payload | [string](#string) |  | The structured change payload as JSON (e.g. IAM binding deltas), empty when the method records none. |
+| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | When the call happened. |
+
+
+
+
+
+
+<a name="laelia-v1-ExportAuditLogsRequest"></a>
+
+### ExportAuditLogsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| filter | [string](#string) |  | Same filter syntax as SearchAuditLogsRequest.filter. |
+| order_by | [string](#string) |  | Order by create_time; only &#34;create_time desc&#34; (default) and &#34;create_time asc&#34; are supported. |
+| limit | [int32](#int32) |  | The maximum number of rows to export. Defaults to 10000, capped at 100000. |
+
+
+
+
+
+
+<a name="laelia-v1-ExportAuditLogsResponse"></a>
+
+### ExportAuditLogsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| content | [string](#string) |  | The audit logs as CSV: name, method, actor_type, actor_id, source_ip, status, error, resource, payload, create_time. |
+
+
+
+
+
+
+<a name="laelia-v1-SearchAuditLogsRequest"></a>
+
+### SearchAuditLogsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| page_size | [int32](#int32) |  | The maximum number of logs to return. The service may return fewer than this value. If unspecified, at most 100 logs will be returned. |
+| page_token | [string](#string) |  | A page token, received from a previous SearchAuditLogs call. |
+| filter | [string](#string) |  | Filter is used to filter audit logs. Supported fields (equality): - method: the RPC method, e.g. &#34;/laelia.v1.IamService/SetWorkspaceIamPolicy&#34;. - actor: the caller identifier (email or agent resource id). - resource: the target resource name. - status: the outcome status (&#34;ok&#34; or a connect code string). Example: method = &#34;/laelia.v1.IamService/SetWorkspaceIamPolicy&#34; |
+| order_by | [string](#string) |  | Order by create_time; only &#34;create_time desc&#34; (default) and &#34;create_time asc&#34; are supported. |
+
+
+
+
+
+
+<a name="laelia-v1-SearchAuditLogsResponse"></a>
+
+### SearchAuditLogsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| audit_logs | [AuditLog](#laelia-v1-AuditLog) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="laelia-v1-AuditLogService"></a>
+
+### AuditLogService
+AuditLogService exposes the structured audit trail. Search and export are
+admin-tier (laelia.auditLogs.search / laelia.auditLogs.export).
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| SearchAuditLogs | [SearchAuditLogsRequest](#laelia-v1-SearchAuditLogsRequest) | [SearchAuditLogsResponse](#laelia-v1-SearchAuditLogsResponse) | Search audit logs with filtering and pagination. |
+| ExportAuditLogs | [ExportAuditLogsRequest](#laelia-v1-ExportAuditLogsRequest) | [ExportAuditLogsResponse](#laelia-v1-ExportAuditLogsResponse) | Export audit logs as CSV. |
 
  
 

@@ -1158,6 +1158,95 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/auditLogs:export:
+        get:
+            tags:
+                - AuditLogService
+            description: Export audit logs as CSV.
+            operationId: AuditLogService_ExportAuditLogs
+            parameters:
+                - name: filter
+                  in: query
+                  description: Same filter syntax as SearchAuditLogsRequest.filter.
+                  schema:
+                    type: string
+                - name: orderBy
+                  in: query
+                  description: |-
+                    Order by create_time; only "create_time desc" (default) and
+                     "create_time asc" are supported.
+                  schema:
+                    type: string
+                - name: limit
+                  in: query
+                  description: The maximum number of rows to export. Defaults to 10000, capped at 100000.
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ExportAuditLogsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/auditLogs:search:
+        get:
+            tags:
+                - AuditLogService
+            description: Search audit logs with filtering and pagination.
+            operationId: AuditLogService_SearchAuditLogs
+            parameters:
+                - name: pageSize
+                  in: query
+                  description: |-
+                    The maximum number of logs to return. The service may return fewer than
+                     this value. If unspecified, at most 100 logs will be returned.
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  description: A page token, received from a previous SearchAuditLogs call.
+                  schema:
+                    type: string
+                - name: filter
+                  in: query
+                  description: |-
+                    Filter is used to filter audit logs. Supported fields (equality):
+                     - method: the RPC method, e.g. "/laelia.v1.IamService/SetWorkspaceIamPolicy".
+                     - actor: the caller identifier (email or agent resource id).
+                     - resource: the target resource name.
+                     - status: the outcome status ("ok" or a connect code string).
+                     Example: method = "/laelia.v1.IamService/SetWorkspaceIamPolicy"
+                  schema:
+                    type: string
+                - name: orderBy
+                  in: query
+                  description: |-
+                    Order by create_time; only "create_time desc" (default) and
+                     "create_time asc" are supported.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/SearchAuditLogsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/auth/login:
         post:
             tags:
@@ -4325,6 +4414,47 @@ components:
                  comment anchoring a span of a file (e.g. a markdown section) rather than a
                  whole-file upload. They are caller-supplied (the file row is not their
                  source of truth) and left empty for ordinary whole-file attachments.
+        AuditLog:
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: The audit log resource name, in the form "auditLogs/{id}".
+                method:
+                    type: string
+                    description: The RPC method, e.g. "/laelia.v1.IamService/SetWorkspaceIamPolicy".
+                actorType:
+                    type: string
+                    description: 'The caller type: "user", "agent", or "unknown".'
+                actorId:
+                    type: string
+                    description: 'The caller identifier: user email or agent resource id.'
+                sourceIp:
+                    type: string
+                    description: The caller's source IP.
+                status:
+                    type: string
+                    description: 'The outcome status: "ok" or a connect code string.'
+                error:
+                    type: string
+                    description: The error message when the call failed.
+                resource:
+                    type: string
+                    description: The target resource of the call, e.g. "agents/{rid}" or "workspaces/-".
+                payload:
+                    type: string
+                    description: |-
+                        The structured change payload as JSON (e.g. IAM binding deltas), empty
+                         when the method records none.
+                createTime:
+                    type: string
+                    description: When the call happened.
+                    format: date-time
+            description: |-
+                AuditLog is one audited API call: who did what, on which resource, with the
+                 structured change payload (e.g. IAM binding deltas) when the method records
+                 one. Audit logs are written by the audit interceptor for methods annotated
+                 with audit=true.
         BatchGetGroupsResponse:
             type: object
             properties:
@@ -5023,6 +5153,14 @@ components:
                     type: string
                 newText:
                     type: string
+        ExportAuditLogsResponse:
+            type: object
+            properties:
+                content:
+                    type: string
+                    description: |-
+                        The audit logs as CSV: name, method, actor_type, actor_id, source_ip,
+                         status, error, resource, payload, create_time.
         Expr:
             type: object
             properties:
@@ -6213,6 +6351,15 @@ components:
                  back file upload/download. When endpoint and bucket are both empty, S3 is
                  considered unconfigured and upload/download endpoints reject with
                  "s3 not configured".
+        SearchAuditLogsResponse:
+            type: object
+            properties:
+                auditLogs:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AuditLog'
+                nextPageToken:
+                    type: string
         SearchChatHistoryResponse:
             type: object
             properties:
@@ -6688,6 +6835,10 @@ components:
                     type: string
 tags:
     - name: AgentService
+    - name: AuditLogService
+      description: |-
+        AuditLogService exposes the structured audit trail. Search and export are
+         admin-tier (laelia.auditLogs.search / laelia.auditLogs.export).
     - name: AuthService
     - name: CommandService
     - name: GroupService

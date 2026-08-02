@@ -456,6 +456,41 @@
         
           
           <li>
+            <a href="#v1%2faudit_log_service.proto">v1/audit_log_service.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.v1.AuditLog"><span class="badge">M</span>AuditLog</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ExportAuditLogsRequest"><span class="badge">M</span>ExportAuditLogsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ExportAuditLogsResponse"><span class="badge">M</span>ExportAuditLogsResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SearchAuditLogsRequest"><span class="badge">M</span>SearchAuditLogsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SearchAuditLogsResponse"><span class="badge">M</span>SearchAuditLogsResponse</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#laelia.v1.AuditLogService"><span class="badge">S</span>AuditLogService</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
             <a href="#v1%2fuser_service.proto">v1/user_service.proto</a>
             <ul>
               
@@ -4428,6 +4463,319 @@ Requires laelia.agents.edit on the agent.</p></td>
                 <td>POST</td>
                 <td>/v1/agent/hello</td>
                 <td>*</td>
+              </tr>
+              
+            
+            </tbody>
+          </table>
+          
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="v1/audit_log_service.proto">v1/audit_log_service.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.v1.AuditLog">AuditLog</h3>
+        <p>AuditLog is one audited API call: who did what, on which resource, with the</p><p>structured change payload (e.g. IAM binding deltas) when the method records</p><p>one. Audit logs are written by the audit interceptor for methods annotated</p><p>with audit=true.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The audit log resource name, in the form &#34;auditLogs/{id}&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>method</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The RPC method, e.g. &#34;/laelia.v1.IamService/SetWorkspaceIamPolicy&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>actor_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The caller type: &#34;user&#34;, &#34;agent&#34;, or &#34;unknown&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>actor_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The caller identifier: user email or agent resource id. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>source_ip</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The caller&#39;s source IP. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>status</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The outcome status: &#34;ok&#34; or a connect code string. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>error</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The error message when the call failed. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>resource</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The target resource of the call, e.g. &#34;agents/{rid}&#34; or &#34;workspaces/-&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>payload</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The structured change payload as JSON (e.g. IAM binding deltas), empty
+when the method records none. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>create_time</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p>When the call happened. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ExportAuditLogsRequest">ExportAuditLogsRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>filter</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Same filter syntax as SearchAuditLogsRequest.filter. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>order_by</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Order by create_time; only &#34;create_time desc&#34; (default) and
+&#34;create_time asc&#34; are supported. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>limit</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>The maximum number of rows to export. Defaults to 10000, capped at 100000. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ExportAuditLogsResponse">ExportAuditLogsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>content</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The audit logs as CSV: name, method, actor_type, actor_id, source_ip,
+status, error, resource, payload, create_time. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SearchAuditLogsRequest">SearchAuditLogsRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>The maximum number of logs to return. The service may return fewer than
+this value. If unspecified, at most 100 logs will be returned. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>A page token, received from a previous SearchAuditLogs call. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>filter</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Filter is used to filter audit logs. Supported fields (equality):
+- method: the RPC method, e.g. &#34;/laelia.v1.IamService/SetWorkspaceIamPolicy&#34;.
+- actor: the caller identifier (email or agent resource id).
+- resource: the target resource name.
+- status: the outcome status (&#34;ok&#34; or a connect code string).
+Example: method = &#34;/laelia.v1.IamService/SetWorkspaceIamPolicy&#34; </p></td>
+                </tr>
+              
+                <tr>
+                  <td>order_by</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Order by create_time; only &#34;create_time desc&#34; (default) and
+&#34;create_time asc&#34; are supported. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SearchAuditLogsResponse">SearchAuditLogsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>audit_logs</td>
+                  <td><a href="#laelia.v1.AuditLog">AuditLog</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="laelia.v1.AuditLogService">AuditLogService</h3>
+        <p>AuditLogService exposes the structured audit trail. Search and export are</p><p>admin-tier (laelia.auditLogs.search / laelia.auditLogs.export).</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>SearchAuditLogs</td>
+                <td><a href="#laelia.v1.SearchAuditLogsRequest">SearchAuditLogsRequest</a></td>
+                <td><a href="#laelia.v1.SearchAuditLogsResponse">SearchAuditLogsResponse</a></td>
+                <td><p>Search audit logs with filtering and pagination.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ExportAuditLogs</td>
+                <td><a href="#laelia.v1.ExportAuditLogsRequest">ExportAuditLogsRequest</a></td>
+                <td><a href="#laelia.v1.ExportAuditLogsResponse">ExportAuditLogsResponse</a></td>
+                <td><p>Export audit logs as CSV.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+          
+          
+          <h4>Methods with HTTP bindings</h4>
+          <table>
+            <thead>
+              <tr>
+                <td>Method Name</td>
+                <td>Method</td>
+                <td>Pattern</td>
+                <td>Body</td>
+              </tr>
+            </thead>
+            <tbody>
+            
+              
+              
+              <tr>
+                <td>SearchAuditLogs</td>
+                <td>GET</td>
+                <td>/v1/auditLogs:search</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ExportAuditLogs</td>
+                <td>GET</td>
+                <td>/v1/auditLogs:export</td>
+                <td></td>
               </tr>
               
             

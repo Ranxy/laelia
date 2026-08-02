@@ -53,6 +53,8 @@
     {"name": "GroupsGet", "id": "laelia.groups.get"},
     {"name": "GroupsList", "id": "laelia.groups.list"},
     {"name": "GroupsUpdate", "id": "laelia.groups.update"},
-    {"name": "GroupsDelete", "id": "laelia.groups.delete"}
+    {"name": "GroupsDelete", "id": "laelia.groups.delete"},
+    {"name": "AuditLogsSearch", "id": "laelia.auditLogs.search"},
+    {"name": "AuditLogsExport", "id": "laelia.auditLogs.export"}
   ]
 }
