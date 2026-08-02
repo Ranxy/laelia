@@ -121,22 +121,9 @@ export function SettingsGroupsPage() {
       ]);
       setGroups(groupRes.groups ?? []);
       setUsers(userRes.users ?? []);
-      // Fetch references for every group in parallel so the table can show
-      // how many policies bind each group before deletion.
-      const refs = new Map<string, GroupReference[]>();
-      await Promise.all(
-        (groupRes.groups ?? []).map(async (g) => {
-          try {
-            const res = await groupServiceClient.getGroupReferences({
-              name: g.name ?? "",
-            });
-            refs.set(g.name ?? "", res.references ?? []);
-          } catch {
-            refs.set(g.name ?? "", []);
-          }
-        })
-      );
-      setRefsByGroup(refs);
+      // References are fetched lazily per group when its references row is
+      // expanded (see toggleRefs) — fetching them for every group on load was
+      // an N+1 burst that most pages never displayed.
     } catch (err) {
       toastManager.add({
         type: "error",
@@ -147,6 +134,33 @@ export function SettingsGroupsPage() {
       setLoading(false);
     }
   }, [t]);
+
+  // Fetch a group's policy references lazily the first time its references row
+  // is expanded, then toggle the expansion. Without this the page load fired a
+  // getGroupReferences RPC for every group, most of which are never displayed.
+  const toggleRefs = useCallback(
+    async (groupName: string) => {
+      if (!refsByGroup.has(groupName)) {
+        try {
+          const res = await groupServiceClient.getGroupReferences({
+            name: groupName,
+          });
+          setRefsByGroup((prev) =>
+            new Map(prev).set(groupName, res.references ?? [])
+          );
+        } catch {
+          setRefsByGroup((prev) => new Map(prev).set(groupName, []));
+        }
+      }
+      setExpandedRefs((prev) => {
+        const next = new Set(prev);
+        if (next.has(groupName)) next.delete(groupName);
+        else next.add(groupName);
+        return next;
+      });
+    },
+    [refsByGroup]
+  );
 
   useEffect(() => {
     if (canList) load();
@@ -355,23 +369,26 @@ export function SettingsGroupsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() =>
-                          setExpandedRefs((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(group.name ?? ""))
-                              next.delete(group.name ?? "");
-                            else next.add(group.name ?? "");
-                            return next;
-                          })
-                        }
+                        onClick={() => toggleRefs(group.name ?? "")}
                         aria-expanded={expanded}
                       >
                         {t("settings.groups.references-count", {
                           count: refs.length,
                         })}
                       </Button>
-                    ) : (
+                    ) : refsByGroup.has(group.name ?? "") ? (
+                      // Loaded and genuinely reference-free.
                       <span className="text-control-placeholder">—</span>
+                    ) : (
+                      // Not yet loaded — fetch on first click.
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleRefs(group.name ?? "")}
+                        aria-expanded={expanded}
+                      >
+                        {t("settings.groups.header-references")}
+                      </Button>
                     )}
                   </TableCell>
                   <TableCell className="text-right">

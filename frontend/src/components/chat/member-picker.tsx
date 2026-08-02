@@ -9,6 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { SearchInput } from "@/components/ui/search-input";
+import { userServiceClient } from "@/connect";
 import { buildUserFilter } from "@/lib/user-filter";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -68,15 +69,17 @@ export function MemberPicker({
   placeholder,
 }: MemberPickerProps) {
   const { t } = useTranslation();
-  const users = useAppStore((s) => s.users);
-  const usersLoading = useAppStore((s) => s.usersLoading);
-  const fetchUsers = useAppStore((s) => s.fetchUsers);
   const agents = useAppStore((s) => s.agents);
+  const fetchAgents = useAppStore((s) => s.fetchAgents);
   const currentUser = useAppStore((s) => s.currentUser);
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // User search results live in local state (not the shared users roster) so a
+  // filtered picker fetch can never clobber the roster other pages depend on.
+  const [userResults, setUserResults] = useState<User[]>([]);
+  const [userResultsLoading, setUserResultsLoading] = useState(false);
 
   const isUser = memberType === 1;
   // Workspace admins hold laelia.agents.edit and may add any agent; everyone
@@ -84,17 +87,39 @@ export function MemberPicker({
   const isAdmin =
     currentUser?.permissions?.includes("laelia.agents.edit") ?? false;
 
-  // Debounced backend search for users; agents are filtered client-side.
+  // Debounced backend search for users (local state); agents are filtered
+  // client-side from the shared roster below.
   useEffect(() => {
     if (!open || !isUser) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      fetchUsers({ pageSize: 50, filter: buildUserFilter(query) });
+    debounceRef.current = setTimeout(async () => {
+      setUserResultsLoading(true);
+      try {
+        const res = await userServiceClient.listUsers({
+          pageSize: 50,
+          filter: buildUserFilter(query),
+        });
+        setUserResults(res.users ?? []);
+      } catch {
+        setUserResults([]);
+      } finally {
+        setUserResultsLoading(false);
+      }
     }, 250);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [open, isUser, query, fetchUsers]);
+  }, [open, isUser, query]);
+
+  // The agent list filters the shared roster client-side; ensure the roster is
+  // loaded when the picker opens so it's never empty just because the user
+  // hasn't visited the members/agents pages yet.
+  useEffect(() => {
+    if (!open || isUser) return;
+    if (useAppStore.getState().agents.length === 0) {
+      fetchAgents({ pageSize: 100 });
+    }
+  }, [open, isUser, fetchAgents]);
 
   // Reset the search box whenever the picker closes or switches type.
   useEffect(() => {
@@ -102,7 +127,7 @@ export function MemberPicker({
   }, [open]);
 
   const options = useMemo<Option[]>(() => {
-    if (isUser) return users.map(userOption);
+    if (isUser) return userResults.map(userOption);
     const q = query.trim().toLowerCase();
     return agents
       .filter(
@@ -118,7 +143,7 @@ export function MemberPicker({
           o.label.toLowerCase().includes(q) ||
           o.memberId.toLowerCase().includes(q)
       );
-  }, [isUser, users, agents, query, isAdmin, currentUser?.name]);
+  }, [isUser, userResults, agents, query, isAdmin, currentUser?.name]);
 
   function handleToggle(o: Option) {
     if (existingMemberIds.has(o.memberId)) return;
@@ -164,18 +189,18 @@ export function MemberPicker({
           className="text-xs"
         />
         <div className="flex-1 overflow-y-auto">
-          {(isUser ? usersLoading : false) && (
+          {(isUser ? userResultsLoading : false) && (
             <div className="flex items-center justify-center gap-2 py-6 text-xs text-control-light">
               <Loader2 className="size-3.5 animate-spin" />
               {t("common.loading")}
             </div>
           )}
-          {!(isUser ? usersLoading : false) && options.length === 0 && (
+          {!(isUser ? userResultsLoading : false) && options.length === 0 && (
             <p className="py-6 text-center text-xs text-control-light">
               {t("channel.no-results")}
             </p>
           )}
-          {!(isUser ? usersLoading : false) &&
+          {!(isUser ? userResultsLoading : false) &&
             options.map((o) => {
               const joined = existingMemberIds.has(o.memberId);
               const selected = value.includes(o.memberId);

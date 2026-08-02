@@ -69,11 +69,15 @@ export function MachinesPage() {
   const anyNonOnline = machines.some(
     (m) => m.status?.state !== MachineStatus_ConnectionState.ONLINE
   );
+  // Machine connection-state transitions are not time-critical; 10s (was 3s)
+  // still flips the list to "online" promptly once the machine app connects
+  // while keeping the poll traffic during an outage at ~6 req/min instead of
+  // ~20.
   useEffect(() => {
     if (!anyNonOnline) return;
     const id = setInterval(
       () => fetchMachines({ pageSize: 100 }, { silent: true }),
-      3000
+      10000
     );
     return () => clearInterval(id);
   }, [anyNonOnline, fetchMachines]);

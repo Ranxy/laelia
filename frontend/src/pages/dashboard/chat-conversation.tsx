@@ -217,7 +217,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // takes effect on the next render without a reload.
   const enterToSend = currentUser?.chatPreferences?.enterToSend ?? true;
   const fetchAgents = useAppStore((s) => s.fetchAgents);
-  const fetchChannels = useAppStore((s) => s.fetchChannels);
   const openThread = useAppStore((s) => s.openThread);
   const closeThread = useAppStore((s) => s.closeThread);
   const activeThreadRoot = useAppStore((s) => s.activeThreadRoot);
@@ -401,12 +400,15 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
       // load failed
     }
     listChannelMembers(channelId);
-    fetchAgents({ pageSize: 100 });
-    fetchChannels();
-
-    // Clear the unread badge for this conversation now that the user has it
-    // open. Done after loadMessages so the cursor advance reflects the latest
-    // fetched version.
+    // Load the agent roster once per session (thread titles / the add-member
+    // picker rely on it) without clobbering the drained roster on every channel
+    // switch — fetchAgents replaces the slice with its one page.
+    if (useAppStore.getState().agents.length === 0) {
+      fetchAgents({ pageSize: 100 });
+    }
+    // fetchChannels is intentionally omitted here: ChatLayout owns the 5s
+    // left-rail poll, and markConversationRead below clears this
+    // conversation's badge locally, so an extra fetch would triple up.
     markConversationRead(channelId);
 
     // Start background polling for new messages and agent activity.
@@ -417,7 +419,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     loadMessages,
     listChannelMembers,
     fetchAgents,
-    fetchChannels,
     markConversationRead,
     startWatchingChannel,
     stopWatchingChannel,

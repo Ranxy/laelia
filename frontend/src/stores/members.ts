@@ -27,16 +27,20 @@ export const createMembersSlice: AppSliceCreator<MembersSlice> = (
     // swapping the rail to a "Loading…" state on every re-entry.
     if (!silent) set({ membersLoading: true, membersError: false });
     try {
-      const users = await drainRoster(
-        (pageToken) => get().fetchUsers({ pageSize: 100, pageToken }),
-        () => get().users,
-        (rows) => set({ users: rows })
-      );
-      const agents = await drainRoster(
-        (pageToken) => get().fetchAgents({ pageSize: 100, pageToken }),
-        () => get().agents,
-        (rows) => set({ agents: rows })
-      );
+      // Drain the user and agent rosters in parallel (they touch independent
+      // slices) — the sequential loop previously doubled the wall-clock time.
+      const [users, agents] = await Promise.all([
+        drainRoster(
+          (pageToken) => get().fetchUsers({ pageSize: 100, pageToken }),
+          () => get().users,
+          (rows) => set({ users: rows })
+        ),
+        drainRoster(
+          (pageToken) => get().fetchAgents({ pageSize: 100, pageToken }),
+          () => get().agents,
+          (rows) => set({ agents: rows })
+        ),
+      ]);
       // fetchUsers/fetchAgents return undefined on a failed fetch and clear
       // their slice to []; either roster failing means the directory is not
       // trustworthy, so we surface a load error rather than a partial list.

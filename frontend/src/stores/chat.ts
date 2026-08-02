@@ -42,28 +42,36 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       chatLoading: { ...state.chatLoading, [conversation]: true },
     }));
     try {
-      // No version filter: the backend returns the latest N messages in
-      // chronological order (newest at the bottom), plus the conversation's
-      // current_version. We cache that version so the channel watcher can poll
-      // incrementally (after_version) instead of re-fetching the whole list.
+      // When a previous load (or the watcher) already populated this
+      // conversation, fetch only messages newer than the cached cursor so
+      // switching A→B→A does not re-download the whole 200-message history.
+      // A first load (version 0) still returns the latest N messages.
+      const afterVersion = get().chatCurrentVersion[conversation] ?? 0n;
       const res = await commandServiceClient.listConversationMessages(
         create(ListConversationMessagesRequestSchema, {
           conversation,
           pageSize: 200,
           pageToken: "",
+          afterVersion,
         })
       );
 
       const uiMsgs: ChatMessageUI[] = (res.messages ?? []).map(toUiMessage);
 
-      set((state) => ({
-        chatMessages: { ...state.chatMessages, [conversation]: uiMsgs },
-        chatCurrentVersion: {
-          ...state.chatCurrentVersion,
-          [conversation]: res.currentVersion,
-        },
-        chatLoading: { ...state.chatLoading, [conversation]: false },
-      }));
+      set((state) => {
+        const prev = state.chatMessages[conversation] ?? [];
+        // Merge rather than replace so a re-entry cannot wipe rows the watcher
+        // appended or an optimistic send is still awaiting its echo.
+        const merged = appendNewMessages(prev, uiMsgs);
+        return {
+          chatMessages: { ...state.chatMessages, [conversation]: merged },
+          chatCurrentVersion: {
+            ...state.chatCurrentVersion,
+            [conversation]: res.currentVersion,
+          },
+          chatLoading: { ...state.chatLoading, [conversation]: false },
+        };
+      });
     } catch {
       set((state) => ({
         chatLoading: { ...state.chatLoading, [conversation]: false },

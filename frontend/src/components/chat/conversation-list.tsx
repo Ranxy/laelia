@@ -1,5 +1,5 @@
 import { Hash, Loader2, Pin, PinOff, Plus } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { Avatar } from "@/components/chat/avatar";
@@ -28,7 +28,6 @@ export function ConversationList() {
   const channels = useAppStore((s) => s.channels);
   const channelsLoading = useAppStore((s) => s.channelsLoading);
   const unreadByConv = useAppStore((s) => s.unreadByConv);
-  const fetchChannels = useAppStore((s) => s.fetchChannels);
   const createChannel = useAppStore((s) => s.createChannel);
   const setConversationPinned = useAppStore((s) => s.setConversationPinned);
 
@@ -37,9 +36,9 @@ export function ConversationList() {
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
 
-  useEffect(() => {
-    fetchChannels();
-  }, [fetchChannels]);
+  // No mount fetch here: ChatLayout (the only host of this list) owns the
+  // listChannels fetch + 5s poll, so fetching again here duplicated the request
+  // on every /chat entry.
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

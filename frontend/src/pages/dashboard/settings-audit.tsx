@@ -1,5 +1,5 @@
 import { Download, Search, X } from "lucide-react";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -85,9 +85,24 @@ export function SettingsAuditPage() {
     [method, actor, status, t]
   );
 
+  // Debounced load of the filtered results. The first run fires immediately so
+  // the list appears without waiting; later filter edits (which change `load`'s
+  // identity) refetch once the query settles — without this, typing a filter
+  // fired a searchAuditLogs request per keystroke. The explicit Filter button
+  // still calls load("") directly.
+  const initialLoadDone = useRef(false);
   useEffect(() => {
-    if (canView) load("");
-    else setLoading(false);
+    if (!canView) {
+      setLoading(false);
+      return;
+    }
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true;
+      void load("");
+      return;
+    }
+    const timer = setTimeout(() => void load(""), 250);
+    return () => clearTimeout(timer);
   }, [canView, load]);
 
   const exportCsv = async () => {
