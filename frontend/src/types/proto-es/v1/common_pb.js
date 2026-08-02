@@ -8,7 +8,7 @@ import { enumDesc, fileDesc, messageDesc, tsEnum } from "@bufbuild/protobuf/code
  * Describes the file v1/common.proto.
  */
 export const file_v1_common = /*@__PURE__*/
-  fileDesc("Cg92MS9jb21tb24ucHJvdG8SCWxhZWxpYS52MSIoCghQb3NpdGlvbhIMCgRsaW5lGAEgASgFEg4KBmNvbHVtbhgCIAEoBSIjCgVSYW5nZRINCgVzdGFydBgBIAEoBRILCgNlbmQYAiABKAUqNwoFU3RhdGUSFQoRU1RBVEVfVU5TUEVDSUZJRUQQABIKCgZBQ1RJVkUQARILCgdERUxFVEVEEAIqSAoJUmlza0xldmVsEhoKFlJJU0tfTEVWRUxfVU5TUEVDSUZJRUQQABIHCgNMT1cQARIMCghNT0RFUkFURRACEggKBEhJR0gQA0IxWi9naXRodWIuY29tL1Jhbnh5L2xhZWxpYS9iYWNrZW5kL2dlbmVyYXRlZC1nby92MWIGcHJvdG8z");
+  fileDesc("Cg92MS9jb21tb24ucHJvdG8SCWxhZWxpYS52MSIoCghQb3NpdGlvbhIMCgRsaW5lGAEgASgFEg4KBmNvbHVtbhgCIAEoBSIjCgVSYW5nZRINCgVzdGFydBgBIAEoBRILCgNlbmQYAiABKAUiWQoWUGVybWlzc2lvbkRlbmllZERldGFpbBIOCgZtZXRob2QYASABKAkSHAoUcmVxdWlyZWRfcGVybWlzc2lvbnMYAiADKAkSEQoJcmVzb3VyY2VzGAMgAygJKjcKBVN0YXRlEhUKEVNUQVRFX1VOU1BFQ0lGSUVEEAASCgoGQUNUSVZFEAESCwoHREVMRVRFRBACKkgKCVJpc2tMZXZlbBIaChZSSVNLX0xFVkVMX1VOU1BFQ0lGSUVEEAASBwoDTE9XEAESDAoITU9ERVJBVEUQAhIICgRISUdIEANCMVovZ2l0aHViLmNvbS9SYW54eS9sYWVsaWEvYmFja2VuZC9nZW5lcmF0ZWQtZ28vdjFiBnByb3RvMw");
 
 /**
  * Describes the message laelia.v1.Position.
@@ -23,6 +23,13 @@ export const PositionSchema = /*@__PURE__*/
  */
 export const RangeSchema = /*@__PURE__*/
   messageDesc(file_v1_common, 1);
+
+/**
+ * Describes the message laelia.v1.PermissionDeniedDetail.
+ * Use `create(PermissionDeniedDetailSchema)` to create a new message.
+ */
+export const PermissionDeniedDetailSchema = /*@__PURE__*/
+  messageDesc(file_v1_common, 2);
 
 /**
  * Describes the enum laelia.v1.State.

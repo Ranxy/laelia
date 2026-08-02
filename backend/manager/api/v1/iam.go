@@ -8,6 +8,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/common"
 	"github.com/Ranxy/laelia/backend/common/permission"
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -48,7 +49,7 @@ func newIAMInterceptorWithChecker(checker PermissionChecker) *IAMInterceptor {
 // permission string are not gated here (the handler remains responsible). When
 // the request carries a recognizable resource (resolveResource), it is passed
 // to CheckPermission so per-resource IAM policies are consulted too.
-func (in *IAMInterceptor) authorize(ctx context.Context, req connect.AnyRequest) error {
+func (in *IAMInterceptor) authorize(ctx context.Context, req connect.AnyRequest, fullMethod string) error {
 	authCtx, ok := common.GetAuthContextFromContext(ctx)
 	if !ok {
 		// No auth context: the request did not pass through the auth interceptor
@@ -85,14 +86,26 @@ func (in *IAMInterceptor) authorize(ctx context.Context, req connect.AnyRequest)
 		return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check permission"))
 	}
 	if !ok {
-		return connect.NewError(connect.CodePermissionDenied, errors.Errorf("permission %q denied", authCtx.Permission))
+		err := connect.NewError(connect.CodePermissionDenied, errors.Errorf("permission %q denied", authCtx.Permission))
+		var resources []string
+		if resource != nil {
+			resources = append(resources, resource.Name)
+		}
+		if detail, detailErr := connect.NewErrorDetail(&v1pb.PermissionDeniedDetail{
+			Method:              fullMethod,
+			RequiredPermissions: []string{authCtx.Permission},
+			Resources:           resources,
+		}); detailErr == nil {
+			err.AddDetail(detail)
+		}
+		return err
 	}
 	return nil
 }
 
 func (in *IAMInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		if err := in.authorize(ctx, req); err != nil {
+		if err := in.authorize(ctx, req, req.Spec().Procedure); err != nil {
 			return nil, err
 		}
 		return next(ctx, req)
@@ -111,7 +124,7 @@ func (in *IAMInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc
 		// Receive); per-resource authorization for streaming RPCs is deferred to
 		// Phase 3's first-Receive wrapper. Workspace-scoped authorization still
 		// applies.
-		if err := in.authorize(ctx, nil); err != nil {
+		if err := in.authorize(ctx, nil, conn.Spec().Procedure); err != nil {
 			return err
 		}
 		return next(ctx, conn)

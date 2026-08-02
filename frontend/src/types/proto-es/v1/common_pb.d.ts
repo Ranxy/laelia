@@ -60,6 +60,44 @@ export declare type Range = Message<"laelia.v1.Range"> & {
 export declare const RangeSchema: GenMessage<Range>;
 
 /**
+ * PermissionDeniedDetail describes why an IAM-gated RPC was denied: the
+ * required permission and, when the request carries a recognizable resource,
+ * the resource that failed the check. It is attached to PermissionDenied
+ * errors by the IAM interceptor so clients can render what access is missing.
+ *
+ * @generated from message laelia.v1.PermissionDeniedDetail
+ */
+export declare type PermissionDeniedDetail = Message<"laelia.v1.PermissionDeniedDetail"> & {
+  /**
+   * The RPC method that was denied, e.g. "/laelia.v1.IamService/SetWorkspaceIamPolicy".
+   *
+   * @generated from field: string method = 1;
+   */
+  method: string;
+
+  /**
+   * The permission the caller lacked, e.g. "laelia.iam.setPolicy".
+   *
+   * @generated from field: repeated string required_permissions = 2;
+   */
+  requiredPermissions: string[];
+
+  /**
+   * The resources the permission was checked against (resource names such as
+   * "agents/{agent}"). Empty for workspace-scoped checks.
+   *
+   * @generated from field: repeated string resources = 3;
+   */
+  resources: string[];
+};
+
+/**
+ * Describes the message laelia.v1.PermissionDeniedDetail.
+ * Use `create(PermissionDeniedDetailSchema)` to create a new message.
+ */
+export declare const PermissionDeniedDetailSchema: GenMessage<PermissionDeniedDetail>;
+
+/**
  * @generated from enum laelia.v1.State
  */
 export enum State {

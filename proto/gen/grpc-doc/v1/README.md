@@ -12,6 +12,7 @@
     - [File-level Extensions](#v1_annotation-proto-extensions)
   
 - [v1/common.proto](#v1_common-proto)
+    - [PermissionDeniedDetail](#laelia-v1-PermissionDeniedDetail)
     - [Position](#laelia-v1-Position)
     - [Range](#laelia-v1-Range)
   
@@ -272,11 +273,16 @@
     - [CommandService](#laelia-v1-CommandService)
   
 - [v1/iam_service.proto](#v1_iam_service-proto)
+    - [BindingDelta](#laelia-v1-BindingDelta)
     - [GetAgentIamPolicyRequest](#laelia-v1-GetAgentIamPolicyRequest)
     - [GetWorkspaceIamPolicyRequest](#laelia-v1-GetWorkspaceIamPolicyRequest)
+    - [IamPolicyChange](#laelia-v1-IamPolicyChange)
     - [IamPolicyView](#laelia-v1-IamPolicyView)
+    - [PolicyDelta](#laelia-v1-PolicyDelta)
     - [SetAgentIamPolicyRequest](#laelia-v1-SetAgentIamPolicyRequest)
     - [SetWorkspaceIamPolicyRequest](#laelia-v1-SetWorkspaceIamPolicyRequest)
+  
+    - [BindingDelta.Action](#laelia-v1-BindingDelta-Action)
   
     - [IamService](#laelia-v1-IamService)
   
@@ -408,6 +414,26 @@
 <p align="right"><a href="#top">Top</a></p>
 
 ## v1/common.proto
+
+
+
+<a name="laelia-v1-PermissionDeniedDetail"></a>
+
+### PermissionDeniedDetail
+PermissionDeniedDetail describes why an IAM-gated RPC was denied: the
+required permission and, when the request carries a recognizable resource,
+the resource that failed the check. It is attached to PermissionDenied
+errors by the IAM interceptor so clients can render what access is missing.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| method | [string](#string) |  | The RPC method that was denied, e.g. &#34;/laelia.v1.IamService/SetWorkspaceIamPolicy&#34;. |
+| required_permissions | [string](#string) | repeated | The permission the caller lacked, e.g. &#34;laelia.iam.setPolicy&#34;. |
+| resources | [string](#string) | repeated | The resources the permission was checked against (resource names such as &#34;agents/{agent}&#34;). Empty for workspace-scoped checks. |
+
+
+
 
 
 
@@ -4758,6 +4784,26 @@ enums cannot share value names), matching SenderType/CommandStatus.
 
 
 
+<a name="laelia-v1-BindingDelta"></a>
+
+### BindingDelta
+BindingDelta describes a single member-role-condition change between two
+IAM policies. It is computed on Set and recorded in the audit log so an
+operator can see who granted or removed what.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| action | [BindingDelta.Action](#laelia-v1-BindingDelta-Action) |  | The action that was performed on the binding. |
+| member | [string](#string) |  | The affected member, e.g. &#34;users/101&#34;, &#34;groups/eng@example.com&#34;, &#34;agents/{rid}&#34;, or &#34;allUsers&#34;. |
+| role | [string](#string) |  | The affected role, in the form &#34;roles/{role}&#34;. |
+| condition | [google.type.Expr](#google-type-Expr) |  | The condition associated with the changed binding, if any. |
+
+
+
+
+
+
 <a name="laelia-v1-GetAgentIamPolicyRequest"></a>
 
 ### GetAgentIamPolicyRequest
@@ -4783,6 +4829,23 @@ enums cannot share value names), matching SenderType/CommandStatus.
 
 
 
+<a name="laelia-v1-IamPolicyChange"></a>
+
+### IamPolicyChange
+IamPolicyChange is the audit payload recorded for a successful SetIamPolicy
+call: the target resource and the binding deltas applied.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| resource | [string](#string) |  | The resource the policy was set on, e.g. &#34;workspaces/-&#34; for the workspace policy or &#34;agents/{agent}&#34; for an agent policy. |
+| binding_deltas | [BindingDelta](#laelia-v1-BindingDelta) | repeated | The binding changes applied by the Set. |
+
+
+
+
+
+
 <a name="laelia-v1-IamPolicyView"></a>
 
 ### IamPolicyView
@@ -4796,6 +4859,21 @@ connect.CodeAborted so the caller can re-fetch and retry.
 | ----- | ---- | ----- | ----------- |
 | policy | [laelia.store.IamPolicy](#laelia-store-IamPolicy) |  |  |
 | etag | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-PolicyDelta"></a>
+
+### PolicyDelta
+PolicyDelta describes the changes between two IAM policies.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| binding_deltas | [BindingDelta](#laelia-v1-BindingDelta) | repeated | The binding deltas between the previous and the new policy. |
 
 
 
@@ -4835,6 +4913,19 @@ connect.CodeAborted so the caller can re-fetch and retry.
 
 
  
+
+
+<a name="laelia-v1-BindingDelta-Action"></a>
+
+### BindingDelta.Action
+Action is the type of change applied to a binding.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| ACTION_UNSPECIFIED | 0 | Unspecified action. |
+| ADD | 1 | The member was added to the role. |
+| REMOVE | 2 | The member was removed from the role. |
+
 
  
 

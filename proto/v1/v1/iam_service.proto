@@ -5,6 +5,7 @@ package laelia.v1;
 import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
+import "google/type/expr.proto";
 import "store/policy.proto";
 import "v1/annotation.proto";
 
@@ -17,6 +18,47 @@ option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
 message IamPolicyView {
   laelia.store.IamPolicy policy = 1;
   string etag = 2;
+}
+
+// BindingDelta describes a single member-role-condition change between two
+// IAM policies. It is computed on Set and recorded in the audit log so an
+// operator can see who granted or removed what.
+message BindingDelta {
+  // Action is the type of change applied to a binding.
+  enum Action {
+    // Unspecified action.
+    ACTION_UNSPECIFIED = 0;
+    // The member was added to the role.
+    ADD = 1;
+    // The member was removed from the role.
+    REMOVE = 2;
+  }
+
+  // The action that was performed on the binding.
+  Action action = 1;
+  // The affected member, e.g. "users/101", "groups/eng@example.com",
+  // "agents/{rid}", or "allUsers".
+  string member = 2;
+  // The affected role, in the form "roles/{role}".
+  string role = 3;
+  // The condition associated with the changed binding, if any.
+  google.type.Expr condition = 4;
+}
+
+// PolicyDelta describes the changes between two IAM policies.
+message PolicyDelta {
+  // The binding deltas between the previous and the new policy.
+  repeated BindingDelta binding_deltas = 1;
+}
+
+// IamPolicyChange is the audit payload recorded for a successful SetIamPolicy
+// call: the target resource and the binding deltas applied.
+message IamPolicyChange {
+  // The resource the policy was set on, e.g. "workspaces/-" for the workspace
+  // policy or "agents/{agent}" for an agent policy.
+  string resource = 1;
+  // The binding changes applied by the Set.
+  repeated BindingDelta binding_deltas = 2;
 }
 
 message GetWorkspaceIamPolicyRequest {}

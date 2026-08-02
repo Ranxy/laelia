@@ -9,6 +9,7 @@ package v1
 import (
 	store "github.com/Ranxy/laelia/backend/generated-go/store"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
+	expr "google.golang.org/genproto/googleapis/type/expr"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -22,6 +23,59 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
+
+// Action is the type of change applied to a binding.
+type BindingDelta_Action int32
+
+const (
+	// Unspecified action.
+	BindingDelta_ACTION_UNSPECIFIED BindingDelta_Action = 0
+	// The member was added to the role.
+	BindingDelta_ADD BindingDelta_Action = 1
+	// The member was removed from the role.
+	BindingDelta_REMOVE BindingDelta_Action = 2
+)
+
+// Enum value maps for BindingDelta_Action.
+var (
+	BindingDelta_Action_name = map[int32]string{
+		0: "ACTION_UNSPECIFIED",
+		1: "ADD",
+		2: "REMOVE",
+	}
+	BindingDelta_Action_value = map[string]int32{
+		"ACTION_UNSPECIFIED": 0,
+		"ADD":                1,
+		"REMOVE":             2,
+	}
+)
+
+func (x BindingDelta_Action) Enum() *BindingDelta_Action {
+	p := new(BindingDelta_Action)
+	*p = x
+	return p
+}
+
+func (x BindingDelta_Action) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (BindingDelta_Action) Descriptor() protoreflect.EnumDescriptor {
+	return file_v1_iam_service_proto_enumTypes[0].Descriptor()
+}
+
+func (BindingDelta_Action) Type() protoreflect.EnumType {
+	return &file_v1_iam_service_proto_enumTypes[0]
+}
+
+func (x BindingDelta_Action) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use BindingDelta_Action.Descriptor instead.
+func (BindingDelta_Action) EnumDescriptor() ([]byte, []int) {
+	return file_v1_iam_service_proto_rawDescGZIP(), []int{1, 0}
+}
 
 // IamPolicyView is an IAM policy together with its etag. The etag is returned
 // by Get and must be supplied on Set for optimistic concurrency: a Set whose
@@ -79,6 +133,185 @@ func (x *IamPolicyView) GetEtag() string {
 	return ""
 }
 
+// BindingDelta describes a single member-role-condition change between two
+// IAM policies. It is computed on Set and recorded in the audit log so an
+// operator can see who granted or removed what.
+type BindingDelta struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The action that was performed on the binding.
+	Action BindingDelta_Action `protobuf:"varint,1,opt,name=action,proto3,enum=laelia.v1.BindingDelta_Action" json:"action,omitempty"`
+	// The affected member, e.g. "users/101", "groups/eng@example.com",
+	// "agents/{rid}", or "allUsers".
+	Member string `protobuf:"bytes,2,opt,name=member,proto3" json:"member,omitempty"`
+	// The affected role, in the form "roles/{role}".
+	Role string `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
+	// The condition associated with the changed binding, if any.
+	Condition     *expr.Expr `protobuf:"bytes,4,opt,name=condition,proto3" json:"condition,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BindingDelta) Reset() {
+	*x = BindingDelta{}
+	mi := &file_v1_iam_service_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BindingDelta) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BindingDelta) ProtoMessage() {}
+
+func (x *BindingDelta) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_iam_service_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BindingDelta.ProtoReflect.Descriptor instead.
+func (*BindingDelta) Descriptor() ([]byte, []int) {
+	return file_v1_iam_service_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *BindingDelta) GetAction() BindingDelta_Action {
+	if x != nil {
+		return x.Action
+	}
+	return BindingDelta_ACTION_UNSPECIFIED
+}
+
+func (x *BindingDelta) GetMember() string {
+	if x != nil {
+		return x.Member
+	}
+	return ""
+}
+
+func (x *BindingDelta) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *BindingDelta) GetCondition() *expr.Expr {
+	if x != nil {
+		return x.Condition
+	}
+	return nil
+}
+
+// PolicyDelta describes the changes between two IAM policies.
+type PolicyDelta struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The binding deltas between the previous and the new policy.
+	BindingDeltas []*BindingDelta `protobuf:"bytes,1,rep,name=binding_deltas,json=bindingDeltas,proto3" json:"binding_deltas,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PolicyDelta) Reset() {
+	*x = PolicyDelta{}
+	mi := &file_v1_iam_service_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PolicyDelta) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PolicyDelta) ProtoMessage() {}
+
+func (x *PolicyDelta) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_iam_service_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PolicyDelta.ProtoReflect.Descriptor instead.
+func (*PolicyDelta) Descriptor() ([]byte, []int) {
+	return file_v1_iam_service_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *PolicyDelta) GetBindingDeltas() []*BindingDelta {
+	if x != nil {
+		return x.BindingDeltas
+	}
+	return nil
+}
+
+// IamPolicyChange is the audit payload recorded for a successful SetIamPolicy
+// call: the target resource and the binding deltas applied.
+type IamPolicyChange struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The resource the policy was set on, e.g. "workspaces/-" for the workspace
+	// policy or "agents/{agent}" for an agent policy.
+	Resource string `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	// The binding changes applied by the Set.
+	BindingDeltas []*BindingDelta `protobuf:"bytes,2,rep,name=binding_deltas,json=bindingDeltas,proto3" json:"binding_deltas,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IamPolicyChange) Reset() {
+	*x = IamPolicyChange{}
+	mi := &file_v1_iam_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IamPolicyChange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IamPolicyChange) ProtoMessage() {}
+
+func (x *IamPolicyChange) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_iam_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IamPolicyChange.ProtoReflect.Descriptor instead.
+func (*IamPolicyChange) Descriptor() ([]byte, []int) {
+	return file_v1_iam_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *IamPolicyChange) GetResource() string {
+	if x != nil {
+		return x.Resource
+	}
+	return ""
+}
+
+func (x *IamPolicyChange) GetBindingDeltas() []*BindingDelta {
+	if x != nil {
+		return x.BindingDeltas
+	}
+	return nil
+}
+
 type GetWorkspaceIamPolicyRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -87,7 +320,7 @@ type GetWorkspaceIamPolicyRequest struct {
 
 func (x *GetWorkspaceIamPolicyRequest) Reset() {
 	*x = GetWorkspaceIamPolicyRequest{}
-	mi := &file_v1_iam_service_proto_msgTypes[1]
+	mi := &file_v1_iam_service_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -99,7 +332,7 @@ func (x *GetWorkspaceIamPolicyRequest) String() string {
 func (*GetWorkspaceIamPolicyRequest) ProtoMessage() {}
 
 func (x *GetWorkspaceIamPolicyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_iam_service_proto_msgTypes[1]
+	mi := &file_v1_iam_service_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -112,7 +345,7 @@ func (x *GetWorkspaceIamPolicyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkspaceIamPolicyRequest.ProtoReflect.Descriptor instead.
 func (*GetWorkspaceIamPolicyRequest) Descriptor() ([]byte, []int) {
-	return file_v1_iam_service_proto_rawDescGZIP(), []int{1}
+	return file_v1_iam_service_proto_rawDescGZIP(), []int{4}
 }
 
 type SetWorkspaceIamPolicyRequest struct {
@@ -125,7 +358,7 @@ type SetWorkspaceIamPolicyRequest struct {
 
 func (x *SetWorkspaceIamPolicyRequest) Reset() {
 	*x = SetWorkspaceIamPolicyRequest{}
-	mi := &file_v1_iam_service_proto_msgTypes[2]
+	mi := &file_v1_iam_service_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -137,7 +370,7 @@ func (x *SetWorkspaceIamPolicyRequest) String() string {
 func (*SetWorkspaceIamPolicyRequest) ProtoMessage() {}
 
 func (x *SetWorkspaceIamPolicyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_iam_service_proto_msgTypes[2]
+	mi := &file_v1_iam_service_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -150,7 +383,7 @@ func (x *SetWorkspaceIamPolicyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetWorkspaceIamPolicyRequest.ProtoReflect.Descriptor instead.
 func (*SetWorkspaceIamPolicyRequest) Descriptor() ([]byte, []int) {
-	return file_v1_iam_service_proto_rawDescGZIP(), []int{2}
+	return file_v1_iam_service_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SetWorkspaceIamPolicyRequest) GetPolicy() *store.IamPolicy {
@@ -177,7 +410,7 @@ type GetAgentIamPolicyRequest struct {
 
 func (x *GetAgentIamPolicyRequest) Reset() {
 	*x = GetAgentIamPolicyRequest{}
-	mi := &file_v1_iam_service_proto_msgTypes[3]
+	mi := &file_v1_iam_service_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -189,7 +422,7 @@ func (x *GetAgentIamPolicyRequest) String() string {
 func (*GetAgentIamPolicyRequest) ProtoMessage() {}
 
 func (x *GetAgentIamPolicyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_iam_service_proto_msgTypes[3]
+	mi := &file_v1_iam_service_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -202,7 +435,7 @@ func (x *GetAgentIamPolicyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentIamPolicyRequest.ProtoReflect.Descriptor instead.
 func (*GetAgentIamPolicyRequest) Descriptor() ([]byte, []int) {
-	return file_v1_iam_service_proto_rawDescGZIP(), []int{3}
+	return file_v1_iam_service_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetAgentIamPolicyRequest) GetName() string {
@@ -224,7 +457,7 @@ type SetAgentIamPolicyRequest struct {
 
 func (x *SetAgentIamPolicyRequest) Reset() {
 	*x = SetAgentIamPolicyRequest{}
-	mi := &file_v1_iam_service_proto_msgTypes[4]
+	mi := &file_v1_iam_service_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -236,7 +469,7 @@ func (x *SetAgentIamPolicyRequest) String() string {
 func (*SetAgentIamPolicyRequest) ProtoMessage() {}
 
 func (x *SetAgentIamPolicyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_iam_service_proto_msgTypes[4]
+	mi := &file_v1_iam_service_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -249,7 +482,7 @@ func (x *SetAgentIamPolicyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetAgentIamPolicyRequest.ProtoReflect.Descriptor instead.
 func (*SetAgentIamPolicyRequest) Descriptor() ([]byte, []int) {
-	return file_v1_iam_service_proto_rawDescGZIP(), []int{4}
+	return file_v1_iam_service_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SetAgentIamPolicyRequest) GetName() string {
@@ -277,10 +510,25 @@ var File_v1_iam_service_proto protoreflect.FileDescriptor
 
 const file_v1_iam_service_proto_rawDesc = "" +
 	"\n" +
-	"\x14v1/iam_service.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x12store/policy.proto\x1a\x13v1/annotation.proto\"T\n" +
+	"\x14v1/iam_service.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x16google/type/expr.proto\x1a\x12store/policy.proto\x1a\x13v1/annotation.proto\"T\n" +
 	"\rIamPolicyView\x12/\n" +
 	"\x06policy\x18\x01 \x01(\v2\x17.laelia.store.IamPolicyR\x06policy\x12\x12\n" +
-	"\x04etag\x18\x02 \x01(\tR\x04etag\"\x1e\n" +
+	"\x04etag\x18\x02 \x01(\tR\x04etag\"\xda\x01\n" +
+	"\fBindingDelta\x126\n" +
+	"\x06action\x18\x01 \x01(\x0e2\x1e.laelia.v1.BindingDelta.ActionR\x06action\x12\x16\n" +
+	"\x06member\x18\x02 \x01(\tR\x06member\x12\x12\n" +
+	"\x04role\x18\x03 \x01(\tR\x04role\x12/\n" +
+	"\tcondition\x18\x04 \x01(\v2\x11.google.type.ExprR\tcondition\"5\n" +
+	"\x06Action\x12\x16\n" +
+	"\x12ACTION_UNSPECIFIED\x10\x00\x12\a\n" +
+	"\x03ADD\x10\x01\x12\n" +
+	"\n" +
+	"\x06REMOVE\x10\x02\"M\n" +
+	"\vPolicyDelta\x12>\n" +
+	"\x0ebinding_deltas\x18\x01 \x03(\v2\x17.laelia.v1.BindingDeltaR\rbindingDeltas\"m\n" +
+	"\x0fIamPolicyChange\x12\x1a\n" +
+	"\bresource\x18\x01 \x01(\tR\bresource\x12>\n" +
+	"\x0ebinding_deltas\x18\x02 \x03(\v2\x17.laelia.v1.BindingDeltaR\rbindingDeltas\"\x1e\n" +
 	"\x1cGetWorkspaceIamPolicyRequest\"h\n" +
 	"\x1cSetWorkspaceIamPolicyRequest\x124\n" +
 	"\x06policy\x18\x01 \x01(\v2\x17.laelia.store.IamPolicyB\x03\xe0A\x02R\x06policy\x12\x12\n" +
@@ -312,32 +560,42 @@ func file_v1_iam_service_proto_rawDescGZIP() []byte {
 	return file_v1_iam_service_proto_rawDescData
 }
 
-var file_v1_iam_service_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_v1_iam_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_v1_iam_service_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_v1_iam_service_proto_goTypes = []any{
-	(*IamPolicyView)(nil),                // 0: laelia.v1.IamPolicyView
-	(*GetWorkspaceIamPolicyRequest)(nil), // 1: laelia.v1.GetWorkspaceIamPolicyRequest
-	(*SetWorkspaceIamPolicyRequest)(nil), // 2: laelia.v1.SetWorkspaceIamPolicyRequest
-	(*GetAgentIamPolicyRequest)(nil),     // 3: laelia.v1.GetAgentIamPolicyRequest
-	(*SetAgentIamPolicyRequest)(nil),     // 4: laelia.v1.SetAgentIamPolicyRequest
-	(*store.IamPolicy)(nil),              // 5: laelia.store.IamPolicy
+	(BindingDelta_Action)(0),             // 0: laelia.v1.BindingDelta.Action
+	(*IamPolicyView)(nil),                // 1: laelia.v1.IamPolicyView
+	(*BindingDelta)(nil),                 // 2: laelia.v1.BindingDelta
+	(*PolicyDelta)(nil),                  // 3: laelia.v1.PolicyDelta
+	(*IamPolicyChange)(nil),              // 4: laelia.v1.IamPolicyChange
+	(*GetWorkspaceIamPolicyRequest)(nil), // 5: laelia.v1.GetWorkspaceIamPolicyRequest
+	(*SetWorkspaceIamPolicyRequest)(nil), // 6: laelia.v1.SetWorkspaceIamPolicyRequest
+	(*GetAgentIamPolicyRequest)(nil),     // 7: laelia.v1.GetAgentIamPolicyRequest
+	(*SetAgentIamPolicyRequest)(nil),     // 8: laelia.v1.SetAgentIamPolicyRequest
+	(*store.IamPolicy)(nil),              // 9: laelia.store.IamPolicy
+	(*expr.Expr)(nil),                    // 10: google.type.Expr
 }
 var file_v1_iam_service_proto_depIdxs = []int32{
-	5, // 0: laelia.v1.IamPolicyView.policy:type_name -> laelia.store.IamPolicy
-	5, // 1: laelia.v1.SetWorkspaceIamPolicyRequest.policy:type_name -> laelia.store.IamPolicy
-	5, // 2: laelia.v1.SetAgentIamPolicyRequest.policy:type_name -> laelia.store.IamPolicy
-	1, // 3: laelia.v1.IamService.GetWorkspaceIamPolicy:input_type -> laelia.v1.GetWorkspaceIamPolicyRequest
-	2, // 4: laelia.v1.IamService.SetWorkspaceIamPolicy:input_type -> laelia.v1.SetWorkspaceIamPolicyRequest
-	3, // 5: laelia.v1.IamService.GetAgentIamPolicy:input_type -> laelia.v1.GetAgentIamPolicyRequest
-	4, // 6: laelia.v1.IamService.SetAgentIamPolicy:input_type -> laelia.v1.SetAgentIamPolicyRequest
-	0, // 7: laelia.v1.IamService.GetWorkspaceIamPolicy:output_type -> laelia.v1.IamPolicyView
-	0, // 8: laelia.v1.IamService.SetWorkspaceIamPolicy:output_type -> laelia.v1.IamPolicyView
-	0, // 9: laelia.v1.IamService.GetAgentIamPolicy:output_type -> laelia.v1.IamPolicyView
-	0, // 10: laelia.v1.IamService.SetAgentIamPolicy:output_type -> laelia.v1.IamPolicyView
-	7, // [7:11] is the sub-list for method output_type
-	3, // [3:7] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	9,  // 0: laelia.v1.IamPolicyView.policy:type_name -> laelia.store.IamPolicy
+	0,  // 1: laelia.v1.BindingDelta.action:type_name -> laelia.v1.BindingDelta.Action
+	10, // 2: laelia.v1.BindingDelta.condition:type_name -> google.type.Expr
+	2,  // 3: laelia.v1.PolicyDelta.binding_deltas:type_name -> laelia.v1.BindingDelta
+	2,  // 4: laelia.v1.IamPolicyChange.binding_deltas:type_name -> laelia.v1.BindingDelta
+	9,  // 5: laelia.v1.SetWorkspaceIamPolicyRequest.policy:type_name -> laelia.store.IamPolicy
+	9,  // 6: laelia.v1.SetAgentIamPolicyRequest.policy:type_name -> laelia.store.IamPolicy
+	5,  // 7: laelia.v1.IamService.GetWorkspaceIamPolicy:input_type -> laelia.v1.GetWorkspaceIamPolicyRequest
+	6,  // 8: laelia.v1.IamService.SetWorkspaceIamPolicy:input_type -> laelia.v1.SetWorkspaceIamPolicyRequest
+	7,  // 9: laelia.v1.IamService.GetAgentIamPolicy:input_type -> laelia.v1.GetAgentIamPolicyRequest
+	8,  // 10: laelia.v1.IamService.SetAgentIamPolicy:input_type -> laelia.v1.SetAgentIamPolicyRequest
+	1,  // 11: laelia.v1.IamService.GetWorkspaceIamPolicy:output_type -> laelia.v1.IamPolicyView
+	1,  // 12: laelia.v1.IamService.SetWorkspaceIamPolicy:output_type -> laelia.v1.IamPolicyView
+	1,  // 13: laelia.v1.IamService.GetAgentIamPolicy:output_type -> laelia.v1.IamPolicyView
+	1,  // 14: laelia.v1.IamService.SetAgentIamPolicy:output_type -> laelia.v1.IamPolicyView
+	11, // [11:15] is the sub-list for method output_type
+	7,  // [7:11] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_v1_iam_service_proto_init() }
@@ -351,13 +609,14 @@ func file_v1_iam_service_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_iam_service_proto_rawDesc), len(file_v1_iam_service_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   5,
+			NumEnums:      1,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_v1_iam_service_proto_goTypes,
 		DependencyIndexes: file_v1_iam_service_proto_depIdxs,
+		EnumInfos:         file_v1_iam_service_proto_enumTypes,
 		MessageInfos:      file_v1_iam_service_proto_msgTypes,
 	}.Build()
 	File_v1_iam_service_proto = out.File

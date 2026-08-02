@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"slices"
 
 	"connectrpc.com/connect"
 	"github.com/pkg/errors"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/common"
 	"github.com/Ranxy/laelia/backend/common/permission"
+	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -143,6 +145,23 @@ func (s *RoleService) DeleteRole(ctx context.Context, req *connect.Request[v1pb.
 	}
 	if store.IsPredefinedRole(resourceID) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("role %q is predefined and read-only", req.Msg.GetName()))
+	}
+	used, err := s.store.GetResourcesUsedByRole(ctx, common.FormatRole(resourceID))
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check role references"))
+	}
+	if len(used) > 0 {
+		names := make([]string, 0, len(used))
+		for _, u := range used {
+			switch u.ResourceType {
+			case storepb.Policy_WORKSPACE:
+				names = append(names, "workspaces/-")
+			default:
+				names = append(names, u.Resource)
+			}
+		}
+		slices.Sort(names)
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Errorf("role %q is still bound by IAM policies on %v; remove the bindings first", req.Msg.GetName(), names))
 	}
 	if err := s.store.DeleteRole(ctx, resourceID); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to delete role"))

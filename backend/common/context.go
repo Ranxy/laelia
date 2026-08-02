@@ -1,7 +1,11 @@
 //nolint:revive
 package common
 
-import "context"
+import (
+	"context"
+
+	"google.golang.org/protobuf/types/known/anypb"
+)
 
 // ContextKey is the key type of context value.
 type ContextKey int
@@ -67,6 +71,20 @@ func (c *AuthContext) GetProjectResources() []string {
 		projectIDs = append(projectIDs, projectID)
 	}
 	return projectIDs
+}
+
+// WithSetServiceData registers a callback that handlers use to attach
+// request-scoped structured data (e.g. the binding deltas of a SetIamPolicy
+// call) to the audit record the interceptor writes after the RPC returns.
+func WithSetServiceData(ctx context.Context, setServiceData func(a *anypb.Any)) context.Context {
+	return context.WithValue(ctx, ServiceDataKey, setServiceData)
+}
+
+// GetSetServiceDataFromContext returns the service-data callback registered by
+// the audit interceptor, if any.
+func GetSetServiceDataFromContext(ctx context.Context) (func(a *anypb.Any), bool) {
+	setServiceData, ok := ctx.Value(ServiceDataKey).(func(*anypb.Any))
+	return setServiceData, ok
 }
 
 func GetSessionIDFromContext(ctx context.Context) (string, bool) {

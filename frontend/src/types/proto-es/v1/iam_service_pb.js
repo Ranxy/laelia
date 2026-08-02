@@ -2,10 +2,11 @@
 // @generated from file v1/iam_service.proto (package laelia.v1, syntax proto3)
 /* eslint-disable */
 
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc, tsEnum } from "@bufbuild/protobuf/codegenv2";
 import { file_google_api_annotations } from "../google/api/annotations_pb";
 import { file_google_api_field_behavior } from "../google/api/field_behavior_pb";
 import { file_google_api_resource } from "../google/api/resource_pb";
+import { file_google_type_expr } from "../google/type/expr_pb";
 import { file_store_policy } from "../store/policy_pb";
 import { file_v1_annotation } from "./annotation_pb";
 
@@ -13,7 +14,7 @@ import { file_v1_annotation } from "./annotation_pb";
  * Describes the file v1/iam_service.proto.
  */
 export const file_v1_iam_service = /*@__PURE__*/
-  fileDesc("ChR2MS9pYW1fc2VydmljZS5wcm90bxIJbGFlbGlhLnYxIkYKDUlhbVBvbGljeVZpZXcSJwoGcG9saWN5GAEgASgLMhcubGFlbGlhLnN0b3JlLklhbVBvbGljeRIMCgRldGFnGAIgASgJIh4KHEdldFdvcmtzcGFjZUlhbVBvbGljeVJlcXVlc3QiWgocU2V0V29ya3NwYWNlSWFtUG9saWN5UmVxdWVzdBIsCgZwb2xpY3kYASABKAsyFy5sYWVsaWEuc3RvcmUuSWFtUG9saWN5QgPgQQISDAoEZXRhZxgCIAEoCSI+ChhHZXRBZ2VudElhbVBvbGljeVJlcXVlc3QSIgoEbmFtZRgBIAEoCUIU4EEC+kEOCgxsYWVsaWEvQWdlbnQiegoYU2V0QWdlbnRJYW1Qb2xpY3lSZXF1ZXN0EiIKBG5hbWUYASABKAlCFOBBAvpBDgoMbGFlbGlhL0FnZW50EiwKBnBvbGljeRgCIAEoCzIXLmxhZWxpYS5zdG9yZS5JYW1Qb2xpY3lCA+BBAhIMCgRldGFnGAMgASgJMv4ECgpJYW1TZXJ2aWNlEpcBChVHZXRXb3Jrc3BhY2VJYW1Qb2xpY3kSJy5sYWVsaWEudjEuR2V0V29ya3NwYWNlSWFtUG9saWN5UmVxdWVzdBoYLmxhZWxpYS52MS5JYW1Qb2xpY3lWaWV3IjuK6jAUbGFlbGlhLmlhbS5nZXRQb2xpY3mQ6jABgtPkkwIZEhcvdjEvd29ya3NwYWNlOmlhbVBvbGljeRKeAQoVU2V0V29ya3NwYWNlSWFtUG9saWN5EicubGFlbGlhLnYxLlNldFdvcmtzcGFjZUlhbVBvbGljeVJlcXVlc3QaGC5sYWVsaWEudjEuSWFtUG9saWN5VmlldyJCiuowFGxhZWxpYS5pYW0uc2V0UG9saWN5kOowAZjqMAGC0+STAhw6ASoiFy92MS93b3Jrc3BhY2U6aWFtUG9saWN5EpUBChFHZXRBZ2VudElhbVBvbGljeRIjLmxhZWxpYS52MS5HZXRBZ2VudElhbVBvbGljeVJlcXVlc3QaGC5sYWVsaWEudjEuSWFtUG9saWN5VmlldyJBiuowFGxhZWxpYS5pYW0uZ2V0UG9saWN5kOowAYLT5JMCHxIdL3YxL3tuYW1lPWFnZW50cy8qfTppYW1Qb2xpY3kSnAEKEVNldEFnZW50SWFtUG9saWN5EiMubGFlbGlhLnYxLlNldEFnZW50SWFtUG9saWN5UmVxdWVzdBoYLmxhZWxpYS52MS5JYW1Qb2xpY3lWaWV3IkiK6jAUbGFlbGlhLmlhbS5zZXRQb2xpY3mQ6jABmOowAYLT5JMCIjoBKiIdL3YxL3tuYW1lPWFnZW50cy8qfTppYW1Qb2xpY3lCMVovZ2l0aHViLmNvbS9SYW54eS9sYWVsaWEvYmFja2VuZC9nZW5lcmF0ZWQtZ28vdjFiBnByb3RvMw", [file_google_api_annotations, file_google_api_field_behavior, file_google_api_resource, file_store_policy, file_v1_annotation]);
+  fileDesc("ChR2MS9pYW1fc2VydmljZS5wcm90bxIJbGFlbGlhLnYxIkYKDUlhbVBvbGljeVZpZXcSJwoGcG9saWN5GAEgASgLMhcubGFlbGlhLnN0b3JlLklhbVBvbGljeRIMCgRldGFnGAIgASgJIrkBCgxCaW5kaW5nRGVsdGESLgoGYWN0aW9uGAEgASgOMh4ubGFlbGlhLnYxLkJpbmRpbmdEZWx0YS5BY3Rpb24SDgoGbWVtYmVyGAIgASgJEgwKBHJvbGUYAyABKAkSJAoJY29uZGl0aW9uGAQgASgLMhEuZ29vZ2xlLnR5cGUuRXhwciI1CgZBY3Rpb24SFgoSQUNUSU9OX1VOU1BFQ0lGSUVEEAASBwoDQUREEAESCgoGUkVNT1ZFEAIiPgoLUG9saWN5RGVsdGESLwoOYmluZGluZ19kZWx0YXMYASADKAsyFy5sYWVsaWEudjEuQmluZGluZ0RlbHRhIlQKD0lhbVBvbGljeUNoYW5nZRIQCghyZXNvdXJjZRgBIAEoCRIvCg5iaW5kaW5nX2RlbHRhcxgCIAMoCzIXLmxhZWxpYS52MS5CaW5kaW5nRGVsdGEiHgocR2V0V29ya3NwYWNlSWFtUG9saWN5UmVxdWVzdCJaChxTZXRXb3Jrc3BhY2VJYW1Qb2xpY3lSZXF1ZXN0EiwKBnBvbGljeRgBIAEoCzIXLmxhZWxpYS5zdG9yZS5JYW1Qb2xpY3lCA+BBAhIMCgRldGFnGAIgASgJIj4KGEdldEFnZW50SWFtUG9saWN5UmVxdWVzdBIiCgRuYW1lGAEgASgJQhTgQQL6QQ4KDGxhZWxpYS9BZ2VudCJ6ChhTZXRBZ2VudElhbVBvbGljeVJlcXVlc3QSIgoEbmFtZRgBIAEoCUIU4EEC+kEOCgxsYWVsaWEvQWdlbnQSLAoGcG9saWN5GAIgASgLMhcubGFlbGlhLnN0b3JlLklhbVBvbGljeUID4EECEgwKBGV0YWcYAyABKAky/gQKCklhbVNlcnZpY2USlwEKFUdldFdvcmtzcGFjZUlhbVBvbGljeRInLmxhZWxpYS52MS5HZXRXb3Jrc3BhY2VJYW1Qb2xpY3lSZXF1ZXN0GhgubGFlbGlhLnYxLklhbVBvbGljeVZpZXciO4rqMBRsYWVsaWEuaWFtLmdldFBvbGljeZDqMAGC0+STAhkSFy92MS93b3Jrc3BhY2U6aWFtUG9saWN5Ep4BChVTZXRXb3Jrc3BhY2VJYW1Qb2xpY3kSJy5sYWVsaWEudjEuU2V0V29ya3NwYWNlSWFtUG9saWN5UmVxdWVzdBoYLmxhZWxpYS52MS5JYW1Qb2xpY3lWaWV3IkKK6jAUbGFlbGlhLmlhbS5zZXRQb2xpY3mQ6jABmOowAYLT5JMCHDoBKiIXL3YxL3dvcmtzcGFjZTppYW1Qb2xpY3kSlQEKEUdldEFnZW50SWFtUG9saWN5EiMubGFlbGlhLnYxLkdldEFnZW50SWFtUG9saWN5UmVxdWVzdBoYLmxhZWxpYS52MS5JYW1Qb2xpY3lWaWV3IkGK6jAUbGFlbGlhLmlhbS5nZXRQb2xpY3mQ6jABgtPkkwIfEh0vdjEve25hbWU9YWdlbnRzLyp9OmlhbVBvbGljeRKcAQoRU2V0QWdlbnRJYW1Qb2xpY3kSIy5sYWVsaWEudjEuU2V0QWdlbnRJYW1Qb2xpY3lSZXF1ZXN0GhgubGFlbGlhLnYxLklhbVBvbGljeVZpZXciSIrqMBRsYWVsaWEuaWFtLnNldFBvbGljeZDqMAGY6jABgtPkkwIiOgEqIh0vdjEve25hbWU9YWdlbnRzLyp9OmlhbVBvbGljeUIxWi9naXRodWIuY29tL1Jhbnh5L2xhZWxpYS9iYWNrZW5kL2dlbmVyYXRlZC1nby92MWIGcHJvdG8z", [file_google_api_annotations, file_google_api_field_behavior, file_google_api_resource, file_google_type_expr, file_store_policy, file_v1_annotation]);
 
 /**
  * Describes the message laelia.v1.IamPolicyView.
@@ -23,32 +24,67 @@ export const IamPolicyViewSchema = /*@__PURE__*/
   messageDesc(file_v1_iam_service, 0);
 
 /**
+ * Describes the message laelia.v1.BindingDelta.
+ * Use `create(BindingDeltaSchema)` to create a new message.
+ */
+export const BindingDeltaSchema = /*@__PURE__*/
+  messageDesc(file_v1_iam_service, 1);
+
+/**
+ * Describes the enum laelia.v1.BindingDelta.Action.
+ */
+export const BindingDelta_ActionSchema = /*@__PURE__*/
+  enumDesc(file_v1_iam_service, 1, 0);
+
+/**
+ * Action is the type of change applied to a binding.
+ *
+ * @generated from enum laelia.v1.BindingDelta.Action
+ */
+export const BindingDelta_Action = /*@__PURE__*/
+  tsEnum(BindingDelta_ActionSchema);
+
+/**
+ * Describes the message laelia.v1.PolicyDelta.
+ * Use `create(PolicyDeltaSchema)` to create a new message.
+ */
+export const PolicyDeltaSchema = /*@__PURE__*/
+  messageDesc(file_v1_iam_service, 2);
+
+/**
+ * Describes the message laelia.v1.IamPolicyChange.
+ * Use `create(IamPolicyChangeSchema)` to create a new message.
+ */
+export const IamPolicyChangeSchema = /*@__PURE__*/
+  messageDesc(file_v1_iam_service, 3);
+
+/**
  * Describes the message laelia.v1.GetWorkspaceIamPolicyRequest.
  * Use `create(GetWorkspaceIamPolicyRequestSchema)` to create a new message.
  */
 export const GetWorkspaceIamPolicyRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_iam_service, 1);
+  messageDesc(file_v1_iam_service, 4);
 
 /**
  * Describes the message laelia.v1.SetWorkspaceIamPolicyRequest.
  * Use `create(SetWorkspaceIamPolicyRequestSchema)` to create a new message.
  */
 export const SetWorkspaceIamPolicyRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_iam_service, 2);
+  messageDesc(file_v1_iam_service, 5);
 
 /**
  * Describes the message laelia.v1.GetAgentIamPolicyRequest.
  * Use `create(GetAgentIamPolicyRequestSchema)` to create a new message.
  */
 export const GetAgentIamPolicyRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_iam_service, 3);
+  messageDesc(file_v1_iam_service, 6);
 
 /**
  * Describes the message laelia.v1.SetAgentIamPolicyRequest.
  * Use `create(SetAgentIamPolicyRequestSchema)` to create a new message.
  */
 export const SetAgentIamPolicyRequestSchema = /*@__PURE__*/
-  messageDesc(file_v1_iam_service, 4);
+  messageDesc(file_v1_iam_service, 7);
 
 /**
  * IamService exposes the workspace and per-agent IAM policies for management.

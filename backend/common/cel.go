@@ -138,7 +138,15 @@ func ValidateMaskingExceptionCELExpr(expression *expr.Expr) (cel.Program, error)
 	return validateCELExpr(expression, MaskingExceptionPolicyCELAttributes)
 }
 
+// ValidateProjectMemberCELExpr validates a project member condition expression.
 func ValidateProjectMemberCELExpr(expression *expr.Expr) (cel.Program, error) {
+	return ValidateIAMBindingConditionExpr(expression)
+}
+
+// ValidateIAMBindingConditionExpr validates an IAM binding condition against
+// the allowed attribute set (request.time). It returns a compiled program so
+// callers can reuse it; a nil or empty expression compiles to nil.
+func ValidateIAMBindingConditionExpr(expression *expr.Expr) (cel.Program, error) {
 	return validateCELExpr(expression, IAMPolicyConditionCELAttributes)
 }
 

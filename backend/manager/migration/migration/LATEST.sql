@@ -299,12 +299,17 @@ CREATE TABLE audit_log (
     source_ip text NOT NULL DEFAULT '',
     status text NOT NULL DEFAULT 'ok',
     error text NOT NULL DEFAULT '',
+    -- resource is the target resource of the audited call, e.g. "agents/{rid}".
+    resource text NOT NULL DEFAULT '',
+    -- payload is the structured change payload (e.g. IAM binding deltas).
+    payload jsonb NOT NULL DEFAULT '{}',
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_audit_log_method ON audit_log(method);
 CREATE INDEX idx_audit_log_actor ON audit_log(actor_type, actor_id);
 CREATE INDEX idx_audit_log_created_at ON audit_log(created_at);
+CREATE INDEX idx_audit_log_resource ON audit_log(resource);
 
 -- Command execution records
 CREATE TABLE command (

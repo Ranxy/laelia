@@ -2,9 +2,10 @@
 // @generated from file v1/iam_service.proto (package laelia.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 import type { IamPolicy } from "../store/policy_pb";
+import type { Expr } from "../google/type/expr_pb";
 
 /**
  * Describes the file v1/iam_service.proto.
@@ -36,6 +37,132 @@ export declare type IamPolicyView = Message<"laelia.v1.IamPolicyView"> & {
  * Use `create(IamPolicyViewSchema)` to create a new message.
  */
 export declare const IamPolicyViewSchema: GenMessage<IamPolicyView>;
+
+/**
+ * BindingDelta describes a single member-role-condition change between two
+ * IAM policies. It is computed on Set and recorded in the audit log so an
+ * operator can see who granted or removed what.
+ *
+ * @generated from message laelia.v1.BindingDelta
+ */
+export declare type BindingDelta = Message<"laelia.v1.BindingDelta"> & {
+  /**
+   * The action that was performed on the binding.
+   *
+   * @generated from field: laelia.v1.BindingDelta.Action action = 1;
+   */
+  action: BindingDelta_Action;
+
+  /**
+   * The affected member, e.g. "users/101", "groups/eng@example.com",
+   * "agents/{rid}", or "allUsers".
+   *
+   * @generated from field: string member = 2;
+   */
+  member: string;
+
+  /**
+   * The affected role, in the form "roles/{role}".
+   *
+   * @generated from field: string role = 3;
+   */
+  role: string;
+
+  /**
+   * The condition associated with the changed binding, if any.
+   *
+   * @generated from field: google.type.Expr condition = 4;
+   */
+  condition?: Expr | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.BindingDelta.
+ * Use `create(BindingDeltaSchema)` to create a new message.
+ */
+export declare const BindingDeltaSchema: GenMessage<BindingDelta>;
+
+/**
+ * Action is the type of change applied to a binding.
+ *
+ * @generated from enum laelia.v1.BindingDelta.Action
+ */
+export enum BindingDelta_Action {
+  /**
+   * Unspecified action.
+   *
+   * @generated from enum value: ACTION_UNSPECIFIED = 0;
+   */
+  ACTION_UNSPECIFIED = 0,
+
+  /**
+   * The member was added to the role.
+   *
+   * @generated from enum value: ADD = 1;
+   */
+  ADD = 1,
+
+  /**
+   * The member was removed from the role.
+   *
+   * @generated from enum value: REMOVE = 2;
+   */
+  REMOVE = 2,
+}
+
+/**
+ * Describes the enum laelia.v1.BindingDelta.Action.
+ */
+export declare const BindingDelta_ActionSchema: GenEnum<BindingDelta_Action>;
+
+/**
+ * PolicyDelta describes the changes between two IAM policies.
+ *
+ * @generated from message laelia.v1.PolicyDelta
+ */
+export declare type PolicyDelta = Message<"laelia.v1.PolicyDelta"> & {
+  /**
+   * The binding deltas between the previous and the new policy.
+   *
+   * @generated from field: repeated laelia.v1.BindingDelta binding_deltas = 1;
+   */
+  bindingDeltas: BindingDelta[];
+};
+
+/**
+ * Describes the message laelia.v1.PolicyDelta.
+ * Use `create(PolicyDeltaSchema)` to create a new message.
+ */
+export declare const PolicyDeltaSchema: GenMessage<PolicyDelta>;
+
+/**
+ * IamPolicyChange is the audit payload recorded for a successful SetIamPolicy
+ * call: the target resource and the binding deltas applied.
+ *
+ * @generated from message laelia.v1.IamPolicyChange
+ */
+export declare type IamPolicyChange = Message<"laelia.v1.IamPolicyChange"> & {
+  /**
+   * The resource the policy was set on, e.g. "workspaces/-" for the workspace
+   * policy or "agents/{agent}" for an agent policy.
+   *
+   * @generated from field: string resource = 1;
+   */
+  resource: string;
+
+  /**
+   * The binding changes applied by the Set.
+   *
+   * @generated from field: repeated laelia.v1.BindingDelta binding_deltas = 2;
+   */
+  bindingDeltas: BindingDelta[];
+};
+
+/**
+ * Describes the message laelia.v1.IamPolicyChange.
+ * Use `create(IamPolicyChangeSchema)` to create a new message.
+ */
+export declare const IamPolicyChangeSchema: GenMessage<IamPolicyChange>;
 
 /**
  * @generated from message laelia.v1.GetWorkspaceIamPolicyRequest

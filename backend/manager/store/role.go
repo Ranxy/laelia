@@ -41,6 +41,51 @@ type UpdateRoleMessage struct {
 	Permissions *map[permission.Permission]bool
 }
 
+// RoleUsedByResource is a resource whose IAM policy references a role.
+type RoleUsedByResource struct {
+	ResourceType models.Policy_Resource
+	Resource     string
+}
+
+// GetResourcesUsedByRole returns every resource whose IAM policy has a
+// non-empty binding for the given role (full name, e.g. "roles/editor").
+// It backs the DeleteRole reference guard: deleting a role that is still
+// bound somewhere would silently turn that binding into a no-op.
+func (s *Store) GetResourcesUsedByRole(ctx context.Context, role string) ([]*RoleUsedByResource, error) {
+	rows, err := s.GetDB().QueryContext(ctx, `
+		SELECT resource, resource_type
+		FROM policy
+		CROSS JOIN LATERAL jsonb_array_elements(payload->'bindings') AS binding
+		WHERE type = $1
+		  AND COALESCE(jsonb_array_length(binding->'members'), 0) > 0
+		  AND binding->>'role' = $2
+		GROUP BY resource, resource_type
+	`, models.Policy_IAM.String(), role)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var used []*RoleUsedByResource
+	for rows.Next() {
+		u := &RoleUsedByResource{}
+		var resourceType string
+		if err := rows.Scan(&u.Resource, &resourceType); err != nil {
+			return nil, err
+		}
+		resourceTypeValue, ok := models.Policy_Resource_value[resourceType]
+		if !ok {
+			return nil, errors.Errorf("invalid policy resource type string: %s", resourceType)
+		}
+		u.ResourceType = models.Policy_Resource(resourceTypeValue)
+		used = append(used, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return used, nil
+}
+
 // CreateRole creates a new custom role.
 func (s *Store) CreateRole(ctx context.Context, create *RoleMessage) (*RoleMessage, error) {
 	p := &models.RolePermissions{}

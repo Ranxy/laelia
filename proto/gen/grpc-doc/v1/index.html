@@ -210,6 +210,10 @@
             <ul>
               
                 <li>
+                  <a href="#laelia.v1.PermissionDeniedDetail"><span class="badge">M</span>PermissionDeniedDetail</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.Position"><span class="badge">M</span>Position</a>
                 </li>
               
@@ -1233,6 +1237,10 @@
             <ul>
               
                 <li>
+                  <a href="#laelia.v1.BindingDelta"><span class="badge">M</span>BindingDelta</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.GetAgentIamPolicyRequest"><span class="badge">M</span>GetAgentIamPolicyRequest</a>
                 </li>
               
@@ -1241,7 +1249,15 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.IamPolicyChange"><span class="badge">M</span>IamPolicyChange</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.IamPolicyView"><span class="badge">M</span>IamPolicyView</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.PolicyDelta"><span class="badge">M</span>PolicyDelta</a>
                 </li>
               
                 <li>
@@ -1252,6 +1268,10 @@
                   <a href="#laelia.v1.SetWorkspaceIamPolicyRequest"><span class="badge">M</span>SetWorkspaceIamPolicyRequest</a>
                 </li>
               
+              
+                <li>
+                  <a href="#laelia.v1.BindingDelta.Action"><span class="badge">E</span>BindingDelta.Action</a>
+                </li>
               
               
               
@@ -1670,6 +1690,45 @@
       </div>
       <p></p>
 
+      
+        <h3 id="laelia.v1.PermissionDeniedDetail">PermissionDeniedDetail</h3>
+        <p>PermissionDeniedDetail describes why an IAM-gated RPC was denied: the</p><p>required permission and, when the request carries a recognizable resource,</p><p>the resource that failed the check. It is attached to PermissionDenied</p><p>errors by the IAM interceptor so clients can render what access is missing.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>method</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The RPC method that was denied, e.g. &#34;/laelia.v1.IamService/SetWorkspaceIamPolicy&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>required_permissions</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>The permission the caller lacked, e.g. &#34;laelia.iam.setPolicy&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>resources</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>The resources the permission was checked against (resource names such as
+&#34;agents/{agent}&#34;). Empty for workspace-scoped checks. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
       
         <h3 id="laelia.v1.Position">Position</h3>
         <p>Position in a text expressed as zero-based line and zero-based column byte</p><p>offset.</p>
@@ -12709,6 +12768,52 @@ user, hiding it from All and Unread. The caller&#39;s own id must own the row.</
       <p></p>
 
       
+        <h3 id="laelia.v1.BindingDelta">BindingDelta</h3>
+        <p>BindingDelta describes a single member-role-condition change between two</p><p>IAM policies. It is computed on Set and recorded in the audit log so an</p><p>operator can see who granted or removed what.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>action</td>
+                  <td><a href="#laelia.v1.BindingDelta.Action">BindingDelta.Action</a></td>
+                  <td></td>
+                  <td><p>The action that was performed on the binding. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>member</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The affected member, e.g. &#34;users/101&#34;, &#34;groups/eng@example.com&#34;,
+&#34;agents/{rid}&#34;, or &#34;allUsers&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>role</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The affected role, in the form &#34;roles/{role}&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>condition</td>
+                  <td><a href="#google.type.Expr">google.type.Expr</a></td>
+                  <td></td>
+                  <td><p>The condition associated with the changed binding, if any. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.GetAgentIamPolicyRequest">GetAgentIamPolicyRequest</h3>
         <p></p>
 
@@ -12740,6 +12845,38 @@ user, hiding it from All and Unread. The caller&#39;s own id must own the row.</
 
         
       
+        <h3 id="laelia.v1.IamPolicyChange">IamPolicyChange</h3>
+        <p>IamPolicyChange is the audit payload recorded for a successful SetIamPolicy</p><p>call: the target resource and the binding deltas applied.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>resource</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The resource the policy was set on, e.g. &#34;workspaces/-&#34; for the workspace
+policy or &#34;agents/{agent}&#34; for an agent policy. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>binding_deltas</td>
+                  <td><a href="#laelia.v1.BindingDelta">BindingDelta</a></td>
+                  <td>repeated</td>
+                  <td><p>The binding changes applied by the Set. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.IamPolicyView">IamPolicyView</h3>
         <p>IamPolicyView is an IAM policy together with its etag. The etag is returned</p><p>by Get and must be supplied on Set for optimistic concurrency: a Set whose</p><p>etag does not match the stored policy's etag is rejected with</p><p>connect.CodeAborted so the caller can re-fetch and retry.</p>
 
@@ -12762,6 +12899,30 @@ user, hiding it from All and Unread. The caller&#39;s own id must own the row.</
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.PolicyDelta">PolicyDelta</h3>
+        <p>PolicyDelta describes the changes between two IAM policies.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>binding_deltas</td>
+                  <td><a href="#laelia.v1.BindingDelta">BindingDelta</a></td>
+                  <td>repeated</td>
+                  <td><p>The binding deltas between the previous and the new policy. </p></td>
                 </tr>
               
             </tbody>
@@ -12841,6 +13002,35 @@ user, hiding it from All and Unread. The caller&#39;s own id must own the row.</
         
       
 
+      
+        <h3 id="laelia.v1.BindingDelta.Action">BindingDelta.Action</h3>
+        <p>Action is the type of change applied to a binding.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>ACTION_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p>Unspecified action.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ADD</td>
+                <td>1</td>
+                <td><p>The member was added to the role.</p></td>
+              </tr>
+            
+              <tr>
+                <td>REMOVE</td>
+                <td>2</td>
+                <td><p>The member was removed from the role.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
       
 
       

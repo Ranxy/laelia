@@ -7,8 +7,11 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/Ranxy/laelia/backend/common"
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
@@ -24,7 +27,7 @@ func NewAuditInterceptor(stores *store.Store) *AuditInterceptor {
 	}
 }
 
-func (a *AuditInterceptor) recordAudit(ctx context.Context, procedure string, err error) {
+func (a *AuditInterceptor) recordAudit(ctx context.Context, procedure string, err error, resource, payload string) {
 	auditLog := &store.AuditLogMessage{
 		Method:    procedure,
 		ActorType: getActorType(ctx),
@@ -32,6 +35,8 @@ func (a *AuditInterceptor) recordAudit(ctx context.Context, procedure string, er
 		SourceIP:  getSourceIP(ctx),
 		Status:    statusFromError(err),
 		Error:     errorFromError(err),
+		Resource:  resource,
+		Payload:   payload,
 		CreatedAt: time.Now(),
 	}
 
@@ -56,7 +61,11 @@ func (a *AuditInterceptor) recordAudit(ctx context.Context, procedure string, er
 
 func (a *AuditInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		resp, err := next(ctx, req)
+		var serviceData *anypb.Any
+		wrappedCtx := common.WithSetServiceData(ctx, func(a *anypb.Any) {
+			serviceData = a
+		})
+		resp, err := next(wrappedCtx, req)
 
 		authCtx, ok := common.GetAuthContextFromContext(ctx)
 		if !ok || !authCtx.Audit {
@@ -70,7 +79,8 @@ func (a *AuditInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 			}
 		}
 
-		a.recordAudit(ctx, procedure, err)
+		resource, payload := serviceDataAuditFields(serviceData)
+		a.recordAudit(ctx, procedure, err, resource, payload)
 
 		return resp, err
 	}
@@ -98,10 +108,32 @@ func (a *AuditInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFun
 			}
 		}
 
-		a.recordAudit(ctx, procedure, err)
+		a.recordAudit(ctx, procedure, err, "", "")
 
 		return err
 	}
+}
+
+// serviceDataAuditFields extracts the audit resource and JSON payload from the
+// service data a handler attached to the request (e.g. an IamPolicyChange with
+// the binding deltas of a SetIamPolicy call). A nil or unmarshalable Any
+// yields empty fields.
+func serviceDataAuditFields(a *anypb.Any) (resource, payload string) {
+	if a == nil {
+		return "", ""
+	}
+	m, err := a.UnmarshalNew()
+	if err != nil {
+		return "", ""
+	}
+	b, err := protojson.Marshal(m)
+	if err != nil {
+		return "", ""
+	}
+	if change, ok := m.(*v1pb.IamPolicyChange); ok {
+		return change.GetResource(), string(b)
+	}
+	return "", string(b)
 }
 
 func shouldSampleHeartbeat(rate int) bool {

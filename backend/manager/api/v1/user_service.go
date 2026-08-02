@@ -603,7 +603,7 @@ func (s *UserService) DeleteUser(ctx context.Context, request *connect.Request[v
 	if err != nil {
 		return nil, err
 	}
-	hasExtraWorkspaceAdmin, err := s.hasExtraWorkspaceAdmin(ctx, policy.Policy, user.ID)
+	hasExtraWorkspaceAdmin, err := hasActiveWorkspaceAdmin(ctx, s.store, policy.Policy, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -615,51 +615,6 @@ func (s *UserService) DeleteUser(ctx context.Context, request *connect.Request[v
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
-}
-
-func (s *UserService) getActiveUserCount(ctx context.Context) (int, error) {
-	userStat, err := s.store.StatUsers(ctx)
-	if err != nil {
-		return 0, connect.NewError(connect.CodeInternal, errors.Errorf("failed to stat users with error: %v", err.Error()))
-	}
-	activeEndUserCount := 0
-	for _, stat := range userStat {
-		if !stat.Deleted && stat.Type == storepb.PrincipalType_END_USER {
-			activeEndUserCount = stat.Count
-			break
-		}
-	}
-	return activeEndUserCount, nil
-}
-
-func (s *UserService) hasExtraWorkspaceAdmin(ctx context.Context, policy *storepb.IamPolicy, userID int) (bool, error) {
-	workspaceAdminRole := common.FormatRole(common.WorkspaceAdmin)
-	userMember := common.FormatUserUID(userID)
-
-	for _, binding := range policy.GetBindings() {
-		if binding.GetRole() != workspaceAdminRole {
-			continue
-		}
-		for _, member := range binding.GetMembers() {
-			if member == userMember {
-				continue
-			}
-			if member == common.AllUsers {
-				activeEndUserCount, err := s.getActiveUserCount(ctx)
-				if err != nil {
-					return false, err
-				}
-				return activeEndUserCount > 1, nil
-			}
-			users := utils.GetUsersByMember(ctx, s.store, member)
-			for _, user := range users {
-				if !user.MemberDeleted && user.Type == storepb.PrincipalType_END_USER {
-					return true, nil
-				}
-			}
-		}
-	}
-	return false, nil
 }
 
 // UndeleteUser undeletes a user.
