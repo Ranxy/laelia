@@ -23,7 +23,9 @@ import {
   MACHINE_ROUTE_LIST,
   MEMBERS_ROUTE,
   SETTINGS_ROUTE,
+  SETTINGS_ROUTE_AUDIT,
   SETTINGS_ROUTE_CHAT,
+  SETTINGS_ROUTE_GROUPS,
   SETTINGS_ROUTE_IAM,
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_ROLES,
@@ -99,6 +101,8 @@ function useSidebarItems(): SidebarItem[] {
   const canViewUsers = useHasPermission("laelia.users.list");
   const canViewRoles = useHasPermission("laelia.roles.list");
   const canViewIam = useHasPermission("laelia.iam.getPolicy");
+  const canViewGroups = useHasPermission("laelia.groups.list");
+  const canViewAudit = useHasPermission("laelia.auditLogs.search");
 
   return useMemo(
     (): SidebarItem[] => [
@@ -166,10 +170,30 @@ function useSidebarItems(): SidebarItem[] {
             type: "route",
             hide: !canViewIam,
           },
+          {
+            title: t("sidebar.settings-groups"),
+            name: SETTINGS_ROUTE_GROUPS,
+            type: "route",
+            hide: !canViewGroups,
+          },
+          {
+            title: t("sidebar.settings-audit"),
+            name: SETTINGS_ROUTE_AUDIT,
+            type: "route",
+            hide: !canViewAudit,
+          },
         ],
       },
     ],
-    [t, canViewStorage, canViewUsers, canViewRoles, canViewIam]
+    [
+      t,
+      canViewStorage,
+      canViewUsers,
+      canViewRoles,
+      canViewIam,
+      canViewGroups,
+      canViewAudit,
+    ]
   );
 }
 

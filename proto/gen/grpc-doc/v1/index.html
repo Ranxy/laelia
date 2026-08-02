@@ -13367,6 +13367,14 @@ with a role: OWNER (may manage the group) or MEMBER. </p></td>
 (e.g. SCIM) and is read-only over this API. </p></td>
                 </tr>
               
+                <tr>
+                  <td>can_manage</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Output only. True when the caller may manage this group: the caller is a
+group OWNER or holds laelia.groups.update. Populated for the caller only. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 

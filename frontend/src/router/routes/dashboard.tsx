@@ -15,7 +15,9 @@ import {
   MEMBERS_ROUTE,
   REMINDER_ROUTE_DETAIL,
   REMINDER_ROUTE_LIST,
+  SETTINGS_ROUTE_AUDIT,
   SETTINGS_ROUTE_CHAT,
+  SETTINGS_ROUTE_GROUPS,
   SETTINGS_ROUTE_IAM,
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_PROFILE,
@@ -280,6 +282,22 @@ export const dashboardRoutes: RouteObject[] = [
             lazy: () =>
               import("@/pages/dashboard/settings-iam").then((m) => ({
                 Component: m.SettingsIamPage,
+              })),
+          },
+          {
+            path: "groups",
+            handle: { name: SETTINGS_ROUTE_GROUPS },
+            lazy: () =>
+              import("@/pages/dashboard/settings-groups").then((m) => ({
+                Component: m.SettingsGroupsPage,
+              })),
+          },
+          {
+            path: "audit",
+            handle: { name: SETTINGS_ROUTE_AUDIT },
+            lazy: () =>
+              import("@/pages/dashboard/settings-audit").then((m) => ({
+                Component: m.SettingsAuditPage,
               })),
           },
         ],

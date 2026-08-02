@@ -5023,6 +5023,7 @@ The IAM engine expands a group&#39;s members at authorization time.
 | description | [string](#string) |  | Longer description of the group. |
 | members | [GroupMember](#laelia-v1-GroupMember) | repeated | The group&#39;s members. Each member is a user resource name (&#34;users/{uid}&#34;) with a role: OWNER (may manage the group) or MEMBER. |
 | source | [string](#string) |  | Output only. When non-empty, the group is synced from an external source (e.g. SCIM) and is read-only over this API. |
+| can_manage | [bool](#bool) |  | Output only. True when the caller may manage this group: the caller is a group OWNER or holds laelia.groups.update. Populated for the caller only. |
 
 
 

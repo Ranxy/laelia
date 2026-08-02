@@ -43,6 +43,10 @@ message Group {
   // Output only. When non-empty, the group is synced from an external source
   // (e.g. SCIM) and is read-only over this API.
   string source = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. True when the caller may manage this group: the caller is a
+  // group OWNER or holds laelia.groups.update. Populated for the caller only.
+  bool can_manage = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message GroupMember {

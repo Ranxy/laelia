@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { roleServiceClient } from "@/connect";
+import { describeError } from "@/lib/connect-errors";
 import {
   ALL_PERMISSIONS,
   PERMISSION_GROUPS,
@@ -261,7 +262,7 @@ export function SettingsRolesPage() {
       toastManager.add({
         type: "error",
         title: t("settings.roles.delete-failed"),
-        description: err instanceof Error ? err.message : String(err),
+        description: describeError(err),
       });
     } finally {
       setDeleting(false);

@@ -46,7 +46,11 @@ func (s *GroupService) GetGroup(ctx context.Context, req *connect.Request[v1pb.G
 	if group == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("group %q not found", req.Msg.Name))
 	}
-	return connect.NewResponse(convertToV1Group(group)), nil
+	canManage, err := s.callerCanManage(ctx, group)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(convertToV1Group(group, canManage)), nil
 }
 
 // BatchGetGroups gets groups in batch; missing groups are skipped.
@@ -61,7 +65,11 @@ func (s *GroupService) BatchGetGroups(ctx context.Context, req *connect.Request[
 		if err != nil || group == nil {
 			continue
 		}
-		response.Groups = append(response.Groups, convertToV1Group(group))
+		canManage, err := s.callerCanManage(ctx, group)
+		if err != nil {
+			return nil, err
+		}
+		response.Groups = append(response.Groups, convertToV1Group(group, canManage))
 	}
 	return connect.NewResponse(response), nil
 }
@@ -101,7 +109,11 @@ func (s *GroupService) ListGroups(ctx context.Context, req *connect.Request[v1pb
 
 	response := &v1pb.ListGroupsResponse{NextPageToken: nextPageToken}
 	for _, group := range groups {
-		response.Groups = append(response.Groups, convertToV1Group(group))
+		canManage, err := s.callerCanManage(ctx, group)
+		if err != nil {
+			return nil, err
+		}
+		response.Groups = append(response.Groups, convertToV1Group(group, canManage))
 	}
 	return connect.NewResponse(response), nil
 }
@@ -142,7 +154,11 @@ func (s *GroupService) CreateGroup(ctx context.Context, req *connect.Request[v1p
 		}
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to create group"))
 	}
-	return connect.NewResponse(convertToV1Group(group)), nil
+	canManage, err := s.callerCanManage(ctx, group)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(convertToV1Group(group, canManage)), nil
 }
 
 // UpdateGroup updates a group. The group owner or a caller holding
@@ -213,7 +229,11 @@ func (s *GroupService) UpdateGroup(ctx context.Context, req *connect.Request[v1p
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update group"))
 	}
-	return connect.NewResponse(convertToV1Group(updated)), nil
+	canManage, err := s.callerCanManage(ctx, updated)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(convertToV1Group(updated, canManage)), nil
 }
 
 // DeleteGroup deletes a group. The group owner or a caller holding
@@ -258,6 +278,16 @@ func (s *GroupService) canManageGroup(ctx context.Context, user *store.UserMessa
 		return true, nil
 	}
 	return s.iam.CheckPermission(ctx, perm, user, nil, nil)
+}
+
+// callerCanManage resolves whether the current caller may manage the group,
+// for the OUTPUT_ONLY can_manage field.
+func (s *GroupService) callerCanManage(ctx context.Context, group *store.GroupMessage) (bool, error) {
+	user, ok := GetUserFromContext(ctx)
+	if !ok {
+		return false, nil
+	}
+	return s.canManageGroup(ctx, user, group, permission.GroupsUpdate)
 }
 
 // validateGroupMembers checks that every member is a well-formed, existing,
@@ -323,13 +353,14 @@ func isGroupOwner(user *store.UserMessage, group *store.GroupMessage) bool {
 }
 
 // convertToV1Group maps a store group to the v1 API shape.
-func convertToV1Group(group *store.GroupMessage) *v1pb.Group {
+func convertToV1Group(group *store.GroupMessage, canManage bool) *v1pb.Group {
 	out := &v1pb.Group{
 		Name:        common.FormatGroupEmail(group.Email),
 		Email:       group.Email,
 		Title:       group.Title,
 		Description: group.Description,
 		Source:      group.Payload.GetSource(),
+		CanManage:   canManage,
 	}
 	for _, m := range group.Payload.GetMembers() {
 		role := v1pb.GroupMemberRole_GROUP_MEMBER_ROLE_UNSPECIFIED

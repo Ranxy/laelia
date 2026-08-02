@@ -62,6 +62,14 @@ export declare type Group = Message<"laelia.v1.Group"> & {
    * @generated from field: string source = 6;
    */
   source: string;
+
+  /**
+   * Output only. True when the caller may manage this group: the caller is a
+   * group OWNER or holds laelia.groups.update. Populated for the caller only.
+   *
+   * @generated from field: bool can_manage = 7;
+   */
+  canManage: boolean;
 };
 
 /**

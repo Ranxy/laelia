@@ -93,7 +93,10 @@ type Group struct {
 	Members []*GroupMember `protobuf:"bytes,5,rep,name=members,proto3" json:"members,omitempty"`
 	// Output only. When non-empty, the group is synced from an external source
 	// (e.g. SCIM) and is read-only over this API.
-	Source        string `protobuf:"bytes,6,opt,name=source,proto3" json:"source,omitempty"`
+	Source string `protobuf:"bytes,6,opt,name=source,proto3" json:"source,omitempty"`
+	// Output only. True when the caller may manage this group: the caller is a
+	// group OWNER or holds laelia.groups.update. Populated for the caller only.
+	CanManage     bool `protobuf:"varint,7,opt,name=can_manage,json=canManage,proto3" json:"can_manage,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -168,6 +171,13 @@ func (x *Group) GetSource() string {
 		return x.Source
 	}
 	return ""
+}
+
+func (x *Group) GetCanManage() bool {
+	if x != nil {
+		return x.CanManage
+	}
+	return false
 }
 
 type GroupMember struct {
@@ -632,14 +642,16 @@ var File_v1_group_service_proto protoreflect.FileDescriptor
 
 const file_v1_group_service_proto_rawDesc = "" +
 	"\n" +
-	"\x16v1/group_service.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x13v1/annotation.proto\"\xe8\x01\n" +
+	"\x16v1/group_service.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x13v1/annotation.proto\"\x8c\x02\n" +
 	"\x05Group\x12\x1a\n" +
 	"\x04name\x18\x01 \x01(\tB\x06\xe0A\b\xe0A\x02R\x04name\x12\x19\n" +
 	"\x05email\x18\x02 \x01(\tB\x03\xe0A\x05R\x05email\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x120\n" +
 	"\amembers\x18\x05 \x03(\v2\x16.laelia.v1.GroupMemberR\amembers\x12\x1b\n" +
-	"\x06source\x18\x06 \x01(\tB\x03\xe0A\x03R\x06source:!\xeaA\x1e\n" +
+	"\x06source\x18\x06 \x01(\tB\x03\xe0A\x03R\x06source\x12\"\n" +
+	"\n" +
+	"can_manage\x18\a \x01(\bB\x03\xe0A\x03R\tcanManage:!\xeaA\x1e\n" +
 	"\flaelia/Group\x12\x0egroups/{group}\"j\n" +
 	"\vGroupMember\x12+\n" +
 	"\x06member\x18\x01 \x01(\tB\x13\xe0A\x02\xfaA\r\n" +

@@ -1,0 +1,570 @@
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { FieldRow } from "@/components/ui/field-row";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { groupServiceClient, userServiceClient } from "@/connect";
+import { describeError } from "@/lib/connect-errors";
+import { toastManager } from "@/lib/toast";
+import { useHasPermission } from "@/stores/auth";
+import { State } from "@/types/proto-es/v1/common_pb";
+import {
+  type Group,
+  GroupMemberRole,
+} from "@/types/proto-es/v1/group_service_pb";
+import { type User } from "@/types/proto-es/v1/user_service_pb";
+
+interface MemberRow {
+  member: string;
+  role: GroupMemberRole;
+}
+
+interface GroupForm {
+  email: string;
+  title: string;
+  description: string;
+  members: MemberRow[];
+}
+
+function emptyForm(): GroupForm {
+  return { email: "", title: "", description: "", members: [] };
+}
+
+function groupToForm(group: Group): GroupForm {
+  return {
+    email: group.email,
+    title: group.title,
+    description: group.description,
+    members: (group.members ?? []).map((m) => ({
+      member: m.member,
+      role: m.role,
+    })),
+  };
+}
+
+function displayName(user: User): string {
+  return user.title || user.email;
+}
+
+export function SettingsGroupsPage() {
+  const { t } = useTranslation();
+  const canList = useHasPermission("laelia.groups.list");
+  const canCreate = useHasPermission("laelia.groups.create");
+
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState<GroupForm>(emptyForm());
+  const [creating, setCreating] = useState(false);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Group | null>(null);
+  const [editForm, setEditForm] = useState<GroupForm>(emptyForm());
+  const [saving, setSaving] = useState(false);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Group | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const activeUsers = useMemo(
+    () => users.filter((u) => u.state === State.ACTIVE),
+    [users]
+  );
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [groupRes, userRes] = await Promise.all([
+        groupServiceClient.listGroups({ pageSize: 1000 }),
+        userServiceClient.listUsers({ pageSize: 1000 }),
+      ]);
+      setGroups(groupRes.groups ?? []);
+      setUsers(userRes.users ?? []);
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("settings.groups.load-failed"),
+        description: describeError(err),
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    if (canList) load();
+    else setLoading(false);
+  }, [canList, load]);
+
+  const hasOwner = (form: GroupForm) =>
+    form.members.some((m) => m.role === GroupMemberRole.OWNER);
+
+  const updateMember = (
+    form: GroupForm,
+    setForm: (f: GroupForm) => void,
+    index: number,
+    patch: Partial<MemberRow>
+  ) => {
+    const next = { ...form, members: [...form.members] };
+    next.members[index] = { ...next.members[index], ...patch };
+    setForm(next);
+  };
+
+  const create = async () => {
+    if (!createForm.title.trim() || !createForm.email.trim()) return;
+    if (!hasOwner(createForm)) {
+      toastManager.add({
+        type: "error",
+        title: t("settings.groups.at-least-one-owner"),
+      });
+      return;
+    }
+    setCreating(true);
+    try {
+      await groupServiceClient.createGroup({
+        groupEmail: createForm.email.trim().toLowerCase(),
+        group: {
+          title: createForm.title,
+          description: createForm.description,
+          members: createForm.members,
+        },
+      });
+      toastManager.add({
+        type: "success",
+        title: t("settings.groups.created"),
+      });
+      setCreateOpen(false);
+      setCreateForm(emptyForm());
+      load();
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("settings.groups.create-title"),
+        description: describeError(err),
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const save = async () => {
+    if (!editTarget) return;
+    if (!hasOwner(editForm)) {
+      toastManager.add({
+        type: "error",
+        title: t("settings.groups.at-least-one-owner"),
+      });
+      return;
+    }
+    setSaving(true);
+    try {
+      const paths = ["title", "description"];
+      if (
+        JSON.stringify(editForm.members) !==
+        JSON.stringify(groupToForm(editTarget).members)
+      ) {
+        paths.push("members");
+      }
+      await groupServiceClient.updateGroup({
+        group: {
+          name: editTarget.name,
+          title: editForm.title,
+          description: editForm.description,
+          members: editForm.members,
+        },
+        updateMask: { paths },
+      });
+      toastManager.add({
+        type: "success",
+        title: t("settings.groups.updated"),
+      });
+      setEditOpen(false);
+      setEditTarget(null);
+      load();
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("settings.groups.edit-title", { title: editTarget.title }),
+        description: describeError(err),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await groupServiceClient.deleteGroup({ name: deleteTarget.name });
+      toastManager.add({
+        type: "success",
+        title: t("settings.groups.deleted"),
+      });
+      setDeleteOpen(false);
+      setDeleteTarget(null);
+      load();
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("settings.groups.delete-failed"),
+        description: describeError(err),
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (!canList) {
+    return (
+      <div className="h-full overflow-y-auto p-6">
+        <p className="text-sm text-control-light">
+          {t("settings.groups.not-allowed")}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full overflow-y-auto p-6 flex flex-col gap-5 w-full">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-semibold text-main">
+            {t("settings.groups.title")}
+          </h1>
+          <p className="text-sm text-control-light">
+            {t("settings.groups.description")}
+          </p>
+        </div>
+        {canCreate && (
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="w-4 h-4" />
+            {t("settings.groups.create")}
+          </Button>
+        )}
+      </div>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t("settings.groups.header-title")}</TableHead>
+            <TableHead>{t("settings.groups.header-email")}</TableHead>
+            <TableHead>{t("settings.groups.header-members")}</TableHead>
+            <TableHead>{t("settings.groups.header-source")}</TableHead>
+            <TableHead />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {groups.map((group) => (
+            <TableRow key={group.name}>
+              <TableCell className="font-medium text-main">
+                {group.title}
+              </TableCell>
+              <TableCell className="text-control-light">
+                {group.email}
+              </TableCell>
+              <TableCell>{group.members?.length ?? 0}</TableCell>
+              <TableCell>
+                {group.source ? (
+                  <Badge variant="secondary">
+                    {t("settings.groups.source-external")}
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary">
+                    {t("settings.groups.source-manual")}
+                  </Badge>
+                )}
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex justify-end gap-2">
+                  {group.canManage && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditTarget(group);
+                          setEditForm(groupToForm(group));
+                          setEditOpen(true);
+                        }}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-danger"
+                        onClick={() => {
+                          setDeleteTarget(group);
+                          setDeleteOpen(true);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+          {groups.length === 0 && !loading && (
+            <TableRow>
+              <TableCell
+                colSpan={5}
+                className="text-center text-control-light py-8"
+              >
+                {t("settings.groups.no-members")}
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+
+      <GroupSheet
+        open={createOpen}
+        title={t("settings.groups.create-title")}
+        description={t("settings.groups.create-description")}
+        form={createForm}
+        users={activeUsers}
+        onSubmit={create}
+        submitting={creating}
+        emailDisabled={false}
+        onClose={() => setCreateOpen(false)}
+        onFormChange={setCreateForm}
+        onUpdateMember={updateMember}
+      />
+
+      <GroupSheet
+        open={editOpen}
+        title={t("settings.groups.edit-title", {
+          title: editTarget?.title ?? "",
+        })}
+        description={t("settings.groups.edit-description")}
+        form={editForm}
+        users={activeUsers}
+        onSubmit={save}
+        submitting={saving}
+        emailDisabled={true}
+        onClose={() => setEditOpen(false)}
+        onFormChange={setEditForm}
+        onUpdateMember={updateMember}
+      />
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogTitle>
+            {t("settings.groups.delete-confirm-title")}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("settings.groups.delete-confirm-description", {
+              title: deleteTarget?.title ?? "",
+            })}
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogClose>
+              <Button variant="outline" disabled={deleting}>
+                {t("common.cancel")}
+              </Button>
+            </AlertDialogClose>
+            <Button variant="destructive" disabled={deleting} onClick={remove}>
+              {deleting ? t("common.saving") : t("common.delete")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+interface GroupSheetProps {
+  open: boolean;
+  title: string;
+  description: string;
+  form: GroupForm;
+  users: User[];
+  submitting: boolean;
+  emailDisabled: boolean;
+  onSubmit: () => void;
+  onClose: () => void;
+  onFormChange: (f: GroupForm) => void;
+  onUpdateMember: (
+    form: GroupForm,
+    setForm: (f: GroupForm) => void,
+    index: number,
+    patch: Partial<MemberRow>
+  ) => void;
+}
+
+function GroupSheet({
+  open,
+  title,
+  description,
+  form,
+  users,
+  submitting,
+  emailDisabled,
+  onSubmit,
+  onClose,
+  onFormChange,
+  onUpdateMember,
+}: GroupSheetProps) {
+  const { t } = useTranslation();
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
+        </SheetHeader>
+        <SheetBody className="flex flex-col gap-4">
+          <FieldRow label={t("settings.groups.field-email")}>
+            <Input
+              value={form.email}
+              disabled={emailDisabled}
+              onChange={(e) => onFormChange({ ...form, email: e.target.value })}
+              placeholder={t("settings.groups.field-email-placeholder")}
+            />
+          </FieldRow>
+          <FieldRow label={t("settings.groups.field-title")}>
+            <Input
+              value={form.title}
+              onChange={(e) => onFormChange({ ...form, title: e.target.value })}
+              placeholder={t("settings.groups.field-title-placeholder")}
+            />
+          </FieldRow>
+          <FieldRow label={t("settings.groups.field-description")}>
+            <Input
+              value={form.description}
+              onChange={(e) =>
+                onFormChange({ ...form, description: e.target.value })
+              }
+              placeholder={t("settings.groups.field-description-placeholder")}
+            />
+          </FieldRow>
+          <div className="flex flex-col gap-2">
+            <span className="text-sm text-control-light">
+              {t("settings.groups.field-members")}
+            </span>
+            {form.members.map((row, i) => (
+              <div key={i} className="flex gap-2 items-center">
+                <Select
+                  value={row.member}
+                  onValueChange={(member) =>
+                    onUpdateMember(form, onFormChange, i, {
+                      member: member ?? "",
+                    })
+                  }
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue
+                      placeholder={t("settings.groups.member-user-placeholder")}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((u) => (
+                      <SelectItem key={u.name} value={u.name ?? ""}>
+                        {displayName(u)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={String(row.role)}
+                  onValueChange={(role) =>
+                    onUpdateMember(form, onFormChange, i, {
+                      role: Number(role) as GroupMemberRole,
+                    })
+                  }
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={String(GroupMemberRole.OWNER)}>
+                      {t("settings.groups.member-role-owner")}
+                    </SelectItem>
+                    <SelectItem value={String(GroupMemberRole.MEMBER)}>
+                      {t("settings.groups.member-role-member")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    onFormChange({
+                      ...form,
+                      members: form.members.filter((_, j) => j !== i),
+                    })
+                  }
+                >
+                  {t("settings.groups.member-remove")}
+                </Button>
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                onFormChange({
+                  ...form,
+                  members: [
+                    ...form.members,
+                    {
+                      member: users[0]?.name ?? "",
+                      role: GroupMemberRole.MEMBER,
+                    },
+                  ],
+                })
+              }
+            >
+              {t("settings.groups.member-add")}
+            </Button>
+          </div>
+        </SheetBody>
+        <SheetFooter>
+          <Button onClick={onSubmit} disabled={submitting}>
+            {submitting ? t("common.saving") : t("common.save")}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}

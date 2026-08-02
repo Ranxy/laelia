@@ -5401,6 +5401,12 @@ components:
                     description: |-
                         Output only. When non-empty, the group is synced from an external source
                          (e.g. SCIM) and is read-only over this API.
+                canManage:
+                    readOnly: true
+                    type: boolean
+                    description: |-
+                        Output only. True when the caller may manage this group: the caller is a
+                         group OWNER or holds laelia.groups.update. Populated for the caller only.
             description: |-
                 Group is a named collection of users that can be bound in IAM policies
                  (workspace, agent, and conversation bindings accept groups/{email} members).
