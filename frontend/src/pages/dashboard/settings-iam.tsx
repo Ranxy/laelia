@@ -1,8 +1,17 @@
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
-import { Loader2, Plus, Shield, User as UserIcon, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  Plus,
+  Shield,
+  User as UserIcon,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { MemberPicker } from "@/components/member-picker";
 import { Alert } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -15,13 +24,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Sheet,
   SheetBody,
@@ -39,7 +41,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { iamServiceClient, roleServiceClient } from "@/connect";
+import {
+  groupServiceClient,
+  iamServiceClient,
+  roleServiceClient,
+} from "@/connect";
 import { toastManager } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -50,8 +56,8 @@ import {
   type IamPolicy,
   IamPolicySchema,
 } from "@/types/proto-es/store/policy_pb";
+import { type Group } from "@/types/proto-es/v1/group_service_pb";
 import { type Role } from "@/types/proto-es/v1/role_service_pb";
-import { type User } from "@/types/proto-es/v1/user_service_pb";
 
 // roleIDFromName extracts the bare id from `roles/{id}`.
 function roleIDFromName(name: string | undefined): string {
@@ -85,10 +91,11 @@ export function SettingsIamPage() {
 
   const [policyState, setPolicyState] = useState<PolicyState | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [assignOpen, setAssignOpen] = useState(false);
-  const [selectedUserName, setSelectedUserName] = useState("");
+  const [selectedMember, setSelectedMember] = useState("");
   const [selectedRoleIds, setSelectedRoleIds] = useState<Set<string>>(
     new Set()
   );
@@ -102,26 +109,28 @@ export function SettingsIamPage() {
   const [roleSheetMembers, setRoleSheetMembers] = useState<Set<string>>(
     new Set()
   );
-  const [roleSheetAddUser, setRoleSheetAddUser] = useState("");
   const [roleSheetOriginalMembers, setRoleSheetOriginalMembers] = useState<
     Set<string>
   >(new Set());
   const [roleSheetConfirmClose, setRoleSheetConfirmClose] = useState(false);
   const [roleSheetSaving, setRoleSheetSaving] = useState(false);
   const [roleSheetError, setRoleSheetError] = useState("");
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [policyRes, rolesRes] = await Promise.all([
+      const [policyRes, rolesRes, groupsRes] = await Promise.all([
         iamServiceClient.getWorkspaceIamPolicy({}),
         roleServiceClient.listRoles({}),
+        groupServiceClient.listGroups({ pageSize: 1000 }),
       ]);
       setPolicyState({
         policy: policyRes.policy ?? create(IamPolicySchema, {}),
         etag: policyRes.etag,
       });
       setRoles(rolesRes.roles ?? []);
+      setGroups(groupsRes.groups ?? []);
     } catch (err) {
       toastManager.add({
         type: "error",
@@ -136,7 +145,7 @@ export function SettingsIamPage() {
   useEffect(() => {
     if (canGet) {
       load();
-      fetchUsers({ pageSize: 100 });
+      fetchUsers({ pageSize: 1000 });
     } else {
       setLoading(false);
     }
@@ -152,8 +161,8 @@ export function SettingsIamPage() {
   }, [roles]);
 
   const selectedUser = useMemo(() => {
-    return users.find((u) => u.name === selectedUserName) ?? null;
-  }, [users, selectedUserName]);
+    return users.find((u) => u.name === selectedMember) ?? null;
+  }, [users, selectedMember]);
 
   // userEmailByMember resolves a `users/{uid}` member string to an email for the
   // binding table, falling back to the raw member.
@@ -162,6 +171,17 @@ export function SettingsIamPage() {
     for (const u of users) m.set(u.name, u.email);
     return m;
   }, [users]);
+
+  // groupByMember resolves a `groups/{id}` or `groups/{email}` member string to
+  // its group for display and expansion.
+  const groupByMember = useMemo(() => {
+    const m = new Map<string, Group>();
+    for (const g of groups) {
+      m.set(g.name ?? "", g);
+      if (g.email) m.set(`groups/${g.email}`, g);
+    }
+    return m;
+  }, [groups]);
 
   // Which members are newly added (pending, not yet saved) in the role sheet.
   const roleSheetNewMembers = useMemo(() => {
@@ -184,7 +204,9 @@ export function SettingsIamPage() {
     if (member.startsWith("users/")) {
       return userEmailByMember.get(member) ?? member;
     }
-    if (member.startsWith("groups/")) return member.slice("groups/".length);
+    if (member.startsWith("groups/")) {
+      return groupByMember.get(member)?.title ?? member.slice("groups/".length);
+    }
     if (member.startsWith("agents/")) return member;
     return member;
   }
@@ -207,16 +229,16 @@ export function SettingsIamPage() {
   }
 
   function openAssign() {
-    setSelectedUserName("");
+    setSelectedMember("");
     setSelectedRoleIds(new Set());
     setAssignError("");
     setAssignOpen(true);
   }
 
-  // When the selected user changes, pre-check the roles they currently hold on
-  // the workspace policy (only grantable ones).
-  function onUserChange(name: string) {
-    setSelectedUserName(name);
+  // When the selected member (user, group, or allUsers) changes, pre-check the
+  // roles they currently hold on the workspace policy (only grantable ones).
+  function onMemberChange(name: string) {
+    setSelectedMember(name);
     const held = new Set<string>();
     const policy = policyState?.policy;
     if (policy) {
@@ -258,8 +280,8 @@ export function SettingsIamPage() {
       const binding =
         byRole.get(role.name) ??
         create(BindingSchema, { role: role.name, members: [] });
-      const members = binding.members.filter((m) => m !== selectedUserName);
-      if (selectedRoleIds.has(role.name)) members.push(selectedUserName);
+      const members = binding.members.filter((m) => m !== selectedMember);
+      if (selectedRoleIds.has(role.name)) members.push(selectedMember);
       binding.members = members;
       byRole.set(role.name, binding);
     }
@@ -316,7 +338,6 @@ export function SettingsIamPage() {
     setRoleSheetBindingRole(binding.role);
     setRoleSheetMembers(new Set(members));
     setRoleSheetOriginalMembers(new Set(members));
-    setRoleSheetAddUser("");
     setRoleSheetError("");
     setRoleSheetOpen(true);
   }
@@ -324,7 +345,6 @@ export function SettingsIamPage() {
   function handleAddMember(name: string) {
     if (!name || roleSheetMembers.has(name)) return;
     setRoleSheetMembers((prev) => new Set(prev).add(name));
-    setRoleSheetAddUser("");
   }
 
   function handleRemoveMember(name: string) {
@@ -367,7 +387,7 @@ export function SettingsIamPage() {
   }
 
   async function handleSaveAssign() {
-    if (!policyState || !selectedUserName) return;
+    if (!policyState || !selectedMember) return;
     setAssignError("");
     setSaving(true);
     try {
@@ -502,7 +522,7 @@ export function SettingsIamPage() {
         open={assignOpen}
         onOpenChange={(next) => {
           setAssignOpen(next);
-          if (!next) setSelectedUserName("");
+          if (!next) setSelectedMember("");
         }}
       >
         <SheetContent width="medium">
@@ -522,61 +542,56 @@ export function SettingsIamPage() {
             )}
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-1.5">
-                <label
-                  htmlFor="assign-user"
-                  className="text-xs font-semibold uppercase tracking-wide text-control"
-                >
-                  {t("settings.iam.field-user")}
+                <label className="text-xs font-semibold uppercase tracking-wide text-control">
+                  {t("settings.iam.field-member")}
                 </label>
-                <Select
-                  value={selectedUserName}
-                  onValueChange={(v) => onUserChange(String(v ?? ""))}
-                >
-                  <SelectTrigger id="assign-user" className="w-full">
-                    <SelectValue
-                      placeholder={t("settings.iam.field-user-placeholder")}
-                    >
-                      {(v: string | null) => {
-                        const u = users.find((x) => x.name === v);
-                        return u?.email ?? v ?? "";
-                      }}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.length === 0 ? (
-                      <SelectItem value="" disabled>
-                        {t("settings.iam.no-users")}
-                      </SelectItem>
-                    ) : (
-                      users.map((u: User) => (
-                        <SelectItem key={u.name} value={u.name}>
-                          {u.email}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                <MemberPicker
+                  users={users}
+                  groups={groups}
+                  value={selectedMember}
+                  onSelect={onMemberChange}
+                  allowAllUsers
+                />
               </div>
 
-              {selectedUser && (
+              {selectedMember && (
                 <div className="flex items-center gap-3 rounded-xs border border-control-border bg-control-bg/50 p-3">
                   <div className="flex size-9 items-center justify-center rounded-full bg-accent/10 text-accent">
-                    <UserIcon className="size-4.5" />
+                    {selectedMember.startsWith("groups/") ? (
+                      <Shield className="size-4.5" />
+                    ) : (
+                      <UserIcon className="size-4.5" />
+                    )}
                   </div>
                   <div className="flex flex-col gap-0.5 min-w-0">
                     <span className="text-sm font-medium text-main truncate">
-                      {selectedUser.email}
+                      {memberLabel(selectedMember)}
                     </span>
-                    {selectedUser.title && (
+                    {selectedUser?.title && (
                       <span className="text-xs text-control-light truncate">
                         {selectedUser.title}
                       </span>
                     )}
+                    {selectedMember === "allUsers" && (
+                      <span className="text-xs text-control-light truncate">
+                        {t("settings.iam.member-all-users-hint")}
+                      </span>
+                    )}
+                    {selectedMember.startsWith("groups/") &&
+                      groupByMember.get(selectedMember) && (
+                        <span className="text-xs text-control-light truncate">
+                          {t("settings.iam.member-picker-members-count", {
+                            count:
+                              groupByMember.get(selectedMember)?.members
+                                ?.length ?? 0,
+                          })}
+                        </span>
+                      )}
                   </div>
                 </div>
               )}
 
-              {selectedUserName && (
+              {selectedMember && (
                 <div className="flex flex-col gap-2">
                   <span className="text-xs font-semibold uppercase tracking-wide text-control">
                     {t("settings.iam.field-roles")}
@@ -640,7 +655,7 @@ export function SettingsIamPage() {
               {t("common.cancel")}
             </Button>
             <Button
-              disabled={saving || !selectedUserName}
+              disabled={saving || !selectedMember}
               onClick={handleSaveAssign}
             >
               {saving ? <Loader2 className="size-4 animate-spin" /> : null}
@@ -710,133 +725,161 @@ export function SettingsIamPage() {
                 <label className="text-xs font-semibold uppercase tracking-wide text-control">
                   {t("settings.iam.role-sheet-current-members")}
                 </label>
-                {roleSheetMembers.size === 0 ? (
-                  <p className="text-sm text-control-light py-4 text-center border border-dashed border-control-border rounded-xs">
-                    {t("settings.iam.role-sheet-no-members")}
-                  </p>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {[...roleSheetMembers]
-                      .sort((a, b) =>
-                        (memberLabel(a) ?? a).localeCompare(memberLabel(b) ?? b)
-                      )
-                      .map((member) => {
-                        const user = users.find((u) => u.name === member);
-                        const isNew = roleSheetNewMembers.has(member);
-                        return (
-                          <div
-                            key={member}
-                            className={cn(
-                              "flex items-center gap-3 rounded-xs border p-3 transition-colors",
-                              isNew
-                                ? "border-dashed border-accent/40 bg-accent/[0.03]"
-                                : "border-control-border bg-background hover:bg-control-bg/60"
-                            )}
-                          >
-                            <div
-                              className={cn(
-                                "flex size-9 items-center justify-center rounded-full shrink-0",
-                                isNew
-                                  ? "bg-accent/10 text-accent"
-                                  : "bg-accent/10 text-accent"
-                              )}
-                            >
-                              {isNew ? (
-                                <Plus className="size-4.5" />
-                              ) : (
-                                <UserIcon className="size-4.5" />
-                              )}
-                            </div>
-                            <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-main truncate">
-                                  {memberLabel(member)}
-                                </span>
-                                {isNew && (
-                                  <Badge
-                                    variant="warning"
-                                    className="text-xs shrink-0"
-                                  >
-                                    {t("settings.iam.role-sheet-pending")}
-                                  </Badge>
+                <div className="max-h-72 overflow-y-auto pr-1">
+                  {roleSheetMembers.size === 0 ? (
+                    <p className="text-sm text-control-light py-4 text-center border border-dashed border-control-border rounded-xs">
+                      {t("settings.iam.role-sheet-no-members")}
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {[...roleSheetMembers]
+                        .sort((a, b) =>
+                          (memberLabel(a) ?? a).localeCompare(
+                            memberLabel(b) ?? b
+                          )
+                        )
+                        .map((member) => {
+                          const user = users.find((u) => u.name === member);
+                          const group = member.startsWith("groups/")
+                            ? groupByMember.get(member)
+                            : undefined;
+                          const isNew = roleSheetNewMembers.has(member);
+                          const isGroupExpanded = expandedGroups.has(member);
+                          return (
+                            <div key={member} className="flex flex-col gap-2">
+                              <div
+                                className={cn(
+                                  "flex items-center gap-3 rounded-xs border p-3 transition-colors",
+                                  isNew
+                                    ? "border-dashed border-accent/40 bg-accent/[0.03]"
+                                    : "border-control-border bg-background hover:bg-control-bg/60"
                                 )}
+                              >
+                                <div
+                                  className={cn(
+                                    "flex size-9 items-center justify-center rounded-full shrink-0 bg-accent/10 text-accent"
+                                  )}
+                                >
+                                  {isNew ? (
+                                    <Plus className="size-4.5" />
+                                  ) : group ? (
+                                    <Shield className="size-4.5" />
+                                  ) : (
+                                    <UserIcon className="size-4.5" />
+                                  )}
+                                </div>
+                                <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-main truncate">
+                                      {memberLabel(member)}
+                                    </span>
+                                    {isNew && (
+                                      <Badge
+                                        variant="warning"
+                                        className="text-xs shrink-0"
+                                      >
+                                        {t("settings.iam.role-sheet-pending")}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {user?.title && (
+                                    <span className="text-xs text-control-light truncate">
+                                      {user.title}
+                                    </span>
+                                  )}
+                                  {group && (
+                                    <span className="text-xs text-control-light truncate">
+                                      {t(
+                                        "settings.iam.member-picker-members-count",
+                                        { count: group.members?.length ?? 0 }
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+                                {group && (
+                                  <Button
+                                    variant="ghost"
+                                    size="xs"
+                                    aria-label={t(
+                                      isGroupExpanded
+                                        ? "settings.iam.role-sheet-collapse-group"
+                                        : "settings.iam.role-sheet-expand-group",
+                                      { title: group.title }
+                                    )}
+                                    onClick={() =>
+                                      setExpandedGroups((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(member))
+                                          next.delete(member);
+                                        else next.add(member);
+                                        return next;
+                                      })
+                                    }
+                                  >
+                                    {isGroupExpanded ? (
+                                      <ChevronDown className="size-4" />
+                                    ) : (
+                                      <ChevronRight className="size-4" />
+                                    )}
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="xs"
+                                  onClick={() => handleRemoveMember(member)}
+                                  aria-label={t(
+                                    "settings.iam.role-sheet-remove-member",
+                                    {
+                                      email: memberLabel(member),
+                                    }
+                                  )}
+                                  className="shrink-0 text-control-light hover:text-error"
+                                >
+                                  <X className="size-4" />
+                                </Button>
                               </div>
-                              {user?.title && (
-                                <span className="text-xs text-control-light truncate">
-                                  {user.title}
-                                </span>
+                              {isGroupExpanded && group && (
+                                <div className="flex flex-col gap-1 pl-12">
+                                  {group.members?.map((gm) => {
+                                    const gu = users.find(
+                                      (u) => u.name === gm.member
+                                    );
+                                    return (
+                                      <span
+                                        key={gm.member}
+                                        className="text-xs text-control-light truncate"
+                                      >
+                                        {gu
+                                          ? gu.title || gu.email || gm.member
+                                          : gm.member}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
                               )}
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="xs"
-                              onClick={() => handleRemoveMember(member)}
-                              aria-label={t(
-                                "settings.iam.role-sheet-remove-member",
-                                {
-                                  email: memberLabel(member),
-                                }
-                              )}
-                              className="shrink-0 text-control-light hover:text-error"
-                            >
-                              <X className="size-4" />
-                            </Button>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Add user section */}
+              {/* Add member section */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wide text-control">
-                  {t("settings.iam.role-sheet-field-add-user")}
+                  {t("settings.iam.role-sheet-field-add-member")}
                 </label>
-                <div className="flex gap-2">
-                  <Select
-                    value={roleSheetAddUser}
-                    onValueChange={(v) => setRoleSheetAddUser(String(v ?? ""))}
-                  >
-                    <SelectTrigger className="flex-1" id="role-sheet-add-user">
-                      <SelectValue
-                        placeholder={t(
-                          "settings.iam.role-sheet-field-add-user-placeholder"
-                        )}
-                      >
-                        {(v: string | null) => {
-                          const u = users.find((x) => x.name === v);
-                          return u?.email ?? v ?? "";
-                        }}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(() => {
-                        const available = users.filter(
-                          (u) => !roleSheetMembers.has(u.name)
-                        );
-                        return available.length === 0 ? (
-                          <SelectItem value="" disabled>
-                            {t("settings.iam.no-users")}
-                          </SelectItem>
-                        ) : (
-                          available.map((u: User) => (
-                            <SelectItem key={u.name} value={u.name}>
-                              {u.email}
-                            </SelectItem>
-                          ))
-                        );
-                      })()}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    disabled={!roleSheetAddUser}
-                    onClick={() => handleAddMember(roleSheetAddUser)}
-                  >
-                    {t("common.add")}
-                  </Button>
-                </div>
+                <p className="text-xs text-control-placeholder">
+                  {t("settings.iam.role-sheet-field-add-member-hint")}
+                </p>
+                <MemberPicker
+                  users={users.filter((u) => !roleSheetMembers.has(u.name))}
+                  groups={groups.filter((g) => !roleSheetMembers.has(g.name))}
+                  value=""
+                  onSelect={handleAddMember}
+                  allowAllUsers={!roleSheetMembers.has("allUsers")}
+                />
               </div>
             </div>
           </SheetBody>
