@@ -7,6 +7,7 @@ import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "v1/annotation.proto";
 import "v1/common.proto";
@@ -37,6 +38,21 @@ service AgentService {
     option (google.api.method_signature) = "name";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.agents.get";
+  }
+
+  // UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
+  // is supported initially (any other update_mask path is rejected). Authorized
+  // in the handler for the agent's creator or a workspace admin; the IAM
+  // interceptor's agents.edit is admin-only, so this RPC carries no permission
+  // annotation and is handler-gated.
+  rpc UpdateAgent(UpdateAgentRequest) returns (Agent) {
+    option (google.api.http) = {
+      patch: "/v1/{agent.name=agents/*}"
+      body: "agent"
+    };
+    option (google.api.method_signature) = "agent,update_mask";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
   }
 
   rpc DeleteAgent(DeleteAgentRequest) returns (google.protobuf.Empty) {
@@ -209,6 +225,11 @@ message CreateAgentRequest {
 message CreateAgentResponse {
   Agent agent = 1;
   string bootstrap_token = 2; // 7-day validity, reusable until rotated/revoked
+}
+
+message UpdateAgentRequest {
+  Agent agent = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
 }
 
 // --- Token Management ---
@@ -488,6 +509,12 @@ message Agent {
   // runs on) and immutable thereafter; an agent runs on exactly one machine,
   // and the machine app picks it up via the MachineChannel control stream.
   string machine = 14 [(google.api.field_behavior) = REQUIRED];
+
+  // allow_add_to_channel controls whether other users may add this agent to a
+  // channel. Default false: only the agent's creator or a workspace admin may
+  // add it. When true, the normal channel-side rule (conversations.manage =
+  // channel owner/admin) applies.
+  bool allow_add_to_channel = 15;
 }
 
 // AgentSummary is the lightweight list-view projection of an Agent returned by
@@ -516,6 +543,10 @@ message AgentSummary {
   // consumers (e.g. the Members page's per-user "Created Agents" view) can
   // group agents by creator without an N+1 of GetAgent.
   string created_by = 8;
+  // allow_add_to_channel mirrors Agent.allow_add_to_channel so list consumers
+  // (e.g. the channel member picker) can hide agents the current caller may
+  // not add.
+  bool allow_add_to_channel = 9;
 }
 
 message AgentInfo {

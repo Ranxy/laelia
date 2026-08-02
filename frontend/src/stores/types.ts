@@ -175,12 +175,20 @@ export interface AgentSlice {
   // model). acpConfig optionally sets the agent's provider/model/persona/env at
   // creation time so the agent is fully configured without a second visit to the
   // agent profile; when omitted the agent is created with the server default.
+  // allowAddToChannel controls whether other users may add this agent to a
+  // channel; when false (default) only the agent's creator or a workspace admin
+  // may add it.
   createAgent: (
     title: string,
     machine: string,
     acpConfig?: AgentACPConfigInput,
-    labels?: Record<string, string>
+    labels?: Record<string, string>,
+    allowAddToChannel?: boolean
   ) => Promise<CreateAgentResponse>;
+  // updateAgent patches a single mutable agent field. Only allow_add_to_channel
+  // is supported currently. Authorized server-side for the agent's creator or a
+  // workspace admin.
+  updateAgent: (name: string, allowAddToChannel: boolean) => Promise<Agent>;
   deleteAgent: (name: string) => Promise<void>;
   rotateAgentToken: (
     name: string,

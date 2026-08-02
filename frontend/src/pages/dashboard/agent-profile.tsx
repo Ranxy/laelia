@@ -9,6 +9,7 @@ import { ConnectionBadge } from "@/components/connection-badge";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ModelCombobox } from "@/components/ui/combobox";
+import { FieldRow } from "@/components/ui/field-row";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -17,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   deleteAgentAvatar,
@@ -27,6 +29,7 @@ import {
 import { agentResourceName, formatTimestamp } from "@/lib/command-status";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
+import { useHasPermission } from "@/stores/auth";
 import type { AgentACPConfigInput } from "@/stores/types";
 import {
   type Agent,
@@ -107,6 +110,10 @@ export function AgentProfilePage() {
   const getAgent = useAppStore((s) => s.getAgent);
   const getMachine = useAppStore((s) => s.getMachine);
   const fetchAgents = useAppStore((s) => s.fetchAgents);
+  // The ACP-config/avatar/persona editors hit admin-only RPCs (agents.edit), so
+  // they are gated on canEditAdminOnly even when canEdit is true for the agent's
+  // creator. The allow_add_to_channel toggle below is gated on canEdit.
+  const canEditAdminOnly = useHasPermission("laelia.agents.edit");
 
   const agentName = agentResourceName(agentId);
   // Hold the full GetAgent result in local state, fetched fresh on entry and
@@ -185,6 +192,7 @@ export function AgentProfilePage() {
   const [machineTitle, setMachineTitle] = useState("");
 
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [allowAddSaving, setAllowAddSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const agentAvatarName = agent?.avatar || undefined;
@@ -329,12 +337,10 @@ export function AgentProfilePage() {
     );
   }
 
-  // Profile mutations are gated to the agent's creator (via the agentEditor IAM
-  // binding) or a workspace admin (all-permissions union), enforced server-side
-  // by the agents.edit permission. The server resolves this per-agent and
-  // surfaces it as Agent.canEdit, so the UI does not need to re-derive it from
-  // the creator's name. Hide/disable the editors for everyone else so the UI
-  // never offers a 403.
+  // canEdit is server-resolved per-agent (Agent.canEdit): true for the agent's
+  // creator or a workspace admin. It gates the allow_add_to_channel toggle.
+  // The ACP-config/avatar/persona editors hit admin-only RPCs (agents.edit), so
+  // they are gated on canEditAdminOnly to avoid offering a 403 to creators.
   const canEdit = agent.canEdit;
 
   // Fold the key-value editor entries into a map, dropping entries with empty
@@ -506,7 +512,7 @@ export function AgentProfilePage() {
   }
 
   function saveConfig() {
-    if (!canEdit) return;
+    if (!canEditAdminOnly) return;
     if (!canSaveFor(configRef.current)) return;
     if (!isConfigDirty()) {
       setSaveStatus("idle");
@@ -524,7 +530,7 @@ export function AgentProfilePage() {
   }
 
   function savePersona() {
-    if (!canEdit) return;
+    if (!canEditAdminOnly) return;
     const persistedPersona =
       agentRef.current?.info?.acpConfig?.personaPrompt ?? "";
     if (personaDraft.trim() === persistedPersona.trim()) {
@@ -538,6 +544,26 @@ export function AgentProfilePage() {
     enqueueSave(() =>
       buildFromPersisted(agentRef.current?.info?.acpConfig, personaDraft.trim())
     );
+  }
+
+  // Toggle allow_add_to_channel via UpdateAgent, then refetch the agent and the
+  // roster so the member picker (which filters on this flag) reflects it.
+  async function handleToggleAllowAdd(next: boolean) {
+    setAllowAddSaving(true);
+    try {
+      const updateAgent = useAppStore.getState().updateAgent;
+      await updateAgent(agentName, next);
+      setAgent(await getAgent(agentName));
+      fetchAgents({ pageSize: 100 }, { silent: true });
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("agent.allow-add-to-channel-save-error"),
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setAllowAddSaving(false);
+    }
   }
 
   const lifecycle = agentLifecycle(agent);
@@ -623,7 +649,7 @@ export function AgentProfilePage() {
                       variant="outline"
                       size="sm"
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={!canEdit || avatarBusy}
+                      disabled={!canEditAdminOnly || avatarBusy}
                     >
                       {avatarBusy ? (
                         <Loader2 className="size-3.5 animate-spin" />
@@ -639,7 +665,7 @@ export function AgentProfilePage() {
                         variant="outline"
                         size="sm"
                         onClick={handleAvatarRemove}
-                        disabled={!canEdit || avatarBusy}
+                        disabled={!canEditAdminOnly || avatarBusy}
                       >
                         <Trash2 className="size-3.5" />
                         {t("agent.profile.avatar-remove")}
@@ -658,6 +684,24 @@ export function AgentProfilePage() {
                   </div>
                 </div>
               </div>
+            </Card>
+          </div>
+
+          {/* Channel access */}
+          <div>
+            <Card title={t("agent.profile.section-add-to-channel")}>
+              <FieldRow
+                label={t("agent.allow-add-to-channel")}
+                hint={t("agent.allow-add-to-channel-hint")}
+              >
+                <Switch
+                  checked={agent.allowAddToChannel ?? false}
+                  disabled={!canEdit || allowAddSaving}
+                  onCheckedChange={(next) => {
+                    void handleToggleAllowAdd(next);
+                  }}
+                />
+              </FieldRow>
             </Card>
           </div>
 
@@ -684,13 +728,13 @@ export function AgentProfilePage() {
                 ) : null
               }
             >
-              <fieldset disabled={!canEdit} className="contents">
+              <fieldset disabled={!canEditAdminOnly} className="contents">
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-1">
                     <label className="text-sm font-medium">
                       {t("agent.acp-config-provider")}
                     </label>
-                    {availableProviders.length === 0 && !canEdit ? (
+                    {availableProviders.length === 0 && !canEditAdminOnly ? (
                       <p className="text-xs text-control-light">
                         {machineResourceID
                           ? t("agent.acp-config-no-providers-machine")
@@ -1021,7 +1065,7 @@ export function AgentProfilePage() {
                           aria-label={t("common.edit")}
                           title={t("common.edit")}
                           className="text-control-light hover:text-control transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                          disabled={!canEdit}
+                          disabled={!canEditAdminOnly}
                           onClick={() => setPersonaEditing(true)}
                         >
                           <Pencil className="size-3" />
@@ -1041,7 +1085,7 @@ export function AgentProfilePage() {
                         <div className="flex items-center gap-2">
                           <Button
                             size="sm"
-                            disabled={!canEdit}
+                            disabled={!canEditAdminOnly}
                             onClick={savePersona}
                           >
                             {t("common.save")}

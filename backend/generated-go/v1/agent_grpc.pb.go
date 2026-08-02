@@ -23,6 +23,7 @@ const (
 	AgentService_CreateAgent_FullMethodName           = "/laelia.v1.AgentService/CreateAgent"
 	AgentService_ListAgents_FullMethodName            = "/laelia.v1.AgentService/ListAgents"
 	AgentService_GetAgent_FullMethodName              = "/laelia.v1.AgentService/GetAgent"
+	AgentService_UpdateAgent_FullMethodName           = "/laelia.v1.AgentService/UpdateAgent"
 	AgentService_DeleteAgent_FullMethodName           = "/laelia.v1.AgentService/DeleteAgent"
 	AgentService_RotateAgentToken_FullMethodName      = "/laelia.v1.AgentService/RotateAgentToken"
 	AgentService_RevokeAgentToken_FullMethodName      = "/laelia.v1.AgentService/RevokeAgentToken"
@@ -48,6 +49,12 @@ type AgentServiceClient interface {
 	CreateAgent(ctx context.Context, in *CreateAgentRequest, opts ...grpc.CallOption) (*CreateAgentResponse, error)
 	ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error)
 	GetAgent(ctx context.Context, in *GetAgentRequest, opts ...grpc.CallOption) (*Agent, error)
+	// UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
+	// is supported initially (any other update_mask path is rejected). Authorized
+	// in the handler for the agent's creator or a workspace admin; the IAM
+	// interceptor's agents.edit is admin-only, so this RPC carries no permission
+	// annotation and is handler-gated.
+	UpdateAgent(ctx context.Context, in *UpdateAgentRequest, opts ...grpc.CallOption) (*Agent, error)
 	DeleteAgent(ctx context.Context, in *DeleteAgentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Token rotation: generate a new bootstrap token, old token invalid after grace period
 	RotateAgentToken(ctx context.Context, in *RotateAgentTokenRequest, opts ...grpc.CallOption) (*RotateAgentTokenResponse, error)
@@ -123,6 +130,16 @@ func (c *agentServiceClient) GetAgent(ctx context.Context, in *GetAgentRequest, 
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Agent)
 	err := c.cc.Invoke(ctx, AgentService_GetAgent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentServiceClient) UpdateAgent(ctx context.Context, in *UpdateAgentRequest, opts ...grpc.CallOption) (*Agent, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Agent)
+	err := c.cc.Invoke(ctx, AgentService_UpdateAgent_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -296,6 +313,12 @@ type AgentServiceServer interface {
 	CreateAgent(context.Context, *CreateAgentRequest) (*CreateAgentResponse, error)
 	ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error)
 	GetAgent(context.Context, *GetAgentRequest) (*Agent, error)
+	// UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
+	// is supported initially (any other update_mask path is rejected). Authorized
+	// in the handler for the agent's creator or a workspace admin; the IAM
+	// interceptor's agents.edit is admin-only, so this RPC carries no permission
+	// annotation and is handler-gated.
+	UpdateAgent(context.Context, *UpdateAgentRequest) (*Agent, error)
 	DeleteAgent(context.Context, *DeleteAgentRequest) (*emptypb.Empty, error)
 	// Token rotation: generate a new bootstrap token, old token invalid after grace period
 	RotateAgentToken(context.Context, *RotateAgentTokenRequest) (*RotateAgentTokenResponse, error)
@@ -355,6 +378,9 @@ func (UnimplementedAgentServiceServer) ListAgents(context.Context, *ListAgentsRe
 }
 func (UnimplementedAgentServiceServer) GetAgent(context.Context, *GetAgentRequest) (*Agent, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAgent not implemented")
+}
+func (UnimplementedAgentServiceServer) UpdateAgent(context.Context, *UpdateAgentRequest) (*Agent, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateAgent not implemented")
 }
 func (UnimplementedAgentServiceServer) DeleteAgent(context.Context, *DeleteAgentRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteAgent not implemented")
@@ -475,6 +501,24 @@ func _AgentService_GetAgent_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AgentServiceServer).GetAgent(ctx, req.(*GetAgentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AgentService_UpdateAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAgentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).UpdateAgent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_UpdateAgent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).UpdateAgent(ctx, req.(*UpdateAgentRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -785,6 +829,10 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAgent",
 			Handler:    _AgentService_GetAgent_Handler,
+		},
+		{
+			MethodName: "UpdateAgent",
+			Handler:    _AgentService_UpdateAgent_Handler,
 		},
 		{
 			MethodName: "DeleteAgent",

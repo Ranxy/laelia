@@ -350,7 +350,8 @@
       "avatar-uploaded": "Agent avatar updated",
       "avatar-upload-failed": "Failed to update agent avatar",
       "avatar-removed": "Agent avatar removed",
-      "avatar-remove-failed": "Failed to remove agent avatar"
+      "avatar-remove-failed": "Failed to remove agent avatar",
+      "section-add-to-channel": "Channel access"
     },
     "lifecycle": {
       "ready": "Ready",
@@ -401,7 +402,10 @@
     "create-name-required": "Please enter an agent name.",
     "detail-machine": "Machine",
     "acp-config-no-providers-machine": "No providers discovered on this machine yet. Open the machine profile to refresh providers.",
-    "acp-config-manage-providers": "Manage providers on the machine"
+    "acp-config-manage-providers": "Manage providers on the machine",
+    "allow-add-to-channel": "Allow others to add this agent to a channel",
+    "allow-add-to-channel-hint": "Off: only the creator or a workspace admin can add this agent to a channel. On: any channel owner or admin can add it.",
+    "allow-add-to-channel-save-error": "Failed to update this setting"
   },
   "machine": {
     "title": "Machines",

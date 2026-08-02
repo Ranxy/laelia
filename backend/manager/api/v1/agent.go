@@ -141,9 +141,10 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 	}
 
 	agentMessage := &store.AgentMessage{
-		Name:         req.Msg.Agent.Title,
-		TokenVersion: 1,
-		MachineID:    machine.ID,
+		Name:              req.Msg.Agent.Title,
+		TokenVersion:      1,
+		MachineID:         machine.ID,
+		AllowAddToChannel: req.Msg.Agent.GetAllowAddToChannel(),
 		Info: &storepb.AgentInfo{
 			Labels:     req.Msg.Agent.Labels,
 			AcpConfig:  storedAcpConfig,
@@ -240,7 +241,7 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 	}
 	out := convertToAgent(agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
 	caller, _ := GetUserFromContext(ctx)
-	out.CanEdit = s.canEditAgent(ctx, caller, out.Name)
+	out.CanEdit = s.canEditAgent(ctx, caller, agent)
 	// The builtin-pi api_key is a plaintext secret. Redact it for callers who
 	// cannot edit this agent; editors (workspaceAdmin / agents.edit) still see
 	// it so they can populate the password field on the config form.
@@ -252,17 +253,72 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 	return connect.NewResponse(out), nil
 }
 
-// canEditAgent reports whether the caller holds laelia.agents.edit on the
-// agent. With the per-agent editor role removed, agents.edit is granted only by
-// the workspaceAdmin role (via the all-permissions union) and by any custom
-// role bound on the agent's IAM policy that includes agents.edit. A lookup
-// failure is treated as not-editable (fail-closed) so a stale can_edit never
-// grants modification. Agent-daemon callers and unauthenticated requests get
-// false.
-func (s *AgentService) canEditAgent(ctx context.Context, user *store.UserMessage, agentName string) bool {
+// UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
+// is supported initially; any other update_mask path is rejected. The IAM
+// interceptor skips this RPC (no permission annotation — agents.edit is
+// admin-only), so authorization is enforced here for the agent's creator or a
+// workspace admin.
+func (s *AgentService) UpdateAgent(ctx context.Context, req *connect.Request[v1pb.UpdateAgentRequest]) (*connect.Response[v1pb.Agent], error) {
+	if req.Msg.Agent == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("agent must be set"))
+	}
+	resourceID, err := common.GetAgentResourceID(req.Msg.Agent.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+
+	// Only allow_add_to_channel is supported; reject any other path. Empty mask
+	// defaults to allow_add_to_channel (the sole mutable field).
+	paths := req.Msg.UpdateMask.GetPaths()
+	if len(paths) == 0 {
+		paths = []string{"allow_add_to_channel"}
+	}
+	for _, p := range paths {
+		if p != "allow_add_to_channel" {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("update_mask path %q is not supported; only allow_add_to_channel", p))
+		}
+	}
+
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get agent, error: %v", err))
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+
+	user, _ := GetUserFromContext(ctx)
+	if !s.canEditAgent(ctx, user, agent) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's creator or a workspace admin can modify this agent"))
+	}
+
+	allowAdd := req.Msg.Agent.GetAllowAddToChannel()
+	updated, err := s.store.UpdateAgent(ctx, agent, &store.UpdateAgentMessage{AllowAddToChannel: &allowAdd})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent, error: %v", err))
+	}
+
+	out := convertToAgent(updated, agentReachable(s.dispatcher, updated.ID, updated.MachineID))
+	out.CanEdit = true // caller just proved edit authorization
+	return connect.NewResponse(out), nil
+}
+
+// canEditAgent reports whether the caller may modify the agent: its creator, or
+// a holder of laelia.agents.edit on the agent. With the per-agent editor role
+// removed, agents.edit is granted only by the workspaceAdmin role (via the
+// all-permissions union) and by any custom role bound on the agent's IAM policy
+// that includes agents.edit. A lookup failure is treated as not-editable
+// (fail-closed) so a stale can_edit never grants modification. Agent-daemon
+// callers and unauthenticated requests get false.
+func (s *AgentService) canEditAgent(ctx context.Context, user *store.UserMessage, agent *store.AgentMessage) bool {
 	if user == nil || s.iam == nil {
 		return false
 	}
+	// The creator may modify their own agent.
+	if agent.CreatedBy != 0 && agent.CreatedBy == user.ID {
+		return true
+	}
+	agentName := common.FormatAgentUID(agent.ResourceID)
 	ok, err := s.iam.CheckPermission(ctx, permission.AgentsEdit, user, nil, &iam.ResourceRef{
 		ResourceType: storepb.Policy_AGENT,
 		Name:         agentName,
@@ -994,14 +1050,15 @@ func convertToAgent(agent *store.AgentMessage, connected bool) *v1pb.Agent {
 	status := convertToV1AgentStatus(agent.Status, agent.Deleted, connected)
 
 	result := &v1pb.Agent{
-		Name:         name,
-		State:        state,
-		Title:        agent.Name,
-		Info:         convertToV1AgentInfo(agent.Info),
-		Status:       status,
-		CreatedAt:    timestamppb.New(agent.CreatedAt),
-		TokenVersion: int32(agent.TokenVersion),
-		Machine:      common.FormatMachineUID(agent.MachineResourceID),
+		Name:              name,
+		State:             state,
+		Title:             agent.Name,
+		Info:              convertToV1AgentInfo(agent.Info),
+		Status:            status,
+		CreatedAt:         timestamppb.New(agent.CreatedAt),
+		TokenVersion:      int32(agent.TokenVersion),
+		AllowAddToChannel: agent.AllowAddToChannel,
+		Machine:           common.FormatMachineUID(agent.MachineResourceID),
 	}
 	if !agent.LastTokenRotatedAt.IsZero() {
 		result.LastTokenRotatedAt = timestamppb.New(agent.LastTokenRotatedAt)
@@ -1030,11 +1087,12 @@ func convertToAgentSummary(agent *store.AgentMessage, connected bool) *v1pb.Agen
 		state = v1pb.State_DELETED
 	}
 	summary := &v1pb.AgentSummary{
-		Name:    common.FormatAgentUID(agent.ResourceID),
-		State:   state,
-		Title:   agent.Name,
-		Status:  convertToV1AgentStatus(agent.Status, agent.Deleted, connected),
-		Machine: common.FormatMachineUID(agent.MachineResourceID),
+		Name:              common.FormatAgentUID(agent.ResourceID),
+		State:             state,
+		Title:             agent.Name,
+		Status:            convertToV1AgentStatus(agent.Status, agent.Deleted, connected),
+		AllowAddToChannel: agent.AllowAddToChannel,
+		Machine:           common.FormatMachineUID(agent.MachineResourceID),
 	}
 	if agent.Info != nil && agent.Info.AcpConfig != nil {
 		summary.Provider = agent.Info.AcpConfig.Provider

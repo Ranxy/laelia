@@ -362,6 +362,47 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - AgentService
+            description: |-
+                UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
+                 is supported initially (any other update_mask path is rejected). Authorized
+                 in the handler for the agent's creator or a workspace admin; the IAM
+                 interceptor's agents.edit is admin-only, so this RPC carries no permission
+                 annotation and is handler-gated.
+            operationId: AgentService_UpdateAgent
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+                - name: updateMask
+                  in: query
+                  schema:
+                    type: string
+                    format: field-mask
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/Agent'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Agent'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}/channels:
         get:
             tags:
@@ -3683,6 +3724,13 @@ components:
                          (machines/{machine}). Required on CreateAgent (the parent machine the agent
                          runs on) and immutable thereafter; an agent runs on exactly one machine,
                          and the machine app picks it up via the MachineChannel control stream.
+                allowAddToChannel:
+                    type: boolean
+                    description: |-
+                        allow_add_to_channel controls whether other users may add this agent to a
+                         channel. Default false: only the agent's creator or a workspace admin may
+                         add it. When true, the normal channel-side rule (conversations.manage =
+                         channel owner/admin) applies.
         AgentACPConfig:
             type: object
             properties:
@@ -3979,6 +4027,12 @@ components:
                          legacy agents with no recorded creator. Surfaced on the summary so list
                          consumers (e.g. the Members page's per-user "Created Agents" view) can
                          group agents by creator without an N+1 of GetAgent.
+                allowAddToChannel:
+                    type: boolean
+                    description: |-
+                        allow_add_to_channel mirrors Agent.allow_add_to_channel so list consumers
+                         (e.g. the channel member picker) can hide agents the current caller may
+                         not add.
             description: |-
                 AgentSummary is the lightweight list-view projection of an Agent returned by
                  ListAgents. It carries only the fields list/header views need: identity,

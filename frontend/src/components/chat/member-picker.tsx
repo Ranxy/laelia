@@ -72,12 +72,17 @@ export function MemberPicker({
   const usersLoading = useAppStore((s) => s.usersLoading);
   const fetchUsers = useAppStore((s) => s.fetchUsers);
   const agents = useAppStore((s) => s.agents);
+  const currentUser = useAppStore((s) => s.currentUser);
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isUser = memberType === 1;
+  // Workspace admins hold laelia.agents.edit and may add any agent; everyone
+  // else only sees public agents (allowAddToChannel) or their own creations.
+  const isAdmin =
+    currentUser?.permissions?.includes("laelia.agents.edit") ?? false;
 
   // Debounced backend search for users; agents are filtered client-side.
   useEffect(() => {
@@ -100,6 +105,12 @@ export function MemberPicker({
     if (isUser) return users.map(userOption);
     const q = query.trim().toLowerCase();
     return agents
+      .filter(
+        (a) =>
+          a.allowAddToChannel ||
+          isAdmin ||
+          (!!a.createdBy && a.createdBy === currentUser?.name)
+      )
       .map(agentOption)
       .filter(
         (o) =>
@@ -107,7 +118,7 @@ export function MemberPicker({
           o.label.toLowerCase().includes(q) ||
           o.memberId.toLowerCase().includes(q)
       );
-  }, [isUser, users, agents, query]);
+  }, [isUser, users, agents, query, isAdmin, currentUser?.name]);
 
   function handleToggle(o: Option) {
     if (existingMemberIds.has(o.memberId)) return;

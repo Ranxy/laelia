@@ -41,6 +41,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { formatTimestamp } from "@/lib/command-status";
 import { buildMachineRunCommand } from "@/lib/machine-token";
@@ -160,6 +161,7 @@ export function MachineProfilePage() {
   const [allowEnv, setAllowEnv] = useState<string[]>([]);
   const [executable, setExecutable] = useState("");
   const [args, setArgs] = useState<string[]>([]);
+  const [allowAddToChannel, setAllowAddToChannel] = useState(false);
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState("");
   const [addedOpen, setAddedOpen] = useState(false);
@@ -292,6 +294,7 @@ export function MachineProfilePage() {
     setAllowEnv([]);
     setExecutable("");
     setArgs([]);
+    setAllowAddToChannel(false);
     setAddError("");
     setPiModels([]);
   }
@@ -416,17 +419,23 @@ export function MachineProfilePage() {
     setAdding(true);
     try {
       const createAgent = useAppStore.getState().createAgent;
-      await createAgent(name, machineName, {
-        executable: executable.trim(),
-        args: args.map((a) => a.trim()).filter((a) => a !== ""),
-        allowEnv: allowEnv.map((e) => e.trim()).filter((e) => e !== ""),
-        provider: provider.trim(),
-        model: model.trim(),
-        personaPrompt: personaPrompt.trim(),
-        customEnv,
-        apiProvider: apiProvider.trim(),
-        apiKey: apiKey.trim(),
-      });
+      await createAgent(
+        name,
+        machineName,
+        {
+          executable: executable.trim(),
+          args: args.map((a) => a.trim()).filter((a) => a !== ""),
+          allowEnv: allowEnv.map((e) => e.trim()).filter((e) => e !== ""),
+          provider: provider.trim(),
+          model: model.trim(),
+          personaPrompt: personaPrompt.trim(),
+          customEnv,
+          apiProvider: apiProvider.trim(),
+          apiKey: apiKey.trim(),
+        },
+        undefined,
+        allowAddToChannel
+      );
       setAddedTitle(name);
       setAddOpen(false);
       resetAddForm();
@@ -1008,6 +1017,16 @@ export function MachineProfilePage() {
                   }}
                 />
               )}
+
+              <FieldRow
+                label={t("agent.allow-add-to-channel")}
+                hint={t("agent.allow-add-to-channel-hint")}
+              >
+                <Switch
+                  checked={allowAddToChannel}
+                  onCheckedChange={setAllowAddToChannel}
+                />
+              </FieldRow>
             </div>
           </SheetBody>
           <SheetFooter>

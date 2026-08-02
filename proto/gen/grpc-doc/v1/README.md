@@ -65,6 +65,7 @@
     - [RotateAgentTokenRequest](#laelia-v1-RotateAgentTokenRequest)
     - [RotateAgentTokenResponse](#laelia-v1-RotateAgentTokenResponse)
     - [UpdateAgentACPConfigRequest](#laelia-v1-UpdateAgentACPConfigRequest)
+    - [UpdateAgentRequest](#laelia-v1-UpdateAgentRequest)
     - [UploadAgentAvatarRequest](#laelia-v1-UploadAgentAvatarRequest)
   
     - [AgentStatus.ConnectionState](#laelia-v1-AgentStatus-ConnectionState)
@@ -505,6 +506,7 @@ RiskLevel is the risk level.
 | can_edit | [bool](#bool) |  | can_edit reports whether the current caller may modify this agent (laelia.agents.edit): true for the creator (via the agentEditor IAM binding) and for workspace admins (via the all-permissions union), false otherwise. Populated per caller by GetAgent/ListAgents; not set on agent-daemon paths. |
 | avatar | [string](#string) |  | avatar is the resource name of the agent&#39;s uploaded avatar image, or empty when the agent has not uploaded one (frontend renders a deterministic pixel identicon seeded by the agent id). Format: agents/{agent}/avatar. |
 | machine | [string](#string) |  | machine is the resource name of the machine this agent is bound to (machines/{machine}). Required on CreateAgent (the parent machine the agent runs on) and immutable thereafter; an agent runs on exactly one machine, and the machine app picks it up via the MachineChannel control stream. |
+| allow_add_to_channel | [bool](#bool) |  | allow_add_to_channel controls whether other users may add this agent to a channel. Default false: only the agent&#39;s creator or a workspace admin may add it. When true, the normal channel-side rule (conversations.manage = channel owner/admin) applies. |
 
 
 
@@ -813,6 +815,7 @@ view does not gate affordances on it (delete is enforced server-side).
 | executable | [string](#string) |  |  |
 | machine | [string](#string) |  | machine is the resource name of the machine this agent is bound to (machines/{machine}). |
 | created_by | [string](#string) |  | created_by is the creator&#39;s user resource name (users/{id}); empty for legacy agents with no recorded creator. Surfaced on the summary so list consumers (e.g. the Members page&#39;s per-user &#34;Created Agents&#34; view) can group agents by creator without an N&#43;1 of GetAgent. |
+| allow_add_to_channel | [bool](#bool) |  | allow_add_to_channel mirrors Agent.allow_add_to_channel so list consumers (e.g. the channel member picker) can hide agents the current caller may not add. |
 
 
 
@@ -1293,6 +1296,22 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 
 
 
+<a name="laelia-v1-UpdateAgentRequest"></a>
+
+### UpdateAgentRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| agent | [Agent](#laelia-v1-Agent) |  |  |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-UploadAgentAvatarRequest"></a>
 
 ### UploadAgentAvatarRequest
@@ -1341,6 +1360,7 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 | CreateAgent | [CreateAgentRequest](#laelia-v1-CreateAgentRequest) | [CreateAgentResponse](#laelia-v1-CreateAgentResponse) |  |
 | ListAgents | [ListAgentsRequest](#laelia-v1-ListAgentsRequest) | [ListAgentsResponse](#laelia-v1-ListAgentsResponse) |  |
 | GetAgent | [GetAgentRequest](#laelia-v1-GetAgentRequest) | [Agent](#laelia-v1-Agent) |  |
+| UpdateAgent | [UpdateAgentRequest](#laelia-v1-UpdateAgentRequest) | [Agent](#laelia-v1-Agent) | UpdateAgent patches a single mutable agent field. Only allow_add_to_channel is supported initially (any other update_mask path is rejected). Authorized in the handler for the agent&#39;s creator or a workspace admin; the IAM interceptor&#39;s agents.edit is admin-only, so this RPC carries no permission annotation and is handler-gated. |
 | DeleteAgent | [DeleteAgentRequest](#laelia-v1-DeleteAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 | RotateAgentToken | [RotateAgentTokenRequest](#laelia-v1-RotateAgentTokenRequest) | [RotateAgentTokenResponse](#laelia-v1-RotateAgentTokenResponse) | Token rotation: generate a new bootstrap token, old token invalid after grace period |
 | RevokeAgentToken | [RevokeAgentTokenRequest](#laelia-v1-RevokeAgentTokenRequest) | [RevokeAgentTokenResponse](#laelia-v1-RevokeAgentTokenResponse) | Token revocation: revoke all tokens for the agent |

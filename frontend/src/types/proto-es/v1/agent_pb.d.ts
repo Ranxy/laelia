@@ -4,7 +4,7 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { EmptySchema, Timestamp } from "@bufbuild/protobuf/wkt";
+import type { EmptySchema, FieldMask, Timestamp } from "@bufbuild/protobuf/wkt";
 import type { State } from "./common_pb";
 
 /**
@@ -50,6 +50,27 @@ export declare type CreateAgentResponse = Message<"laelia.v1.CreateAgentResponse
  * Use `create(CreateAgentResponseSchema)` to create a new message.
  */
 export declare const CreateAgentResponseSchema: GenMessage<CreateAgentResponse>;
+
+/**
+ * @generated from message laelia.v1.UpdateAgentRequest
+ */
+export declare type UpdateAgentRequest = Message<"laelia.v1.UpdateAgentRequest"> & {
+  /**
+   * @generated from field: laelia.v1.Agent agent = 1;
+   */
+  agent?: Agent | undefined;
+
+  /**
+   * @generated from field: google.protobuf.FieldMask update_mask = 2;
+   */
+  updateMask?: FieldMask | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateAgentRequest.
+ * Use `create(UpdateAgentRequestSchema)` to create a new message.
+ */
+export declare const UpdateAgentRequestSchema: GenMessage<UpdateAgentRequest>;
 
 /**
  * @generated from message laelia.v1.RotateAgentTokenRequest
@@ -946,6 +967,16 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
    * @generated from field: string machine = 14;
    */
   machine: string;
+
+  /**
+   * allow_add_to_channel controls whether other users may add this agent to a
+   * channel. Default false: only the agent's creator or a workspace admin may
+   * add it. When true, the normal channel-side rule (conversations.manage =
+   * channel owner/admin) applies.
+   *
+   * @generated from field: bool allow_add_to_channel = 15;
+   */
+  allowAddToChannel: boolean;
 };
 
 /**
@@ -1018,6 +1049,15 @@ export declare type AgentSummary = Message<"laelia.v1.AgentSummary"> & {
    * @generated from field: string created_by = 8;
    */
   createdBy: string;
+
+  /**
+   * allow_add_to_channel mirrors Agent.allow_add_to_channel so list consumers
+   * (e.g. the channel member picker) can hide agents the current caller may
+   * not add.
+   *
+   * @generated from field: bool allow_add_to_channel = 9;
+   */
+  allowAddToChannel: boolean;
 };
 
 /**
@@ -1464,6 +1504,20 @@ export declare const AgentService: GenService<{
   getAgent: {
     methodKind: "unary";
     input: typeof GetAgentRequestSchema;
+    output: typeof AgentSchema;
+  },
+  /**
+   * UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
+   * is supported initially (any other update_mask path is rejected). Authorized
+   * in the handler for the agent's creator or a workspace admin; the IAM
+   * interceptor's agents.edit is admin-only, so this RPC carries no permission
+   * annotation and is handler-gated.
+   *
+   * @generated from rpc laelia.v1.AgentService.UpdateAgent
+   */
+  updateAgent: {
+    methodKind: "unary";
+    input: typeof UpdateAgentRequestSchema;
     output: typeof AgentSchema;
   },
   /**

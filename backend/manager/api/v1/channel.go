@@ -341,6 +341,15 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 			if agentErr != nil || agent == nil {
 				return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", memberID))
 			}
+			// Agent-side rule: a private agent (allow_add_to_channel=false) may
+			// only be added by its creator or a workspace admin. The channel-side
+			// rule (conversations.manage, enforced by the IAM interceptor) is
+			// unchanged.
+			if !agent.AllowAddToChannel {
+				if err := s.checkAgentAddableByCaller(ctx, agent); err != nil {
+					return nil, err
+				}
+			}
 		}
 		if memberType == store.MemberTypeUser {
 			if _, uidErr := strconv.Atoi(memberID); uidErr != nil {
@@ -371,6 +380,28 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 	}
 
 	return connect.NewResponse(&v1pb.AddChannelMemberResponse{Members: members}), nil
+}
+
+// checkAgentAddableByCaller enforces the agent-side allow_add_to_channel rule:
+// when the agent does not allow being added to channels, the caller must be the
+// agent's creator or a workspace admin. The channel-side manage check is already
+// enforced by the IAM interceptor, so this only adds the agent's own opt-in gate.
+func (s *CommandService) checkAgentAddableByCaller(ctx context.Context, agent *store.AgentMessage) error {
+	user, ok := GetUserFromContext(ctx)
+	if !ok || user == nil {
+		return connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's creator or a workspace admin may add this agent"))
+	}
+	if agent.CreatedBy != 0 && agent.CreatedBy == user.ID {
+		return nil
+	}
+	isAdmin, err := isUserWorkspaceAdmin(ctx, s.store, user)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve workspace admin"))
+	}
+	if isAdmin {
+		return nil
+	}
+	return connect.NewError(connect.CodePermissionDenied, errors.Errorf("agent %s does not allow being added to channels; only its creator or a workspace admin may add it", agent.ResourceID))
 }
 
 func (s *CommandService) RemoveChannelMember(ctx context.Context, req *connect.Request[v1pb.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error) {

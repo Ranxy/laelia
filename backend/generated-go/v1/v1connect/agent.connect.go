@@ -41,6 +41,9 @@ const (
 	AgentServiceListAgentsProcedure = "/laelia.v1.AgentService/ListAgents"
 	// AgentServiceGetAgentProcedure is the fully-qualified name of the AgentService's GetAgent RPC.
 	AgentServiceGetAgentProcedure = "/laelia.v1.AgentService/GetAgent"
+	// AgentServiceUpdateAgentProcedure is the fully-qualified name of the AgentService's UpdateAgent
+	// RPC.
+	AgentServiceUpdateAgentProcedure = "/laelia.v1.AgentService/UpdateAgent"
 	// AgentServiceDeleteAgentProcedure is the fully-qualified name of the AgentService's DeleteAgent
 	// RPC.
 	AgentServiceDeleteAgentProcedure = "/laelia.v1.AgentService/DeleteAgent"
@@ -95,6 +98,12 @@ type AgentServiceClient interface {
 	CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.CreateAgentResponse], error)
 	ListAgents(context.Context, *connect.Request[v1.ListAgentsRequest]) (*connect.Response[v1.ListAgentsResponse], error)
 	GetAgent(context.Context, *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error)
+	// UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
+	// is supported initially (any other update_mask path is rejected). Authorized
+	// in the handler for the agent's creator or a workspace admin; the IAM
+	// interceptor's agents.edit is admin-only, so this RPC carries no permission
+	// annotation and is handler-gated.
+	UpdateAgent(context.Context, *connect.Request[v1.UpdateAgentRequest]) (*connect.Response[v1.Agent], error)
 	DeleteAgent(context.Context, *connect.Request[v1.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error)
 	// Token rotation: generate a new bootstrap token, old token invalid after grace period
 	RotateAgentToken(context.Context, *connect.Request[v1.RotateAgentTokenRequest]) (*connect.Response[v1.RotateAgentTokenResponse], error)
@@ -165,6 +174,12 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+AgentServiceGetAgentProcedure,
 			connect.WithSchema(agentServiceMethods.ByName("GetAgent")),
+			connect.WithClientOptions(opts...),
+		),
+		updateAgent: connect.NewClient[v1.UpdateAgentRequest, v1.Agent](
+			httpClient,
+			baseURL+AgentServiceUpdateAgentProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("UpdateAgent")),
 			connect.WithClientOptions(opts...),
 		),
 		deleteAgent: connect.NewClient[v1.DeleteAgentRequest, emptypb.Empty](
@@ -271,6 +286,7 @@ type agentServiceClient struct {
 	createAgent           *connect.Client[v1.CreateAgentRequest, v1.CreateAgentResponse]
 	listAgents            *connect.Client[v1.ListAgentsRequest, v1.ListAgentsResponse]
 	getAgent              *connect.Client[v1.GetAgentRequest, v1.Agent]
+	updateAgent           *connect.Client[v1.UpdateAgentRequest, v1.Agent]
 	deleteAgent           *connect.Client[v1.DeleteAgentRequest, emptypb.Empty]
 	rotateAgentToken      *connect.Client[v1.RotateAgentTokenRequest, v1.RotateAgentTokenResponse]
 	revokeAgentToken      *connect.Client[v1.RevokeAgentTokenRequest, v1.RevokeAgentTokenResponse]
@@ -302,6 +318,11 @@ func (c *agentServiceClient) ListAgents(ctx context.Context, req *connect.Reques
 // GetAgent calls laelia.v1.AgentService.GetAgent.
 func (c *agentServiceClient) GetAgent(ctx context.Context, req *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error) {
 	return c.getAgent.CallUnary(ctx, req)
+}
+
+// UpdateAgent calls laelia.v1.AgentService.UpdateAgent.
+func (c *agentServiceClient) UpdateAgent(ctx context.Context, req *connect.Request[v1.UpdateAgentRequest]) (*connect.Response[v1.Agent], error) {
+	return c.updateAgent.CallUnary(ctx, req)
 }
 
 // DeleteAgent calls laelia.v1.AgentService.DeleteAgent.
@@ -389,6 +410,12 @@ type AgentServiceHandler interface {
 	CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.CreateAgentResponse], error)
 	ListAgents(context.Context, *connect.Request[v1.ListAgentsRequest]) (*connect.Response[v1.ListAgentsResponse], error)
 	GetAgent(context.Context, *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error)
+	// UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
+	// is supported initially (any other update_mask path is rejected). Authorized
+	// in the handler for the agent's creator or a workspace admin; the IAM
+	// interceptor's agents.edit is admin-only, so this RPC carries no permission
+	// annotation and is handler-gated.
+	UpdateAgent(context.Context, *connect.Request[v1.UpdateAgentRequest]) (*connect.Response[v1.Agent], error)
 	DeleteAgent(context.Context, *connect.Request[v1.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error)
 	// Token rotation: generate a new bootstrap token, old token invalid after grace period
 	RotateAgentToken(context.Context, *connect.Request[v1.RotateAgentTokenRequest]) (*connect.Response[v1.RotateAgentTokenResponse], error)
@@ -455,6 +482,12 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 		AgentServiceGetAgentProcedure,
 		svc.GetAgent,
 		connect.WithSchema(agentServiceMethods.ByName("GetAgent")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceUpdateAgentHandler := connect.NewUnaryHandler(
+		AgentServiceUpdateAgentProcedure,
+		svc.UpdateAgent,
+		connect.WithSchema(agentServiceMethods.ByName("UpdateAgent")),
 		connect.WithHandlerOptions(opts...),
 	)
 	agentServiceDeleteAgentHandler := connect.NewUnaryHandler(
@@ -561,6 +594,8 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 			agentServiceListAgentsHandler.ServeHTTP(w, r)
 		case AgentServiceGetAgentProcedure:
 			agentServiceGetAgentHandler.ServeHTTP(w, r)
+		case AgentServiceUpdateAgentProcedure:
+			agentServiceUpdateAgentHandler.ServeHTTP(w, r)
 		case AgentServiceDeleteAgentProcedure:
 			agentServiceDeleteAgentHandler.ServeHTTP(w, r)
 		case AgentServiceRotateAgentTokenProcedure:
@@ -612,6 +647,10 @@ func (UnimplementedAgentServiceHandler) ListAgents(context.Context, *connect.Req
 
 func (UnimplementedAgentServiceHandler) GetAgent(context.Context, *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.GetAgent is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) UpdateAgent(context.Context, *connect.Request[v1.UpdateAgentRequest]) (*connect.Response[v1.Agent], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.UpdateAgent is not implemented"))
 }
 
 func (UnimplementedAgentServiceHandler) DeleteAgent(context.Context, *connect.Request[v1.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error) {

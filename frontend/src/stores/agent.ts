@@ -1,4 +1,5 @@
 import { create, equals } from "@bufbuild/protobuf";
+import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
 import { agentServiceClient } from "@/connect";
 import type {
   AgentProviderInfo,
@@ -17,6 +18,7 @@ import {
   RevokeAgentTokenRequestSchema,
   RotateAgentTokenRequestSchema,
   UpdateAgentACPConfigRequestSchema,
+  UpdateAgentRequestSchema,
 } from "@/types/proto-es/v1/agent_pb";
 import type { AgentACPConfigInput, AgentSlice, AppSliceCreator } from "./types";
 
@@ -71,7 +73,8 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     title: string,
     machine: string,
     acpConfig?: AgentACPConfigInput,
-    labels?: Record<string, string>
+    labels?: Record<string, string>,
+    allowAddToChannel?: boolean
   ) {
     const res = await agentServiceClient.createAgent(
       create(CreateAgentRequestSchema, {
@@ -79,6 +82,7 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
           title,
           machine,
           labels,
+          allowAddToChannel,
           info: acpConfig
             ? create(AgentInfoSchema, {
                 acpConfig: create(AgentACPConfigSchema, acpConfig),
@@ -88,6 +92,17 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
       })
     );
     return res;
+  },
+
+  async updateAgent(name: string, allowAddToChannel: boolean) {
+    return agentServiceClient.updateAgent(
+      create(UpdateAgentRequestSchema, {
+        agent: create(AgentSchema, { name, allowAddToChannel }),
+        updateMask: create(FieldMaskSchema, {
+          paths: ["allow_add_to_channel"],
+        }),
+      })
+    );
   },
 
   async deleteAgent(name: string) {
