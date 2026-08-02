@@ -20,14 +20,17 @@ export declare const file_v1_group_service: GenFile;
  */
 export declare type Group = Message<"laelia.v1.Group"> & {
   /**
-   * The resource name of the group, in the form `groups/{email}`.
+   * The resource name of the group, in the form `groups/{id}`. The id is the
+   * stable primary key; groups with an email also accept `groups/{email}` in
+   * IAM bindings and Get requests (resolved by the store).
    *
    * @generated from field: string name = 1;
    */
   name: string;
 
   /**
-   * The group email, e.g. "eng@example.com".
+   * The group email, e.g. "eng@example.com". Optional: groups without an email
+   * are referenced by their id only.
    *
    * @generated from field: string email = 2;
    */
@@ -212,15 +215,24 @@ export declare const ListGroupsResponseSchema: GenMessage<ListGroupsResponse>;
  */
 export declare type CreateGroupRequest = Message<"laelia.v1.CreateGroupRequest"> & {
   /**
-   * The group email, e.g. "eng@example.com".
+   * The group email, e.g. "eng@example.com". Optional; groups without an email
+   * are referenced by their generated id.
    *
    * @generated from field: string group_email = 1;
    */
   groupEmail: string;
 
   /**
-   * The group to create. The name field is ignored (the email is taken from
-   * group_email); title and members are required.
+   * Optional stable id (lowercase alnum + dash). When empty, a UUID is
+   * generated. The id is immutable after creation.
+   *
+   * @generated from field: string group_id = 3;
+   */
+  groupId: string;
+
+  /**
+   * The group to create. The name field is ignored (the id/email are taken
+   * from group_id/group_email); title and members are required.
    *
    * @generated from field: laelia.v1.Group group = 2;
    */

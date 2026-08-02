@@ -33,12 +33,7 @@ func GetUsersByMember(ctx context.Context, stores *store.Store, member string) [
 			users = append(users, user)
 		}
 	} else if strings.HasPrefix(member, common.GroupPrefix) {
-		groupEmail, err := common.GetGroupEmail(member)
-		if err != nil {
-			slog.Error("failed to parse group email", slog.String("group", member), log.WithError(err))
-			return users
-		}
-		group, err := stores.GetGroup(ctx, groupEmail)
+		group, err := stores.GetGroupByName(ctx, member)
 		if err != nil {
 			slog.Error("failed to get group", slog.String("group", member), log.WithError(err))
 			return users
@@ -160,12 +155,7 @@ func MemberContainsUser(ctx context.Context, stores *store.Store, member string,
 
 	// Check if member is a group
 	if strings.HasPrefix(member, common.GroupPrefix) {
-		groupEmail, err := common.GetGroupEmail(member)
-		if err != nil {
-			slog.Error("failed to parse group email", slog.String("group", member), log.WithError(err))
-			return false
-		}
-		group, err := stores.GetGroup(ctx, groupEmail)
+		group, err := stores.GetGroupByName(ctx, member)
 		if err != nil {
 			slog.Error("failed to get group", slog.String("group", member), log.WithError(err))
 			return false

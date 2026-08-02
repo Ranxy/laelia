@@ -694,9 +694,9 @@ func convertToUser(user *store.UserMessage) *v1pb.User {
 	}
 	convertedUser.ChatPreferences = &v1pb.ChatPreferences{EnterToSend: enterToSend}
 
-	for _, group := range user.Groups {
-		convertedUser.Groups = append(convertedUser.Groups, common.FormatGroupEmail(group))
-	}
+	// Groups already carries full group resource names ("groups/{email}" or
+	// "groups/{id}") from the store.
+	convertedUser.Groups = user.Groups
 
 	return convertedUser
 }

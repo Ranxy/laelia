@@ -63,3 +63,14 @@ func TestBuildListUsersQuery_ProjectFilter_Legitimate(t *testing.T) {
 		t.Fatalf("expected projects/foo in args, got %v", args)
 	}
 }
+
+// TestBuildListUsersQuery_GroupsNullFilter guards against the NULL-array
+// regression where ARRAY_AGG over the LEFT JOINed user_groups CTE produced
+// arrays containing NULL for users with no groups (breaking the pq.StringArray
+// scan on login). The FILTER must exclude unmatched LEFT JOIN rows.
+func TestBuildListUsersQuery_GroupsNullFilter(t *testing.T) {
+	query, _ := buildListUsersQuery(&FindUserMessage{})
+	if !strings.Contains(query, "FILTER (WHERE user_group.id IS NOT NULL)") {
+		t.Fatalf("user_groups CTE must filter out NULL LEFT JOIN rows:\n%s", query)
+	}
+}

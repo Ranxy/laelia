@@ -119,7 +119,8 @@ CREATE UNIQUE INDEX idx_project_unique_resource_id ON project(resource_id);
 
 
 CREATE TABLE user_group (
-  email text PRIMARY KEY,
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  email text UNIQUE,
   name text NOT NULL,
   description text NOT NULL DEFAULT '',
   -- Stored as GroupPayload (proto/store/store/group.proto)

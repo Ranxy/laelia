@@ -77,7 +77,7 @@ function groupToForm(group: Group): GroupForm {
 }
 
 function displayName(user: User): string {
-  return user.title || user.email;
+  return user.title || user.email || user.name || "";
 }
 
 export function SettingsGroupsPage() {
@@ -147,7 +147,13 @@ export function SettingsGroupsPage() {
   };
 
   const create = async () => {
-    if (!createForm.title.trim() || !createForm.email.trim()) return;
+    if (!createForm.title.trim()) {
+      toastManager.add({
+        type: "error",
+        title: t("settings.groups.title-required"),
+      });
+      return;
+    }
     if (!hasOwner(createForm)) {
       toastManager.add({
         type: "error",
@@ -185,6 +191,13 @@ export function SettingsGroupsPage() {
 
   const save = async () => {
     if (!editTarget) return;
+    if (!editForm.title.trim()) {
+      toastManager.add({
+        type: "error",
+        title: t("settings.groups.title-required"),
+      });
+      return;
+    }
     if (!hasOwner(editForm)) {
       toastManager.add({
         type: "error",
@@ -313,7 +326,7 @@ export function SettingsGroupsPage() {
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
-                  {group.canManage && (
+                  {group.canManage && !group.source && (
                     <>
                       <Button
                         variant="outline"
@@ -349,7 +362,7 @@ export function SettingsGroupsPage() {
                 colSpan={5}
                 className="text-center text-control-light py-8"
               >
-                {t("settings.groups.no-members")}
+                {t("settings.groups.no-groups")}
               </TableCell>
             </TableRow>
           )}
@@ -445,6 +458,10 @@ function GroupSheet({
   onUpdateMember,
 }: GroupSheetProps) {
   const { t } = useTranslation();
+  const usedMembers = new Set(
+    form.members.map((m) => m.member).filter(Boolean)
+  );
+  const nextMember = users.find((u) => !usedMembers.has(u.name));
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -454,15 +471,7 @@ function GroupSheet({
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
         <SheetBody className="flex flex-col gap-4">
-          <FieldRow label={t("settings.groups.field-email")}>
-            <Input
-              value={form.email}
-              disabled={emailDisabled}
-              onChange={(e) => onFormChange({ ...form, email: e.target.value })}
-              placeholder={t("settings.groups.field-email-placeholder")}
-            />
-          </FieldRow>
-          <FieldRow label={t("settings.groups.field-title")}>
+          <FieldRow label={t("settings.groups.field-title")} required>
             <Input
               value={form.title}
               onChange={(e) => onFormChange({ ...form, title: e.target.value })}
@@ -478,85 +487,136 @@ function GroupSheet({
               placeholder={t("settings.groups.field-description-placeholder")}
             />
           </FieldRow>
+          <FieldRow
+            label={t("settings.groups.field-email")}
+            hint={t("settings.groups.field-email-hint")}
+          >
+            <Input
+              value={form.email}
+              disabled={emailDisabled}
+              onChange={(e) => onFormChange({ ...form, email: e.target.value })}
+              placeholder={t("settings.groups.field-email-placeholder")}
+            />
+          </FieldRow>
           <div className="flex flex-col gap-2">
-            <span className="text-sm text-control-light">
-              {t("settings.groups.field-members")}
-            </span>
-            {form.members.map((row, i) => (
-              <div key={i} className="flex gap-2 items-center">
-                <Select
-                  value={row.member}
-                  onValueChange={(member) =>
-                    onUpdateMember(form, onFormChange, i, {
-                      member: member ?? "",
-                    })
-                  }
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue
-                      placeholder={t("settings.groups.member-user-placeholder")}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.map((u) => (
-                      <SelectItem key={u.name} value={u.name ?? ""}>
-                        {displayName(u)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={String(row.role)}
-                  onValueChange={(role) =>
-                    onUpdateMember(form, onFormChange, i, {
-                      role: Number(role) as GroupMemberRole,
-                    })
-                  }
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={String(GroupMemberRole.OWNER)}>
-                      {t("settings.groups.member-role-owner")}
-                    </SelectItem>
-                    <SelectItem value={String(GroupMemberRole.MEMBER)}>
-                      {t("settings.groups.member-role-member")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    onFormChange({
-                      ...form,
-                      members: form.members.filter((_, j) => j !== i),
-                    })
-                  }
-                >
-                  {t("settings.groups.member-remove")}
-                </Button>
-              </div>
-            ))}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                onFormChange({
-                  ...form,
-                  members: [
-                    ...form.members,
-                    {
-                      member: users[0]?.name ?? "",
-                      role: GroupMemberRole.MEMBER,
-                    },
-                  ],
-                })
-              }
+            <FieldRow
+              label={t("settings.groups.field-members")}
+              required
+              hint={t("settings.groups.field-members-hint")}
             >
-              {t("settings.groups.member-add")}
-            </Button>
+              <div className="flex flex-col gap-2">
+                {form.members.map((row, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <Select
+                      value={row.member}
+                      onValueChange={(member) => {
+                        // Never allow the same user in two rows: options below
+                        // already exclude used members; this guards programmatic
+                        // changes as well.
+                        if (
+                          member &&
+                          form.members.some(
+                            (m, j) => j !== i && m.member === member
+                          )
+                        ) {
+                          return;
+                        }
+                        onUpdateMember(form, onFormChange, i, {
+                          member: member ?? "",
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue>
+                          {(value) => {
+                            const user = users.find((u) => u.name === value);
+                            return user
+                              ? displayName(user)
+                              : t("settings.groups.member-user-placeholder");
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users
+                          .filter(
+                            (u) =>
+                              u.name === row.member || !usedMembers.has(u.name)
+                          )
+                          .map((u) => (
+                            <SelectItem key={u.name} value={u.name ?? ""}>
+                              {displayName(u)}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={String(row.role)}
+                      onValueChange={(role) =>
+                        onUpdateMember(form, onFormChange, i, {
+                          role: Number(role) as GroupMemberRole,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue>
+                          {(value) =>
+                            String(value) === String(GroupMemberRole.OWNER)
+                              ? t("settings.groups.member-role-owner")
+                              : t("settings.groups.member-role-member")
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={String(GroupMemberRole.OWNER)}>
+                          {t("settings.groups.member-role-owner")}
+                        </SelectItem>
+                        <SelectItem value={String(GroupMemberRole.MEMBER)}>
+                          {t("settings.groups.member-role-member")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        onFormChange({
+                          ...form,
+                          members: form.members.filter((_, j) => j !== i),
+                        })
+                      }
+                    >
+                      {t("settings.groups.member-remove")}
+                    </Button>
+                  </div>
+                ))}
+                {users.length === 0 ? (
+                  <span className="text-xs text-control-placeholder">
+                    {t("settings.groups.member-no-users")}
+                  </span>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!nextMember}
+                    onClick={() =>
+                      nextMember &&
+                      onFormChange({
+                        ...form,
+                        members: [
+                          ...form.members,
+                          {
+                            member: nextMember.name ?? "",
+                            role: GroupMemberRole.MEMBER,
+                          },
+                        ],
+                      })
+                    }
+                  >
+                    {t("settings.groups.member-add")}
+                  </Button>
+                )}
+              </div>
+            </FieldRow>
           </div>
         </SheetBody>
         <SheetFooter>

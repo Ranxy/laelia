@@ -30,6 +30,19 @@ func TestConvertToGroupPayload(t *testing.T) {
 	}); err == nil {
 		t.Fatal("expected unspecified role to be rejected")
 	}
+
+	if _, err := convertToGroupPayload([]*v1pb.GroupMember{
+		{Member: "users/101", Role: v1pb.GroupMemberRole_OWNER},
+		{Member: "users/101", Role: v1pb.GroupMemberRole_MEMBER},
+	}); err == nil {
+		t.Fatal("expected duplicate member to be rejected")
+	}
+
+	if _, err := convertToGroupPayload([]*v1pb.GroupMember{
+		{Member: "", Role: v1pb.GroupMemberRole_OWNER},
+	}); err == nil {
+		t.Fatal("expected empty member to be rejected")
+	}
 }
 
 // TestHasGroupOwner verifies the last-owner guard input.

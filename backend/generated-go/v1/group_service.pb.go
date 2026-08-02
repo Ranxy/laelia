@@ -80,9 +80,12 @@ func (GroupMemberRole) EnumDescriptor() ([]byte, []int) {
 // The IAM engine expands a group's members at authorization time.
 type Group struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The resource name of the group, in the form `groups/{email}`.
+	// The resource name of the group, in the form `groups/{id}`. The id is the
+	// stable primary key; groups with an email also accept `groups/{email}` in
+	// IAM bindings and Get requests (resolved by the store).
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// The group email, e.g. "eng@example.com".
+	// The group email, e.g. "eng@example.com". Optional: groups without an email
+	// are referenced by their id only.
 	Email string `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
 	// Human-readable title.
 	Title string `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
@@ -486,10 +489,14 @@ func (x *ListGroupsResponse) GetNextPageToken() string {
 
 type CreateGroupRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The group email, e.g. "eng@example.com".
+	// The group email, e.g. "eng@example.com". Optional; groups without an email
+	// are referenced by their generated id.
 	GroupEmail string `protobuf:"bytes,1,opt,name=group_email,json=groupEmail,proto3" json:"group_email,omitempty"`
-	// The group to create. The name field is ignored (the email is taken from
-	// group_email); title and members are required.
+	// Optional stable id (lowercase alnum + dash). When empty, a UUID is
+	// generated. The id is immutable after creation.
+	GroupId string `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	// The group to create. The name field is ignored (the id/email are taken
+	// from group_id/group_email); title and members are required.
 	Group         *Group `protobuf:"bytes,2,opt,name=group,proto3" json:"group,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -528,6 +535,13 @@ func (*CreateGroupRequest) Descriptor() ([]byte, []int) {
 func (x *CreateGroupRequest) GetGroupEmail() string {
 	if x != nil {
 		return x.GroupEmail
+	}
+	return ""
+}
+
+func (x *CreateGroupRequest) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
 	}
 	return ""
 }
@@ -672,10 +686,11 @@ const file_v1_group_service_proto_rawDesc = "" +
 	"\x06filter\x18\x03 \x01(\tR\x06filter\"f\n" +
 	"\x12ListGroupsResponse\x12(\n" +
 	"\x06groups\x18\x01 \x03(\v2\x10.laelia.v1.GroupR\x06groups\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"g\n" +
-	"\x12CreateGroupRequest\x12$\n" +
-	"\vgroup_email\x18\x01 \x01(\tB\x03\xe0A\x02R\n" +
-	"groupEmail\x12+\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"}\n" +
+	"\x12CreateGroupRequest\x12\x1f\n" +
+	"\vgroup_email\x18\x01 \x01(\tR\n" +
+	"groupEmail\x12\x19\n" +
+	"\bgroup_id\x18\x03 \x01(\tR\agroupId\x12+\n" +
 	"\x05group\x18\x02 \x01(\v2\x10.laelia.v1.GroupB\x03\xe0A\x02R\x05group\"~\n" +
 	"\x12UpdateGroupRequest\x12+\n" +
 	"\x05group\x18\x01 \x01(\v2\x10.laelia.v1.GroupB\x03\xe0A\x02R\x05group\x12;\n" +

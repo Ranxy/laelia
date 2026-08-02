@@ -1846,7 +1846,7 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | recovery_codes | [string](#string) | repeated | The recovery_codes is the temporary recovery codes using in two phase verification. |
 | phone | [string](#string) |  | Should be a valid E.164 compliant phone number. Could be empty. |
 | profile | [UserProfile](#laelia-v1-UserProfile) |  |  |
-| groups | [string](#string) | repeated | The groups for the user. Format: groups/{email} |
+| groups | [string](#string) | repeated | The groups for the user. Format: groups/{identifier}, where the identifier is the group email when the group has one, otherwise its id. |
 | workspace_admin | [bool](#bool) |  | workspace_admin is true when the user holds the roles/workspaceAdmin role. Only populated for the current caller (GetCurrentUser). Retained as a computed shim during the IAM transition; prefer `permissions` for gating. |
 | description | [string](#string) |  | description is a short, user-authored self-description surfaced to agents and other users so they know who this user is and what they focus on, e.g. &#34;Backend engineer, focused on agent building&#34; or &#34;UI/UX expert, reviews come to me&#34;. Editable via UpdateUser with update_mask &#34;description&#34;. |
 | permissions | [string](#string) | repeated | permissions is the caller&#39;s effective workspace-scope permission set (roles/workspaceMember baseline ∪ the permissions of every workspace role the user holds), populated only by GetCurrentUser. The frontend gates workspace actions on this (e.g. laelia.users.update). Per-resource permissions (conversations.read/send/manage, agents.edit) are resolved per resource and surfaced on the resource, not here. |
@@ -4969,8 +4969,9 @@ enums cannot share value names), matching SenderType/CommandStatus.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| group_email | [string](#string) |  | The group email, e.g. &#34;eng@example.com&#34;. |
-| group | [Group](#laelia-v1-Group) |  | The group to create. The name field is ignored (the email is taken from group_email); title and members are required. |
+| group_email | [string](#string) |  | The group email, e.g. &#34;eng@example.com&#34;. Optional; groups without an email are referenced by their generated id. |
+| group_id | [string](#string) |  | Optional stable id (lowercase alnum &#43; dash). When empty, a UUID is generated. The id is immutable after creation. |
+| group | [Group](#laelia-v1-Group) |  | The group to create. The name field is ignored (the id/email are taken from group_id/group_email); title and members are required. |
 
 
 
@@ -5017,8 +5018,8 @@ The IAM engine expands a group&#39;s members at authorization time.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The resource name of the group, in the form `groups/{email}`. |
-| email | [string](#string) |  | The group email, e.g. &#34;eng@example.com&#34;. |
+| name | [string](#string) |  | The resource name of the group, in the form `groups/{id}`. The id is the stable primary key; groups with an email also accept `groups/{email}` in IAM bindings and Get requests (resolved by the store). |
+| email | [string](#string) |  | The group email, e.g. &#34;eng@example.com&#34;. Optional: groups without an email are referenced by their id only. |
 | title | [string](#string) |  | Human-readable title. |
 | description | [string](#string) |  | Longer description of the group. |
 | members | [GroupMember](#laelia-v1-GroupMember) | repeated | The group&#39;s members. Each member is a user resource name (&#34;users/{uid}&#34;) with a role: OWNER (may manage the group) or MEMBER. |

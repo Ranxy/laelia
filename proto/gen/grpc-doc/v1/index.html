@@ -5318,7 +5318,8 @@ Could be empty. </p></td>
                   <td><a href="#string">string</a></td>
                   <td>repeated</td>
                   <td><p>The groups for the user.
-Format: groups/{email} </p></td>
+Format: groups/{identifier}, where the identifier is the group email when
+the group has one, otherwise its id. </p></td>
                 </tr>
               
                 <tr>
@@ -13247,15 +13248,24 @@ user, hiding it from All and Unread. The caller&#39;s own id must own the row.</
                   <td>group_email</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>The group email, e.g. &#34;eng@example.com&#34;. </p></td>
+                  <td><p>The group email, e.g. &#34;eng@example.com&#34;. Optional; groups without an email
+are referenced by their generated id. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>group_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Optional stable id (lowercase alnum &#43; dash). When empty, a UUID is
+generated. The id is immutable after creation. </p></td>
                 </tr>
               
                 <tr>
                   <td>group</td>
                   <td><a href="#laelia.v1.Group">Group</a></td>
                   <td></td>
-                  <td><p>The group to create. The name field is ignored (the email is taken from
-group_email); title and members are required. </p></td>
+                  <td><p>The group to create. The name field is ignored (the id/email are taken
+from group_id/group_email); title and members are required. </p></td>
                 </tr>
               
             </tbody>
@@ -13327,14 +13337,17 @@ group_email); title and members are required. </p></td>
                   <td>name</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>The resource name of the group, in the form `groups/{email}`. </p></td>
+                  <td><p>The resource name of the group, in the form `groups/{id}`. The id is the
+stable primary key; groups with an email also accept `groups/{email}` in
+IAM bindings and Get requests (resolved by the store). </p></td>
                 </tr>
               
                 <tr>
                   <td>email</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>The group email, e.g. &#34;eng@example.com&#34;. </p></td>
+                  <td><p>The group email, e.g. &#34;eng@example.com&#34;. Optional: groups without an email
+are referenced by their id only. </p></td>
                 </tr>
               
                 <tr>

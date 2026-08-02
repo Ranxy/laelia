@@ -63,7 +63,8 @@ type UserMessage struct {
 	Phone string
 	// output only
 	CreatedAt time.Time
-	// The group email list
+	// Groups are the full group resource names the user belongs to
+	// ("groups/{email}" when the group has an email, else "groups/{id}").
 	Groups []string
 	// Description is the user-authored self-description surfaced in channel/thread
 	// rosters so agents and other users can perceive who this user is.
@@ -342,7 +343,13 @@ func buildListUsersQuery(find *FindUserMessage) (string, []any) {
 	query := with + ` user_groups AS (
 		SELECT
 			principal.id AS user_id,
-			COALESCE(ARRAY_AGG(user_group.email ORDER BY user_group.email) FILTER (WHERE user_group.email IS NOT NULL), '{}') AS groups
+			COALESCE(ARRAY_AGG(
+				CASE WHEN user_group.email IS NOT NULL
+					THEN 'groups/' || user_group.email
+					ELSE 'groups/' || user_group.id
+				END
+				ORDER BY user_group.email
+			) FILTER (WHERE user_group.id IS NOT NULL), '{}') AS groups
 		FROM principal
 		LEFT JOIN user_group ON EXISTS (
 			SELECT 1 FROM jsonb_array_elements(user_group.payload->'members') AS m

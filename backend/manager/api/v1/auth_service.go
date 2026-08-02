@@ -391,7 +391,7 @@ func (s *AuthService) syncUserGroups(ctx context.Context, user *store.UserMessag
 					return member.Member == common.FormatUserUID(user.ID)
 				})
 			}
-			if _, err := s.store.UpdateGroup(ctx, groupMessage.Email, &store.UpdateGroupMessage{
+			if _, err := s.store.UpdateGroup(ctx, groupMessage.ID, &store.UpdateGroupMessage{
 				Payload: groupMessage.Payload,
 			}); err != nil {
 				return connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to update group %q", groupMessage.Email))

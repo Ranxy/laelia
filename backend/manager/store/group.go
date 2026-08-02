@@ -16,6 +16,7 @@ import (
 
 // FindGroupMessage is the message for finding groups.
 type FindGroupMessage struct {
+	ID        *string
 	Email     *string
 	ProjectID *string
 	Filter    *ListResourceFilter
@@ -31,42 +32,64 @@ type UpdateGroupMessage struct {
 	Payload     *models.GroupPayload
 }
 
-// GroupMessage is the message for a group.
+// GroupMessage is the message for a group. ID is the stable primary key; Email
+// is optional (external/SCIM groups may have no email). IAM bindings may
+// reference a group as groups/{id} or, when it has one, groups/{email}.
 type GroupMessage struct {
+	ID          string
 	Email       string
 	Title       string
 	Description string
 	Payload     *models.GroupPayload
 }
 
-// GetGroup gets a group.
+// GetGroup gets a group by email.
 func (s *Store) GetGroup(ctx context.Context, email string) (*GroupMessage, error) {
-	if v, ok := s.groupCache.Get(email); ok && s.enableCache {
-		return v, nil
-	}
-
-	tx, err := s.GetDB().BeginTx(ctx, nil)
+	groups, err := s.ListGroups(ctx, &FindGroupMessage{Email: &email})
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
-
-	groups, err := s.listGroupImpl(ctx, tx, &FindGroupMessage{
-		Email: &email,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-
 	if len(groups) == 0 {
 		return nil, nil
 	} else if len(groups) > 1 {
 		return nil, &common.Error{Code: common.Conflict, Err: errors.Errorf("found %d groups with email %+v, expect 1", len(groups), email)}
 	}
 	return groups[0], nil
+}
+
+// GetGroupByID gets a group by its stable id.
+func (s *Store) GetGroupByID(ctx context.Context, id string) (*GroupMessage, error) {
+	groups, err := s.ListGroups(ctx, &FindGroupMessage{ID: &id})
+	if err != nil {
+		return nil, err
+	}
+	if len(groups) == 0 {
+		return nil, nil
+	} else if len(groups) > 1 {
+		return nil, &common.Error{Code: common.Conflict, Err: errors.Errorf("found %d groups with id %+v, expect 1", len(groups), id)}
+	}
+	return groups[0], nil
+}
+
+// GetGroupByName resolves a group by its resource name "groups/{identifier}",
+// where the identifier is either the group email (contains "@") or its id.
+// Lookups try the matching identifier first, then fall back to the other
+// (legacy SCIM sync may have stored an email as the id).
+func (s *Store) GetGroupByName(ctx context.Context, name string) (*GroupMessage, error) {
+	token, err := common.GetGroupEmail(name)
+	if err != nil {
+		return nil, err
+	}
+	if strings.Contains(token, "@") {
+		if group, err := s.GetGroup(ctx, token); err != nil || group != nil {
+			return group, err
+		}
+		return s.GetGroupByID(ctx, token)
+	}
+	if group, err := s.GetGroupByID(ctx, token); err != nil || group != nil {
+		return group, err
+	}
+	return s.GetGroup(ctx, token)
 }
 
 // ListGroups list all groups.
@@ -86,7 +109,7 @@ func (s *Store) ListGroups(ctx context.Context, find *FindGroupMessage) ([]*Grou
 	}
 
 	for _, group := range groups {
-		s.groupCache.Add(group.Email, group)
+		s.groupCache.Add(group.ID, group)
 	}
 	return groups, nil
 }
@@ -96,6 +119,9 @@ func (*Store) listGroupImpl(ctx context.Context, txn *sql.Tx, find *FindGroupMes
 	if filter := find.Filter; filter != nil {
 		where = append(where, filter.Where)
 		args = append(args, filter.Args...)
+	}
+	if v := find.ID; v != nil {
+		where, args = append(where, fmt.Sprintf("id = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := find.Email; v != nil {
 		where, args = append(where, fmt.Sprintf("email = $%d", len(args)+1)), append(args, *v)
@@ -120,16 +146,21 @@ func (*Store) listGroupImpl(ctx context.Context, txn *sql.Tx, find *FindGroupMes
 		project_members AS (
 			SELECT ARRAY_AGG(member) AS members FROM all_members WHERE role NOT LIKE 'roles/workspace%%'
 		)`, models.Policy_PROJECT.String(), placeholder, models.Policy_WORKSPACE.String(), models.Policy_IAM.String())
-		join = fmt.Sprintf(`INNER JOIN project_members ON (CONCAT('groups/', user_group.email) = ANY(project_members.members) OR '%s' = ANY(project_members.members))`, common.AllUsers)
+		join = fmt.Sprintf(`INNER JOIN project_members ON (
+			CONCAT('groups/', user_group.id) = ANY(project_members.members)
+			OR (user_group.email IS NOT NULL AND CONCAT('groups/', user_group.email) = ANY(project_members.members))
+			OR '%s' = ANY(project_members.members)
+		)`, common.AllUsers)
 	}
 
 	query := with + `
 	SELECT
+		user_group.id,
 		user_group.email,
 		user_group.name,
 		user_group.description,
 		user_group.payload
-	FROM user_group ` + join + ` WHERE ` + strings.Join(where, " AND ") + ` ORDER BY email`
+	FROM user_group ` + join + ` WHERE ` + strings.Join(where, " AND ") + ` ORDER BY name, email`
 	if v := find.Limit; v != nil {
 		query += fmt.Sprintf(" LIMIT %d", *v)
 	}
@@ -146,14 +177,19 @@ func (*Store) listGroupImpl(ctx context.Context, txn *sql.Tx, find *FindGroupMes
 
 	for rows.Next() {
 		var group GroupMessage
+		var email sql.NullString
 		var payload []byte
 		if err := rows.Scan(
-			&group.Email,
+			&group.ID,
+			&email,
 			&group.Title,
 			&group.Description,
 			&payload,
 		); err != nil {
 			return nil, err
+		}
+		if email.Valid {
+			group.Email = email.String
 		}
 		groupPayload := models.GroupPayload{}
 		if err := common.ProtojsonUnmarshaler.Unmarshal(payload, &groupPayload); err != nil {
@@ -169,20 +205,12 @@ func (*Store) listGroupImpl(ctx context.Context, txn *sql.Tx, find *FindGroupMes
 	return groups, nil
 }
 
-// CreateGroup creates a group.
+// CreateGroup creates a group. ID may be empty (a UUID is generated); Email may
+// be empty for groups without an email.
 func (s *Store) CreateGroup(ctx context.Context, create *GroupMessage) (*GroupMessage, error) {
 	if create.Payload == nil {
 		create.Payload = &models.GroupPayload{}
 	}
-
-	query := `
-		INSERT INTO user_group (
-			email,
-			name,
-			description,
-			payload
-		) VALUES ($1, $2, $3, $4)
-	`
 	payloadBytes, err := protojson.Marshal(create.Payload)
 	if err != nil {
 		return nil, err
@@ -194,14 +222,11 @@ func (s *Store) CreateGroup(ctx context.Context, create *GroupMessage) (*GroupMe
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.ExecContext(
-		ctx,
-		query,
-		create.Email,
-		create.Title,
-		create.Description,
-		payloadBytes,
-	); err != nil {
+	if err := tx.QueryRowContext(ctx, `
+		INSERT INTO user_group (id, email, name, description, payload)
+		VALUES (COALESCE(NULLIF($1, ''), gen_random_uuid()::text), NULLIF($2, ''), $3, $4, $5)
+		RETURNING id
+	`, create.ID, create.Email, create.Title, create.Description, payloadBytes).Scan(&create.ID); err != nil {
 		return nil, err
 	}
 
@@ -209,19 +234,18 @@ func (s *Store) CreateGroup(ctx context.Context, create *GroupMessage) (*GroupMe
 		return nil, errors.Wrap(err, "failed to commit")
 	}
 
-	s.groupCache.Add(create.Email, create)
+	s.groupCache.Add(create.ID, create)
 	return create, nil
 }
 
-// UpdateGroup updates a group.
-func (s *Store) UpdateGroup(ctx context.Context, email string, patch *UpdateGroupMessage) (*GroupMessage, error) {
+// UpdateGroup updates a group by its stable id.
+func (s *Store) UpdateGroup(ctx context.Context, id string, patch *UpdateGroupMessage) (*GroupMessage, error) {
 	tx, err := s.GetDB().BeginTx(ctx, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to begin transaction")
 	}
 
 	set, args := []string{}, []any{}
-
 	if v := patch.Title; v != nil {
 		set, args = append(set, fmt.Sprintf("name = $%d", len(args)+1)), append(args, *v)
 	}
@@ -235,29 +259,36 @@ func (s *Store) UpdateGroup(ctx context.Context, email string, patch *UpdateGrou
 		}
 		set, args = append(set, fmt.Sprintf("payload = $%d", len(args)+1)), append(args, payload)
 	}
-	args = append(args, email)
+	if len(set) == 0 {
+		return nil, errors.New("no fields to update")
+	}
+	args = append(args, id)
 
 	var group GroupMessage
+	var email sql.NullString
 	var payload []byte
-
 	if err := tx.QueryRowContext(ctx, fmt.Sprintf(`
 		UPDATE user_group
 		SET %s
-		WHERE email = $%d
+		WHERE id = $%d
 		RETURNING
+			id,
 			email,
 			name,
 			description,
 			payload
 		`, strings.Join(set, ", "), len(set)+1), args...).Scan(
-		&group.Email,
+		&group.ID,
+		&email,
 		&group.Title,
 		&group.Description,
 		&payload,
 	); err != nil {
 		return nil, err
 	}
-
+	if email.Valid {
+		group.Email = email.String
+	}
 	groupPayload := models.GroupPayload{}
 	if err := common.ProtojsonUnmarshaler.Unmarshal(payload, &groupPayload); err != nil {
 		return nil, err
@@ -268,19 +299,19 @@ func (s *Store) UpdateGroup(ctx context.Context, email string, patch *UpdateGrou
 		return nil, errors.Wrap(err, "failed to commit transaction")
 	}
 
-	s.groupCache.Add(group.Email, &group)
+	s.groupCache.Add(group.ID, &group)
 	return &group, nil
 }
 
-// DeleteGroup deletes a group.
-func (s *Store) DeleteGroup(ctx context.Context, email string) error {
+// DeleteGroup deletes a group by its stable id.
+func (s *Store) DeleteGroup(ctx context.Context, id string) error {
 	tx, err := s.GetDB().BeginTx(ctx, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to begin transaction")
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.ExecContext(ctx, `DELETE FROM user_group WHERE email = $1`, email); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM user_group WHERE id = $1`, id); err != nil {
 		return err
 	}
 
@@ -288,6 +319,6 @@ func (s *Store) DeleteGroup(ctx context.Context, email string) error {
 		return errors.Wrap(err, "failed to commit transaction")
 	}
 
-	s.groupCache.Remove(email)
+	s.groupCache.Remove(id)
 	return nil
 }

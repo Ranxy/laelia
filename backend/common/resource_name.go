@@ -77,7 +77,8 @@ func GetRoleID(name string) (string, error) {
 	return tokens[0], nil
 }
 
-// GetGroupEmail returns the group email.
+// GetGroupEmail returns the group identifier token from a groups/{identifier}
+// resource name; the identifier may be an email or the group id.
 func GetGroupEmail(name string) (string, error) {
 	tokens, err := GetNameParentTokens(name, GroupPrefix)
 	if err != nil {
@@ -178,8 +179,10 @@ func FormatRole(role string) string {
 	return fmt.Sprintf("%s%s", RolePrefix, role)
 }
 
-func FormatGroupEmail(email string) string {
-	return fmt.Sprintf("%s%s", GroupPrefix, email)
+// FormatGroupName formats a group identifier (email or id) as a groups/{
+// identifier} resource name.
+func FormatGroupName(identifier string) string {
+	return fmt.Sprintf("%s%s", GroupPrefix, identifier)
 }
 
 func GetAgentResourceID(name string) (string, error) {

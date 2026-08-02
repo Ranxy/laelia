@@ -249,7 +249,8 @@ message User {
   UserProfile profile = 13;
 
   // The groups for the user.
-  // Format: groups/{email}
+  // Format: groups/{identifier}, where the identifier is the group email when
+  // the group has one, otherwise its id.
   repeated string groups = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // workspace_admin is true when the user holds the roles/workspaceAdmin role.

@@ -195,11 +195,7 @@ func validateMemberExists(ctx context.Context, s *store.Store, member string) er
 			return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("member %q does not exist or is deleted", member))
 		}
 	case strings.HasPrefix(member, common.GroupPrefix):
-		groupEmail, err := common.GetGroupEmail(member)
-		if err != nil {
-			return connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid member %q", member))
-		}
-		group, err := s.GetGroup(ctx, groupEmail)
+		group, err := s.GetGroupByName(ctx, member)
 		if err != nil {
 			return connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to look up member %q", member))
 		}

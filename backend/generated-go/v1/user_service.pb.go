@@ -592,7 +592,8 @@ type User struct {
 	Phone   string       `protobuf:"bytes,12,opt,name=phone,proto3" json:"phone,omitempty"`
 	Profile *UserProfile `protobuf:"bytes,13,opt,name=profile,proto3" json:"profile,omitempty"`
 	// The groups for the user.
-	// Format: groups/{email}
+	// Format: groups/{identifier}, where the identifier is the group email when
+	// the group has one, otherwise its id.
 	Groups []string `protobuf:"bytes,14,rep,name=groups,proto3" json:"groups,omitempty"`
 	// workspace_admin is true when the user holds the roles/workspaceAdmin role.
 	// Only populated for the current caller (GetCurrentUser). Retained as a

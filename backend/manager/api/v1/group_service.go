@@ -35,11 +35,7 @@ func NewGroupService(s *store.Store, iamManager *iam.Manager) *GroupService {
 
 // GetGroup gets a group.
 func (s *GroupService) GetGroup(ctx context.Context, req *connect.Request[v1pb.GetGroupRequest]) (*connect.Response[v1pb.Group], error) {
-	groupEmail, err := common.GetGroupEmail(req.Msg.Name)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	}
-	group, err := s.store.GetGroup(ctx, groupEmail)
+	group, err := s.store.GetGroupByName(ctx, req.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get group"))
 	}
@@ -57,11 +53,7 @@ func (s *GroupService) GetGroup(ctx context.Context, req *connect.Request[v1pb.G
 func (s *GroupService) BatchGetGroups(ctx context.Context, req *connect.Request[v1pb.BatchGetGroupsRequest]) (*connect.Response[v1pb.BatchGetGroupsResponse], error) {
 	response := &v1pb.BatchGetGroupsResponse{}
 	for _, name := range req.Msg.Names {
-		groupEmail, err := common.GetGroupEmail(name)
-		if err != nil {
-			continue
-		}
-		group, err := s.store.GetGroup(ctx, groupEmail)
+		group, err := s.store.GetGroupByName(ctx, name)
 		if err != nil || group == nil {
 			continue
 		}
@@ -122,9 +114,6 @@ func (s *GroupService) ListGroups(ctx context.Context, req *connect.Request[v1pb
 // group never starts ownerless.
 func (s *GroupService) CreateGroup(ctx context.Context, req *connect.Request[v1pb.CreateGroupRequest]) (*connect.Response[v1pb.Group], error) {
 	groupEmail := strings.ToLower(strings.TrimSpace(req.Msg.GroupEmail))
-	if groupEmail == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("group_email is required"))
-	}
 	if req.Msg.Group == nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("group is required"))
 	}
@@ -143,6 +132,7 @@ func (s *GroupService) CreateGroup(ctx context.Context, req *connect.Request[v1p
 	}
 
 	group, err := s.store.CreateGroup(ctx, &store.GroupMessage{
+		ID:          strings.TrimSpace(req.Msg.GroupId),
 		Email:       groupEmail,
 		Title:       req.Msg.Group.Title,
 		Description: req.Msg.Group.Description,
@@ -168,11 +158,7 @@ func (s *GroupService) UpdateGroup(ctx context.Context, req *connect.Request[v1p
 	if req.Msg.Group == nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("group is required"))
 	}
-	groupEmail, err := common.GetGroupEmail(req.Msg.Group.Name)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	}
-	group, err := s.store.GetGroup(ctx, groupEmail)
+	group, err := s.store.GetGroupByName(ctx, req.Msg.Group.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get group"))
 	}
@@ -225,7 +211,7 @@ func (s *GroupService) UpdateGroup(ctx context.Context, req *connect.Request[v1p
 		}
 	}
 
-	updated, err := s.store.UpdateGroup(ctx, groupEmail, patch)
+	updated, err := s.store.UpdateGroup(ctx, group.ID, patch)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update group"))
 	}
@@ -240,11 +226,7 @@ func (s *GroupService) UpdateGroup(ctx context.Context, req *connect.Request[v1p
 // laelia.groups.delete may delete. Existing IAM bindings referencing the group
 // become no-ops (the engine resolves a missing group to no members).
 func (s *GroupService) DeleteGroup(ctx context.Context, req *connect.Request[v1pb.DeleteGroupRequest]) (*connect.Response[emptypb.Empty], error) {
-	groupEmail, err := common.GetGroupEmail(req.Msg.Name)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	}
-	group, err := s.store.GetGroup(ctx, groupEmail)
+	group, err := s.store.GetGroupByName(ctx, req.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get group"))
 	}
@@ -265,7 +247,7 @@ func (s *GroupService) DeleteGroup(ctx context.Context, req *connect.Request[v1p
 	if !ok {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("only the group owner or a caller with %q can delete this group", permission.GroupsDelete))
 	}
-	if err := s.store.DeleteGroup(ctx, groupEmail); err != nil {
+	if err := s.store.DeleteGroup(ctx, group.ID); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to delete group"))
 	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
@@ -313,7 +295,15 @@ func (s *GroupService) validateGroupMembers(ctx context.Context, payload *storep
 // member format and roles.
 func convertToGroupPayload(members []*v1pb.GroupMember) (*storepb.GroupPayload, error) {
 	payload := &storepb.GroupPayload{}
+	seen := make(map[string]bool, len(members))
 	for _, m := range members {
+		if m.GetMember() == "" {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("group member must not be empty"))
+		}
+		if seen[m.GetMember()] {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("duplicate group member %q", m.GetMember()))
+		}
+		seen[m.GetMember()] = true
 		storeMember := &storepb.GroupMember{Member: m.GetMember()}
 		switch m.GetRole() {
 		case v1pb.GroupMemberRole_OWNER:
@@ -355,7 +345,7 @@ func isGroupOwner(user *store.UserMessage, group *store.GroupMessage) bool {
 // convertToV1Group maps a store group to the v1 API shape.
 func convertToV1Group(group *store.GroupMessage, canManage bool) *v1pb.Group {
 	out := &v1pb.Group{
-		Name:        common.FormatGroupEmail(group.Email),
+		Name:        common.FormatGroupName(group.ID),
 		Email:       group.Email,
 		Title:       group.Title,
 		Description: group.Description,

@@ -318,7 +318,8 @@ export declare type User = Message<"laelia.v1.User"> & {
 
   /**
    * The groups for the user.
-   * Format: groups/{email}
+   * Format: groups/{identifier}, where the identifier is the group email when
+   * the group has one, otherwise its id.
    *
    * @generated from field: repeated string groups = 14;
    */

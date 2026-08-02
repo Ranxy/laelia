@@ -5080,19 +5080,25 @@ components:
                     type: string
         CreateGroupRequest:
             required:
-                - groupEmail
                 - group
             type: object
             properties:
                 groupEmail:
                     type: string
-                    description: The group email, e.g. "eng@example.com".
+                    description: |-
+                        The group email, e.g. "eng@example.com". Optional; groups without an email
+                         are referenced by their generated id.
+                groupId:
+                    type: string
+                    description: |-
+                        Optional stable id (lowercase alnum + dash). When empty, a UUID is
+                         generated. The id is immutable after creation.
                 group:
                     allOf:
                         - $ref: '#/components/schemas/Group'
                     description: |-
-                        The group to create. The name field is ignored (the email is taken from
-                         group_email); title and members are required.
+                        The group to create. The name field is ignored (the id/email are taken
+                         from group_id/group_email); title and members are required.
         CreateMachineResponse:
             type: object
             properties:
@@ -5378,10 +5384,15 @@ components:
             properties:
                 name:
                     type: string
-                    description: The resource name of the group, in the form `groups/{email}`.
+                    description: |-
+                        The resource name of the group, in the form `groups/{id}`. The id is the
+                         stable primary key; groups with an email also accept `groups/{email}` in
+                         IAM bindings and Get requests (resolved by the store).
                 email:
                     type: string
-                    description: The group email, e.g. "eng@example.com".
+                    description: |-
+                        The group email, e.g. "eng@example.com". Optional: groups without an email
+                         are referenced by their id only.
                 title:
                     type: string
                     description: Human-readable title.
@@ -6773,7 +6784,8 @@ components:
                         type: string
                     description: |-
                         The groups for the user.
-                         Format: groups/{email}
+                         Format: groups/{identifier}, where the identifier is the group email when
+                         the group has one, otherwise its id.
                 workspaceAdmin:
                     readOnly: true
                     type: boolean

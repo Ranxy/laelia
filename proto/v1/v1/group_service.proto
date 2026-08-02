@@ -21,13 +21,16 @@ message Group {
     pattern: "groups/{group}"
   };
 
-  // The resource name of the group, in the form `groups/{email}`.
+  // The resource name of the group, in the form `groups/{id}`. The id is the
+  // stable primary key; groups with an email also accept `groups/{email}` in
+  // IAM bindings and Get requests (resolved by the store).
   string name = 1 [
     (google.api.field_behavior) = IDENTIFIER,
     (google.api.field_behavior) = REQUIRED
   ];
 
-  // The group email, e.g. "eng@example.com".
+  // The group email, e.g. "eng@example.com". Optional: groups without an email
+  // are referenced by their id only.
   string email = 2 [(google.api.field_behavior) = IMMUTABLE];
 
   // Human-readable title.
@@ -105,11 +108,16 @@ message ListGroupsResponse {
 }
 
 message CreateGroupRequest {
-  // The group email, e.g. "eng@example.com".
-  string group_email = 1 [(google.api.field_behavior) = REQUIRED];
+  // The group email, e.g. "eng@example.com". Optional; groups without an email
+  // are referenced by their generated id.
+  string group_email = 1;
 
-  // The group to create. The name field is ignored (the email is taken from
-  // group_email); title and members are required.
+  // Optional stable id (lowercase alnum + dash). When empty, a UUID is
+  // generated. The id is immutable after creation.
+  string group_id = 3;
+
+  // The group to create. The name field is ignored (the id/email are taken
+  // from group_id/group_email); title and members are required.
   Group group = 2 [(google.api.field_behavior) = REQUIRED];
 }
 
