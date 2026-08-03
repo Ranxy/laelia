@@ -35,7 +35,7 @@ var (
 	_ = metadata.Join
 )
 
-func request_ApiProviderService_GetApiProvider_0(ctx context.Context, marshaler runtime.Marshaler, client ApiProviderServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_ApiProviderService_GetAPIProvider_0(ctx context.Context, marshaler runtime.Marshaler, client ApiProviderServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq GetApiProviderRequest
 		metadata runtime.ServerMetadata
@@ -52,11 +52,11 @@ func request_ApiProviderService_GetApiProvider_0(ctx context.Context, marshaler 
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "name", err)
 	}
-	msg, err := client.GetApiProvider(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.GetAPIProvider(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
 
-func local_request_ApiProviderService_GetApiProvider_0(ctx context.Context, marshaler runtime.Marshaler, server ApiProviderServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_ApiProviderService_GetAPIProvider_0(ctx context.Context, marshaler runtime.Marshaler, server ApiProviderServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq GetApiProviderRequest
 		metadata runtime.ServerMetadata
@@ -70,13 +70,13 @@ func local_request_ApiProviderService_GetApiProvider_0(ctx context.Context, mars
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "name", err)
 	}
-	msg, err := server.GetApiProvider(ctx, &protoReq)
+	msg, err := server.GetAPIProvider(ctx, &protoReq)
 	return msg, metadata, err
 }
 
-var filter_ApiProviderService_ListApiProviders_0 = &utilities.DoubleArray{Encoding: map[string]int{}, Base: []int(nil), Check: []int(nil)}
+var filter_ApiProviderService_ListAPIProviders_0 = &utilities.DoubleArray{Encoding: map[string]int{}, Base: []int(nil), Check: []int(nil)}
 
-func request_ApiProviderService_ListApiProviders_0(ctx context.Context, marshaler runtime.Marshaler, client ApiProviderServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_ApiProviderService_ListAPIProviders_0(ctx context.Context, marshaler runtime.Marshaler, client ApiProviderServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq ListApiProvidersRequest
 		metadata runtime.ServerMetadata
@@ -87,14 +87,14 @@ func request_ApiProviderService_ListApiProviders_0(ctx context.Context, marshale
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_ApiProviderService_ListApiProviders_0); err != nil {
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_ApiProviderService_ListAPIProviders_0); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	msg, err := client.ListApiProviders(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.ListAPIProviders(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
 
-func local_request_ApiProviderService_ListApiProviders_0(ctx context.Context, marshaler runtime.Marshaler, server ApiProviderServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_ApiProviderService_ListAPIProviders_0(ctx context.Context, marshaler runtime.Marshaler, server ApiProviderServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq ListApiProvidersRequest
 		metadata runtime.ServerMetadata
@@ -102,14 +102,14 @@ func local_request_ApiProviderService_ListApiProviders_0(ctx context.Context, ma
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_ApiProviderService_ListApiProviders_0); err != nil {
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_ApiProviderService_ListAPIProviders_0); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	msg, err := server.ListApiProviders(ctx, &protoReq)
+	msg, err := server.ListAPIProviders(ctx, &protoReq)
 	return msg, metadata, err
 }
 
-func request_ApiProviderService_CreateApiProvider_0(ctx context.Context, marshaler runtime.Marshaler, client ApiProviderServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_ApiProviderService_CreateAPIProvider_0(ctx context.Context, marshaler runtime.Marshaler, client ApiProviderServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq CreateApiProviderRequest
 		metadata runtime.ServerMetadata
@@ -120,11 +120,11 @@ func request_ApiProviderService_CreateApiProvider_0(ctx context.Context, marshal
 	if req.Body != nil {
 		_, _ = io.Copy(io.Discard, req.Body)
 	}
-	msg, err := client.CreateApiProvider(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.CreateAPIProvider(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
 
-func local_request_ApiProviderService_CreateApiProvider_0(ctx context.Context, marshaler runtime.Marshaler, server ApiProviderServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_ApiProviderService_CreateAPIProvider_0(ctx context.Context, marshaler runtime.Marshaler, server ApiProviderServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq CreateApiProviderRequest
 		metadata runtime.ServerMetadata
@@ -132,13 +132,13 @@ func local_request_ApiProviderService_CreateApiProvider_0(ctx context.Context, m
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq.ApiProvider); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	msg, err := server.CreateApiProvider(ctx, &protoReq)
+	msg, err := server.CreateAPIProvider(ctx, &protoReq)
 	return msg, metadata, err
 }
 
-var filter_ApiProviderService_UpdateApiProvider_0 = &utilities.DoubleArray{Encoding: map[string]int{"api_provider": 0, "name": 1}, Base: []int{1, 2, 1, 0, 0}, Check: []int{0, 1, 2, 3, 2}}
+var filter_ApiProviderService_UpdateAPIProvider_0 = &utilities.DoubleArray{Encoding: map[string]int{"api_provider": 0, "name": 1}, Base: []int{1, 2, 1, 0, 0}, Check: []int{0, 1, 2, 3, 2}}
 
-func request_ApiProviderService_UpdateApiProvider_0(ctx context.Context, marshaler runtime.Marshaler, client ApiProviderServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_ApiProviderService_UpdateAPIProvider_0(ctx context.Context, marshaler runtime.Marshaler, client ApiProviderServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq UpdateApiProviderRequest
 		metadata runtime.ServerMetadata
@@ -172,14 +172,14 @@ func request_ApiProviderService_UpdateApiProvider_0(ctx context.Context, marshal
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_ApiProviderService_UpdateApiProvider_0); err != nil {
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_ApiProviderService_UpdateAPIProvider_0); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	msg, err := client.UpdateApiProvider(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.UpdateAPIProvider(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
 
-func local_request_ApiProviderService_UpdateApiProvider_0(ctx context.Context, marshaler runtime.Marshaler, server ApiProviderServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_ApiProviderService_UpdateAPIProvider_0(ctx context.Context, marshaler runtime.Marshaler, server ApiProviderServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq UpdateApiProviderRequest
 		metadata runtime.ServerMetadata
@@ -210,14 +210,14 @@ func local_request_ApiProviderService_UpdateApiProvider_0(ctx context.Context, m
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_ApiProviderService_UpdateApiProvider_0); err != nil {
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_ApiProviderService_UpdateAPIProvider_0); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	msg, err := server.UpdateApiProvider(ctx, &protoReq)
+	msg, err := server.UpdateAPIProvider(ctx, &protoReq)
 	return msg, metadata, err
 }
 
-func request_ApiProviderService_DeleteApiProvider_0(ctx context.Context, marshaler runtime.Marshaler, client ApiProviderServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_ApiProviderService_DeleteAPIProvider_0(ctx context.Context, marshaler runtime.Marshaler, client ApiProviderServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq DeleteApiProviderRequest
 		metadata runtime.ServerMetadata
@@ -234,11 +234,11 @@ func request_ApiProviderService_DeleteApiProvider_0(ctx context.Context, marshal
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "name", err)
 	}
-	msg, err := client.DeleteApiProvider(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.DeleteAPIProvider(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
 
-func local_request_ApiProviderService_DeleteApiProvider_0(ctx context.Context, marshaler runtime.Marshaler, server ApiProviderServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_ApiProviderService_DeleteAPIProvider_0(ctx context.Context, marshaler runtime.Marshaler, server ApiProviderServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq DeleteApiProviderRequest
 		metadata runtime.ServerMetadata
@@ -252,11 +252,11 @@ func local_request_ApiProviderService_DeleteApiProvider_0(ctx context.Context, m
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "name", err)
 	}
-	msg, err := server.DeleteApiProvider(ctx, &protoReq)
+	msg, err := server.DeleteAPIProvider(ctx, &protoReq)
 	return msg, metadata, err
 }
 
-func request_ApiProviderService_ListApiProviderModels_0(ctx context.Context, marshaler runtime.Marshaler, client ApiProviderServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_ApiProviderService_ListAPIProviderModels_0(ctx context.Context, marshaler runtime.Marshaler, client ApiProviderServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq ListApiProviderModelsRequest
 		metadata runtime.ServerMetadata
@@ -267,11 +267,11 @@ func request_ApiProviderService_ListApiProviderModels_0(ctx context.Context, mar
 	if req.Body != nil {
 		_, _ = io.Copy(io.Discard, req.Body)
 	}
-	msg, err := client.ListApiProviderModels(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.ListAPIProviderModels(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
 
-func local_request_ApiProviderService_ListApiProviderModels_0(ctx context.Context, marshaler runtime.Marshaler, server ApiProviderServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_ApiProviderService_ListAPIProviderModels_0(ctx context.Context, marshaler runtime.Marshaler, server ApiProviderServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq ListApiProviderModelsRequest
 		metadata runtime.ServerMetadata
@@ -279,7 +279,7 @@ func local_request_ApiProviderService_ListApiProviderModels_0(ctx context.Contex
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	msg, err := server.ListApiProviderModels(ctx, &protoReq)
+	msg, err := server.ListAPIProviderModels(ctx, &protoReq)
 	return msg, metadata, err
 }
 
@@ -289,125 +289,125 @@ func local_request_ApiProviderService_ListApiProviderModels_0(ctx context.Contex
 // Note that using this registration option will cause many gRPC library features to stop working. Consider using RegisterApiProviderServiceHandlerFromEndpoint instead.
 // GRPC interceptors will not work for this type of registration. To use interceptors, you must use the "runtime.WithMiddlewares" option in the "runtime.NewServeMux" call.
 func RegisterApiProviderServiceHandlerServer(ctx context.Context, mux *runtime.ServeMux, server ApiProviderServiceServer) error {
-	mux.Handle(http.MethodGet, pattern_ApiProviderService_GetApiProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_ApiProviderService_GetAPIProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.ApiProviderService/GetApiProvider", runtime.WithHTTPPathPattern("/v1/{name=apiProviders/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.ApiProviderService/GetAPIProvider", runtime.WithHTTPPathPattern("/v1/{name=apiProviders/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_ApiProviderService_GetApiProvider_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_ApiProviderService_GetAPIProvider_0(annotatedContext, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_ApiProviderService_GetApiProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_ApiProviderService_GetAPIProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodGet, pattern_ApiProviderService_ListApiProviders_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_ApiProviderService_ListAPIProviders_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.ApiProviderService/ListApiProviders", runtime.WithHTTPPathPattern("/v1/apiProviders"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.ApiProviderService/ListAPIProviders", runtime.WithHTTPPathPattern("/v1/apiProviders"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_ApiProviderService_ListApiProviders_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_ApiProviderService_ListAPIProviders_0(annotatedContext, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_ApiProviderService_ListApiProviders_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_ApiProviderService_ListAPIProviders_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPost, pattern_ApiProviderService_CreateApiProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_ApiProviderService_CreateAPIProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.ApiProviderService/CreateApiProvider", runtime.WithHTTPPathPattern("/v1/apiProviders"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.ApiProviderService/CreateAPIProvider", runtime.WithHTTPPathPattern("/v1/apiProviders"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_ApiProviderService_CreateApiProvider_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_ApiProviderService_CreateAPIProvider_0(annotatedContext, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_ApiProviderService_CreateApiProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_ApiProviderService_CreateAPIProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPatch, pattern_ApiProviderService_UpdateApiProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPatch, pattern_ApiProviderService_UpdateAPIProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.ApiProviderService/UpdateApiProvider", runtime.WithHTTPPathPattern("/v1/{api_provider.name=apiProviders/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.ApiProviderService/UpdateAPIProvider", runtime.WithHTTPPathPattern("/v1/{api_provider.name=apiProviders/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_ApiProviderService_UpdateApiProvider_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_ApiProviderService_UpdateAPIProvider_0(annotatedContext, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_ApiProviderService_UpdateApiProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_ApiProviderService_UpdateAPIProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodDelete, pattern_ApiProviderService_DeleteApiProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodDelete, pattern_ApiProviderService_DeleteAPIProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.ApiProviderService/DeleteApiProvider", runtime.WithHTTPPathPattern("/v1/{name=apiProviders/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.ApiProviderService/DeleteAPIProvider", runtime.WithHTTPPathPattern("/v1/{name=apiProviders/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_ApiProviderService_DeleteApiProvider_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_ApiProviderService_DeleteAPIProvider_0(annotatedContext, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_ApiProviderService_DeleteApiProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_ApiProviderService_DeleteAPIProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPost, pattern_ApiProviderService_ListApiProviderModels_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_ApiProviderService_ListAPIProviderModels_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.ApiProviderService/ListApiProviderModels", runtime.WithHTTPPathPattern("/v1/apiProviders:listModels"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.ApiProviderService/ListAPIProviderModels", runtime.WithHTTPPathPattern("/v1/apiProviders:listModels"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_ApiProviderService_ListApiProviderModels_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_ApiProviderService_ListAPIProviderModels_0(annotatedContext, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_ApiProviderService_ListApiProviderModels_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_ApiProviderService_ListAPIProviderModels_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 
 	return nil
@@ -449,125 +449,125 @@ func RegisterApiProviderServiceHandler(ctx context.Context, mux *runtime.ServeMu
 // doesn't go through the normal gRPC flow (creating a gRPC client etc.) then it will be up to the passed in
 // "ApiProviderServiceClient" to call the correct interceptors. This client ignores the HTTP middlewares.
 func RegisterApiProviderServiceHandlerClient(ctx context.Context, mux *runtime.ServeMux, client ApiProviderServiceClient) error {
-	mux.Handle(http.MethodGet, pattern_ApiProviderService_GetApiProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_ApiProviderService_GetAPIProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.ApiProviderService/GetApiProvider", runtime.WithHTTPPathPattern("/v1/{name=apiProviders/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.ApiProviderService/GetAPIProvider", runtime.WithHTTPPathPattern("/v1/{name=apiProviders/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_ApiProviderService_GetApiProvider_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_ApiProviderService_GetAPIProvider_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_ApiProviderService_GetApiProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_ApiProviderService_GetAPIProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodGet, pattern_ApiProviderService_ListApiProviders_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_ApiProviderService_ListAPIProviders_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.ApiProviderService/ListApiProviders", runtime.WithHTTPPathPattern("/v1/apiProviders"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.ApiProviderService/ListAPIProviders", runtime.WithHTTPPathPattern("/v1/apiProviders"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_ApiProviderService_ListApiProviders_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_ApiProviderService_ListAPIProviders_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_ApiProviderService_ListApiProviders_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_ApiProviderService_ListAPIProviders_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPost, pattern_ApiProviderService_CreateApiProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_ApiProviderService_CreateAPIProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.ApiProviderService/CreateApiProvider", runtime.WithHTTPPathPattern("/v1/apiProviders"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.ApiProviderService/CreateAPIProvider", runtime.WithHTTPPathPattern("/v1/apiProviders"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_ApiProviderService_CreateApiProvider_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_ApiProviderService_CreateAPIProvider_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_ApiProviderService_CreateApiProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_ApiProviderService_CreateAPIProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPatch, pattern_ApiProviderService_UpdateApiProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPatch, pattern_ApiProviderService_UpdateAPIProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.ApiProviderService/UpdateApiProvider", runtime.WithHTTPPathPattern("/v1/{api_provider.name=apiProviders/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.ApiProviderService/UpdateAPIProvider", runtime.WithHTTPPathPattern("/v1/{api_provider.name=apiProviders/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_ApiProviderService_UpdateApiProvider_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_ApiProviderService_UpdateAPIProvider_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_ApiProviderService_UpdateApiProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_ApiProviderService_UpdateAPIProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodDelete, pattern_ApiProviderService_DeleteApiProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodDelete, pattern_ApiProviderService_DeleteAPIProvider_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.ApiProviderService/DeleteApiProvider", runtime.WithHTTPPathPattern("/v1/{name=apiProviders/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.ApiProviderService/DeleteAPIProvider", runtime.WithHTTPPathPattern("/v1/{name=apiProviders/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_ApiProviderService_DeleteApiProvider_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_ApiProviderService_DeleteAPIProvider_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_ApiProviderService_DeleteApiProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_ApiProviderService_DeleteAPIProvider_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPost, pattern_ApiProviderService_ListApiProviderModels_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_ApiProviderService_ListAPIProviderModels_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.ApiProviderService/ListApiProviderModels", runtime.WithHTTPPathPattern("/v1/apiProviders:listModels"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.ApiProviderService/ListAPIProviderModels", runtime.WithHTTPPathPattern("/v1/apiProviders:listModels"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_ApiProviderService_ListApiProviderModels_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_ApiProviderService_ListAPIProviderModels_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_ApiProviderService_ListApiProviderModels_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_ApiProviderService_ListAPIProviderModels_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	return nil
 }
 
 var (
-	pattern_ApiProviderService_GetApiProvider_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "apiProviders", "name"}, ""))
-	pattern_ApiProviderService_ListApiProviders_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "apiProviders"}, ""))
-	pattern_ApiProviderService_CreateApiProvider_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "apiProviders"}, ""))
-	pattern_ApiProviderService_UpdateApiProvider_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "apiProviders", "api_provider.name"}, ""))
-	pattern_ApiProviderService_DeleteApiProvider_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "apiProviders", "name"}, ""))
-	pattern_ApiProviderService_ListApiProviderModels_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "apiProviders"}, "listModels"))
+	pattern_ApiProviderService_GetAPIProvider_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "apiProviders", "name"}, ""))
+	pattern_ApiProviderService_ListAPIProviders_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "apiProviders"}, ""))
+	pattern_ApiProviderService_CreateAPIProvider_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "apiProviders"}, ""))
+	pattern_ApiProviderService_UpdateAPIProvider_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "apiProviders", "api_provider.name"}, ""))
+	pattern_ApiProviderService_DeleteAPIProvider_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "apiProviders", "name"}, ""))
+	pattern_ApiProviderService_ListAPIProviderModels_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "apiProviders"}, "listModels"))
 )
 
 var (
-	forward_ApiProviderService_GetApiProvider_0        = runtime.ForwardResponseMessage
-	forward_ApiProviderService_ListApiProviders_0      = runtime.ForwardResponseMessage
-	forward_ApiProviderService_CreateApiProvider_0     = runtime.ForwardResponseMessage
-	forward_ApiProviderService_UpdateApiProvider_0     = runtime.ForwardResponseMessage
-	forward_ApiProviderService_DeleteApiProvider_0     = runtime.ForwardResponseMessage
-	forward_ApiProviderService_ListApiProviderModels_0 = runtime.ForwardResponseMessage
+	forward_ApiProviderService_GetAPIProvider_0        = runtime.ForwardResponseMessage
+	forward_ApiProviderService_ListAPIProviders_0      = runtime.ForwardResponseMessage
+	forward_ApiProviderService_CreateAPIProvider_0     = runtime.ForwardResponseMessage
+	forward_ApiProviderService_UpdateAPIProvider_0     = runtime.ForwardResponseMessage
+	forward_ApiProviderService_DeleteAPIProvider_0     = runtime.ForwardResponseMessage
+	forward_ApiProviderService_ListAPIProviderModels_0 = runtime.ForwardResponseMessage
 )

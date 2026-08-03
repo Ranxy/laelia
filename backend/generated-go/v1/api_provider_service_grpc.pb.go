@@ -20,12 +20,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ApiProviderService_GetApiProvider_FullMethodName        = "/laelia.v1.ApiProviderService/GetApiProvider"
-	ApiProviderService_ListApiProviders_FullMethodName      = "/laelia.v1.ApiProviderService/ListApiProviders"
-	ApiProviderService_CreateApiProvider_FullMethodName     = "/laelia.v1.ApiProviderService/CreateApiProvider"
-	ApiProviderService_UpdateApiProvider_FullMethodName     = "/laelia.v1.ApiProviderService/UpdateApiProvider"
-	ApiProviderService_DeleteApiProvider_FullMethodName     = "/laelia.v1.ApiProviderService/DeleteApiProvider"
-	ApiProviderService_ListApiProviderModels_FullMethodName = "/laelia.v1.ApiProviderService/ListApiProviderModels"
+	ApiProviderService_GetAPIProvider_FullMethodName        = "/laelia.v1.ApiProviderService/GetAPIProvider"
+	ApiProviderService_ListAPIProviders_FullMethodName      = "/laelia.v1.ApiProviderService/ListAPIProviders"
+	ApiProviderService_CreateAPIProvider_FullMethodName     = "/laelia.v1.ApiProviderService/CreateAPIProvider"
+	ApiProviderService_UpdateAPIProvider_FullMethodName     = "/laelia.v1.ApiProviderService/UpdateAPIProvider"
+	ApiProviderService_DeleteAPIProvider_FullMethodName     = "/laelia.v1.ApiProviderService/DeleteAPIProvider"
+	ApiProviderService_ListAPIProviderModels_FullMethodName = "/laelia.v1.ApiProviderService/ListAPIProviderModels"
 )
 
 // ApiProviderServiceClient is the client API for ApiProviderService service.
@@ -39,15 +39,15 @@ const (
 // providers the caller may use, so the agent create/edit form can list them
 // without a management permission.
 type ApiProviderServiceClient interface {
-	GetApiProvider(ctx context.Context, in *GetApiProviderRequest, opts ...grpc.CallOption) (*ApiProvider, error)
-	ListApiProviders(ctx context.Context, in *ListApiProvidersRequest, opts ...grpc.CallOption) (*ListApiProvidersResponse, error)
-	CreateApiProvider(ctx context.Context, in *CreateApiProviderRequest, opts ...grpc.CallOption) (*ApiProvider, error)
-	UpdateApiProvider(ctx context.Context, in *UpdateApiProviderRequest, opts ...grpc.CallOption) (*ApiProvider, error)
-	DeleteApiProvider(ctx context.Context, in *DeleteApiProviderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetAPIProvider(ctx context.Context, in *GetApiProviderRequest, opts ...grpc.CallOption) (*ApiProvider, error)
+	ListAPIProviders(ctx context.Context, in *ListApiProvidersRequest, opts ...grpc.CallOption) (*ListApiProvidersResponse, error)
+	CreateAPIProvider(ctx context.Context, in *CreateApiProviderRequest, opts ...grpc.CallOption) (*ApiProvider, error)
+	UpdateAPIProvider(ctx context.Context, in *UpdateApiProviderRequest, opts ...grpc.CallOption) (*ApiProvider, error)
+	DeleteAPIProvider(ctx context.Context, in *DeleteApiProviderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// List the models a provider type exposes. The manager proxies the provider's
 	// model-listing HTTP API (DeepSeek GET /models with the caller's api_key;
 	// OpenRouter GET /models, public). Admin (laelia.apiProviders.update) only.
-	ListApiProviderModels(ctx context.Context, in *ListApiProviderModelsRequest, opts ...grpc.CallOption) (*ListApiProviderModelsResponse, error)
+	ListAPIProviderModels(ctx context.Context, in *ListApiProviderModelsRequest, opts ...grpc.CallOption) (*ListApiProviderModelsResponse, error)
 }
 
 type apiProviderServiceClient struct {
@@ -58,60 +58,60 @@ func NewApiProviderServiceClient(cc grpc.ClientConnInterface) ApiProviderService
 	return &apiProviderServiceClient{cc}
 }
 
-func (c *apiProviderServiceClient) GetApiProvider(ctx context.Context, in *GetApiProviderRequest, opts ...grpc.CallOption) (*ApiProvider, error) {
+func (c *apiProviderServiceClient) GetAPIProvider(ctx context.Context, in *GetApiProviderRequest, opts ...grpc.CallOption) (*ApiProvider, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ApiProvider)
-	err := c.cc.Invoke(ctx, ApiProviderService_GetApiProvider_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ApiProviderService_GetAPIProvider_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *apiProviderServiceClient) ListApiProviders(ctx context.Context, in *ListApiProvidersRequest, opts ...grpc.CallOption) (*ListApiProvidersResponse, error) {
+func (c *apiProviderServiceClient) ListAPIProviders(ctx context.Context, in *ListApiProvidersRequest, opts ...grpc.CallOption) (*ListApiProvidersResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListApiProvidersResponse)
-	err := c.cc.Invoke(ctx, ApiProviderService_ListApiProviders_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ApiProviderService_ListAPIProviders_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *apiProviderServiceClient) CreateApiProvider(ctx context.Context, in *CreateApiProviderRequest, opts ...grpc.CallOption) (*ApiProvider, error) {
+func (c *apiProviderServiceClient) CreateAPIProvider(ctx context.Context, in *CreateApiProviderRequest, opts ...grpc.CallOption) (*ApiProvider, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ApiProvider)
-	err := c.cc.Invoke(ctx, ApiProviderService_CreateApiProvider_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ApiProviderService_CreateAPIProvider_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *apiProviderServiceClient) UpdateApiProvider(ctx context.Context, in *UpdateApiProviderRequest, opts ...grpc.CallOption) (*ApiProvider, error) {
+func (c *apiProviderServiceClient) UpdateAPIProvider(ctx context.Context, in *UpdateApiProviderRequest, opts ...grpc.CallOption) (*ApiProvider, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ApiProvider)
-	err := c.cc.Invoke(ctx, ApiProviderService_UpdateApiProvider_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ApiProviderService_UpdateAPIProvider_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *apiProviderServiceClient) DeleteApiProvider(ctx context.Context, in *DeleteApiProviderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *apiProviderServiceClient) DeleteAPIProvider(ctx context.Context, in *DeleteApiProviderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, ApiProviderService_DeleteApiProvider_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ApiProviderService_DeleteAPIProvider_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *apiProviderServiceClient) ListApiProviderModels(ctx context.Context, in *ListApiProviderModelsRequest, opts ...grpc.CallOption) (*ListApiProviderModelsResponse, error) {
+func (c *apiProviderServiceClient) ListAPIProviderModels(ctx context.Context, in *ListApiProviderModelsRequest, opts ...grpc.CallOption) (*ListApiProviderModelsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListApiProviderModelsResponse)
-	err := c.cc.Invoke(ctx, ApiProviderService_ListApiProviderModels_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ApiProviderService_ListAPIProviderModels_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -129,15 +129,15 @@ func (c *apiProviderServiceClient) ListApiProviderModels(ctx context.Context, in
 // providers the caller may use, so the agent create/edit form can list them
 // without a management permission.
 type ApiProviderServiceServer interface {
-	GetApiProvider(context.Context, *GetApiProviderRequest) (*ApiProvider, error)
-	ListApiProviders(context.Context, *ListApiProvidersRequest) (*ListApiProvidersResponse, error)
-	CreateApiProvider(context.Context, *CreateApiProviderRequest) (*ApiProvider, error)
-	UpdateApiProvider(context.Context, *UpdateApiProviderRequest) (*ApiProvider, error)
-	DeleteApiProvider(context.Context, *DeleteApiProviderRequest) (*emptypb.Empty, error)
+	GetAPIProvider(context.Context, *GetApiProviderRequest) (*ApiProvider, error)
+	ListAPIProviders(context.Context, *ListApiProvidersRequest) (*ListApiProvidersResponse, error)
+	CreateAPIProvider(context.Context, *CreateApiProviderRequest) (*ApiProvider, error)
+	UpdateAPIProvider(context.Context, *UpdateApiProviderRequest) (*ApiProvider, error)
+	DeleteAPIProvider(context.Context, *DeleteApiProviderRequest) (*emptypb.Empty, error)
 	// List the models a provider type exposes. The manager proxies the provider's
 	// model-listing HTTP API (DeepSeek GET /models with the caller's api_key;
 	// OpenRouter GET /models, public). Admin (laelia.apiProviders.update) only.
-	ListApiProviderModels(context.Context, *ListApiProviderModelsRequest) (*ListApiProviderModelsResponse, error)
+	ListAPIProviderModels(context.Context, *ListApiProviderModelsRequest) (*ListApiProviderModelsResponse, error)
 	mustEmbedUnimplementedApiProviderServiceServer()
 }
 
@@ -148,23 +148,23 @@ type ApiProviderServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedApiProviderServiceServer struct{}
 
-func (UnimplementedApiProviderServiceServer) GetApiProvider(context.Context, *GetApiProviderRequest) (*ApiProvider, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetApiProvider not implemented")
+func (UnimplementedApiProviderServiceServer) GetAPIProvider(context.Context, *GetApiProviderRequest) (*ApiProvider, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAPIProvider not implemented")
 }
-func (UnimplementedApiProviderServiceServer) ListApiProviders(context.Context, *ListApiProvidersRequest) (*ListApiProvidersResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListApiProviders not implemented")
+func (UnimplementedApiProviderServiceServer) ListAPIProviders(context.Context, *ListApiProvidersRequest) (*ListApiProvidersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAPIProviders not implemented")
 }
-func (UnimplementedApiProviderServiceServer) CreateApiProvider(context.Context, *CreateApiProviderRequest) (*ApiProvider, error) {
-	return nil, status.Error(codes.Unimplemented, "method CreateApiProvider not implemented")
+func (UnimplementedApiProviderServiceServer) CreateAPIProvider(context.Context, *CreateApiProviderRequest) (*ApiProvider, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateAPIProvider not implemented")
 }
-func (UnimplementedApiProviderServiceServer) UpdateApiProvider(context.Context, *UpdateApiProviderRequest) (*ApiProvider, error) {
-	return nil, status.Error(codes.Unimplemented, "method UpdateApiProvider not implemented")
+func (UnimplementedApiProviderServiceServer) UpdateAPIProvider(context.Context, *UpdateApiProviderRequest) (*ApiProvider, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateAPIProvider not implemented")
 }
-func (UnimplementedApiProviderServiceServer) DeleteApiProvider(context.Context, *DeleteApiProviderRequest) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "method DeleteApiProvider not implemented")
+func (UnimplementedApiProviderServiceServer) DeleteAPIProvider(context.Context, *DeleteApiProviderRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteAPIProvider not implemented")
 }
-func (UnimplementedApiProviderServiceServer) ListApiProviderModels(context.Context, *ListApiProviderModelsRequest) (*ListApiProviderModelsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListApiProviderModels not implemented")
+func (UnimplementedApiProviderServiceServer) ListAPIProviderModels(context.Context, *ListApiProviderModelsRequest) (*ListApiProviderModelsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAPIProviderModels not implemented")
 }
 func (UnimplementedApiProviderServiceServer) mustEmbedUnimplementedApiProviderServiceServer() {}
 func (UnimplementedApiProviderServiceServer) testEmbeddedByValue()                            {}
@@ -187,110 +187,110 @@ func RegisterApiProviderServiceServer(s grpc.ServiceRegistrar, srv ApiProviderSe
 	s.RegisterService(&ApiProviderService_ServiceDesc, srv)
 }
 
-func _ApiProviderService_GetApiProvider_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ApiProviderService_GetAPIProvider_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetApiProviderRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ApiProviderServiceServer).GetApiProvider(ctx, in)
+		return srv.(ApiProviderServiceServer).GetAPIProvider(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ApiProviderService_GetApiProvider_FullMethodName,
+		FullMethod: ApiProviderService_GetAPIProvider_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApiProviderServiceServer).GetApiProvider(ctx, req.(*GetApiProviderRequest))
+		return srv.(ApiProviderServiceServer).GetAPIProvider(ctx, req.(*GetApiProviderRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ApiProviderService_ListApiProviders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ApiProviderService_ListAPIProviders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListApiProvidersRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ApiProviderServiceServer).ListApiProviders(ctx, in)
+		return srv.(ApiProviderServiceServer).ListAPIProviders(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ApiProviderService_ListApiProviders_FullMethodName,
+		FullMethod: ApiProviderService_ListAPIProviders_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApiProviderServiceServer).ListApiProviders(ctx, req.(*ListApiProvidersRequest))
+		return srv.(ApiProviderServiceServer).ListAPIProviders(ctx, req.(*ListApiProvidersRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ApiProviderService_CreateApiProvider_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ApiProviderService_CreateAPIProvider_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateApiProviderRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ApiProviderServiceServer).CreateApiProvider(ctx, in)
+		return srv.(ApiProviderServiceServer).CreateAPIProvider(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ApiProviderService_CreateApiProvider_FullMethodName,
+		FullMethod: ApiProviderService_CreateAPIProvider_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApiProviderServiceServer).CreateApiProvider(ctx, req.(*CreateApiProviderRequest))
+		return srv.(ApiProviderServiceServer).CreateAPIProvider(ctx, req.(*CreateApiProviderRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ApiProviderService_UpdateApiProvider_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ApiProviderService_UpdateAPIProvider_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateApiProviderRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ApiProviderServiceServer).UpdateApiProvider(ctx, in)
+		return srv.(ApiProviderServiceServer).UpdateAPIProvider(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ApiProviderService_UpdateApiProvider_FullMethodName,
+		FullMethod: ApiProviderService_UpdateAPIProvider_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApiProviderServiceServer).UpdateApiProvider(ctx, req.(*UpdateApiProviderRequest))
+		return srv.(ApiProviderServiceServer).UpdateAPIProvider(ctx, req.(*UpdateApiProviderRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ApiProviderService_DeleteApiProvider_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ApiProviderService_DeleteAPIProvider_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteApiProviderRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ApiProviderServiceServer).DeleteApiProvider(ctx, in)
+		return srv.(ApiProviderServiceServer).DeleteAPIProvider(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ApiProviderService_DeleteApiProvider_FullMethodName,
+		FullMethod: ApiProviderService_DeleteAPIProvider_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApiProviderServiceServer).DeleteApiProvider(ctx, req.(*DeleteApiProviderRequest))
+		return srv.(ApiProviderServiceServer).DeleteAPIProvider(ctx, req.(*DeleteApiProviderRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ApiProviderService_ListApiProviderModels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ApiProviderService_ListAPIProviderModels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListApiProviderModelsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ApiProviderServiceServer).ListApiProviderModels(ctx, in)
+		return srv.(ApiProviderServiceServer).ListAPIProviderModels(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ApiProviderService_ListApiProviderModels_FullMethodName,
+		FullMethod: ApiProviderService_ListAPIProviderModels_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApiProviderServiceServer).ListApiProviderModels(ctx, req.(*ListApiProviderModelsRequest))
+		return srv.(ApiProviderServiceServer).ListAPIProviderModels(ctx, req.(*ListApiProviderModelsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -303,28 +303,28 @@ var ApiProviderService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ApiProviderServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GetApiProvider",
-			Handler:    _ApiProviderService_GetApiProvider_Handler,
+			MethodName: "GetAPIProvider",
+			Handler:    _ApiProviderService_GetAPIProvider_Handler,
 		},
 		{
-			MethodName: "ListApiProviders",
-			Handler:    _ApiProviderService_ListApiProviders_Handler,
+			MethodName: "ListAPIProviders",
+			Handler:    _ApiProviderService_ListAPIProviders_Handler,
 		},
 		{
-			MethodName: "CreateApiProvider",
-			Handler:    _ApiProviderService_CreateApiProvider_Handler,
+			MethodName: "CreateAPIProvider",
+			Handler:    _ApiProviderService_CreateAPIProvider_Handler,
 		},
 		{
-			MethodName: "UpdateApiProvider",
-			Handler:    _ApiProviderService_UpdateApiProvider_Handler,
+			MethodName: "UpdateAPIProvider",
+			Handler:    _ApiProviderService_UpdateAPIProvider_Handler,
 		},
 		{
-			MethodName: "DeleteApiProvider",
-			Handler:    _ApiProviderService_DeleteApiProvider_Handler,
+			MethodName: "DeleteAPIProvider",
+			Handler:    _ApiProviderService_DeleteAPIProvider_Handler,
 		},
 		{
-			MethodName: "ListApiProviderModels",
-			Handler:    _ApiProviderService_ListApiProviderModels_Handler,
+			MethodName: "ListAPIProviderModels",
+			Handler:    _ApiProviderService_ListAPIProviderModels_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

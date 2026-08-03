@@ -34,37 +34,37 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// ApiProviderServiceGetApiProviderProcedure is the fully-qualified name of the ApiProviderService's
-	// GetApiProvider RPC.
-	ApiProviderServiceGetApiProviderProcedure = "/laelia.v1.ApiProviderService/GetApiProvider"
-	// ApiProviderServiceListApiProvidersProcedure is the fully-qualified name of the
-	// ApiProviderService's ListApiProviders RPC.
-	ApiProviderServiceListApiProvidersProcedure = "/laelia.v1.ApiProviderService/ListApiProviders"
-	// ApiProviderServiceCreateApiProviderProcedure is the fully-qualified name of the
-	// ApiProviderService's CreateApiProvider RPC.
-	ApiProviderServiceCreateApiProviderProcedure = "/laelia.v1.ApiProviderService/CreateApiProvider"
-	// ApiProviderServiceUpdateApiProviderProcedure is the fully-qualified name of the
-	// ApiProviderService's UpdateApiProvider RPC.
-	ApiProviderServiceUpdateApiProviderProcedure = "/laelia.v1.ApiProviderService/UpdateApiProvider"
-	// ApiProviderServiceDeleteApiProviderProcedure is the fully-qualified name of the
-	// ApiProviderService's DeleteApiProvider RPC.
-	ApiProviderServiceDeleteApiProviderProcedure = "/laelia.v1.ApiProviderService/DeleteApiProvider"
-	// ApiProviderServiceListApiProviderModelsProcedure is the fully-qualified name of the
-	// ApiProviderService's ListApiProviderModels RPC.
-	ApiProviderServiceListApiProviderModelsProcedure = "/laelia.v1.ApiProviderService/ListApiProviderModels"
+	// ApiProviderServiceGetAPIProviderProcedure is the fully-qualified name of the ApiProviderService's
+	// GetAPIProvider RPC.
+	ApiProviderServiceGetAPIProviderProcedure = "/laelia.v1.ApiProviderService/GetAPIProvider"
+	// ApiProviderServiceListAPIProvidersProcedure is the fully-qualified name of the
+	// ApiProviderService's ListAPIProviders RPC.
+	ApiProviderServiceListAPIProvidersProcedure = "/laelia.v1.ApiProviderService/ListAPIProviders"
+	// ApiProviderServiceCreateAPIProviderProcedure is the fully-qualified name of the
+	// ApiProviderService's CreateAPIProvider RPC.
+	ApiProviderServiceCreateAPIProviderProcedure = "/laelia.v1.ApiProviderService/CreateAPIProvider"
+	// ApiProviderServiceUpdateAPIProviderProcedure is the fully-qualified name of the
+	// ApiProviderService's UpdateAPIProvider RPC.
+	ApiProviderServiceUpdateAPIProviderProcedure = "/laelia.v1.ApiProviderService/UpdateAPIProvider"
+	// ApiProviderServiceDeleteAPIProviderProcedure is the fully-qualified name of the
+	// ApiProviderService's DeleteAPIProvider RPC.
+	ApiProviderServiceDeleteAPIProviderProcedure = "/laelia.v1.ApiProviderService/DeleteAPIProvider"
+	// ApiProviderServiceListAPIProviderModelsProcedure is the fully-qualified name of the
+	// ApiProviderService's ListAPIProviderModels RPC.
+	ApiProviderServiceListAPIProviderModelsProcedure = "/laelia.v1.ApiProviderService/ListAPIProviderModels"
 )
 
 // ApiProviderServiceClient is a client for the laelia.v1.ApiProviderService service.
 type ApiProviderServiceClient interface {
-	GetApiProvider(context.Context, *connect.Request[v1.GetApiProviderRequest]) (*connect.Response[v1.ApiProvider], error)
-	ListApiProviders(context.Context, *connect.Request[v1.ListApiProvidersRequest]) (*connect.Response[v1.ListApiProvidersResponse], error)
-	CreateApiProvider(context.Context, *connect.Request[v1.CreateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error)
-	UpdateApiProvider(context.Context, *connect.Request[v1.UpdateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error)
-	DeleteApiProvider(context.Context, *connect.Request[v1.DeleteApiProviderRequest]) (*connect.Response[emptypb.Empty], error)
+	GetAPIProvider(context.Context, *connect.Request[v1.GetApiProviderRequest]) (*connect.Response[v1.ApiProvider], error)
+	ListAPIProviders(context.Context, *connect.Request[v1.ListApiProvidersRequest]) (*connect.Response[v1.ListApiProvidersResponse], error)
+	CreateAPIProvider(context.Context, *connect.Request[v1.CreateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error)
+	UpdateAPIProvider(context.Context, *connect.Request[v1.UpdateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error)
+	DeleteAPIProvider(context.Context, *connect.Request[v1.DeleteApiProviderRequest]) (*connect.Response[emptypb.Empty], error)
 	// List the models a provider type exposes. The manager proxies the provider's
 	// model-listing HTTP API (DeepSeek GET /models with the caller's api_key;
 	// OpenRouter GET /models, public). Admin (laelia.apiProviders.update) only.
-	ListApiProviderModels(context.Context, *connect.Request[v1.ListApiProviderModelsRequest]) (*connect.Response[v1.ListApiProviderModelsResponse], error)
+	ListAPIProviderModels(context.Context, *connect.Request[v1.ListApiProviderModelsRequest]) (*connect.Response[v1.ListApiProviderModelsResponse], error)
 }
 
 // NewApiProviderServiceClient constructs a client for the laelia.v1.ApiProviderService service. By
@@ -78,40 +78,40 @@ func NewApiProviderServiceClient(httpClient connect.HTTPClient, baseURL string, 
 	baseURL = strings.TrimRight(baseURL, "/")
 	apiProviderServiceMethods := v1.File_v1_api_provider_service_proto.Services().ByName("ApiProviderService").Methods()
 	return &apiProviderServiceClient{
-		getApiProvider: connect.NewClient[v1.GetApiProviderRequest, v1.ApiProvider](
+		getAPIProvider: connect.NewClient[v1.GetApiProviderRequest, v1.ApiProvider](
 			httpClient,
-			baseURL+ApiProviderServiceGetApiProviderProcedure,
-			connect.WithSchema(apiProviderServiceMethods.ByName("GetApiProvider")),
+			baseURL+ApiProviderServiceGetAPIProviderProcedure,
+			connect.WithSchema(apiProviderServiceMethods.ByName("GetAPIProvider")),
 			connect.WithClientOptions(opts...),
 		),
-		listApiProviders: connect.NewClient[v1.ListApiProvidersRequest, v1.ListApiProvidersResponse](
+		listAPIProviders: connect.NewClient[v1.ListApiProvidersRequest, v1.ListApiProvidersResponse](
 			httpClient,
-			baseURL+ApiProviderServiceListApiProvidersProcedure,
-			connect.WithSchema(apiProviderServiceMethods.ByName("ListApiProviders")),
+			baseURL+ApiProviderServiceListAPIProvidersProcedure,
+			connect.WithSchema(apiProviderServiceMethods.ByName("ListAPIProviders")),
 			connect.WithClientOptions(opts...),
 		),
-		createApiProvider: connect.NewClient[v1.CreateApiProviderRequest, v1.ApiProvider](
+		createAPIProvider: connect.NewClient[v1.CreateApiProviderRequest, v1.ApiProvider](
 			httpClient,
-			baseURL+ApiProviderServiceCreateApiProviderProcedure,
-			connect.WithSchema(apiProviderServiceMethods.ByName("CreateApiProvider")),
+			baseURL+ApiProviderServiceCreateAPIProviderProcedure,
+			connect.WithSchema(apiProviderServiceMethods.ByName("CreateAPIProvider")),
 			connect.WithClientOptions(opts...),
 		),
-		updateApiProvider: connect.NewClient[v1.UpdateApiProviderRequest, v1.ApiProvider](
+		updateAPIProvider: connect.NewClient[v1.UpdateApiProviderRequest, v1.ApiProvider](
 			httpClient,
-			baseURL+ApiProviderServiceUpdateApiProviderProcedure,
-			connect.WithSchema(apiProviderServiceMethods.ByName("UpdateApiProvider")),
+			baseURL+ApiProviderServiceUpdateAPIProviderProcedure,
+			connect.WithSchema(apiProviderServiceMethods.ByName("UpdateAPIProvider")),
 			connect.WithClientOptions(opts...),
 		),
-		deleteApiProvider: connect.NewClient[v1.DeleteApiProviderRequest, emptypb.Empty](
+		deleteAPIProvider: connect.NewClient[v1.DeleteApiProviderRequest, emptypb.Empty](
 			httpClient,
-			baseURL+ApiProviderServiceDeleteApiProviderProcedure,
-			connect.WithSchema(apiProviderServiceMethods.ByName("DeleteApiProvider")),
+			baseURL+ApiProviderServiceDeleteAPIProviderProcedure,
+			connect.WithSchema(apiProviderServiceMethods.ByName("DeleteAPIProvider")),
 			connect.WithClientOptions(opts...),
 		),
-		listApiProviderModels: connect.NewClient[v1.ListApiProviderModelsRequest, v1.ListApiProviderModelsResponse](
+		listAPIProviderModels: connect.NewClient[v1.ListApiProviderModelsRequest, v1.ListApiProviderModelsResponse](
 			httpClient,
-			baseURL+ApiProviderServiceListApiProviderModelsProcedure,
-			connect.WithSchema(apiProviderServiceMethods.ByName("ListApiProviderModels")),
+			baseURL+ApiProviderServiceListAPIProviderModelsProcedure,
+			connect.WithSchema(apiProviderServiceMethods.ByName("ListAPIProviderModels")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -119,55 +119,55 @@ func NewApiProviderServiceClient(httpClient connect.HTTPClient, baseURL string, 
 
 // apiProviderServiceClient implements ApiProviderServiceClient.
 type apiProviderServiceClient struct {
-	getApiProvider        *connect.Client[v1.GetApiProviderRequest, v1.ApiProvider]
-	listApiProviders      *connect.Client[v1.ListApiProvidersRequest, v1.ListApiProvidersResponse]
-	createApiProvider     *connect.Client[v1.CreateApiProviderRequest, v1.ApiProvider]
-	updateApiProvider     *connect.Client[v1.UpdateApiProviderRequest, v1.ApiProvider]
-	deleteApiProvider     *connect.Client[v1.DeleteApiProviderRequest, emptypb.Empty]
-	listApiProviderModels *connect.Client[v1.ListApiProviderModelsRequest, v1.ListApiProviderModelsResponse]
+	getAPIProvider        *connect.Client[v1.GetApiProviderRequest, v1.ApiProvider]
+	listAPIProviders      *connect.Client[v1.ListApiProvidersRequest, v1.ListApiProvidersResponse]
+	createAPIProvider     *connect.Client[v1.CreateApiProviderRequest, v1.ApiProvider]
+	updateAPIProvider     *connect.Client[v1.UpdateApiProviderRequest, v1.ApiProvider]
+	deleteAPIProvider     *connect.Client[v1.DeleteApiProviderRequest, emptypb.Empty]
+	listAPIProviderModels *connect.Client[v1.ListApiProviderModelsRequest, v1.ListApiProviderModelsResponse]
 }
 
-// GetApiProvider calls laelia.v1.ApiProviderService.GetApiProvider.
-func (c *apiProviderServiceClient) GetApiProvider(ctx context.Context, req *connect.Request[v1.GetApiProviderRequest]) (*connect.Response[v1.ApiProvider], error) {
-	return c.getApiProvider.CallUnary(ctx, req)
+// GetAPIProvider calls laelia.v1.ApiProviderService.GetAPIProvider.
+func (c *apiProviderServiceClient) GetAPIProvider(ctx context.Context, req *connect.Request[v1.GetApiProviderRequest]) (*connect.Response[v1.ApiProvider], error) {
+	return c.getAPIProvider.CallUnary(ctx, req)
 }
 
-// ListApiProviders calls laelia.v1.ApiProviderService.ListApiProviders.
-func (c *apiProviderServiceClient) ListApiProviders(ctx context.Context, req *connect.Request[v1.ListApiProvidersRequest]) (*connect.Response[v1.ListApiProvidersResponse], error) {
-	return c.listApiProviders.CallUnary(ctx, req)
+// ListAPIProviders calls laelia.v1.ApiProviderService.ListAPIProviders.
+func (c *apiProviderServiceClient) ListAPIProviders(ctx context.Context, req *connect.Request[v1.ListApiProvidersRequest]) (*connect.Response[v1.ListApiProvidersResponse], error) {
+	return c.listAPIProviders.CallUnary(ctx, req)
 }
 
-// CreateApiProvider calls laelia.v1.ApiProviderService.CreateApiProvider.
-func (c *apiProviderServiceClient) CreateApiProvider(ctx context.Context, req *connect.Request[v1.CreateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error) {
-	return c.createApiProvider.CallUnary(ctx, req)
+// CreateAPIProvider calls laelia.v1.ApiProviderService.CreateAPIProvider.
+func (c *apiProviderServiceClient) CreateAPIProvider(ctx context.Context, req *connect.Request[v1.CreateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error) {
+	return c.createAPIProvider.CallUnary(ctx, req)
 }
 
-// UpdateApiProvider calls laelia.v1.ApiProviderService.UpdateApiProvider.
-func (c *apiProviderServiceClient) UpdateApiProvider(ctx context.Context, req *connect.Request[v1.UpdateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error) {
-	return c.updateApiProvider.CallUnary(ctx, req)
+// UpdateAPIProvider calls laelia.v1.ApiProviderService.UpdateAPIProvider.
+func (c *apiProviderServiceClient) UpdateAPIProvider(ctx context.Context, req *connect.Request[v1.UpdateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error) {
+	return c.updateAPIProvider.CallUnary(ctx, req)
 }
 
-// DeleteApiProvider calls laelia.v1.ApiProviderService.DeleteApiProvider.
-func (c *apiProviderServiceClient) DeleteApiProvider(ctx context.Context, req *connect.Request[v1.DeleteApiProviderRequest]) (*connect.Response[emptypb.Empty], error) {
-	return c.deleteApiProvider.CallUnary(ctx, req)
+// DeleteAPIProvider calls laelia.v1.ApiProviderService.DeleteAPIProvider.
+func (c *apiProviderServiceClient) DeleteAPIProvider(ctx context.Context, req *connect.Request[v1.DeleteApiProviderRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.deleteAPIProvider.CallUnary(ctx, req)
 }
 
-// ListApiProviderModels calls laelia.v1.ApiProviderService.ListApiProviderModels.
-func (c *apiProviderServiceClient) ListApiProviderModels(ctx context.Context, req *connect.Request[v1.ListApiProviderModelsRequest]) (*connect.Response[v1.ListApiProviderModelsResponse], error) {
-	return c.listApiProviderModels.CallUnary(ctx, req)
+// ListAPIProviderModels calls laelia.v1.ApiProviderService.ListAPIProviderModels.
+func (c *apiProviderServiceClient) ListAPIProviderModels(ctx context.Context, req *connect.Request[v1.ListApiProviderModelsRequest]) (*connect.Response[v1.ListApiProviderModelsResponse], error) {
+	return c.listAPIProviderModels.CallUnary(ctx, req)
 }
 
 // ApiProviderServiceHandler is an implementation of the laelia.v1.ApiProviderService service.
 type ApiProviderServiceHandler interface {
-	GetApiProvider(context.Context, *connect.Request[v1.GetApiProviderRequest]) (*connect.Response[v1.ApiProvider], error)
-	ListApiProviders(context.Context, *connect.Request[v1.ListApiProvidersRequest]) (*connect.Response[v1.ListApiProvidersResponse], error)
-	CreateApiProvider(context.Context, *connect.Request[v1.CreateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error)
-	UpdateApiProvider(context.Context, *connect.Request[v1.UpdateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error)
-	DeleteApiProvider(context.Context, *connect.Request[v1.DeleteApiProviderRequest]) (*connect.Response[emptypb.Empty], error)
+	GetAPIProvider(context.Context, *connect.Request[v1.GetApiProviderRequest]) (*connect.Response[v1.ApiProvider], error)
+	ListAPIProviders(context.Context, *connect.Request[v1.ListApiProvidersRequest]) (*connect.Response[v1.ListApiProvidersResponse], error)
+	CreateAPIProvider(context.Context, *connect.Request[v1.CreateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error)
+	UpdateAPIProvider(context.Context, *connect.Request[v1.UpdateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error)
+	DeleteAPIProvider(context.Context, *connect.Request[v1.DeleteApiProviderRequest]) (*connect.Response[emptypb.Empty], error)
 	// List the models a provider type exposes. The manager proxies the provider's
 	// model-listing HTTP API (DeepSeek GET /models with the caller's api_key;
 	// OpenRouter GET /models, public). Admin (laelia.apiProviders.update) only.
-	ListApiProviderModels(context.Context, *connect.Request[v1.ListApiProviderModelsRequest]) (*connect.Response[v1.ListApiProviderModelsResponse], error)
+	ListAPIProviderModels(context.Context, *connect.Request[v1.ListApiProviderModelsRequest]) (*connect.Response[v1.ListApiProviderModelsResponse], error)
 }
 
 // NewApiProviderServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -177,56 +177,56 @@ type ApiProviderServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewApiProviderServiceHandler(svc ApiProviderServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	apiProviderServiceMethods := v1.File_v1_api_provider_service_proto.Services().ByName("ApiProviderService").Methods()
-	apiProviderServiceGetApiProviderHandler := connect.NewUnaryHandler(
-		ApiProviderServiceGetApiProviderProcedure,
-		svc.GetApiProvider,
-		connect.WithSchema(apiProviderServiceMethods.ByName("GetApiProvider")),
+	apiProviderServiceGetAPIProviderHandler := connect.NewUnaryHandler(
+		ApiProviderServiceGetAPIProviderProcedure,
+		svc.GetAPIProvider,
+		connect.WithSchema(apiProviderServiceMethods.ByName("GetAPIProvider")),
 		connect.WithHandlerOptions(opts...),
 	)
-	apiProviderServiceListApiProvidersHandler := connect.NewUnaryHandler(
-		ApiProviderServiceListApiProvidersProcedure,
-		svc.ListApiProviders,
-		connect.WithSchema(apiProviderServiceMethods.ByName("ListApiProviders")),
+	apiProviderServiceListAPIProvidersHandler := connect.NewUnaryHandler(
+		ApiProviderServiceListAPIProvidersProcedure,
+		svc.ListAPIProviders,
+		connect.WithSchema(apiProviderServiceMethods.ByName("ListAPIProviders")),
 		connect.WithHandlerOptions(opts...),
 	)
-	apiProviderServiceCreateApiProviderHandler := connect.NewUnaryHandler(
-		ApiProviderServiceCreateApiProviderProcedure,
-		svc.CreateApiProvider,
-		connect.WithSchema(apiProviderServiceMethods.ByName("CreateApiProvider")),
+	apiProviderServiceCreateAPIProviderHandler := connect.NewUnaryHandler(
+		ApiProviderServiceCreateAPIProviderProcedure,
+		svc.CreateAPIProvider,
+		connect.WithSchema(apiProviderServiceMethods.ByName("CreateAPIProvider")),
 		connect.WithHandlerOptions(opts...),
 	)
-	apiProviderServiceUpdateApiProviderHandler := connect.NewUnaryHandler(
-		ApiProviderServiceUpdateApiProviderProcedure,
-		svc.UpdateApiProvider,
-		connect.WithSchema(apiProviderServiceMethods.ByName("UpdateApiProvider")),
+	apiProviderServiceUpdateAPIProviderHandler := connect.NewUnaryHandler(
+		ApiProviderServiceUpdateAPIProviderProcedure,
+		svc.UpdateAPIProvider,
+		connect.WithSchema(apiProviderServiceMethods.ByName("UpdateAPIProvider")),
 		connect.WithHandlerOptions(opts...),
 	)
-	apiProviderServiceDeleteApiProviderHandler := connect.NewUnaryHandler(
-		ApiProviderServiceDeleteApiProviderProcedure,
-		svc.DeleteApiProvider,
-		connect.WithSchema(apiProviderServiceMethods.ByName("DeleteApiProvider")),
+	apiProviderServiceDeleteAPIProviderHandler := connect.NewUnaryHandler(
+		ApiProviderServiceDeleteAPIProviderProcedure,
+		svc.DeleteAPIProvider,
+		connect.WithSchema(apiProviderServiceMethods.ByName("DeleteAPIProvider")),
 		connect.WithHandlerOptions(opts...),
 	)
-	apiProviderServiceListApiProviderModelsHandler := connect.NewUnaryHandler(
-		ApiProviderServiceListApiProviderModelsProcedure,
-		svc.ListApiProviderModels,
-		connect.WithSchema(apiProviderServiceMethods.ByName("ListApiProviderModels")),
+	apiProviderServiceListAPIProviderModelsHandler := connect.NewUnaryHandler(
+		ApiProviderServiceListAPIProviderModelsProcedure,
+		svc.ListAPIProviderModels,
+		connect.WithSchema(apiProviderServiceMethods.ByName("ListAPIProviderModels")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/laelia.v1.ApiProviderService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case ApiProviderServiceGetApiProviderProcedure:
-			apiProviderServiceGetApiProviderHandler.ServeHTTP(w, r)
-		case ApiProviderServiceListApiProvidersProcedure:
-			apiProviderServiceListApiProvidersHandler.ServeHTTP(w, r)
-		case ApiProviderServiceCreateApiProviderProcedure:
-			apiProviderServiceCreateApiProviderHandler.ServeHTTP(w, r)
-		case ApiProviderServiceUpdateApiProviderProcedure:
-			apiProviderServiceUpdateApiProviderHandler.ServeHTTP(w, r)
-		case ApiProviderServiceDeleteApiProviderProcedure:
-			apiProviderServiceDeleteApiProviderHandler.ServeHTTP(w, r)
-		case ApiProviderServiceListApiProviderModelsProcedure:
-			apiProviderServiceListApiProviderModelsHandler.ServeHTTP(w, r)
+		case ApiProviderServiceGetAPIProviderProcedure:
+			apiProviderServiceGetAPIProviderHandler.ServeHTTP(w, r)
+		case ApiProviderServiceListAPIProvidersProcedure:
+			apiProviderServiceListAPIProvidersHandler.ServeHTTP(w, r)
+		case ApiProviderServiceCreateAPIProviderProcedure:
+			apiProviderServiceCreateAPIProviderHandler.ServeHTTP(w, r)
+		case ApiProviderServiceUpdateAPIProviderProcedure:
+			apiProviderServiceUpdateAPIProviderHandler.ServeHTTP(w, r)
+		case ApiProviderServiceDeleteAPIProviderProcedure:
+			apiProviderServiceDeleteAPIProviderHandler.ServeHTTP(w, r)
+		case ApiProviderServiceListAPIProviderModelsProcedure:
+			apiProviderServiceListAPIProviderModelsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -236,26 +236,26 @@ func NewApiProviderServiceHandler(svc ApiProviderServiceHandler, opts ...connect
 // UnimplementedApiProviderServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedApiProviderServiceHandler struct{}
 
-func (UnimplementedApiProviderServiceHandler) GetApiProvider(context.Context, *connect.Request[v1.GetApiProviderRequest]) (*connect.Response[v1.ApiProvider], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.ApiProviderService.GetApiProvider is not implemented"))
+func (UnimplementedApiProviderServiceHandler) GetAPIProvider(context.Context, *connect.Request[v1.GetApiProviderRequest]) (*connect.Response[v1.ApiProvider], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.ApiProviderService.GetAPIProvider is not implemented"))
 }
 
-func (UnimplementedApiProviderServiceHandler) ListApiProviders(context.Context, *connect.Request[v1.ListApiProvidersRequest]) (*connect.Response[v1.ListApiProvidersResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.ApiProviderService.ListApiProviders is not implemented"))
+func (UnimplementedApiProviderServiceHandler) ListAPIProviders(context.Context, *connect.Request[v1.ListApiProvidersRequest]) (*connect.Response[v1.ListApiProvidersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.ApiProviderService.ListAPIProviders is not implemented"))
 }
 
-func (UnimplementedApiProviderServiceHandler) CreateApiProvider(context.Context, *connect.Request[v1.CreateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.ApiProviderService.CreateApiProvider is not implemented"))
+func (UnimplementedApiProviderServiceHandler) CreateAPIProvider(context.Context, *connect.Request[v1.CreateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.ApiProviderService.CreateAPIProvider is not implemented"))
 }
 
-func (UnimplementedApiProviderServiceHandler) UpdateApiProvider(context.Context, *connect.Request[v1.UpdateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.ApiProviderService.UpdateApiProvider is not implemented"))
+func (UnimplementedApiProviderServiceHandler) UpdateAPIProvider(context.Context, *connect.Request[v1.UpdateApiProviderRequest]) (*connect.Response[v1.ApiProvider], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.ApiProviderService.UpdateAPIProvider is not implemented"))
 }
 
-func (UnimplementedApiProviderServiceHandler) DeleteApiProvider(context.Context, *connect.Request[v1.DeleteApiProviderRequest]) (*connect.Response[emptypb.Empty], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.ApiProviderService.DeleteApiProvider is not implemented"))
+func (UnimplementedApiProviderServiceHandler) DeleteAPIProvider(context.Context, *connect.Request[v1.DeleteApiProviderRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.ApiProviderService.DeleteAPIProvider is not implemented"))
 }
 
-func (UnimplementedApiProviderServiceHandler) ListApiProviderModels(context.Context, *connect.Request[v1.ListApiProviderModelsRequest]) (*connect.Response[v1.ListApiProviderModelsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.ApiProviderService.ListApiProviderModels is not implemented"))
+func (UnimplementedApiProviderServiceHandler) ListAPIProviderModels(context.Context, *connect.Request[v1.ListApiProviderModelsRequest]) (*connect.Response[v1.ListApiProviderModelsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.ApiProviderService.ListAPIProviderModels is not implemented"))
 }

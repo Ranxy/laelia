@@ -146,7 +146,7 @@ export function SettingsApiProvidersPage() {
     setLoading(true);
     try {
       const [providerRes, userRes, groupRes] = await Promise.all([
-        apiProviderServiceClient.listApiProviders({ pageSize: 1000 }),
+        apiProviderServiceClient.listAPIProviders({ pageSize: 1000 }),
         userServiceClient.listUsers({ pageSize: 1000 }),
         groupServiceClient.listGroups({ pageSize: 1000 }),
       ]);
@@ -188,7 +188,7 @@ export function SettingsApiProvidersPage() {
     }
     setCreating(true);
     try {
-      await apiProviderServiceClient.createApiProvider({
+      await apiProviderServiceClient.createAPIProvider({
         apiProvider: {
           title: createForm.title.trim(),
           providerType: createForm.providerType,
@@ -249,7 +249,7 @@ export function SettingsApiProvidersPage() {
     }
     setSaving(true);
     try {
-      await apiProviderServiceClient.updateApiProvider({
+      await apiProviderServiceClient.updateAPIProvider({
         apiProvider: {
           name: editTarget.name,
           title: editForm.title.trim(),
@@ -290,7 +290,7 @@ export function SettingsApiProvidersPage() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await apiProviderServiceClient.deleteApiProvider({
+      await apiProviderServiceClient.deleteAPIProvider({
         name: deleteTarget.name,
       });
       toastManager.add({
@@ -498,7 +498,7 @@ function ProviderSheet({
     setFetching(true);
     setFetchError("");
     try {
-      const res = await apiProviderServiceClient.listApiProviderModels({
+      const res = await apiProviderServiceClient.listAPIProviderModels({
         providerType: form.providerType,
         apiKey: fetchKey.trim(),
         baseUrl: form.baseUrl.trim(),

@@ -1710,12 +1710,12 @@ without a management permission.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| GetApiProvider | [GetApiProviderRequest](#laelia-v1-GetApiProviderRequest) | [ApiProvider](#laelia-v1-ApiProvider) |  |
-| ListApiProviders | [ListApiProvidersRequest](#laelia-v1-ListApiProvidersRequest) | [ListApiProvidersResponse](#laelia-v1-ListApiProvidersResponse) |  |
-| CreateApiProvider | [CreateApiProviderRequest](#laelia-v1-CreateApiProviderRequest) | [ApiProvider](#laelia-v1-ApiProvider) |  |
-| UpdateApiProvider | [UpdateApiProviderRequest](#laelia-v1-UpdateApiProviderRequest) | [ApiProvider](#laelia-v1-ApiProvider) |  |
-| DeleteApiProvider | [DeleteApiProviderRequest](#laelia-v1-DeleteApiProviderRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
-| ListApiProviderModels | [ListApiProviderModelsRequest](#laelia-v1-ListApiProviderModelsRequest) | [ListApiProviderModelsResponse](#laelia-v1-ListApiProviderModelsResponse) | List the models a provider type exposes. The manager proxies the provider&#39;s model-listing HTTP API (DeepSeek GET /models with the caller&#39;s api_key; OpenRouter GET /models, public). Admin (laelia.apiProviders.update) only. |
+| GetAPIProvider | [GetApiProviderRequest](#laelia-v1-GetApiProviderRequest) | [ApiProvider](#laelia-v1-ApiProvider) |  |
+| ListAPIProviders | [ListApiProvidersRequest](#laelia-v1-ListApiProvidersRequest) | [ListApiProvidersResponse](#laelia-v1-ListApiProvidersResponse) |  |
+| CreateAPIProvider | [CreateApiProviderRequest](#laelia-v1-CreateApiProviderRequest) | [ApiProvider](#laelia-v1-ApiProvider) |  |
+| UpdateAPIProvider | [UpdateApiProviderRequest](#laelia-v1-UpdateApiProviderRequest) | [ApiProvider](#laelia-v1-ApiProvider) |  |
+| DeleteAPIProvider | [DeleteApiProviderRequest](#laelia-v1-DeleteApiProviderRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+| ListAPIProviderModels | [ListApiProviderModelsRequest](#laelia-v1-ListApiProviderModelsRequest) | [ListApiProviderModelsResponse](#laelia-v1-ListApiProviderModelsResponse) | List the models a provider type exposes. The manager proxies the provider&#39;s model-listing HTTP API (DeepSeek GET /models with the caller&#39;s api_key; OpenRouter GET /models, public). Admin (laelia.apiProviders.update) only. |
 
  
 

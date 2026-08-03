@@ -48,6 +48,13 @@ func NewAPIProviderService(s *store.Store, iamManager *iam.Manager) *APIProvider
 	return &APIProviderService{store: s, iam: iamManager}
 }
 
+// Compile-time assertion that the service implements every RPC of the generated
+// connect handler. Without it, a name mismatch (e.g. the revive-mandated `API`
+// casing differing from a proto-derived `Api`) silently falls through to the
+// embedded UnimplementedApiProviderServiceHandler, so every call returns
+// "unimplemented" once auth passes.
+var _ v1connect.ApiProviderServiceHandler = (*APIProviderService)(nil)
+
 // GetAPIProvider returns one provider. Management-only (laelia.apiProviders.get).
 func (s *APIProviderService) GetAPIProvider(ctx context.Context, req *connect.Request[v1pb.GetApiProviderRequest]) (*connect.Response[v1pb.ApiProvider], error) {
 	resourceID, err := common.GetAPIProviderResourceID(req.Msg.Name)

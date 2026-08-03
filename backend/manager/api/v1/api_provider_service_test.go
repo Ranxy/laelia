@@ -121,7 +121,7 @@ func TestValidateAgentACPConfigGlobalProvider(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			err := validateAgentACPConfig(tc.cfg, nil)
 			if tc.wantErr && err == nil {
-				t.Fatalf("expected error, got nil")
+				t.Fatal("expected error, got nil")
 			}
 			if !tc.wantErr && err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -206,8 +206,8 @@ func TestMaskSecretBoundary(t *testing.T) {
 	if short != secretMaskPrefix {
 		t.Fatalf("a key of length <= 4 masks to exactly the sentinel, got %q", short)
 	}
-	real := maskSecret("sk-abcdefgh1234")
-	if !strings.HasSuffix(real, "1234") || !strings.HasPrefix(real, secretMaskPrefix) {
-		t.Fatalf("masked key should retain last 4, got %q", real)
+	masked := maskSecret("sk-abcdefgh1234")
+	if !strings.HasSuffix(masked, "1234") || !strings.HasPrefix(masked, secretMaskPrefix) {
+		t.Fatalf("masked key should retain last 4, got %q", masked)
 	}
 }

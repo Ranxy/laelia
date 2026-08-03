@@ -1171,7 +1171,7 @@ paths:
         get:
             tags:
                 - ApiProviderService
-            operationId: ApiProviderService_ListApiProviders
+            operationId: ApiProviderService_ListAPIProviders
             parameters:
                 - name: pageSize
                   in: query
@@ -1198,7 +1198,7 @@ paths:
         post:
             tags:
                 - ApiProviderService
-            operationId: ApiProviderService_CreateApiProvider
+            operationId: ApiProviderService_CreateAPIProvider
             requestBody:
                 content:
                     application/json:
@@ -1222,7 +1222,7 @@ paths:
         get:
             tags:
                 - ApiProviderService
-            operationId: ApiProviderService_GetApiProvider
+            operationId: ApiProviderService_GetAPIProvider
             parameters:
                 - name: apiProvider
                   in: path
@@ -1246,7 +1246,7 @@ paths:
         delete:
             tags:
                 - ApiProviderService
-            operationId: ApiProviderService_DeleteApiProvider
+            operationId: ApiProviderService_DeleteAPIProvider
             parameters:
                 - name: apiProvider
                   in: path
@@ -1267,7 +1267,7 @@ paths:
         patch:
             tags:
                 - ApiProviderService
-            operationId: ApiProviderService_UpdateApiProvider
+            operationId: ApiProviderService_UpdateAPIProvider
             parameters:
                 - name: apiProvider
                   in: path
@@ -1307,7 +1307,7 @@ paths:
                 List the models a provider type exposes. The manager proxies the provider's
                  model-listing HTTP API (DeepSeek GET /models with the caller's api_key;
                  OpenRouter GET /models, public). Admin (laelia.apiProviders.update) only.
-            operationId: ApiProviderService_ListApiProviderModels
+            operationId: ApiProviderService_ListAPIProviderModels
             requestBody:
                 content:
                     application/json:

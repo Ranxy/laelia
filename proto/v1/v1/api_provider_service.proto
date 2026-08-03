@@ -146,19 +146,19 @@ message ApiProviderChange {
 // providers the caller may use, so the agent create/edit form can list them
 // without a management permission.
 service ApiProviderService {
-  rpc GetApiProvider(GetApiProviderRequest) returns (ApiProvider) {
+  rpc GetAPIProvider(GetApiProviderRequest) returns (ApiProvider) {
     option (google.api.http) = {get: "/v1/{name=apiProviders/*}"};
     option (google.api.method_signature) = "name";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.apiProviders.get";
   }
 
-  rpc ListApiProviders(ListApiProvidersRequest) returns (ListApiProvidersResponse) {
+  rpc ListAPIProviders(ListApiProvidersRequest) returns (ListApiProvidersResponse) {
     option (google.api.http) = {get: "/v1/apiProviders"};
     option (laelia.v1.auth_method) = IAM;
   }
 
-  rpc CreateApiProvider(CreateApiProviderRequest) returns (ApiProvider) {
+  rpc CreateAPIProvider(CreateApiProviderRequest) returns (ApiProvider) {
     option (google.api.http) = {
       post: "/v1/apiProviders"
       body: "api_provider"
@@ -169,7 +169,7 @@ service ApiProviderService {
     option (laelia.v1.audit) = true;
   }
 
-  rpc UpdateApiProvider(UpdateApiProviderRequest) returns (ApiProvider) {
+  rpc UpdateAPIProvider(UpdateApiProviderRequest) returns (ApiProvider) {
     option (google.api.http) = {
       patch: "/v1/{api_provider.name=apiProviders/*}"
       body: "api_provider"
@@ -180,7 +180,7 @@ service ApiProviderService {
     option (laelia.v1.audit) = true;
   }
 
-  rpc DeleteApiProvider(DeleteApiProviderRequest) returns (google.protobuf.Empty) {
+  rpc DeleteAPIProvider(DeleteApiProviderRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/v1/{name=apiProviders/*}"};
     option (google.api.method_signature) = "name";
     option (laelia.v1.auth_method) = IAM;
@@ -191,7 +191,7 @@ service ApiProviderService {
   // List the models a provider type exposes. The manager proxies the provider's
   // model-listing HTTP API (DeepSeek GET /models with the caller's api_key;
   // OpenRouter GET /models, public). Admin (laelia.apiProviders.update) only.
-  rpc ListApiProviderModels(ListApiProviderModelsRequest) returns (ListApiProviderModelsResponse) {
+  rpc ListAPIProviderModels(ListApiProviderModelsRequest) returns (ListApiProviderModelsResponse) {
     option (google.api.http) = {
       post: "/v1/apiProviders:listModels"
       body: "*"

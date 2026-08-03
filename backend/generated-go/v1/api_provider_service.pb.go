@@ -768,12 +768,12 @@ const file_v1_api_provider_service_proto_rawDesc = "" +
 	"\rentries_added\x18\x02 \x03(\tR\fentriesAdded\x12'\n" +
 	"\x0fentries_removed\x18\x03 \x03(\tR\x0eentriesRemoved2\x81\b\n" +
 	"\x12ApiProviderService\x12\x93\x01\n" +
-	"\x0eGetApiProvider\x12 .laelia.v1.GetApiProviderRequest\x1a\x16.laelia.v1.ApiProvider\"G\xdaA\x04name\x8a\xea0\x17laelia.apiProviders.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1b\x12\x19/v1/{name=apiProviders/*}\x12y\n" +
-	"\x10ListApiProviders\x12\".laelia.v1.ListApiProvidersRequest\x1a#.laelia.v1.ListApiProvidersResponse\"\x1c\x90\xea0\x01\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/apiProviders\x12\xad\x01\n" +
-	"\x11CreateApiProvider\x12#.laelia.v1.CreateApiProviderRequest\x1a\x16.laelia.v1.ApiProvider\"[\xdaA\fapi_provider\x8a\xea0\x1alaelia.apiProviders.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02 :\fapi_provider\"\x10/v1/apiProviders\x12\xcf\x01\n" +
-	"\x11UpdateApiProvider\x12#.laelia.v1.UpdateApiProviderRequest\x1a\x16.laelia.v1.ApiProvider\"}\xdaA\x18api_provider,update_mask\x8a\xea0\x1alaelia.apiProviders.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x026:\fapi_provider2&/v1/{api_provider.name=apiProviders/*}\x12\xa0\x01\n" +
-	"\x11DeleteApiProvider\x12#.laelia.v1.DeleteApiProviderRequest\x1a\x16.google.protobuf.Empty\"N\xdaA\x04name\x8a\xea0\x1alaelia.apiProviders.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1b*\x19/v1/{name=apiProviders/*}\x12\xb4\x01\n" +
-	"\x15ListApiProviderModels\x12'.laelia.v1.ListApiProviderModelsRequest\x1a(.laelia.v1.ListApiProviderModelsResponse\"H\x8a\xea0\x1alaelia.apiProviders.update\x90\xea0\x01\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/v1/apiProviders:listModelsB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"\x0eGetAPIProvider\x12 .laelia.v1.GetApiProviderRequest\x1a\x16.laelia.v1.ApiProvider\"G\xdaA\x04name\x8a\xea0\x17laelia.apiProviders.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1b\x12\x19/v1/{name=apiProviders/*}\x12y\n" +
+	"\x10ListAPIProviders\x12\".laelia.v1.ListApiProvidersRequest\x1a#.laelia.v1.ListApiProvidersResponse\"\x1c\x90\xea0\x01\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/apiProviders\x12\xad\x01\n" +
+	"\x11CreateAPIProvider\x12#.laelia.v1.CreateApiProviderRequest\x1a\x16.laelia.v1.ApiProvider\"[\xdaA\fapi_provider\x8a\xea0\x1alaelia.apiProviders.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02 :\fapi_provider\"\x10/v1/apiProviders\x12\xcf\x01\n" +
+	"\x11UpdateAPIProvider\x12#.laelia.v1.UpdateApiProviderRequest\x1a\x16.laelia.v1.ApiProvider\"}\xdaA\x18api_provider,update_mask\x8a\xea0\x1alaelia.apiProviders.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x026:\fapi_provider2&/v1/{api_provider.name=apiProviders/*}\x12\xa0\x01\n" +
+	"\x11DeleteAPIProvider\x12#.laelia.v1.DeleteApiProviderRequest\x1a\x16.google.protobuf.Empty\"N\xdaA\x04name\x8a\xea0\x1alaelia.apiProviders.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1b*\x19/v1/{name=apiProviders/*}\x12\xb4\x01\n" +
+	"\x15ListAPIProviderModels\x12'.laelia.v1.ListApiProviderModelsRequest\x1a(.laelia.v1.ListApiProviderModelsResponse\"H\x8a\xea0\x1alaelia.apiProviders.update\x90\xea0\x01\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/v1/apiProviders:listModelsB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_api_provider_service_proto_rawDescOnce sync.Once
@@ -814,18 +814,18 @@ var file_v1_api_provider_service_proto_depIdxs = []int32{
 	0,  // 5: laelia.v1.UpdateApiProviderRequest.api_provider:type_name -> laelia.v1.ApiProvider
 	12, // 6: laelia.v1.UpdateApiProviderRequest.update_mask:type_name -> google.protobuf.FieldMask
 	13, // 7: laelia.v1.ListApiProviderModelsResponse.models:type_name -> laelia.v1.PiModel
-	2,  // 8: laelia.v1.ApiProviderService.GetApiProvider:input_type -> laelia.v1.GetApiProviderRequest
-	3,  // 9: laelia.v1.ApiProviderService.ListApiProviders:input_type -> laelia.v1.ListApiProvidersRequest
-	5,  // 10: laelia.v1.ApiProviderService.CreateApiProvider:input_type -> laelia.v1.CreateApiProviderRequest
-	6,  // 11: laelia.v1.ApiProviderService.UpdateApiProvider:input_type -> laelia.v1.UpdateApiProviderRequest
-	7,  // 12: laelia.v1.ApiProviderService.DeleteApiProvider:input_type -> laelia.v1.DeleteApiProviderRequest
-	8,  // 13: laelia.v1.ApiProviderService.ListApiProviderModels:input_type -> laelia.v1.ListApiProviderModelsRequest
-	0,  // 14: laelia.v1.ApiProviderService.GetApiProvider:output_type -> laelia.v1.ApiProvider
-	4,  // 15: laelia.v1.ApiProviderService.ListApiProviders:output_type -> laelia.v1.ListApiProvidersResponse
-	0,  // 16: laelia.v1.ApiProviderService.CreateApiProvider:output_type -> laelia.v1.ApiProvider
-	0,  // 17: laelia.v1.ApiProviderService.UpdateApiProvider:output_type -> laelia.v1.ApiProvider
-	14, // 18: laelia.v1.ApiProviderService.DeleteApiProvider:output_type -> google.protobuf.Empty
-	9,  // 19: laelia.v1.ApiProviderService.ListApiProviderModels:output_type -> laelia.v1.ListApiProviderModelsResponse
+	2,  // 8: laelia.v1.ApiProviderService.GetAPIProvider:input_type -> laelia.v1.GetApiProviderRequest
+	3,  // 9: laelia.v1.ApiProviderService.ListAPIProviders:input_type -> laelia.v1.ListApiProvidersRequest
+	5,  // 10: laelia.v1.ApiProviderService.CreateAPIProvider:input_type -> laelia.v1.CreateApiProviderRequest
+	6,  // 11: laelia.v1.ApiProviderService.UpdateAPIProvider:input_type -> laelia.v1.UpdateApiProviderRequest
+	7,  // 12: laelia.v1.ApiProviderService.DeleteAPIProvider:input_type -> laelia.v1.DeleteApiProviderRequest
+	8,  // 13: laelia.v1.ApiProviderService.ListAPIProviderModels:input_type -> laelia.v1.ListApiProviderModelsRequest
+	0,  // 14: laelia.v1.ApiProviderService.GetAPIProvider:output_type -> laelia.v1.ApiProvider
+	4,  // 15: laelia.v1.ApiProviderService.ListAPIProviders:output_type -> laelia.v1.ListApiProvidersResponse
+	0,  // 16: laelia.v1.ApiProviderService.CreateAPIProvider:output_type -> laelia.v1.ApiProvider
+	0,  // 17: laelia.v1.ApiProviderService.UpdateAPIProvider:output_type -> laelia.v1.ApiProvider
+	14, // 18: laelia.v1.ApiProviderService.DeleteAPIProvider:output_type -> google.protobuf.Empty
+	9,  // 19: laelia.v1.ApiProviderService.ListAPIProviderModels:output_type -> laelia.v1.ListApiProviderModelsResponse
 	14, // [14:20] is the sub-list for method output_type
 	8,  // [8:14] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name

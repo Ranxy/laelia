@@ -357,41 +357,41 @@ export declare const ApiProviderChangeSchema: GenMessage<ApiProviderChange>;
  */
 export declare const ApiProviderService: GenService<{
   /**
-   * @generated from rpc laelia.v1.ApiProviderService.GetApiProvider
+   * @generated from rpc laelia.v1.ApiProviderService.GetAPIProvider
    */
-  getApiProvider: {
+  getAPIProvider: {
     methodKind: "unary";
     input: typeof GetApiProviderRequestSchema;
     output: typeof ApiProviderSchema;
   },
   /**
-   * @generated from rpc laelia.v1.ApiProviderService.ListApiProviders
+   * @generated from rpc laelia.v1.ApiProviderService.ListAPIProviders
    */
-  listApiProviders: {
+  listAPIProviders: {
     methodKind: "unary";
     input: typeof ListApiProvidersRequestSchema;
     output: typeof ListApiProvidersResponseSchema;
   },
   /**
-   * @generated from rpc laelia.v1.ApiProviderService.CreateApiProvider
+   * @generated from rpc laelia.v1.ApiProviderService.CreateAPIProvider
    */
-  createApiProvider: {
+  createAPIProvider: {
     methodKind: "unary";
     input: typeof CreateApiProviderRequestSchema;
     output: typeof ApiProviderSchema;
   },
   /**
-   * @generated from rpc laelia.v1.ApiProviderService.UpdateApiProvider
+   * @generated from rpc laelia.v1.ApiProviderService.UpdateAPIProvider
    */
-  updateApiProvider: {
+  updateAPIProvider: {
     methodKind: "unary";
     input: typeof UpdateApiProviderRequestSchema;
     output: typeof ApiProviderSchema;
   },
   /**
-   * @generated from rpc laelia.v1.ApiProviderService.DeleteApiProvider
+   * @generated from rpc laelia.v1.ApiProviderService.DeleteAPIProvider
    */
-  deleteApiProvider: {
+  deleteAPIProvider: {
     methodKind: "unary";
     input: typeof DeleteApiProviderRequestSchema;
     output: typeof EmptySchema;
@@ -401,9 +401,9 @@ export declare const ApiProviderService: GenService<{
    * model-listing HTTP API (DeepSeek GET /models with the caller's api_key;
    * OpenRouter GET /models, public). Admin (laelia.apiProviders.update) only.
    *
-   * @generated from rpc laelia.v1.ApiProviderService.ListApiProviderModels
+   * @generated from rpc laelia.v1.ApiProviderService.ListAPIProviderModels
    */
-  listApiProviderModels: {
+  listAPIProviderModels: {
     methodKind: "unary";
     input: typeof ListApiProviderModelsRequestSchema;
     output: typeof ListApiProviderModelsResponseSchema;
