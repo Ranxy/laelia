@@ -14,6 +14,7 @@ export const MACHINE_ROUTE_LIST = "machine.list";
 export const MACHINE_ROUTE_PROFILE = "machine.profile";
 export const MEMBERS_ROUTE = "members";
 export const SETTINGS_ROUTE = "settings";
+export const SETTINGS_ROUTE_AGENTS = "settings.agents";
 export const SETTINGS_ROUTE_PROFILE = "settings.profile";
 export const SETTINGS_ROUTE_STORAGE = "settings.storage";
 export const SETTINGS_ROUTE_CHAT = "settings.chat";

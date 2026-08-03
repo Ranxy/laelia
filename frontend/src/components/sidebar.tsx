@@ -23,6 +23,7 @@ import {
   MACHINE_ROUTE_LIST,
   MEMBERS_ROUTE,
   SETTINGS_ROUTE,
+  SETTINGS_ROUTE_AGENTS,
   SETTINGS_ROUTE_API_PROVIDERS,
   SETTINGS_ROUTE_AUDIT,
   SETTINGS_ROUTE_CHAT,
@@ -141,6 +142,12 @@ function useSidebarItems(): SidebarItem[] {
           {
             title: t("sidebar.settings-storage"),
             name: SETTINGS_ROUTE_STORAGE,
+            type: "route",
+            hide: !canViewStorage,
+          },
+          {
+            title: t("sidebar.settings-agents"),
+            name: SETTINGS_ROUTE_AGENTS,
             type: "route",
             hide: !canViewStorage,
           },

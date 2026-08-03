@@ -142,6 +142,13 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 				return nil, err
 			}
 		}
+		// Legacy inline api_provider/api_key is gated by the workspace toggle (or
+		// agents.edit). When the toggle is off, only admins may self-provide a key.
+		if reqACP.GetGlobalProvider() == "" && reqACP.Provider == pi.BuiltinPiProvider {
+			if !s.canUseInlineAPIKeyAtCreate(ctx, user) {
+				return nil, connect.NewError(connect.CodePermissionDenied, errors.New("self-provided api keys are disabled; use a global provider"))
+			}
+		}
 		storedAcpConfig = convertToStoreAgentACPConfig(reqACP)
 		// Inherit the default allow_env set when the caller left it empty so the
 		// child process still receives the baseline passthrough env.
@@ -260,12 +267,14 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 	out := s.convertToAgent(ctx, agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
 	caller, _ := GetUserFromContext(ctx)
 	out.CanEdit = s.canEditAgent(ctx, caller, agent)
-	// The builtin-pi api_key is a plaintext secret. Only a caller holding
-	// agents.edit (workspace admin today) may see it — not every editor: an
-	// owner without agents.edit can edit the agent but must not see the key.
-	// Global-provider agents never carry an inline key anyway.
-	if out.GetInfo().GetAcpConfig().GetProvider() == pi.BuiltinPiProvider && out.Info.AcpConfig != nil {
-		if !s.canManageAgentKey(ctx, caller, agent) {
+	// The builtin-pi api_key is a plaintext secret. Admins see the full key;
+	// the owner sees a masked preview when the workspace toggle enables
+	// self-provided keys; everyone else sees nothing. Global-provider agents
+	// never carry an inline key.
+	if out.GetInfo().GetAcpConfig().GetProvider() == pi.BuiltinPiProvider && out.Info.AcpConfig != nil && out.Info.AcpConfig.ApiKey != "" {
+		if view, masked := s.canViewInlineKey(ctx, caller, agent); view && masked {
+			out.Info.AcpConfig.ApiKey = maskKeyPreview(out.Info.AcpConfig.ApiKey)
+		} else if !view {
 			out.Info.AcpConfig.ApiKey = ""
 		}
 	}
@@ -1532,22 +1541,27 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a workspace admin can modify this agent"))
 	}
 
-	// Legacy inline api_provider/api_key is admin-only: only a caller holding
-	// agents.edit may set it. An owner without it must use a global provider.
+	// Legacy inline api_provider/api_key is gated by the workspace toggle: a
+	// caller holding agents.edit may always set it; otherwise the toggle must be
+	// on (the agent's owner may then self-configure their own key).
 	reqACP := req.Msg.AcpConfig
 	if reqACP != nil && reqACP.Provider == pi.BuiltinPiProvider && reqACP.GlobalProvider == "" && reqACP.GlobalProviderEntry == "" {
-		if !s.canManageAgentKey(ctx, user, agent) {
-			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only a workspace admin may set an inline api key; use a global provider"))
+		if !s.canUseInlineAPIKey(ctx, user, agent) {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("self-provided api keys are disabled; use a global provider"))
 		}
 	}
 
 	// builtin-pi api_key is a secret: the config form does not echo it back on
 	// save (the password field is left empty to avoid retransmitting it). An
-	// empty api_key here means "keep the existing key", so copy it from the
-	// stored config before validation so the required-field check passes.
-	if reqACP != nil && reqACP.Provider == pi.BuiltinPiProvider && strings.TrimSpace(reqACP.ApiKey) == "" {
-		if existing := agent.Info.GetAcpConfig(); existing != nil {
-			reqACP.ApiKey = existing.ApiKey
+	// empty api_key — or a "****"-prefixed masked preview echoed back — means
+	// "keep the existing key", so copy it from the stored config before
+	// validation so the required-field check passes.
+	if reqACP != nil && reqACP.Provider == pi.BuiltinPiProvider {
+		key := strings.TrimSpace(reqACP.ApiKey)
+		if key == "" || strings.HasPrefix(key, secretMaskPrefix) {
+			if existing := agent.Info.GetAcpConfig(); existing != nil {
+				reqACP.ApiKey = existing.ApiKey
+			}
 		}
 	}
 

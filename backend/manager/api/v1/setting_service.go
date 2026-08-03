@@ -71,6 +71,30 @@ func (s *SettingService) UpdateS3Config(ctx context.Context, req *connect.Reques
 	return connect.NewResponse(&v1pb.UpdateS3ConfigResponse{Config: in}), nil
 }
 
+// GetLlmAgentConfig reads the workspace LLM agent configuration. It is
+// handler-gated (no permission annotation): the agent create/edit forms read
+// the toggle for any authenticated user.
+func (s *SettingService) GetLlmAgentConfig(ctx context.Context, _ *connect.Request[v1pb.GetLlmAgentConfigRequest]) (*connect.Response[v1pb.GetLlmAgentConfigResponse], error) {
+	cfg, err := s.store.GetLlmAgentConfigSetting(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get llm agent config"))
+	}
+	return connect.NewResponse(&v1pb.GetLlmAgentConfigResponse{Config: cfg}), nil
+}
+
+// UpdateLlmAgentConfig updates the workspace LLM agent configuration. Gated by
+// the IAM interceptor on laelia.settings.update (admin).
+func (s *SettingService) UpdateLlmAgentConfig(ctx context.Context, req *connect.Request[v1pb.UpdateLlmAgentConfigRequest]) (*connect.Response[v1pb.UpdateLlmAgentConfigResponse], error) {
+	in := req.Msg.GetConfig()
+	if in == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("config is required"))
+	}
+	if _, err := s.store.UpsertLlmAgentConfigSetting(ctx, in); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update llm agent config"))
+	}
+	return connect.NewResponse(&v1pb.UpdateLlmAgentConfigResponse{Config: in}), nil
+}
+
 // setupCheck reports whether one required-config item is fully configured.
 type setupCheck func(ctx context.Context) (bool, error)
 

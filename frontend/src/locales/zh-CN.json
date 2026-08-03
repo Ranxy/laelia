@@ -73,7 +73,8 @@
     "settings-audit": "审计日志",
     "settings-notifications": "通知",
     "settings-chat": "聊天",
-    "settings-api-providers": "API 提供方"
+    "settings-api-providers": "API 提供方",
+    "settings-agents": "Agents / LLM"
   },
   "settings": {
     "title": "设置",
@@ -339,6 +340,14 @@
       "delete-failed": "删除提供方失败",
       "delete-confirm-title": "删除提供方",
       "delete-confirm-description": "删除提供方 \"{{title}}\"? 仍被 agent 使用的提供方无法删除。"
+    },
+    "agents": {
+      "title": "Agents / LLM",
+      "description": "工作区级 agent 与 LLM 配置。",
+      "self-provided-keys": "允许用户自行提供 API 密钥",
+      "self-provided-keys-hint": "开启后,用户在创建或编辑内置 pi agent 时可自行填写 API 提供方、密钥与模型(与托管的全局提供方并存);关闭后仅可使用托管的全局提供方。",
+      "saved": "配置已保存",
+      "save-failed": "保存配置失败"
     }
   },
   "setup": {
@@ -560,7 +569,10 @@
     "acp-config-pi-global-providers-empty": "没有可用的 API 提供方",
     "acp-config-pi-global-entry": "密钥 / 模型条目",
     "acp-config-pi-global-entry-hint": "选择该 agent 使用的 (密钥, 模型) 条目。密钥由提供方统一管理,此处不显示。",
-    "acp-config-pi-global-entries-empty": "该提供方还没有条目。"
+    "acp-config-pi-global-entries-empty": "该提供方还没有条目。",
+    "acp-config-pi-mode": "API 密钥来源",
+    "acp-config-pi-mode-managed": "托管的提供方",
+    "acp-config-pi-mode-self": "自己的 API 密钥"
   },
   "machine": {
     "title": "机器",

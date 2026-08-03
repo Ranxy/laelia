@@ -396,6 +396,8 @@
 - [v1/setting.proto](#v1_setting-proto)
     - [GetDebugConfigRequest](#laelia-v1-GetDebugConfigRequest)
     - [GetDebugConfigResponse](#laelia-v1-GetDebugConfigResponse)
+    - [GetLlmAgentConfigRequest](#laelia-v1-GetLlmAgentConfigRequest)
+    - [GetLlmAgentConfigResponse](#laelia-v1-GetLlmAgentConfigResponse)
     - [GetS3ConfigRequest](#laelia-v1-GetS3ConfigRequest)
     - [GetS3ConfigResponse](#laelia-v1-GetS3ConfigResponse)
     - [GetSetupStatusRequest](#laelia-v1-GetSetupStatusRequest)
@@ -403,6 +405,8 @@
     - [SetupItem](#laelia-v1-SetupItem)
     - [UpdateDebugConfigRequest](#laelia-v1-UpdateDebugConfigRequest)
     - [UpdateDebugConfigResponse](#laelia-v1-UpdateDebugConfigResponse)
+    - [UpdateLlmAgentConfigRequest](#laelia-v1-UpdateLlmAgentConfigRequest)
+    - [UpdateLlmAgentConfigResponse](#laelia-v1-UpdateLlmAgentConfigResponse)
     - [UpdateS3ConfigRequest](#laelia-v1-UpdateS3ConfigRequest)
     - [UpdateS3ConfigResponse](#laelia-v1-UpdateS3ConfigResponse)
   
@@ -6592,6 +6596,31 @@ laelia.roles.* permissions.
 
 
 
+<a name="laelia-v1-GetLlmAgentConfigRequest"></a>
+
+### GetLlmAgentConfigRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-GetLlmAgentConfigResponse"></a>
+
+### GetLlmAgentConfigResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| config | [laelia.store.LlmAgentConfigSetting](#laelia-store-LlmAgentConfigSetting) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-GetS3ConfigRequest"></a>
 
 ### GetS3ConfigRequest
@@ -6690,6 +6719,36 @@ owns presentation (title/description/route) keyed by `id`.
 
 
 
+<a name="laelia-v1-UpdateLlmAgentConfigRequest"></a>
+
+### UpdateLlmAgentConfigRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| config | [laelia.store.LlmAgentConfigSetting](#laelia-store-LlmAgentConfigSetting) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateLlmAgentConfigResponse"></a>
+
+### UpdateLlmAgentConfigResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| config | [laelia.store.LlmAgentConfigSetting](#laelia-store-LlmAgentConfigSetting) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-UpdateS3ConfigRequest"></a>
 
 ### UpdateS3ConfigRequest
@@ -6738,6 +6797,8 @@ an update carrying a masked secret preserves the stored value.
 | ----------- | ------------ | ------------- | ------------|
 | GetS3Config | [GetS3ConfigRequest](#laelia-v1-GetS3ConfigRequest) | [GetS3ConfigResponse](#laelia-v1-GetS3ConfigResponse) |  |
 | UpdateS3Config | [UpdateS3ConfigRequest](#laelia-v1-UpdateS3ConfigRequest) | [UpdateS3ConfigResponse](#laelia-v1-UpdateS3ConfigResponse) |  |
+| GetLlmAgentConfig | [GetLlmAgentConfigRequest](#laelia-v1-GetLlmAgentConfigRequest) | [GetLlmAgentConfigResponse](#laelia-v1-GetLlmAgentConfigResponse) | GetLlmAgentConfig reads the workspace LLM agent configuration. It is handler-gated (no permission annotation) so the agent create/edit forms — which members use — can read the toggle without a settings permission. |
+| UpdateLlmAgentConfig | [UpdateLlmAgentConfigRequest](#laelia-v1-UpdateLlmAgentConfigRequest) | [UpdateLlmAgentConfigResponse](#laelia-v1-UpdateLlmAgentConfigResponse) | UpdateLlmAgentConfig updates the workspace LLM agent configuration. Admin (laelia.settings.update) only. |
 | GetSetupStatus | [GetSetupStatusRequest](#laelia-v1-GetSetupStatusRequest) | [GetSetupStatusResponse](#laelia-v1-GetSetupStatusResponse) | GetSetupStatus reports which required-config items are not yet configured, so the frontend can guide an admin to finish setting up the workspace. |
 | GetDebugConfig | [GetDebugConfigRequest](#laelia-v1-GetDebugConfigRequest) | [GetDebugConfigResponse](#laelia-v1-GetDebugConfigResponse) |  |
 | UpdateDebugConfig | [UpdateDebugConfigRequest](#laelia-v1-UpdateDebugConfigRequest) | [UpdateDebugConfigResponse](#laelia-v1-UpdateDebugConfigResponse) |  |

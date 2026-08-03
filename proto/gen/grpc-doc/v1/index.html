@@ -1710,6 +1710,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.GetLlmAgentConfigRequest"><span class="badge">M</span>GetLlmAgentConfigRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetLlmAgentConfigResponse"><span class="badge">M</span>GetLlmAgentConfigResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.GetS3ConfigRequest"><span class="badge">M</span>GetS3ConfigRequest</a>
                 </li>
               
@@ -1735,6 +1743,14 @@
               
                 <li>
                   <a href="#laelia.v1.UpdateDebugConfigResponse"><span class="badge">M</span>UpdateDebugConfigResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateLlmAgentConfigRequest"><span class="badge">M</span>UpdateLlmAgentConfigRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateLlmAgentConfigResponse"><span class="badge">M</span>UpdateLlmAgentConfigResponse</a>
                 </li>
               
                 <li>
@@ -17132,6 +17148,37 @@ string from the permission catalog. </p></td>
 
         
       
+        <h3 id="laelia.v1.GetLlmAgentConfigRequest">GetLlmAgentConfigRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.GetLlmAgentConfigResponse">GetLlmAgentConfigResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>config</td>
+                  <td><a href="#laelia.store.LlmAgentConfigSetting">laelia.store.LlmAgentConfigSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.GetS3ConfigRequest">GetS3ConfigRequest</h3>
         <p></p>
 
@@ -17273,6 +17320,54 @@ string from the permission catalog. </p></td>
 
         
       
+        <h3 id="laelia.v1.UpdateLlmAgentConfigRequest">UpdateLlmAgentConfigRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>config</td>
+                  <td><a href="#laelia.store.LlmAgentConfigSetting">laelia.store.LlmAgentConfigSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateLlmAgentConfigResponse">UpdateLlmAgentConfigResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>config</td>
+                  <td><a href="#laelia.store.LlmAgentConfigSetting">laelia.store.LlmAgentConfigSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.UpdateS3ConfigRequest">UpdateS3ConfigRequest</h3>
         <p></p>
 
@@ -17350,6 +17445,23 @@ string from the permission catalog. </p></td>
               </tr>
             
               <tr>
+                <td>GetLlmAgentConfig</td>
+                <td><a href="#laelia.v1.GetLlmAgentConfigRequest">GetLlmAgentConfigRequest</a></td>
+                <td><a href="#laelia.v1.GetLlmAgentConfigResponse">GetLlmAgentConfigResponse</a></td>
+                <td><p>GetLlmAgentConfig reads the workspace LLM agent configuration. It is
+handler-gated (no permission annotation) so the agent create/edit forms —
+which members use — can read the toggle without a settings permission.</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateLlmAgentConfig</td>
+                <td><a href="#laelia.v1.UpdateLlmAgentConfigRequest">UpdateLlmAgentConfigRequest</a></td>
+                <td><a href="#laelia.v1.UpdateLlmAgentConfigResponse">UpdateLlmAgentConfigResponse</a></td>
+                <td><p>UpdateLlmAgentConfig updates the workspace LLM agent configuration.
+Admin (laelia.settings.update) only.</p></td>
+              </tr>
+            
+              <tr>
                 <td>GetSetupStatus</td>
                 <td><a href="#laelia.v1.GetSetupStatusRequest">GetSetupStatusRequest</a></td>
                 <td><a href="#laelia.v1.GetSetupStatusResponse">GetSetupStatusResponse</a></td>
@@ -17405,6 +17517,26 @@ so the frontend can guide an admin to finish setting up the workspace.</p></td>
                 <td>UpdateS3Config</td>
                 <td>PATCH</td>
                 <td>/v1/s3Config</td>
+                <td>config</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetLlmAgentConfig</td>
+                <td>GET</td>
+                <td>/v1/llmAgentConfig</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateLlmAgentConfig</td>
+                <td>PATCH</td>
+                <td>/v1/llmAgentConfig</td>
                 <td>config</td>
               </tr>
               

@@ -78,3 +78,30 @@ export declare type S3ConfigSetting = Message<"laelia.store.S3ConfigSetting"> & 
  */
 export declare const S3ConfigSettingSchema: GenMessage<S3ConfigSetting>;
 
+/**
+ * LlmAgentConfigSetting is the workspace-level LLM agent configuration. The
+ * only knob today is whether users may self-provide an inline api_provider /
+ * api_key / model when creating or editing a builtin-pi agent, in addition to
+ * using the managed global API providers. Defaults to enabled when unset.
+ *
+ * @generated from message laelia.store.LlmAgentConfigSetting
+ */
+export declare type LlmAgentConfigSetting = Message<"laelia.store.LlmAgentConfigSetting"> & {
+  /**
+   * allow_user_self_provided_keys gates the legacy inline api_provider/api_key
+   * path on builtin-pi agents. When true, any user who may create/edit the
+   * agent can fill in their own LLM API key; when false, only a caller holding
+   * agents.edit (workspace admin) may, and everyone else must use a global
+   * provider. Default true.
+   *
+   * @generated from field: bool allow_user_self_provided_keys = 1;
+   */
+  allowUserSelfProvidedKeys: boolean;
+};
+
+/**
+ * Describes the message laelia.store.LlmAgentConfigSetting.
+ * Use `create(LlmAgentConfigSettingSchema)` to create a new message.
+ */
+export declare const LlmAgentConfigSettingSchema: GenMessage<LlmAgentConfigSetting>;
+

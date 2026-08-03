@@ -73,7 +73,8 @@
     "settings-audit": "Audit logs",
     "settings-notifications": "Notifications",
     "settings-chat": "Chat",
-    "settings-api-providers": "API Providers"
+    "settings-api-providers": "API Providers",
+    "settings-agents": "Agents / LLM"
   },
   "settings": {
     "title": "Settings",
@@ -339,6 +340,14 @@
       "delete-failed": "Failed to delete provider",
       "delete-confirm-title": "Delete provider",
       "delete-confirm-description": "Delete the provider \"{{title}}\"? Providers still used by agents cannot be deleted."
+    },
+    "agents": {
+      "title": "Agents / LLM",
+      "description": "Workspace-wide agent and LLM configuration.",
+      "self-provided-keys": "Allow users to self-provide API keys",
+      "self-provided-keys-hint": "When enabled, users may enter their own API provider, key and model when creating or editing a built-in pi agent, in addition to the managed global providers. When disabled, only managed global providers are available.",
+      "saved": "Configuration saved",
+      "save-failed": "Failed to save configuration"
     }
   },
   "setup": {
@@ -560,7 +569,10 @@
     "acp-config-pi-global-providers-empty": "No API providers available",
     "acp-config-pi-global-entry": "Key / model entry",
     "acp-config-pi-global-entry-hint": "Select the (key, model) entry this agent uses. The key is managed by the provider and never shown here.",
-    "acp-config-pi-global-entries-empty": "This provider has no entries yet."
+    "acp-config-pi-global-entries-empty": "This provider has no entries yet.",
+    "acp-config-pi-mode": "API key source",
+    "acp-config-pi-mode-managed": "Managed provider",
+    "acp-config-pi-mode-self": "My own API key"
   },
   "machine": {
     "title": "Machines",

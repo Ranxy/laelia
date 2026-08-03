@@ -4,7 +4,7 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { S3ConfigSetting } from "../store/setting_pb";
+import type { LlmAgentConfigSetting, S3ConfigSetting } from "../store/setting_pb";
 
 /**
  * Describes the file v1/setting.proto.
@@ -70,6 +70,66 @@ export declare type UpdateS3ConfigResponse = Message<"laelia.v1.UpdateS3ConfigRe
  * Use `create(UpdateS3ConfigResponseSchema)` to create a new message.
  */
 export declare const UpdateS3ConfigResponseSchema: GenMessage<UpdateS3ConfigResponse>;
+
+/**
+ * @generated from message laelia.v1.GetLlmAgentConfigRequest
+ */
+export declare type GetLlmAgentConfigRequest = Message<"laelia.v1.GetLlmAgentConfigRequest"> & {
+};
+
+/**
+ * Describes the message laelia.v1.GetLlmAgentConfigRequest.
+ * Use `create(GetLlmAgentConfigRequestSchema)` to create a new message.
+ */
+export declare const GetLlmAgentConfigRequestSchema: GenMessage<GetLlmAgentConfigRequest>;
+
+/**
+ * @generated from message laelia.v1.GetLlmAgentConfigResponse
+ */
+export declare type GetLlmAgentConfigResponse = Message<"laelia.v1.GetLlmAgentConfigResponse"> & {
+  /**
+   * @generated from field: laelia.store.LlmAgentConfigSetting config = 1;
+   */
+  config?: LlmAgentConfigSetting | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.GetLlmAgentConfigResponse.
+ * Use `create(GetLlmAgentConfigResponseSchema)` to create a new message.
+ */
+export declare const GetLlmAgentConfigResponseSchema: GenMessage<GetLlmAgentConfigResponse>;
+
+/**
+ * @generated from message laelia.v1.UpdateLlmAgentConfigRequest
+ */
+export declare type UpdateLlmAgentConfigRequest = Message<"laelia.v1.UpdateLlmAgentConfigRequest"> & {
+  /**
+   * @generated from field: laelia.store.LlmAgentConfigSetting config = 1;
+   */
+  config?: LlmAgentConfigSetting | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateLlmAgentConfigRequest.
+ * Use `create(UpdateLlmAgentConfigRequestSchema)` to create a new message.
+ */
+export declare const UpdateLlmAgentConfigRequestSchema: GenMessage<UpdateLlmAgentConfigRequest>;
+
+/**
+ * @generated from message laelia.v1.UpdateLlmAgentConfigResponse
+ */
+export declare type UpdateLlmAgentConfigResponse = Message<"laelia.v1.UpdateLlmAgentConfigResponse"> & {
+  /**
+   * @generated from field: laelia.store.LlmAgentConfigSetting config = 1;
+   */
+  config?: LlmAgentConfigSetting | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateLlmAgentConfigResponse.
+ * Use `create(UpdateLlmAgentConfigResponseSchema)` to create a new message.
+ */
+export declare const UpdateLlmAgentConfigResponseSchema: GenMessage<UpdateLlmAgentConfigResponse>;
 
 /**
  * @generated from message laelia.v1.GetSetupStatusRequest
@@ -208,6 +268,29 @@ export declare const SettingService: GenService<{
     methodKind: "unary";
     input: typeof UpdateS3ConfigRequestSchema;
     output: typeof UpdateS3ConfigResponseSchema;
+  },
+  /**
+   * GetLlmAgentConfig reads the workspace LLM agent configuration. It is
+   * handler-gated (no permission annotation) so the agent create/edit forms —
+   * which members use — can read the toggle without a settings permission.
+   *
+   * @generated from rpc laelia.v1.SettingService.GetLlmAgentConfig
+   */
+  getLlmAgentConfig: {
+    methodKind: "unary";
+    input: typeof GetLlmAgentConfigRequestSchema;
+    output: typeof GetLlmAgentConfigResponseSchema;
+  },
+  /**
+   * UpdateLlmAgentConfig updates the workspace LLM agent configuration.
+   * Admin (laelia.settings.update) only.
+   *
+   * @generated from rpc laelia.v1.SettingService.UpdateLlmAgentConfig
+   */
+  updateLlmAgentConfig: {
+    methodKind: "unary";
+    input: typeof UpdateLlmAgentConfigRequestSchema;
+    output: typeof UpdateLlmAgentConfigResponseSchema;
   },
   /**
    * GetSetupStatus reports which required-config items are not yet configured,

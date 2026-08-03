@@ -19,11 +19,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SettingService_GetS3Config_FullMethodName       = "/laelia.v1.SettingService/GetS3Config"
-	SettingService_UpdateS3Config_FullMethodName    = "/laelia.v1.SettingService/UpdateS3Config"
-	SettingService_GetSetupStatus_FullMethodName    = "/laelia.v1.SettingService/GetSetupStatus"
-	SettingService_GetDebugConfig_FullMethodName    = "/laelia.v1.SettingService/GetDebugConfig"
-	SettingService_UpdateDebugConfig_FullMethodName = "/laelia.v1.SettingService/UpdateDebugConfig"
+	SettingService_GetS3Config_FullMethodName          = "/laelia.v1.SettingService/GetS3Config"
+	SettingService_UpdateS3Config_FullMethodName       = "/laelia.v1.SettingService/UpdateS3Config"
+	SettingService_GetLlmAgentConfig_FullMethodName    = "/laelia.v1.SettingService/GetLlmAgentConfig"
+	SettingService_UpdateLlmAgentConfig_FullMethodName = "/laelia.v1.SettingService/UpdateLlmAgentConfig"
+	SettingService_GetSetupStatus_FullMethodName       = "/laelia.v1.SettingService/GetSetupStatus"
+	SettingService_GetDebugConfig_FullMethodName       = "/laelia.v1.SettingService/GetDebugConfig"
+	SettingService_UpdateDebugConfig_FullMethodName    = "/laelia.v1.SettingService/UpdateDebugConfig"
 )
 
 // SettingServiceClient is the client API for SettingService service.
@@ -37,6 +39,13 @@ const (
 type SettingServiceClient interface {
 	GetS3Config(ctx context.Context, in *GetS3ConfigRequest, opts ...grpc.CallOption) (*GetS3ConfigResponse, error)
 	UpdateS3Config(ctx context.Context, in *UpdateS3ConfigRequest, opts ...grpc.CallOption) (*UpdateS3ConfigResponse, error)
+	// GetLlmAgentConfig reads the workspace LLM agent configuration. It is
+	// handler-gated (no permission annotation) so the agent create/edit forms —
+	// which members use — can read the toggle without a settings permission.
+	GetLlmAgentConfig(ctx context.Context, in *GetLlmAgentConfigRequest, opts ...grpc.CallOption) (*GetLlmAgentConfigResponse, error)
+	// UpdateLlmAgentConfig updates the workspace LLM agent configuration.
+	// Admin (laelia.settings.update) only.
+	UpdateLlmAgentConfig(ctx context.Context, in *UpdateLlmAgentConfigRequest, opts ...grpc.CallOption) (*UpdateLlmAgentConfigResponse, error)
 	// GetSetupStatus reports which required-config items are not yet configured,
 	// so the frontend can guide an admin to finish setting up the workspace.
 	GetSetupStatus(ctx context.Context, in *GetSetupStatusRequest, opts ...grpc.CallOption) (*GetSetupStatusResponse, error)
@@ -66,6 +75,26 @@ func (c *settingServiceClient) UpdateS3Config(ctx context.Context, in *UpdateS3C
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateS3ConfigResponse)
 	err := c.cc.Invoke(ctx, SettingService_UpdateS3Config_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *settingServiceClient) GetLlmAgentConfig(ctx context.Context, in *GetLlmAgentConfigRequest, opts ...grpc.CallOption) (*GetLlmAgentConfigResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetLlmAgentConfigResponse)
+	err := c.cc.Invoke(ctx, SettingService_GetLlmAgentConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *settingServiceClient) UpdateLlmAgentConfig(ctx context.Context, in *UpdateLlmAgentConfigRequest, opts ...grpc.CallOption) (*UpdateLlmAgentConfigResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateLlmAgentConfigResponse)
+	err := c.cc.Invoke(ctx, SettingService_UpdateLlmAgentConfig_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -113,6 +142,13 @@ func (c *settingServiceClient) UpdateDebugConfig(ctx context.Context, in *Update
 type SettingServiceServer interface {
 	GetS3Config(context.Context, *GetS3ConfigRequest) (*GetS3ConfigResponse, error)
 	UpdateS3Config(context.Context, *UpdateS3ConfigRequest) (*UpdateS3ConfigResponse, error)
+	// GetLlmAgentConfig reads the workspace LLM agent configuration. It is
+	// handler-gated (no permission annotation) so the agent create/edit forms —
+	// which members use — can read the toggle without a settings permission.
+	GetLlmAgentConfig(context.Context, *GetLlmAgentConfigRequest) (*GetLlmAgentConfigResponse, error)
+	// UpdateLlmAgentConfig updates the workspace LLM agent configuration.
+	// Admin (laelia.settings.update) only.
+	UpdateLlmAgentConfig(context.Context, *UpdateLlmAgentConfigRequest) (*UpdateLlmAgentConfigResponse, error)
 	// GetSetupStatus reports which required-config items are not yet configured,
 	// so the frontend can guide an admin to finish setting up the workspace.
 	GetSetupStatus(context.Context, *GetSetupStatusRequest) (*GetSetupStatusResponse, error)
@@ -133,6 +169,12 @@ func (UnimplementedSettingServiceServer) GetS3Config(context.Context, *GetS3Conf
 }
 func (UnimplementedSettingServiceServer) UpdateS3Config(context.Context, *UpdateS3ConfigRequest) (*UpdateS3ConfigResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateS3Config not implemented")
+}
+func (UnimplementedSettingServiceServer) GetLlmAgentConfig(context.Context, *GetLlmAgentConfigRequest) (*GetLlmAgentConfigResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetLlmAgentConfig not implemented")
+}
+func (UnimplementedSettingServiceServer) UpdateLlmAgentConfig(context.Context, *UpdateLlmAgentConfigRequest) (*UpdateLlmAgentConfigResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateLlmAgentConfig not implemented")
 }
 func (UnimplementedSettingServiceServer) GetSetupStatus(context.Context, *GetSetupStatusRequest) (*GetSetupStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSetupStatus not implemented")
@@ -196,6 +238,42 @@ func _SettingService_UpdateS3Config_Handler(srv interface{}, ctx context.Context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SettingServiceServer).UpdateS3Config(ctx, req.(*UpdateS3ConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SettingService_GetLlmAgentConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLlmAgentConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingServiceServer).GetLlmAgentConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingService_GetLlmAgentConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingServiceServer).GetLlmAgentConfig(ctx, req.(*GetLlmAgentConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SettingService_UpdateLlmAgentConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateLlmAgentConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingServiceServer).UpdateLlmAgentConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingService_UpdateLlmAgentConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingServiceServer).UpdateLlmAgentConfig(ctx, req.(*UpdateLlmAgentConfigRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -268,6 +346,14 @@ var SettingService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateS3Config",
 			Handler:    _SettingService_UpdateS3Config_Handler,
+		},
+		{
+			MethodName: "GetLlmAgentConfig",
+			Handler:    _SettingService_GetLlmAgentConfig_Handler,
+		},
+		{
+			MethodName: "UpdateLlmAgentConfig",
+			Handler:    _SettingService_UpdateLlmAgentConfig_Handler,
 		},
 		{
 			MethodName: "GetSetupStatus",

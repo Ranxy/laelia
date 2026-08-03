@@ -444,6 +444,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.store.LlmAgentConfigSetting"><span class="badge">M</span>LlmAgentConfigSetting</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.store.PasswordRestrictionSetting"><span class="badge">M</span>PasswordRestrictionSetting</a>
                 </li>
               
@@ -2703,6 +2707,34 @@ objects from their owning agent / parent conversation membership.</p></td>
 
         
       
+        <h3 id="laelia.store.LlmAgentConfigSetting">LlmAgentConfigSetting</h3>
+        <p>LlmAgentConfigSetting is the workspace-level LLM agent configuration. The</p><p>only knob today is whether users may self-provide an inline api_provider /</p><p>api_key / model when creating or editing a builtin-pi agent, in addition to</p><p>using the managed global API providers. Defaults to enabled when unset.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>allow_user_self_provided_keys</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>allow_user_self_provided_keys gates the legacy inline api_provider/api_key
+path on builtin-pi agents. When true, any user who may create/edit the
+agent can fill in their own LLM API key; when false, only a caller holding
+agents.edit (workspace admin) may, and everyone else must use a global
+provider. Default true. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.store.PasswordRestrictionSetting">PasswordRestrictionSetting</h3>
         <p></p>
 
@@ -3081,6 +3113,12 @@ endpoints directly. Only http:// and https:// schemes are supported. </p></td>
               <tr>
                 <td>WEB_PUSH_CONFIG</td>
                 <td>11</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>LLM_AGENT_CONFIG</td>
+                <td>12</td>
                 <td><p></p></td>
               </tr>
             

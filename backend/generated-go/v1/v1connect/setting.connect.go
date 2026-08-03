@@ -39,6 +39,12 @@ const (
 	// SettingServiceUpdateS3ConfigProcedure is the fully-qualified name of the SettingService's
 	// UpdateS3Config RPC.
 	SettingServiceUpdateS3ConfigProcedure = "/laelia.v1.SettingService/UpdateS3Config"
+	// SettingServiceGetLlmAgentConfigProcedure is the fully-qualified name of the SettingService's
+	// GetLlmAgentConfig RPC.
+	SettingServiceGetLlmAgentConfigProcedure = "/laelia.v1.SettingService/GetLlmAgentConfig"
+	// SettingServiceUpdateLlmAgentConfigProcedure is the fully-qualified name of the SettingService's
+	// UpdateLlmAgentConfig RPC.
+	SettingServiceUpdateLlmAgentConfigProcedure = "/laelia.v1.SettingService/UpdateLlmAgentConfig"
 	// SettingServiceGetSetupStatusProcedure is the fully-qualified name of the SettingService's
 	// GetSetupStatus RPC.
 	SettingServiceGetSetupStatusProcedure = "/laelia.v1.SettingService/GetSetupStatus"
@@ -54,6 +60,13 @@ const (
 type SettingServiceClient interface {
 	GetS3Config(context.Context, *connect.Request[v1.GetS3ConfigRequest]) (*connect.Response[v1.GetS3ConfigResponse], error)
 	UpdateS3Config(context.Context, *connect.Request[v1.UpdateS3ConfigRequest]) (*connect.Response[v1.UpdateS3ConfigResponse], error)
+	// GetLlmAgentConfig reads the workspace LLM agent configuration. It is
+	// handler-gated (no permission annotation) so the agent create/edit forms —
+	// which members use — can read the toggle without a settings permission.
+	GetLlmAgentConfig(context.Context, *connect.Request[v1.GetLlmAgentConfigRequest]) (*connect.Response[v1.GetLlmAgentConfigResponse], error)
+	// UpdateLlmAgentConfig updates the workspace LLM agent configuration.
+	// Admin (laelia.settings.update) only.
+	UpdateLlmAgentConfig(context.Context, *connect.Request[v1.UpdateLlmAgentConfigRequest]) (*connect.Response[v1.UpdateLlmAgentConfigResponse], error)
 	// GetSetupStatus reports which required-config items are not yet configured,
 	// so the frontend can guide an admin to finish setting up the workspace.
 	GetSetupStatus(context.Context, *connect.Request[v1.GetSetupStatusRequest]) (*connect.Response[v1.GetSetupStatusResponse], error)
@@ -84,6 +97,18 @@ func NewSettingServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(settingServiceMethods.ByName("UpdateS3Config")),
 			connect.WithClientOptions(opts...),
 		),
+		getLlmAgentConfig: connect.NewClient[v1.GetLlmAgentConfigRequest, v1.GetLlmAgentConfigResponse](
+			httpClient,
+			baseURL+SettingServiceGetLlmAgentConfigProcedure,
+			connect.WithSchema(settingServiceMethods.ByName("GetLlmAgentConfig")),
+			connect.WithClientOptions(opts...),
+		),
+		updateLlmAgentConfig: connect.NewClient[v1.UpdateLlmAgentConfigRequest, v1.UpdateLlmAgentConfigResponse](
+			httpClient,
+			baseURL+SettingServiceUpdateLlmAgentConfigProcedure,
+			connect.WithSchema(settingServiceMethods.ByName("UpdateLlmAgentConfig")),
+			connect.WithClientOptions(opts...),
+		),
 		getSetupStatus: connect.NewClient[v1.GetSetupStatusRequest, v1.GetSetupStatusResponse](
 			httpClient,
 			baseURL+SettingServiceGetSetupStatusProcedure,
@@ -107,11 +132,13 @@ func NewSettingServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 
 // settingServiceClient implements SettingServiceClient.
 type settingServiceClient struct {
-	getS3Config       *connect.Client[v1.GetS3ConfigRequest, v1.GetS3ConfigResponse]
-	updateS3Config    *connect.Client[v1.UpdateS3ConfigRequest, v1.UpdateS3ConfigResponse]
-	getSetupStatus    *connect.Client[v1.GetSetupStatusRequest, v1.GetSetupStatusResponse]
-	getDebugConfig    *connect.Client[v1.GetDebugConfigRequest, v1.GetDebugConfigResponse]
-	updateDebugConfig *connect.Client[v1.UpdateDebugConfigRequest, v1.UpdateDebugConfigResponse]
+	getS3Config          *connect.Client[v1.GetS3ConfigRequest, v1.GetS3ConfigResponse]
+	updateS3Config       *connect.Client[v1.UpdateS3ConfigRequest, v1.UpdateS3ConfigResponse]
+	getLlmAgentConfig    *connect.Client[v1.GetLlmAgentConfigRequest, v1.GetLlmAgentConfigResponse]
+	updateLlmAgentConfig *connect.Client[v1.UpdateLlmAgentConfigRequest, v1.UpdateLlmAgentConfigResponse]
+	getSetupStatus       *connect.Client[v1.GetSetupStatusRequest, v1.GetSetupStatusResponse]
+	getDebugConfig       *connect.Client[v1.GetDebugConfigRequest, v1.GetDebugConfigResponse]
+	updateDebugConfig    *connect.Client[v1.UpdateDebugConfigRequest, v1.UpdateDebugConfigResponse]
 }
 
 // GetS3Config calls laelia.v1.SettingService.GetS3Config.
@@ -122,6 +149,16 @@ func (c *settingServiceClient) GetS3Config(ctx context.Context, req *connect.Req
 // UpdateS3Config calls laelia.v1.SettingService.UpdateS3Config.
 func (c *settingServiceClient) UpdateS3Config(ctx context.Context, req *connect.Request[v1.UpdateS3ConfigRequest]) (*connect.Response[v1.UpdateS3ConfigResponse], error) {
 	return c.updateS3Config.CallUnary(ctx, req)
+}
+
+// GetLlmAgentConfig calls laelia.v1.SettingService.GetLlmAgentConfig.
+func (c *settingServiceClient) GetLlmAgentConfig(ctx context.Context, req *connect.Request[v1.GetLlmAgentConfigRequest]) (*connect.Response[v1.GetLlmAgentConfigResponse], error) {
+	return c.getLlmAgentConfig.CallUnary(ctx, req)
+}
+
+// UpdateLlmAgentConfig calls laelia.v1.SettingService.UpdateLlmAgentConfig.
+func (c *settingServiceClient) UpdateLlmAgentConfig(ctx context.Context, req *connect.Request[v1.UpdateLlmAgentConfigRequest]) (*connect.Response[v1.UpdateLlmAgentConfigResponse], error) {
+	return c.updateLlmAgentConfig.CallUnary(ctx, req)
 }
 
 // GetSetupStatus calls laelia.v1.SettingService.GetSetupStatus.
@@ -143,6 +180,13 @@ func (c *settingServiceClient) UpdateDebugConfig(ctx context.Context, req *conne
 type SettingServiceHandler interface {
 	GetS3Config(context.Context, *connect.Request[v1.GetS3ConfigRequest]) (*connect.Response[v1.GetS3ConfigResponse], error)
 	UpdateS3Config(context.Context, *connect.Request[v1.UpdateS3ConfigRequest]) (*connect.Response[v1.UpdateS3ConfigResponse], error)
+	// GetLlmAgentConfig reads the workspace LLM agent configuration. It is
+	// handler-gated (no permission annotation) so the agent create/edit forms —
+	// which members use — can read the toggle without a settings permission.
+	GetLlmAgentConfig(context.Context, *connect.Request[v1.GetLlmAgentConfigRequest]) (*connect.Response[v1.GetLlmAgentConfigResponse], error)
+	// UpdateLlmAgentConfig updates the workspace LLM agent configuration.
+	// Admin (laelia.settings.update) only.
+	UpdateLlmAgentConfig(context.Context, *connect.Request[v1.UpdateLlmAgentConfigRequest]) (*connect.Response[v1.UpdateLlmAgentConfigResponse], error)
 	// GetSetupStatus reports which required-config items are not yet configured,
 	// so the frontend can guide an admin to finish setting up the workspace.
 	GetSetupStatus(context.Context, *connect.Request[v1.GetSetupStatusRequest]) (*connect.Response[v1.GetSetupStatusResponse], error)
@@ -169,6 +213,18 @@ func NewSettingServiceHandler(svc SettingServiceHandler, opts ...connect.Handler
 		connect.WithSchema(settingServiceMethods.ByName("UpdateS3Config")),
 		connect.WithHandlerOptions(opts...),
 	)
+	settingServiceGetLlmAgentConfigHandler := connect.NewUnaryHandler(
+		SettingServiceGetLlmAgentConfigProcedure,
+		svc.GetLlmAgentConfig,
+		connect.WithSchema(settingServiceMethods.ByName("GetLlmAgentConfig")),
+		connect.WithHandlerOptions(opts...),
+	)
+	settingServiceUpdateLlmAgentConfigHandler := connect.NewUnaryHandler(
+		SettingServiceUpdateLlmAgentConfigProcedure,
+		svc.UpdateLlmAgentConfig,
+		connect.WithSchema(settingServiceMethods.ByName("UpdateLlmAgentConfig")),
+		connect.WithHandlerOptions(opts...),
+	)
 	settingServiceGetSetupStatusHandler := connect.NewUnaryHandler(
 		SettingServiceGetSetupStatusProcedure,
 		svc.GetSetupStatus,
@@ -193,6 +249,10 @@ func NewSettingServiceHandler(svc SettingServiceHandler, opts ...connect.Handler
 			settingServiceGetS3ConfigHandler.ServeHTTP(w, r)
 		case SettingServiceUpdateS3ConfigProcedure:
 			settingServiceUpdateS3ConfigHandler.ServeHTTP(w, r)
+		case SettingServiceGetLlmAgentConfigProcedure:
+			settingServiceGetLlmAgentConfigHandler.ServeHTTP(w, r)
+		case SettingServiceUpdateLlmAgentConfigProcedure:
+			settingServiceUpdateLlmAgentConfigHandler.ServeHTTP(w, r)
 		case SettingServiceGetSetupStatusProcedure:
 			settingServiceGetSetupStatusHandler.ServeHTTP(w, r)
 		case SettingServiceGetDebugConfigProcedure:
@@ -214,6 +274,14 @@ func (UnimplementedSettingServiceHandler) GetS3Config(context.Context, *connect.
 
 func (UnimplementedSettingServiceHandler) UpdateS3Config(context.Context, *connect.Request[v1.UpdateS3ConfigRequest]) (*connect.Response[v1.UpdateS3ConfigResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.UpdateS3Config is not implemented"))
+}
+
+func (UnimplementedSettingServiceHandler) GetLlmAgentConfig(context.Context, *connect.Request[v1.GetLlmAgentConfigRequest]) (*connect.Response[v1.GetLlmAgentConfigResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.GetLlmAgentConfig is not implemented"))
+}
+
+func (UnimplementedSettingServiceHandler) UpdateLlmAgentConfig(context.Context, *connect.Request[v1.UpdateLlmAgentConfigRequest]) (*connect.Response[v1.UpdateLlmAgentConfigResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.UpdateLlmAgentConfig is not implemented"))
 }
 
 func (UnimplementedSettingServiceHandler) GetSetupStatus(context.Context, *connect.Request[v1.GetSetupStatusRequest]) (*connect.Response[v1.GetSetupStatusResponse], error) {

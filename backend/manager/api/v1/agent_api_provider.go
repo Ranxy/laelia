@@ -38,6 +38,71 @@ func (s *AgentService) canManageAgentKey(ctx context.Context, user *store.UserMe
 	return ok
 }
 
+// canUseInlineAPIKey reports whether the caller may set/keep the legacy inline
+// api_provider/api_key on an existing agent: a caller holding agents.edit
+// (workspace admin today) always may; otherwise the workspace-wide
+// allow_user_self_provided_keys toggle decides — when enabled, the agent's
+// owner may self-configure their own key.
+func (s *AgentService) canUseInlineAPIKey(ctx context.Context, user *store.UserMessage, agent *store.AgentMessage) bool {
+	if s.canManageAgentKey(ctx, user, agent) {
+		return true
+	}
+	return s.llmAgentAllowsSelfProvidedKeys(ctx)
+}
+
+// canUseInlineAPIKeyAtCreate reports whether the caller may create an agent with
+// a legacy inline api_provider/api_key (no agent resource exists yet). Same rule
+// as canUseInlineAPIKey, but the admin check is workspace-scoped.
+func (s *AgentService) canUseInlineAPIKeyAtCreate(ctx context.Context, user *store.UserMessage) bool {
+	if user == nil || s.iam == nil {
+		return false
+	}
+	ok, err := s.iam.CheckPermission(ctx, permission.AgentsEdit, user, nil, nil)
+	if err != nil {
+		slog.Error("failed to resolve agents.edit", log.WithError(err))
+		return false
+	}
+	if ok {
+		return true
+	}
+	return s.llmAgentAllowsSelfProvidedKeys(ctx)
+}
+
+// canViewInlineKey reports whether the caller may see an agent's stored inline
+// api key and in what form: admins see the full key (masked=false); the owner
+// sees a masked preview when the workspace toggle enables self-provided keys
+// (masked=true); everyone else sees nothing.
+func (s *AgentService) canViewInlineKey(ctx context.Context, user *store.UserMessage, agent *store.AgentMessage) (view, masked bool) {
+	if s.canManageAgentKey(ctx, user, agent) {
+		return true, false
+	}
+	if user != nil && agent.OwnerID != 0 && agent.OwnerID == user.ID && s.llmAgentAllowsSelfProvidedKeys(ctx) {
+		return true, true
+	}
+	return false, false
+}
+
+// llmAgentAllowsSelfProvidedKeys reads the workspace LLM agent config toggle,
+// failing closed (false) on lookup errors.
+func (s *AgentService) llmAgentAllowsSelfProvidedKeys(ctx context.Context) bool {
+	cfg, err := s.store.GetLlmAgentConfigSetting(ctx)
+	if err != nil {
+		slog.Error("failed to get llm agent config", log.WithError(err))
+		return false
+	}
+	return cfg.GetAllowUserSelfProvidedKeys()
+}
+
+// maskKeyPreview masks a stored inline api key for its owner: the first five and
+// last three characters kept, prefixed with the secret sentinel so a save that
+// echoes the preview back is treated as "keep existing" by the update handler.
+func maskKeyPreview(key string) string {
+	if len(key) <= 8 {
+		return secretMaskPrefix
+	}
+	return secretMaskPrefix + key[:5] + "***" + key[len(key)-3:]
+}
+
 // canCreateAgentOnMachine reports whether the caller may create an agent on the
 // machine: the machine's creator, or a caller holding laelia.agents.create
 // (workspace admin today). Machines are created by privileged users, so in

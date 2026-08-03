@@ -211,3 +211,24 @@ func TestMaskSecretBoundary(t *testing.T) {
 		t.Fatalf("masked key should retain last 4, got %q", masked)
 	}
 }
+
+// TestMaskKeyPreview locks in the owner-facing inline key preview: it shows a
+// fragment (first 5 + last 3) but not the full key, and is prefixed with the
+// "****" sentinel so the update handler treats a save echoing it back as "keep
+// existing" rather than storing the masked string as the real key.
+func TestMaskKeyPreview(t *testing.T) {
+	if got := maskKeyPreview(""); got != secretMaskPrefix {
+		t.Fatalf("empty key should mask to the bare sentinel, got %q", got)
+	}
+	if got := maskKeyPreview("sk-abcdefgh1234"); got != "****sk-ab***234" {
+		t.Fatalf("unexpected preview %q, want %q", got, "****sk-ab***234")
+	}
+	// A preview always carries the sentinel prefix so it round-trips as "keep".
+	preview := maskKeyPreview("sk-abcdefgh1234")
+	if !strings.HasPrefix(preview, secretMaskPrefix) {
+		t.Fatalf("preview must start with the keep-existing sentinel, got %q", preview)
+	}
+	if strings.Contains(preview, "sk-abcdefgh1234") {
+		t.Fatalf("preview must not leak the full key, got %q", preview)
+	}
+}

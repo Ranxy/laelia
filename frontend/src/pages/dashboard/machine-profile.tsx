@@ -1,5 +1,5 @@
 import { Loader2, Plus, Trash } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { KeyValueEnvEditor } from "@/components/agent/key-value-env-editor";
@@ -11,6 +11,7 @@ import {
   entryLabel,
   Field,
   modelLabel,
+  piAPIProviderIds,
   providerDisplayName,
   providerLabel,
 } from "@/components/profile-common";
@@ -24,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { ModelCombobox } from "@/components/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +52,7 @@ import {
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { settingServiceClient } from "@/connect";
 import { formatTimestamp } from "@/lib/command-status";
 import { buildMachineRunCommand } from "@/lib/machine-token";
 import { cn } from "@/lib/utils";
@@ -57,6 +60,7 @@ import { useAppStore } from "@/stores";
 import {
   type AgentProviderInfo,
   type AgentSummary,
+  type PiModel,
 } from "@/types/proto-es/v1/agent_pb";
 import { type Machine } from "@/types/proto-es/v1/machine_pb";
 
@@ -100,6 +104,16 @@ export function MachineProfilePage() {
   const [model, setModel] = useState("");
   const [globalProvider, setGlobalProvider] = useState("");
   const [globalProviderEntry, setGlobalProviderEntry] = useState("");
+  // Self-provided-key mode for the builtin-pi runtime: whether the sheet offers
+  // "use my own API key" (api_provider + key + model) in addition to the managed
+  // global providers, and the inline fields when that mode is active.
+  const [piMode, setPiMode] = useState<"global" | "self">("global");
+  const [selfProvidedKeysEnabled, setSelfProvidedKeysEnabled] = useState(false);
+  const [apiProvider, setApiProvider] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [piModels, setPiModels] = useState<PiModel[]>([]);
+  const [piModelsLoading, setPiModelsLoading] = useState(false);
+  const piModelsCacheRef = useRef<Map<string, PiModel[]>>(new Map());
   const [personaPrompt, setPersonaPrompt] = useState("");
   const [customEnvEntries, setCustomEnvEntries] = useState<
     { key: string; value: string }[]
@@ -142,10 +156,57 @@ export function MachineProfilePage() {
   }, [machineId, machineName]);
 
   // Load the caller's accessible global API providers once per page view; the
-  // store slice caches them for the sheet's provider/entry dropdowns.
+  // store slice caches them for the sheet's provider/entry dropdowns. Also read
+  // the workspace toggle that decides whether the self-provided-key mode is
+  // offered in the sheet.
   useEffect(() => {
     void useAppStore.getState().fetchApiProviders(undefined, { silent: true });
+    void settingServiceClient.getLlmAgentConfig({}).then((res) => {
+      setSelfProvidedKeysEnabled(res.config?.allowUserSelfProvidedKeys ?? true);
+    });
   }, []);
+
+  // fetchPiModels loads the model list for a self-provided LLM API provider
+  // (ListPiModels). deepseek requires the api_key; openrouter is public.
+  async function fetchPiModels(nextProvider: string, key: string) {
+    if (!nextProvider) return;
+    if (nextProvider === "deepseek" && key.trim() === "") return;
+    const cached = piModelsCacheRef.current.get(nextProvider);
+    if (cached) {
+      setPiModels(cached);
+      return;
+    }
+    setPiModelsLoading(true);
+    setAddError("");
+    try {
+      const models = await useAppStore
+        .getState()
+        .listPiModels(nextProvider, key);
+      piModelsCacheRef.current.set(nextProvider, models);
+      setPiModels(models);
+    } catch (err) {
+      setAddError(
+        err instanceof Error
+          ? err.message
+          : t("agent.acp-config-pi-models-refresh-failed")
+      );
+    } finally {
+      setPiModelsLoading(false);
+    }
+  }
+
+  // Debounced: fetch the model list once the user stops typing in the
+  // self-provided mode (deepseek needs the key before the list is useful).
+  useEffect(() => {
+    if (provider !== "builtin-pi" || piMode !== "self" || !apiProvider) return;
+    if (apiProvider === "deepseek" && apiKey.trim() === "") return;
+    const timer = setTimeout(
+      () => void fetchPiModels(apiProvider, apiKey),
+      400
+    );
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider, piMode, apiProvider, apiKey]);
 
   if (!machine) {
     return (
@@ -201,6 +262,10 @@ export function MachineProfilePage() {
     setModel("");
     setGlobalProvider("");
     setGlobalProviderEntry("");
+    setPiMode("global");
+    setApiProvider("");
+    setApiKey("");
+    setPiModels([]);
     setPersonaPrompt("");
     setCustomEnvEntries([]);
     setAllowEnv([]);
@@ -302,13 +367,28 @@ export function MachineProfilePage() {
       return;
     }
     if (isPiProvider) {
-      if (!globalProvider.trim()) {
-        setAddError(t("machine.add-agent-provider-required"));
-        return;
-      }
-      if (!globalProviderEntry.trim()) {
-        setAddError(t("machine.add-agent-global-entry-required"));
-        return;
+      if (piMode === "global") {
+        if (!globalProvider.trim()) {
+          setAddError(t("machine.add-agent-provider-required"));
+          return;
+        }
+        if (!globalProviderEntry.trim()) {
+          setAddError(t("machine.add-agent-global-entry-required"));
+          return;
+        }
+      } else {
+        if (!apiProvider.trim()) {
+          setAddError(t("machine.add-agent-provider-required"));
+          return;
+        }
+        if (!model.trim()) {
+          setAddError(t("machine.add-agent-model-required"));
+          return;
+        }
+        if (!apiKey.trim()) {
+          setAddError(t("machine.add-agent-api-key-required"));
+          return;
+        }
       }
     }
     if (modelRequired && !model.trim()) {
@@ -339,6 +419,8 @@ export function MachineProfilePage() {
           customEnv,
           globalProvider: globalProvider.trim(),
           globalProviderEntry: globalProviderEntry.trim(),
+          apiProvider: apiProvider.trim(),
+          apiKey: apiKey.trim(),
         },
         undefined,
         allowAddToChannel
@@ -714,59 +796,51 @@ export function MachineProfilePage() {
 
               {isPiProvider && (
                 <>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium">
-                      {t("agent.acp-config-pi-global-provider")}
-                    </label>
-                    <Select
-                      value={globalProvider}
-                      onValueChange={(v) => {
-                        const next = String(v ?? "");
-                        setGlobalProvider(next);
-                        setGlobalProviderEntry("");
-                        setAddError("");
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue>
-                          {(v: string | null) =>
-                            v
-                              ? (apiProviders.find((p) => p.name === v)
-                                  ?.title ?? v)
-                              : ""
-                          }
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {apiProviders.length === 0 && (
-                          <SelectItem value="__no_provider" disabled>
-                            {t("agent.acp-config-pi-global-providers-empty")}
+                  {selfProvidedKeysEnabled && (
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm font-medium">
+                        {t("agent.acp-config-pi-mode")}
+                      </label>
+                      <Select
+                        value={piMode}
+                        onValueChange={(v) => {
+                          setPiMode(v === "self" ? "self" : "global");
+                          setAddError("");
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue>
+                            {(v: string | null) =>
+                              v === "self"
+                                ? t("agent.acp-config-pi-mode-self")
+                                : t("agent.acp-config-pi-mode-managed")
+                            }
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="global">
+                            {t("agent.acp-config-pi-mode-managed")}
                           </SelectItem>
-                        )}
-                        {apiProviders.map((p) => (
-                          <SelectItem key={p.name} value={p.name}>
-                            {p.title}
+                          <SelectItem value="self">
+                            {t("agent.acp-config-pi-mode-self")}
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {apiProviders.length === 0 && (
-                      <p className="text-xs text-control-light">
-                        {t("machine.add-agent-no-providers")}
-                      </p>
-                    )}
-                  </div>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
-                  {globalProvider &&
-                    (globalProviderEntries.length > 0 ? (
+                  {piMode === "global" && (
+                    <>
                       <div className="flex flex-col gap-1">
                         <label className="text-sm font-medium">
-                          {t("agent.acp-config-pi-global-entry")}
+                          {t("agent.acp-config-pi-global-provider")}
                         </label>
                         <Select
-                          value={globalProviderEntry}
+                          value={globalProvider}
                           onValueChange={(v) => {
-                            setGlobalProviderEntry(String(v ?? ""));
+                            const next = String(v ?? "");
+                            setGlobalProvider(next);
+                            setGlobalProviderEntry("");
                             setAddError("");
                           }}
                         >
@@ -774,32 +848,186 @@ export function MachineProfilePage() {
                             <SelectValue>
                               {(v: string | null) =>
                                 v
-                                  ? entryLabel(
-                                      globalProviderEntries.find(
-                                        (e) => e.name === v
-                                      )
-                                    )
+                                  ? (apiProviders.find((p) => p.name === v)
+                                      ?.title ?? v)
                                   : ""
                               }
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            {globalProviderEntries.map((e) => (
-                              <SelectItem key={e.name} value={e.name}>
-                                {entryLabel(e)}
+                            {apiProviders.length === 0 && (
+                              <SelectItem value="__no_provider" disabled>
+                                {t(
+                                  "agent.acp-config-pi-global-providers-empty"
+                                )}
+                              </SelectItem>
+                            )}
+                            {apiProviders.map((p) => (
+                              <SelectItem key={p.name} value={p.name}>
+                                {p.title}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
+                        {apiProviders.length === 0 && (
+                          <p className="text-xs text-control-light">
+                            {t("machine.add-agent-no-providers")}
+                          </p>
+                        )}
+                      </div>
+
+                      {globalProvider &&
+                        (globalProviderEntries.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            <label className="text-sm font-medium">
+                              {t("agent.acp-config-pi-global-entry")}
+                            </label>
+                            <Select
+                              value={globalProviderEntry}
+                              onValueChange={(v) => {
+                                setGlobalProviderEntry(String(v ?? ""));
+                                setAddError("");
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue>
+                                  {(v: string | null) =>
+                                    v
+                                      ? entryLabel(
+                                          globalProviderEntries.find(
+                                            (e) => e.name === v
+                                          )
+                                        )
+                                      : ""
+                                  }
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {globalProviderEntries.map((e) => (
+                                  <SelectItem key={e.name} value={e.name}>
+                                    {entryLabel(e)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-control-light">
+                              {t("agent.acp-config-pi-global-entry-hint")}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-control-light">
+                            {t("agent.acp-config-pi-global-entries-empty")}
+                          </p>
+                        ))}
+                    </>
+                  )}
+
+                  {piMode === "self" && (
+                    <>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-medium">
+                          {t("agent.acp-config-pi-api-provider")}
+                        </label>
+                        <Select
+                          value={apiProvider}
+                          onValueChange={(v) => {
+                            setApiProvider(String(v ?? ""));
+                            setModel("");
+                            setAddError("");
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue>
+                              {(v: string | null) => v ?? ""}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {piAPIProviderIds.map((id) => (
+                              <SelectItem key={id} value={id}>
+                                {id}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-medium">
+                          {t("agent.acp-config-pi-api-key")}
+                        </label>
+                        <Input
+                          type="password"
+                          autoComplete="off"
+                          data-1p-ignore
+                          data-lpignore="true"
+                          placeholder={t(
+                            "agent.acp-config-pi-api-key-placeholder"
+                          )}
+                          value={apiKey}
+                          onChange={(e) => {
+                            setApiKey(e.target.value);
+                            setAddError("");
+                          }}
+                        />
                         <p className="text-xs text-control-light">
-                          {t("agent.acp-config-pi-global-entry-hint")}
+                          {t("agent.acp-config-pi-api-key-hint")}
                         </p>
                       </div>
-                    ) : (
-                      <p className="text-xs text-control-light">
-                        {t("agent.acp-config-pi-global-entries-empty")}
-                      </p>
-                    ))}
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-medium">
+                          {t("agent.acp-config-model")}
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <ModelCombobox
+                            className="flex-1"
+                            value={model}
+                            options={piModels}
+                            loading={piModelsLoading}
+                            placeholder={t(
+                              "agent.acp-config-pi-model-placeholder"
+                            )}
+                            disabled={!apiProvider}
+                            emptyLabel={t("agent.acp-config-pi-models-empty")}
+                            onValueChange={(next) => {
+                              setModel(next);
+                              setAddError("");
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={
+                              !apiProvider ||
+                              piModelsLoading ||
+                              (apiProvider === "deepseek" &&
+                                apiKey.trim() === "")
+                            }
+                            onClick={() => {
+                              if (apiProvider) {
+                                piModelsCacheRef.current.delete(apiProvider);
+                              }
+                              void fetchPiModels(apiProvider, apiKey);
+                            }}
+                          >
+                            {piModelsLoading ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              t("agent.acp-config-pi-models-refresh")
+                            )}
+                          </Button>
+                        </div>
+                        {apiProvider &&
+                          !piModelsLoading &&
+                          piModels.length === 0 && (
+                            <p className="text-xs text-control-light">
+                              {t("agent.acp-config-pi-models-empty")}
+                            </p>
+                          )}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
@@ -938,7 +1166,9 @@ export function MachineProfilePage() {
                 (isCustomProvider && !executable.trim()) ||
                 (modelRequired && !model.trim()) ||
                 (isPiProvider &&
-                  (!globalProvider.trim() || !globalProviderEntry.trim()))
+                  (piMode === "global"
+                    ? !globalProvider.trim() || !globalProviderEntry.trim()
+                    : !apiProvider.trim() || !model.trim() || !apiKey.trim()))
               }
               onClick={handleAddAgent}
             >

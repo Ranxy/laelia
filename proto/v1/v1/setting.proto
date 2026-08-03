@@ -23,6 +23,20 @@ message UpdateS3ConfigResponse {
   laelia.store.S3ConfigSetting config = 1;
 }
 
+message GetLlmAgentConfigRequest {}
+
+message GetLlmAgentConfigResponse {
+  laelia.store.LlmAgentConfigSetting config = 1;
+}
+
+message UpdateLlmAgentConfigRequest {
+  laelia.store.LlmAgentConfigSetting config = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateLlmAgentConfigResponse {
+  laelia.store.LlmAgentConfigSetting config = 1;
+}
+
 message GetSetupStatusRequest {}
 
 // SetupItem describes one required-config item the admin onboarding overlay
@@ -65,6 +79,26 @@ service SettingService {
   rpc UpdateS3Config(UpdateS3ConfigRequest) returns (UpdateS3ConfigResponse) {
     option (google.api.http) = {
       patch: "/v1/s3Config"
+      body: "config"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.settings.update";
+    option (laelia.v1.audit) = true;
+  }
+
+  // GetLlmAgentConfig reads the workspace LLM agent configuration. It is
+  // handler-gated (no permission annotation) so the agent create/edit forms —
+  // which members use — can read the toggle without a settings permission.
+  rpc GetLlmAgentConfig(GetLlmAgentConfigRequest) returns (GetLlmAgentConfigResponse) {
+    option (google.api.http) = {get: "/v1/llmAgentConfig"};
+    option (laelia.v1.auth_method) = IAM;
+  }
+
+  // UpdateLlmAgentConfig updates the workspace LLM agent configuration.
+  // Admin (laelia.settings.update) only.
+  rpc UpdateLlmAgentConfig(UpdateLlmAgentConfigRequest) returns (UpdateLlmAgentConfigResponse) {
+    option (google.api.http) = {
+      patch: "/v1/llmAgentConfig"
       body: "config"
     };
     option (laelia.v1.auth_method) = IAM;

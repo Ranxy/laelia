@@ -70,6 +70,7 @@
     - [EnvironmentSetting](#laelia-store-EnvironmentSetting)
     - [EnvironmentSetting.Environment](#laelia-store-EnvironmentSetting-Environment)
     - [EnvironmentSetting.Environment.TagsEntry](#laelia-store-EnvironmentSetting-Environment-TagsEntry)
+    - [LlmAgentConfigSetting](#laelia-store-LlmAgentConfigSetting)
     - [PasswordRestrictionSetting](#laelia-store-PasswordRestrictionSetting)
     - [S3ConfigSetting](#laelia-store-S3ConfigSetting)
     - [WebPushSetting](#laelia-store-WebPushSetting)
@@ -1019,6 +1020,24 @@ EnvironmentTierPolicy is the tier of an environment.
 
 
 
+<a name="laelia-store-LlmAgentConfigSetting"></a>
+
+### LlmAgentConfigSetting
+LlmAgentConfigSetting is the workspace-level LLM agent configuration. The
+only knob today is whether users may self-provide an inline api_provider /
+api_key / model when creating or editing a builtin-pi agent, in addition to
+using the managed global API providers. Defaults to enabled when unset.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| allow_user_self_provided_keys | [bool](#bool) |  | allow_user_self_provided_keys gates the legacy inline api_provider/api_key path on builtin-pi agents. When true, any user who may create/edit the agent can fill in their own LLM API key; when false, only a caller holding agents.edit (workspace admin) may, and everyone else must use a global provider. Default true. |
+
+
+
+
+
+
 <a name="laelia-store-PasswordRestrictionSetting"></a>
 
 ### PasswordRestrictionSetting
@@ -1145,6 +1164,7 @@ IP validation policy for agent connections.
 | AGENT_SECURITY | 9 |  |
 | S3_CONFIG | 10 |  |
 | WEB_PUSH_CONFIG | 11 |  |
+| LLM_AGENT_CONFIG | 12 |  |
 
 
  
