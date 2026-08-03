@@ -3,5 +3,19 @@
 reasonix.toml
 .mcp.json
 build/
+backend/manager/server/dist/
+# pi distribution artifacts populated by scripts/build-pi.sh; the 0-byte
+# placeholder backend/agent/pi/embedded/dist/pi itself is tracked.
+backend/agent/pi/embedded/dist/CHANGELOG.md
+backend/agent/pi/embedded/dist/README.md
+backend/agent/pi/embedded/dist/assets/
+backend/agent/pi/embedded/dist/docs/
+backend/agent/pi/embedded/dist/examples/
+backend/agent/pi/embedded/dist/export-html/
+backend/agent/pi/embedded/dist/node_modules/
+backend/agent/pi/embedded/dist/package.json
+backend/agent/pi/embedded/dist/photon_rs_bg.wasm
+backend/agent/pi/embedded/dist/pi.meta
+backend/agent/pi/embedded/dist/theme/
 temp/
 docs/review

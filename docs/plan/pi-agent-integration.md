@@ -236,14 +236,15 @@ Release adds a build step that produces an embeddable pi binary **before** `go b
 release`:
 
 - `scripts/build-pi.sh` (invoked by the release pipeline): for the target `GOOS/GOARCH`, download
-  the matching pi standalone binary from the pi GitHub releases (or build it from source via
+  the matching pi standalone distribution from the pi GitHub releases (or build it from source via
   `bun build --compile --target=<os>-<arch>` if no prebuilt release artifact exists), and write it
-  to `backend/agent/pi/embedded/pi`. Then `go build -tags release` compiles
-  `binary_release.go`, whose `//go:embed embedded/pi` bakes the blob into the laelia binary.
-- The embed path is relative to the `.go` file, so a single `//go:embed embedded/pi` works; for
-  cross-platform releases the script overwrites `embedded/pi` with the correct target binary per
-  build (one binary per target platform, built separately — same as laelia's own per-platform
-  release).
+  to `backend/agent/pi/embedded/dist`. Then `go build -tags release` compiles
+  `binary_release.go`, whose `//go:embed embedded/dist` bakes the whole distribution (binary +
+  runtime assets such as `theme/`) into the laelia binary.
+- The embed path is relative to the `.go` file, so a single `//go:embed embedded/dist` works; for
+  cross-platform releases the script overwrites `embedded/dist` with the correct target
+  distribution per build (one per target platform, built separately — same as laelia's own
+  per-platform release).
 
 **Risk:** this depends on either (a) pi publishing prebuilt standalone binaries on GitHub releases
 for the target platforms, or (b) `bun build --compile` producing a working standalone binary. This

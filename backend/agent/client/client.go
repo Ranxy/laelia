@@ -27,6 +27,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
+	"golang.org/x/net/http2"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -180,6 +181,18 @@ func New(managerURL, token string, insecure bool, allowHTTP bool) (*MachineClien
 			TLSClientConfig:       tlsCfg.Clone(),
 			ForceAttemptHTTP2:     true,
 			ResponseHeaderTimeout: 60 * time.Second,
+		}
+	} else {
+		// Plain HTTP: bidi streams still require HTTP/2, so dial h2c
+		// (HTTP/2 cleartext) directly. The manager enables unencrypted HTTP/2
+		// without TLS; without this the connect server rejects bidi streams
+		// over HTTP/1.1 with 505 and the machine can never connect over
+		// --allow-http.
+		streamClient.Transport = &http2.Transport{
+			AllowHTTP: true,
+			DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, network, addr)
+			},
 		}
 	}
 

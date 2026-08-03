@@ -95,6 +95,39 @@ buf lint proto
 cd proto && buf generate
 ```
 
+### Build & Docker
+
+```bash
+# Local monolithic build: frontend -> embedded into manager, pi -> embedded into machine
+scripts/build_laelia.sh                             # outputs build/laelia + build/laelia-machine
+LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia.sh  # route the pi GitHub download through a proxy
+
+# Docker images (manager image embeds the frontend; machine image embeds pi)
+LAELIA_BUILD_PROXY=http://host:port scripts/build_laelia_docker.sh
+# -> laelia/manager:local + laelia/machine:local
+```
+
+Notes:
+
+- `scripts/build-pi.sh` downloads and checksum-verifies the standalone pi
+  distribution (binary + runtime assets) into `backend/agent/pi/embedded/dist`
+  before any `go build -tags release`. It is idempotent (recorded
+  version/platform in `pi.meta`); use `PI_FORCE=1` to re-download.
+- `backend/agent/pi/embedded/dist/pi` is a tracked 0-byte placeholder. A
+  release build replaces it with the real (large) binary; restore it with
+  `git restore backend/agent/pi/embedded/dist/pi` before committing.
+- The manager image needs `LAELIA_PG_URL`; the machine image needs
+  `LAELIA_MANAGER_URL` and `LAELIA_TOKEN` (its entrypoint maps these env vars
+  to CLI flags, adding `--allow-http` for `http://` URLs automatically).
+- The machine image is an agent runtime: node/npm (base image) plus
+  python3/pip, build-essential (make/gcc), git, curl, wget, jq, unzip, zip,
+  ripgrep. Pass `APT_MIRROR=http://mirrors.aliyun.com/debian` (or your local
+  Debian mirror) to speed up the apt steps in restricted networks.
+- `LAELIA_BUILD_PROXY` is the single build proxy (pi download + docker Go
+  stages). `PI_PROXY` is a legacy alias that overrides just the pi download.
+  Do not use a global `HTTPS_PROXY` for docker builds: BuildKit auto-injects
+  standard proxy args into every stage, including the final runtime images.
+
 ### Database
 
 ```bash

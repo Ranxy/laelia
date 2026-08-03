@@ -1,0 +1,11 @@
+.git
+.gitignore
+.agents
+.codex
+.vscode
+**/node_modules
+**/dist
+build
+temp
+docs/review
+backend/agent/pi/embedded/dist
