@@ -30,7 +30,7 @@ import {
 import { resizeImageFile } from "@/lib/image-resize";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
-import { useHasPermission } from "@/stores/auth";
+import { useHasPermission } from "@/stores/permissions";
 import type { AgentSummary } from "@/types/proto-es/v1/agent_pb";
 import { type Group } from "@/types/proto-es/v1/group_service_pb";
 import type { Role } from "@/types/proto-es/v1/role_service_pb";

@@ -100,7 +100,7 @@ export interface AuthSlice {
 // user-management mutations. It wraps userServiceClient; permission gating for
 // mutating RPCs is enforced server-side (laelia.users.update/delete) and the UI
 // hides the controls for callers lacking `laelia.users.update` (see
-// useHasPermission in stores/auth).
+// useHasPermission in stores/permissions).
 export interface UserSlice {
   users: User[];
   usersLoading: boolean;

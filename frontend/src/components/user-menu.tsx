@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { settingServiceClient } from "@/connect";
 import { setLocale } from "@/lib/i18n";
 import { useAppStore } from "@/stores";
-import { useHasPermission } from "@/stores/auth";
+import { useHasPermission } from "@/stores/permissions";
 import {
   GetDebugConfigRequestSchema,
   UpdateDebugConfigRequestSchema,

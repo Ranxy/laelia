@@ -38,7 +38,7 @@ import { formatTimestamp } from "@/lib/command-status";
 import { toastManager } from "@/lib/toast";
 import { buildUserFilter } from "@/lib/user-filter";
 import { useAppStore } from "@/stores";
-import { useHasPermission } from "@/stores/auth";
+import { useHasPermission } from "@/stores/permissions";
 import { State } from "@/types/proto-es/v1/common_pb";
 import { type User, UserType } from "@/types/proto-es/v1/user_service_pb";
 

@@ -12,7 +12,7 @@ import {
 import { settingServiceClient } from "@/connect";
 import { SETTINGS_ROUTE_STORAGE } from "@/router/handles";
 import { resolvePath } from "@/router/route-index";
-import { useHasPermission } from "@/stores/auth";
+import { useHasPermission } from "@/stores/permissions";
 
 // Frontend registry: setup item id -> presentation. Mirrors the backend
 // SettingService.setupChecks. Add an entry here when a new required-config

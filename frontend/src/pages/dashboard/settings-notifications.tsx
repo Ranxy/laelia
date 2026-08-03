@@ -13,7 +13,7 @@ import {
   PUSH_ENABLED_KEY,
   webPushSupported,
 } from "@/lib/web-push";
-import { useHasPermission } from "@/stores/auth";
+import { useHasPermission } from "@/stores/permissions";
 
 type Status = "loading" | "unsupported" | "not-configured" | "denied" | "ready";
 

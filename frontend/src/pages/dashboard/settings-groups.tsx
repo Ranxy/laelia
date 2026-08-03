@@ -40,7 +40,7 @@ import {
 import { groupServiceClient, userServiceClient } from "@/connect";
 import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
-import { useHasPermission } from "@/stores/auth";
+import { useHasPermission } from "@/stores/permissions";
 import { State } from "@/types/proto-es/v1/common_pb";
 import {
   type Group,

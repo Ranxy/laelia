@@ -44,7 +44,7 @@ import {
 import { agentResourceName, formatTimestamp } from "@/lib/command-status";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
-import { useHasPermission } from "@/stores/auth";
+import { useHasPermission } from "@/stores/permissions";
 import type { AgentACPConfigInput } from "@/stores/types";
 import {
   type Agent,

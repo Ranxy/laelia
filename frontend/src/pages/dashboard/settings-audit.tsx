@@ -16,7 +16,7 @@ import {
 import { auditLogServiceClient } from "@/connect";
 import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
-import { useHasPermission } from "@/stores/auth";
+import { useHasPermission } from "@/stores/permissions";
 import { type AuditLog } from "@/types/proto-es/v1/audit_log_service_pb";
 
 function formatTime(ts?: { seconds?: bigint; nanos?: number }): string {

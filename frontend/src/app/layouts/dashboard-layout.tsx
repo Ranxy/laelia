@@ -1,13 +1,51 @@
 import { Menu } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ImagePreviewOverlay } from "@/components/preview/image-preview-overlay";
-import { MarkdownPreviewOverlay } from "@/components/preview/markdown-preview-overlay";
-import { SetupChecklistDialog } from "@/components/setup-checklist-dialog";
 import { DesktopSidebar, MobileSidebar } from "@/components/sidebar";
 import { UserMenu } from "@/components/user-menu";
 import { toastManager } from "@/lib/toast";
 import { reSubscribeIfEnabled, suppressRoute } from "@/lib/web-push";
+import { useAppStore } from "@/stores";
+
+// The overlays/dialog are code-split so markstream-react (and the
+// stream-markdown grammar registry it pulls in) stays out of the initial entry
+// chunk: the shell only loads a chunk when a preview/lightbox is actually
+// open, or when an admin loads the setup checklist. Chat pages pull markstream
+// in their own lazy route chunks, so it is never part of first paint.
+const MarkdownPreviewOverlay = lazy(() =>
+  import("@/components/preview/markdown-preview-overlay").then((m) => ({
+    default: m.MarkdownPreviewOverlay,
+  }))
+);
+const ImagePreviewOverlay = lazy(() =>
+  import("@/components/preview/image-preview-overlay").then((m) => ({
+    default: m.ImagePreviewOverlay,
+  }))
+);
+const SetupChecklistDialog = lazy(() =>
+  import("@/components/setup-checklist-dialog").then((m) => ({
+    default: m.SetupChecklistDialog,
+  }))
+);
+
+// Each gate renders the lazy overlay only while its store state is active, so
+// the underlying chunk loads on first use instead of on boot.
+function MarkdownPreviewGate() {
+  const open = useAppStore((s) => s.activePreview != null);
+  return open ? <MarkdownPreviewOverlay /> : null;
+}
+
+function ImagePreviewGate() {
+  const open = useAppStore((s) => s.activeImage != null);
+  return open ? <ImagePreviewOverlay /> : null;
+}
+
+function SetupChecklistGate() {
+  const isAdmin = useAppStore(
+    (s) => s.currentUser?.permissions?.includes("laelia.settings.get") ?? false
+  );
+  return isAdmin ? <SetupChecklistDialog /> : null;
+}
 
 const COLLAPSED_KEY = "laelia-sidebar-collapsed";
 
@@ -104,11 +142,13 @@ export function DashboardLayout() {
           <Outlet />
         </main>
       </div>
-      {/* Store-driven preview overlays (render only when active). */}
-      <MarkdownPreviewOverlay />
-      <ImagePreviewOverlay />
-      {/* Admin onboarding: prompts admins to finish required config. */}
-      <SetupChecklistDialog />
+      {/* Store-driven preview overlays (lazy — load only when opened). */}
+      <Suspense fallback={null}>
+        <MarkdownPreviewGate />
+        <ImagePreviewGate />
+        {/* Admin onboarding: prompts admins to finish required config. */}
+        <SetupChecklistGate />
+      </Suspense>
     </div>
   );
 }

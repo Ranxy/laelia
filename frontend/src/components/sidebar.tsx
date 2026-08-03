@@ -33,7 +33,7 @@ import {
   SETTINGS_ROUTE_USERS,
 } from "@/router/handles";
 import { useCurrentRoute } from "@/router/use-current-route";
-import { useHasPermission } from "@/stores/auth";
+import { useHasPermission } from "@/stores/permissions";
 
 // ---------------------------------------------------------------------------
 // Types

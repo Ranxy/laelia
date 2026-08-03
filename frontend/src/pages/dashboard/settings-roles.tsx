@@ -41,7 +41,7 @@ import {
   permissionLabel,
 } from "@/lib/permissions";
 import { toastManager } from "@/lib/toast";
-import { useHasPermission } from "@/stores/auth";
+import { useHasPermission } from "@/stores/permissions";
 import { type Role } from "@/types/proto-es/v1/role_service_pb";
 
 // roleIDFromName extracts the bare id from `roles/{id}`.

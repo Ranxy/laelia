@@ -49,7 +49,7 @@ import {
 import { toastManager } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
-import { useHasPermission } from "@/stores/auth";
+import { useHasPermission } from "@/stores/permissions";
 import {
   type Binding,
   BindingSchema,
