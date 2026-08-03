@@ -12,6 +12,46 @@ import type { AppSliceCreator, ChatMessageUI, ChatSlice } from "./types";
 // Re-export so existing `./chat` imports of these helpers keep working.
 export { appendNewMessages, toUiMessage } from "./chat-helpers";
 
+// Max pages the incremental delta fetch will follow. The backend caps each
+// after_version page at 100 (pageSize 200 is clamped), so a burst of >100 new
+// messages needs pagination to avoid dropping the newest ones.
+const MAX_DELTA_PAGES = 10;
+
+// fetchConversationDelta pulls the full incremental delta for a conversation
+// (all messages with room_version > afterVersion), following nextPageToken so a
+// >pageSize burst is not truncated. Returns the cursor to advance to: the
+// server's current version on a complete read, or the last fetched message's
+// room_version when the delta was too big to finish in one pass — so the next
+// poll continues the catch-up instead of permanently skipping the remainder.
+export async function fetchConversationDelta(
+  conversation: string,
+  afterVersion: bigint
+): Promise<{ uiMsgs: ChatMessageUI[]; currentVersion: bigint }> {
+  let pageToken = "";
+  let uiMsgs: ChatMessageUI[] = [];
+  let currentVersion = afterVersion;
+  for (let page = 0; page < MAX_DELTA_PAGES; page++) {
+    const res = await commandServiceClient.listConversationMessages(
+      create(ListConversationMessagesRequestSchema, {
+        conversation,
+        pageSize: 200,
+        pageToken,
+        afterVersion,
+      })
+    );
+    currentVersion = res.currentVersion;
+    const pageMsgs = (res.messages ?? []).map(toUiMessage);
+    if (pageMsgs.length > 0) uiMsgs = uiMsgs.concat(pageMsgs);
+    const next = res.nextPageToken ?? "";
+    if (!next) return { uiMsgs, currentVersion };
+    pageToken = next;
+  }
+  // More pages remain past the cap — advance only to the last message actually
+  // received so a later poll continues from here.
+  const last = uiMsgs[uiMsgs.length - 1];
+  return { uiMsgs, currentVersion: last?.roomVersion ?? currentVersion };
+}
+
 export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
   conversations: {},
   chatMessages: {},
@@ -47,16 +87,12 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
       // switching A→B→A does not re-download the whole 200-message history.
       // A first load (version 0) still returns the latest N messages.
       const afterVersion = get().chatCurrentVersion[conversation] ?? 0n;
-      const res = await commandServiceClient.listConversationMessages(
-        create(ListConversationMessagesRequestSchema, {
-          conversation,
-          pageSize: 200,
-          pageToken: "",
-          afterVersion,
-        })
+      // Follows nextPageToken so a >100-message burst while away is not
+      // truncated (the newest messages were previously dropped permanently).
+      const { uiMsgs, currentVersion } = await fetchConversationDelta(
+        conversation,
+        afterVersion
       );
-
-      const uiMsgs: ChatMessageUI[] = (res.messages ?? []).map(toUiMessage);
 
       set((state) => {
         const prev = state.chatMessages[conversation] ?? [];
@@ -67,7 +103,7 @@ export const createChatSlice: AppSliceCreator<ChatSlice> = (set, get) => ({
           chatMessages: { ...state.chatMessages, [conversation]: merged },
           chatCurrentVersion: {
             ...state.chatCurrentVersion,
-            [conversation]: res.currentVersion,
+            [conversation]: currentVersion,
           },
           chatLoading: { ...state.chatLoading, [conversation]: false },
         };

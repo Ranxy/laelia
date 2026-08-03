@@ -13,14 +13,13 @@ import {
   ListChannelsForAgentRequestSchema,
   ListChannelsRequestSchema,
   ListChannelThreadsRequestSchema,
-  ListConversationMessagesRequestSchema,
   ListTasksRequestSchema,
   MarkConversationReadRequestSchema,
   RemoveChannelMemberRequestSchema,
   SendMessageRequestSchema,
   SetConversationPinnedRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
-import { appendNewMessages, toUiMessage } from "./chat";
+import { appendNewMessages, fetchConversationDelta, toUiMessage } from "./chat";
 import type { AppSliceCreator, ChannelSlice, ChatMessageUI } from "./types";
 
 const WATCHER_POLL_INTERVAL_MS = 5000;
@@ -243,21 +242,19 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
         // every tick. When no cursor is set yet (e.g. loadMessages failed) this
         // falls back to afterVersion=0, which the backend serves as latest-N.
         const afterVersion = get().chatCurrentVersion[conversationName] ?? 0n;
-        const res = await commandServiceClient.listConversationMessages(
-          create(ListConversationMessagesRequestSchema, {
-            conversation: conversationName,
-            pageSize: 200,
-            pageToken: "",
-            afterVersion,
-          })
+        // Shared delta fetch: follows nextPageToken so a >100-message burst is
+        // not truncated, and keeps the cursor at the last received message when
+        // the delta can't finish in one pass so the next tick continues.
+        const { uiMsgs, currentVersion } = await fetchConversationDelta(
+          conversationName,
+          afterVersion
         );
-        const delta: ChatMessageUI[] = (res.messages ?? []).map(toUiMessage);
         const prev = get().chatMessages[conversationName] ?? [];
         // Append only messages we don't already have. This dedups the optimistic
         // send already in the list against its server echo, and returns the same
         // reference when nothing new arrived so subscribers bail out.
-        const merged = appendNewMessages(prev, delta);
-        const nextVersion = res.currentVersion;
+        const merged = appendNewMessages(prev, uiMsgs);
+        const nextVersion = currentVersion;
         const prevVersion = get().chatCurrentVersion[conversationName] ?? 0n;
         if (merged !== prev || nextVersion !== prevVersion) {
           set((state) => ({

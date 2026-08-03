@@ -8,17 +8,28 @@ const STORAGE_KEY = "laelia.language";
 // synchronous; every other locale loads on demand via setLocale (or on boot
 // when the stored language is non-default). Keeping the second locale out of
 // the entry chunk avoids shipping both ~40K JSON bundles to every user.
-const localeLoaders: Record<string, () => Promise<{ default: unknown }>> = {
+const KNOWN_LOCALES = ["en-US", "zh-CN"] as const;
+type Locale = (typeof KNOWN_LOCALES)[number];
+
+const localeLoaders: Record<Locale, () => Promise<{ default: unknown }>> = {
   "en-US": async () => ({ default: enUS }),
   "zh-CN": () => import("@/locales/zh-CN.json"),
 };
 
-function getStoredLocale(): string {
+function getStoredLocale(): Locale {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as unknown;
-      if (typeof parsed === "string") return parsed;
+      // Only trust strings that are actually registered — an unknown/removed
+      // locale (old build, manual edit, browser extension) must fall back, not
+      // crash the loader lookup on boot.
+      if (
+        typeof parsed === "string" &&
+        (KNOWN_LOCALES as readonly string[]).includes(parsed)
+      ) {
+        return parsed as Locale;
+      }
     }
   } catch {
     // ignore corrupted value
@@ -47,7 +58,7 @@ void i18n.use(initReactI18next).init({
 // away so the app renders in the user's language as soon as it is ready
 // (usually masked by the session loading state).
 if (initialLng !== "en-US") {
-  void localeLoaders[initialLng]?.().then((mod) => {
+  void localeLoaders[initialLng]().then((mod) => {
     i18n.addResourceBundle(
       initialLng,
       "translation",
@@ -59,7 +70,14 @@ if (initialLng !== "en-US") {
 
 export function setLocale(locale: string) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(locale));
-  void localeLoaders[locale]?.().then((mod) => {
+  const load = localeLoaders[locale as Locale];
+  if (!load) {
+    // Unknown/removed locale — fall back to the always-bundled default rather
+    // than throwing on the loader lookup.
+    void i18n.changeLanguage("en-US");
+    return;
+  }
+  void load().then((mod) => {
     i18n.addResourceBundle(
       locale,
       "translation",
