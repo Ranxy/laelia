@@ -1,6 +1,7 @@
 import { Loader2, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { PageLoading } from "@/components/settings-page";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -125,10 +126,7 @@ export function SettingsStoragePage() {
         </p>
 
         {loading ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-control-light text-sm">
-            <Loader2 className="size-4 animate-spin" />
-            {t("common.loading")}
-          </div>
+          <PageLoading />
         ) : (
           <div className="mt-6 space-y-4">
             <Field label={t("settings.s3.endpoint")}>

@@ -1,6 +1,7 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { PermissionNotice, SettingsPage } from "@/components/settings-page";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -300,34 +301,22 @@ export function SettingsGroupsPage() {
   };
 
   if (!canList) {
-    return (
-      <div className="h-full overflow-y-auto p-6">
-        <p className="text-sm text-control-light">
-          {t("settings.groups.not-allowed")}
-        </p>
-      </div>
-    );
+    return <PermissionNotice message={t("settings.groups.not-allowed")} />;
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6 flex flex-col gap-5 w-full">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold text-main">
-            {t("settings.groups.title")}
-          </h1>
-          <p className="text-sm text-control-light">
-            {t("settings.groups.description")}
-          </p>
-        </div>
-        {canCreate && (
+    <SettingsPage
+      title={t("settings.groups.title")}
+      description={t("settings.groups.description")}
+      actions={
+        canCreate && (
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="w-4 h-4" />
             {t("settings.groups.create")}
           </Button>
-        )}
-      </div>
-
+        )
+      }
+    >
       <Table>
         <TableHeader>
           <TableRow>
@@ -510,7 +499,7 @@ export function SettingsGroupsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </SettingsPage>
   );
 }
 

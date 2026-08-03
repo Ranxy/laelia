@@ -1,6 +1,7 @@
 import { Download, Search, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { PermissionNotice, SettingsPage } from "@/components/settings-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FieldRow } from "@/components/ui/field-row";
@@ -143,32 +144,20 @@ export function SettingsAuditPage() {
   };
 
   if (!canView) {
-    return (
-      <div className="h-full overflow-y-auto p-6">
-        <p className="text-sm text-control-light">
-          {t("settings.audit.not-allowed")}
-        </p>
-      </div>
-    );
+    return <PermissionNotice message={t("settings.audit.not-allowed")} />;
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6 flex flex-col gap-5 w-full">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold text-main">
-            {t("settings.audit.title")}
-          </h1>
-          <p className="text-sm text-control-light">
-            {t("settings.audit.description")}
-          </p>
-        </div>
+    <SettingsPage
+      title={t("settings.audit.title")}
+      description={t("settings.audit.description")}
+      actions={
         <Button variant="outline" onClick={exportCsv} disabled={exporting}>
           <Download className="w-4 h-4" />
           {t("settings.audit.export")}
         </Button>
-      </div>
-
+      }
+    >
       <div className="flex flex-wrap items-end gap-3">
         <FieldRow label={t("settings.audit.filter-method")}>
           <Input
@@ -294,6 +283,6 @@ export function SettingsAuditPage() {
           </Button>
         </div>
       )}
-    </div>
+    </SettingsPage>
   );
 }

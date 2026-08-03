@@ -12,6 +12,11 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MemberPicker } from "@/components/member-picker";
+import {
+  PageLoading,
+  PermissionNotice,
+  SettingsPage,
+} from "@/components/settings-page";
 import { Alert } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -412,39 +417,28 @@ export function SettingsIamPage() {
   }
 
   if (!canGet) {
-    return (
-      <div className="h-full overflow-y-auto p-6">
-        <p className="text-sm text-control-light">
-          {t("settings.iam.not-allowed")}
-        </p>
-      </div>
-    );
+    return <PermissionNotice message={t("settings.iam.not-allowed")} />;
   }
 
   const visibleBindings = policyState?.policy.bindings ?? [];
 
   return (
-    <div className="h-full overflow-y-auto p-6 flex flex-col gap-5 w-full">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold text-main flex items-center gap-2">
-            <Shield className="size-5 text-accent" />
-            {t("settings.iam.title")}
-          </h1>
-          <p className="text-sm text-control-light max-w-2xl">
-            {t("settings.iam.description")}
-          </p>
-        </div>
-        {canSet && (
+    <SettingsPage
+      title={
+        <span className="flex items-center gap-2">
+          <Shield className="size-5 text-accent" />
+          {t("settings.iam.title")}
+        </span>
+      }
+      description={t("settings.iam.description")}
+      actions={
+        canSet && (
           <Button onClick={openAssign}>{t("settings.iam.assign")}</Button>
-        )}
-      </div>
-
+        )
+      }
+    >
       {loading ? (
-        <div className="flex items-center justify-center gap-2 py-16 text-control-light text-sm">
-          <Loader2 className="size-4 animate-spin" />
-          {t("common.loading")}
-        </div>
+        <PageLoading />
       ) : (
         <div className="rounded-xs border border-control-border bg-background shadow-xs overflow-hidden">
           <Table>
@@ -918,6 +912,6 @@ export function SettingsIamPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </SettingsPage>
   );
 }

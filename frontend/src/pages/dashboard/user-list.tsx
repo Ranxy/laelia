@@ -1,5 +1,11 @@
 import { Loader2, Users } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { Alert } from "@/components/ui/alert";
 import {
@@ -43,6 +49,94 @@ import { State } from "@/types/proto-es/v1/common_pb";
 import { type User, UserType } from "@/types/proto-es/v1/user_service_pb";
 
 type Tab = "active" | "trash";
+
+// UserTable renders the shared user-roster table shell (email/title/type/state
+// columns + optional last-login and actions columns). The active and trash
+// tabs previously duplicated this ~150-line markup; they now differ only in
+// the columns they enable and the per-row action buttons.
+function UserTable({
+  users,
+  loading,
+  showLastLogin,
+  actionsColumn,
+  emptyMessage,
+  renderActions,
+}: {
+  users: User[];
+  loading: boolean;
+  showLastLogin: boolean;
+  actionsColumn: boolean;
+  emptyMessage: string;
+  renderActions: (user: User) => ReactNode;
+}) {
+  const { t } = useTranslation();
+  const colCount = 4 + (showLastLogin ? 1 : 0) + (actionsColumn ? 1 : 0);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-16 text-control-light text-sm">
+        <Loader2 className="size-4 animate-spin" />
+        {t("common.loading")}
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-xs border border-control-border bg-background shadow-xs overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[25%]">{t("user.header-email")}</TableHead>
+            <TableHead className="w-[15%]">{t("user.header-title")}</TableHead>
+            <TableHead className="w-[10%]">{t("user.header-type")}</TableHead>
+            <TableHead className="w-[10%]">{t("user.header-state")}</TableHead>
+            {showLastLogin && (
+              <TableHead className="w-[20%]">
+                {t("user.header-last-login")}
+              </TableHead>
+            )}
+            {actionsColumn && (
+              <TableHead className="w-[20%]">{t("common.actions")}</TableHead>
+            )}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {users.length === 0 ? (
+            <TableRow>
+              <TableCell
+                colSpan={colCount}
+                className="text-center text-control-light py-12"
+              >
+                {emptyMessage}
+              </TableCell>
+            </TableRow>
+          ) : (
+            users.map((user) => (
+              <TableRow key={user.name}>
+                <TableCell className="align-top">{user.email}</TableCell>
+                <TableCell className="align-top">{user.title || "-"}</TableCell>
+                <TableCell className="align-top">
+                  {userTypeLabel(t, user.userType)}
+                </TableCell>
+                <TableCell className="align-top">
+                  <StateBadge state={user.state} t={t} />
+                </TableCell>
+                {showLastLogin && (
+                  <TableCell className="align-top">
+                    {formatTimestamp(user.profile?.lastLoginTime)}
+                  </TableCell>
+                )}
+                {actionsColumn && (
+                  <TableCell className="align-top">
+                    {renderActions(user)}
+                  </TableCell>
+                )}
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
 
 export function UserListPage() {
   const { t } = useTranslation();
@@ -344,188 +438,70 @@ export function UserListPage() {
         </TabsList>
 
         <TabsPanel value="active">
-          {usersLoading ? (
-            <div className="flex items-center justify-center gap-2 py-16 text-control-light text-sm">
-              <Loader2 className="size-4 animate-spin" />
-              {t("common.loading")}
-            </div>
-          ) : (
-            <div className="rounded-xs border border-control-border bg-background shadow-xs overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[25%]">
-                      {t("user.header-email")}
-                    </TableHead>
-                    <TableHead className="w-[15%]">
-                      {t("user.header-title")}
-                    </TableHead>
-                    <TableHead className="w-[10%]">
-                      {t("user.header-type")}
-                    </TableHead>
-                    <TableHead className="w-[10%]">
-                      {t("user.header-state")}
-                    </TableHead>
-                    <TableHead className="w-[20%]">
-                      {t("user.header-last-login")}
-                    </TableHead>
-                    {canManageUsers && (
-                      <TableHead className="w-[20%]">
-                        {t("common.actions")}
-                      </TableHead>
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={canManageUsers ? 6 : 5}
-                        className="text-center text-control-light py-12"
-                      >
-                        {t("user.no-data")}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    users.map((user) => (
-                      <TableRow key={user.name}>
-                        <TableCell className="align-top">
-                          {user.email}
-                        </TableCell>
-                        <TableCell className="align-top">
-                          {user.title || "-"}
-                        </TableCell>
-                        <TableCell className="align-top">
-                          {userTypeLabel(t, user.userType)}
-                        </TableCell>
-                        <TableCell className="align-top">
-                          <StateBadge state={user.state} t={t} />
-                        </TableCell>
-                        <TableCell className="align-top">
-                          {formatTimestamp(user.profile?.lastLoginTime)}
-                        </TableCell>
-                        {canManageUsers && (
-                          <TableCell className="align-top">
-                            <div className="flex items-center gap-2">
-                              {canUpdateUsers && !isSpecialUser(user) && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openEdit(user)}
-                                >
-                                  {t("user.edit")}
-                                </Button>
-                              )}
-                              {canUpdateUsers && canResetPassword(user) && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openReset(user)}
-                                >
-                                  {t("user.reset-password")}
-                                </Button>
-                              )}
-                              {canDeleteUsers &&
-                                !isSpecialUser(user) &&
-                                !isSelf(user, currentUser) && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setDeleteTarget(user);
-                                      setDeleteOpen(true);
-                                    }}
-                                  >
-                                    {t("common.delete")}
-                                  </Button>
-                                )}
-                            </div>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    ))
+          <UserTable
+            users={users}
+            loading={usersLoading}
+            showLastLogin
+            actionsColumn={canManageUsers}
+            emptyMessage={t("user.no-data")}
+            renderActions={(user) => (
+              <div className="flex items-center gap-2">
+                {canUpdateUsers && !isSpecialUser(user) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openEdit(user)}
+                  >
+                    {t("user.edit")}
+                  </Button>
+                )}
+                {canUpdateUsers && canResetPassword(user) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openReset(user)}
+                  >
+                    {t("user.reset-password")}
+                  </Button>
+                )}
+                {canDeleteUsers &&
+                  !isSpecialUser(user) &&
+                  !isSelf(user, currentUser) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDeleteTarget(user);
+                        setDeleteOpen(true);
+                      }}
+                    >
+                      {t("common.delete")}
+                    </Button>
                   )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+              </div>
+            )}
+          />
         </TabsPanel>
 
         <TabsPanel value="trash">
-          {deletedUsersLoading ? (
-            <div className="flex items-center justify-center gap-2 py-16 text-control-light text-sm">
-              <Loader2 className="size-4 animate-spin" />
-              {t("common.loading")}
-            </div>
-          ) : (
-            <div className="rounded-xs border border-control-border bg-background shadow-xs overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[25%]">
-                      {t("user.header-email")}
-                    </TableHead>
-                    <TableHead className="w-[15%]">
-                      {t("user.header-title")}
-                    </TableHead>
-                    <TableHead className="w-[10%]">
-                      {t("user.header-type")}
-                    </TableHead>
-                    <TableHead className="w-[10%]">
-                      {t("user.header-state")}
-                    </TableHead>
-                    {canDeleteUsers && (
-                      <TableHead className="w-[20%]">
-                        {t("common.actions")}
-                      </TableHead>
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {deletedUsers.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={canDeleteUsers ? 5 : 4}
-                        className="text-center text-control-light py-12"
-                      >
-                        {t("user.no-data")}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    deletedUsers.map((user) => (
-                      <TableRow key={user.name}>
-                        <TableCell className="align-top">
-                          {user.email}
-                        </TableCell>
-                        <TableCell className="align-top">
-                          {user.title || "-"}
-                        </TableCell>
-                        <TableCell className="align-top">
-                          {userTypeLabel(t, user.userType)}
-                        </TableCell>
-                        <TableCell className="align-top">
-                          <StateBadge state={user.state} t={t} />
-                        </TableCell>
-                        {canDeleteUsers && (
-                          <TableCell className="align-top">
-                            {!isSpecialUser(user) && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleRestore(user)}
-                              >
-                                {t("user.restore")}
-                              </Button>
-                            )}
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          <UserTable
+            users={deletedUsers}
+            loading={deletedUsersLoading}
+            showLastLogin={false}
+            actionsColumn={canDeleteUsers}
+            emptyMessage={t("user.no-data")}
+            renderActions={(user) =>
+              !isSpecialUser(user) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleRestore(user)}
+                >
+                  {t("user.restore")}
+                </Button>
+              )
+            }
+          />
         </TabsPanel>
       </Tabs>
 

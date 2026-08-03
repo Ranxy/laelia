@@ -1,6 +1,11 @@
 import { Key, Loader2, Save } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  PageLoading,
+  PermissionNotice,
+  SettingsPage,
+} from "@/components/settings-page";
 import { Alert } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -265,34 +270,23 @@ export function SettingsRolesPage() {
   }
 
   if (!canList) {
-    return (
-      <div className="h-full overflow-y-auto p-6">
-        <p className="text-sm text-control-light">
-          {t("settings.roles.not-allowed")}
-        </p>
-      </div>
-    );
+    return <PermissionNotice message={t("settings.roles.not-allowed")} />;
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6 flex flex-col gap-5 w-full">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold text-main flex items-center gap-2">
-            <Key className="size-5 text-accent" />
-            {t("settings.roles.title")}
-          </h1>
-        </div>
-        {canCreate && (
-          <Button onClick={openCreate}>{t("common.create")}</Button>
-        )}
-      </div>
-
+    <SettingsPage
+      title={
+        <span className="flex items-center gap-2">
+          <Key className="size-5 text-accent" />
+          {t("settings.roles.title")}
+        </span>
+      }
+      actions={
+        canCreate && <Button onClick={openCreate}>{t("common.create")}</Button>
+      }
+    >
       {loading ? (
-        <div className="flex items-center justify-center gap-2 py-16 text-control-light text-sm">
-          <Loader2 className="size-4 animate-spin" />
-          {t("common.loading")}
-        </div>
+        <PageLoading />
       ) : (
         <div className="rounded-xs border border-control-border bg-background shadow-xs overflow-hidden">
           <Table>
@@ -640,7 +634,7 @@ export function SettingsRolesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </SettingsPage>
   );
 }
 

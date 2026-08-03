@@ -1,6 +1,7 @@
 import { Bell, Loader2, Network, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { PageLoading } from "@/components/settings-page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -180,10 +181,7 @@ export function SettingsNotificationsPage() {
         </p>
 
         {status === "loading" ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-control-light text-sm">
-            <Loader2 className="size-4 animate-spin" />
-            {t("settings.notifications.loading")}
-          </div>
+          <PageLoading message={t("settings.notifications.loading")} />
         ) : (
           <div className="mt-6 space-y-4">
             {status === "unsupported" && (
