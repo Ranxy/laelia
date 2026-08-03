@@ -47,6 +47,12 @@ import { CommandEventType, SenderType } from "@/types/proto-es/v1/command_pb";
 // so non-streaming consumers (channel chat) can pass a stable empty slice.
 const EMPTY_EVENTS: CommandEvent[] = [];
 
+// Module-level constant for the mention path's customHtmlTags prop. Passing an
+// inline ["mention"] array literal would mint a fresh reference every render,
+// defeating MemoMarkdown's React.memo (shallow props compare) in exactly the
+// channel/thread path the memo was added for.
+const MENTION_HTML_TAGS = ["mention"];
+
 export { EMPTY_EVENTS };
 
 // Computes the streaming props for a single row. Only the row that is
@@ -539,7 +545,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
                   scrollRoot={scrollRoot}
                   markdownCustomId={markdownCustomId}
                   fade={fade ?? false}
-                  customHtmlTags={["mention"]}
+                  customHtmlTags={MENTION_HTML_TAGS}
                 />
               </div>
             )

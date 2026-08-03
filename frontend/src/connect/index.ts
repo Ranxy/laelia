@@ -31,8 +31,11 @@ async function onUnauthenticated() {
   try {
     const { useAppStore } = await import("@/stores");
     // Clear auth without calling the backend `logout` RPC (it would itself 401
-    // and re-enter this handler). Keep sessionLoaded true so the guard does not
-    // re-show the initial spinner.
+    // and re-enter this handler). Also wipe every slice (same as logout) so a
+    // mid-session expiry can't leave the previous principal's cached
+    // messages/channels/rosters behind for the next login. Keep sessionLoaded
+    // true so the guard does not re-show the initial spinner.
+    useAppStore.getState().reset();
     useAppStore.setState({
       currentUser: null,
       isLoggedIn: false,

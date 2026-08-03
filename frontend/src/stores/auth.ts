@@ -1,6 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { authServiceClient, userServiceClient } from "@/connect";
 import { invalidateAvatar } from "@/lib/avatar-cache";
+import { invalidateImageBlobs } from "@/lib/image-blob-cache";
 import {
   LoginRequestSchema,
   LogoutRequestSchema,
@@ -51,9 +52,11 @@ export const createAuthSlice: AppSliceCreator<AuthSlice> = (set, get) => ({
       // Keep sessionLoaded true so the router guard does not re-show the
       // initial loading spinner on the way to the sign-in page.
       set({ sessionLoaded: true });
-      // Avatar blob URLs and the "missing" set are module-level caches that a
-      // store reset cannot reach; clear them so they don't survive across users.
+      // Avatar blob URLs and the cached image blobs are module-level caches
+      // that a store reset cannot reach; clear them so they don't survive
+      // across users.
       invalidateAvatar();
+      invalidateImageBlobs();
     }
   },
 

@@ -257,6 +257,11 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
         const nextVersion = currentVersion;
         const prevVersion = get().chatCurrentVersion[conversationName] ?? 0n;
         if (merged !== prev || nextVersion !== prevVersion) {
+          // Bail if the watcher was stopped/reset while this poll was in
+          // flight — clearInterval can't abort an already-running poll, but
+          // writing here would repopulate a freshly reset store (cross-user
+          // data leak on logout/401).
+          if (!get().channelWatchers[conversationName]) return;
           set((state) => ({
             chatMessages:
               merged !== prev
@@ -444,6 +449,8 @@ async function refreshChannelThreadCounts(
     return { ...m, threadReplyCount: count };
   });
   if (changed) {
+    // Bail if the watcher was stopped/reset mid-flight (see the poll guard).
+    if (!get().channelWatchers[conversationName]) return;
     set((state) => ({
       chatMessages: { ...state.chatMessages, [conversationName]: next },
     }));
@@ -503,6 +510,8 @@ async function refreshChannelTaskInfo(
     return { ...m, task: fresh };
   });
   if (changed) {
+    // Bail if the watcher was stopped/reset mid-flight (see the poll guard).
+    if (!get().channelWatchers[conversationName]) return;
     set((state) => ({
       chatMessages: { ...state.chatMessages, [conversationName]: next },
     }));

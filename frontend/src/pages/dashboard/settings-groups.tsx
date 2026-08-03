@@ -1,5 +1,12 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { PermissionNotice, SettingsPage } from "@/components/settings-page";
 import {
@@ -139,28 +146,53 @@ export function SettingsGroupsPage() {
   // Fetch a group's policy references lazily the first time its references row
   // is expanded, then toggle the expansion. Without this the page load fired a
   // getGroupReferences RPC for every group, most of which are never displayed.
-  const toggleRefs = useCallback(
+  // Group names whose references are currently being fetched, so a double-click
+  // can't fire duplicate RPCs and net-cancel the expansion (the toggle happens
+  // once the fetch completes, not once per click).
+  const pendingRefsRef = useRef<Set<string>>(new Set());
+
+  const loadRefs = useCallback(
     async (groupName: string) => {
-      if (!refsByGroup.has(groupName)) {
-        try {
-          const res = await groupServiceClient.getGroupReferences({
-            name: groupName,
-          });
-          setRefsByGroup((prev) =>
-            new Map(prev).set(groupName, res.references ?? [])
-          );
-        } catch {
-          setRefsByGroup((prev) => new Map(prev).set(groupName, []));
-        }
+      if (refsByGroup.has(groupName) || pendingRefsRef.current.has(groupName)) {
+        return;
       }
-      setExpandedRefs((prev) => {
-        const next = new Set(prev);
-        if (next.has(groupName)) next.delete(groupName);
-        else next.add(groupName);
-        return next;
-      });
+      pendingRefsRef.current.add(groupName);
+      try {
+        const res = await groupServiceClient.getGroupReferences({
+          name: groupName,
+        });
+        setRefsByGroup((prev) =>
+          new Map(prev).set(groupName, res.references ?? [])
+        );
+      } catch {
+        setRefsByGroup((prev) => new Map(prev).set(groupName, []));
+      } finally {
+        pendingRefsRef.current.delete(groupName);
+      }
+      // Reveal the row once the references arrive — the click that started the
+      // load intended to expand it.
+      setExpandedRefs((prev) => new Set(prev).add(groupName));
     },
     [refsByGroup]
+  );
+
+  const toggleRefs = useCallback(
+    (groupName: string) => {
+      if (refsByGroup.has(groupName)) {
+        // Already loaded — plain expand/collapse toggle.
+        setExpandedRefs((prev) => {
+          const next = new Set(prev);
+          if (next.has(groupName)) next.delete(groupName);
+          else next.add(groupName);
+          return next;
+        });
+        return;
+      }
+      // Not loaded — fetch once (idempotent while in flight) and expand on
+      // completion; a second click while loading is ignored.
+      void loadRefs(groupName);
+    },
+    [refsByGroup, loadRefs]
   );
 
   useEffect(() => {

@@ -1,62 +1,15 @@
 import { ImageIcon, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { commandServiceClient } from "@/connect";
+import { getImageBlob } from "@/lib/image-blob-cache";
 import { cn } from "@/lib/utils";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
 
-// Module-level blob cache keyed by attachment id, mirroring avatar-cache: a
-// channel full of images fetches each attachment's bytes at most once per
-// session, so switching channels and back (which remounts every RemoteImage)
-// does not re-download every image. Object URLs are intentionally NOT revoked
-// on unmount — they're shared. The cap evicts the oldest entry so a long-lived
-// image-heavy conversation doesn't pin every downloaded byte in memory.
-const MAX_CACHED_IMAGES = 100;
-const imageBlobUrls = new Map<string, string>();
-const inflight = new Map<string, Promise<string | null>>();
-
-function cacheImageUrl(id: string, url: string) {
-  if (imageBlobUrls.size >= MAX_CACHED_IMAGES) {
-    const oldest = imageBlobUrls.keys().next().value;
-    if (oldest !== undefined) {
-      const oldUrl = imageBlobUrls.get(oldest);
-      if (oldUrl) URL.revokeObjectURL(oldUrl);
-      imageBlobUrls.delete(oldest);
-    }
-  }
-  imageBlobUrls.set(id, url);
-}
-
-async function getImageUrl(
-  id: string,
-  mimeType: string
-): Promise<string | null> {
-  const cached = imageBlobUrls.get(id);
-  if (cached) return cached;
-  const pending = inflight.get(id);
-  if (pending) return pending;
-  const promise = (async () => {
-    try {
-      const res = await commandServiceClient.downloadFile({ id });
-      const blob = new Blob([new Uint8Array(res.data)], {
-        type: mimeType || undefined,
-      });
-      const url = URL.createObjectURL(blob);
-      cacheImageUrl(id, url);
-      return url;
-    } catch (err) {
-      console.error("image fetch failed", err);
-      return null;
-    } finally {
-      inflight.delete(id);
-    }
-  })();
-  inflight.set(id, promise);
-  return promise;
-}
-
-// RemoteImage fetches an attachment's bytes via downloadFile (cached per
-// attachment id) and renders them as an <img>. Two layout variants:
+// RemoteImage renders an attachment's bytes as an <img>. The bytes come from
+// the shared image-blob cache (fetched at most once per session); each mount
+// creates its own object URL from the cached Blob and revokes it on unmount,
+// so evicting a cached blob never breaks a still-displayed image. Two layout
+// variants:
 //   - "thumb":  a fixed square thumbnail (composer draft chips), cover-fit.
 //   - "inline": the published in-message image, contain-fit and capped to fit
 //               the chat width/height; large images scale down.
@@ -80,21 +33,24 @@ export function RemoteImage({
 
   useEffect(() => {
     let cancelled = false;
+    let createdUrl: string | null = null;
     setUrl(null);
     setStatus("loading");
-    // The cached object URL is shared, so there's nothing to revoke on unmount
-    // (and must not be — another mounted RemoteImage may still be using it).
-    getImageUrl(attachment.id, attachment.mimeType ?? "").then((url) => {
+    getImageBlob(attachment.id, attachment.mimeType ?? "").then((blob) => {
       if (cancelled) return;
-      if (url) {
-        setUrl(url);
-        setStatus("ready");
-      } else {
+      if (!blob) {
         setStatus("error");
+        return;
       }
+      createdUrl = URL.createObjectURL(blob);
+      setUrl(createdUrl);
+      setStatus("ready");
     });
     return () => {
       cancelled = true;
+      // This URL was created for this mount only — revoke it on unmount so the
+      // blob is released once the image leaves the screen.
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
     };
   }, [attachment.id, attachment.mimeType]);
 

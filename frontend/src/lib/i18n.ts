@@ -68,8 +68,14 @@ if (initialLng !== "en-US") {
   });
 }
 
+// Tracks the most recent setLocale request so a faster earlier loader (en-US
+// resolves in a microtask, zh-CN is a dynamic import) can't override a later
+// selection once it resolves.
+let latestRequestedLocale = "";
+
 export function setLocale(locale: string) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(locale));
+  latestRequestedLocale = locale;
   const load = localeLoaders[locale as Locale];
   if (!load) {
     // Unknown/removed locale — fall back to the always-bundled default rather
@@ -78,6 +84,9 @@ export function setLocale(locale: string) {
     return;
   }
   void load().then((mod) => {
+    // Only apply when this is still the latest selection — otherwise a slow
+    // zh-CN import resolving after a later en-US click would flip the UI back.
+    if (latestRequestedLocale !== locale) return;
     i18n.addResourceBundle(
       locale,
       "translation",
