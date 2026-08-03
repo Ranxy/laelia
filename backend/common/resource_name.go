@@ -21,6 +21,8 @@ const (
 	AgentNamePrefix            = "agents/"
 	MachineNamePrefix          = "machines/"
 	ConversationNamePrefix     = "conversations/"
+	APIProviderNamePrefix      = "apiProviders/"
+	APIProviderEntryPrefix     = "entries/"
 )
 
 // GetUserID returns the user ID from a resource name.
@@ -226,4 +228,37 @@ func GetConversationResourceID(name string) (string, error) {
 		return "", err
 	}
 	return tokens[0], nil
+}
+
+// GetAPIProviderResourceID returns the api provider resource id (uuid) from an
+// apiProviders/{id} resource name.
+func GetAPIProviderResourceID(name string) (string, error) {
+	tokens, err := GetNameParentTokens(name, APIProviderNamePrefix)
+	if err != nil {
+		return "", err
+	}
+	return tokens[0], nil
+}
+
+// FormatAPIProviderUID returns the apiProviders/{id} resource name for the
+// given provider resource id.
+func FormatAPIProviderUID(id string) string {
+	return fmt.Sprintf("%s%s", APIProviderNamePrefix, id)
+}
+
+// FormatAPIProviderEntryName returns the
+// apiProviders/{provider}/entries/{entry} resource name for the given provider
+// and entry resource ids.
+func FormatAPIProviderEntryName(providerID, entryID string) string {
+	return fmt.Sprintf("%s%s/entries/%s", APIProviderNamePrefix, providerID, entryID)
+}
+
+// ParseAPIProviderEntryName parses an apiProviders/{provider}/entries/{entry}
+// resource name and returns the provider and entry resource ids.
+func ParseAPIProviderEntryName(name string) (providerID, entryID string, err error) {
+	tokens, err := GetNameParentTokens(name, APIProviderNamePrefix, APIProviderEntryPrefix)
+	if err != nil {
+		return "", "", err
+	}
+	return tokens[0], tokens[1], nil
 }

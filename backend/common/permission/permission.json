@@ -55,6 +55,11 @@
     {"name": "GroupsUpdate", "id": "laelia.groups.update"},
     {"name": "GroupsDelete", "id": "laelia.groups.delete"},
     {"name": "AuditLogsSearch", "id": "laelia.auditLogs.search"},
-    {"name": "AuditLogsExport", "id": "laelia.auditLogs.export"}
+    {"name": "AuditLogsExport", "id": "laelia.auditLogs.export"},
+    {"name": "ApiProvidersCreate", "id": "laelia.apiProviders.create"},
+    {"name": "ApiProvidersGet", "id": "laelia.apiProviders.get"},
+    {"name": "ApiProvidersList", "id": "laelia.apiProviders.list"},
+    {"name": "ApiProvidersUpdate", "id": "laelia.apiProviders.update"},
+    {"name": "ApiProvidersDelete", "id": "laelia.apiProviders.delete"}
   ]
 }

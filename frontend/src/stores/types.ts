@@ -9,6 +9,7 @@ import type {
   RotateAgentTokenResponse,
   TransferAgentOwnershipResponse,
 } from "@/types/proto-es/v1/agent_pb";
+import type { ApiProvider } from "@/types/proto-es/v1/api_provider_service_pb";
 import type {
   Activity,
   ActivityCategory,
@@ -154,8 +155,15 @@ export interface AgentACPConfigInput {
   // apiProvider is the LLM API provider ("deepseek" | "openrouter"); apiKey is
   // the plaintext LLM API key. apiKey may be left empty on update to keep the
   // existing stored key (the server treats empty as "preserve").
-  apiProvider: string;
-  apiKey: string;
+  //
+  // Global-provider mode (preferred): globalProvider references a managed API
+  // provider ("apiProviders/{id}") and globalProviderEntry one of its (key,
+  // model) entries. When both are set the server resolves the key at the daemon
+  // boundary and the inline apiProvider/apiKey are ignored.
+  apiProvider?: string;
+  apiKey?: string;
+  globalProvider?: string;
+  globalProviderEntry?: string;
 }
 
 export interface AgentSlice {
@@ -534,7 +542,22 @@ export interface ActivitySlice {
   markActivityDone: (name: string) => Promise<Activity | undefined>;
 }
 
+// ApiProviderSlice owns the global LLM API provider roster. The backend
+// handler-gates ListApiProviders: admins/managers see every provider, other
+// callers see only the providers they may use, so the same list feeds both the
+// settings page and the agent create/edit form dropdowns.
+export interface ApiProviderSlice {
+  apiProviders: ApiProvider[];
+  apiProvidersLoading: boolean;
+
+  fetchApiProviders: (
+    params?: { pageSize?: number; pageToken?: string },
+    opts?: { silent?: boolean }
+  ) => Promise<{ nextPageToken: string } | undefined>;
+}
+
 export type AppStoreState = AuthSlice &
+  ApiProviderSlice &
   AgentSlice &
   MachineSlice &
   MembersSlice &

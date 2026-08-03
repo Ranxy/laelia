@@ -80,3 +80,17 @@ export function modelLabel(
 // is fetched dynamically from the provider's model API (see usePiModels), never
 // hardcoded.
 export const piAPIProviderIds = ["deepseek", "openrouter"];
+
+// entryLabel renders a global API provider entry's select label: "model (label)"
+// when the entry has a display label, the bare model otherwise.
+export function entryLabel(
+  e:
+    | {
+        model: string;
+        label?: string;
+      }
+    | undefined
+): string {
+  if (!e) return "";
+  return e.label ? `${e.model} (${e.label})` : e.model;
+}

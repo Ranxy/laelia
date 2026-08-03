@@ -61,6 +61,11 @@ const (
 	GroupsDelete               Permission = "laelia.groups.delete"
 	AuditLogsSearch            Permission = "laelia.auditLogs.search"
 	AuditLogsExport            Permission = "laelia.auditLogs.export"
+	ApiProvidersCreate         Permission = "laelia.apiProviders.create"
+	ApiProvidersGet            Permission = "laelia.apiProviders.get"
+	ApiProvidersList           Permission = "laelia.apiProviders.list"
+	ApiProvidersUpdate         Permission = "laelia.apiProviders.update"
+	ApiProvidersDelete         Permission = "laelia.apiProviders.delete"
 )
 
 // allPermissions is the complete, authoritative list of valid permission
@@ -123,6 +128,11 @@ var allPermissions = []Permission{
 	GroupsDelete,
 	AuditLogsSearch,
 	AuditLogsExport,
+	ApiProvidersCreate,
+	ApiProvidersGet,
+	ApiProvidersList,
+	ApiProvidersUpdate,
+	ApiProvidersDelete,
 }
 
 var allPermissionsMap = func() map[Permission]bool {

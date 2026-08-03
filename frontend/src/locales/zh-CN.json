@@ -72,7 +72,8 @@
     "settings-groups": "用户组",
     "settings-audit": "审计日志",
     "settings-notifications": "通知",
-    "settings-chat": "聊天"
+    "settings-chat": "聊天",
+    "settings-api-providers": "API 提供方"
   },
   "settings": {
     "title": "设置",
@@ -289,6 +290,55 @@
       "show-payload": "查看变更",
       "hide-payload": "收起变更",
       "actor-unknown": "未知"
+    },
+    "api-providers": {
+      "title": "API 提供方",
+      "description": "管理全局 LLM API 提供方。每个提供方包含若干 (API 密钥, 模型) 条目,以及允许使用的用户/用户组。",
+      "load-failed": "加载提供方失败",
+      "not-allowed": "你没有查看 API 提供方的权限。",
+      "header-title": "名称",
+      "header-type": "类型",
+      "header-entries": "条目",
+      "header-members": "成员",
+      "no-providers": "还没有 API 提供方。",
+      "create": "创建提供方",
+      "create-title": "创建提供方",
+      "create-description": "配置一个全局 LLM API 提供方及其可用范围。",
+      "edit-title": "编辑提供方: {{title}}",
+      "edit-description": "更新提供方的字段、条目或成员。",
+      "title-required": "名称必填。",
+      "field-title": "名称",
+      "field-title-placeholder": "例如 DeepSeek",
+      "field-type": "类型",
+      "type-deepseek": "DeepSeek",
+      "type-openrouter": "OpenRouter",
+      "field-base-url": "API 基础地址",
+      "field-base-url-placeholder": "https://api.deepseek.com",
+      "field-base-url-hint": "可选。留空使用该类型的默认地址。",
+      "field-description": "描述",
+      "field-description-placeholder": "该提供方的用途",
+      "field-entries": "条目 (密钥 + 模型)",
+      "field-entries-hint": "每个条目组合一个 API 密钥与一个模型。填入密钥、拉取模型列表,再勾选模型即可生成条目。",
+      "field-fetch-key-placeholder": "用于拉取模型的 API 密钥",
+      "fetch-key-required": "请先填写 API 密钥以拉取模型。",
+      "fetch-models": "拉取模型",
+      "fetching": "拉取中…",
+      "entry-incomplete": "每个条目都需要模型和 API 密钥。",
+      "entry-key-required": "新条目需要 API 密钥。",
+      "entry-label-placeholder": "标签 (可选)",
+      "entry-key-kept": "密钥已存储 (掩码显示)。输入新密钥可替换。",
+      "entry-key-replace-placeholder": "新密钥 (留空保持不变)",
+      "entry-key-set": "此条目将保存该密钥。",
+      "field-members": "允许使用的用户 / 组",
+      "field-members-hint": "创建 agent 时谁可以使用该提供方。管理员可使用任意提供方。",
+      "created": "提供方已创建",
+      "updated": "提供方已更新",
+      "deleted": "提供方已删除",
+      "create-failed": "创建提供方失败",
+      "update-failed": "更新提供方失败",
+      "delete-failed": "删除提供方失败",
+      "delete-confirm-title": "删除提供方",
+      "delete-confirm-description": "删除提供方 \"{{title}}\"? 仍被 agent 使用的提供方无法删除。"
     }
   },
   "setup": {
@@ -505,7 +555,12 @@
     "acp-config-manage-providers": "到机器详情页管理 Provider",
     "allow-add-to-channel": "允许其他人将此 Agent 加入频道",
     "allow-add-to-channel-hint": "关闭：只有该 Agent 的负责人或工作区管理员可以将其加入频道。开启：任何频道的 owner/admin 都可以添加它。",
-    "allow-add-to-channel-save-error": "更新此设置失败"
+    "allow-add-to-channel-save-error": "更新此设置失败",
+    "acp-config-pi-global-provider": "全局 API 提供方",
+    "acp-config-pi-global-providers-empty": "没有可用的 API 提供方",
+    "acp-config-pi-global-entry": "密钥 / 模型条目",
+    "acp-config-pi-global-entry-hint": "选择该 agent 使用的 (密钥, 模型) 条目。密钥由提供方统一管理,此处不显示。",
+    "acp-config-pi-global-entries-empty": "该提供方还没有条目。"
   },
   "machine": {
     "title": "机器",
@@ -576,7 +631,8 @@
       "section-token": "令牌与连接",
       "edit-not-allowed": "仅工作区管理员可管理此机器。",
       "load-failed": "加载机器失败。它可能已被删除,或请求出错。"
-    }
+    },
+    "add-agent-global-entry-required": "请为该 agent 选择密钥/模型条目。"
   },
   "members": {
     "title": "成员",

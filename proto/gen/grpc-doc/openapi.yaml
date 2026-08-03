@@ -130,6 +130,11 @@ paths:
         post:
             tags:
                 - AgentService
+            description: |-
+                CreateAgent is handler-gated (no permission annotation): the machine's
+                 creator or a caller holding laelia.agents.create (workspace admin) may
+                 create agents on it. The machine-scoped check cannot be expressed as a
+                 catalog permission.
             operationId: AgentService_CreateAgent
             requestBody:
                 content:
@@ -1036,7 +1041,11 @@ paths:
         patch:
             tags:
                 - AgentService
-            description: Update agent ACP config YAML (admin only)
+            description: |-
+                Update the agent's ACP config. Handler-gated (no permission annotation):
+                 the agent's owner or a workspace admin may update it. Setting a legacy
+                 inline api_provider/api_key additionally requires laelia.agents.edit (only
+                 workspace admin today); owners without it must use a global provider.
             operationId: AgentService_UpdateAgentACPConfig
             parameters:
                 - name: agent
@@ -1152,6 +1161,166 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/RefreshAgentTokenResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/apiProviders:
+        get:
+            tags:
+                - ApiProviderService
+            operationId: ApiProviderService_ListApiProviders
+            parameters:
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListApiProvidersResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - ApiProviderService
+            operationId: ApiProviderService_CreateApiProvider
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ApiProvider'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ApiProvider'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/apiProviders/{apiProvider}:
+        get:
+            tags:
+                - ApiProviderService
+            operationId: ApiProviderService_GetApiProvider
+            parameters:
+                - name: apiProvider
+                  in: path
+                  description: The apiProvider id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ApiProvider'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        delete:
+            tags:
+                - ApiProviderService
+            operationId: ApiProviderService_DeleteApiProvider
+            parameters:
+                - name: apiProvider
+                  in: path
+                  description: The apiProvider id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - ApiProviderService
+            operationId: ApiProviderService_UpdateApiProvider
+            parameters:
+                - name: apiProvider
+                  in: path
+                  description: The apiProvider id.
+                  required: true
+                  schema:
+                    type: string
+                - name: updateMask
+                  in: query
+                  schema:
+                    type: string
+                    format: field-mask
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ApiProvider'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ApiProvider'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/apiProviders:listModels:
+        post:
+            tags:
+                - ApiProviderService
+            description: |-
+                List the models a provider type exposes. The manager proxies the provider's
+                 model-listing HTTP API (DeepSeek GET /models with the caller's api_key;
+                 OpenRouter GET /models, public). Admin (laelia.apiProviders.update) only.
+            operationId: ApiProviderService_ListApiProviderModels
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ListApiProviderModelsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListApiProviderModelsResponse'
                 default:
                     description: Default error response
                     content:
@@ -4131,7 +4300,22 @@ components:
                     description: |-
                         api_key is the plaintext LLM API key for the api_provider. Only meaningful when
                          provider == "builtin-pi"; ignored by ACP runtimes. Stored in the agent info JSONB with the
-                         same plaintext-at-rest posture as custom_env.
+                         same plaintext-at-rest posture as custom_env. When global_provider is set, api_key is
+                         ignored: the key is resolved server-side from the global provider's entry and never stored
+                         in (nor returned with) the agent.
+                globalProvider:
+                    type: string
+                    description: |-
+                        global_provider is the resource name of the global API provider this builtin-pi agent uses
+                         ("apiProviders/{id}"). Only meaningful when provider == "builtin-pi". When set, the stored
+                         config carries the provider/entry references instead of an inline api_provider/api_key; the
+                         server resolves the concrete api_provider/api_key/model at the daemon boundary.
+                globalProviderEntry:
+                    type: string
+                    description: |-
+                        global_provider_entry is the resource name of the (key, model) entry within the global
+                         provider, in the form "apiProviders/{id}/entries/{entry}". Only meaningful when
+                         provider == "builtin-pi" and global_provider is set.
             description: |-
                 User-configurable ACP settings. Everything else (working dir, capabilities,
                  permissions) is derived from a built-in template, not set by the admin.
@@ -4417,6 +4601,88 @@ components:
                  the two RPCs don't overlap. can_edit is intentionally omitted: resolving it
                  per row would N+1 the IAM policy lookup for non-admin callers, and the list
                  view does not gate affordances on it (delete is enforced server-side).
+        ApiProvider:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: The resource name of the provider, in the form `apiProviders/{id}`.
+                providerType:
+                    type: string
+                    description: |-
+                        The LLM API provider type, e.g. "deepseek" or "openrouter" (the phase-1 pi
+                         runtime support set).
+                title:
+                    type: string
+                    description: Human-readable title.
+                baseUrl:
+                    type: string
+                    description: API base URL. Empty means the provider type's default.
+                description:
+                    type: string
+                    description: Longer description of the provider.
+                entries:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ApiProviderEntry'
+                    description: The (api_key, model) entries of this provider.
+                members:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        Users or groups allowed to use this provider, in IAM member format:
+                         `users/{uid}`, `groups/{email}`, `groups/{id}`, or `allUsers`. Access is
+                         checked when an agent references the provider (write-time snapshot).
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
+                createdBy:
+                    readOnly: true
+                    type: string
+                    description: Creator's user resource name (users/{id}). Display-only.
+            description: |-
+                ApiProvider is a named global LLM API provider (e.g. "DeepSeek"). A provider
+                 bundles a set of (api_key, model) entries plus the users/groups allowed to
+                 use them. The API never returns the api keys: entries expose has_api_key and
+                 a masked form ("****"+last4) so the key stays out of the renderer.
+        ApiProviderEntry:
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: |-
+                        The entry's resource name, in the form
+                         `apiProviders/{provider}/entries/{entry}`.
+                label:
+                    type: string
+                    description: Optional display label to distinguish entries sharing a model.
+                model:
+                    type: string
+                    description: The model name this entry exposes (passed to the pi runtime as --model).
+                hasApiKey:
+                    readOnly: true
+                    type: boolean
+                    description: Whether an api key is stored. Output only.
+                maskedApiKey:
+                    readOnly: true
+                    type: string
+                    description: Masked form of the stored key ("****"+last4), for display only. Output only.
+                apiKey:
+                    writeOnly: true
+                    type: string
+                    description: |-
+                        Input only. On write: empty or a "****"-prefixed value means "keep the
+                         existing key"; any other value replaces it. Never echoed on read.
+            description: |-
+                ApiProviderEntry is one (api_key, model) entry of an ApiProvider. The api key
+                 is stored server-side and never returned; has_api_key/masked_api_key are the
+                 only read surface.
         Attachment:
             type: object
             properties:
@@ -5573,6 +5839,38 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/AgentSummary'
+                nextPageToken:
+                    type: string
+        ListApiProviderModelsRequest:
+            required:
+                - providerType
+            type: object
+            properties:
+                providerType:
+                    type: string
+                apiKey:
+                    type: string
+                baseUrl:
+                    type: string
+                    description: Optional base URL override; when empty the provider type's default is used.
+            description: |-
+                ListApiProviderModelsRequest fetches the model list a provider type exposes.
+                 The api_key is a bearer credential: it is never logged and never echoed in
+                 errors.
+        ListApiProviderModelsResponse:
+            type: object
+            properties:
+                models:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/PiModel'
+        ListApiProvidersResponse:
+            type: object
+            properties:
+                apiProviders:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ApiProvider'
                 nextPageToken:
                     type: string
         ListChannelMembersResponse:
@@ -6909,6 +7207,14 @@ components:
                     type: string
 tags:
     - name: AgentService
+    - name: ApiProviderService
+      description: |-
+        ApiProviderService manages global LLM API providers. Management RPCs
+         (create/update/delete) are gated by the IAM interceptor with the
+         laelia.apiProviders.* permissions (held by workspaceAdmin or an authorized
+         custom role). ListApiProviders is handler-gated instead: it returns only the
+         providers the caller may use, so the agent create/edit form can list them
+         without a management permission.
     - name: AuditLogService
       description: |-
         AuditLogService exposes the structured audit trail. Search and export are

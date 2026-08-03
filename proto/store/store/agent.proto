@@ -43,6 +43,8 @@ message AgentACPConfig {
   string persona_prompt = 7;
   string api_provider = 8;
   string api_key = 9;
+  string global_provider = 10;
+  string global_provider_entry = 11;
 }
 
 message AgentProviderInfo {

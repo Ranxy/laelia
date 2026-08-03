@@ -1,0 +1,202 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "v1/agent.proto";
+import "v1/annotation.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+// ApiProvider is a named global LLM API provider (e.g. "DeepSeek"). A provider
+// bundles a set of (api_key, model) entries plus the users/groups allowed to
+// use them. The API never returns the api keys: entries expose has_api_key and
+// a masked form ("****"+last4) so the key stays out of the renderer.
+message ApiProvider {
+  option (google.api.resource) = {
+    type: "laelia/ApiProvider"
+    pattern: "apiProviders/{provider}"
+  };
+
+  // The resource name of the provider, in the form `apiProviders/{id}`.
+  string name = 1 [
+    (google.api.field_behavior) = IDENTIFIER,
+    (google.api.field_behavior) = REQUIRED
+  ];
+
+  // The LLM API provider type, e.g. "deepseek" or "openrouter" (the phase-1 pi
+  // runtime support set).
+  string provider_type = 2;
+
+  // Human-readable title.
+  string title = 3;
+
+  // API base URL. Empty means the provider type's default.
+  string base_url = 4;
+
+  // Longer description of the provider.
+  string description = 5;
+
+  // The (api_key, model) entries of this provider.
+  repeated ApiProviderEntry entries = 6;
+
+  // Users or groups allowed to use this provider, in IAM member format:
+  // `users/{uid}`, `groups/{email}`, `groups/{id}`, or `allUsers`. Access is
+  // checked when an agent references the provider (write-time snapshot).
+  repeated string members = 7;
+
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+
+  // Creator's user resource name (users/{id}). Display-only.
+  string created_by = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ApiProviderEntry is one (api_key, model) entry of an ApiProvider. The api key
+// is stored server-side and never returned; has_api_key/masked_api_key are the
+// only read surface.
+message ApiProviderEntry {
+  // The entry's resource name, in the form
+  // `apiProviders/{provider}/entries/{entry}`.
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Optional display label to distinguish entries sharing a model.
+  string label = 2;
+
+  // The model name this entry exposes (passed to the pi runtime as --model).
+  string model = 3;
+
+  // Whether an api key is stored. Output only.
+  bool has_api_key = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Masked form of the stored key ("****"+last4), for display only. Output only.
+  string masked_api_key = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Input only. On write: empty or a "****"-prefixed value means "keep the
+  // existing key"; any other value replaces it. Never echoed on read.
+  string api_key = 6 [(google.api.field_behavior) = INPUT_ONLY];
+}
+
+message GetApiProviderRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/ApiProvider"}
+  ];
+}
+
+message ListApiProvidersRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListApiProvidersResponse {
+  repeated ApiProvider api_providers = 1;
+  string next_page_token = 2;
+}
+
+message CreateApiProviderRequest {
+  ApiProvider api_provider = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateApiProviderRequest {
+  ApiProvider api_provider = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteApiProviderRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/ApiProvider"}
+  ];
+}
+
+// ListApiProviderModelsRequest fetches the model list a provider type exposes.
+// The api_key is a bearer credential: it is never logged and never echoed in
+// errors.
+message ListApiProviderModelsRequest {
+  string provider_type = 1 [(google.api.field_behavior) = REQUIRED];
+  string api_key = 2;
+  // Optional base URL override; when empty the provider type's default is used.
+  string base_url = 3;
+}
+
+message ListApiProviderModelsResponse {
+  repeated PiModel models = 1;
+}
+
+// ApiProviderChange is the audit payload recorded for a successful
+// CreateApiProvider/UpdateApiProvider. It carries only the provider resource
+// name and the entry names added/removed — never the api keys.
+message ApiProviderChange {
+  string provider = 1;
+  repeated string entries_added = 2;
+  repeated string entries_removed = 3;
+}
+
+// ApiProviderService manages global LLM API providers. Management RPCs
+// (create/update/delete) are gated by the IAM interceptor with the
+// laelia.apiProviders.* permissions (held by workspaceAdmin or an authorized
+// custom role). ListApiProviders is handler-gated instead: it returns only the
+// providers the caller may use, so the agent create/edit form can list them
+// without a management permission.
+service ApiProviderService {
+  rpc GetApiProvider(GetApiProviderRequest) returns (ApiProvider) {
+    option (google.api.http) = {get: "/v1/{name=apiProviders/*}"};
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.apiProviders.get";
+  }
+
+  rpc ListApiProviders(ListApiProvidersRequest) returns (ListApiProvidersResponse) {
+    option (google.api.http) = {get: "/v1/apiProviders"};
+    option (laelia.v1.auth_method) = IAM;
+  }
+
+  rpc CreateApiProvider(CreateApiProviderRequest) returns (ApiProvider) {
+    option (google.api.http) = {
+      post: "/v1/apiProviders"
+      body: "api_provider"
+    };
+    option (google.api.method_signature) = "api_provider";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.apiProviders.create";
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc UpdateApiProvider(UpdateApiProviderRequest) returns (ApiProvider) {
+    option (google.api.http) = {
+      patch: "/v1/{api_provider.name=apiProviders/*}"
+      body: "api_provider"
+    };
+    option (google.api.method_signature) = "api_provider,update_mask";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.apiProviders.update";
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc DeleteApiProvider(DeleteApiProviderRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/{name=apiProviders/*}"};
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.apiProviders.delete";
+    option (laelia.v1.audit) = true;
+  }
+
+  // List the models a provider type exposes. The manager proxies the provider's
+  // model-listing HTTP API (DeepSeek GET /models with the caller's api_key;
+  // OpenRouter GET /models, public). Admin (laelia.apiProviders.update) only.
+  rpc ListApiProviderModels(ListApiProviderModelsRequest) returns (ListApiProviderModelsResponse) {
+    option (google.api.http) = {
+      post: "/v1/apiProviders:listModels"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.apiProviders.update";
+  }
+}

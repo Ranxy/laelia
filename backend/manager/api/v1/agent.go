@@ -24,6 +24,7 @@ import (
 	"github.com/Ranxy/laelia/backend/agent/pi"
 	"github.com/Ranxy/laelia/backend/agent/provider"
 	"github.com/Ranxy/laelia/backend/common"
+	"github.com/Ranxy/laelia/backend/common/log"
 	"github.com/Ranxy/laelia/backend/common/permission"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -105,15 +106,21 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("parent machine %s not found", machineResourceID))
 	}
 
-	// Record the creator (display-only Agent.created_by) and default the owner to
-	// the same user (Agent.owner). CreateAgent is admin-tier (only workspaceAdmin
-	// holds laelia.agents.create), so a user is always present; guard defensively
-	// against a missing one. Editing the agent is authorized by the owner or the
-	// workspaceAdmin role (which holds agents.edit via the all-permissions union).
-	creatorID := 0
-	if user, _ := GetUserFromContext(ctx); user != nil {
-		creatorID = user.ID
+	// CreateAgent is handler-gated (the proto carries no permission annotation):
+	// the machine's creator or a caller holding laelia.agents.create (workspace
+	// admin) may create agents on it. The creator becomes the agent's owner.
+	user, _ := GetUserFromContext(ctx)
+	if user == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
+	canCreate, err := s.canCreateAgentOnMachine(ctx, user, machine)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check agent creation permission"))
+	}
+	if !canCreate {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can create an agent on this machine"))
+	}
+	creatorID := user.ID
 	ownerID := creatorID
 
 	// ACP config is admin-owned. CreateAgent may carry an initial acp_config
@@ -129,6 +136,11 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 	if reqACP := req.Msg.Agent.GetInfo().GetAcpConfig(); reqACP != nil && !isEmptyAgentACPConfig(reqACP) {
 		if err := validateAgentACPConfig(reqACP, s.machineAvailableProviders(ctx, machine.ID)); err != nil {
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		if reqACP.GetGlobalProvider() != "" {
+			if err := s.validateGlobalProviderReference(ctx, user, reqACP); err != nil {
+				return nil, err
+			}
 		}
 		storedAcpConfig = convertToStoreAgentACPConfig(reqACP)
 		// Inherit the default allow_env set when the caller left it empty so the
@@ -166,10 +178,14 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 	// (machine offline, send race) is recovered on the next ConnectMachine
 	// resync, so a send failure is logged, not returned.
 	if s.dispatcher != nil {
+		assignmentAcp, resolveErr := resolveAcpConfigForDaemon(ctx, s.store, convertToV1AgentACPConfig(created.Info.GetAcpConfig()))
+		if resolveErr != nil {
+			slog.Info("failed to resolve acp config for agent assignment", "agent", created.ResourceID, log.WithError(resolveErr))
+		}
 		assignment := &v1pb.AgentAssignment{
 			AgentName:        common.FormatAgentUID(created.ResourceID),
 			AgentDisplayName: created.Name,
-			AcpConfig:        convertToV1AgentACPConfig(created.Info.GetAcpConfig()),
+			AcpConfig:        assignmentAcp,
 		}
 		if pushErr := s.dispatcher.SendAgentAssignment(machine.ID, assignment); pushErr != nil {
 			slog.Info("best-effort agent assignment push skipped", "agent", created.ResourceID, "machine", machine.ResourceID, "error", pushErr)
@@ -244,11 +260,12 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 	out := s.convertToAgent(ctx, agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
 	caller, _ := GetUserFromContext(ctx)
 	out.CanEdit = s.canEditAgent(ctx, caller, agent)
-	// The builtin-pi api_key is a plaintext secret. Redact it for callers who
-	// cannot edit this agent; editors (workspaceAdmin / agents.edit) still see
-	// it so they can populate the password field on the config form.
-	if !out.CanEdit && out.GetInfo().GetAcpConfig().GetProvider() == pi.BuiltinPiProvider {
-		if out.Info.AcpConfig != nil {
+	// The builtin-pi api_key is a plaintext secret. Only a caller holding
+	// agents.edit (workspace admin today) may see it — not every editor: an
+	// owner without agents.edit can edit the agent but must not see the key.
+	// Global-provider agents never carry an inline key anyway.
+	if out.GetInfo().GetAcpConfig().GetProvider() == pi.BuiltinPiProvider && out.Info.AcpConfig != nil {
+		if !s.canManageAgentKey(ctx, caller, agent) {
 			out.Info.AcpConfig.ApiKey = ""
 		}
 	}
@@ -701,11 +718,17 @@ func (s *AgentService) ConnectAgent(ctx context.Context, req *connect.Request[v1
 		}
 	}
 
+	// The daemon receives the concrete config: a global-provider reference is
+	// resolved to api_provider/api_key/model here, never in the v1 API surface.
+	resolvedAcp, resolveErr := resolveAcpConfigForDaemon(ctx, s.store, convertToV1AgentACPConfig(storedAcpConfig))
+	if resolveErr != nil {
+		slog.Info("failed to resolve acp config for agent connect", "agent", agent.ResourceID, log.WithError(resolveErr))
+	}
 	resp := &v1pb.ConnectAgentResponse{
 		SessionId:     sessionID,
 		NextNonce:     nonce,
 		InitialStatus: convertToV1AgentStatus(updated.Status, updated.Deleted, true),
-		AcpConfig:     convertToV1AgentACPConfig(storedAcpConfig),
+		AcpConfig:     resolvedAcp,
 	}
 	if accessToken != "" {
 		resp.AccessToken = accessToken
@@ -1231,15 +1254,17 @@ func convertToV1AgentACPConfig(cfg *storepb.AgentACPConfig) *v1pb.AgentACPConfig
 		return nil
 	}
 	return &v1pb.AgentACPConfig{
-		Executable:    cfg.Executable,
-		Args:          cfg.Args,
-		AllowEnv:      cfg.AllowEnv,
-		Provider:      cfg.Provider,
-		Model:         cfg.Model,
-		CustomEnv:     cfg.CustomEnv,
-		PersonaPrompt: cfg.PersonaPrompt,
-		ApiProvider:   cfg.ApiProvider,
-		ApiKey:        cfg.ApiKey,
+		Executable:          cfg.Executable,
+		Args:                cfg.Args,
+		AllowEnv:            cfg.AllowEnv,
+		Provider:            cfg.Provider,
+		Model:               cfg.Model,
+		CustomEnv:           cfg.CustomEnv,
+		PersonaPrompt:       cfg.PersonaPrompt,
+		ApiProvider:         cfg.ApiProvider,
+		ApiKey:              cfg.ApiKey,
+		GlobalProvider:      cfg.GlobalProvider,
+		GlobalProviderEntry: cfg.GlobalProviderEntry,
 	}
 }
 
@@ -1248,15 +1273,17 @@ func convertToStoreAgentACPConfig(cfg *v1pb.AgentACPConfig) *storepb.AgentACPCon
 		return nil
 	}
 	return &storepb.AgentACPConfig{
-		Executable:    cfg.Executable,
-		Args:          cfg.Args,
-		AllowEnv:      cfg.AllowEnv,
-		Provider:      cfg.Provider,
-		Model:         cfg.Model,
-		CustomEnv:     cfg.CustomEnv,
-		PersonaPrompt: cfg.PersonaPrompt,
-		ApiProvider:   cfg.ApiProvider,
-		ApiKey:        cfg.ApiKey,
+		Executable:          cfg.Executable,
+		Args:                cfg.Args,
+		AllowEnv:            cfg.AllowEnv,
+		Provider:            cfg.Provider,
+		Model:               cfg.Model,
+		CustomEnv:           cfg.CustomEnv,
+		PersonaPrompt:       cfg.PersonaPrompt,
+		ApiProvider:         cfg.ApiProvider,
+		ApiKey:              cfg.ApiKey,
+		GlobalProvider:      cfg.GlobalProvider,
+		GlobalProviderEntry: cfg.GlobalProviderEntry,
 	}
 }
 
@@ -1266,7 +1293,8 @@ func convertToStoreAgentACPConfig(cfg *v1pb.AgentACPConfig) *storepb.AgentACPCon
 // validating (and rejecting) an empty provider.
 func isEmptyAgentACPConfig(cfg *v1pb.AgentACPConfig) bool {
 	return cfg.Executable == "" && len(cfg.Args) == 0 && len(cfg.AllowEnv) == 0 &&
-		cfg.Provider == "" && cfg.Model == "" && len(cfg.CustomEnv) == 0 && cfg.PersonaPrompt == ""
+		cfg.Provider == "" && cfg.Model == "" && len(cfg.CustomEnv) == 0 && cfg.PersonaPrompt == "" &&
+		cfg.GlobalProvider == "" && cfg.GlobalProviderEntry == ""
 }
 
 // buildCapabilityForACPConfig derives the agent capability from the
@@ -1497,18 +1525,39 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
 	}
 
+	// Handler-gated: the agent's owner or a workspace admin may update the ACP
+	// config (the proto carries no permission annotation).
+	user, _ := GetUserFromContext(ctx)
+	if !s.canEditAgent(ctx, user, agent) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a workspace admin can modify this agent"))
+	}
+
+	// Legacy inline api_provider/api_key is admin-only: only a caller holding
+	// agents.edit may set it. An owner without it must use a global provider.
+	reqACP := req.Msg.AcpConfig
+	if reqACP != nil && reqACP.Provider == pi.BuiltinPiProvider && reqACP.GlobalProvider == "" && reqACP.GlobalProviderEntry == "" {
+		if !s.canManageAgentKey(ctx, user, agent) {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only a workspace admin may set an inline api key; use a global provider"))
+		}
+	}
+
 	// builtin-pi api_key is a secret: the config form does not echo it back on
 	// save (the password field is left empty to avoid retransmitting it). An
 	// empty api_key here means "keep the existing key", so copy it from the
 	// stored config before validation so the required-field check passes.
-	if req.Msg.AcpConfig != nil && req.Msg.AcpConfig.Provider == pi.BuiltinPiProvider && strings.TrimSpace(req.Msg.AcpConfig.ApiKey) == "" {
+	if reqACP != nil && reqACP.Provider == pi.BuiltinPiProvider && strings.TrimSpace(reqACP.ApiKey) == "" {
 		if existing := agent.Info.GetAcpConfig(); existing != nil {
-			req.Msg.AcpConfig.ApiKey = existing.ApiKey
+			reqACP.ApiKey = existing.ApiKey
 		}
 	}
 
-	if err := validateAgentACPConfig(req.Msg.AcpConfig, nil); err != nil {
+	if err := validateAgentACPConfig(reqACP, nil); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	if reqACP != nil && reqACP.GetGlobalProvider() != "" {
+		if err := s.validateGlobalProviderReference(ctx, user, reqACP); err != nil {
+			return nil, err
+		}
 	}
 
 	// Re-validate against the owning machine's discovered providers now that
@@ -1542,7 +1591,11 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 	// invalidates the persisted ACP SessionId so the next turn cold-starts with
 	// the new config. A missed push (machine offline) is recovered on reconnect.
 	if s.dispatcher != nil && agent.MachineID > 0 {
-		if pushErr := s.dispatcher.SendAgentConfigUpdate(agent.MachineID, common.FormatAgentUID(agent.ResourceID), req.Msg.AcpConfig); pushErr != nil {
+		resolvedAcp, resolveErr := resolveAcpConfigForDaemon(ctx, s.store, reqACP)
+		if resolveErr != nil {
+			slog.Info("failed to resolve acp config for update push", "agent", agent.ResourceID, log.WithError(resolveErr))
+		}
+		if pushErr := s.dispatcher.SendAgentConfigUpdate(agent.MachineID, common.FormatAgentUID(agent.ResourceID), resolvedAcp); pushErr != nil {
 			slog.Info("best-effort agent config update push skipped", "agent", agent.ResourceID, "machineID", agent.MachineID, "error", pushErr)
 		}
 	}
@@ -1651,6 +1704,26 @@ func validateAgentACPConfig(cfg *v1pb.AgentACPConfig, machineAvailableProviders 
 	// host-availability / model-config-option checks (pi is always available —
 	// it is bundled with laelia, not installed on the host).
 	if cfg.Provider == pi.BuiltinPiProvider {
+		// A global-provider reference replaces the inline api_provider/api_key
+		// (the model resolves from the referenced entry). Both fields must be
+		// set and consistent; access to the provider is checked by the handler.
+		if cfg.GlobalProvider != "" || cfg.GlobalProviderEntry != "" {
+			if cfg.GlobalProvider == "" || cfg.GlobalProviderEntry == "" {
+				return errors.New("acp_config.global_provider and global_provider_entry must both be set")
+			}
+			providerID, err := common.GetAPIProviderResourceID(cfg.GlobalProvider)
+			if err != nil {
+				return errors.Errorf("invalid acp_config.global_provider %q", cfg.GlobalProvider)
+			}
+			entryProvider, _, err := common.ParseAPIProviderEntryName(cfg.GlobalProviderEntry)
+			if err != nil {
+				return errors.Errorf("invalid acp_config.global_provider_entry %q", cfg.GlobalProviderEntry)
+			}
+			if entryProvider != providerID {
+				return errors.Errorf("acp_config.global_provider_entry %q does not belong to global_provider %q", cfg.GlobalProviderEntry, cfg.GlobalProvider)
+			}
+			return nil
+		}
 		if !pi.IsKnownAPIProvider(cfg.ApiProvider) {
 			return errors.Errorf("acp_config.api_provider %q is not supported (phase 1: deepseek, openrouter)", cfg.ApiProvider)
 		}

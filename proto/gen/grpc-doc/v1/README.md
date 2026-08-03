@@ -75,6 +75,21 @@
   
     - [AgentService](#laelia-v1-AgentService)
   
+- [v1/api_provider_service.proto](#v1_api_provider_service-proto)
+    - [ApiProvider](#laelia-v1-ApiProvider)
+    - [ApiProviderChange](#laelia-v1-ApiProviderChange)
+    - [ApiProviderEntry](#laelia-v1-ApiProviderEntry)
+    - [CreateApiProviderRequest](#laelia-v1-CreateApiProviderRequest)
+    - [DeleteApiProviderRequest](#laelia-v1-DeleteApiProviderRequest)
+    - [GetApiProviderRequest](#laelia-v1-GetApiProviderRequest)
+    - [ListApiProviderModelsRequest](#laelia-v1-ListApiProviderModelsRequest)
+    - [ListApiProviderModelsResponse](#laelia-v1-ListApiProviderModelsResponse)
+    - [ListApiProvidersRequest](#laelia-v1-ListApiProvidersRequest)
+    - [ListApiProvidersResponse](#laelia-v1-ListApiProvidersResponse)
+    - [UpdateApiProviderRequest](#laelia-v1-UpdateApiProviderRequest)
+  
+    - [ApiProviderService](#laelia-v1-ApiProviderService)
+  
 - [v1/audit_log_service.proto](#v1_audit_log_service-proto)
     - [AuditLog](#laelia-v1-AuditLog)
     - [ExportAuditLogsRequest](#laelia-v1-ExportAuditLogsRequest)
@@ -603,7 +618,9 @@ permissions) is derived from a built-in template, not set by the admin.
 | custom_env | [AgentACPConfig.CustomEnvEntry](#laelia-v1-AgentACPConfig-CustomEnvEntry) | repeated | user-defined key-value env vars overlaid (and overriding) the inherited allow_env set |
 | persona_prompt | [string](#string) |  | admin-authored self-awareness prompt: personality, chat style, focus area. Empty = not loaded. |
 | api_provider | [string](#string) |  | api_provider is the LLM API provider for the built-in pi runtime (&#34;deepseek&#34; or &#34;openrouter&#34; in phase 1). Only meaningful when provider == &#34;builtin-pi&#34;; ignored by ACP runtimes. |
-| api_key | [string](#string) |  | api_key is the plaintext LLM API key for the api_provider. Only meaningful when provider == &#34;builtin-pi&#34;; ignored by ACP runtimes. Stored in the agent info JSONB with the same plaintext-at-rest posture as custom_env. |
+| api_key | [string](#string) |  | api_key is the plaintext LLM API key for the api_provider. Only meaningful when provider == &#34;builtin-pi&#34;; ignored by ACP runtimes. Stored in the agent info JSONB with the same plaintext-at-rest posture as custom_env. When global_provider is set, api_key is ignored: the key is resolved server-side from the global provider&#39;s entry and never stored in (nor returned with) the agent. |
+| global_provider | [string](#string) |  | global_provider is the resource name of the global API provider this builtin-pi agent uses (&#34;apiProviders/{id}&#34;). Only meaningful when provider == &#34;builtin-pi&#34;. When set, the stored config carries the provider/entry references instead of an inline api_provider/api_key; the server resolves the concrete api_provider/api_key/model at the daemon boundary. |
+| global_provider_entry | [string](#string) |  | global_provider_entry is the resource name of the (key, model) entry within the global provider, in the form &#34;apiProviders/{id}/entries/{entry}&#34;. Only meaningful when provider == &#34;builtin-pi&#34; and global_provider is set. |
 
 
 
@@ -1447,7 +1464,7 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| CreateAgent | [CreateAgentRequest](#laelia-v1-CreateAgentRequest) | [CreateAgentResponse](#laelia-v1-CreateAgentResponse) |  |
+| CreateAgent | [CreateAgentRequest](#laelia-v1-CreateAgentRequest) | [CreateAgentResponse](#laelia-v1-CreateAgentResponse) | CreateAgent is handler-gated (no permission annotation): the machine&#39;s creator or a caller holding laelia.agents.create (workspace admin) may create agents on it. The machine-scoped check cannot be expressed as a catalog permission. |
 | ListAgents | [ListAgentsRequest](#laelia-v1-ListAgentsRequest) | [ListAgentsResponse](#laelia-v1-ListAgentsResponse) |  |
 | GetAgent | [GetAgentRequest](#laelia-v1-GetAgentRequest) | [Agent](#laelia-v1-Agent) |  |
 | UpdateAgent | [UpdateAgentRequest](#laelia-v1-UpdateAgentRequest) | [Agent](#laelia-v1-Agent) | UpdateAgent patches a single mutable agent field. Only allow_add_to_channel is supported initially (any other update_mask path is rejected). Authorized in the handler for the agent&#39;s owner or a workspace admin; the IAM interceptor&#39;s agents.edit is admin-only, so this RPC carries no permission annotation and is handler-gated. |
@@ -1457,7 +1474,7 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 | RevokeAgentToken | [RevokeAgentTokenRequest](#laelia-v1-RevokeAgentTokenRequest) | [RevokeAgentTokenResponse](#laelia-v1-RevokeAgentTokenResponse) | Token revocation: revoke all tokens for the agent |
 | ForceDisconnectAgent | [ForceDisconnectAgentRequest](#laelia-v1-ForceDisconnectAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Admin force disconnects an agent connection |
 | ListAgentSessions | [ListAgentSessionsRequest](#laelia-v1-ListAgentSessionsRequest) | [ListAgentSessionsResponse](#laelia-v1-ListAgentSessionsResponse) | List agent sessions |
-| UpdateAgentACPConfig | [UpdateAgentACPConfigRequest](#laelia-v1-UpdateAgentACPConfigRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Update agent ACP config YAML (admin only) |
+| UpdateAgentACPConfig | [UpdateAgentACPConfigRequest](#laelia-v1-UpdateAgentACPConfigRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Update the agent&#39;s ACP config. Handler-gated (no permission annotation): the agent&#39;s owner or a workspace admin may update it. Setting a legacy inline api_provider/api_key additionally requires laelia.agents.edit (only workspace admin today); owners without it must use a global provider. |
 | RefreshAgentProviders | [RefreshAgentProvidersRequest](#laelia-v1-RefreshAgentProvidersRequest) | [RefreshAgentProvidersResponse](#laelia-v1-RefreshAgentProvidersResponse) | Ask the agent daemon to re-probe its host for installed LLM agent providers and their models. Returns the freshly discovered provider list (also persisted into agent.info.available_providers). Admin only. |
 | ListPiModels | [ListPiModelsRequest](#laelia-v1-ListPiModelsRequest) | [ListPiModelsResponse](#laelia-v1-ListPiModelsResponse) | List the models a built-in pi agent&#39;s LLM API provider exposes. The manager proxies the provider&#39;s model-listing HTTP API (DeepSeek `GET /models` with the caller&#39;s api_key; OpenRouter `GET /models`, public) so the model list is fetched dynamically rather than hardcoded. Not agent-scoped: the add-agent form calls it before the agent exists. Admin (agents.edit) only. |
 | ConnectAgent | [ConnectAgentRequest](#laelia-v1-ConnectAgentRequest) | [ConnectAgentResponse](#laelia-v1-ConnectAgentResponse) | Agent initial connection using bootstrap token |
@@ -1468,6 +1485,237 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 | DownloadAgentAvatar | [DownloadAgentAvatarRequest](#laelia-v1-DownloadAgentAvatarRequest) | [DownloadAgentAvatarResponse](#laelia-v1-DownloadAgentAvatarResponse) | DownloadAgentAvatar fetches an agent&#39;s avatar image bytes. Any authenticated user may download any agent&#39;s avatar (workspace-internal profile image). |
 | DeleteAgentAvatar | [DeleteAgentAvatarRequest](#laelia-v1-DeleteAgentAvatarRequest) | [Agent](#laelia-v1-Agent) | DeleteAgentAvatar clears an agent&#39;s avatar, reverting to the pixel default. Requires laelia.agents.edit on the agent. |
 | Hello | [HelloRequest](#laelia-v1-HelloRequest) | [HelloResponse](#laelia-v1-HelloResponse) | Health check (no auth required) |
+
+ 
+
+
+
+<a name="v1_api_provider_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/api_provider_service.proto
+
+
+
+<a name="laelia-v1-ApiProvider"></a>
+
+### ApiProvider
+ApiProvider is a named global LLM API provider (e.g. &#34;DeepSeek&#34;). A provider
+bundles a set of (api_key, model) entries plus the users/groups allowed to
+use them. The API never returns the api keys: entries expose has_api_key and
+a masked form (&#34;****&#34;&#43;last4) so the key stays out of the renderer.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The resource name of the provider, in the form `apiProviders/{id}`. |
+| provider_type | [string](#string) |  | The LLM API provider type, e.g. &#34;deepseek&#34; or &#34;openrouter&#34; (the phase-1 pi runtime support set). |
+| title | [string](#string) |  | Human-readable title. |
+| base_url | [string](#string) |  | API base URL. Empty means the provider type&#39;s default. |
+| description | [string](#string) |  | Longer description of the provider. |
+| entries | [ApiProviderEntry](#laelia-v1-ApiProviderEntry) | repeated | The (api_key, model) entries of this provider. |
+| members | [string](#string) | repeated | Users or groups allowed to use this provider, in IAM member format: `users/{uid}`, `groups/{email}`, `groups/{id}`, or `allUsers`. Access is checked when an agent references the provider (write-time snapshot). |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| updated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}). Display-only. |
+
+
+
+
+
+
+<a name="laelia-v1-ApiProviderChange"></a>
+
+### ApiProviderChange
+ApiProviderChange is the audit payload recorded for a successful
+CreateApiProvider/UpdateApiProvider. It carries only the provider resource
+name and the entry names added/removed — never the api keys.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| provider | [string](#string) |  |  |
+| entries_added | [string](#string) | repeated |  |
+| entries_removed | [string](#string) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-ApiProviderEntry"></a>
+
+### ApiProviderEntry
+ApiProviderEntry is one (api_key, model) entry of an ApiProvider. The api key
+is stored server-side and never returned; has_api_key/masked_api_key are the
+only read surface.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The entry&#39;s resource name, in the form `apiProviders/{provider}/entries/{entry}`. |
+| label | [string](#string) |  | Optional display label to distinguish entries sharing a model. |
+| model | [string](#string) |  | The model name this entry exposes (passed to the pi runtime as --model). |
+| has_api_key | [bool](#bool) |  | Whether an api key is stored. Output only. |
+| masked_api_key | [string](#string) |  | Masked form of the stored key (&#34;****&#34;&#43;last4), for display only. Output only. |
+| api_key | [string](#string) |  | Input only. On write: empty or a &#34;****&#34;-prefixed value means &#34;keep the existing key&#34;; any other value replaces it. Never echoed on read. |
+
+
+
+
+
+
+<a name="laelia-v1-CreateApiProviderRequest"></a>
+
+### CreateApiProviderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| api_provider | [ApiProvider](#laelia-v1-ApiProvider) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-DeleteApiProviderRequest"></a>
+
+### DeleteApiProviderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetApiProviderRequest"></a>
+
+### GetApiProviderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListApiProviderModelsRequest"></a>
+
+### ListApiProviderModelsRequest
+ListApiProviderModelsRequest fetches the model list a provider type exposes.
+The api_key is a bearer credential: it is never logged and never echoed in
+errors.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| provider_type | [string](#string) |  |  |
+| api_key | [string](#string) |  |  |
+| base_url | [string](#string) |  | Optional base URL override; when empty the provider type&#39;s default is used. |
+
+
+
+
+
+
+<a name="laelia-v1-ListApiProviderModelsResponse"></a>
+
+### ListApiProviderModelsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| models | [PiModel](#laelia-v1-PiModel) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListApiProvidersRequest"></a>
+
+### ListApiProvidersRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListApiProvidersResponse"></a>
+
+### ListApiProvidersResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| api_providers | [ApiProvider](#laelia-v1-ApiProvider) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateApiProviderRequest"></a>
+
+### UpdateApiProviderRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| api_provider | [ApiProvider](#laelia-v1-ApiProvider) |  |  |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  |  |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="laelia-v1-ApiProviderService"></a>
+
+### ApiProviderService
+ApiProviderService manages global LLM API providers. Management RPCs
+(create/update/delete) are gated by the IAM interceptor with the
+laelia.apiProviders.* permissions (held by workspaceAdmin or an authorized
+custom role). ListApiProviders is handler-gated instead: it returns only the
+providers the caller may use, so the agent create/edit form can list them
+without a management permission.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetApiProvider | [GetApiProviderRequest](#laelia-v1-GetApiProviderRequest) | [ApiProvider](#laelia-v1-ApiProvider) |  |
+| ListApiProviders | [ListApiProvidersRequest](#laelia-v1-ListApiProvidersRequest) | [ListApiProvidersResponse](#laelia-v1-ListApiProvidersResponse) |  |
+| CreateApiProvider | [CreateApiProviderRequest](#laelia-v1-CreateApiProviderRequest) | [ApiProvider](#laelia-v1-ApiProvider) |  |
+| UpdateApiProvider | [UpdateApiProviderRequest](#laelia-v1-UpdateApiProviderRequest) | [ApiProvider](#laelia-v1-ApiProvider) |  |
+| DeleteApiProvider | [DeleteApiProviderRequest](#laelia-v1-DeleteApiProviderRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+| ListApiProviderModels | [ListApiProviderModelsRequest](#laelia-v1-ListApiProviderModelsRequest) | [ListApiProviderModelsResponse](#laelia-v1-ListApiProviderModelsResponse) | List the models a provider type exposes. The manager proxies the provider&#39;s model-listing HTTP API (DeepSeek GET /models with the caller&#39;s api_key; OpenRouter GET /models, public). Admin (laelia.apiProviders.update) only. |
 
  
 

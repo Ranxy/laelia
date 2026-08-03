@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/common"
+	"github.com/Ranxy/laelia/backend/common/log"
 	"github.com/Ranxy/laelia/backend/common/permission"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -590,10 +591,14 @@ func (s *MachineService) buildAssignedAgents(ctx context.Context, machineID int)
 	}
 	out := make([]*v1pb.AgentAssignment, 0, len(agents))
 	for _, agent := range agents {
+		acp, err := resolveAcpConfigForDaemon(ctx, s.store, convertToV1AgentACPConfig(agent.Info.GetAcpConfig()))
+		if err != nil {
+			slog.Warn("failed to resolve acp config for assigned agent", "agent", agent.ResourceID, log.WithError(err))
+		}
 		out = append(out, &v1pb.AgentAssignment{
 			AgentName:        common.FormatAgentUID(agent.ResourceID),
 			AgentDisplayName: agent.Name,
-			AcpConfig:        convertToV1AgentACPConfig(agent.Info.GetAcpConfig()),
+			AcpConfig:        acp,
 		})
 	}
 	return out, nil

@@ -1359,11 +1359,32 @@ export declare type AgentACPConfig = Message<"laelia.v1.AgentACPConfig"> & {
   /**
    * api_key is the plaintext LLM API key for the api_provider. Only meaningful when
    * provider == "builtin-pi"; ignored by ACP runtimes. Stored in the agent info JSONB with the
-   * same plaintext-at-rest posture as custom_env.
+   * same plaintext-at-rest posture as custom_env. When global_provider is set, api_key is
+   * ignored: the key is resolved server-side from the global provider's entry and never stored
+   * in (nor returned with) the agent.
    *
    * @generated from field: string api_key = 9;
    */
   apiKey: string;
+
+  /**
+   * global_provider is the resource name of the global API provider this builtin-pi agent uses
+   * ("apiProviders/{id}"). Only meaningful when provider == "builtin-pi". When set, the stored
+   * config carries the provider/entry references instead of an inline api_provider/api_key; the
+   * server resolves the concrete api_provider/api_key/model at the daemon boundary.
+   *
+   * @generated from field: string global_provider = 10;
+   */
+  globalProvider: string;
+
+  /**
+   * global_provider_entry is the resource name of the (key, model) entry within the global
+   * provider, in the form "apiProviders/{id}/entries/{entry}". Only meaningful when
+   * provider == "builtin-pi" and global_provider is set.
+   *
+   * @generated from field: string global_provider_entry = 11;
+   */
+  globalProviderEntry: string;
 };
 
 /**
@@ -1560,6 +1581,11 @@ export declare const AgentMetricsSchema: GenMessage<AgentMetrics>;
  */
 export declare const AgentService: GenService<{
   /**
+   * CreateAgent is handler-gated (no permission annotation): the machine's
+   * creator or a caller holding laelia.agents.create (workspace admin) may
+   * create agents on it. The machine-scoped check cannot be expressed as a
+   * catalog permission.
+   *
    * @generated from rpc laelia.v1.AgentService.CreateAgent
    */
   createAgent: {
@@ -1661,7 +1687,10 @@ export declare const AgentService: GenService<{
     output: typeof ListAgentSessionsResponseSchema;
   },
   /**
-   * Update agent ACP config YAML (admin only)
+   * Update the agent's ACP config. Handler-gated (no permission annotation):
+   * the agent's owner or a workspace admin may update it. Setting a legacy
+   * inline api_provider/api_key additionally requires laelia.agents.edit (only
+   * workspace admin today); owners without it must use a global provider.
    *
    * @generated from rpc laelia.v1.AgentService.UpdateAgentACPConfig
    */

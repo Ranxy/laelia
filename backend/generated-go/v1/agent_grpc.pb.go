@@ -47,6 +47,10 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentServiceClient interface {
+	// CreateAgent is handler-gated (no permission annotation): the machine's
+	// creator or a caller holding laelia.agents.create (workspace admin) may
+	// create agents on it. The machine-scoped check cannot be expressed as a
+	// catalog permission.
 	CreateAgent(ctx context.Context, in *CreateAgentRequest, opts ...grpc.CallOption) (*CreateAgentResponse, error)
 	ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error)
 	GetAgent(ctx context.Context, in *GetAgentRequest, opts ...grpc.CallOption) (*Agent, error)
@@ -72,7 +76,10 @@ type AgentServiceClient interface {
 	ForceDisconnectAgent(ctx context.Context, in *ForceDisconnectAgentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// List agent sessions
 	ListAgentSessions(ctx context.Context, in *ListAgentSessionsRequest, opts ...grpc.CallOption) (*ListAgentSessionsResponse, error)
-	// Update agent ACP config YAML (admin only)
+	// Update the agent's ACP config. Handler-gated (no permission annotation):
+	// the agent's owner or a workspace admin may update it. Setting a legacy
+	// inline api_provider/api_key additionally requires laelia.agents.edit (only
+	// workspace admin today); owners without it must use a global provider.
 	UpdateAgentACPConfig(ctx context.Context, in *UpdateAgentACPConfigRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Ask the agent daemon to re-probe its host for installed LLM agent providers
 	// and their models. Returns the freshly discovered provider list (also
@@ -328,6 +335,10 @@ func (c *agentServiceClient) Hello(ctx context.Context, in *HelloRequest, opts .
 // All implementations must embed UnimplementedAgentServiceServer
 // for forward compatibility.
 type AgentServiceServer interface {
+	// CreateAgent is handler-gated (no permission annotation): the machine's
+	// creator or a caller holding laelia.agents.create (workspace admin) may
+	// create agents on it. The machine-scoped check cannot be expressed as a
+	// catalog permission.
 	CreateAgent(context.Context, *CreateAgentRequest) (*CreateAgentResponse, error)
 	ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error)
 	GetAgent(context.Context, *GetAgentRequest) (*Agent, error)
@@ -353,7 +364,10 @@ type AgentServiceServer interface {
 	ForceDisconnectAgent(context.Context, *ForceDisconnectAgentRequest) (*emptypb.Empty, error)
 	// List agent sessions
 	ListAgentSessions(context.Context, *ListAgentSessionsRequest) (*ListAgentSessionsResponse, error)
-	// Update agent ACP config YAML (admin only)
+	// Update the agent's ACP config. Handler-gated (no permission annotation):
+	// the agent's owner or a workspace admin may update it. Setting a legacy
+	// inline api_provider/api_key additionally requires laelia.agents.edit (only
+	// workspace admin today); owners without it must use a global provider.
 	UpdateAgentACPConfig(context.Context, *UpdateAgentACPConfigRequest) (*emptypb.Empty, error)
 	// Ask the agent daemon to re-probe its host for installed LLM agent providers
 	// and their models. Returns the freshly discovered provider list (also

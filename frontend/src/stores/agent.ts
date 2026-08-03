@@ -127,20 +127,7 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     );
   },
 
-  async updateAgentACPConfig(
-    name: string,
-    acpConfig: {
-      executable: string;
-      args: string[];
-      allowEnv: string[];
-      provider: string;
-      model: string;
-      customEnv: Record<string, string>;
-      personaPrompt: string;
-      apiProvider: string;
-      apiKey: string;
-    }
-  ) {
+  async updateAgentACPConfig(name: string, acpConfig: AgentACPConfigInput) {
     await agentServiceClient.updateAgentACPConfig(
       create(UpdateAgentACPConfigRequestSchema, {
         name,

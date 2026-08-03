@@ -456,6 +456,65 @@
         
           
           <li>
+            <a href="#v1%2fapi_provider_service.proto">v1/api_provider_service.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.v1.ApiProvider"><span class="badge">M</span>ApiProvider</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ApiProviderChange"><span class="badge">M</span>ApiProviderChange</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ApiProviderEntry"><span class="badge">M</span>ApiProviderEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.CreateApiProviderRequest"><span class="badge">M</span>CreateApiProviderRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DeleteApiProviderRequest"><span class="badge">M</span>DeleteApiProviderRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetApiProviderRequest"><span class="badge">M</span>GetApiProviderRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListApiProviderModelsRequest"><span class="badge">M</span>ListApiProviderModelsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListApiProviderModelsResponse"><span class="badge">M</span>ListApiProviderModelsResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListApiProvidersRequest"><span class="badge">M</span>ListApiProvidersRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListApiProvidersResponse"><span class="badge">M</span>ListApiProvidersResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateApiProviderRequest"><span class="badge">M</span>UpdateApiProviderRequest</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#laelia.v1.ApiProviderService"><span class="badge">S</span>ApiProviderService</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
             <a href="#v1%2faudit_log_service.proto">v1/audit_log_service.proto</a>
             <ul>
               
@@ -2224,7 +2283,28 @@ in phase 1). Only meaningful when provider == &#34;builtin-pi&#34;; ignored by A
                   <td></td>
                   <td><p>api_key is the plaintext LLM API key for the api_provider. Only meaningful when
 provider == &#34;builtin-pi&#34;; ignored by ACP runtimes. Stored in the agent info JSONB with the
-same plaintext-at-rest posture as custom_env. </p></td>
+same plaintext-at-rest posture as custom_env. When global_provider is set, api_key is
+ignored: the key is resolved server-side from the global provider&#39;s entry and never stored
+in (nor returned with) the agent. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>global_provider</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>global_provider is the resource name of the global API provider this builtin-pi agent uses
+(&#34;apiProviders/{id}&#34;). Only meaningful when provider == &#34;builtin-pi&#34;. When set, the stored
+config carries the provider/entry references instead of an inline api_provider/api_key; the
+server resolves the concrete api_provider/api_key/model at the daemon boundary. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>global_provider_entry</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>global_provider_entry is the resource name of the (key, model) entry within the global
+provider, in the form &#34;apiProviders/{id}/entries/{entry}&#34;. Only meaningful when
+provider == &#34;builtin-pi&#34; and global_provider is set. </p></td>
                 </tr>
               
             </tbody>
@@ -4114,7 +4194,10 @@ the list to agents bound to that machine. Empty lists all agents. </p></td>
                 <td>CreateAgent</td>
                 <td><a href="#laelia.v1.CreateAgentRequest">CreateAgentRequest</a></td>
                 <td><a href="#laelia.v1.CreateAgentResponse">CreateAgentResponse</a></td>
-                <td><p></p></td>
+                <td><p>CreateAgent is handler-gated (no permission annotation): the machine&#39;s
+creator or a caller holding laelia.agents.create (workspace admin) may
+create agents on it. The machine-scoped check cannot be expressed as a
+catalog permission.</p></td>
               </tr>
             
               <tr>
@@ -4193,7 +4276,10 @@ handler-gated via canEditAgent.</p></td>
                 <td>UpdateAgentACPConfig</td>
                 <td><a href="#laelia.v1.UpdateAgentACPConfigRequest">UpdateAgentACPConfigRequest</a></td>
                 <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
-                <td><p>Update agent ACP config YAML (admin only)</p></td>
+                <td><p>Update the agent&#39;s ACP config. Handler-gated (no permission annotation):
+the agent&#39;s owner or a workspace admin may update it. Setting a legacy
+inline api_provider/api_key additionally requires laelia.agents.edit (only
+workspace admin today); owners without it must use a global provider.</p></td>
               </tr>
             
               <tr>
@@ -4470,6 +4556,570 @@ Requires laelia.agents.edit on the agent.</p></td>
                 <td>Hello</td>
                 <td>POST</td>
                 <td>/v1/agent/hello</td>
+                <td>*</td>
+              </tr>
+              
+            
+            </tbody>
+          </table>
+          
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="v1/api_provider_service.proto">v1/api_provider_service.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.v1.ApiProvider">ApiProvider</h3>
+        <p>ApiProvider is a named global LLM API provider (e.g. "DeepSeek"). A provider</p><p>bundles a set of (api_key, model) entries plus the users/groups allowed to</p><p>use them. The API never returns the api keys: entries expose has_api_key and</p><p>a masked form ("****"+last4) so the key stays out of the renderer.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The resource name of the provider, in the form `apiProviders/{id}`. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>provider_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The LLM API provider type, e.g. &#34;deepseek&#34; or &#34;openrouter&#34; (the phase-1 pi
+runtime support set). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Human-readable title. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>base_url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>API base URL. Empty means the provider type&#39;s default. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Longer description of the provider. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>entries</td>
+                  <td><a href="#laelia.v1.ApiProviderEntry">ApiProviderEntry</a></td>
+                  <td>repeated</td>
+                  <td><p>The (api_key, model) entries of this provider. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>members</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>Users or groups allowed to use this provider, in IAM member format:
+`users/{uid}`, `groups/{email}`, `groups/{id}`, or `allUsers`. Access is
+checked when an agent references the provider (write-time snapshot). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>updated_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_by</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Creator&#39;s user resource name (users/{id}). Display-only. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ApiProviderChange">ApiProviderChange</h3>
+        <p>ApiProviderChange is the audit payload recorded for a successful</p><p>CreateApiProvider/UpdateApiProvider. It carries only the provider resource</p><p>name and the entry names added/removed — never the api keys.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>provider</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>entries_added</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>entries_removed</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ApiProviderEntry">ApiProviderEntry</h3>
+        <p>ApiProviderEntry is one (api_key, model) entry of an ApiProvider. The api key</p><p>is stored server-side and never returned; has_api_key/masked_api_key are the</p><p>only read surface.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The entry&#39;s resource name, in the form
+`apiProviders/{provider}/entries/{entry}`. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>label</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Optional display label to distinguish entries sharing a model. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>model</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The model name this entry exposes (passed to the pi runtime as --model). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>has_api_key</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Whether an api key is stored. Output only. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>masked_api_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Masked form of the stored key (&#34;****&#34;&#43;last4), for display only. Output only. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>api_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Input only. On write: empty or a &#34;****&#34;-prefixed value means &#34;keep the
+existing key&#34;; any other value replaces it. Never echoed on read. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.CreateApiProviderRequest">CreateApiProviderRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>api_provider</td>
+                  <td><a href="#laelia.v1.ApiProvider">ApiProvider</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DeleteApiProviderRequest">DeleteApiProviderRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetApiProviderRequest">GetApiProviderRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListApiProviderModelsRequest">ListApiProviderModelsRequest</h3>
+        <p>ListApiProviderModelsRequest fetches the model list a provider type exposes.</p><p>The api_key is a bearer credential: it is never logged and never echoed in</p><p>errors.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>provider_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>api_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>base_url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Optional base URL override; when empty the provider type&#39;s default is used. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListApiProviderModelsResponse">ListApiProviderModelsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>models</td>
+                  <td><a href="#laelia.v1.PiModel">PiModel</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListApiProvidersRequest">ListApiProvidersRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListApiProvidersResponse">ListApiProvidersResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>api_providers</td>
+                  <td><a href="#laelia.v1.ApiProvider">ApiProvider</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateApiProviderRequest">UpdateApiProviderRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>api_provider</td>
+                  <td><a href="#laelia.v1.ApiProvider">ApiProvider</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>update_mask</td>
+                  <td><a href="#google.protobuf.FieldMask">google.protobuf.FieldMask</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="laelia.v1.ApiProviderService">ApiProviderService</h3>
+        <p>ApiProviderService manages global LLM API providers. Management RPCs</p><p>(create/update/delete) are gated by the IAM interceptor with the</p><p>laelia.apiProviders.* permissions (held by workspaceAdmin or an authorized</p><p>custom role). ListApiProviders is handler-gated instead: it returns only the</p><p>providers the caller may use, so the agent create/edit form can list them</p><p>without a management permission.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GetApiProvider</td>
+                <td><a href="#laelia.v1.GetApiProviderRequest">GetApiProviderRequest</a></td>
+                <td><a href="#laelia.v1.ApiProvider">ApiProvider</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ListApiProviders</td>
+                <td><a href="#laelia.v1.ListApiProvidersRequest">ListApiProvidersRequest</a></td>
+                <td><a href="#laelia.v1.ListApiProvidersResponse">ListApiProvidersResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>CreateApiProvider</td>
+                <td><a href="#laelia.v1.CreateApiProviderRequest">CreateApiProviderRequest</a></td>
+                <td><a href="#laelia.v1.ApiProvider">ApiProvider</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateApiProvider</td>
+                <td><a href="#laelia.v1.UpdateApiProviderRequest">UpdateApiProviderRequest</a></td>
+                <td><a href="#laelia.v1.ApiProvider">ApiProvider</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>DeleteApiProvider</td>
+                <td><a href="#laelia.v1.DeleteApiProviderRequest">DeleteApiProviderRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ListApiProviderModels</td>
+                <td><a href="#laelia.v1.ListApiProviderModelsRequest">ListApiProviderModelsRequest</a></td>
+                <td><a href="#laelia.v1.ListApiProviderModelsResponse">ListApiProviderModelsResponse</a></td>
+                <td><p>List the models a provider type exposes. The manager proxies the provider&#39;s
+model-listing HTTP API (DeepSeek GET /models with the caller&#39;s api_key;
+OpenRouter GET /models, public). Admin (laelia.apiProviders.update) only.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+          
+          
+          <h4>Methods with HTTP bindings</h4>
+          <table>
+            <thead>
+              <tr>
+                <td>Method Name</td>
+                <td>Method</td>
+                <td>Pattern</td>
+                <td>Body</td>
+              </tr>
+            </thead>
+            <tbody>
+            
+              
+              
+              <tr>
+                <td>GetApiProvider</td>
+                <td>GET</td>
+                <td>/v1/{name=apiProviders/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListApiProviders</td>
+                <td>GET</td>
+                <td>/v1/apiProviders</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>CreateApiProvider</td>
+                <td>POST</td>
+                <td>/v1/apiProviders</td>
+                <td>api_provider</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateApiProvider</td>
+                <td>PATCH</td>
+                <td>/v1/{api_provider.name=apiProviders/*}</td>
+                <td>api_provider</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>DeleteApiProvider</td>
+                <td>DELETE</td>
+                <td>/v1/{name=apiProviders/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListApiProviderModels</td>
+                <td>POST</td>
+                <td>/v1/apiProviders:listModels</td>
                 <td>*</td>
               </tr>
               

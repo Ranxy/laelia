@@ -8,6 +8,7 @@ import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
 import {
   Card,
+  entryLabel,
   Field,
   modelLabel,
   piAPIProviderIds,
@@ -99,6 +100,8 @@ export function AgentProfilePage() {
   const [model, setModel] = useState("");
   const [apiProvider, setApiProvider] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [globalProvider, setGlobalProvider] = useState("");
+  const [globalProviderEntry, setGlobalProviderEntry] = useState("");
   const [customEnvEntries, setCustomEnvEntries] = useState<
     { key: string; value: string }[]
   >([]);
@@ -120,6 +123,9 @@ export function AgentProfilePage() {
   const apiKeyFetchDebounceRef = useRef<
     ReturnType<typeof setTimeout> | undefined
   >(undefined);
+  // Global API providers the caller may use (handler-gated server-side), for
+  // the builtin-pi runtime's provider/entry pickers.
+  const apiProviders = useAppStore((s) => s.apiProviders);
 
   const configRef = useRef({
     executable: "",
@@ -129,6 +135,8 @@ export function AgentProfilePage() {
     model: "",
     apiProvider: "",
     apiKey: "",
+    globalProvider: "",
+    globalProviderEntry: "",
     customEnvEntries: [] as { key: string; value: string }[],
   });
   const agentRef = useRef<Agent | undefined>(undefined);
@@ -242,6 +250,8 @@ export function AgentProfilePage() {
       // Non-editors get an empty key server-side (redacted), which is fine —
       // they cannot save anyway. On save, an empty key means "keep existing".
       apiKey: cfg?.apiKey ?? "",
+      globalProvider: cfg?.globalProvider ?? "",
+      globalProviderEntry: cfg?.globalProviderEntry ?? "",
       customEnvEntries: cfg?.customEnv
         ? Object.entries(cfg.customEnv).map(([key, value]) => ({ key, value }))
         : [],
@@ -254,6 +264,8 @@ export function AgentProfilePage() {
     setModel(next.model);
     setApiProvider(next.apiProvider);
     setApiKey(next.apiKey);
+    setGlobalProvider(next.globalProvider);
+    setGlobalProviderEntry(next.globalProviderEntry);
     setCustomEnvEntries(next.customEnvEntries);
     setPersonaDraft(cfg?.personaPrompt ?? "");
     setPersonaEditing(false);
@@ -329,6 +341,8 @@ export function AgentProfilePage() {
       apiProvider: draft.apiProvider.trim(),
       // Empty apiKey on save means "keep the existing stored key" server-side.
       apiKey: draft.apiKey,
+      globalProvider: draft.globalProvider.trim(),
+      globalProviderEntry: draft.globalProviderEntry.trim(),
     };
   }
 
@@ -350,6 +364,8 @@ export function AgentProfilePage() {
       apiProvider: cfg?.apiProvider ?? "",
       // Preserve the stored key on a persona-only save.
       apiKey: cfg?.apiKey ?? "",
+      globalProvider: cfg?.globalProvider ?? "",
+      globalProviderEntry: cfg?.globalProviderEntry ?? "",
     };
   }
 
@@ -391,6 +407,13 @@ export function AgentProfilePage() {
   const availableProviders: AgentProviderInfo[] = machineProviders;
   const isCustomProvider = provider === "custom";
   const isPiProvider = provider === "builtin-pi";
+  // Global-provider selection for the builtin-pi runtime: the provider (one the
+  // caller may use) and the entry (one (key, model) pair) the agent will use.
+  // The model resolves from the entry server-side.
+  const selectedGlobalProvider = apiProviders.find(
+    (p) => p.name === globalProvider
+  );
+  const globalProviderEntries = selectedGlobalProvider?.entries ?? [];
   const selectedProviderInfo = availableProviders.find(
     (p) => p.providerId === provider
   );
@@ -822,6 +845,100 @@ export function AgentProfilePage() {
 
                   {isPiProvider && (
                     <>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-medium">
+                          {t("agent.acp-config-pi-global-provider")}
+                        </label>
+                        <Select
+                          value={globalProvider}
+                          onValueChange={(v) => {
+                            const next = String(v ?? "");
+                            configRef.current = {
+                              ...configRef.current,
+                              globalProvider: next,
+                              globalProviderEntry: "",
+                            };
+                            setGlobalProvider(next);
+                            setGlobalProviderEntry("");
+                            saveConfig();
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue>
+                              {(v: string | null) =>
+                                v
+                                  ? (apiProviders.find((p) => p.name === v)
+                                      ?.title ?? v)
+                                  : ""
+                              }
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {apiProviders.length === 0 && (
+                              <SelectItem value="__no_provider" disabled>
+                                {t(
+                                  "agent.acp-config-pi-global-providers-empty"
+                                )}
+                              </SelectItem>
+                            )}
+                            {apiProviders.map((p) => (
+                              <SelectItem key={p.name} value={p.name}>
+                                {p.title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {globalProvider &&
+                        (globalProviderEntries.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            <label className="text-sm font-medium">
+                              {t("agent.acp-config-pi-global-entry")}
+                            </label>
+                            <Select
+                              value={globalProviderEntry}
+                              onValueChange={(v) => {
+                                const next = String(v ?? "");
+                                configRef.current = {
+                                  ...configRef.current,
+                                  globalProviderEntry: next,
+                                };
+                                setGlobalProviderEntry(next);
+                                saveConfig();
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue>
+                                  {(v: string | null) =>
+                                    v
+                                      ? entryLabel(
+                                          globalProviderEntries.find(
+                                            (e) => e.name === v
+                                          )
+                                        )
+                                      : ""
+                                  }
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {globalProviderEntries.map((e) => (
+                                  <SelectItem key={e.name} value={e.name}>
+                                    {entryLabel(e)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-control-light">
+                              {t("agent.acp-config-pi-global-entry-hint")}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-control-light">
+                            {t("agent.acp-config-pi-global-entries-empty")}
+                          </p>
+                        ))}
+
                       <div className="flex flex-col gap-1">
                         <label className="text-sm font-medium">
                           {t("agent.acp-config-pi-api-provider")}

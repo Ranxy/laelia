@@ -23,6 +23,7 @@ import {
   MACHINE_ROUTE_LIST,
   MEMBERS_ROUTE,
   SETTINGS_ROUTE,
+  SETTINGS_ROUTE_API_PROVIDERS,
   SETTINGS_ROUTE_AUDIT,
   SETTINGS_ROUTE_CHAT,
   SETTINGS_ROUTE_GROUPS,
@@ -102,6 +103,7 @@ function useSidebarItems(): SidebarItem[] {
   const canViewRoles = useHasPermission("laelia.roles.list");
   const canViewIam = useHasPermission("laelia.iam.getPolicy");
   const canViewGroups = useHasPermission("laelia.groups.list");
+  const canViewApiProviders = useHasPermission("laelia.apiProviders.list");
   const canViewAudit = useHasPermission("laelia.auditLogs.search");
 
   return useMemo(
@@ -177,6 +179,12 @@ function useSidebarItems(): SidebarItem[] {
             hide: !canViewGroups,
           },
           {
+            title: t("sidebar.settings-api-providers"),
+            name: SETTINGS_ROUTE_API_PROVIDERS,
+            type: "route",
+            hide: !canViewApiProviders,
+          },
+          {
             title: t("sidebar.settings-audit"),
             name: SETTINGS_ROUTE_AUDIT,
             type: "route",
@@ -192,6 +200,7 @@ function useSidebarItems(): SidebarItem[] {
       canViewRoles,
       canViewIam,
       canViewGroups,
+      canViewApiProviders,
       canViewAudit,
     ]
   );

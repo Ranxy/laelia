@@ -112,6 +112,8 @@
 | persona_prompt | [string](#string) |  |  |
 | api_provider | [string](#string) |  |  |
 | api_key | [string](#string) |  |  |
+| global_provider | [string](#string) |  |  |
+| global_provider_entry | [string](#string) |  |  |
 
 
 

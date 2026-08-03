@@ -9,6 +9,7 @@ import { SettingService } from "@/types/proto-es/v1/setting_pb";
 import { RoleService } from "@/types/proto-es/v1/role_service_pb";
 import { IamService } from "@/types/proto-es/v1/iam_service_pb";
 import { GroupService } from "@/types/proto-es/v1/group_service_pb";
+import { ApiProviderService } from "@/types/proto-es/v1/api_provider_service_pb";
 import { AuditLogService } from "@/types/proto-es/v1/audit_log_service_pb";
 import { NotificationService } from "@/types/proto-es/v1/notification_pb";
 import { createAuthInterceptor } from "./auth-interceptor";
@@ -67,6 +68,10 @@ export const settingServiceClient = createClient(SettingService, transport);
 export const roleServiceClient = createClient(RoleService, transport);
 export const iamServiceClient = createClient(IamService, transport);
 export const groupServiceClient = createClient(GroupService, transport);
+export const apiProviderServiceClient = createClient(
+  ApiProviderService,
+  transport
+);
 export const auditLogServiceClient = createClient(AuditLogService, transport);
 export const notificationServiceClient = createClient(
   NotificationService,

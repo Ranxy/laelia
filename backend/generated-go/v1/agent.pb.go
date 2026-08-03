@@ -2759,10 +2759,21 @@ type AgentACPConfig struct {
 	ApiProvider string `protobuf:"bytes,8,opt,name=api_provider,json=apiProvider,proto3" json:"api_provider,omitempty"`
 	// api_key is the plaintext LLM API key for the api_provider. Only meaningful when
 	// provider == "builtin-pi"; ignored by ACP runtimes. Stored in the agent info JSONB with the
-	// same plaintext-at-rest posture as custom_env.
-	ApiKey        string `protobuf:"bytes,9,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// same plaintext-at-rest posture as custom_env. When global_provider is set, api_key is
+	// ignored: the key is resolved server-side from the global provider's entry and never stored
+	// in (nor returned with) the agent.
+	ApiKey string `protobuf:"bytes,9,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
+	// global_provider is the resource name of the global API provider this builtin-pi agent uses
+	// ("apiProviders/{id}"). Only meaningful when provider == "builtin-pi". When set, the stored
+	// config carries the provider/entry references instead of an inline api_provider/api_key; the
+	// server resolves the concrete api_provider/api_key/model at the daemon boundary.
+	GlobalProvider string `protobuf:"bytes,10,opt,name=global_provider,json=globalProvider,proto3" json:"global_provider,omitempty"`
+	// global_provider_entry is the resource name of the (key, model) entry within the global
+	// provider, in the form "apiProviders/{id}/entries/{entry}". Only meaningful when
+	// provider == "builtin-pi" and global_provider is set.
+	GlobalProviderEntry string `protobuf:"bytes,11,opt,name=global_provider_entry,json=globalProviderEntry,proto3" json:"global_provider_entry,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *AgentACPConfig) Reset() {
@@ -2854,6 +2865,20 @@ func (x *AgentACPConfig) GetApiProvider() string {
 func (x *AgentACPConfig) GetApiKey() string {
 	if x != nil {
 		return x.ApiKey
+	}
+	return ""
+}
+
+func (x *AgentACPConfig) GetGlobalProvider() string {
+	if x != nil {
+		return x.GlobalProvider
+	}
+	return ""
+}
+
+func (x *AgentACPConfig) GetGlobalProviderEntry() string {
+	if x != nil {
+		return x.GlobalProviderEntry
 	}
 	return ""
 }
@@ -3371,7 +3396,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x10AgentModelOption\x12\x14\n" +
 	"\x05value\x18\x01 \x01(\tR\x05value\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\"\xfd\x02\n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\"\xda\x03\n" +
 	"\x0eAgentACPConfig\x12\x1e\n" +
 	"\n" +
 	"executable\x18\x01 \x01(\tR\n" +
@@ -3384,7 +3409,10 @@ const file_v1_agent_proto_rawDesc = "" +
 	"custom_env\x18\x06 \x03(\v2(.laelia.v1.AgentACPConfig.CustomEnvEntryR\tcustomEnv\x12%\n" +
 	"\x0epersona_prompt\x18\a \x01(\tR\rpersonaPrompt\x12!\n" +
 	"\fapi_provider\x18\b \x01(\tR\vapiProvider\x12\x17\n" +
-	"\aapi_key\x18\t \x01(\tR\x06apiKey\x1a<\n" +
+	"\aapi_key\x18\t \x01(\tR\x06apiKey\x12'\n" +
+	"\x0fglobal_provider\x18\n" +
+	" \x01(\tR\x0eglobalProvider\x122\n" +
+	"\x15global_provider_entry\x18\v \x01(\tR\x13globalProviderEntry\x1a<\n" +
 	"\x0eCustomEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa0\x03\n" +
@@ -3422,9 +3450,9 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x0fdisk_used_bytes\x18\x04 \x01(\x04R\rdiskUsedBytes\x12(\n" +
 	"\x10disk_total_bytes\x18\x05 \x01(\x04R\x0ediskTotalBytes\x12%\n" +
 	"\x0euptime_seconds\x18\x06 \x01(\rR\ruptimeSeconds\x12'\n" +
-	"\x0fgoroutine_count\x18\a \x01(\rR\x0egoroutineCount2\xf2\x16\n" +
-	"\fAgentService\x12\x87\x01\n" +
-	"\vCreateAgent\x12\x1d.laelia.v1.CreateAgentRequest\x1a\x1e.laelia.v1.CreateAgentResponse\"9\x8a\xea0\x14laelia.agents.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x13:\x05agent\"\n" +
+	"\x0fgoroutine_count\x18\a \x01(\rR\x0egoroutineCount2\xc3\x16\n" +
+	"\fAgentService\x12o\n" +
+	"\vCreateAgent\x12\x1d.laelia.v1.CreateAgentRequest\x1a\x1e.laelia.v1.CreateAgentResponse\"!\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x13:\x05agent\"\n" +
 	"/v1/agents\x12v\n" +
 	"\n" +
 	"ListAgents\x12\x1c.laelia.v1.ListAgentsRequest\x1a\x1d.laelia.v1.ListAgentsResponse\"+\x8a\xea0\x11laelia.agents.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\f\x12\n" +
@@ -3436,8 +3464,8 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x10RotateAgentToken\x12\".laelia.v1.RotateAgentTokenRequest\x1a#.laelia.v1.RotateAgentTokenResponse\"H\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/{name=agents/*}:rotateToken\x12\xa5\x01\n" +
 	"\x10RevokeAgentToken\x12\".laelia.v1.RevokeAgentTokenRequest\x1a#.laelia.v1.RevokeAgentTokenResponse\"H\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/{name=agents/*}:revokeToken\x12\xa4\x01\n" +
 	"\x14ForceDisconnectAgent\x12&.laelia.v1.ForceDisconnectAgentRequest\x1a\x16.google.protobuf.Empty\"L\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*\"#/v1/{name=agents/*}:forceDisconnect\x12\xa6\x01\n" +
-	"\x11ListAgentSessions\x12#.laelia.v1.ListAgentSessionsRequest\x1a$.laelia.v1.ListAgentSessionsResponse\"F\x8a\xea0\x1alaelia.agents.listSessions\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1e\x12\x1c/v1/{name=agents/*}/sessions\x12\xa4\x01\n" +
-	"\x14UpdateAgentACPConfig\x12&.laelia.v1.UpdateAgentACPConfigRequest\x1a\x16.google.protobuf.Empty\"L\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*2#/v1/{name=agents/*}:updateAcpConfig\x12\xb9\x01\n" +
+	"\x11ListAgentSessions\x12#.laelia.v1.ListAgentSessionsRequest\x1a$.laelia.v1.ListAgentSessionsResponse\"F\x8a\xea0\x1alaelia.agents.listSessions\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1e\x12\x1c/v1/{name=agents/*}/sessions\x12\x8e\x01\n" +
+	"\x14UpdateAgentACPConfig\x12&.laelia.v1.UpdateAgentACPConfigRequest\x1a\x16.google.protobuf.Empty\"6\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*2#/v1/{name=agents/*}:updateAcpConfig\x12\xb9\x01\n" +
 	"\x15RefreshAgentProviders\x12'.laelia.v1.RefreshAgentProvidersRequest\x1a(.laelia.v1.RefreshAgentProvidersResponse\"M\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02):\x01*\"$/v1/{name=agents/*}:refreshProviders\x12\x8b\x01\n" +
 	"\fListPiModels\x12\x1e.laelia.v1.ListPiModelsRequest\x1a\x1f.laelia.v1.ListPiModelsResponse\":\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/pi:listModels\x12v\n" +
 	"\fConnectAgent\x12\x1e.laelia.v1.ConnectAgentRequest\x1a\x1f.laelia.v1.ConnectAgentResponse\"%\x90\xea0\x02\x98\xea0\x01\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/v1/agents:connect\x12z\n" +

@@ -298,18 +298,20 @@ func (x *AgentInfo) GetAcpConfig() *AgentACPConfig {
 }
 
 type AgentACPConfig struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Executable    string                 `protobuf:"bytes,1,opt,name=executable,proto3" json:"executable,omitempty"`
-	Args          []string               `protobuf:"bytes,2,rep,name=args,proto3" json:"args,omitempty"`
-	AllowEnv      []string               `protobuf:"bytes,3,rep,name=allow_env,json=allowEnv,proto3" json:"allow_env,omitempty"`
-	Provider      string                 `protobuf:"bytes,4,opt,name=provider,proto3" json:"provider,omitempty"`
-	Model         string                 `protobuf:"bytes,5,opt,name=model,proto3" json:"model,omitempty"`
-	CustomEnv     map[string]string      `protobuf:"bytes,6,rep,name=custom_env,json=customEnv,proto3" json:"custom_env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	PersonaPrompt string                 `protobuf:"bytes,7,opt,name=persona_prompt,json=personaPrompt,proto3" json:"persona_prompt,omitempty"`
-	ApiProvider   string                 `protobuf:"bytes,8,opt,name=api_provider,json=apiProvider,proto3" json:"api_provider,omitempty"`
-	ApiKey        string                 `protobuf:"bytes,9,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Executable          string                 `protobuf:"bytes,1,opt,name=executable,proto3" json:"executable,omitempty"`
+	Args                []string               `protobuf:"bytes,2,rep,name=args,proto3" json:"args,omitempty"`
+	AllowEnv            []string               `protobuf:"bytes,3,rep,name=allow_env,json=allowEnv,proto3" json:"allow_env,omitempty"`
+	Provider            string                 `protobuf:"bytes,4,opt,name=provider,proto3" json:"provider,omitempty"`
+	Model               string                 `protobuf:"bytes,5,opt,name=model,proto3" json:"model,omitempty"`
+	CustomEnv           map[string]string      `protobuf:"bytes,6,rep,name=custom_env,json=customEnv,proto3" json:"custom_env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	PersonaPrompt       string                 `protobuf:"bytes,7,opt,name=persona_prompt,json=personaPrompt,proto3" json:"persona_prompt,omitempty"`
+	ApiProvider         string                 `protobuf:"bytes,8,opt,name=api_provider,json=apiProvider,proto3" json:"api_provider,omitempty"`
+	ApiKey              string                 `protobuf:"bytes,9,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
+	GlobalProvider      string                 `protobuf:"bytes,10,opt,name=global_provider,json=globalProvider,proto3" json:"global_provider,omitempty"`
+	GlobalProviderEntry string                 `protobuf:"bytes,11,opt,name=global_provider_entry,json=globalProviderEntry,proto3" json:"global_provider_entry,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *AgentACPConfig) Reset() {
@@ -401,6 +403,20 @@ func (x *AgentACPConfig) GetApiProvider() string {
 func (x *AgentACPConfig) GetApiKey() string {
 	if x != nil {
 		return x.ApiKey
+	}
+	return ""
+}
+
+func (x *AgentACPConfig) GetGlobalProvider() string {
+	if x != nil {
+		return x.GlobalProvider
+	}
+	return ""
+}
+
+func (x *AgentACPConfig) GetGlobalProviderEntry() string {
+	if x != nil {
+		return x.GlobalProviderEntry
 	}
 	return ""
 }
@@ -764,7 +780,7 @@ const file_store_agent_proto_rawDesc = "" +
 	" \x01(\v2\x1c.laelia.store.AgentACPConfigR\tacpConfig\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x80\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xdd\x03\n" +
 	"\x0eAgentACPConfig\x12\x1e\n" +
 	"\n" +
 	"executable\x18\x01 \x01(\tR\n" +
@@ -777,7 +793,10 @@ const file_store_agent_proto_rawDesc = "" +
 	"custom_env\x18\x06 \x03(\v2+.laelia.store.AgentACPConfig.CustomEnvEntryR\tcustomEnv\x12%\n" +
 	"\x0epersona_prompt\x18\a \x01(\tR\rpersonaPrompt\x12!\n" +
 	"\fapi_provider\x18\b \x01(\tR\vapiProvider\x12\x17\n" +
-	"\aapi_key\x18\t \x01(\tR\x06apiKey\x1a<\n" +
+	"\aapi_key\x18\t \x01(\tR\x06apiKey\x12'\n" +
+	"\x0fglobal_provider\x18\n" +
+	" \x01(\tR\x0eglobalProvider\x122\n" +
+	"\x15global_provider_entry\x18\v \x01(\tR\x13globalProviderEntry\x1a<\n" +
 	"\x0eCustomEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd0\x02\n" +

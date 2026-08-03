@@ -91,6 +91,7 @@ func configureGrpcRouters(
 	roleService := apiv1.NewRoleService(stores)
 	iamService := apiv1.NewIamService(stores)
 	groupService := apiv1.NewGroupService(stores, iamManager)
+	apiProviderService := apiv1.NewAPIProviderService(stores, iamManager)
 	auditLogService := apiv1.NewAuditLogService(stores)
 
 	// Web Push: load the auto-generated VAPID keypair from the setting table
@@ -166,6 +167,8 @@ func configureGrpcRouters(
 	connectHandlers[iamPath] = iamHandler
 	groupPath, groupHandler := v1connect.NewGroupServiceHandler(groupService, handlerOpts)
 	connectHandlers[groupPath] = groupHandler
+	apiProviderPath, apiProviderHandler := v1connect.NewApiProviderServiceHandler(apiProviderService, handlerOpts)
+	connectHandlers[apiProviderPath] = apiProviderHandler
 	auditLogPath, auditLogHandler := v1connect.NewAuditLogServiceHandler(auditLogService, handlerOpts)
 	connectHandlers[auditLogPath] = auditLogHandler
 	notificationPath, notificationHandler := v1connect.NewNotificationServiceHandler(notificationService, handlerOpts)
@@ -183,6 +186,7 @@ func configureGrpcRouters(
 		v1connect.RoleServiceName,
 		v1connect.IamServiceName,
 		v1connect.GroupServiceName,
+		v1connect.ApiProviderServiceName,
 		v1connect.AuditLogServiceName,
 		v1connect.NotificationServiceName,
 	)
@@ -229,6 +233,9 @@ func configureGrpcRouters(
 		return err
 	}
 	if err := v1pb.RegisterGroupServiceHandler(ctx, mux, grpcConn); err != nil {
+		return err
+	}
+	if err := v1pb.RegisterApiProviderServiceHandler(ctx, mux, grpcConn); err != nil {
 		return err
 	}
 	if err := v1pb.RegisterAuditLogServiceHandler(ctx, mux, grpcConn); err != nil {

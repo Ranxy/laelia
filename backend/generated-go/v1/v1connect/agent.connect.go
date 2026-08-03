@@ -98,6 +98,10 @@ const (
 
 // AgentServiceClient is a client for the laelia.v1.AgentService service.
 type AgentServiceClient interface {
+	// CreateAgent is handler-gated (no permission annotation): the machine's
+	// creator or a caller holding laelia.agents.create (workspace admin) may
+	// create agents on it. The machine-scoped check cannot be expressed as a
+	// catalog permission.
 	CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.CreateAgentResponse], error)
 	ListAgents(context.Context, *connect.Request[v1.ListAgentsRequest]) (*connect.Response[v1.ListAgentsResponse], error)
 	GetAgent(context.Context, *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error)
@@ -123,7 +127,10 @@ type AgentServiceClient interface {
 	ForceDisconnectAgent(context.Context, *connect.Request[v1.ForceDisconnectAgentRequest]) (*connect.Response[emptypb.Empty], error)
 	// List agent sessions
 	ListAgentSessions(context.Context, *connect.Request[v1.ListAgentSessionsRequest]) (*connect.Response[v1.ListAgentSessionsResponse], error)
-	// Update agent ACP config YAML (admin only)
+	// Update the agent's ACP config. Handler-gated (no permission annotation):
+	// the agent's owner or a workspace admin may update it. Setting a legacy
+	// inline api_provider/api_key additionally requires laelia.agents.edit (only
+	// workspace admin today); owners without it must use a global provider.
 	UpdateAgentACPConfig(context.Context, *connect.Request[v1.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error)
 	// Ask the agent daemon to re-probe its host for installed LLM agent providers
 	// and their models. Returns the freshly discovered provider list (also
@@ -429,6 +436,10 @@ func (c *agentServiceClient) Hello(ctx context.Context, req *connect.Request[v1.
 
 // AgentServiceHandler is an implementation of the laelia.v1.AgentService service.
 type AgentServiceHandler interface {
+	// CreateAgent is handler-gated (no permission annotation): the machine's
+	// creator or a caller holding laelia.agents.create (workspace admin) may
+	// create agents on it. The machine-scoped check cannot be expressed as a
+	// catalog permission.
 	CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.CreateAgentResponse], error)
 	ListAgents(context.Context, *connect.Request[v1.ListAgentsRequest]) (*connect.Response[v1.ListAgentsResponse], error)
 	GetAgent(context.Context, *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error)
@@ -454,7 +465,10 @@ type AgentServiceHandler interface {
 	ForceDisconnectAgent(context.Context, *connect.Request[v1.ForceDisconnectAgentRequest]) (*connect.Response[emptypb.Empty], error)
 	// List agent sessions
 	ListAgentSessions(context.Context, *connect.Request[v1.ListAgentSessionsRequest]) (*connect.Response[v1.ListAgentSessionsResponse], error)
-	// Update agent ACP config YAML (admin only)
+	// Update the agent's ACP config. Handler-gated (no permission annotation):
+	// the agent's owner or a workspace admin may update it. Setting a legacy
+	// inline api_provider/api_key additionally requires laelia.agents.edit (only
+	// workspace admin today); owners without it must use a global provider.
 	UpdateAgentACPConfig(context.Context, *connect.Request[v1.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error)
 	// Ask the agent daemon to re-probe its host for installed LLM agent providers
 	// and their models. Returns the freshly discovered provider list (also

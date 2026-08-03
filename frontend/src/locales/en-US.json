@@ -72,7 +72,8 @@
     "settings-groups": "Groups",
     "settings-audit": "Audit logs",
     "settings-notifications": "Notifications",
-    "settings-chat": "Chat"
+    "settings-chat": "Chat",
+    "settings-api-providers": "API Providers"
   },
   "settings": {
     "title": "Settings",
@@ -289,6 +290,55 @@
       "show-payload": "Show change",
       "hide-payload": "Hide change",
       "actor-unknown": "unknown"
+    },
+    "api-providers": {
+      "title": "API Providers",
+      "description": "Manage global LLM API providers. Each provider bundles (api key, model) entries and the users or groups allowed to use them.",
+      "load-failed": "Failed to load providers",
+      "not-allowed": "You do not have permission to view API providers.",
+      "header-title": "Title",
+      "header-type": "Type",
+      "header-entries": "Entries",
+      "header-members": "Members",
+      "no-providers": "No providers yet.",
+      "create": "Create provider",
+      "create-title": "Create provider",
+      "create-description": "Configure a global LLM API provider and who may use it.",
+      "edit-title": "Edit provider: {{title}}",
+      "edit-description": "Update the provider's fields, entries, or members.",
+      "title-required": "Title is required.",
+      "field-title": "Title",
+      "field-title-placeholder": "e.g. DeepSeek",
+      "field-type": "Type",
+      "type-deepseek": "DeepSeek",
+      "type-openrouter": "OpenRouter",
+      "field-base-url": "API base URL",
+      "field-base-url-placeholder": "https://api.deepseek.com",
+      "field-base-url-hint": "Optional. Empty uses the provider type's default.",
+      "field-description": "Description",
+      "field-description-placeholder": "What this provider is for",
+      "field-entries": "Entries (key + model)",
+      "field-entries-hint": "Each entry pairs one API key with one model. Enter a key, fetch the model list, then enable the models to create entries.",
+      "field-fetch-key-placeholder": "API key to fetch models",
+      "fetch-key-required": "Enter an API key to fetch models.",
+      "fetch-models": "Fetch models",
+      "fetching": "Fetching…",
+      "entry-incomplete": "Every entry needs a model and an API key.",
+      "entry-key-required": "New entries need an API key.",
+      "entry-label-placeholder": "Label (optional)",
+      "entry-key-kept": "Key stored (masked). Type a new key to replace it.",
+      "entry-key-replace-placeholder": "New key (leave empty to keep)",
+      "entry-key-set": "Key will be stored for this entry.",
+      "field-members": "Allowed users / groups",
+      "field-members-hint": "Who may use this provider when creating agents. Admins may use any provider.",
+      "created": "Provider created",
+      "updated": "Provider updated",
+      "deleted": "Provider deleted",
+      "create-failed": "Failed to create provider",
+      "update-failed": "Failed to update provider",
+      "delete-failed": "Failed to delete provider",
+      "delete-confirm-title": "Delete provider",
+      "delete-confirm-description": "Delete the provider \"{{title}}\"? Providers still used by agents cannot be deleted."
     }
   },
   "setup": {
@@ -505,7 +555,12 @@
     "acp-config-manage-providers": "Manage providers on the machine",
     "allow-add-to-channel": "Allow others to add this agent to a channel",
     "allow-add-to-channel-hint": "Off: only the agent's owner or a workspace admin can add this agent to a channel. On: any channel owner or admin can add it.",
-    "allow-add-to-channel-save-error": "Failed to update this setting"
+    "allow-add-to-channel-save-error": "Failed to update this setting",
+    "acp-config-pi-global-provider": "Global API provider",
+    "acp-config-pi-global-providers-empty": "No API providers available",
+    "acp-config-pi-global-entry": "Key / model entry",
+    "acp-config-pi-global-entry-hint": "Select the (key, model) entry this agent uses. The key is managed by the provider and never shown here.",
+    "acp-config-pi-global-entries-empty": "This provider has no entries yet."
   },
   "machine": {
     "title": "Machines",
@@ -576,7 +631,8 @@
       "section-token": "Token & Connection",
       "edit-not-allowed": "Only a workspace admin can manage this machine.",
       "load-failed": "Failed to load this machine. It may have been deleted or the request failed."
-    }
+    },
+    "add-agent-global-entry-required": "Select a key/model entry for the agent."
   },
   "members": {
     "title": "Members",

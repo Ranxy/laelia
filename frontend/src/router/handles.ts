@@ -22,4 +22,5 @@ export const SETTINGS_ROUTE_USERS = "settings.users";
 export const SETTINGS_ROUTE_ROLES = "settings.roles";
 export const SETTINGS_ROUTE_IAM = "settings.iam";
 export const SETTINGS_ROUTE_GROUPS = "settings.groups";
+export const SETTINGS_ROUTE_API_PROVIDERS = "settings.apiProviders";
 export const SETTINGS_ROUTE_AUDIT = "settings.audit";
