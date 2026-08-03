@@ -6,8 +6,9 @@ import { Avatar } from "@/components/chat/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useAvatarEditor } from "@/composables/useAvatarEditor";
 import { userServiceClient } from "@/connect";
-import { invalidateAvatar, useAvatar } from "@/lib/avatar-cache";
+import { useAvatar } from "@/lib/avatar-cache";
 import { resizeImageFile } from "@/lib/image-resize";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
@@ -38,7 +39,6 @@ export function SettingsProfilePage() {
     description: "",
   });
   const [saving, setSaving] = useState(false);
-  const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // The current user's principal id (the {user} segment of "users/{user}"),
@@ -50,54 +50,30 @@ export function SettingsProfilePage() {
     currentUser?.avatar || (userId ? `users/${userId}/avatar` : undefined);
   const avatarSrc = useAvatar(avatarName);
 
-  async function handleAvatarChange(file: File | undefined) {
-    if (!file || !userId) return;
-    setAvatarBusy(true);
-    try {
+  const {
+    busy: avatarBusy,
+    onChange: handleAvatarChange,
+    onRemove: handleAvatarRemove,
+  } = useAvatarEditor({
+    avatarName: userId ? `users/${userId}/avatar` : null,
+    upload: async (file) => {
       const { data, mimeType } = await resizeImageFile(file, 256, 0.9);
       await userServiceClient.uploadAvatar(
         create(UploadAvatarRequestSchema, { data, mimeType })
       );
-      invalidateAvatar(`users/${userId}/avatar`);
-      await fetchCurrentUser();
-      toastManager.add({
-        type: "success",
-        title: t("settings.profile.avatar-uploaded"),
-      });
-    } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.profile.avatar-upload-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      setAvatarBusy(false);
-    }
-  }
-
-  async function handleAvatarRemove() {
-    if (!userId) return;
-    setAvatarBusy(true);
-    try {
-      await userServiceClient.deleteAvatar(
-        create(DeleteAvatarRequestSchema, { name: `users/${userId}/avatar` })
-      );
-      invalidateAvatar(`users/${userId}/avatar`);
-      await fetchCurrentUser();
-      toastManager.add({
-        type: "success",
-        title: t("settings.profile.avatar-removed"),
-      });
-    } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("settings.profile.avatar-remove-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      setAvatarBusy(false);
-    }
-  }
+    },
+    remove: (name) =>
+      userServiceClient.deleteAvatar(
+        create(DeleteAvatarRequestSchema, { name })
+      ),
+    refetch: fetchCurrentUser,
+    messages: {
+      uploadSuccess: t("settings.profile.avatar-uploaded"),
+      uploadFailure: t("settings.profile.avatar-upload-failed"),
+      removeSuccess: t("settings.profile.avatar-removed"),
+      removeFailure: t("settings.profile.avatar-remove-failed"),
+    },
+  });
 
   // Seed from currentUser once it is available. Re-seeding on currentUser
   // change (e.g. after a save-driven refetch) keeps the form in sync without

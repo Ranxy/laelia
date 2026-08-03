@@ -46,6 +46,7 @@ import {
   iamServiceClient,
   roleServiceClient,
 } from "@/connect";
+import { roleIDFromName } from "@/lib/command-status";
 import { toastManager } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
@@ -58,12 +59,6 @@ import {
 } from "@/types/proto-es/store/policy_pb";
 import { type Group } from "@/types/proto-es/v1/group_service_pb";
 import { type Role } from "@/types/proto-es/v1/role_service_pb";
-
-// roleIDFromName extracts the bare id from `roles/{id}`.
-function roleIDFromName(name: string | undefined): string {
-  if (!name) return "";
-  return name.startsWith("roles/") ? name.slice("roles/".length) : name;
-}
 
 // NON_GRANTABLE_WORKSPACE_ROLE_IDS lists roles that must not be offered on the
 // workspace policy. workspaceMember is the auto-granted authenticated-principal

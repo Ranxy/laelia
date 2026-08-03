@@ -35,9 +35,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useAvatarEditor } from "@/composables/useAvatarEditor";
 import {
   deleteAgentAvatar,
-  invalidateAvatar,
   uploadAgentAvatar,
   useAvatar,
 } from "@/lib/avatar-cache";
@@ -208,7 +208,27 @@ export function AgentProfilePage() {
   // agent.machine so the identity grid shows a name, not the raw id).
   const [machineTitle, setMachineTitle] = useState("");
 
-  const [avatarBusy, setAvatarBusy] = useState(false);
+  const agentAvatarName = agent?.avatar || undefined;
+  const avatarSrc = useAvatar(agentAvatarName);
+
+  const {
+    busy: avatarBusy,
+    onChange: handleAvatarChange,
+    onRemove: handleAvatarRemove,
+  } = useAvatarEditor({
+    avatarName: agentAvatarName ?? null,
+    upload: (file) => uploadAgentAvatar(agentName, file),
+    remove: (name) => deleteAgentAvatar(name),
+    refetch: async () => {
+      setAgent(await getAgent(agentName));
+    },
+    messages: {
+      uploadSuccess: t("agent.profile.avatar-uploaded"),
+      uploadFailure: t("agent.profile.avatar-upload-failed"),
+      removeSuccess: t("agent.profile.avatar-removed"),
+      removeFailure: t("agent.profile.avatar-remove-failed"),
+    },
+  });
   const [allowAddSaving, setAllowAddSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -222,53 +242,6 @@ export function AgentProfilePage() {
   const [transferConfirmOpen, setTransferConfirmOpen] = useState(false);
   const [transferBusy, setTransferBusy] = useState(false);
   const [transferError, setTransferError] = useState("");
-
-  const agentAvatarName = agent?.avatar || undefined;
-  const avatarSrc = useAvatar(agentAvatarName);
-
-  async function handleAvatarChange(file: File | undefined) {
-    if (!file || !agentName) return;
-    setAvatarBusy(true);
-    try {
-      await uploadAgentAvatar(agentName, file);
-      if (agentAvatarName) invalidateAvatar(agentAvatarName);
-      setAgent(await getAgent(agentName));
-      toastManager.add({
-        type: "success",
-        title: t("agent.profile.avatar-uploaded"),
-      });
-    } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("agent.profile.avatar-upload-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      setAvatarBusy(false);
-    }
-  }
-
-  async function handleAvatarRemove() {
-    if (!agentName || !agentAvatarName) return;
-    setAvatarBusy(true);
-    try {
-      await deleteAgentAvatar(agentAvatarName);
-      invalidateAvatar(agentAvatarName);
-      setAgent(await getAgent(agentName));
-      toastManager.add({
-        type: "success",
-        title: t("agent.profile.avatar-removed"),
-      });
-    } catch (err) {
-      toastManager.add({
-        type: "error",
-        title: t("agent.profile.avatar-remove-failed"),
-        description: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      setAvatarBusy(false);
-    }
-  }
 
   async function loadAgent() {
     if (!agentId) return;

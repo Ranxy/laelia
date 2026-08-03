@@ -72,6 +72,12 @@ function agentResourceName(agentId: string | undefined): string {
   return `agents/${agentId ?? ""}`;
 }
 
+// roleIDFromName extracts the bare id from `roles/{id}`.
+function roleIDFromName(name: string | undefined): string {
+  if (!name) return "";
+  return name.startsWith("roles/") ? name.slice("roles/".length) : name;
+}
+
 function commandResourceName(
   agentId: string | undefined,
   commandId: string | undefined
@@ -95,4 +101,5 @@ export {
   formatDuration,
   formatTimeOfDay,
   formatTimestamp,
+  roleIDFromName,
 };

@@ -101,8 +101,10 @@ export const dashboardRoutes: RouteObject[] = [
           {
             index: true,
             lazy: () =>
-              import("@/pages/dashboard/members-empty-state").then((m) => ({
-                Component: m.MembersEmptyState,
+              import("@/components/selection-empty-state").then((m) => ({
+                element: (
+                  <m.SelectionEmptyState messageKey="members.no-selection" />
+                ),
               })),
           },
           {
@@ -182,11 +184,11 @@ export const dashboardRoutes: RouteObject[] = [
             index: true,
             handle: { name: MACHINE_ROUTE_LIST },
             lazy: () =>
-              import("@/pages/dashboard/machine-detail-empty-state").then(
-                (m) => ({
-                  Component: m.MachineDetailEmptyState,
-                })
-              ),
+              import("@/components/selection-empty-state").then((m) => ({
+                element: (
+                  <m.SelectionEmptyState messageKey="machine.no-selection" />
+                ),
+              })),
           },
           {
             path: ":machineId",

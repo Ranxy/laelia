@@ -403,6 +403,8 @@ export function SettingsGroupsPage() {
                               setEditForm(groupToForm(group));
                               setEditOpen(true);
                             }}
+                            aria-label={t("common.edit")}
+                            title={t("common.edit")}
                           >
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -414,6 +416,8 @@ export function SettingsGroupsPage() {
                               setDeleteTarget(group);
                               setDeleteOpen(true);
                             }}
+                            aria-label={t("common.delete")}
+                            title={t("common.delete")}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>

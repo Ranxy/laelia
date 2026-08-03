@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { roleServiceClient } from "@/connect";
+import { roleIDFromName } from "@/lib/command-status";
 import { describeError } from "@/lib/connect-errors";
 import {
   ALL_PERMISSIONS,
@@ -43,12 +44,6 @@ import {
 import { toastManager } from "@/lib/toast";
 import { useHasPermission } from "@/stores/permissions";
 import { type Role } from "@/types/proto-es/v1/role_service_pb";
-
-// roleIDFromName extracts the bare id from `roles/{id}`.
-function roleIDFromName(name: string | undefined): string {
-  if (!name) return "";
-  return name.startsWith("roles/") ? name.slice("roles/".length) : name;
-}
 
 // slugify turns a free-form title into a role resource-id slug (lowercase,
 // alnum + dash). The role id is immutable after creation, so we derive it from
