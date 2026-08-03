@@ -6,6 +6,14 @@ import { KeyValueEnvEditor } from "@/components/agent/key-value-env-editor";
 import { StringListEditor } from "@/components/agent/string-list-editor";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { MachineConnectionBadge } from "@/components/machine-connection-badge";
+import {
+  Card,
+  Field,
+  modelLabel,
+  piAPIProviderIds,
+  providerDisplayName,
+  providerLabel,
+} from "@/components/profile-common";
 import { Alert } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -53,66 +61,6 @@ import {
   type PiModel,
 } from "@/types/proto-es/v1/agent_pb";
 import { type Machine } from "@/types/proto-es/v1/machine_pb";
-
-// Field renders a labeled value row in the identity grid.
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <>
-      <dt className="text-xs text-control-light whitespace-nowrap pt-0.5">
-        {label}
-      </dt>
-      <dd className="text-sm text-main min-w-0 break-words">{children}</dd>
-    </>
-  );
-}
-
-function Card({
-  title,
-  children,
-  footer,
-}: {
-  title: string;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-}) {
-  return (
-    <section className="flex flex-col rounded-lg border border-control-border bg-background shadow-xs">
-      <header className="border-b border-control-border px-5 py-3">
-        <h2 className="text-sm font-semibold text-control">{title}</h2>
-      </header>
-      <div className="flex flex-col gap-4 p-5">{children}</div>
-      {footer && (
-        <footer className="border-t border-control-border px-5 py-3">
-          {footer}
-        </footer>
-      )}
-    </section>
-  );
-}
-
-function providerDisplayName(p: AgentProviderInfo): string {
-  if (p.displayName) {
-    return p.version ? `${p.displayName} (${p.version})` : p.displayName;
-  }
-  return p.providerId;
-}
-
-function providerLabel(id: string, providers: AgentProviderInfo[]): string {
-  if (id === "custom") return "";
-  const p = providers.find((it) => it.providerId === id);
-  return p ? providerDisplayName(p) : id;
-}
-
-function modelLabel(value: string, models: { value: string; name: string }[]) {
-  const m = models.find((it) => it.value === value);
-  return m ? m.name || m.value : value;
-}
 
 export function MachineProfilePage() {
   const { t } = useTranslation();
@@ -248,11 +196,6 @@ export function MachineProfilePage() {
   const modelRequired =
     !!selectedProviderInfo?.supportsModelConfigOption &&
     modelOptions.length > 0;
-  // The built-in pi runtime: phase-1 API provider ids. The model list for each
-  // is fetched dynamically from the provider's model API (see fetchPiModels),
-  // never hardcoded.
-  const piAPIProviderIds = ["deepseek", "openrouter"];
-
   // fetchPiModels loads the model list for an API provider from the manager
   // (ListPiModels). deepseek requires the api_key; openrouter is public.
   async function fetchPiModels(nextProvider: string, key: string) {

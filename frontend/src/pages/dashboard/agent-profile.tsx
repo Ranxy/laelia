@@ -6,6 +6,14 @@ import { KeyValueEnvEditor } from "@/components/agent/key-value-env-editor";
 import { StringListEditor } from "@/components/agent/string-list-editor";
 import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
+import {
+  Card,
+  Field,
+  modelLabel,
+  piAPIProviderIds,
+  providerDisplayName,
+  providerLabel,
+} from "@/components/profile-common";
 import { Alert } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -53,70 +61,6 @@ import {
   type PiModel,
 } from "@/types/proto-es/v1/agent_pb";
 import { agentLifecycle, lifecycleLabel } from "./agents";
-
-function providerDisplayName(p: AgentProviderInfo): string {
-  if (p.displayName) {
-    return p.version ? `${p.displayName} (${p.version})` : p.displayName;
-  }
-  return p.providerId;
-}
-
-function providerLabel(id: string, providers: AgentProviderInfo[]): string {
-  if (id === "custom") return "";
-  const p = providers.find((it) => it.providerId === id);
-  return p ? providerDisplayName(p) : id;
-}
-
-function modelLabel(value: string, models: { value: string; name: string }[]) {
-  const m = models.find((it) => it.value === value);
-  return m ? m.name || m.value : value;
-}
-
-// Field renders a labeled value row in the identity grid. The label is muted
-// and right-aligned on a fixed column so values line up vertically.
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <>
-      <dt className="text-xs text-control-light whitespace-nowrap pt-0.5">
-        {label}
-      </dt>
-      <dd className="text-sm text-main min-w-0 break-words">{children}</dd>
-    </>
-  );
-}
-
-function Card({
-  title,
-  children,
-  footer,
-  actions,
-}: {
-  title: string;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-  actions?: React.ReactNode;
-}) {
-  return (
-    <section className="flex flex-col rounded-lg border border-control-border bg-background shadow-xs">
-      <header className="flex items-center justify-between border-b border-control-border px-5 py-3">
-        <h2 className="text-sm font-semibold text-control">{title}</h2>
-        {actions}
-      </header>
-      <div className="flex flex-col gap-4 p-5">{children}</div>
-      {footer && (
-        <footer className="border-t border-control-border px-5 py-3">
-          {footer}
-        </footer>
-      )}
-    </section>
-  );
-}
 
 export function AgentProfilePage() {
   const { t } = useTranslation();
@@ -453,11 +397,6 @@ export function AgentProfilePage() {
   const modelOptions = selectedProviderInfo?.models ?? [];
   const providerSupportsModel =
     !!selectedProviderInfo?.supportsModelConfigOption;
-  // The LLM API provider ids the built-in pi runtime supports in phase 1. The
-  // model list for each is fetched dynamically from the provider's model API
-  // (see fetchPiModels), never hardcoded.
-  const piAPIProviderIds = ["deepseek", "openrouter"];
-
   // fetchPiModels loads the model list for an API provider from the manager
   // (ListPiModels). deepseek requires the api_key; openrouter is public. Results
   // are cached per provider so toggling back does not refetch.
