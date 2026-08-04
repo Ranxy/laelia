@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -26,8 +27,18 @@ func (s *Store) CreateAuditLog(ctx context.Context, log *AuditLogMessage) error 
 	_, err := s.GetDB().ExecContext(ctx, `
 		INSERT INTO audit_log (method, actor_type, actor_id, source_ip, status, error, resource, payload, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, log.Method, log.ActorType, log.ActorID, log.SourceIP, log.Status, log.Error, log.Resource, log.Payload, log.CreatedAt)
+	`, log.Method, log.ActorType, log.ActorID, log.SourceIP, log.Status, log.Error, log.Resource, normalizeAuditPayload(log.Payload), log.CreatedAt)
 	return err
+}
+
+// normalizeAuditPayload guarantees a value the jsonb payload column accepts.
+// The interceptor emits "" when a call carries no structured change (e.g.
+// ConnectMachine), and Postgres rejects ” as jsonb with SQLSTATE 22P02.
+func normalizeAuditPayload(payload string) string {
+	if !json.Valid([]byte(payload)) {
+		return "{}"
+	}
+	return payload
 }
 
 // AuditLogRecord is a stored audit log row.
