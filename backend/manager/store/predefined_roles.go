@@ -44,16 +44,19 @@ var allPermissionSet = func() map[permission.Permission]bool {
 
 // memberBaselinePermissions is the permission set granted to any authenticated
 // principal (roles/workspaceMember). It carries only workspace-scope perms: the
-// discovery/list perms (conversations.list, commands.list, reminders.list),
-// creation perms, and files.upload — the one per-object operation that may
-// legitimately target no resource (the agent file tool uploads
-// conversation-less blobs) and therefore cannot be authorized per-resource.
-// The per-object perms (conversations.read/send/manage, agents.edit,
-// commands.get/watch/cancel, reminders.get/update/cancel, files.download/list)
-// are deliberately absent: the IAM engine authorizes them per resource.
-// files.list is conversation-scoped (ListFilesRequest carries a conversation).
-// The review perms (reviewAgentDM, reviewAll) are also absent: they are granted
-// only via workspaceAdmin.
+// discovery/list perms (conversations.list, commands.list, reminders.list,
+// groups.get/list), creation perms, and files.upload — the one per-object
+// operation that may legitimately target no resource (the agent file tool
+// uploads conversation-less blobs) and therefore cannot be authorized
+// per-resource. The per-object perms (conversations.read/send/manage,
+// agents.edit, commands.get/watch/cancel, reminders.get/update/cancel,
+// files.download/list) are deliberately absent: the IAM engine authorizes them
+// per resource. files.list is conversation-scoped (ListFilesRequest carries a
+// conversation). The review perms (reviewAgentDM, reviewAll) are also absent:
+// they are granted only via workspaceAdmin. groups.create is absent as well:
+// groups are org-level IAM principals (bindable in workspace/agent/conversation
+// policies), so creating one is a management action reserved for workspaceAdmin
+// (or a custom role holding laelia.groups.create).
 var memberBaselinePermissions = permissionSet(
 	permission.AgentsGet,
 	permission.MachinesGet,
@@ -69,7 +72,6 @@ var memberBaselinePermissions = permissionSet(
 	permission.FilesUpload,
 	permission.GroupsGet,
 	permission.GroupsList,
-	permission.GroupsCreate,
 )
 
 // PredefinedRoles are the read-only, Go-defined roles shown on the management

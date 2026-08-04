@@ -52,6 +52,9 @@ func TestCheckPermissionAgentBaseline(t *testing.T) {
 		// Machine-scoped createAgent is not in the baseline: it is granted by the
 		// machine's IAM policy (or workspaceAdmin).
 		{permission.MachinesCreateAgent, false},
+		// groups.create is not in the baseline: groups are org-level IAM
+		// principals, so creating them is reserved for workspaceAdmin.
+		{permission.GroupsCreate, false},
 	}
 	for _, c := range cases {
 		got, err := m.CheckPermission(context.Background(), c.perm, nil, agent, nil)
