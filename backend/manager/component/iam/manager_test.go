@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Ranxy/laelia/backend/common"
 	"github.com/Ranxy/laelia/backend/common/permission"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -48,6 +49,9 @@ func TestCheckPermissionAgentBaseline(t *testing.T) {
 		{permission.UsersUpdate, false},
 		{permission.SettingsUpdate, false},
 		{permission.RolesCreate, false},
+		// Machine-scoped createAgent is not in the baseline: it is granted by the
+		// machine's IAM policy (or workspaceAdmin).
+		{permission.MachinesCreateAgent, false},
 	}
 	for _, c := range cases {
 		got, err := m.CheckPermission(context.Background(), c.perm, nil, agent, nil)
@@ -119,5 +123,29 @@ func TestWorkspaceAdminIsSuperuser(t *testing.T) {
 		if !admin[p] {
 			t.Errorf("workspaceAdmin missing catalog permission %q", p)
 		}
+	}
+}
+
+// TestMachineRolePermissionsResolve checks the machine-scope marker role →
+// permission map. machineAgentCreator is not a predefined role (it must not
+// appear on the management Roles page), but machineRolePermissions must still
+// grant laelia.machines.createAgent. (The non-marker fallback to the role
+// catalog needs a store, so it is not unit-tested here.)
+func TestMachineRolePermissionsResolve(t *testing.T) {
+	m := newManagerWithoutStore()
+
+	perms := m.machineRolePermissions(
+		context.Background(),
+		common.FormatRole(store.MachineAgentCreatorRole),
+	)
+	if perms == nil || !perms[permission.MachinesCreateAgent] {
+		t.Error("machineAgentCreator must grant laelia.machines.createAgent")
+	}
+	if perms == nil || perms[permission.MachinesEdit] {
+		t.Error("machineAgentCreator must not grant unrelated permissions")
+	}
+
+	if store.GetPredefinedRole(store.MachineAgentCreatorRole) != nil {
+		t.Error("machineAgentCreator must not be a predefined workspace role")
 	}
 }

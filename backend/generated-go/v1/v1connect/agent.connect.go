@@ -99,9 +99,10 @@ const (
 // AgentServiceClient is a client for the laelia.v1.AgentService service.
 type AgentServiceClient interface {
 	// CreateAgent is handler-gated (no permission annotation): the machine's
-	// creator or a caller holding laelia.agents.create (workspace admin) may
-	// create agents on it. The machine-scoped check cannot be expressed as a
-	// catalog permission.
+	// creator, a workspace admin, or a principal bound to
+	// roles/machineAgentCreator on the machine's IAM policy may create agents on
+	// it. The machine-scoped check is enforced by the handler via
+	// laelia.machines.createAgent against the machine's IAM policy.
 	CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.CreateAgentResponse], error)
 	ListAgents(context.Context, *connect.Request[v1.ListAgentsRequest]) (*connect.Response[v1.ListAgentsResponse], error)
 	GetAgent(context.Context, *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error)
@@ -437,9 +438,10 @@ func (c *agentServiceClient) Hello(ctx context.Context, req *connect.Request[v1.
 // AgentServiceHandler is an implementation of the laelia.v1.AgentService service.
 type AgentServiceHandler interface {
 	// CreateAgent is handler-gated (no permission annotation): the machine's
-	// creator or a caller holding laelia.agents.create (workspace admin) may
-	// create agents on it. The machine-scoped check cannot be expressed as a
-	// catalog permission.
+	// creator, a workspace admin, or a principal bound to
+	// roles/machineAgentCreator on the machine's IAM policy may create agents on
+	// it. The machine-scoped check is enforced by the handler via
+	// laelia.machines.createAgent against the machine's IAM policy.
 	CreateAgent(context.Context, *connect.Request[v1.CreateAgentRequest]) (*connect.Response[v1.CreateAgentResponse], error)
 	ListAgents(context.Context, *connect.Request[v1.ListAgentsRequest]) (*connect.Response[v1.ListAgentsResponse], error)
 	GetAgent(context.Context, *connect.Request[v1.GetAgentRequest]) (*connect.Response[v1.Agent], error)

@@ -179,6 +179,10 @@ func (s *MachineService) GetMachine(ctx context.Context, req *connect.Request[v1
 	out := convertToMachine(machine)
 	caller, _ := GetUserFromContext(ctx)
 	out.CanEdit = s.canEditMachine(ctx, caller)
+	if create, err := canCreateAgentOnMachine(ctx, s.iam, caller, machine); err == nil {
+		out.CanCreateAgent = create
+	}
+	out.CanManage = isMachineAdmin(ctx, s.iam, caller, machine)
 	return connect.NewResponse(out), nil
 }
 
@@ -191,6 +195,23 @@ func (s *MachineService) canEditMachine(ctx context.Context, user *store.UserMes
 		return false
 	}
 	ok, err := s.iam.CheckPermission(ctx, permission.MachinesEdit, user, nil, nil)
+	if err != nil {
+		return false
+	}
+	return ok
+}
+
+// isMachineAdmin reports whether the caller may manage a machine's IAM policy:
+// the machine's creator or a workspace admin (laelia.machines.edit). Shared by
+// the machine policy handlers and GetMachine (to populate can_manage).
+func isMachineAdmin(ctx context.Context, im *iam.Manager, user *store.UserMessage, machine *store.MachineMessage) bool {
+	if user == nil || im == nil {
+		return false
+	}
+	if machine.CreatedBy != 0 && machine.CreatedBy == user.ID {
+		return true
+	}
+	ok, err := im.CheckPermission(ctx, permission.MachinesEdit, user, nil, nil)
 	if err != nil {
 		return false
 	}
@@ -221,6 +242,16 @@ func (s *MachineService) DeleteMachine(ctx context.Context, req *connect.Request
 			return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
 		}
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Errorf("machine %s still hosts agent(s); delete them first", resourceID))
+	}
+	// Tidy up the machine's IAM policy row (who may create agents on it). Best
+	// effort: the machine is already deleted, so a cleanup failure must not turn
+	// a successful delete into an error the client would retry into a NotFound.
+	if err := s.store.DeletePolicyV2(ctx, &store.PolicyMessage{
+		ResourceType: storepb.Policy_MACHINE,
+		Resource:     common.FormatMachineUID(resourceID),
+		Type:         storepb.Policy_IAM,
+	}); err != nil {
+		slog.Warn("failed to clean up machine iam policy", slog.String("machine", resourceID), log.WithError(err))
 	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }

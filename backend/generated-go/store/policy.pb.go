@@ -94,6 +94,10 @@ const (
 	Policy_COMMAND  Policy_Resource = 6
 	Policy_REMINDER Policy_Resource = 7
 	Policy_FILE     Policy_Resource = 8
+	// MACHINE is a per-machine IAM policy: who may create agents on the
+	// machine. Machine-scoped access (laelia.machines.createAgent) is
+	// authorized from this policy at authorization time.
+	Policy_MACHINE Policy_Resource = 9
 )
 
 // Enum value maps for Policy_Resource.
@@ -108,6 +112,7 @@ var (
 		6: "COMMAND",
 		7: "REMINDER",
 		8: "FILE",
+		9: "MACHINE",
 	}
 	Policy_Resource_value = map[string]int32{
 		"RESOURCE_UNSPECIFIED": 0,
@@ -119,6 +124,7 @@ var (
 		"COMMAND":              6,
 		"REMINDER":             7,
 		"FILE":                 8,
+		"MACHINE":              9,
 	}
 )
 
@@ -451,12 +457,12 @@ var File_store_policy_proto protoreflect.FileDescriptor
 
 const file_store_policy_proto_rawDesc = "" +
 	"\n" +
-	"\x12store/policy.proto\x12\flaelia.store\x1a\x16google/type/expr.proto\"\xce\x01\n" +
+	"\x12store/policy.proto\x12\flaelia.store\x1a\x16google/type/expr.proto\"\xdb\x01\n" +
 	"\x06Policy\".\n" +
 	"\x04Type\x12\x14\n" +
 	"\x10TYPE_UNSPECIFIED\x10\x00\x12\a\n" +
 	"\x03IAM\x10\x01\x12\a\n" +
-	"\x03TAG\x10\x02\"\x93\x01\n" +
+	"\x03TAG\x10\x02\"\xa0\x01\n" +
 	"\bResource\x12\x18\n" +
 	"\x14RESOURCE_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tWORKSPACE\x10\x01\x12\x0f\n" +
@@ -466,7 +472,8 @@ const file_store_policy_proto_rawDesc = "" +
 	"\x05AGENT\x10\x05\x12\v\n" +
 	"\aCOMMAND\x10\x06\x12\f\n" +
 	"\bREMINDER\x10\a\x12\b\n" +
-	"\x04FILE\x10\b\"{\n" +
+	"\x04FILE\x10\b\x12\v\n" +
+	"\aMACHINE\x10\t\"{\n" +
 	"\tTagPolicy\x125\n" +
 	"\x04tags\x18\x01 \x03(\v2!.laelia.store.TagPolicy.TagsEntryR\x04tags\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +

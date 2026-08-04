@@ -1,11 +1,21 @@
-import { Loader2, Plus, Trash } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { create } from "@bufbuild/protobuf";
+import { Code, ConnectError } from "@connectrpc/connect";
+import {
+  Loader2,
+  Plus,
+  Shield,
+  Trash,
+  User as UserIcon,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { KeyValueEnvEditor } from "@/components/agent/key-value-env-editor";
 import { StringListEditor } from "@/components/agent/string-list-editor";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { MachineConnectionBadge } from "@/components/machine-connection-badge";
+import { MemberPicker } from "@/components/member-picker";
 import {
   Card,
   entryLabel,
@@ -24,6 +34,7 @@ import {
   AlertDialogFooter,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ModelCombobox } from "@/components/ui/combobox";
 import {
@@ -52,17 +63,33 @@ import {
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { settingServiceClient } from "@/connect";
+import {
+  groupServiceClient,
+  iamServiceClient,
+  settingServiceClient,
+} from "@/connect";
 import { formatTimestamp } from "@/lib/command-status";
 import { buildMachineRunCommand } from "@/lib/machine-token";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import {
+  type Binding,
+  BindingSchema,
+  type IamPolicy,
+  IamPolicySchema,
+} from "@/types/proto-es/store/policy_pb";
+import {
   type AgentProviderInfo,
   type AgentSummary,
   type PiModel,
 } from "@/types/proto-es/v1/agent_pb";
+import { type Group } from "@/types/proto-es/v1/group_service_pb";
 import { type Machine } from "@/types/proto-es/v1/machine_pb";
+
+// AGENT_CREATOR_ROLE is the machine-scope IAM role bound on a machine's IAM
+// policy to grant creating agents on that machine. Only this role's bindings
+// are surfaced on the machine profile's Access card.
+const AGENT_CREATOR_ROLE = "roles/machineAgentCreator";
 
 export function MachineProfilePage() {
   const { t } = useTranslation();
@@ -136,6 +163,20 @@ export function MachineProfilePage() {
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState("");
 
+  // Access (IAM) state: who may create agents on this machine. The policy is
+  // loaded only for callers who may manage it (machine.canManage).
+  const [policyState, setPolicyState] = useState<{
+    policy: IamPolicy;
+    etag: string;
+  } | null>(null);
+  const [accessOpen, setAccessOpen] = useState(false);
+  const [accessMembers, setAccessMembers] = useState<Set<string>>(new Set());
+  const [accessSaving, setAccessSaving] = useState(false);
+  const [accessError, setAccessError] = useState("");
+  const [groups, setGroups] = useState<Group[]>([]);
+  const users = useAppStore((s) => s.users);
+  const fetchUsers = useAppStore((s) => s.fetchUsers);
+
   async function reload() {
     const m = await getMachine(machineName);
     setMachine(m);
@@ -208,6 +249,43 @@ export function MachineProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider, piMode, apiProvider, apiKey]);
 
+  // Access (who may create agents) logic. The machine IAM policy is
+  // handler-gated server-side to the machine's creator or a workspace admin,
+  // matching machine.canManage.
+  async function loadPolicy() {
+    try {
+      const res = await iamServiceClient.getMachineIamPolicy({
+        name: machineName,
+      });
+      setPolicyState({
+        policy: res.policy ?? create(IamPolicySchema, {}),
+        etag: res.etag,
+      });
+      setAccessError("");
+    } catch (err) {
+      setAccessError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  useEffect(() => {
+    if (!machine?.canManage || !machineId) return;
+    void loadPolicy();
+    fetchUsers({ pageSize: 1000 });
+    void groupServiceClient
+      .listGroups({ pageSize: 1000 })
+      .then((res) => setGroups(res.groups ?? []));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [machineId, machineName, machine?.canManage, fetchUsers]);
+
+  // agentCreatorMembers are the principals bound to the machineAgentCreator
+  // role on this machine's IAM policy.
+  const agentCreatorMembers = useMemo(() => {
+    const binding = policyState?.policy.bindings.find(
+      (b) => b.role === AGENT_CREATOR_ROLE
+    );
+    return binding?.members ?? [];
+  }, [policyState]);
+
   if (!machine) {
     return (
       <div className="h-full overflow-y-auto p-6">
@@ -229,6 +307,11 @@ export function MachineProfilePage() {
   }
 
   const canEdit = machine.canEdit;
+  const canCreateAgent = machine.canCreateAgent;
+  const canManage = machine.canManage;
+  // hasAnyAction suppresses the "not allowed" notice for users who hold at least
+  // one capability on this machine (e.g. a granted agent creator).
+  const hasAnyAction = canEdit || canCreateAgent || canManage;
   const info = machine.info;
   const availableProviders: AgentProviderInfo[] =
     info?.availableProviders ?? [];
@@ -455,10 +538,106 @@ export function MachineProfilePage() {
     }
   }
 
+  function memberLabel(member: string): string {
+    if (member === "allUsers") return t("machine.access-member-all-users");
+    if (member.startsWith("users/")) {
+      const u = users.find((u) => u.name === member);
+      return u ? u.title || u.email || member : member;
+    }
+    if (member.startsWith("groups/")) {
+      const g = groups.find(
+        (grp) =>
+          grp.name === member ||
+          (grp.email ? `groups/${grp.email}` === member : false)
+      );
+      return g ? g.title || g.email || member : member.slice("groups/".length);
+    }
+    return member;
+  }
+
+  function openAccess() {
+    setAccessMembers(new Set(agentCreatorMembers));
+    setAccessError("");
+    setAccessOpen(true);
+  }
+
+  function handleAccessAdd(member: string) {
+    if (!member || accessMembers.has(member)) return;
+    setAccessMembers((prev) => new Set(prev).add(member));
+  }
+
+  function handleAccessRemove(member: string) {
+    setAccessMembers((prev) => {
+      const next = new Set(prev);
+      next.delete(member);
+      return next;
+    });
+  }
+
+  // handleSaveAccess replaces only the machineAgentCreator binding (members set
+  // to the sheet's selection), leaving any other bindings untouched, and writes
+  // it back etag-guarded.
+  async function handleSaveAccess() {
+    if (!policyState) return;
+    setAccessSaving(true);
+    setAccessError("");
+    try {
+      const bindings: Binding[] = [];
+      let found = false;
+      for (const b of policyState.policy.bindings) {
+        if (b.role === AGENT_CREATOR_ROLE) {
+          found = true;
+          if (accessMembers.size > 0) {
+            bindings.push(
+              create(BindingSchema, {
+                role: AGENT_CREATOR_ROLE,
+                members: [...accessMembers],
+              })
+            );
+          }
+        } else {
+          bindings.push(
+            create(BindingSchema, { role: b.role, members: [...b.members] })
+          );
+        }
+      }
+      if (!found && accessMembers.size > 0) {
+        bindings.push(
+          create(BindingSchema, {
+            role: AGENT_CREATOR_ROLE,
+            members: [...accessMembers],
+          })
+        );
+      }
+      const policy = create(IamPolicySchema, { bindings });
+      const res = await iamServiceClient.setMachineIamPolicy({
+        name: machineName,
+        policy,
+        etag: policyState.etag,
+      });
+      setPolicyState({
+        policy: res.policy ?? create(IamPolicySchema, {}),
+        etag: res.etag,
+      });
+      setAccessOpen(false);
+    } catch (err) {
+      if (err instanceof ConnectError && err.code === Code.Aborted) {
+        // Etag mismatch: another writer changed the policy. Reload the latest
+        // state so the admin can review and retry.
+        setAccessError(t("machine.access-etag-mismatch"));
+        await loadPolicy();
+      } else {
+        setAccessError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      setAccessSaving(false);
+    }
+  }
+
   return (
     <div className="h-full overflow-y-auto p-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        {!canEdit && (
+        {!hasAnyAction && (
           <Alert
             variant="info"
             description={t("machine.profile.edit-not-allowed")}
@@ -556,6 +735,37 @@ export function MachineProfilePage() {
                 )}
               </Card>
             </div>
+
+            {/* Who can create agents on this machine */}
+            {canManage && (
+              <Card
+                title={t("machine.access-title")}
+                footer={
+                  <div className="flex items-center justify-end">
+                    <Button variant="outline" size="sm" onClick={openAccess}>
+                      {t("machine.access-manage")}
+                    </Button>
+                  </div>
+                }
+              >
+                {accessError && (
+                  <Alert variant="error" description={accessError} />
+                )}
+                {agentCreatorMembers.length === 0 ? (
+                  <p className="text-xs text-control-light">
+                    {t("machine.access-no-members")}
+                  </p>
+                ) : (
+                  <ul className="flex flex-wrap gap-1.5">
+                    {agentCreatorMembers.map((m) => (
+                      <li key={m}>
+                        <Badge variant="secondary">{memberLabel(m)}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            )}
           </div>
 
           {/* Providers + agent roster */}
@@ -604,7 +814,7 @@ export function MachineProfilePage() {
                 <div className="flex items-center justify-end gap-2">
                   <Button
                     size="sm"
-                    disabled={!canEdit}
+                    disabled={!canCreateAgent}
                     onClick={() => {
                       resetAddForm();
                       setAddOpen(true);
@@ -1225,6 +1435,146 @@ export function MachineProfilePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Manage access (who may create agents) */}
+      <Sheet
+        open={accessOpen}
+        onOpenChange={(next) => {
+          setAccessOpen(next);
+          if (!next) setAccessError("");
+        }}
+      >
+        <SheetContent width="medium">
+          <SheetHeader>
+            <SheetTitle>{t("machine.access-manage-title")}</SheetTitle>
+            <SheetDescription>
+              {t("machine.access-manage-description", { title: machine.title })}
+            </SheetDescription>
+          </SheetHeader>
+          <SheetBody>
+            {accessError && (
+              <Alert
+                variant="error"
+                description={accessError}
+                className="mb-2"
+              />
+            )}
+            <div className="flex flex-col gap-5">
+              {/* Current members */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-control">
+                  {t("machine.access-current-members")}
+                </label>
+                <div className="max-h-64 overflow-y-auto pr-1">
+                  {accessMembers.size === 0 ? (
+                    <p className="text-sm text-control-light py-4 text-center border border-dashed border-control-border rounded-xs">
+                      {t("machine.access-no-members")}
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {[...accessMembers]
+                        .sort((a, b) =>
+                          (memberLabel(a) ?? a).localeCompare(
+                            memberLabel(b) ?? b
+                          )
+                        )
+                        .map((member) => {
+                          const user = users.find((u) => u.name === member);
+                          const group = member.startsWith("groups/")
+                            ? groups.find(
+                                (g) =>
+                                  g.name === member ||
+                                  (g.email
+                                    ? `groups/${g.email}` === member
+                                    : false)
+                              )
+                            : undefined;
+                          return (
+                            <div
+                              key={member}
+                              className="flex items-center gap-3 rounded-xs border border-control-border bg-background p-3"
+                            >
+                              <div className="flex size-9 items-center justify-center rounded-full shrink-0 bg-accent/10 text-accent">
+                                {group ? (
+                                  <Shield className="size-4.5" />
+                                ) : (
+                                  <UserIcon className="size-4.5" />
+                                )}
+                              </div>
+                              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                                <span className="text-sm font-medium text-main truncate">
+                                  {memberLabel(member)}
+                                </span>
+                                {user?.title && (
+                                  <span className="text-xs text-control-light truncate">
+                                    {user.title}
+                                  </span>
+                                )}
+                                {group && (
+                                  <span className="text-xs text-control-light truncate">
+                                    {t("machine.access-member-group-count", {
+                                      count: group.members?.length ?? 0,
+                                    })}
+                                  </span>
+                                )}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                onClick={() => handleAccessRemove(member)}
+                                aria-label={t("machine.access-remove-member", {
+                                  email: memberLabel(member),
+                                })}
+                                className="shrink-0 text-control-light hover:text-error"
+                              >
+                                <X className="size-4" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Add member */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-control">
+                  {t("machine.access-add-member")}
+                </label>
+                <p className="text-xs text-control-placeholder">
+                  {t("machine.access-add-member-hint")}
+                </p>
+                <MemberPicker
+                  users={users.filter((u) => !accessMembers.has(u.name ?? ""))}
+                  groups={groups.filter(
+                    (g) =>
+                      !accessMembers.has(g.name ?? "") &&
+                      !(g.email && accessMembers.has(`groups/${g.email}`))
+                  )}
+                  value=""
+                  onSelect={handleAccessAdd}
+                />
+              </div>
+            </div>
+          </SheetBody>
+          <SheetFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAccessOpen(false)}
+              disabled={accessSaving}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button disabled={accessSaving} onClick={handleSaveAccess}>
+              {accessSaving ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : null}
+              {t("common.save")}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* Rotate confirm */}
       <AlertDialog

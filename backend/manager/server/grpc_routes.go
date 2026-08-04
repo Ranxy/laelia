@@ -89,7 +89,7 @@ func configureGrpcRouters(
 	machineStreamService := apiv1.NewMachineStreamService(stores, cmdDispatcher)
 	settingService := apiv1.NewSettingService(stores, s3clientmanager, profile)
 	roleService := apiv1.NewRoleService(stores)
-	iamService := apiv1.NewIamService(stores)
+	iamService := apiv1.NewIamService(stores, iamManager)
 	groupService := apiv1.NewGroupService(stores, iamManager)
 	apiProviderService := apiv1.NewAPIProviderService(stores, iamManager)
 	auditLogService := apiv1.NewAuditLogService(stores)

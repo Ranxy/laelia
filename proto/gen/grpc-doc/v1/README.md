@@ -317,11 +317,13 @@
 - [v1/iam_service.proto](#v1_iam_service-proto)
     - [BindingDelta](#laelia-v1-BindingDelta)
     - [GetAgentIamPolicyRequest](#laelia-v1-GetAgentIamPolicyRequest)
+    - [GetMachineIamPolicyRequest](#laelia-v1-GetMachineIamPolicyRequest)
     - [GetWorkspaceIamPolicyRequest](#laelia-v1-GetWorkspaceIamPolicyRequest)
     - [IamPolicyChange](#laelia-v1-IamPolicyChange)
     - [IamPolicyView](#laelia-v1-IamPolicyView)
     - [PolicyDelta](#laelia-v1-PolicyDelta)
     - [SetAgentIamPolicyRequest](#laelia-v1-SetAgentIamPolicyRequest)
+    - [SetMachineIamPolicyRequest](#laelia-v1-SetMachineIamPolicyRequest)
     - [SetWorkspaceIamPolicyRequest](#laelia-v1-SetWorkspaceIamPolicyRequest)
   
     - [BindingDelta.Action](#laelia-v1-BindingDelta-Action)
@@ -1468,7 +1470,7 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| CreateAgent | [CreateAgentRequest](#laelia-v1-CreateAgentRequest) | [CreateAgentResponse](#laelia-v1-CreateAgentResponse) | CreateAgent is handler-gated (no permission annotation): the machine&#39;s creator or a caller holding laelia.agents.create (workspace admin) may create agents on it. The machine-scoped check cannot be expressed as a catalog permission. |
+| CreateAgent | [CreateAgentRequest](#laelia-v1-CreateAgentRequest) | [CreateAgentResponse](#laelia-v1-CreateAgentResponse) | CreateAgent is handler-gated (no permission annotation): the machine&#39;s creator, a workspace admin, or a principal bound to roles/machineAgentCreator on the machine&#39;s IAM policy may create agents on it. The machine-scoped check is enforced by the handler via laelia.machines.createAgent against the machine&#39;s IAM policy. |
 | ListAgents | [ListAgentsRequest](#laelia-v1-ListAgentsRequest) | [ListAgentsResponse](#laelia-v1-ListAgentsResponse) |  |
 | GetAgent | [GetAgentRequest](#laelia-v1-GetAgentRequest) | [Agent](#laelia-v1-Agent) |  |
 | UpdateAgent | [UpdateAgentRequest](#laelia-v1-UpdateAgentRequest) | [Agent](#laelia-v1-Agent) | UpdateAgent patches a single mutable agent field. Only allow_add_to_channel is supported initially (any other update_mask path is rejected). Authorized in the handler for the agent&#39;s owner or a workspace admin; the IAM interceptor&#39;s agents.edit is admin-only, so this RPC carries no permission annotation and is handler-gated. |
@@ -5465,6 +5467,21 @@ operator can see who granted or removed what.
 
 
 
+<a name="laelia-v1-GetMachineIamPolicyRequest"></a>
+
+### GetMachineIamPolicyRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The machine resource name, in the form `machines/{machine}`. |
+
+
+
+
+
+
 <a name="laelia-v1-GetWorkspaceIamPolicyRequest"></a>
 
 ### GetWorkspaceIamPolicyRequest
@@ -5543,6 +5560,23 @@ PolicyDelta describes the changes between two IAM policies.
 
 
 
+<a name="laelia-v1-SetMachineIamPolicyRequest"></a>
+
+### SetMachineIamPolicyRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The machine resource name, in the form `machines/{machine}`. |
+| policy | [laelia.store.IamPolicy](#laelia-store-IamPolicy) |  |  |
+| etag | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-SetWorkspaceIamPolicyRequest"></a>
 
 ### SetWorkspaceIamPolicyRequest
@@ -5581,9 +5615,12 @@ Action is the type of change applied to a binding.
 <a name="laelia-v1-IamService"></a>
 
 ### IamService
-IamService exposes the workspace and per-agent IAM policies for management.
-Get reads the full policy; Set replaces it whole, guarded by an etag. Each
-RPC is gated by the IAM interceptor with laelia.iam.getPolicy / setPolicy.
+IamService exposes the workspace, per-agent, and per-machine IAM policies for
+management. Get reads the full policy; Set replaces it whole, guarded by an
+etag. The workspace/agent RPCs are gated by the IAM interceptor with
+laelia.iam.getPolicy / setPolicy; the machine RPCs are handler-gated (the
+machine&#39;s creator or a workspace admin) because a machine-scoped permission
+cannot express the creator&#39;s implicit authority.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -5591,6 +5628,8 @@ RPC is gated by the IAM interceptor with laelia.iam.getPolicy / setPolicy.
 | SetWorkspaceIamPolicy | [SetWorkspaceIamPolicyRequest](#laelia-v1-SetWorkspaceIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Set the workspace IAM policy (full replace, etag-guarded). |
 | GetAgentIamPolicy | [GetAgentIamPolicyRequest](#laelia-v1-GetAgentIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Get the IAM policy attached to an agent. |
 | SetAgentIamPolicy | [SetAgentIamPolicyRequest](#laelia-v1-SetAgentIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Set the IAM policy attached to an agent (full replace, etag-guarded). |
+| GetMachineIamPolicy | [GetMachineIamPolicyRequest](#laelia-v1-GetMachineIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Get the IAM policy attached to a machine (who may create agents on it). |
+| SetMachineIamPolicy | [SetMachineIamPolicyRequest](#laelia-v1-SetMachineIamPolicyRequest) | [IamPolicyView](#laelia-v1-IamPolicyView) | Set the IAM policy attached to a machine (full replace, etag-guarded). |
 
  
 
@@ -5835,6 +5874,8 @@ in full in ConnectMachineResponse.assigned_agents on (re)connect.
 | labels | [Machine.LabelsEntry](#laelia-v1-Machine-LabelsEntry) | repeated |  |
 | created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}). |
 | can_edit | [bool](#bool) |  | can_edit reports whether the current caller may modify this machine (laelia.machines.edit). |
+| can_create_agent | [bool](#bool) |  | can_create_agent reports whether the current caller may create agents on this machine: the machine&#39;s creator, a workspace admin, or a principal bound to roles/machineAgentCreator in the machine&#39;s IAM policy. |
+| can_manage | [bool](#bool) |  | can_manage reports whether the current caller may manage this machine&#39;s IAM policy (the machine&#39;s creator or a workspace admin). |
 
 
 

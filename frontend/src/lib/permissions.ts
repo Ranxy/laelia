@@ -26,6 +26,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       "laelia.machines.get",
       "laelia.machines.edit",
       "laelia.machines.delete",
+      "laelia.machines.createAgent",
     ],
   },
   {

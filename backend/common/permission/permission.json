@@ -8,6 +8,7 @@
     {"name": "MachinesGet", "id": "laelia.machines.get"},
     {"name": "MachinesEdit", "id": "laelia.machines.edit"},
     {"name": "MachinesDelete", "id": "laelia.machines.delete"},
+    {"name": "MachinesCreateAgent", "id": "laelia.machines.createAgent"},
     {"name": "CommandsGet", "id": "laelia.commands.get"},
     {"name": "CommandsList", "id": "laelia.commands.list"},
     {"name": "CommandsWatch", "id": "laelia.commands.watch"},

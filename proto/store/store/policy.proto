@@ -34,6 +34,10 @@ message Policy {
     COMMAND = 6;
     REMINDER = 7;
     FILE = 8;
+    // MACHINE is a per-machine IAM policy: who may create agents on the
+    // machine. Machine-scoped access (laelia.machines.createAgent) is
+    // authorized from this policy at authorization time.
+    MACHINE = 9;
   }
 }
 

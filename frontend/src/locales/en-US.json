@@ -641,10 +641,22 @@
     "profile": {
       "section-identity": "Identity & Status",
       "section-token": "Token & Connection",
-      "edit-not-allowed": "Only a workspace admin can manage this machine.",
+      "edit-not-allowed": "Only the machine's creator or a workspace admin can manage this machine.",
       "load-failed": "Failed to load this machine. It may have been deleted or the request failed."
     },
-    "add-agent-global-entry-required": "Select a key/model entry for the agent."
+    "add-agent-global-entry-required": "Select a key/model entry for the agent.",
+    "access-title": "Who can create agents",
+    "access-manage": "Manage access",
+    "access-no-members": "Only the machine's creator and workspace admins can create agents here.",
+    "access-manage-title": "Manage access",
+    "access-manage-description": "Grant users or groups the ability to create agents on machine {{title}}.",
+    "access-current-members": "Current members",
+    "access-member-all-users": "Everyone",
+    "access-member-group-count": "{{count}} members",
+    "access-remove-member": "Remove {{email}}",
+    "access-add-member": "Add member",
+    "access-add-member-hint": "Add a user or group who may create agents on this machine.",
+    "access-etag-mismatch": "Access changed since it was loaded; the latest state has been reloaded. Review and save again."
   },
   "members": {
     "title": "Members",

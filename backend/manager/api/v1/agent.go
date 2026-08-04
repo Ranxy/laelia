@@ -107,18 +107,19 @@ func (s *AgentService) CreateAgent(ctx context.Context, req *connect.Request[v1p
 	}
 
 	// CreateAgent is handler-gated (the proto carries no permission annotation):
-	// the machine's creator or a caller holding laelia.agents.create (workspace
-	// admin) may create agents on it. The creator becomes the agent's owner.
+	// the machine's creator, a workspace admin, or a principal bound to
+	// roles/machineAgentCreator on the machine's IAM policy may create agents on
+	// it. The creator becomes the agent's owner.
 	user, _ := GetUserFromContext(ctx)
 	if user == nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
-	canCreate, err := s.canCreateAgentOnMachine(ctx, user, machine)
+	canCreate, err := canCreateAgentOnMachine(ctx, s.iam, user, machine)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check agent creation permission"))
 	}
 	if !canCreate {
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can create an agent on this machine"))
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("you are not allowed to create an agent on this machine"))
 	}
 	creatorID := user.ID
 	ownerID := creatorID

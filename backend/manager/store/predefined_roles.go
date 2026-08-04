@@ -15,6 +15,12 @@ const (
 	ConversationMemberRole = "conversationMember"
 	ConversationAdminRole  = "conversationAdmin"
 	ConversationOwnerRole  = "conversationOwner"
+	// MachineAgentCreatorRole is the machine-scope IAM role granting
+	// laelia.machines.createAgent on the machine whose IAM policy binds it. Like
+	// the conversation roles it is a marker role: its permission set is resolved
+	// by component/iam.machineRolePermissions and it is deliberately not in
+	// PredefinedRoles (so it never appears on the management Roles page).
+	MachineAgentCreatorRole = "machineAgentCreator"
 )
 
 func permissionSet(perms ...permission.Permission) map[permission.Permission]bool {

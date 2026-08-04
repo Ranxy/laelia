@@ -48,9 +48,10 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentServiceClient interface {
 	// CreateAgent is handler-gated (no permission annotation): the machine's
-	// creator or a caller holding laelia.agents.create (workspace admin) may
-	// create agents on it. The machine-scoped check cannot be expressed as a
-	// catalog permission.
+	// creator, a workspace admin, or a principal bound to
+	// roles/machineAgentCreator on the machine's IAM policy may create agents on
+	// it. The machine-scoped check is enforced by the handler via
+	// laelia.machines.createAgent against the machine's IAM policy.
 	CreateAgent(ctx context.Context, in *CreateAgentRequest, opts ...grpc.CallOption) (*CreateAgentResponse, error)
 	ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error)
 	GetAgent(ctx context.Context, in *GetAgentRequest, opts ...grpc.CallOption) (*Agent, error)
@@ -336,9 +337,10 @@ func (c *agentServiceClient) Hello(ctx context.Context, in *HelloRequest, opts .
 // for forward compatibility.
 type AgentServiceServer interface {
 	// CreateAgent is handler-gated (no permission annotation): the machine's
-	// creator or a caller holding laelia.agents.create (workspace admin) may
-	// create agents on it. The machine-scoped check cannot be expressed as a
-	// catalog permission.
+	// creator, a workspace admin, or a principal bound to
+	// roles/machineAgentCreator on the machine's IAM policy may create agents on
+	// it. The machine-scoped check is enforced by the handler via
+	// laelia.machines.createAgent against the machine's IAM policy.
 	CreateAgent(context.Context, *CreateAgentRequest) (*CreateAgentResponse, error)
 	ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error)
 	GetAgent(context.Context, *GetAgentRequest) (*Agent, error)

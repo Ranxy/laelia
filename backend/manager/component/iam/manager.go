@@ -98,7 +98,8 @@ func (m *Manager) CheckPermission(ctx context.Context, perm permission.Permissio
 
 // checkResourcePermission authorizes a resource-scoped permission. For an
 // agent it consults the agent's IAM policy (custom roles bound on the agent).
-// For a conversation it reads the conversation IAM policy and maps the
+// For a machine it consults the machine's IAM policy (who may create agents on
+// it). For a conversation it reads the conversation IAM policy and maps the
 // caller's binding roles to conversation permissions (member/admin/owner). A
 // non-member user may still read an agent-DM (type 3) if they hold the
 // workspace-scope conversations.reviewAgentDM permission. A resource type
@@ -114,6 +115,17 @@ func (m *Manager) checkResourcePermission(ctx context.Context, perm permission.P
 		}
 		for _, binding := range utils.GetCallerIAMPolicyBindings(ctx, m.store, user, agent, p.Policy) {
 			if rolePerms := m.rolePermissions(ctx, binding.Role); rolePerms != nil && rolePerms[perm] {
+				return true, nil
+			}
+		}
+		return false, nil
+	case models.Policy_MACHINE:
+		p, err := m.store.GetMachineIamPolicy(ctx, resource.Name)
+		if err != nil {
+			return false, err
+		}
+		for _, binding := range utils.GetCallerIAMPolicyBindings(ctx, m.store, user, agent, p.Policy) {
+			if rolePerms := m.machineRolePermissions(ctx, binding.Role); rolePerms != nil && rolePerms[perm] {
 				return true, nil
 			}
 		}
@@ -197,6 +209,26 @@ func (m *Manager) conversationRolePermissions(ctx context.Context, role string) 
 		return m.rolePermissions(ctx, role)
 	}
 }
+
+// machineRolePermissions resolves an IAM binding role on a machine to its
+// permission set: the built-in machineAgentCreator role maps to the machine
+// agent-creator set; any other role resolves through the normal role catalog
+// (custom roles).
+func (m *Manager) machineRolePermissions(ctx context.Context, role string) map[permission.Permission]bool {
+	if role == common.FormatRole(store.MachineAgentCreatorRole) {
+		return machineAgentCreatorPermissions
+	}
+	return m.rolePermissions(ctx, role)
+}
+
+// machineAgentCreatorPermissions is the permission set of the machine-scope
+// roles/machineAgentCreator marker role: it grants creating agents on the
+// machine whose IAM policy binds it. Like the conversation roles it is
+// deliberately not in store.PredefinedRoles (so it never appears on the
+// management Roles page as a workspace-bindable role).
+var machineAgentCreatorPermissions = permSet(
+	permission.MachinesCreateAgent,
+)
 
 // chatRolePermissions maps a conversation chat role value to its permission
 // set. The values come from the conversation IAM policy's built-in roles

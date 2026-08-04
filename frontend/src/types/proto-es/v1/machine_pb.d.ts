@@ -561,6 +561,23 @@ export declare type Machine = Message<"laelia.v1.Machine"> & {
    * @generated from field: bool can_edit = 12;
    */
   canEdit: boolean;
+
+  /**
+   * can_create_agent reports whether the current caller may create agents on
+   * this machine: the machine's creator, a workspace admin, or a principal
+   * bound to roles/machineAgentCreator in the machine's IAM policy.
+   *
+   * @generated from field: bool can_create_agent = 13;
+   */
+  canCreateAgent: boolean;
+
+  /**
+   * can_manage reports whether the current caller may manage this machine's
+   * IAM policy (the machine's creator or a workspace admin).
+   *
+   * @generated from field: bool can_manage = 14;
+   */
+  canManage: boolean;
 };
 
 /**

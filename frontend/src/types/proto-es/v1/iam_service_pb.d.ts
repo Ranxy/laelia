@@ -244,9 +244,58 @@ export declare type SetAgentIamPolicyRequest = Message<"laelia.v1.SetAgentIamPol
 export declare const SetAgentIamPolicyRequestSchema: GenMessage<SetAgentIamPolicyRequest>;
 
 /**
- * IamService exposes the workspace and per-agent IAM policies for management.
- * Get reads the full policy; Set replaces it whole, guarded by an etag. Each
- * RPC is gated by the IAM interceptor with laelia.iam.getPolicy / setPolicy.
+ * @generated from message laelia.v1.GetMachineIamPolicyRequest
+ */
+export declare type GetMachineIamPolicyRequest = Message<"laelia.v1.GetMachineIamPolicyRequest"> & {
+  /**
+   * The machine resource name, in the form `machines/{machine}`.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.GetMachineIamPolicyRequest.
+ * Use `create(GetMachineIamPolicyRequestSchema)` to create a new message.
+ */
+export declare const GetMachineIamPolicyRequestSchema: GenMessage<GetMachineIamPolicyRequest>;
+
+/**
+ * @generated from message laelia.v1.SetMachineIamPolicyRequest
+ */
+export declare type SetMachineIamPolicyRequest = Message<"laelia.v1.SetMachineIamPolicyRequest"> & {
+  /**
+   * The machine resource name, in the form `machines/{machine}`.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: laelia.store.IamPolicy policy = 2;
+   */
+  policy?: IamPolicy | undefined;
+
+  /**
+   * @generated from field: string etag = 3;
+   */
+  etag: string;
+};
+
+/**
+ * Describes the message laelia.v1.SetMachineIamPolicyRequest.
+ * Use `create(SetMachineIamPolicyRequestSchema)` to create a new message.
+ */
+export declare const SetMachineIamPolicyRequestSchema: GenMessage<SetMachineIamPolicyRequest>;
+
+/**
+ * IamService exposes the workspace, per-agent, and per-machine IAM policies for
+ * management. Get reads the full policy; Set replaces it whole, guarded by an
+ * etag. The workspace/agent RPCs are gated by the IAM interceptor with
+ * laelia.iam.getPolicy / setPolicy; the machine RPCs are handler-gated (the
+ * machine's creator or a workspace admin) because a machine-scoped permission
+ * cannot express the creator's implicit authority.
  *
  * @generated from service laelia.v1.IamService
  */
@@ -289,6 +338,26 @@ export declare const IamService: GenService<{
   setAgentIamPolicy: {
     methodKind: "unary";
     input: typeof SetAgentIamPolicyRequestSchema;
+    output: typeof IamPolicyViewSchema;
+  },
+  /**
+   * Get the IAM policy attached to a machine (who may create agents on it).
+   *
+   * @generated from rpc laelia.v1.IamService.GetMachineIamPolicy
+   */
+  getMachineIamPolicy: {
+    methodKind: "unary";
+    input: typeof GetMachineIamPolicyRequestSchema;
+    output: typeof IamPolicyViewSchema;
+  },
+  /**
+   * Set the IAM policy attached to a machine (full replace, etag-guarded).
+   *
+   * @generated from rpc laelia.v1.IamService.SetMachineIamPolicy
+   */
+  setMachineIamPolicy: {
+    methodKind: "unary";
+    input: typeof SetMachineIamPolicyRequestSchema;
     output: typeof IamPolicyViewSchema;
   },
 }>;

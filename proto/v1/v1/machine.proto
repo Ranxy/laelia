@@ -336,6 +336,15 @@ message Machine {
   // (laelia.machines.edit).
   bool can_edit = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // can_create_agent reports whether the current caller may create agents on
+  // this machine: the machine's creator, a workspace admin, or a principal
+  // bound to roles/machineAgentCreator in the machine's IAM policy.
+  bool can_create_agent = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // can_manage reports whether the current caller may manage this machine's
+  // IAM policy (the machine's creator or a workspace admin).
+  bool can_manage = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   reserved 4; // "token"
 }
 

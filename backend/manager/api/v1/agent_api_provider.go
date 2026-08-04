@@ -104,17 +104,21 @@ func maskKeyPreview(key string) string {
 }
 
 // canCreateAgentOnMachine reports whether the caller may create an agent on the
-// machine: the machine's creator, or a caller holding laelia.agents.create
-// (workspace admin today). Machines are created by privileged users, so in
-// practice this reaches admins and authorized managers.
-func (s *AgentService) canCreateAgentOnMachine(ctx context.Context, user *store.UserMessage, machine *store.MachineMessage) (bool, error) {
+// machine: the machine's creator, a workspace admin (who holds the
+// workspace-scoped laelia.machines.createAgent via the workspaceAdmin role), or
+// a principal bound to roles/machineAgentCreator in the machine's IAM policy.
+// Shared by the CreateAgent handler and GetMachine (to populate can_create_agent).
+func canCreateAgentOnMachine(ctx context.Context, im *iam.Manager, user *store.UserMessage, machine *store.MachineMessage) (bool, error) {
 	if user == nil {
 		return false, nil
 	}
 	if machine.CreatedBy != 0 && machine.CreatedBy == user.ID {
 		return true, nil
 	}
-	return s.iam.CheckPermission(ctx, permission.AgentsCreate, user, nil, nil)
+	return im.CheckPermission(ctx, permission.MachinesCreateAgent, user, nil, &iam.ResourceRef{
+		ResourceType: storepb.Policy_MACHINE,
+		Name:         common.FormatMachineUID(machine.ResourceID),
+	})
 }
 
 // validateGlobalProviderReference validates a builtin-pi config's global

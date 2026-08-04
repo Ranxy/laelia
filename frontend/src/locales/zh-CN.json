@@ -641,10 +641,22 @@
     "profile": {
       "section-identity": "身份与状态",
       "section-token": "令牌与连接",
-      "edit-not-allowed": "仅工作区管理员可管理此机器。",
+      "edit-not-allowed": "仅机器的创建者或工作区管理员可管理此机器。",
       "load-failed": "加载机器失败。它可能已被删除,或请求出错。"
     },
-    "add-agent-global-entry-required": "请为该 agent 选择密钥/模型条目。"
+    "add-agent-global-entry-required": "请为该 agent 选择密钥/模型条目。",
+    "access-title": "谁可以创建 Agent",
+    "access-manage": "管理授权",
+    "access-no-members": "目前只有机器的创建者和工作区管理员可以在此创建 Agent。",
+    "access-manage-title": "管理授权",
+    "access-manage-description": "授予用户或组在此机器 {{title}} 上创建 Agent 的权限。",
+    "access-current-members": "当前成员",
+    "access-member-all-users": "所有人",
+    "access-member-group-count": "{{count}} 个成员",
+    "access-remove-member": "移除 {{email}}",
+    "access-add-member": "添加成员",
+    "access-add-member-hint": "添加一个用户或组,允许其在此机器上创建 Agent。",
+    "access-etag-mismatch": "授权信息自加载后已发生变化,已重新加载最新状态,请确认后再次保存。"
   },
   "members": {
     "title": "成员",

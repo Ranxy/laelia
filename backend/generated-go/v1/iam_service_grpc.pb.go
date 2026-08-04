@@ -23,15 +23,20 @@ const (
 	IamService_SetWorkspaceIamPolicy_FullMethodName = "/laelia.v1.IamService/SetWorkspaceIamPolicy"
 	IamService_GetAgentIamPolicy_FullMethodName     = "/laelia.v1.IamService/GetAgentIamPolicy"
 	IamService_SetAgentIamPolicy_FullMethodName     = "/laelia.v1.IamService/SetAgentIamPolicy"
+	IamService_GetMachineIamPolicy_FullMethodName   = "/laelia.v1.IamService/GetMachineIamPolicy"
+	IamService_SetMachineIamPolicy_FullMethodName   = "/laelia.v1.IamService/SetMachineIamPolicy"
 )
 
 // IamServiceClient is the client API for IamService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// IamService exposes the workspace and per-agent IAM policies for management.
-// Get reads the full policy; Set replaces it whole, guarded by an etag. Each
-// RPC is gated by the IAM interceptor with laelia.iam.getPolicy / setPolicy.
+// IamService exposes the workspace, per-agent, and per-machine IAM policies for
+// management. Get reads the full policy; Set replaces it whole, guarded by an
+// etag. The workspace/agent RPCs are gated by the IAM interceptor with
+// laelia.iam.getPolicy / setPolicy; the machine RPCs are handler-gated (the
+// machine's creator or a workspace admin) because a machine-scoped permission
+// cannot express the creator's implicit authority.
 type IamServiceClient interface {
 	// Get the workspace IAM policy.
 	GetWorkspaceIamPolicy(ctx context.Context, in *GetWorkspaceIamPolicyRequest, opts ...grpc.CallOption) (*IamPolicyView, error)
@@ -41,6 +46,10 @@ type IamServiceClient interface {
 	GetAgentIamPolicy(ctx context.Context, in *GetAgentIamPolicyRequest, opts ...grpc.CallOption) (*IamPolicyView, error)
 	// Set the IAM policy attached to an agent (full replace, etag-guarded).
 	SetAgentIamPolicy(ctx context.Context, in *SetAgentIamPolicyRequest, opts ...grpc.CallOption) (*IamPolicyView, error)
+	// Get the IAM policy attached to a machine (who may create agents on it).
+	GetMachineIamPolicy(ctx context.Context, in *GetMachineIamPolicyRequest, opts ...grpc.CallOption) (*IamPolicyView, error)
+	// Set the IAM policy attached to a machine (full replace, etag-guarded).
+	SetMachineIamPolicy(ctx context.Context, in *SetMachineIamPolicyRequest, opts ...grpc.CallOption) (*IamPolicyView, error)
 }
 
 type iamServiceClient struct {
@@ -91,13 +100,36 @@ func (c *iamServiceClient) SetAgentIamPolicy(ctx context.Context, in *SetAgentIa
 	return out, nil
 }
 
+func (c *iamServiceClient) GetMachineIamPolicy(ctx context.Context, in *GetMachineIamPolicyRequest, opts ...grpc.CallOption) (*IamPolicyView, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IamPolicyView)
+	err := c.cc.Invoke(ctx, IamService_GetMachineIamPolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iamServiceClient) SetMachineIamPolicy(ctx context.Context, in *SetMachineIamPolicyRequest, opts ...grpc.CallOption) (*IamPolicyView, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IamPolicyView)
+	err := c.cc.Invoke(ctx, IamService_SetMachineIamPolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IamServiceServer is the server API for IamService service.
 // All implementations must embed UnimplementedIamServiceServer
 // for forward compatibility.
 //
-// IamService exposes the workspace and per-agent IAM policies for management.
-// Get reads the full policy; Set replaces it whole, guarded by an etag. Each
-// RPC is gated by the IAM interceptor with laelia.iam.getPolicy / setPolicy.
+// IamService exposes the workspace, per-agent, and per-machine IAM policies for
+// management. Get reads the full policy; Set replaces it whole, guarded by an
+// etag. The workspace/agent RPCs are gated by the IAM interceptor with
+// laelia.iam.getPolicy / setPolicy; the machine RPCs are handler-gated (the
+// machine's creator or a workspace admin) because a machine-scoped permission
+// cannot express the creator's implicit authority.
 type IamServiceServer interface {
 	// Get the workspace IAM policy.
 	GetWorkspaceIamPolicy(context.Context, *GetWorkspaceIamPolicyRequest) (*IamPolicyView, error)
@@ -107,6 +139,10 @@ type IamServiceServer interface {
 	GetAgentIamPolicy(context.Context, *GetAgentIamPolicyRequest) (*IamPolicyView, error)
 	// Set the IAM policy attached to an agent (full replace, etag-guarded).
 	SetAgentIamPolicy(context.Context, *SetAgentIamPolicyRequest) (*IamPolicyView, error)
+	// Get the IAM policy attached to a machine (who may create agents on it).
+	GetMachineIamPolicy(context.Context, *GetMachineIamPolicyRequest) (*IamPolicyView, error)
+	// Set the IAM policy attached to a machine (full replace, etag-guarded).
+	SetMachineIamPolicy(context.Context, *SetMachineIamPolicyRequest) (*IamPolicyView, error)
 	mustEmbedUnimplementedIamServiceServer()
 }
 
@@ -128,6 +164,12 @@ func (UnimplementedIamServiceServer) GetAgentIamPolicy(context.Context, *GetAgen
 }
 func (UnimplementedIamServiceServer) SetAgentIamPolicy(context.Context, *SetAgentIamPolicyRequest) (*IamPolicyView, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetAgentIamPolicy not implemented")
+}
+func (UnimplementedIamServiceServer) GetMachineIamPolicy(context.Context, *GetMachineIamPolicyRequest) (*IamPolicyView, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMachineIamPolicy not implemented")
+}
+func (UnimplementedIamServiceServer) SetMachineIamPolicy(context.Context, *SetMachineIamPolicyRequest) (*IamPolicyView, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetMachineIamPolicy not implemented")
 }
 func (UnimplementedIamServiceServer) mustEmbedUnimplementedIamServiceServer() {}
 func (UnimplementedIamServiceServer) testEmbeddedByValue()                    {}
@@ -222,6 +264,42 @@ func _IamService_SetAgentIamPolicy_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IamService_GetMachineIamPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMachineIamPolicyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IamServiceServer).GetMachineIamPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IamService_GetMachineIamPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IamServiceServer).GetMachineIamPolicy(ctx, req.(*GetMachineIamPolicyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IamService_SetMachineIamPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetMachineIamPolicyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IamServiceServer).SetMachineIamPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IamService_SetMachineIamPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IamServiceServer).SetMachineIamPolicy(ctx, req.(*SetMachineIamPolicyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // IamService_ServiceDesc is the grpc.ServiceDesc for IamService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -244,6 +322,14 @@ var IamService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetAgentIamPolicy",
 			Handler:    _IamService_SetAgentIamPolicy_Handler,
+		},
+		{
+			MethodName: "GetMachineIamPolicy",
+			Handler:    _IamService_GetMachineIamPolicy_Handler,
+		},
+		{
+			MethodName: "SetMachineIamPolicy",
+			Handler:    _IamService_SetMachineIamPolicy_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

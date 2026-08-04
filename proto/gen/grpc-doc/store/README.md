@@ -887,6 +887,7 @@ EnvironmentTierPolicy is the tier of an environment.
 | COMMAND | 6 | COMMAND / REMINDER / FILE are engine-only resource kinds: they are never stored in the policy table. The IAM engine resolves access to these objects from their owning agent / parent conversation membership. |
 | REMINDER | 7 |  |
 | FILE | 8 |  |
+| MACHINE | 9 | MACHINE is a per-machine IAM policy: who may create agents on the machine. Machine-scoped access (laelia.machines.createAgent) is authorized from this policy at authorization time. |
 
 
 

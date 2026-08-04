@@ -15,24 +15,28 @@ import (
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
+	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/store"
 	"github.com/Ranxy/laelia/backend/manager/utils"
 )
 
-// IamService exposes the workspace and per-agent IAM policies for management.
-// Get reads the full policy; Set replaces it whole, guarded by an etag returned
-// by Get. Each RPC is gated by the IAM interceptor with laelia.iam.getPolicy /
-// setPolicy. Set validates every binding before writing: roles must resolve,
-// chat-role labels are rejected (they are chat-membership markers, not IAM
-// bindings), workspace/agent-only roles are scoped to their policy, and
-// members must be well-formed principal names.
+// IamService exposes the workspace, per-agent, and per-machine IAM policies for
+// management. Get reads the full policy; Set replaces it whole, guarded by an
+// etag returned by Get. The workspace/agent RPCs are gated by the IAM
+// interceptor with laelia.iam.getPolicy / setPolicy; the machine RPCs are
+// handler-gated (the machine's creator or a workspace admin). Set validates
+// every binding before writing: roles must resolve, chat-role labels are
+// rejected (they are chat-membership markers, not IAM bindings),
+// workspace/machine-only roles are scoped to their policy, and members must be
+// well-formed principal names.
 type IamService struct {
 	v1connect.UnimplementedIamServiceHandler
 	store *store.Store
+	iam   *iam.Manager
 }
 
-func NewIamService(s *store.Store) *IamService {
-	return &IamService{store: s}
+func NewIamService(s *store.Store, im *iam.Manager) *IamService {
+	return &IamService{store: s, iam: im}
 }
 
 func (s *IamService) GetWorkspaceIamPolicy(ctx context.Context, _ *connect.Request[v1pb.GetWorkspaceIamPolicyRequest]) (*connect.Response[v1pb.IamPolicyView], error) {
@@ -44,7 +48,7 @@ func (s *IamService) GetWorkspaceIamPolicy(ctx context.Context, _ *connect.Reque
 }
 
 func (s *IamService) SetWorkspaceIamPolicy(ctx context.Context, req *connect.Request[v1pb.SetWorkspaceIamPolicyRequest]) (*connect.Response[v1pb.IamPolicyView], error) {
-	if err := validateIamPolicy(ctx, s.store, req.Msg.GetPolicy(), false /* agentScoped */); err != nil {
+	if err := validateIamPolicy(ctx, s.store, req.Msg.GetPolicy(), storepb.Policy_WORKSPACE); err != nil {
 		return nil, err
 	}
 	// The workspace must keep at least one active end-user admin after the
@@ -83,7 +87,7 @@ func (s *IamService) SetAgentIamPolicy(ctx context.Context, req *connect.Request
 	if _, err := common.GetAgentResourceID(req.Msg.GetName()); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	if err := validateIamPolicy(ctx, s.store, req.Msg.GetPolicy(), true /* agentScoped */); err != nil {
+	if err := validateIamPolicy(ctx, s.store, req.Msg.GetPolicy(), storepb.Policy_AGENT); err != nil {
 		return nil, err
 	}
 	oldPolicy, err := s.store.GetAgentIamPolicy(ctx, req.Msg.GetName())
@@ -91,6 +95,59 @@ func (s *IamService) SetAgentIamPolicy(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get agent iam policy"))
 	}
 	p, err := s.store.SetAgentIamPolicy(ctx, req.Msg.GetName(), req.Msg.GetPolicy(), req.Msg.GetEtag())
+	if err != nil {
+		return nil, translateSetIamError(err)
+	}
+	recordIamPolicyChange(ctx, req.Msg.GetName(), findIamPolicyDeltas(oldPolicy.Policy, p.Policy))
+	return connect.NewResponse(toIamPolicyView(p)), nil
+}
+
+// requireMachineAdmin validates the machine resource name, loads the machine
+// (rejecting deleted machines), and verifies the caller may manage its IAM
+// policy (the machine's creator or a workspace admin). Returns a connect error
+// describing any failure, or nil when the caller may proceed.
+func (s *IamService) requireMachineAdmin(ctx context.Context, name string) error {
+	resourceID, err := common.GetMachineResourceID(name)
+	if err != nil {
+		return connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	machine, err := s.store.GetMachineByResourceID(ctx, resourceID)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get machine %s", resourceID))
+	}
+	if machine == nil || machine.Deleted {
+		return connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !isMachineAdmin(ctx, s.iam, user, machine) {
+		return connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can manage this machine's IAM policy"))
+	}
+	return nil
+}
+
+func (s *IamService) GetMachineIamPolicy(ctx context.Context, req *connect.Request[v1pb.GetMachineIamPolicyRequest]) (*connect.Response[v1pb.IamPolicyView], error) {
+	if err := s.requireMachineAdmin(ctx, req.Msg.GetName()); err != nil {
+		return nil, err
+	}
+	p, err := s.store.GetMachineIamPolicy(ctx, req.Msg.GetName())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get machine iam policy"))
+	}
+	return connect.NewResponse(toIamPolicyView(p)), nil
+}
+
+func (s *IamService) SetMachineIamPolicy(ctx context.Context, req *connect.Request[v1pb.SetMachineIamPolicyRequest]) (*connect.Response[v1pb.IamPolicyView], error) {
+	if err := s.requireMachineAdmin(ctx, req.Msg.GetName()); err != nil {
+		return nil, err
+	}
+	if err := validateIamPolicy(ctx, s.store, req.Msg.GetPolicy(), storepb.Policy_MACHINE); err != nil {
+		return nil, err
+	}
+	oldPolicy, err := s.store.GetMachineIamPolicy(ctx, req.Msg.GetName())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get machine iam policy"))
+	}
+	p, err := s.store.SetMachineIamPolicy(ctx, req.Msg.GetName(), req.Msg.GetPolicy(), req.Msg.GetEtag())
 	if err != nil {
 		return nil, translateSetIamError(err)
 	}
@@ -132,12 +189,19 @@ var workspaceOnlyRoles = map[string]bool{
 	store.WorkspaceMemberRole: true,
 }
 
-// validateIamPolicy checks every binding before a Set. agentScoped reports
-// whether the policy is attached to an agent (true) or the workspace (false).
-// It rejects unknown roles, chat-role labels (which are chat-membership
-// markers, never IAM bindings), workspace-scoped roles bound on an agent, and
-// malformed member strings — so a management UI cannot corrupt the engine.
-func validateIamPolicy(ctx context.Context, s *store.Store, policy *storepb.IamPolicy, agentScoped bool) error {
+// machineOnlyRoles are only meaningful on a machine IAM policy. Like the
+// conversation roles they are marker roles (resolved by the IAM engine, not the
+// role table), so they are exempt from the GetRoleSnapshot existence check.
+var machineOnlyRoles = map[string]bool{
+	store.MachineAgentCreatorRole: true,
+}
+
+// validateIamPolicy checks every binding before a Set. scope is the policy's
+// resource kind (workspace, agent, or machine). It rejects unknown roles,
+// chat-role labels (which are chat-membership markers, never IAM bindings),
+// workspace/machine-scoped roles bound on a different resource, and malformed
+// member strings — so a management UI cannot corrupt the engine.
+func validateIamPolicy(ctx context.Context, s *store.Store, policy *storepb.IamPolicy, scope storepb.Policy_Resource) error {
 	if policy == nil {
 		return nil // an empty policy is a valid "clear all" write.
 	}
@@ -149,15 +213,20 @@ func validateIamPolicy(ctx context.Context, s *store.Store, policy *storepb.IamP
 		if chatRoleLabels[resourceID] {
 			return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("role %q is a chat-membership marker and cannot be bound in an IAM policy", binding.GetRole()))
 		}
-		if workspaceOnlyRoles[resourceID] && agentScoped {
-			return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("role %q is workspace-scoped and cannot be bound on an agent", binding.GetRole()))
+		if workspaceOnlyRoles[resourceID] && scope != storepb.Policy_WORKSPACE {
+			return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("role %q is workspace-scoped and cannot be bound on a %s", binding.GetRole(), scope.String()))
 		}
-		role, err := s.GetRoleSnapshot(ctx, resourceID)
-		if err != nil {
-			return connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to resolve role %q", binding.GetRole()))
+		if machineOnlyRoles[resourceID] && scope != storepb.Policy_MACHINE {
+			return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("role %q is machine-scoped and cannot be bound on a %s", binding.GetRole(), scope.String()))
 		}
-		if role == nil {
-			return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unknown role %q", binding.GetRole()))
+		if !machineOnlyRoles[resourceID] {
+			role, err := s.GetRoleSnapshot(ctx, resourceID)
+			if err != nil {
+				return connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to resolve role %q", binding.GetRole()))
+			}
+			if role == nil {
+				return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unknown role %q", binding.GetRole()))
+			}
 		}
 		if _, err := common.ValidateIAMBindingConditionExpr(binding.GetCondition()); err != nil {
 			return connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid condition for role %q", binding.GetRole()))

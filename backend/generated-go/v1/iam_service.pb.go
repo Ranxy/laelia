@@ -506,6 +506,112 @@ func (x *SetAgentIamPolicyRequest) GetEtag() string {
 	return ""
 }
 
+type GetMachineIamPolicyRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The machine resource name, in the form `machines/{machine}`.
+	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMachineIamPolicyRequest) Reset() {
+	*x = GetMachineIamPolicyRequest{}
+	mi := &file_v1_iam_service_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMachineIamPolicyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMachineIamPolicyRequest) ProtoMessage() {}
+
+func (x *GetMachineIamPolicyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_iam_service_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMachineIamPolicyRequest.ProtoReflect.Descriptor instead.
+func (*GetMachineIamPolicyRequest) Descriptor() ([]byte, []int) {
+	return file_v1_iam_service_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetMachineIamPolicyRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type SetMachineIamPolicyRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The machine resource name, in the form `machines/{machine}`.
+	Name          string           `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Policy        *store.IamPolicy `protobuf:"bytes,2,opt,name=policy,proto3" json:"policy,omitempty"`
+	Etag          string           `protobuf:"bytes,3,opt,name=etag,proto3" json:"etag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetMachineIamPolicyRequest) Reset() {
+	*x = SetMachineIamPolicyRequest{}
+	mi := &file_v1_iam_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetMachineIamPolicyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetMachineIamPolicyRequest) ProtoMessage() {}
+
+func (x *SetMachineIamPolicyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_iam_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetMachineIamPolicyRequest.ProtoReflect.Descriptor instead.
+func (*SetMachineIamPolicyRequest) Descriptor() ([]byte, []int) {
+	return file_v1_iam_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SetMachineIamPolicyRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SetMachineIamPolicyRequest) GetPolicy() *store.IamPolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return nil
+}
+
+func (x *SetMachineIamPolicyRequest) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
+}
+
 var File_v1_iam_service_proto protoreflect.FileDescriptor
 
 const file_v1_iam_service_proto_rawDesc = "" +
@@ -540,13 +646,23 @@ const file_v1_iam_service_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tB\x14\xe0A\x02\xfaA\x0e\n" +
 	"\flaelia/AgentR\x04name\x124\n" +
 	"\x06policy\x18\x02 \x01(\v2\x17.laelia.store.IamPolicyB\x03\xe0A\x02R\x06policy\x12\x12\n" +
-	"\x04etag\x18\x03 \x01(\tR\x04etag2\xfe\x04\n" +
+	"\x04etag\x18\x03 \x01(\tR\x04etag\"H\n" +
+	"\x1aGetMachineIamPolicyRequest\x12*\n" +
+	"\x04name\x18\x01 \x01(\tB\x16\xe0A\x02\xfaA\x10\n" +
+	"\x0elaelia/MachineR\x04name\"\x92\x01\n" +
+	"\x1aSetMachineIamPolicyRequest\x12*\n" +
+	"\x04name\x18\x01 \x01(\tB\x16\xe0A\x02\xfaA\x10\n" +
+	"\x0elaelia/MachineR\x04name\x124\n" +
+	"\x06policy\x18\x02 \x01(\v2\x17.laelia.store.IamPolicyB\x03\xe0A\x02R\x06policy\x12\x12\n" +
+	"\x04etag\x18\x03 \x01(\tR\x04etag2\x91\a\n" +
 	"\n" +
 	"IamService\x12\x97\x01\n" +
 	"\x15GetWorkspaceIamPolicy\x12'.laelia.v1.GetWorkspaceIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\";\x8a\xea0\x14laelia.iam.getPolicy\x90\xea0\x01\x82\xd3\xe4\x93\x02\x19\x12\x17/v1/workspace:iamPolicy\x12\x9e\x01\n" +
 	"\x15SetWorkspaceIamPolicy\x12'.laelia.v1.SetWorkspaceIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"B\x8a\xea0\x14laelia.iam.setPolicy\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/workspace:iamPolicy\x12\x95\x01\n" +
 	"\x11GetAgentIamPolicy\x12#.laelia.v1.GetAgentIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"A\x8a\xea0\x14laelia.iam.getPolicy\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1f\x12\x1d/v1/{name=agents/*}:iamPolicy\x12\x9c\x01\n" +
-	"\x11SetAgentIamPolicy\x12#.laelia.v1.SetAgentIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"H\x8a\xea0\x14laelia.iam.setPolicy\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/v1/{name=agents/*}:iamPolicyB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"\x11SetAgentIamPolicy\x12#.laelia.v1.SetAgentIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"H\x8a\xea0\x14laelia.iam.setPolicy\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/v1/{name=agents/*}:iamPolicy\x12\x83\x01\n" +
+	"\x13GetMachineIamPolicy\x12%.laelia.v1.GetMachineIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"+\x90\xea0\x01\x82\xd3\xe4\x93\x02!\x12\x1f/v1/{name=machines/*}:iamPolicy\x12\x8a\x01\n" +
+	"\x13SetMachineIamPolicy\x12%.laelia.v1.SetMachineIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"2\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/{name=machines/*}:iamPolicyB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_iam_service_proto_rawDescOnce sync.Once
@@ -561,7 +677,7 @@ func file_v1_iam_service_proto_rawDescGZIP() []byte {
 }
 
 var file_v1_iam_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_v1_iam_service_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_v1_iam_service_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_v1_iam_service_proto_goTypes = []any{
 	(BindingDelta_Action)(0),             // 0: laelia.v1.BindingDelta.Action
 	(*IamPolicyView)(nil),                // 1: laelia.v1.IamPolicyView
@@ -572,30 +688,37 @@ var file_v1_iam_service_proto_goTypes = []any{
 	(*SetWorkspaceIamPolicyRequest)(nil), // 6: laelia.v1.SetWorkspaceIamPolicyRequest
 	(*GetAgentIamPolicyRequest)(nil),     // 7: laelia.v1.GetAgentIamPolicyRequest
 	(*SetAgentIamPolicyRequest)(nil),     // 8: laelia.v1.SetAgentIamPolicyRequest
-	(*store.IamPolicy)(nil),              // 9: laelia.store.IamPolicy
-	(*expr.Expr)(nil),                    // 10: google.type.Expr
+	(*GetMachineIamPolicyRequest)(nil),   // 9: laelia.v1.GetMachineIamPolicyRequest
+	(*SetMachineIamPolicyRequest)(nil),   // 10: laelia.v1.SetMachineIamPolicyRequest
+	(*store.IamPolicy)(nil),              // 11: laelia.store.IamPolicy
+	(*expr.Expr)(nil),                    // 12: google.type.Expr
 }
 var file_v1_iam_service_proto_depIdxs = []int32{
-	9,  // 0: laelia.v1.IamPolicyView.policy:type_name -> laelia.store.IamPolicy
+	11, // 0: laelia.v1.IamPolicyView.policy:type_name -> laelia.store.IamPolicy
 	0,  // 1: laelia.v1.BindingDelta.action:type_name -> laelia.v1.BindingDelta.Action
-	10, // 2: laelia.v1.BindingDelta.condition:type_name -> google.type.Expr
+	12, // 2: laelia.v1.BindingDelta.condition:type_name -> google.type.Expr
 	2,  // 3: laelia.v1.PolicyDelta.binding_deltas:type_name -> laelia.v1.BindingDelta
 	2,  // 4: laelia.v1.IamPolicyChange.binding_deltas:type_name -> laelia.v1.BindingDelta
-	9,  // 5: laelia.v1.SetWorkspaceIamPolicyRequest.policy:type_name -> laelia.store.IamPolicy
-	9,  // 6: laelia.v1.SetAgentIamPolicyRequest.policy:type_name -> laelia.store.IamPolicy
-	5,  // 7: laelia.v1.IamService.GetWorkspaceIamPolicy:input_type -> laelia.v1.GetWorkspaceIamPolicyRequest
-	6,  // 8: laelia.v1.IamService.SetWorkspaceIamPolicy:input_type -> laelia.v1.SetWorkspaceIamPolicyRequest
-	7,  // 9: laelia.v1.IamService.GetAgentIamPolicy:input_type -> laelia.v1.GetAgentIamPolicyRequest
-	8,  // 10: laelia.v1.IamService.SetAgentIamPolicy:input_type -> laelia.v1.SetAgentIamPolicyRequest
-	1,  // 11: laelia.v1.IamService.GetWorkspaceIamPolicy:output_type -> laelia.v1.IamPolicyView
-	1,  // 12: laelia.v1.IamService.SetWorkspaceIamPolicy:output_type -> laelia.v1.IamPolicyView
-	1,  // 13: laelia.v1.IamService.GetAgentIamPolicy:output_type -> laelia.v1.IamPolicyView
-	1,  // 14: laelia.v1.IamService.SetAgentIamPolicy:output_type -> laelia.v1.IamPolicyView
-	11, // [11:15] is the sub-list for method output_type
-	7,  // [7:11] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	11, // 5: laelia.v1.SetWorkspaceIamPolicyRequest.policy:type_name -> laelia.store.IamPolicy
+	11, // 6: laelia.v1.SetAgentIamPolicyRequest.policy:type_name -> laelia.store.IamPolicy
+	11, // 7: laelia.v1.SetMachineIamPolicyRequest.policy:type_name -> laelia.store.IamPolicy
+	5,  // 8: laelia.v1.IamService.GetWorkspaceIamPolicy:input_type -> laelia.v1.GetWorkspaceIamPolicyRequest
+	6,  // 9: laelia.v1.IamService.SetWorkspaceIamPolicy:input_type -> laelia.v1.SetWorkspaceIamPolicyRequest
+	7,  // 10: laelia.v1.IamService.GetAgentIamPolicy:input_type -> laelia.v1.GetAgentIamPolicyRequest
+	8,  // 11: laelia.v1.IamService.SetAgentIamPolicy:input_type -> laelia.v1.SetAgentIamPolicyRequest
+	9,  // 12: laelia.v1.IamService.GetMachineIamPolicy:input_type -> laelia.v1.GetMachineIamPolicyRequest
+	10, // 13: laelia.v1.IamService.SetMachineIamPolicy:input_type -> laelia.v1.SetMachineIamPolicyRequest
+	1,  // 14: laelia.v1.IamService.GetWorkspaceIamPolicy:output_type -> laelia.v1.IamPolicyView
+	1,  // 15: laelia.v1.IamService.SetWorkspaceIamPolicy:output_type -> laelia.v1.IamPolicyView
+	1,  // 16: laelia.v1.IamService.GetAgentIamPolicy:output_type -> laelia.v1.IamPolicyView
+	1,  // 17: laelia.v1.IamService.SetAgentIamPolicy:output_type -> laelia.v1.IamPolicyView
+	1,  // 18: laelia.v1.IamService.GetMachineIamPolicy:output_type -> laelia.v1.IamPolicyView
+	1,  // 19: laelia.v1.IamService.SetMachineIamPolicy:output_type -> laelia.v1.IamPolicyView
+	14, // [14:20] is the sub-list for method output_type
+	8,  // [8:14] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_v1_iam_service_proto_init() }
@@ -610,7 +733,7 @@ func file_v1_iam_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_iam_service_proto_rawDesc), len(file_v1_iam_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

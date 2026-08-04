@@ -1254,7 +1254,14 @@ type Machine struct {
 	CreatedBy string `protobuf:"bytes,11,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// can_edit reports whether the current caller may modify this machine
 	// (laelia.machines.edit).
-	CanEdit       bool `protobuf:"varint,12,opt,name=can_edit,json=canEdit,proto3" json:"can_edit,omitempty"`
+	CanEdit bool `protobuf:"varint,12,opt,name=can_edit,json=canEdit,proto3" json:"can_edit,omitempty"`
+	// can_create_agent reports whether the current caller may create agents on
+	// this machine: the machine's creator, a workspace admin, or a principal
+	// bound to roles/machineAgentCreator in the machine's IAM policy.
+	CanCreateAgent bool `protobuf:"varint,13,opt,name=can_create_agent,json=canCreateAgent,proto3" json:"can_create_agent,omitempty"`
+	// can_manage reports whether the current caller may manage this machine's
+	// IAM policy (the machine's creator or a workspace admin).
+	CanManage     bool `protobuf:"varint,14,opt,name=can_manage,json=canManage,proto3" json:"can_manage,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1348,6 +1355,20 @@ func (x *Machine) GetCreatedBy() string {
 func (x *Machine) GetCanEdit() bool {
 	if x != nil {
 		return x.CanEdit
+	}
+	return false
+}
+
+func (x *Machine) GetCanCreateAgent() bool {
+	if x != nil {
+		return x.CanCreateAgent
+	}
+	return false
+}
+
+func (x *Machine) GetCanManage() bool {
+	if x != nil {
+		return x.CanManage
 	}
 	return false
 }
@@ -2255,7 +2276,7 @@ const file_v1_machine_proto_rawDesc = "" +
 	"\x0elaelia/MachineR\x04name\"B\n" +
 	"\x14DeleteMachineRequest\x12*\n" +
 	"\x04name\x18\x01 \x01(\tB\x16\xe0A\x02\xfaA\x10\n" +
-	"\x0elaelia/MachineR\x04name\"\xda\x03\n" +
+	"\x0elaelia/MachineR\x04name\"\xad\x04\n" +
 	"\aMachine\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -2267,7 +2288,10 @@ const file_v1_machine_proto_rawDesc = "" +
 	"\x06labels\x18\b \x03(\v2\x1e.laelia.v1.Machine.LabelsEntryR\x06labels\x12\"\n" +
 	"\n" +
 	"created_by\x18\v \x01(\tB\x03\xe0A\x03R\tcreatedBy\x12\x1e\n" +
-	"\bcan_edit\x18\f \x01(\bB\x03\xe0A\x03R\acanEdit\x1a9\n" +
+	"\bcan_edit\x18\f \x01(\bB\x03\xe0A\x03R\acanEdit\x12-\n" +
+	"\x10can_create_agent\x18\r \x01(\bB\x03\xe0A\x03R\x0ecanCreateAgent\x12\"\n" +
+	"\n" +
+	"can_manage\x18\x0e \x01(\bB\x03\xe0A\x03R\tcanManage\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:'\xeaA$\n" +

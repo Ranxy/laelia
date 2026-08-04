@@ -45,6 +45,12 @@ const (
 	// IamServiceSetAgentIamPolicyProcedure is the fully-qualified name of the IamService's
 	// SetAgentIamPolicy RPC.
 	IamServiceSetAgentIamPolicyProcedure = "/laelia.v1.IamService/SetAgentIamPolicy"
+	// IamServiceGetMachineIamPolicyProcedure is the fully-qualified name of the IamService's
+	// GetMachineIamPolicy RPC.
+	IamServiceGetMachineIamPolicyProcedure = "/laelia.v1.IamService/GetMachineIamPolicy"
+	// IamServiceSetMachineIamPolicyProcedure is the fully-qualified name of the IamService's
+	// SetMachineIamPolicy RPC.
+	IamServiceSetMachineIamPolicyProcedure = "/laelia.v1.IamService/SetMachineIamPolicy"
 )
 
 // IamServiceClient is a client for the laelia.v1.IamService service.
@@ -57,6 +63,10 @@ type IamServiceClient interface {
 	GetAgentIamPolicy(context.Context, *connect.Request[v1.GetAgentIamPolicyRequest]) (*connect.Response[v1.IamPolicyView], error)
 	// Set the IAM policy attached to an agent (full replace, etag-guarded).
 	SetAgentIamPolicy(context.Context, *connect.Request[v1.SetAgentIamPolicyRequest]) (*connect.Response[v1.IamPolicyView], error)
+	// Get the IAM policy attached to a machine (who may create agents on it).
+	GetMachineIamPolicy(context.Context, *connect.Request[v1.GetMachineIamPolicyRequest]) (*connect.Response[v1.IamPolicyView], error)
+	// Set the IAM policy attached to a machine (full replace, etag-guarded).
+	SetMachineIamPolicy(context.Context, *connect.Request[v1.SetMachineIamPolicyRequest]) (*connect.Response[v1.IamPolicyView], error)
 }
 
 // NewIamServiceClient constructs a client for the laelia.v1.IamService service. By default, it uses
@@ -94,6 +104,18 @@ func NewIamServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(iamServiceMethods.ByName("SetAgentIamPolicy")),
 			connect.WithClientOptions(opts...),
 		),
+		getMachineIamPolicy: connect.NewClient[v1.GetMachineIamPolicyRequest, v1.IamPolicyView](
+			httpClient,
+			baseURL+IamServiceGetMachineIamPolicyProcedure,
+			connect.WithSchema(iamServiceMethods.ByName("GetMachineIamPolicy")),
+			connect.WithClientOptions(opts...),
+		),
+		setMachineIamPolicy: connect.NewClient[v1.SetMachineIamPolicyRequest, v1.IamPolicyView](
+			httpClient,
+			baseURL+IamServiceSetMachineIamPolicyProcedure,
+			connect.WithSchema(iamServiceMethods.ByName("SetMachineIamPolicy")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -103,6 +125,8 @@ type iamServiceClient struct {
 	setWorkspaceIamPolicy *connect.Client[v1.SetWorkspaceIamPolicyRequest, v1.IamPolicyView]
 	getAgentIamPolicy     *connect.Client[v1.GetAgentIamPolicyRequest, v1.IamPolicyView]
 	setAgentIamPolicy     *connect.Client[v1.SetAgentIamPolicyRequest, v1.IamPolicyView]
+	getMachineIamPolicy   *connect.Client[v1.GetMachineIamPolicyRequest, v1.IamPolicyView]
+	setMachineIamPolicy   *connect.Client[v1.SetMachineIamPolicyRequest, v1.IamPolicyView]
 }
 
 // GetWorkspaceIamPolicy calls laelia.v1.IamService.GetWorkspaceIamPolicy.
@@ -125,6 +149,16 @@ func (c *iamServiceClient) SetAgentIamPolicy(ctx context.Context, req *connect.R
 	return c.setAgentIamPolicy.CallUnary(ctx, req)
 }
 
+// GetMachineIamPolicy calls laelia.v1.IamService.GetMachineIamPolicy.
+func (c *iamServiceClient) GetMachineIamPolicy(ctx context.Context, req *connect.Request[v1.GetMachineIamPolicyRequest]) (*connect.Response[v1.IamPolicyView], error) {
+	return c.getMachineIamPolicy.CallUnary(ctx, req)
+}
+
+// SetMachineIamPolicy calls laelia.v1.IamService.SetMachineIamPolicy.
+func (c *iamServiceClient) SetMachineIamPolicy(ctx context.Context, req *connect.Request[v1.SetMachineIamPolicyRequest]) (*connect.Response[v1.IamPolicyView], error) {
+	return c.setMachineIamPolicy.CallUnary(ctx, req)
+}
+
 // IamServiceHandler is an implementation of the laelia.v1.IamService service.
 type IamServiceHandler interface {
 	// Get the workspace IAM policy.
@@ -135,6 +169,10 @@ type IamServiceHandler interface {
 	GetAgentIamPolicy(context.Context, *connect.Request[v1.GetAgentIamPolicyRequest]) (*connect.Response[v1.IamPolicyView], error)
 	// Set the IAM policy attached to an agent (full replace, etag-guarded).
 	SetAgentIamPolicy(context.Context, *connect.Request[v1.SetAgentIamPolicyRequest]) (*connect.Response[v1.IamPolicyView], error)
+	// Get the IAM policy attached to a machine (who may create agents on it).
+	GetMachineIamPolicy(context.Context, *connect.Request[v1.GetMachineIamPolicyRequest]) (*connect.Response[v1.IamPolicyView], error)
+	// Set the IAM policy attached to a machine (full replace, etag-guarded).
+	SetMachineIamPolicy(context.Context, *connect.Request[v1.SetMachineIamPolicyRequest]) (*connect.Response[v1.IamPolicyView], error)
 }
 
 // NewIamServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -168,6 +206,18 @@ func NewIamServiceHandler(svc IamServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(iamServiceMethods.ByName("SetAgentIamPolicy")),
 		connect.WithHandlerOptions(opts...),
 	)
+	iamServiceGetMachineIamPolicyHandler := connect.NewUnaryHandler(
+		IamServiceGetMachineIamPolicyProcedure,
+		svc.GetMachineIamPolicy,
+		connect.WithSchema(iamServiceMethods.ByName("GetMachineIamPolicy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	iamServiceSetMachineIamPolicyHandler := connect.NewUnaryHandler(
+		IamServiceSetMachineIamPolicyProcedure,
+		svc.SetMachineIamPolicy,
+		connect.WithSchema(iamServiceMethods.ByName("SetMachineIamPolicy")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/laelia.v1.IamService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case IamServiceGetWorkspaceIamPolicyProcedure:
@@ -178,6 +228,10 @@ func NewIamServiceHandler(svc IamServiceHandler, opts ...connect.HandlerOption) 
 			iamServiceGetAgentIamPolicyHandler.ServeHTTP(w, r)
 		case IamServiceSetAgentIamPolicyProcedure:
 			iamServiceSetAgentIamPolicyHandler.ServeHTTP(w, r)
+		case IamServiceGetMachineIamPolicyProcedure:
+			iamServiceGetMachineIamPolicyHandler.ServeHTTP(w, r)
+		case IamServiceSetMachineIamPolicyProcedure:
+			iamServiceSetMachineIamPolicyHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -201,4 +255,12 @@ func (UnimplementedIamServiceHandler) GetAgentIamPolicy(context.Context, *connec
 
 func (UnimplementedIamServiceHandler) SetAgentIamPolicy(context.Context, *connect.Request[v1.SetAgentIamPolicyRequest]) (*connect.Response[v1.IamPolicyView], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.IamService.SetAgentIamPolicy is not implemented"))
+}
+
+func (UnimplementedIamServiceHandler) GetMachineIamPolicy(context.Context, *connect.Request[v1.GetMachineIamPolicyRequest]) (*connect.Response[v1.IamPolicyView], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.IamService.GetMachineIamPolicy is not implemented"))
+}
+
+func (UnimplementedIamServiceHandler) SetMachineIamPolicy(context.Context, *connect.Request[v1.SetMachineIamPolicyRequest]) (*connect.Response[v1.IamPolicyView], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.IamService.SetMachineIamPolicy is not implemented"))
 }

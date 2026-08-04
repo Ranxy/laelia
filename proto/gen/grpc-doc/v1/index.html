@@ -1406,6 +1406,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.GetMachineIamPolicyRequest"><span class="badge">M</span>GetMachineIamPolicyRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.GetWorkspaceIamPolicyRequest"><span class="badge">M</span>GetWorkspaceIamPolicyRequest</a>
                 </li>
               
@@ -1423,6 +1427,10 @@
               
                 <li>
                   <a href="#laelia.v1.SetAgentIamPolicyRequest"><span class="badge">M</span>SetAgentIamPolicyRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SetMachineIamPolicyRequest"><span class="badge">M</span>SetMachineIamPolicyRequest</a>
                 </li>
               
                 <li>
@@ -4211,9 +4219,10 @@ the list to agents bound to that machine. Empty lists all agents. </p></td>
                 <td><a href="#laelia.v1.CreateAgentRequest">CreateAgentRequest</a></td>
                 <td><a href="#laelia.v1.CreateAgentResponse">CreateAgentResponse</a></td>
                 <td><p>CreateAgent is handler-gated (no permission annotation): the machine&#39;s
-creator or a caller holding laelia.agents.create (workspace admin) may
-create agents on it. The machine-scoped check cannot be expressed as a
-catalog permission.</p></td>
+creator, a workspace admin, or a principal bound to
+roles/machineAgentCreator on the machine&#39;s IAM policy may create agents on
+it. The machine-scoped check is enforced by the handler via
+laelia.machines.createAgent against the machine&#39;s IAM policy.</p></td>
               </tr>
             
               <tr>
@@ -14536,6 +14545,30 @@ see the impact of deleting it.</p></td>
 
         
       
+        <h3 id="laelia.v1.GetMachineIamPolicyRequest">GetMachineIamPolicyRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The machine resource name, in the form `machines/{machine}`. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.GetWorkspaceIamPolicyRequest">GetWorkspaceIamPolicyRequest</h3>
         <p></p>
 
@@ -14668,6 +14701,44 @@ policy or &#34;agents/{agent}&#34; for an agent policy. </p></td>
 
         
       
+        <h3 id="laelia.v1.SetMachineIamPolicyRequest">SetMachineIamPolicyRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The machine resource name, in the form `machines/{machine}`. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>policy</td>
+                  <td><a href="#laelia.store.IamPolicy">laelia.store.IamPolicy</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>etag</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.SetWorkspaceIamPolicyRequest">SetWorkspaceIamPolicyRequest</h3>
         <p></p>
 
@@ -14735,7 +14806,7 @@ policy or &#34;agents/{agent}&#34; for an agent policy. </p></td>
 
       
         <h3 id="laelia.v1.IamService">IamService</h3>
-        <p>IamService exposes the workspace and per-agent IAM policies for management.</p><p>Get reads the full policy; Set replaces it whole, guarded by an etag. Each</p><p>RPC is gated by the IAM interceptor with laelia.iam.getPolicy / setPolicy.</p>
+        <p>IamService exposes the workspace, per-agent, and per-machine IAM policies for</p><p>management. Get reads the full policy; Set replaces it whole, guarded by an</p><p>etag. The workspace/agent RPCs are gated by the IAM interceptor with</p><p>laelia.iam.getPolicy / setPolicy; the machine RPCs are handler-gated (the</p><p>machine's creator or a workspace admin) because a machine-scoped permission</p><p>cannot express the creator's implicit authority.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -14768,6 +14839,20 @@ policy or &#34;agents/{agent}&#34; for an agent policy. </p></td>
                 <td><a href="#laelia.v1.SetAgentIamPolicyRequest">SetAgentIamPolicyRequest</a></td>
                 <td><a href="#laelia.v1.IamPolicyView">IamPolicyView</a></td>
                 <td><p>Set the IAM policy attached to an agent (full replace, etag-guarded).</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetMachineIamPolicy</td>
+                <td><a href="#laelia.v1.GetMachineIamPolicyRequest">GetMachineIamPolicyRequest</a></td>
+                <td><a href="#laelia.v1.IamPolicyView">IamPolicyView</a></td>
+                <td><p>Get the IAM policy attached to a machine (who may create agents on it).</p></td>
+              </tr>
+            
+              <tr>
+                <td>SetMachineIamPolicy</td>
+                <td><a href="#laelia.v1.SetMachineIamPolicyRequest">SetMachineIamPolicyRequest</a></td>
+                <td><a href="#laelia.v1.IamPolicyView">IamPolicyView</a></td>
+                <td><p>Set the IAM policy attached to a machine (full replace, etag-guarded).</p></td>
               </tr>
             
           </tbody>
@@ -14824,6 +14909,26 @@ policy or &#34;agents/{agent}&#34; for an agent policy. </p></td>
                 <td>SetAgentIamPolicy</td>
                 <td>POST</td>
                 <td>/v1/{name=agents/*}:iamPolicy</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetMachineIamPolicy</td>
+                <td>GET</td>
+                <td>/v1/{name=machines/*}:iamPolicy</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>SetMachineIamPolicy</td>
+                <td>POST</td>
+                <td>/v1/{name=machines/*}:iamPolicy</td>
                 <td>*</td>
               </tr>
               
@@ -15351,6 +15456,23 @@ AgentChannel per entry immediately after connect (and on every reconnect). </p><
                   <td></td>
                   <td><p>can_edit reports whether the current caller may modify this machine
 (laelia.machines.edit). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>can_create_agent</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>can_create_agent reports whether the current caller may create agents on
+this machine: the machine&#39;s creator, a workspace admin, or a principal
+bound to roles/machineAgentCreator in the machine&#39;s IAM policy. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>can_manage</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>can_manage reports whether the current caller may manage this machine&#39;s
+IAM policy (the machine&#39;s creator or a workspace admin). </p></td>
                 </tr>
               
             </tbody>

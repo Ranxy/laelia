@@ -132,9 +132,10 @@ paths:
                 - AgentService
             description: |-
                 CreateAgent is handler-gated (no permission annotation): the machine's
-                 creator or a caller holding laelia.agents.create (workspace admin) may
-                 create agents on it. The machine-scoped check cannot be expressed as a
-                 catalog permission.
+                 creator, a workspace admin, or a principal bound to
+                 roles/machineAgentCreator on the machine's IAM policy may create agents on
+                 it. The machine-scoped check is enforced by the handler via
+                 laelia.machines.createAgent against the machine's IAM policy.
             operationId: AgentService_CreateAgent
             requestBody:
                 content:
@@ -2929,6 +2930,63 @@ paths:
                 "200":
                     description: OK
                     content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/machines/{machine}:iamPolicy:
+        get:
+            tags:
+                - IamService
+            description: Get the IAM policy attached to a machine (who may create agents on it).
+            operationId: IamService_GetMachineIamPolicy
+            parameters:
+                - name: machine
+                  in: path
+                  description: The machine id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/IamPolicyView'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - IamService
+            description: Set the IAM policy attached to a machine (full replace, etag-guarded).
+            operationId: IamService_SetMachineIamPolicy
+            parameters:
+                - name: machine
+                  in: path
+                  description: The machine id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SetMachineIamPolicyRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/IamPolicyView'
                 default:
                     description: Default error response
                     content:
@@ -6222,6 +6280,19 @@ components:
                     description: |-
                         can_edit reports whether the current caller may modify this machine
                          (laelia.machines.edit).
+                canCreateAgent:
+                    readOnly: true
+                    type: boolean
+                    description: |-
+                        can_create_agent reports whether the current caller may create agents on
+                         this machine: the machine's creator, a workspace admin, or a principal
+                         bound to roles/machineAgentCreator in the machine's IAM policy.
+                canManage:
+                    readOnly: true
+                    type: boolean
+                    description: |-
+                        can_manage reports whether the current caller may manage this machine's
+                         IAM policy (the machine's creator or a workspace admin).
         MachineDisconnectRequest:
             type: object
             properties:
@@ -6870,6 +6941,19 @@ components:
         SetConversationPinnedResponse:
             type: object
             properties: {}
+        SetMachineIamPolicyRequest:
+            required:
+                - name
+                - policy
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: The machine resource name, in the form `machines/{machine}`.
+                policy:
+                    $ref: '#/components/schemas/IamPolicy'
+                etag:
+                    type: string
         SetWorkspaceIamPolicyRequest:
             required:
                 - policy
@@ -7302,9 +7386,12 @@ tags:
          permissions. Groups synced from an external source (SCIM/IdP) are read-only.
     - name: IamService
       description: |-
-        IamService exposes the workspace and per-agent IAM policies for management.
-         Get reads the full policy; Set replaces it whole, guarded by an etag. Each
-         RPC is gated by the IAM interceptor with laelia.iam.getPolicy / setPolicy.
+        IamService exposes the workspace, per-agent, and per-machine IAM policies for
+         management. Get reads the full policy; Set replaces it whole, guarded by an
+         etag. The workspace/agent RPCs are gated by the IAM interceptor with
+         laelia.iam.getPolicy / setPolicy; the machine RPCs are handler-gated (the
+         machine's creator or a workspace admin) because a machine-scoped permission
+         cannot express the creator's implicit authority.
     - name: MachineService
       description: |-
         MachineService manages machines (a long-lived agent-application process a

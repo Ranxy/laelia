@@ -13,6 +13,7 @@ const (
 	MachinesGet                Permission = "laelia.machines.get"
 	MachinesEdit               Permission = "laelia.machines.edit"
 	MachinesDelete             Permission = "laelia.machines.delete"
+	MachinesCreateAgent        Permission = "laelia.machines.createAgent"
 	CommandsGet                Permission = "laelia.commands.get"
 	CommandsList               Permission = "laelia.commands.list"
 	CommandsWatch              Permission = "laelia.commands.watch"
@@ -80,6 +81,7 @@ var allPermissions = []Permission{
 	MachinesGet,
 	MachinesEdit,
 	MachinesDelete,
+	MachinesCreateAgent,
 	CommandsGet,
 	CommandsList,
 	CommandsWatch,
