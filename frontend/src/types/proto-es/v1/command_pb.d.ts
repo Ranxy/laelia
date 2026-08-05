@@ -5,6 +5,7 @@
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { JsonObject, Message } from "@bufbuild/protobuf";
 import type { EmptySchema, FieldMask, Timestamp } from "@bufbuild/protobuf/wkt";
+import type { PreferredLanguage } from "./user_service_pb";
 import type { AgentProviderInfo, AgentStatus_ConnectionState } from "./agent_pb";
 
 /**
@@ -1317,6 +1318,15 @@ export declare type ChannelMember = Message<"laelia.v1.ChannelMember"> & {
    * @generated from field: string avatar = 7;
    */
   avatar: string;
+
+  /**
+   * preferred_language is the member's preferred language when the member is a
+   * user (from User.chat_preferences), UNSPECIFIED otherwise. Surfaced so an
+   * agent can perceive whom it is talking to and converse in that language.
+   *
+   * @generated from field: laelia.v1.PreferredLanguage preferred_language = 8;
+   */
+  preferredLanguage: PreferredLanguage;
 };
 
 /**
@@ -3383,6 +3393,121 @@ export declare type ListChannelUpdatesResponse = Message<"laelia.v1.ListChannelU
 export declare const ListChannelUpdatesResponseSchema: GenMessage<ListChannelUpdatesResponse>;
 
 /**
+ * ListAccessibleChannels returns, for the authenticated agent, every
+ * conversation it can read: its own memberships plus — when the agent's
+ * follow_owner_permissions is enabled — every conversation its owner can read
+ * (channels and DMs). This is the on-demand discovery surface ("what channels
+ * can I access"); it is separate from ListChannelUpdates (the drain-loop
+ * inbox), which stays limited to conversations the agent has joined so the
+ * agent is not woken for every message in its owner's channels.
+ *
+ * @generated from message laelia.v1.ListAccessibleChannelsRequest
+ */
+export declare type ListAccessibleChannelsRequest = Message<"laelia.v1.ListAccessibleChannelsRequest"> & {
+  /**
+   * @generated from field: int32 page_size = 1;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 2;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListAccessibleChannelsRequest.
+ * Use `create(ListAccessibleChannelsRequestSchema)` to create a new message.
+ */
+export declare const ListAccessibleChannelsRequestSchema: GenMessage<ListAccessibleChannelsRequest>;
+
+/**
+ * AccessibleChannel wraps a conversation the agent can read, with is_member
+ * reporting whether the agent has actually joined it (only joined conversations
+ * accept posts and appear in the agent's ListChannelUpdates inbox).
+ *
+ * @generated from message laelia.v1.AccessibleChannel
+ */
+export declare type AccessibleChannel = Message<"laelia.v1.AccessibleChannel"> & {
+  /**
+   * @generated from field: laelia.v1.Conversation channel = 1;
+   */
+  channel?: Conversation | undefined;
+
+  /**
+   * @generated from field: bool is_member = 2;
+   */
+  isMember: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.AccessibleChannel.
+ * Use `create(AccessibleChannelSchema)` to create a new message.
+ */
+export declare const AccessibleChannelSchema: GenMessage<AccessibleChannel>;
+
+/**
+ * @generated from message laelia.v1.ListAccessibleChannelsResponse
+ */
+export declare type ListAccessibleChannelsResponse = Message<"laelia.v1.ListAccessibleChannelsResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.AccessibleChannel channels = 1;
+   */
+  channels: AccessibleChannel[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListAccessibleChannelsResponse.
+ * Use `create(ListAccessibleChannelsResponseSchema)` to create a new message.
+ */
+export declare const ListAccessibleChannelsResponseSchema: GenMessage<ListAccessibleChannelsResponse>;
+
+/**
+ * JoinChannel makes the calling agent a real member of a channel it can read
+ * (via its own membership or owner-follow). Joining seeds the agent's
+ * per-channel cursor to the current version, so the channel starts appearing in
+ * ListChannelUpdates from that point on and the agent may post to it. Idempotent
+ * for members. The gate is laelia.conversations.read (the agent may only join a
+ * channel it can already read); a mutation gated by a read permission is
+ * deliberate — "join" is exactly "subscribe to a conversation I can see".
+ *
+ * @generated from message laelia.v1.JoinChannelRequest
+ */
+export declare type JoinChannelRequest = Message<"laelia.v1.JoinChannelRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+};
+
+/**
+ * Describes the message laelia.v1.JoinChannelRequest.
+ * Use `create(JoinChannelRequestSchema)` to create a new message.
+ */
+export declare const JoinChannelRequestSchema: GenMessage<JoinChannelRequest>;
+
+/**
+ * @generated from message laelia.v1.JoinChannelResponse
+ */
+export declare type JoinChannelResponse = Message<"laelia.v1.JoinChannelResponse"> & {
+  /**
+   * @generated from field: laelia.v1.Conversation conversation = 1;
+   */
+  conversation?: Conversation | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.JoinChannelResponse.
+ * Use `create(JoinChannelResponseSchema)` to create a new message.
+ */
+export declare const JoinChannelResponseSchema: GenMessage<JoinChannelResponse>;
+
+/**
  * AckProcessedVersion advances the agent's durable per-channel cursor to
  * processed_version, marking the channel as processed up to that room_version so
  * that subsequent ListChannelUpdates no longer report it. command_id, when
@@ -5290,6 +5415,22 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof ListChannelUpdatesRequestSchema;
     output: typeof ListChannelUpdatesResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.ListAccessibleChannels
+   */
+  listAccessibleChannels: {
+    methodKind: "unary";
+    input: typeof ListAccessibleChannelsRequestSchema;
+    output: typeof ListAccessibleChannelsResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.JoinChannel
+   */
+  joinChannel: {
+    methodKind: "unary";
+    input: typeof JoinChannelRequestSchema;
+    output: typeof JoinChannelResponseSchema;
   },
   /**
    * @generated from rpc laelia.v1.CommandService.ListThreadUpdates

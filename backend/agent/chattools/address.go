@@ -17,11 +17,12 @@ import (
 // "conversations/<id>/messages/<m>" resource names the manager expects,
 // creating DMs if absent.
 //
-// The grammar is name-based only: legacy "conversations/<id>", bare ids, and
-// "conversations/<c>/messages/<m>" are rejected as input (no compatibility
-// concerns — the project is pre-launch). Files (bare file id), reminders
-// ("reminders/<id>"), and thread roots (bare message id) stay id-based by
-// design — they have no human name.
+// The grammar is name-based, with one id escape hatch: "conversations/<id>" is
+// accepted for conversations the agent can already read (surfaced by `channel
+// list`; the manager re-validates read permission), while bare ids and
+// "conversations/<c>/messages/<m>" paths are rejected as input. Files (bare
+// file id), reminders ("reminders/<id>"), and thread roots (bare message id)
+// stay id-based by design — they have no human name.
 //
 // The resolver is the input-side counterpart of conversationAddress (also in
 // this file): output emits "<address>", input accepts "<address>".
@@ -29,9 +30,13 @@ import (
 // resolveConversationAddress turns a conversation address into the canonical
 // "conversations/<id>" resource name. "#<title>" resolves (never creates) a
 // channel; "dm:@<peer>" opens or reuses a DM with the named agent or user;
-// anything else is an INVALID_ARGUMENT_FAILED — only the name grammar is
-// accepted. An empty address resolves to "" with no error so optional callers
-// (search, upload) can pass through unchanged.
+// "conversations/<id>" is passed through for conversations the agent can
+// already read (its memberships or owner-follow — the manager re-validates read
+// permission on every use), which is how `channel list` surfaces owner-visible
+// DMs that have no name-form address. Anything else is an
+// INVALID_ARGUMENT_FAILED — only the name grammar is accepted. An empty
+// address resolves to "" with no error so optional callers (search, upload) can
+// pass through unchanged.
 func resolveConversationAddress(ctx context.Context, d Deps, addr string) (string, error) {
 	addr = strings.TrimSpace(addr)
 	if addr == "" {
@@ -46,8 +51,16 @@ func resolveConversationAddress(ctx context.Context, d Deps, addr string) (strin
 			return "", localError("INVALID_ARGUMENT_FAILED", "dm: requires a peer name (dm:@<agent-or-user>)", "Use dm:@<peer>.")
 		}
 		return resolveDMAddress(ctx, d, peer)
+	case strings.HasPrefix(addr, "conversations/"):
+		// The id must be a well-formed UUID; anything else is rejected locally so
+		// a malformed name never reaches the manager (the manager re-validates
+		// read permission on the well-formed ones).
+		if _, err := uuid.Parse(strings.TrimPrefix(addr, "conversations/")); err != nil {
+			return "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("invalid conversation resource name %q", addr), "Use the name printed by `channel list` (conversations/<uuid>).")
+		}
+		return addr, nil
 	default:
-		return "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("unknown conversation address %q; use #<title> or dm:@<peer>", addr), "Run `message check` to see your channels, or `agent list` for a peer.")
+		return "", localError("INVALID_ARGUMENT_FAILED", fmt.Sprintf("unknown conversation address %q; use #<title>, dm:@<peer>, or a conversations/<id> name", addr), "Run `channel list` to see what you can read, or `message check` for your channels.")
 	}
 }
 

@@ -172,6 +172,28 @@ func (m *Manager) checkConversationPermission(ctx context.Context, perm permissi
 		}
 	}
 
+	// Owner-follow read: when the calling agent has follow_owner_permissions
+	// enabled, it can read any conversation its owner can read (channels and
+	// DMs) — the owner's direct, group-expanded, and allUsers bindings. The
+	// ConversationsRead guard keeps the follow grant read-only (sending still
+	// requires explicit membership); the reviewAgentDM override below stays
+	// user-only so agents never inherit it. A missing or deleted owner denies
+	// (there are no bindings to follow).
+	if perm == permission.ConversationsRead && agent != nil && agent.FollowOwnerPermissions {
+		owner, err := m.store.GetUserByID(ctx, agent.OwnerID)
+		if err != nil {
+			return false, err
+		}
+		if owner != nil && !owner.MemberDeleted {
+			for _, binding := range utils.GetUserIAMPolicyBindings(ctx, m.store, owner, policy.Policy) {
+				rolePerms := m.conversationRolePermissions(ctx, binding.GetRole())
+				if rolePerms != nil && rolePerms[perm] {
+					return true, nil
+				}
+			}
+		}
+	}
+
 	// Non-member override: a user holding the grantable reviewAgentDM workspace
 	// permission may read (not send/manage) an agent-to-agent DM.
 	if perm == permission.ConversationsRead && user != nil {

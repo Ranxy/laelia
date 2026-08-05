@@ -136,7 +136,7 @@ Register routes in `backend/manager/server/grpc_routes.go` (~line 126-147) along
 
 ### Agent side — claim, drain, complete
 
-- **Prompt (load-bearing)**: `backend/agent/executor/prompt.go:46-79` (`AgentFirstPromptBody`) — the current step 1 runs `laelia-agent message check` and **stops if empty**. Add a step **before** that stop-gate: run `laelia-agent reminder list-due`; if non-empty, process each (do the work, then `reminder complete <id> "<result>"` or `reminder fail`), then proceed to `message check`. Without this, due reminders are never picked up. Also document the reminder commands in `backend/agent/executor/prompt/communication.md`.
+- **Prompt (load-bearing)**: `backend/agent/executor/prompt.go:46-79` (`AgentFirstPromptBody`) — the current step 1 runs `laelia-machine message check` and **stops if empty**. Add a step **before** that stop-gate: run `laelia-machine reminder list-due`; if non-empty, process each (do the work, then `reminder complete <id> "<result>"` or `reminder fail`), then proceed to `message check`. Without this, due reminders are never picked up. Also document the reminder commands in `backend/agent/executor/prompt/communication.md`.
 - **Cobra subcommands**: `backend/agent/cmd/reminder.go` (mirror `task.go:9-39`): `reminder convert <message>`, `reminder list`, `reminder list-due`, `reminder update <name>`, `reminder cancel <name>`, `reminder complete <name> <result>`, `reminder fail <name> <error>`.
 - **Daemon handlers**: `backend/agent/daemon/server.go` — register `/reminder/*` mux routes at ~line 165 (mirror `/task/*` at 160-164); add `handleReminder*` funcs mirroring `handleTask*` (`server.go:394-441`); extend the `Request` envelope (`server.go:191-225`) with `FireAt`, `CronExpr`, `Tz` string fields.
 - **chattools wrappers**: `backend/agent/chattools/chattools_reminder.go` (mirror `chattools_task.go:13-226`) calling `commandServiceClient.*` via the Connect client; no central-registration change (`chattools.go:29-33` is generic).
@@ -157,8 +157,8 @@ Register routes in `backend/manager/server/grpc_routes.go` (~line 126-147) along
 ## End-to-end flow
 
 1. User posts "每天晚上3点分析github提交" in a channel where agent `A` is a member.
-2. Existing wake path: `notifyConversationAgents` → `NotifyWake(A)` → `HandleBeginSession` (channel cursor behind) → session → LLM drains, reads the message via `laelia-agent message ...`.
-3. LLM recognizes intent, calls `laelia-agent reminder convert <message> --task-content "..." --cron "0 3 * * *" --tz Asia/Shanghai` → `ConvertMessageToReminder` → reminder row (assignee=A, PENDING, fire_at=next 3am), A subscribed to the thread. Agent may post a confirmation in the thread.
+2. Existing wake path: `notifyConversationAgents` → `NotifyWake(A)` → `HandleBeginSession` (channel cursor behind) → session → LLM drains, reads the message via `laelia-machine message ...`.
+3. LLM recognizes intent, calls `laelia-machine reminder convert <message> --task-content "..." --cron "0 3 * * *" --tz Asia/Shanghai` → `ConvertMessageToReminder` → reminder row (assignee=A, PENDING, fire_at=next 3am), A subscribed to the thread. Agent may post a confirmation in the thread.
 4. Scheduler due-scan hits `fire_at` → `MarkDue` → A connected → `NotifyWake(A)` → `HandleBeginSession` (`HasDueReminders=true`) → session → prompt step runs `reminder list-due` → LLM does the analysis → `reminder complete <name> "<result>"` → `CompleteReminderAndPostNotification` (one tx: COMPLETED + SYSTEM thread message). Recurring → `RescheduleRecurring` → PENDING at next 3am.
 5. User sees the completion in the channel thread **and** in the agent-page Reminders detail (same thread, one message — no duplication). User can edit/cancel from the detail page, or chat in the thread ("改成4点") which wakes A to call `reminder update`.
 

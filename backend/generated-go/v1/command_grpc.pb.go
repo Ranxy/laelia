@@ -68,6 +68,8 @@ const (
 	CommandService_FailReminder_FullMethodName              = "/laelia.v1.CommandService/FailReminder"
 	CommandService_ListDueReminders_FullMethodName          = "/laelia.v1.CommandService/ListDueReminders"
 	CommandService_ListChannelUpdates_FullMethodName        = "/laelia.v1.CommandService/ListChannelUpdates"
+	CommandService_ListAccessibleChannels_FullMethodName    = "/laelia.v1.CommandService/ListAccessibleChannels"
+	CommandService_JoinChannel_FullMethodName               = "/laelia.v1.CommandService/JoinChannel"
 	CommandService_ListThreadUpdates_FullMethodName         = "/laelia.v1.CommandService/ListThreadUpdates"
 	CommandService_AckProcessedVersion_FullMethodName       = "/laelia.v1.CommandService/AckProcessedVersion"
 	CommandService_FetchConversationActivity_FullMethodName = "/laelia.v1.CommandService/FetchConversationActivity"
@@ -217,6 +219,8 @@ type CommandServiceClient interface {
 	// from the auth context.
 	ListDueReminders(ctx context.Context, in *ListDueRemindersRequest, opts ...grpc.CallOption) (*ListDueRemindersResponse, error)
 	ListChannelUpdates(ctx context.Context, in *ListChannelUpdatesRequest, opts ...grpc.CallOption) (*ListChannelUpdatesResponse, error)
+	ListAccessibleChannels(ctx context.Context, in *ListAccessibleChannelsRequest, opts ...grpc.CallOption) (*ListAccessibleChannelsResponse, error)
+	JoinChannel(ctx context.Context, in *JoinChannelRequest, opts ...grpc.CallOption) (*JoinChannelResponse, error)
 	ListThreadUpdates(ctx context.Context, in *ListThreadUpdatesRequest, opts ...grpc.CallOption) (*ListThreadUpdatesResponse, error)
 	AckProcessedVersion(ctx context.Context, in *AckProcessedVersionRequest, opts ...grpc.CallOption) (*AckProcessedVersionResponse, error)
 	FetchConversationActivity(ctx context.Context, in *FetchConversationActivityRequest, opts ...grpc.CallOption) (*FetchConversationActivityResponse, error)
@@ -751,6 +755,26 @@ func (c *commandServiceClient) ListChannelUpdates(ctx context.Context, in *ListC
 	return out, nil
 }
 
+func (c *commandServiceClient) ListAccessibleChannels(ctx context.Context, in *ListAccessibleChannelsRequest, opts ...grpc.CallOption) (*ListAccessibleChannelsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAccessibleChannelsResponse)
+	err := c.cc.Invoke(ctx, CommandService_ListAccessibleChannels_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) JoinChannel(ctx context.Context, in *JoinChannelRequest, opts ...grpc.CallOption) (*JoinChannelResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JoinChannelResponse)
+	err := c.cc.Invoke(ctx, CommandService_JoinChannel_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *commandServiceClient) ListThreadUpdates(ctx context.Context, in *ListThreadUpdatesRequest, opts ...grpc.CallOption) (*ListThreadUpdatesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListThreadUpdatesResponse)
@@ -988,6 +1012,8 @@ type CommandServiceServer interface {
 	// from the auth context.
 	ListDueReminders(context.Context, *ListDueRemindersRequest) (*ListDueRemindersResponse, error)
 	ListChannelUpdates(context.Context, *ListChannelUpdatesRequest) (*ListChannelUpdatesResponse, error)
+	ListAccessibleChannels(context.Context, *ListAccessibleChannelsRequest) (*ListAccessibleChannelsResponse, error)
+	JoinChannel(context.Context, *JoinChannelRequest) (*JoinChannelResponse, error)
 	ListThreadUpdates(context.Context, *ListThreadUpdatesRequest) (*ListThreadUpdatesResponse, error)
 	AckProcessedVersion(context.Context, *AckProcessedVersionRequest) (*AckProcessedVersionResponse, error)
 	FetchConversationActivity(context.Context, *FetchConversationActivityRequest) (*FetchConversationActivityResponse, error)
@@ -1167,6 +1193,12 @@ func (UnimplementedCommandServiceServer) ListDueReminders(context.Context, *List
 }
 func (UnimplementedCommandServiceServer) ListChannelUpdates(context.Context, *ListChannelUpdatesRequest) (*ListChannelUpdatesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListChannelUpdates not implemented")
+}
+func (UnimplementedCommandServiceServer) ListAccessibleChannels(context.Context, *ListAccessibleChannelsRequest) (*ListAccessibleChannelsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAccessibleChannels not implemented")
+}
+func (UnimplementedCommandServiceServer) JoinChannel(context.Context, *JoinChannelRequest) (*JoinChannelResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method JoinChannel not implemented")
 }
 func (UnimplementedCommandServiceServer) ListThreadUpdates(context.Context, *ListThreadUpdatesRequest) (*ListThreadUpdatesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListThreadUpdates not implemented")
@@ -2069,6 +2101,42 @@ func _CommandService_ListChannelUpdates_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommandService_ListAccessibleChannels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAccessibleChannelsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).ListAccessibleChannels(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_ListAccessibleChannels_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).ListAccessibleChannels(ctx, req.(*ListAccessibleChannelsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_JoinChannel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JoinChannelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).JoinChannel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_JoinChannel_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).JoinChannel(ctx, req.(*JoinChannelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CommandService_ListThreadUpdates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListThreadUpdatesRequest)
 	if err := dec(in); err != nil {
@@ -2439,6 +2507,14 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListChannelUpdates",
 			Handler:    _CommandService_ListChannelUpdates_Handler,
+		},
+		{
+			MethodName: "ListAccessibleChannels",
+			Handler:    _CommandService_ListAccessibleChannels_Handler,
+		},
+		{
+			MethodName: "JoinChannel",
+			Handler:    _CommandService_JoinChannel_Handler,
 		},
 		{
 			MethodName: "ListThreadUpdates",

@@ -619,6 +619,10 @@
               
               
                 <li>
+                  <a href="#laelia.v1.PreferredLanguage"><span class="badge">E</span>PreferredLanguage</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.UserType"><span class="badge">E</span>UserType</a>
                 </li>
               
@@ -670,6 +674,10 @@
           <li>
             <a href="#v1%2fcommand.proto">v1/command.proto</a>
             <ul>
+              
+                <li>
+                  <a href="#laelia.v1.AccessibleChannel"><span class="badge">M</span>AccessibleChannel</a>
+                </li>
               
                 <li>
                   <a href="#laelia.v1.AckProcessedVersionRequest"><span class="badge">M</span>AckProcessedVersionRequest</a>
@@ -944,11 +952,27 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.JoinChannelRequest"><span class="badge">M</span>JoinChannelRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.JoinChannelResponse"><span class="badge">M</span>JoinChannelResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.LeaveChannelRequest"><span class="badge">M</span>LeaveChannelRequest</a>
                 </li>
               
                 <li>
                   <a href="#laelia.v1.LifecyclePayload"><span class="badge">M</span>LifecyclePayload</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListAccessibleChannelsRequest"><span class="badge">M</span>ListAccessibleChannelsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListAccessibleChannelsResponse"><span class="badge">M</span>ListAccessibleChannelsResponse</a>
                 </li>
               
                 <li>
@@ -2204,6 +2228,17 @@ backfilled from created_by for existing agents. </p></td>
 requesting approval for a high-risk operation. Empty for legacy agents. </p></td>
                 </tr>
               
+                <tr>
+                  <td>follow_owner_permissions</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>follow_owner_permissions grants this agent read access to every channel (and
+DM) its owner can read, without requiring the agent to be added as a member.
+The agent can read and proactively join such channels; posting still
+requires explicit membership. Default true: the agent acts within its
+owner&#39;s channel visibility. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -3102,6 +3137,14 @@ not add. </p></td>
 agents with no recorded owner. Surfaced on the summary so list consumers
 (e.g. the Members page&#39;s per-user &#34;Owned Agents&#34; view and the channel
 member picker) can group agents by owner without an N&#43;1 of GetAgent. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>follow_owner_permissions</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>follow_owner_permissions mirrors Agent.follow_owner_permissions so list
+consumers can show whether the agent follows its owner&#39;s channel access. </p></td>
                 </tr>
               
             </tbody>
@@ -5532,7 +5575,7 @@ Format: users/{user uid or user email} </p></td>
         
       
         <h3 id="laelia.v1.ChatPreferences">ChatPreferences</h3>
-        <p>ChatPreferences holds per-user chat composer preferences. Only the user</p><p>themselves sees the effect; stored per principal so it follows the account</p><p>across devices/browsers.</p>
+        <p>ChatPreferences holds per-user chat preferences. Only the user themselves</p><p>sees the effect; stored per principal so it follows the account across</p><p>devices/browsers. Surfaced to agents (via ChannelMember.preferred_language)</p><p>so an agent can converse with the user in their preferred language.</p>
 
         
           <table class="field-table">
@@ -5548,6 +5591,16 @@ Format: users/{user uid or user email} </p></td>
                   <td><p>enter_to_send is true when pressing Enter sends the message and Shift&#43;Enter
 inserts a newline (the historic default). When false the keybinding is
 inverted: Enter inserts a newline and Shift&#43;Enter sends. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>preferred_language</td>
+                  <td><a href="#laelia.v1.PreferredLanguage">PreferredLanguage</a></td>
+                  <td></td>
+                  <td><p>preferred_language is the user&#39;s preferred language for agent-initiated
+conversation. Agents read it and reply in that language when chatting with
+the user (e.g. in a DM or channel). UNSPECIFIED means the user has not set
+one; the agent then chooses the most appropriate language. </p></td>
                 </tr>
               
             </tbody>
@@ -6119,6 +6172,41 @@ so the historic behavior is preserved. </p></td>
       
 
       
+        <h3 id="laelia.v1.PreferredLanguage">PreferredLanguage</h3>
+        <p>PreferredLanguage is a user's preferred language for interacting with agents.</p><p>It is distinct from the frontend's UI locale: it is a server-stored</p><p>preference that agents can perceive and honor when conversing.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>PREFERRED_LANGUAGE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PREFERRED_LANGUAGE_ZH_CN</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PREFERRED_LANGUAGE_EN_US</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PREFERRED_LANGUAGE_JA_JP</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
         <h3 id="laelia.v1.UserType">UserType</h3>
         <p></p>
         <table class="enum-table">
@@ -6587,6 +6675,37 @@ Format: idps/{idp} </p></td>
       </div>
       <p></p>
 
+      
+        <h3 id="laelia.v1.AccessibleChannel">AccessibleChannel</h3>
+        <p>AccessibleChannel wraps a conversation the agent can read, with is_member</p><p>reporting whether the agent has actually joined it (only joined conversations</p><p>accept posts and appear in the agent's ListChannelUpdates inbox).</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>channel</td>
+                  <td><a href="#laelia.v1.Conversation">Conversation</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>is_member</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
       
         <h3 id="laelia.v1.AckProcessedVersionRequest">AckProcessedVersionRequest</h3>
         <p>AckProcessedVersion advances the agent's durable per-channel cursor to</p><p>processed_version, marking the channel as processed up to that room_version so</p><p>that subsequent ListChannelUpdates no longer report it. command_id, when</p><p>supplied, links the current session's command to this conversation so the</p><p>frontend can associate execution events with the channel.</p>
@@ -7326,6 +7445,15 @@ each co-agent&#39;s persona — in a single lookup, and decide whom to address. 
 agents/{agent}/avatar) when the member has uploaded one, empty otherwise
 (in which case the frontend renders a deterministic pixel identicon). Surfaced
 inline so the frontend can render roster avatars without a per-member lookup. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>preferred_language</td>
+                  <td><a href="#laelia.v1.PreferredLanguage">PreferredLanguage</a></td>
+                  <td></td>
+                  <td><p>preferred_language is the member&#39;s preferred language when the member is a
+user (from User.chat_preferences), UNSPECIFIED otherwise. Surfaced so an
+agent can perceive whom it is talking to and converse in that language. </p></td>
                 </tr>
               
             </tbody>
@@ -9493,6 +9621,54 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
 
         
       
+        <h3 id="laelia.v1.JoinChannelRequest">JoinChannelRequest</h3>
+        <p>JoinChannel makes the calling agent a real member of a channel it can read</p><p>(via its own membership or owner-follow). Joining seeds the agent's</p><p>per-channel cursor to the current version, so the channel starts appearing in</p><p>ListChannelUpdates from that point on and the agent may post to it. Idempotent</p><p>for members. The gate is laelia.conversations.read (the agent may only join a</p><p>channel it can already read); a mutation gated by a read permission is</p><p>deliberate — "join" is exactly "subscribe to a conversation I can see".</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.JoinChannelResponse">JoinChannelResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#laelia.v1.Conversation">Conversation</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.LeaveChannelRequest">LeaveChannelRequest</h3>
         <p>LeaveChannelRequest names the channel the caller is leaving. The caller is</p><p>resolved from the auth context; no member_id is carried.</p>
 
@@ -9536,6 +9712,68 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
               
                 <tr>
                   <td>profile</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListAccessibleChannelsRequest">ListAccessibleChannelsRequest</h3>
+        <p>ListAccessibleChannels returns, for the authenticated agent, every</p><p>conversation it can read: its own memberships plus — when the agent's</p><p>follow_owner_permissions is enabled — every conversation its owner can read</p><p>(channels and DMs). This is the on-demand discovery surface ("what channels</p><p>can I access"); it is separate from ListChannelUpdates (the drain-loop</p><p>inbox), which stays limited to conversations the agent has joined so the</p><p>agent is not woken for every message in its owner's channels.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListAccessibleChannelsResponse">ListAccessibleChannelsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>channels</td>
+                  <td><a href="#laelia.v1.AccessibleChannel">AccessibleChannel</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -13227,6 +13465,20 @@ from the auth context.</p></td>
               </tr>
             
               <tr>
+                <td>ListAccessibleChannels</td>
+                <td><a href="#laelia.v1.ListAccessibleChannelsRequest">ListAccessibleChannelsRequest</a></td>
+                <td><a href="#laelia.v1.ListAccessibleChannelsResponse">ListAccessibleChannelsResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>JoinChannel</td>
+                <td><a href="#laelia.v1.JoinChannelRequest">JoinChannelRequest</a></td>
+                <td><a href="#laelia.v1.JoinChannelResponse">JoinChannelResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
                 <td>ListThreadUpdates</td>
                 <td><a href="#laelia.v1.ListThreadUpdatesRequest">ListThreadUpdatesRequest</a></td>
                 <td><a href="#laelia.v1.ListThreadUpdatesResponse">ListThreadUpdatesResponse</a></td>
@@ -13802,6 +14054,26 @@ user, hiding it from All and Unread. The caller&#39;s own id must own the row.</
                 <td>GET</td>
                 <td>/v1/agents/-/channelUpdates</td>
                 <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListAccessibleChannels</td>
+                <td>GET</td>
+                <td>/v1/agents/-:listAccessibleChannels</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>JoinChannel</td>
+                <td>POST</td>
+                <td>/v1/{conversation=conversations/*}:join</td>
+                <td>*</td>
               </tr>
               
             

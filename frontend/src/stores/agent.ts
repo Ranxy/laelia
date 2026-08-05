@@ -95,13 +95,27 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     return res;
   },
 
-  async updateAgent(name: string, allowAddToChannel: boolean) {
+  // updateAgent patches the agent's mutable flag fields. Only the keys present
+  // in `fields` are sent (the update_mask is built from them), so the caller
+  // never overwrites a flag it did not touch.
+  async updateAgent(
+    name: string,
+    fields: { allowAddToChannel?: boolean; followOwnerPermissions?: boolean }
+  ) {
+    const agent = create(AgentSchema, { name });
+    const paths: string[] = [];
+    if (fields.allowAddToChannel !== undefined) {
+      agent.allowAddToChannel = fields.allowAddToChannel;
+      paths.push("allow_add_to_channel");
+    }
+    if (fields.followOwnerPermissions !== undefined) {
+      agent.followOwnerPermissions = fields.followOwnerPermissions;
+      paths.push("follow_owner_permissions");
+    }
     return agentServiceClient.updateAgent(
       create(UpdateAgentRequestSchema, {
-        agent: create(AgentSchema, { name, allowAddToChannel }),
-        updateMask: create(FieldMaskSchema, {
-          paths: ["allow_add_to_channel"],
-        }),
+        agent,
+        updateMask: create(FieldMaskSchema, { paths }),
       })
     );
   },

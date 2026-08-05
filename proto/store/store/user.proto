@@ -29,4 +29,13 @@ message UserProfile {
 // true), so a nil pointer in the store layer signals "unset".
 message ChatPreferences {
   bool enter_to_send = 1;
+  PreferredLanguage preferred_language = 2;
+}
+
+// PreferredLanguage mirrors laelia.v1.PreferredLanguage.
+enum PreferredLanguage {
+  PREFERRED_LANGUAGE_UNSPECIFIED = 0;
+  PREFERRED_LANGUAGE_ZH_CN = 1;
+  PREFERRED_LANGUAGE_EN_US = 2;
+  PREFERRED_LANGUAGE_JA_JP = 3;
 }

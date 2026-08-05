@@ -7,7 +7,10 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/Ranxy/laelia/backend/common"
+	"github.com/Ranxy/laelia/backend/common/permission"
+	models "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
+	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
@@ -25,7 +28,8 @@ func requireCallingAgent(ctx context.Context) (*store.AgentMessage, error) {
 // title, returning NOT_FOUND when absent (it never creates one). Powers the
 // "#<title>" address resolver.
 func (s *CommandService) ResolveChannelByTitle(ctx context.Context, req *connect.Request[v1pb.ResolveChannelByTitleRequest]) (*connect.Response[v1pb.ResolveChannelByTitleResponse], error) {
-	if _, err := requireCallingAgent(ctx); err != nil {
+	agent, err := requireCallingAgent(ctx)
+	if err != nil {
 		return nil, err
 	}
 	if req.Msg.Title == "" {
@@ -37,6 +41,21 @@ func (s *CommandService) ResolveChannelByTitle(ctx context.Context, req *connect
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve channel by title"))
 	}
 	if conv == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("channel %q not found", req.Msg.Title))
+	}
+
+	// The resolver doubles as the address gate: an agent may only resolve a
+	// channel it can read (its own membership or owner-follow). Deny as
+	// NotFound so existence is not probed, matching the IAM engine's fail-closed
+	// convention.
+	ok, err := s.iam.CheckPermission(ctx, permission.ConversationsRead, nil, agent, &iam.ResourceRef{
+		ResourceType: models.Policy_CONVERSATION,
+		Name:         common.FormatConversationName(conv.ID.String()),
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check channel access"))
+	}
+	if !ok {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("channel %q not found", req.Msg.Title))
 	}
 

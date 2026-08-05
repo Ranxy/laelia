@@ -653,7 +653,7 @@ func (c *commandStream) persistContextState(ctxState *executor.ContextState, res
 // runSession executes one drain session: it builds the agent-first runtime
 // (fixed prompt) and pumps progress/events/result over the bidi stream via
 // runCommand. The agent itself decides which channel to process and how, by
-// shelling out to the `laelia-agent` CLI over the local daemon. Blocking:
+// shelling out to the `laelia-machine` CLI over the local daemon. Blocking:
 // returns when the session finishes.
 func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, agentDisplayName, ownerDisplayName string) {
 	// Per-agent context state drives re-anchor / usage-warning decisions for

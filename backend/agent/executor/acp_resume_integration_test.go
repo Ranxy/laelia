@@ -45,7 +45,7 @@ func TestACPExecutorColdThenWarmResumesSession(t *testing.T) {
 
 	// Cold turn: seed a file with the secret, ask the agent to read it back. This
 	// is a concrete task opencode finishes in seconds (the init prompt's
-	// laelia-agent procedure does not derail it), and it puts the secret into the
+	// laelia-machine procedure does not derail it), and it puts the secret into the
 	// session's conversation history.
 	secret := "ZEPHYR"
 	seedPath := filepath.Join(workspace, "secret.txt")
@@ -73,7 +73,7 @@ func TestACPExecutorColdThenWarmResumesSession(t *testing.T) {
 
 	// Warm turn: fresh subprocess, same agentID + workspace => fingerprint matches
 	// => ResumeSession(same id). Only the batch (this instruction) is sent — no
-	// init prompt, so the agent does not re-receive the laelia-agent procedure.
+	// init prompt, so the agent does not re-receive the laelia-machine procedure.
 	warmRuntime, err := NewACP(Request{
 		CommandID:      "resume-warm",
 		AgentID:        agentID,

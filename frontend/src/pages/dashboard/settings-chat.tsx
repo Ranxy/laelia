@@ -1,11 +1,21 @@
 import { create } from "@bufbuild/protobuf";
-import { Keyboard, Loader2 } from "lucide-react";
+import { Keyboard, Languages, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toastManager } from "@/lib/toast";
 import { useAppStore } from "@/stores";
-import { ChatPreferencesSchema } from "@/types/proto-es/v1/user_service_pb";
+import {
+  ChatPreferencesSchema,
+  PreferredLanguage,
+} from "@/types/proto-es/v1/user_service_pb";
 
 // SettingsChatPage exposes per-user chat composer preferences. The single
 // toggle today inverts the Enter / Shift+Enter keybinding. The value lives on
@@ -21,19 +31,40 @@ export function SettingsChatPage() {
 
   // The server returns the default (enter_to_send = true) when the user has
   // never customized the preference, so a missing field is the historic
-  // behavior, not "off".
+  // behavior, not "off". PreferredLanguage stays UNSPECIFIED until set.
   const enterToSend = currentUser?.chatPreferences?.enterToSend ?? true;
+  const preferredLanguage =
+    currentUser?.chatPreferences?.preferredLanguage ??
+    PreferredLanguage.UNSPECIFIED;
   const [saving, setSaving] = useState(false);
 
-  async function handleToggle(next: boolean) {
+  // preferredLanguageLabel renders the localized label for a language value,
+  // used by SelectValue (which by default would show the raw numeric value).
+  function preferredLanguageLabel(lang: PreferredLanguage) {
+    switch (lang) {
+      case PreferredLanguage.ZH_CN:
+        return t("settings.chat.language.zh-CN");
+      case PreferredLanguage.EN_US:
+        return t("settings.chat.language.en-US");
+      case PreferredLanguage.JA_JP:
+        return t("settings.chat.language.ja-JP");
+      default:
+        return t("settings.chat.language.auto");
+    }
+  }
+
+  // Both preferences are saved as one chat_preferences message so saving one
+  // never wipes the other.
+  async function savePreferences(prefs: {
+    enterToSend: boolean;
+    preferredLanguage: PreferredLanguage;
+  }) {
     if (!currentUser?.name) return;
     setSaving(true);
     try {
       await updateUser(
         currentUser.name,
-        {
-          chatPreferences: create(ChatPreferencesSchema, { enterToSend: next }),
-        },
+        { chatPreferences: create(ChatPreferencesSchema, prefs) },
         ["chat_preferences"]
       );
       await fetchCurrentUser();
@@ -47,6 +78,14 @@ export function SettingsChatPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleToggle(next: boolean) {
+    await savePreferences({ enterToSend: next, preferredLanguage });
+  }
+
+  async function handleLanguageChange(next: PreferredLanguage) {
+    await savePreferences({ enterToSend, preferredLanguage: next });
   }
 
   if (!currentUser) {
@@ -88,6 +127,48 @@ export function SettingsChatPage() {
               size="md"
               className="shrink-0"
             />
+          </div>
+
+          <div className="flex items-center justify-between rounded-md border border-control-border p-4">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <Languages className="mt-0.5 size-4 shrink-0 text-control-light" />
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-main">
+                  {t("settings.chat.preferred-language")}
+                </div>
+                <div className="mt-0.5 text-xs text-control-light">
+                  {t("settings.chat.preferred-language-hint")}
+                </div>
+              </div>
+            </div>
+            <Select
+              value={String(preferredLanguage)}
+              onValueChange={(v) =>
+                void handleLanguageChange(Number(v) as PreferredLanguage)
+              }
+            >
+              <SelectTrigger className="shrink-0">
+                <SelectValue>
+                  {(value) =>
+                    preferredLanguageLabel(Number(value) as PreferredLanguage)
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={String(PreferredLanguage.UNSPECIFIED)}>
+                  {t("settings.chat.language.auto")}
+                </SelectItem>
+                <SelectItem value={String(PreferredLanguage.ZH_CN)}>
+                  {t("settings.chat.language.zh-CN")}
+                </SelectItem>
+                <SelectItem value={String(PreferredLanguage.EN_US)}>
+                  {t("settings.chat.language.en-US")}
+                </SelectItem>
+                <SelectItem value={String(PreferredLanguage.JA_JP)}>
+                  {t("settings.chat.language.ja-JP")}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </div>

@@ -48,7 +48,7 @@ type PiExecutor struct {
 	outputBytes   atomic.Int64
 
 	// stdoutBuf accumulates text_delta content for the final summary when the
-	// agent does not post its own reply (it normally does, via laelia-agent).
+	// agent does not post its own reply (it normally does, via laelia-machine).
 	stdoutBuf strings.Builder
 
 	// buffer batches STDOUT/SYSTEM text deltas into consolidated CommandOutput

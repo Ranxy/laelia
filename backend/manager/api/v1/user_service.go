@@ -537,7 +537,15 @@ func (s *UserService) UpdateUser(ctx context.Context, request *connect.Request[v
 			patch.Description = &request.Msg.User.Description
 		case "chat_preferences":
 			if v := request.Msg.User.ChatPreferences; v != nil {
-				patch.ChatPreferences = &storepb.ChatPreferences{EnterToSend: v.EnterToSend}
+				if err := validatePreferredLanguage(v.PreferredLanguage); err != nil {
+					return nil, err
+				}
+				// Copy both fields so saving one never wipes the other (the
+				// frontend always submits the full current prefs).
+				patch.ChatPreferences = &storepb.ChatPreferences{
+					EnterToSend:       v.EnterToSend,
+					PreferredLanguage: storepb.PreferredLanguage(v.PreferredLanguage),
+				}
 			}
 		default:
 		}
@@ -687,18 +695,38 @@ func convertToUser(user *store.UserMessage) *v1pb.User {
 	}
 
 	// ChatPreferences defaults to enter_to_send = true (the historic behavior)
-	// when the user has never customized it (nil = NULL column).
+	// when the user has never customized it (nil = NULL column). PreferredLanguage
+	// stays UNSPECIFIED (the zero value) in that case.
 	enterToSend := true
+	var preferredLanguage v1pb.PreferredLanguage
 	if user.ChatPreferences != nil {
 		enterToSend = user.ChatPreferences.EnterToSend
+		preferredLanguage = v1pb.PreferredLanguage(user.ChatPreferences.PreferredLanguage)
 	}
-	convertedUser.ChatPreferences = &v1pb.ChatPreferences{EnterToSend: enterToSend}
+	convertedUser.ChatPreferences = &v1pb.ChatPreferences{
+		EnterToSend:       enterToSend,
+		PreferredLanguage: preferredLanguage,
+	}
 
 	// Groups already carries full group resource names ("groups/{email}" or
 	// "groups/{id}") from the store.
 	convertedUser.Groups = user.Groups
 
 	return convertedUser
+}
+
+// validatePreferredLanguage rejects a PreferredLanguage value outside the known
+// set. proto3 enums arrive as raw ints on the wire, so an out-of-range value
+// would otherwise be silently persisted into the chat_preferences jsonb column.
+func validatePreferredLanguage(lang v1pb.PreferredLanguage) error {
+	switch lang {
+	case v1pb.PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED,
+		v1pb.PreferredLanguage_PREFERRED_LANGUAGE_ZH_CN,
+		v1pb.PreferredLanguage_PREFERRED_LANGUAGE_EN_US,
+		v1pb.PreferredLanguage_PREFERRED_LANGUAGE_JA_JP:
+		return nil
+	}
+	return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid preferred_language %d", lang))
 }
 
 func convertToPrincipalType(userType v1pb.UserType) (storepb.PrincipalType, error) {

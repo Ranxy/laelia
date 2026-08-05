@@ -322,6 +322,34 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/-:listAccessibleChannels:
+        get:
+            tags:
+                - CommandService
+            operationId: CommandService_ListAccessibleChannels
+            parameters:
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListAccessibleChannelsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}:
         get:
             tags:
@@ -2273,6 +2301,37 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/conversations/{conversation}:join:
+        post:
+            tags:
+                - CommandService
+            operationId: CommandService_JoinChannel
+            parameters:
+                - name: conversation
+                  in: path
+                  description: The conversation id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/JoinChannelRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/JoinChannelResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/conversations/{conversation}:leave:
         post:
             tags:
@@ -4175,6 +4234,17 @@ paths:
                                 $ref: '#/components/schemas/Status'
 components:
     schemas:
+        AccessibleChannel:
+            type: object
+            properties:
+                channel:
+                    $ref: '#/components/schemas/Conversation'
+                isMember:
+                    type: boolean
+            description: |-
+                AccessibleChannel wraps a conversation the agent can read, with is_member
+                 reporting whether the agent has actually joined it (only joined conversations
+                 accept posts and appear in the agent's ListChannelUpdates inbox).
         AckProcessedVersionRequest:
             required:
                 - conversation
@@ -4395,6 +4465,14 @@ components:
                     description: |-
                         Owner's display name — the name the agent writes `dm:@<owner_name>` to when
                          requesting approval for a high-risk operation. Empty for legacy agents.
+                followOwnerPermissions:
+                    type: boolean
+                    description: |-
+                        follow_owner_permissions grants this agent read access to every channel (and
+                         DM) its owner can read, without requiring the agent to be added as a member.
+                         The agent can read and proactively join such channels; posting still
+                         requires explicit membership. Default true: the agent acts within its
+                         owner's channel visibility.
         AgentACPConfig:
             type: object
             properties:
@@ -4719,6 +4797,11 @@ components:
                          agents with no recorded owner. Surfaced on the summary so list consumers
                          (e.g. the Members page's per-user "Owned Agents" view and the channel
                          member picker) can group agents by owner without an N+1 of GetAgent.
+                followOwnerPermissions:
+                    type: boolean
+                    description: |-
+                        follow_owner_permissions mirrors Agent.follow_owner_permissions so list
+                         consumers can show whether the agent follows its owner's channel access.
             description: |-
                 AgentSummary is the lightweight list-view projection of an Agent returned by
                  ListAgents. It carries only the fields list/header views need: identity,
@@ -4973,6 +5056,18 @@ components:
                          agents/{agent}/avatar) when the member has uploaded one, empty otherwise
                          (in which case the frontend renders a deterministic pixel identicon). Surfaced
                          inline so the frontend can render roster avatars without a per-member lookup.
+                preferredLanguage:
+                    enum:
+                        - PREFERRED_LANGUAGE_UNSPECIFIED
+                        - PREFERRED_LANGUAGE_ZH_CN
+                        - PREFERRED_LANGUAGE_EN_US
+                        - PREFERRED_LANGUAGE_JA_JP
+                    type: string
+                    description: |-
+                        preferred_language is the member's preferred language when the member is a
+                         user (from User.chat_preferences), UNSPECIFIED otherwise. Surfaced so an
+                         agent can perceive whom it is talking to and converse in that language.
+                    format: enum
         ChannelThread:
             type: object
             properties:
@@ -5112,10 +5207,24 @@ components:
                         enter_to_send is true when pressing Enter sends the message and Shift+Enter
                          inserts a newline (the historic default). When false the keybinding is
                          inverted: Enter inserts a newline and Shift+Enter sends.
+                preferredLanguage:
+                    enum:
+                        - PREFERRED_LANGUAGE_UNSPECIFIED
+                        - PREFERRED_LANGUAGE_ZH_CN
+                        - PREFERRED_LANGUAGE_EN_US
+                        - PREFERRED_LANGUAGE_JA_JP
+                    type: string
+                    description: |-
+                        preferred_language is the user's preferred language for agent-initiated
+                         conversation. Agents read it and reply in that language when chatting with
+                         the user (e.g. in a DM or channel). UNSPECIFIED means the user has not set
+                         one; the agent then chooses the most appropriate language.
+                    format: enum
             description: |-
-                ChatPreferences holds per-user chat composer preferences. Only the user
-                 themselves sees the effect; stored per principal so it follows the account
-                 across devices/browsers.
+                ChatPreferences holds per-user chat preferences. Only the user themselves
+                 sees the effect; stored per principal so it follows the account across
+                 devices/browsers. Surfaced to agents (via ChannelMember.preferred_language)
+                 so an agent can converse with the user in their preferred language.
         ClaimTaskRequest:
             required:
                 - message
@@ -5930,6 +6039,26 @@ components:
             properties:
                 oauth2Context:
                     $ref: '#/components/schemas/OAuth2IdentityProviderContext'
+        JoinChannelRequest:
+            required:
+                - conversation
+            type: object
+            properties:
+                conversation:
+                    type: string
+            description: |-
+                JoinChannel makes the calling agent a real member of a channel it can read
+                 (via its own membership or owner-follow). Joining seeds the agent's
+                 per-channel cursor to the current version, so the channel starts appearing in
+                 ListChannelUpdates from that point on and the agent may post to it. Idempotent
+                 for members. The gate is laelia.conversations.read (the agent may only join a
+                 channel it can already read); a mutation gated by a read permission is
+                 deliberate — "join" is exactly "subscribe to a conversation I can see".
+        JoinChannelResponse:
+            type: object
+            properties:
+                conversation:
+                    $ref: '#/components/schemas/Conversation'
         LeaveChannelRequest:
             required:
                 - conversation
@@ -5946,6 +6075,15 @@ components:
                 executorKind:
                     type: string
                 profile:
+                    type: string
+        ListAccessibleChannelsResponse:
+            type: object
+            properties:
+                channels:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AccessibleChannel'
+                nextPageToken:
                     type: string
         ListActivitiesResponse:
             type: object

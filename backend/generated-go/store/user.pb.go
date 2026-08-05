@@ -78,6 +78,59 @@ func (PrincipalType) EnumDescriptor() ([]byte, []int) {
 	return file_store_user_proto_rawDescGZIP(), []int{0}
 }
 
+// PreferredLanguage mirrors laelia.v1.PreferredLanguage.
+type PreferredLanguage int32
+
+const (
+	PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED PreferredLanguage = 0
+	PreferredLanguage_PREFERRED_LANGUAGE_ZH_CN       PreferredLanguage = 1
+	PreferredLanguage_PREFERRED_LANGUAGE_EN_US       PreferredLanguage = 2
+	PreferredLanguage_PREFERRED_LANGUAGE_JA_JP       PreferredLanguage = 3
+)
+
+// Enum value maps for PreferredLanguage.
+var (
+	PreferredLanguage_name = map[int32]string{
+		0: "PREFERRED_LANGUAGE_UNSPECIFIED",
+		1: "PREFERRED_LANGUAGE_ZH_CN",
+		2: "PREFERRED_LANGUAGE_EN_US",
+		3: "PREFERRED_LANGUAGE_JA_JP",
+	}
+	PreferredLanguage_value = map[string]int32{
+		"PREFERRED_LANGUAGE_UNSPECIFIED": 0,
+		"PREFERRED_LANGUAGE_ZH_CN":       1,
+		"PREFERRED_LANGUAGE_EN_US":       2,
+		"PREFERRED_LANGUAGE_JA_JP":       3,
+	}
+)
+
+func (x PreferredLanguage) Enum() *PreferredLanguage {
+	p := new(PreferredLanguage)
+	*p = x
+	return p
+}
+
+func (x PreferredLanguage) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PreferredLanguage) Descriptor() protoreflect.EnumDescriptor {
+	return file_store_user_proto_enumTypes[1].Descriptor()
+}
+
+func (PreferredLanguage) Type() protoreflect.EnumType {
+	return &file_store_user_proto_enumTypes[1]
+}
+
+func (x PreferredLanguage) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PreferredLanguage.Descriptor instead.
+func (PreferredLanguage) EnumDescriptor() ([]byte, []int) {
+	return file_store_user_proto_rawDescGZIP(), []int{1}
+}
+
 type UserProfile struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	LastLoginTime          *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=last_login_time,json=lastLoginTime,proto3" json:"last_login_time,omitempty"`
@@ -143,10 +196,11 @@ func (x *UserProfile) GetSource() string {
 // principal row; a NULL/absent value means "use the default" (enter_to_send
 // true), so a nil pointer in the store layer signals "unset".
 type ChatPreferences struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	EnterToSend   bool                   `protobuf:"varint,1,opt,name=enter_to_send,json=enterToSend,proto3" json:"enter_to_send,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	EnterToSend       bool                   `protobuf:"varint,1,opt,name=enter_to_send,json=enterToSend,proto3" json:"enter_to_send,omitempty"`
+	PreferredLanguage PreferredLanguage      `protobuf:"varint,2,opt,name=preferred_language,json=preferredLanguage,proto3,enum=laelia.store.PreferredLanguage" json:"preferred_language,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *ChatPreferences) Reset() {
@@ -186,6 +240,13 @@ func (x *ChatPreferences) GetEnterToSend() bool {
 	return false
 }
 
+func (x *ChatPreferences) GetPreferredLanguage() PreferredLanguage {
+	if x != nil {
+		return x.PreferredLanguage
+	}
+	return PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED
+}
+
 var File_store_user_proto protoreflect.FileDescriptor
 
 const file_store_user_proto_rawDesc = "" +
@@ -194,15 +255,21 @@ const file_store_user_proto_rawDesc = "" +
 	"\vUserProfile\x12B\n" +
 	"\x0flast_login_time\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\rlastLoginTime\x12U\n" +
 	"\x19last_change_password_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x16lastChangePasswordTime\x12\x16\n" +
-	"\x06source\x18\x03 \x01(\tR\x06source\"5\n" +
+	"\x06source\x18\x03 \x01(\tR\x06source\"\x85\x01\n" +
 	"\x0fChatPreferences\x12\"\n" +
-	"\renter_to_send\x18\x01 \x01(\bR\venterToSend*b\n" +
+	"\renter_to_send\x18\x01 \x01(\bR\venterToSend\x12N\n" +
+	"\x12preferred_language\x18\x02 \x01(\x0e2\x1f.laelia.store.PreferredLanguageR\x11preferredLanguage*b\n" +
 	"\rPrincipalType\x12\x1e\n" +
 	"\x1aPRINCIPAL_TYPE_UNSPECIFIED\x10\x00\x12\f\n" +
 	"\bEND_USER\x10\x01\x12\x13\n" +
 	"\x0fSERVICE_ACCOUNT\x10\x02\x12\x0e\n" +
 	"\n" +
-	"SYSTEM_BOT\x10\x03B4Z2github.com/Ranxy/laelia/backend/generated-go/storeb\x06proto3"
+	"SYSTEM_BOT\x10\x03*\x91\x01\n" +
+	"\x11PreferredLanguage\x12\"\n" +
+	"\x1ePREFERRED_LANGUAGE_UNSPECIFIED\x10\x00\x12\x1c\n" +
+	"\x18PREFERRED_LANGUAGE_ZH_CN\x10\x01\x12\x1c\n" +
+	"\x18PREFERRED_LANGUAGE_EN_US\x10\x02\x12\x1c\n" +
+	"\x18PREFERRED_LANGUAGE_JA_JP\x10\x03B4Z2github.com/Ranxy/laelia/backend/generated-go/storeb\x06proto3"
 
 var (
 	file_store_user_proto_rawDescOnce sync.Once
@@ -216,22 +283,24 @@ func file_store_user_proto_rawDescGZIP() []byte {
 	return file_store_user_proto_rawDescData
 }
 
-var file_store_user_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_store_user_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_store_user_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_store_user_proto_goTypes = []any{
 	(PrincipalType)(0),            // 0: laelia.store.PrincipalType
-	(*UserProfile)(nil),           // 1: laelia.store.UserProfile
-	(*ChatPreferences)(nil),       // 2: laelia.store.ChatPreferences
-	(*timestamppb.Timestamp)(nil), // 3: google.protobuf.Timestamp
+	(PreferredLanguage)(0),        // 1: laelia.store.PreferredLanguage
+	(*UserProfile)(nil),           // 2: laelia.store.UserProfile
+	(*ChatPreferences)(nil),       // 3: laelia.store.ChatPreferences
+	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
 }
 var file_store_user_proto_depIdxs = []int32{
-	3, // 0: laelia.store.UserProfile.last_login_time:type_name -> google.protobuf.Timestamp
-	3, // 1: laelia.store.UserProfile.last_change_password_time:type_name -> google.protobuf.Timestamp
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	4, // 0: laelia.store.UserProfile.last_login_time:type_name -> google.protobuf.Timestamp
+	4, // 1: laelia.store.UserProfile.last_change_password_time:type_name -> google.protobuf.Timestamp
+	1, // 2: laelia.store.ChatPreferences.preferred_language:type_name -> laelia.store.PreferredLanguage
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_store_user_proto_init() }
@@ -244,7 +313,7 @@ func file_store_user_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_store_user_proto_rawDesc), len(file_store_user_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,

@@ -218,8 +218,29 @@ func TestFormatMemberLine(t *testing.T) {
 	assert.Equal(t, "- [agent] dev [agents/9] (member)\n",
 		formatMemberLine(&v1pb.ChannelMember{MemberType: 2, MemberId: "9", DisplayName: "dev", MemberRole: 2}))
 
+	// A user member with a preferred language renders a (language: xx-XX) tag so
+	// the agent knows which language to converse in.
+	assert.Equal(t, "- [user] Alice (member) (language: zh-CN)\n",
+		formatMemberLine(&v1pb.ChannelMember{MemberType: 1, DisplayName: "Alice", MemberRole: 2, PreferredLanguage: v1pb.PreferredLanguage_PREFERRED_LANGUAGE_ZH_CN}))
+
+	// Agents never render a language tag (their language is always UNSPECIFIED).
+	assert.Equal(t, "- [agent] dev [agents/9] (member)\n",
+		formatMemberLine(&v1pb.ChannelMember{MemberType: 2, MemberId: "9", DisplayName: "dev", MemberRole: 2, PreferredLanguage: v1pb.PreferredLanguage_PREFERRED_LANGUAGE_EN_US}))
+
+	// UNSPECIFIED (unset) renders no language tag.
+	assert.Equal(t, "- [user] Bob\n",
+		formatMemberLine(&v1pb.ChannelMember{MemberType: 1, DisplayName: "Bob"}))
+
 	// nil is safe.
 	assert.Equal(t, "", formatMemberLine(nil))
+}
+
+func TestPreferredLanguageString(t *testing.T) {
+	assert.Equal(t, "zh-CN", preferredLanguageString(v1pb.PreferredLanguage_PREFERRED_LANGUAGE_ZH_CN))
+	assert.Equal(t, "en-US", preferredLanguageString(v1pb.PreferredLanguage_PREFERRED_LANGUAGE_EN_US))
+	assert.Equal(t, "ja-JP", preferredLanguageString(v1pb.PreferredLanguage_PREFERRED_LANGUAGE_JA_JP))
+	assert.Equal(t, "", preferredLanguageString(v1pb.PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED))
+	assert.Equal(t, "", preferredLanguageString(v1pb.PreferredLanguage(99)))
 }
 
 func TestListMembersRequiresConversation(t *testing.T) {

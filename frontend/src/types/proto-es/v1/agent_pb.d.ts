@@ -1044,6 +1044,17 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
    * @generated from field: string owner_name = 17;
    */
   ownerName: string;
+
+  /**
+   * follow_owner_permissions grants this agent read access to every channel (and
+   * DM) its owner can read, without requiring the agent to be added as a member.
+   * The agent can read and proactively join such channels; posting still
+   * requires explicit membership. Default true: the agent acts within its
+   * owner's channel visibility.
+   *
+   * @generated from field: bool follow_owner_permissions = 18;
+   */
+  followOwnerPermissions: boolean;
 };
 
 /**
@@ -1135,6 +1146,14 @@ export declare type AgentSummary = Message<"laelia.v1.AgentSummary"> & {
    * @generated from field: string owner = 10;
    */
   owner: string;
+
+  /**
+   * follow_owner_permissions mirrors Agent.follow_owner_permissions so list
+   * consumers can show whether the agent follows its owner's channel access.
+   *
+   * @generated from field: bool follow_owner_permissions = 11;
+   */
+  followOwnerPermissions: boolean;
 };
 
 /**

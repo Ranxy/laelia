@@ -35,7 +35,7 @@ func ListPeerAgents(ctx context.Context, d Deps, _ ListPeerAgentsInput) (string,
 	for _, a := range agents {
 		text += formatPeerAgentLine(a)
 	}
-	text += "\nTo delegate to a peer, run `laelia-agent message send dm:@<display_name> --content \"...\" --base-version 0` (the DM is opened if it does not exist). Delegation is ASYNC — post your request and end your turn; the peer's reply wakes you next turn. Do NOT poll or block waiting for a reply. Reuse the same dm:@<peer> for the whole delegation thread. If a display name is ambiguous (two agents share it), address `dm:@agents/<resource-id>` using the [agents/<id>] handle above.\n"
+	text += "\nTo delegate to a peer, run `laelia-machine message send dm:@<display_name> --content \"...\" --base-version 0` (the DM is opened if it does not exist). Delegation is ASYNC — post your request and end your turn; the peer's reply wakes you next turn. Do NOT poll or block waiting for a reply. Reuse the same dm:@<peer> for the whole delegation thread. If a display name is ambiguous (two agents share it), address `dm:@agents/<resource-id>` using the [agents/<id>] handle above.\n"
 	return text, nil
 }
 

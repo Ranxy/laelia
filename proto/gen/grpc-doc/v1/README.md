@@ -117,6 +117,7 @@
     - [User](#laelia-v1-User)
     - [UserProfile](#laelia-v1-UserProfile)
   
+    - [PreferredLanguage](#laelia-v1-PreferredLanguage)
     - [UserType](#laelia-v1-UserType)
   
     - [UserService](#laelia-v1-UserService)
@@ -131,6 +132,7 @@
     - [AuthService](#laelia-v1-AuthService)
   
 - [v1/command.proto](#v1_command-proto)
+    - [AccessibleChannel](#laelia-v1-AccessibleChannel)
     - [AckProcessedVersionRequest](#laelia-v1-AckProcessedVersionRequest)
     - [AckProcessedVersionResponse](#laelia-v1-AckProcessedVersionResponse)
     - [Activity](#laelia-v1-Activity)
@@ -199,8 +201,12 @@
     - [GetOrCreateUserUserDMResponse](#laelia-v1-GetOrCreateUserUserDMResponse)
     - [GetReminderRequest](#laelia-v1-GetReminderRequest)
     - [GetReminderResponse](#laelia-v1-GetReminderResponse)
+    - [JoinChannelRequest](#laelia-v1-JoinChannelRequest)
+    - [JoinChannelResponse](#laelia-v1-JoinChannelResponse)
     - [LeaveChannelRequest](#laelia-v1-LeaveChannelRequest)
     - [LifecyclePayload](#laelia-v1-LifecyclePayload)
+    - [ListAccessibleChannelsRequest](#laelia-v1-ListAccessibleChannelsRequest)
+    - [ListAccessibleChannelsResponse](#laelia-v1-ListAccessibleChannelsResponse)
     - [ListActivitiesRequest](#laelia-v1-ListActivitiesRequest)
     - [ListActivitiesResponse](#laelia-v1-ListActivitiesResponse)
     - [ListChannelMembersRequest](#laelia-v1-ListChannelMembersRequest)
@@ -587,6 +593,7 @@ RiskLevel is the risk level.
 | allow_add_to_channel | [bool](#bool) |  | allow_add_to_channel controls whether other users may add this agent to a channel. Default false: only the agent&#39;s owner or a workspace admin may add it. When true, the normal channel-side rule (conversations.manage = channel owner/admin) applies. |
 | owner | [string](#string) |  | Owner&#39;s user resource name (users/{id}); empty for legacy agents with no recorded owner. The owner is the human responsible for the agent: only the owner or a workspace admin may modify it, the owner may transfer ownership to another user (TransferAgentOwnership), and non-owners&#39; high-risk requests to the agent require the owner&#39;s approval (see the agent prompt&#39;s Ownership &amp; Safety section). Defaults to the creator on CreateAgent and is backfilled from created_by for existing agents. |
 | owner_name | [string](#string) |  | Owner&#39;s display name — the name the agent writes `dm:@&lt;owner_name&gt;` to when requesting approval for a high-risk operation. Empty for legacy agents. |
+| follow_owner_permissions | [bool](#bool) |  | follow_owner_permissions grants this agent read access to every channel (and DM) its owner can read, without requiring the agent to be added as a member. The agent can read and proactively join such channels; posting still requires explicit membership. Default true: the agent acts within its owner&#39;s channel visibility. |
 
 
 
@@ -899,6 +906,7 @@ view does not gate affordances on it (delete is enforced server-side).
 | created_by | [string](#string) |  | created_by is the creator&#39;s user resource name (users/{id}); empty for legacy agents with no recorded creator. Display-only — grouping and authorization use owner. Surfaced on the summary so list consumers can show the creator without an N&#43;1 of GetAgent. |
 | allow_add_to_channel | [bool](#bool) |  | allow_add_to_channel mirrors Agent.allow_add_to_channel so list consumers (e.g. the channel member picker) can hide agents the current caller may not add. |
 | owner | [string](#string) |  | owner is the owner&#39;s user resource name (users/{id}); empty for legacy agents with no recorded owner. Surfaced on the summary so list consumers (e.g. the Members page&#39;s per-user &#34;Owned Agents&#34; view and the channel member picker) can group agents by owner without an N&#43;1 of GetAgent. |
+| follow_owner_permissions | [bool](#bool) |  | follow_owner_permissions mirrors Agent.follow_owner_permissions so list consumers can show whether the agent follows its owner&#39;s channel access. |
 
 
 
@@ -1890,14 +1898,16 @@ admin-tier (laelia.auditLogs.search / laelia.auditLogs.export).
 <a name="laelia-v1-ChatPreferences"></a>
 
 ### ChatPreferences
-ChatPreferences holds per-user chat composer preferences. Only the user
-themselves sees the effect; stored per principal so it follows the account
-across devices/browsers.
+ChatPreferences holds per-user chat preferences. Only the user themselves
+sees the effect; stored per principal so it follows the account across
+devices/browsers. Surfaced to agents (via ChannelMember.preferred_language)
+so an agent can converse with the user in their preferred language.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | enter_to_send | [bool](#bool) |  | enter_to_send is true when pressing Enter sends the message and Shift&#43;Enter inserts a newline (the historic default). When false the keybinding is inverted: Enter inserts a newline and Shift&#43;Enter sends. |
+| preferred_language | [PreferredLanguage](#laelia-v1-PreferredLanguage) |  | preferred_language is the user&#39;s preferred language for agent-initiated conversation. Agents read it and reply in that language when chatting with the user (e.g. in a DM or channel). UNSPECIFIED means the user has not set one; the agent then chooses the most appropriate language. |
 
 
 
@@ -2136,6 +2146,22 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
  
 
 
+<a name="laelia-v1-PreferredLanguage"></a>
+
+### PreferredLanguage
+PreferredLanguage is a user&#39;s preferred language for interacting with agents.
+It is distinct from the frontend&#39;s UI locale: it is a server-stored
+preference that agents can perceive and honor when conversing.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| PREFERRED_LANGUAGE_UNSPECIFIED | 0 |  |
+| PREFERRED_LANGUAGE_ZH_CN | 1 |  |
+| PREFERRED_LANGUAGE_EN_US | 2 |  |
+| PREFERRED_LANGUAGE_JA_JP | 3 |  |
+
+
+
 <a name="laelia-v1-UserType"></a>
 
 ### UserType
@@ -2284,6 +2310,24 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 <p align="right"><a href="#top">Top</a></p>
 
 ## v1/command.proto
+
+
+
+<a name="laelia-v1-AccessibleChannel"></a>
+
+### AccessibleChannel
+AccessibleChannel wraps a conversation the agent can read, with is_member
+reporting whether the agent has actually joined it (only joined conversations
+accept posts and appear in the agent&#39;s ListChannelUpdates inbox).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| channel | [Conversation](#laelia-v1-Conversation) |  |  |
+| is_member | [bool](#bool) |  |  |
+
+
+
 
 
 
@@ -2597,6 +2641,7 @@ the agent uses to anchor its execution events and link any posted replies.
 | joined_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | description | [string](#string) |  | description is the member&#39;s self-description: for users it is User.description, for agents it is the agent&#39;s full persona_prompt (from AgentACPConfig). Surfaced inline in the roster so an agent can perceive who is in a channel/thread — and each co-agent&#39;s persona — in a single lookup, and decide whom to address. |
 | avatar | [string](#string) |  | avatar is the member&#39;s avatar resource name (users/{user}/avatar or agents/{agent}/avatar) when the member has uploaded one, empty otherwise (in which case the frontend renders a deterministic pixel identicon). Surfaced inline so the frontend can render roster avatars without a per-member lookup. |
+| preferred_language | [PreferredLanguage](#laelia-v1-PreferredLanguage) |  | preferred_language is the member&#39;s preferred language when the member is a user (from User.chat_preferences), UNSPECIFIED otherwise. Surfaced so an agent can perceive whom it is talking to and converse in that language. |
 
 
 
@@ -3513,6 +3558,42 @@ store. This is the user-user twin of the user-agent GetOrCreateConversation.
 
 
 
+<a name="laelia-v1-JoinChannelRequest"></a>
+
+### JoinChannelRequest
+JoinChannel makes the calling agent a real member of a channel it can read
+(via its own membership or owner-follow). Joining seeds the agent&#39;s
+per-channel cursor to the current version, so the channel starts appearing in
+ListChannelUpdates from that point on and the agent may post to it. Idempotent
+for members. The gate is laelia.conversations.read (the agent may only join a
+channel it can already read); a mutation gated by a read permission is
+deliberate — &#34;join&#34; is exactly &#34;subscribe to a conversation I can see&#34;.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-JoinChannelResponse"></a>
+
+### JoinChannelResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [Conversation](#laelia-v1-Conversation) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-LeaveChannelRequest"></a>
 
 ### LeaveChannelRequest
@@ -3539,6 +3620,44 @@ resolved from the auth context; no member_id is carried.
 | ----- | ---- | ----- | ----------- |
 | executor_kind | [string](#string) |  |  |
 | profile | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListAccessibleChannelsRequest"></a>
+
+### ListAccessibleChannelsRequest
+ListAccessibleChannels returns, for the authenticated agent, every
+conversation it can read: its own memberships plus — when the agent&#39;s
+follow_owner_permissions is enabled — every conversation its owner can read
+(channels and DMs). This is the on-demand discovery surface (&#34;what channels
+can I access&#34;); it is separate from ListChannelUpdates (the drain-loop
+inbox), which stays limited to conversations the agent has joined so the
+agent is not woken for every message in its owner&#39;s channels.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListAccessibleChannelsResponse"></a>
+
+### ListAccessibleChannelsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| channels | [AccessibleChannel](#laelia-v1-AccessibleChannel) | repeated |  |
+| next_page_token | [string](#string) |  |  |
 
 
 
@@ -5168,6 +5287,8 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | FailReminder | [FailReminderRequest](#laelia-v1-FailReminderRequest) | [FailReminderResponse](#laelia-v1-FailReminderResponse) | FailReminder marks a DUE reminder failed with the given error and posts it as a system thread message. Recurring reminders reschedule. Only the owning agent may call this. |
 | ListDueReminders | [ListDueRemindersRequest](#laelia-v1-ListDueRemindersRequest) | [ListDueRemindersResponse](#laelia-v1-ListDueRemindersResponse) | ListDueReminders returns the DUE reminders owned by the calling agent, for the autonomous drain loop to pick up fired work. Agent identity is resolved from the auth context. |
 | ListChannelUpdates | [ListChannelUpdatesRequest](#laelia-v1-ListChannelUpdatesRequest) | [ListChannelUpdatesResponse](#laelia-v1-ListChannelUpdatesResponse) |  |
+| ListAccessibleChannels | [ListAccessibleChannelsRequest](#laelia-v1-ListAccessibleChannelsRequest) | [ListAccessibleChannelsResponse](#laelia-v1-ListAccessibleChannelsResponse) |  |
+| JoinChannel | [JoinChannelRequest](#laelia-v1-JoinChannelRequest) | [JoinChannelResponse](#laelia-v1-JoinChannelResponse) |  |
 | ListThreadUpdates | [ListThreadUpdatesRequest](#laelia-v1-ListThreadUpdatesRequest) | [ListThreadUpdatesResponse](#laelia-v1-ListThreadUpdatesResponse) |  |
 | AckProcessedVersion | [AckProcessedVersionRequest](#laelia-v1-AckProcessedVersionRequest) | [AckProcessedVersionResponse](#laelia-v1-AckProcessedVersionResponse) |  |
 | FetchConversationActivity | [FetchConversationActivityRequest](#laelia-v1-FetchConversationActivityRequest) | [FetchConversationActivityResponse](#laelia-v1-FetchConversationActivityResponse) |  |

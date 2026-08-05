@@ -25,6 +25,61 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// PreferredLanguage is a user's preferred language for interacting with agents.
+// It is distinct from the frontend's UI locale: it is a server-stored
+// preference that agents can perceive and honor when conversing.
+type PreferredLanguage int32
+
+const (
+	PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED PreferredLanguage = 0
+	PreferredLanguage_PREFERRED_LANGUAGE_ZH_CN       PreferredLanguage = 1
+	PreferredLanguage_PREFERRED_LANGUAGE_EN_US       PreferredLanguage = 2
+	PreferredLanguage_PREFERRED_LANGUAGE_JA_JP       PreferredLanguage = 3
+)
+
+// Enum value maps for PreferredLanguage.
+var (
+	PreferredLanguage_name = map[int32]string{
+		0: "PREFERRED_LANGUAGE_UNSPECIFIED",
+		1: "PREFERRED_LANGUAGE_ZH_CN",
+		2: "PREFERRED_LANGUAGE_EN_US",
+		3: "PREFERRED_LANGUAGE_JA_JP",
+	}
+	PreferredLanguage_value = map[string]int32{
+		"PREFERRED_LANGUAGE_UNSPECIFIED": 0,
+		"PREFERRED_LANGUAGE_ZH_CN":       1,
+		"PREFERRED_LANGUAGE_EN_US":       2,
+		"PREFERRED_LANGUAGE_JA_JP":       3,
+	}
+)
+
+func (x PreferredLanguage) Enum() *PreferredLanguage {
+	p := new(PreferredLanguage)
+	*p = x
+	return p
+}
+
+func (x PreferredLanguage) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PreferredLanguage) Descriptor() protoreflect.EnumDescriptor {
+	return file_v1_user_service_proto_enumTypes[0].Descriptor()
+}
+
+func (PreferredLanguage) Type() protoreflect.EnumType {
+	return &file_v1_user_service_proto_enumTypes[0]
+}
+
+func (x PreferredLanguage) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PreferredLanguage.Descriptor instead.
+func (PreferredLanguage) EnumDescriptor() ([]byte, []int) {
+	return file_v1_user_service_proto_rawDescGZIP(), []int{0}
+}
+
 type UserType int32
 
 const (
@@ -61,11 +116,11 @@ func (x UserType) String() string {
 }
 
 func (UserType) Descriptor() protoreflect.EnumDescriptor {
-	return file_v1_user_service_proto_enumTypes[0].Descriptor()
+	return file_v1_user_service_proto_enumTypes[1].Descriptor()
 }
 
 func (UserType) Type() protoreflect.EnumType {
-	return &file_v1_user_service_proto_enumTypes[0]
+	return &file_v1_user_service_proto_enumTypes[1]
 }
 
 func (x UserType) Number() protoreflect.EnumNumber {
@@ -74,7 +129,7 @@ func (x UserType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use UserType.Descriptor instead.
 func (UserType) EnumDescriptor() ([]byte, []int) {
-	return file_v1_user_service_proto_rawDescGZIP(), []int{0}
+	return file_v1_user_service_proto_rawDescGZIP(), []int{1}
 }
 
 type GetUserRequest struct {
@@ -777,17 +832,23 @@ func (x *User) GetChatPreferences() *ChatPreferences {
 	return nil
 }
 
-// ChatPreferences holds per-user chat composer preferences. Only the user
-// themselves sees the effect; stored per principal so it follows the account
-// across devices/browsers.
+// ChatPreferences holds per-user chat preferences. Only the user themselves
+// sees the effect; stored per principal so it follows the account across
+// devices/browsers. Surfaced to agents (via ChannelMember.preferred_language)
+// so an agent can converse with the user in their preferred language.
 type ChatPreferences struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// enter_to_send is true when pressing Enter sends the message and Shift+Enter
 	// inserts a newline (the historic default). When false the keybinding is
 	// inverted: Enter inserts a newline and Shift+Enter sends.
-	EnterToSend   bool `protobuf:"varint,1,opt,name=enter_to_send,json=enterToSend,proto3" json:"enter_to_send,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	EnterToSend bool `protobuf:"varint,1,opt,name=enter_to_send,json=enterToSend,proto3" json:"enter_to_send,omitempty"`
+	// preferred_language is the user's preferred language for agent-initiated
+	// conversation. Agents read it and reply in that language when chatting with
+	// the user (e.g. in a DM or channel). UNSPECIFIED means the user has not set
+	// one; the agent then chooses the most appropriate language.
+	PreferredLanguage PreferredLanguage `protobuf:"varint,2,opt,name=preferred_language,json=preferredLanguage,proto3,enum=laelia.v1.PreferredLanguage" json:"preferred_language,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *ChatPreferences) Reset() {
@@ -825,6 +886,13 @@ func (x *ChatPreferences) GetEnterToSend() bool {
 		return x.EnterToSend
 	}
 	return false
+}
+
+func (x *ChatPreferences) GetPreferredLanguage() PreferredLanguage {
+	if x != nil {
+		return x.PreferredLanguage
+	}
+	return PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED
 }
 
 type UserProfile struct {
@@ -1149,9 +1217,10 @@ const file_v1_user_service_proto_rawDesc = "" +
 	"debug_mode\x18\x12 \x01(\bB\x03\xe0A\x03R\tdebugMode\x12\x1b\n" +
 	"\x06avatar\x18\x13 \x01(\tB\x03\xe0A\x03R\x06avatar\x12E\n" +
 	"\x10chat_preferences\x18\x14 \x01(\v2\x1a.laelia.v1.ChatPreferencesR\x0fchatPreferences:\x1e\xeaA\x1b\n" +
-	"\vlaelia/User\x12\fusers/{user}\"5\n" +
+	"\vlaelia/User\x12\fusers/{user}\"\x82\x01\n" +
 	"\x0fChatPreferences\x12\"\n" +
-	"\renter_to_send\x18\x01 \x01(\bR\venterToSend\"\xc0\x01\n" +
+	"\renter_to_send\x18\x01 \x01(\bR\venterToSend\x12K\n" +
+	"\x12preferred_language\x18\x02 \x01(\x0e2\x1c.laelia.v1.PreferredLanguageR\x11preferredLanguage\"\xc0\x01\n" +
 	"\vUserProfile\x12B\n" +
 	"\x0flast_login_time\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\rlastLoginTime\x12U\n" +
 	"\x19last_change_password_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x16lastChangePasswordTime\x12\x16\n" +
@@ -1168,7 +1237,12 @@ const file_v1_user_service_proto_rawDesc = "" +
 	"\x04etag\x18\x03 \x01(\tR\x04etag\">\n" +
 	"\x13DeleteAvatarRequest\x12'\n" +
 	"\x04name\x18\x01 \x01(\tB\x13\xe0A\x02\xfaA\r\n" +
-	"\vlaelia/UserR\x04name*T\n" +
+	"\vlaelia/UserR\x04name*\x91\x01\n" +
+	"\x11PreferredLanguage\x12\"\n" +
+	"\x1ePREFERRED_LANGUAGE_UNSPECIFIED\x10\x00\x12\x1c\n" +
+	"\x18PREFERRED_LANGUAGE_ZH_CN\x10\x01\x12\x1c\n" +
+	"\x18PREFERRED_LANGUAGE_EN_US\x10\x02\x12\x1c\n" +
+	"\x18PREFERRED_LANGUAGE_JA_JP\x10\x03*T\n" +
 	"\bUserType\x12\x19\n" +
 	"\x15USER_TYPE_UNSPECIFIED\x10\x00\x12\b\n" +
 	"\x04USER\x10\x01\x12\x13\n" +
@@ -1203,70 +1277,72 @@ func file_v1_user_service_proto_rawDescGZIP() []byte {
 	return file_v1_user_service_proto_rawDescData
 }
 
-var file_v1_user_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_v1_user_service_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_v1_user_service_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_v1_user_service_proto_goTypes = []any{
-	(UserType)(0),                  // 0: laelia.v1.UserType
-	(*GetUserRequest)(nil),         // 1: laelia.v1.GetUserRequest
-	(*BatchGetUsersRequest)(nil),   // 2: laelia.v1.BatchGetUsersRequest
-	(*BatchGetUsersResponse)(nil),  // 3: laelia.v1.BatchGetUsersResponse
-	(*ListUsersRequest)(nil),       // 4: laelia.v1.ListUsersRequest
-	(*ListUsersResponse)(nil),      // 5: laelia.v1.ListUsersResponse
-	(*CreateUserRequest)(nil),      // 6: laelia.v1.CreateUserRequest
-	(*UpdateUserRequest)(nil),      // 7: laelia.v1.UpdateUserRequest
-	(*DeleteUserRequest)(nil),      // 8: laelia.v1.DeleteUserRequest
-	(*UndeleteUserRequest)(nil),    // 9: laelia.v1.UndeleteUserRequest
-	(*User)(nil),                   // 10: laelia.v1.User
-	(*ChatPreferences)(nil),        // 11: laelia.v1.ChatPreferences
-	(*UserProfile)(nil),            // 12: laelia.v1.UserProfile
-	(*UploadAvatarRequest)(nil),    // 13: laelia.v1.UploadAvatarRequest
-	(*DownloadAvatarRequest)(nil),  // 14: laelia.v1.DownloadAvatarRequest
-	(*DownloadAvatarResponse)(nil), // 15: laelia.v1.DownloadAvatarResponse
-	(*DeleteAvatarRequest)(nil),    // 16: laelia.v1.DeleteAvatarRequest
-	(*fieldmaskpb.FieldMask)(nil),  // 17: google.protobuf.FieldMask
-	(State)(0),                     // 18: laelia.v1.State
-	(*timestamppb.Timestamp)(nil),  // 19: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),          // 20: google.protobuf.Empty
+	(PreferredLanguage)(0),         // 0: laelia.v1.PreferredLanguage
+	(UserType)(0),                  // 1: laelia.v1.UserType
+	(*GetUserRequest)(nil),         // 2: laelia.v1.GetUserRequest
+	(*BatchGetUsersRequest)(nil),   // 3: laelia.v1.BatchGetUsersRequest
+	(*BatchGetUsersResponse)(nil),  // 4: laelia.v1.BatchGetUsersResponse
+	(*ListUsersRequest)(nil),       // 5: laelia.v1.ListUsersRequest
+	(*ListUsersResponse)(nil),      // 6: laelia.v1.ListUsersResponse
+	(*CreateUserRequest)(nil),      // 7: laelia.v1.CreateUserRequest
+	(*UpdateUserRequest)(nil),      // 8: laelia.v1.UpdateUserRequest
+	(*DeleteUserRequest)(nil),      // 9: laelia.v1.DeleteUserRequest
+	(*UndeleteUserRequest)(nil),    // 10: laelia.v1.UndeleteUserRequest
+	(*User)(nil),                   // 11: laelia.v1.User
+	(*ChatPreferences)(nil),        // 12: laelia.v1.ChatPreferences
+	(*UserProfile)(nil),            // 13: laelia.v1.UserProfile
+	(*UploadAvatarRequest)(nil),    // 14: laelia.v1.UploadAvatarRequest
+	(*DownloadAvatarRequest)(nil),  // 15: laelia.v1.DownloadAvatarRequest
+	(*DownloadAvatarResponse)(nil), // 16: laelia.v1.DownloadAvatarResponse
+	(*DeleteAvatarRequest)(nil),    // 17: laelia.v1.DeleteAvatarRequest
+	(*fieldmaskpb.FieldMask)(nil),  // 18: google.protobuf.FieldMask
+	(State)(0),                     // 19: laelia.v1.State
+	(*timestamppb.Timestamp)(nil),  // 20: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),          // 21: google.protobuf.Empty
 }
 var file_v1_user_service_proto_depIdxs = []int32{
-	10, // 0: laelia.v1.BatchGetUsersResponse.users:type_name -> laelia.v1.User
-	10, // 1: laelia.v1.ListUsersResponse.users:type_name -> laelia.v1.User
-	10, // 2: laelia.v1.CreateUserRequest.user:type_name -> laelia.v1.User
-	10, // 3: laelia.v1.UpdateUserRequest.user:type_name -> laelia.v1.User
-	17, // 4: laelia.v1.UpdateUserRequest.update_mask:type_name -> google.protobuf.FieldMask
-	18, // 5: laelia.v1.User.state:type_name -> laelia.v1.State
-	0,  // 6: laelia.v1.User.user_type:type_name -> laelia.v1.UserType
-	12, // 7: laelia.v1.User.profile:type_name -> laelia.v1.UserProfile
-	11, // 8: laelia.v1.User.chat_preferences:type_name -> laelia.v1.ChatPreferences
-	19, // 9: laelia.v1.UserProfile.last_login_time:type_name -> google.protobuf.Timestamp
-	19, // 10: laelia.v1.UserProfile.last_change_password_time:type_name -> google.protobuf.Timestamp
-	1,  // 11: laelia.v1.UserService.GetUser:input_type -> laelia.v1.GetUserRequest
-	2,  // 12: laelia.v1.UserService.BatchGetUsers:input_type -> laelia.v1.BatchGetUsersRequest
-	20, // 13: laelia.v1.UserService.GetCurrentUser:input_type -> google.protobuf.Empty
-	4,  // 14: laelia.v1.UserService.ListUsers:input_type -> laelia.v1.ListUsersRequest
-	6,  // 15: laelia.v1.UserService.CreateUser:input_type -> laelia.v1.CreateUserRequest
-	7,  // 16: laelia.v1.UserService.UpdateUser:input_type -> laelia.v1.UpdateUserRequest
-	8,  // 17: laelia.v1.UserService.DeleteUser:input_type -> laelia.v1.DeleteUserRequest
-	9,  // 18: laelia.v1.UserService.UndeleteUser:input_type -> laelia.v1.UndeleteUserRequest
-	13, // 19: laelia.v1.UserService.UploadAvatar:input_type -> laelia.v1.UploadAvatarRequest
-	14, // 20: laelia.v1.UserService.DownloadAvatar:input_type -> laelia.v1.DownloadAvatarRequest
-	16, // 21: laelia.v1.UserService.DeleteAvatar:input_type -> laelia.v1.DeleteAvatarRequest
-	10, // 22: laelia.v1.UserService.GetUser:output_type -> laelia.v1.User
-	3,  // 23: laelia.v1.UserService.BatchGetUsers:output_type -> laelia.v1.BatchGetUsersResponse
-	10, // 24: laelia.v1.UserService.GetCurrentUser:output_type -> laelia.v1.User
-	5,  // 25: laelia.v1.UserService.ListUsers:output_type -> laelia.v1.ListUsersResponse
-	10, // 26: laelia.v1.UserService.CreateUser:output_type -> laelia.v1.User
-	10, // 27: laelia.v1.UserService.UpdateUser:output_type -> laelia.v1.User
-	20, // 28: laelia.v1.UserService.DeleteUser:output_type -> google.protobuf.Empty
-	10, // 29: laelia.v1.UserService.UndeleteUser:output_type -> laelia.v1.User
-	10, // 30: laelia.v1.UserService.UploadAvatar:output_type -> laelia.v1.User
-	15, // 31: laelia.v1.UserService.DownloadAvatar:output_type -> laelia.v1.DownloadAvatarResponse
-	10, // 32: laelia.v1.UserService.DeleteAvatar:output_type -> laelia.v1.User
-	22, // [22:33] is the sub-list for method output_type
-	11, // [11:22] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	11, // 0: laelia.v1.BatchGetUsersResponse.users:type_name -> laelia.v1.User
+	11, // 1: laelia.v1.ListUsersResponse.users:type_name -> laelia.v1.User
+	11, // 2: laelia.v1.CreateUserRequest.user:type_name -> laelia.v1.User
+	11, // 3: laelia.v1.UpdateUserRequest.user:type_name -> laelia.v1.User
+	18, // 4: laelia.v1.UpdateUserRequest.update_mask:type_name -> google.protobuf.FieldMask
+	19, // 5: laelia.v1.User.state:type_name -> laelia.v1.State
+	1,  // 6: laelia.v1.User.user_type:type_name -> laelia.v1.UserType
+	13, // 7: laelia.v1.User.profile:type_name -> laelia.v1.UserProfile
+	12, // 8: laelia.v1.User.chat_preferences:type_name -> laelia.v1.ChatPreferences
+	0,  // 9: laelia.v1.ChatPreferences.preferred_language:type_name -> laelia.v1.PreferredLanguage
+	20, // 10: laelia.v1.UserProfile.last_login_time:type_name -> google.protobuf.Timestamp
+	20, // 11: laelia.v1.UserProfile.last_change_password_time:type_name -> google.protobuf.Timestamp
+	2,  // 12: laelia.v1.UserService.GetUser:input_type -> laelia.v1.GetUserRequest
+	3,  // 13: laelia.v1.UserService.BatchGetUsers:input_type -> laelia.v1.BatchGetUsersRequest
+	21, // 14: laelia.v1.UserService.GetCurrentUser:input_type -> google.protobuf.Empty
+	5,  // 15: laelia.v1.UserService.ListUsers:input_type -> laelia.v1.ListUsersRequest
+	7,  // 16: laelia.v1.UserService.CreateUser:input_type -> laelia.v1.CreateUserRequest
+	8,  // 17: laelia.v1.UserService.UpdateUser:input_type -> laelia.v1.UpdateUserRequest
+	9,  // 18: laelia.v1.UserService.DeleteUser:input_type -> laelia.v1.DeleteUserRequest
+	10, // 19: laelia.v1.UserService.UndeleteUser:input_type -> laelia.v1.UndeleteUserRequest
+	14, // 20: laelia.v1.UserService.UploadAvatar:input_type -> laelia.v1.UploadAvatarRequest
+	15, // 21: laelia.v1.UserService.DownloadAvatar:input_type -> laelia.v1.DownloadAvatarRequest
+	17, // 22: laelia.v1.UserService.DeleteAvatar:input_type -> laelia.v1.DeleteAvatarRequest
+	11, // 23: laelia.v1.UserService.GetUser:output_type -> laelia.v1.User
+	4,  // 24: laelia.v1.UserService.BatchGetUsers:output_type -> laelia.v1.BatchGetUsersResponse
+	11, // 25: laelia.v1.UserService.GetCurrentUser:output_type -> laelia.v1.User
+	6,  // 26: laelia.v1.UserService.ListUsers:output_type -> laelia.v1.ListUsersResponse
+	11, // 27: laelia.v1.UserService.CreateUser:output_type -> laelia.v1.User
+	11, // 28: laelia.v1.UserService.UpdateUser:output_type -> laelia.v1.User
+	21, // 29: laelia.v1.UserService.DeleteUser:output_type -> google.protobuf.Empty
+	11, // 30: laelia.v1.UserService.UndeleteUser:output_type -> laelia.v1.User
+	11, // 31: laelia.v1.UserService.UploadAvatar:output_type -> laelia.v1.User
+	16, // 32: laelia.v1.UserService.DownloadAvatar:output_type -> laelia.v1.DownloadAvatarResponse
+	11, // 33: laelia.v1.UserService.DeleteAvatar:output_type -> laelia.v1.User
+	23, // [23:34] is the sub-list for method output_type
+	12, // [12:23] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_v1_user_service_proto_init() }
@@ -1281,7 +1357,7 @@ func file_v1_user_service_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_user_service_proto_rawDesc), len(file_v1_user_service_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,

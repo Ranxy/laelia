@@ -74,7 +74,7 @@ func probeConn(ctx context.Context, cwd string, stdin io.Writer, stdout io.Reade
 			Fs:       acp.FileSystemCapabilities{},
 			Terminal: false,
 		},
-		ClientInfo: &acp.Implementation{Name: "laelia-agent-probe", Version: "0.1.0"},
+		ClientInfo: &acp.Implementation{Name: "laelia-machine-probe", Version: "0.1.0"},
 	}); err != nil {
 		return nil, err
 	}

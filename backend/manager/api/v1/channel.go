@@ -191,6 +191,157 @@ func (s *CommandService) ListChannelsForAgent(ctx context.Context, req *connect.
 	}), nil
 }
 
+// ListAccessibleChannels is the agent's on-demand discovery of what it can
+// read: every conversation the calling agent is a member of, unioned (when
+// follow_owner_permissions is enabled) with every conversation its owner is a
+// member of. Each entry carries is_member so the agent knows which it has
+// actually joined (only joined conversations accept posts and appear in
+// `message check`). It is deliberately separate from ListChannelUpdates (the
+// drain-loop inbox), which stays limited to joined conversations so the agent
+// is not woken for every message in its owner's channels.
+func (s *CommandService) ListAccessibleChannels(ctx context.Context, req *connect.Request[v1pb.ListAccessibleChannelsRequest]) (*connect.Response[v1pb.ListAccessibleChannelsResponse], error) {
+	agent, err := requireCallingAgent(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	offset, err := parseLimitAndOffset(&pageSize{
+		token:   req.Msg.PageToken,
+		limit:   int(req.Msg.PageSize),
+		maximum: 100,
+	})
+	if err != nil {
+		return nil, err
+	}
+	limitPlusOne := offset.limit + 1
+
+	convs, err := s.store.ListAccessibleChannels(ctx, agent.ResourceID, agent.OwnerID, agent.FollowOwnerPermissions, limitPlusOne, offset.offset)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list accessible channels"))
+	}
+
+	nextPageToken := ""
+	if len(convs) == limitPlusOne {
+		convs = convs[:offset.limit]
+		nextPageToken, _ = offset.getNextPageToken()
+	}
+
+	channels := make([]*v1pb.AccessibleChannel, 0, len(convs))
+	for _, uc := range convs {
+		conv := uc.Conversation
+		memberCount, _ := s.store.GetConversationMemberCount(ctx, conv.ID)
+		ownerName := resolveUserName(ctx, s.store, conv.OwnerID)
+		title, peerName, peerResource := s.resolveAccessibleDisplay(ctx, &conv, uc.IsMember, agent)
+		channels = append(channels, &v1pb.AccessibleChannel{
+			Channel:  convertToV1Conversation(&conv, ownerName, peerName, peerResource, memberCount, 0, title, 0),
+			IsMember: uc.IsMember,
+		})
+	}
+
+	return connect.NewResponse(&v1pb.ListAccessibleChannelsResponse{
+		Channels:      channels,
+		NextPageToken: nextPageToken,
+	}), nil
+}
+
+// resolveAccessibleDisplay resolves the title and, for DMs, the peer of a
+// conversation in the calling agent's accessible list. Channels keep their
+// title and no peer. DMs resolve a peer for display: the agent's own DMs
+// (isMember) carry a dm:@<peer> address (addressable by name); owner-visible
+// DMs (isMember=false) show the peer in the title but emit no address — the
+// agent addresses them by the conversation resource name, which the read gate
+// accepts (the dm:@ grammar would open a different conversation).
+func (s *CommandService) resolveAccessibleDisplay(ctx context.Context, conv *store.ConversationMessage, isMember bool, agent *store.AgentMessage) (title, peerName, peerResource string) {
+	switch conv.Type {
+	case store.ConversationTypeChannel:
+		return conv.Title, "", ""
+	case store.ConversationTypeDM:
+		if a, err := s.store.GetAgent(ctx, int(conv.AgentID.Int32)); err == nil && a != nil && a.Name != "" {
+			if a.ID == agent.ID {
+				// The agent's own DM: the peer is the owner user.
+				peerName = resolveUserName(ctx, s.store, conv.OwnerID)
+				peerResource = common.FormatUserUID(conv.OwnerID)
+			} else {
+				// The owner's DM with another agent.
+				peerName = a.Name
+				peerResource = common.FormatAgentUID(a.ResourceID)
+			}
+			title = peerName
+		}
+	case store.ConversationTypeAgentDM:
+		if peer := s.resolveAgentDMPeer(ctx, conv.ID, agent.ResourceID); peer != nil {
+			peerName = peer.Name
+			peerResource = common.FormatAgentUID(peer.ResourceID)
+			title = peerName
+		}
+	case store.ConversationTypeUserDM:
+		if peer := s.resolveUserDMPeer(ctx, conv.ID, 0); peer != nil {
+			peerName = peer.Name
+			peerResource = common.FormatUserUID(peer.ID)
+			title = peerName
+		}
+	default:
+		// Unknown conversation types have no peer or special title.
+	}
+	if !isMember {
+		// Owner-visible DMs are not addressable by dm:@ (that would create a
+		// different conversation); the caller reads them by resource name.
+		peerName = ""
+		peerResource = ""
+	}
+	return title, peerName, peerResource
+}
+
+// JoinChannel makes the calling agent a real member of a channel it can read
+// (via its own membership or owner-follow). Joining seeds the agent's
+// per-channel cursor to the current version, so the channel starts appearing in
+// `message check` and the agent may post to it. Idempotent for members. The IAM
+// interceptor gates this with laelia.conversations.read — an agent may only
+// join a channel it can already read (a mutation gated by a read permission is
+// deliberate: "join" is "subscribe to a conversation I can see").
+func (s *CommandService) JoinChannel(ctx context.Context, req *connect.Request[v1pb.JoinChannelRequest]) (*connect.Response[v1pb.JoinChannelResponse], error) {
+	agent, err := requireCallingAgent(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	convUUID, err := parseConversationID(req.Msg.Conversation)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
+	}
+
+	conv, err := s.store.GetConversation(ctx, convUUID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	// DMs are created for the agent by the address resolver; only channels are
+	// joinable.
+	if conv.Type != store.ConversationTypeChannel {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("only channels can be joined"))
+	}
+
+	isMember, err := s.store.IsConversationMember(ctx, convUUID, store.MemberTypeAgent, agent.ResourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check membership"))
+	}
+	if !isMember {
+		if err := s.store.AddConversationMembers(ctx, convUUID, []store.ConversationMemberInput{
+			{MemberType: store.MemberTypeAgent, MemberID: agent.ResourceID},
+		}); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to join channel"))
+		}
+		if err := s.store.SeedCursorOnJoin(ctx, agent.ID, convUUID); err != nil {
+			slog.Warn("failed to seed agent channel cursor on join", "agent", agent.ResourceID, "conversationID", convUUID, "error", err)
+		}
+	}
+
+	memberCount, _ := s.store.GetConversationMemberCount(ctx, convUUID)
+	ownerName := resolveUserName(ctx, s.store, conv.OwnerID)
+	return connect.NewResponse(&v1pb.JoinChannelResponse{
+		Conversation: convertToV1Conversation(conv, ownerName, "", "", memberCount, 0, conv.Title, 0),
+	}), nil
+}
+
 func (s *CommandService) GetChannel(ctx context.Context, req *connect.Request[v1pb.GetChannelRequest]) (*connect.Response[v1pb.Conversation], error) {
 	convID, err := parseConversationID(req.Msg.Name)
 	if err != nil {
@@ -1212,57 +1363,59 @@ func resolveMemberDisplayName(ctx context.Context, s *store.Store, memberType in
 	return memberID
 }
 
-// resolveMemberDescriptionAndAvatar returns a member's self-description and
-// avatar resource name from a single user/agent lookup. For users the
-// description is User.description and the avatar is users/{id}/avatar when the
-// user has uploaded one (empty otherwise); for agents the description is the
-// admin-authored persona_prompt and the avatar is agents/{agent}/avatar when
-// the agent has uploaded one (empty otherwise, frontend renders a pixel
-// identicon). Surfaced in channel/thread rosters so an agent can perceive who
-// a member is and the frontend can render avatars without a per-user lookup.
-// Both empty when unavailable.
-func resolveMemberDescriptionAndAvatar(ctx context.Context, s *store.Store, memberType int32, memberID string) (string, string) {
+// resolveMemberProfile returns a member's self-description, avatar resource
+// name, and preferred language from a single user/agent lookup. For users the
+// description is User.description, the avatar is users/{id}/avatar when the
+// user has uploaded one (empty otherwise), and the language is the user's
+// chat_preferences preferred_language (UNSPECIFIED when unset); for agents the
+// description is the admin-authored persona_prompt, the avatar is
+// agents/{agent}/avatar when uploaded (empty otherwise), and the language is
+// always UNSPECIFIED. Surfaced in channel/thread rosters so an agent can
+// perceive who a member is, render avatars without a per-user lookup, and
+// converse in the member's preferred language.
+func resolveMemberProfile(ctx context.Context, s *store.Store, memberType int32, memberID string) (string, string, v1pb.PreferredLanguage) {
 	if memberType == store.MemberTypeUser {
 		uid, err := strconv.Atoi(memberID)
 		if err != nil {
-			return "", ""
+			return "", "", v1pb.PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED
 		}
 		u, err := s.GetUserByID(ctx, uid)
 		if err != nil || u == nil {
-			return "", ""
+			return "", "", v1pb.PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED
 		}
 		avatar := ""
 		if u.AvatarS3Key != "" {
 			avatar = common.FormatUserAvatar(u.ID)
 		}
-		return u.Description, avatar
+		return u.Description, avatar, v1pb.PreferredLanguage(u.ChatPreferences.GetPreferredLanguage())
 	}
 	if memberType == store.MemberTypeAgent {
 		agent, err := s.GetAgentByResourceID(ctx, memberID)
 		if err != nil || agent == nil {
-			return "", ""
+			return "", "", v1pb.PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED
 		}
 		avatar := ""
 		if agent.AvatarS3Key != "" {
 			avatar = common.FormatAgentAvatar(agent.ResourceID)
 		}
-		return agent.Info.GetAcpConfig().GetPersonaPrompt(), avatar
+		return agent.Info.GetAcpConfig().GetPersonaPrompt(), avatar, v1pb.PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED
 	}
-	return "", ""
+	return "", "", v1pb.PreferredLanguage_PREFERRED_LANGUAGE_UNSPECIFIED
 }
 
 // buildChannelMember assembles a v1 ChannelMember from a membership row, resolving
 // the display name and self-description. Shared by ListChannelMembers and
 // ListThreadParticipants so both rosters render identity consistently.
 func buildChannelMember(ctx context.Context, s *store.Store, memberType int32, memberID string, role int32, joinedAt time.Time) *v1pb.ChannelMember {
-	description, avatar := resolveMemberDescriptionAndAvatar(ctx, s, memberType, memberID)
+	description, avatar, language := resolveMemberProfile(ctx, s, memberType, memberID)
 	m := &v1pb.ChannelMember{
-		MemberType:  memberType,
-		MemberId:    memberID,
-		DisplayName: resolveMemberDisplayName(ctx, s, memberType, memberID),
-		MemberRole:  role,
-		Description: description,
-		Avatar:      avatar,
+		MemberType:        memberType,
+		MemberId:          memberID,
+		DisplayName:       resolveMemberDisplayName(ctx, s, memberType, memberID),
+		MemberRole:        role,
+		Description:       description,
+		Avatar:            avatar,
+		PreferredLanguage: language,
 	}
 	if !joinedAt.IsZero() {
 		m.JoinedAt = timestamppb.New(joinedAt)

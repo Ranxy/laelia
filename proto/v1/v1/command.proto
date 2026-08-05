@@ -11,6 +11,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "v1/agent.proto";
 import "v1/annotation.proto";
+import "v1/user_service.proto";
 
 option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
 
@@ -448,6 +449,10 @@ message ChannelMember {
   // (in which case the frontend renders a deterministic pixel identicon). Surfaced
   // inline so the frontend can render roster avatars without a per-member lookup.
   string avatar = 7;
+  // preferred_language is the member's preferred language when the member is a
+  // user (from User.chat_preferences), UNSPECIFIED otherwise. Surfaced so an
+  // agent can perceive whom it is talking to and converse in that language.
+  PreferredLanguage preferred_language = 8;
 }
 
 message ListConversationMessagesRequest {
@@ -1152,6 +1157,49 @@ message ListChannelUpdatesResponse {
   repeated ChannelUpdate updates = 1;
 }
 
+// ListAccessibleChannels returns, for the authenticated agent, every
+// conversation it can read: its own memberships plus — when the agent's
+// follow_owner_permissions is enabled — every conversation its owner can read
+// (channels and DMs). This is the on-demand discovery surface ("what channels
+// can I access"); it is separate from ListChannelUpdates (the drain-loop
+// inbox), which stays limited to conversations the agent has joined so the
+// agent is not woken for every message in its owner's channels.
+message ListAccessibleChannelsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+// AccessibleChannel wraps a conversation the agent can read, with is_member
+// reporting whether the agent has actually joined it (only joined conversations
+// accept posts and appear in the agent's ListChannelUpdates inbox).
+message AccessibleChannel {
+  Conversation channel = 1;
+  bool is_member = 2;
+}
+
+message ListAccessibleChannelsResponse {
+  repeated AccessibleChannel channels = 1;
+  string next_page_token = 2;
+}
+
+// JoinChannel makes the calling agent a real member of a channel it can read
+// (via its own membership or owner-follow). Joining seeds the agent's
+// per-channel cursor to the current version, so the channel starts appearing in
+// ListChannelUpdates from that point on and the agent may post to it. Idempotent
+// for members. The gate is laelia.conversations.read (the agent may only join a
+// channel it can already read); a mutation gated by a read permission is
+// deliberate — "join" is exactly "subscribe to a conversation I can see".
+message JoinChannelRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
+}
+
+message JoinChannelResponse {
+  Conversation conversation = 1;
+}
+
 // AckProcessedVersion advances the agent's durable per-channel cursor to
 // processed_version, marking the channel as processed up to that room_version so
 // that subsequent ListChannelUpdates no longer report it. command_id, when
@@ -1726,6 +1774,20 @@ service CommandService {
 
   rpc ListChannelUpdates(ListChannelUpdatesRequest) returns (ListChannelUpdatesResponse) {
     option (google.api.http) = {get: "/v1/agents/-/channelUpdates"};
+  }
+
+  rpc ListAccessibleChannels(ListAccessibleChannelsRequest) returns (ListAccessibleChannelsResponse) {
+    option (google.api.http) = {get: "/v1/agents/-:listAccessibleChannels"};
+  }
+
+  rpc JoinChannel(JoinChannelRequest) returns (JoinChannelResponse) {
+    option (google.api.http) = {
+      post: "/v1/{conversation=conversations/*}:join"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.read";
+    option (laelia.v1.audit) = true;
   }
 
   rpc ListThreadUpdates(ListThreadUpdatesRequest) returns (ListThreadUpdatesResponse) {

@@ -282,7 +282,7 @@ func GetConversationMessages(ctx context.Context, d Deps, in GetConversationMess
 		return "", err
 	}
 	if name == "" {
-		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the address from the batch header or `laelia-agent message check`, e.g. #general or dm:@alice)", "")
+		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the address from the batch header or `laelia-machine message check`, e.g. #general or dm:@alice)", "")
 	}
 
 	direction := in.Direction
@@ -347,7 +347,7 @@ func PostMessage(ctx context.Context, d Deps, in PostMessageInput) (string, erro
 		return "", err
 	}
 	if name == "" {
-		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the address from the batch header or `laelia-agent message check`, e.g. #general or dm:@alice)", "")
+		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the address from the batch header or `laelia-machine message check`, e.g. #general or dm:@alice)", "")
 	}
 
 	// Build id-only attachment references; the manager resolves each id to full
@@ -390,7 +390,7 @@ func PostMessage(ctx context.Context, d Deps, in PostMessageInput) (string, erro
 			text += formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, addr, m.Name, m.RoomVersion, m.Content, m.Attachments)
 		}
 	}
-	text += fmt.Sprintf("\nTo resolve: call `laelia-agent message read %s --version %d` to get full context, then call `laelia-agent message send` again with --base-version %d.",
+	text += fmt.Sprintf("\nTo resolve: call `laelia-machine message read %s --version %d` to get full context, then call `laelia-machine message send` again with --base-version %d.",
 		addr, resp.Msg.CurrentVersion, resp.Msg.CurrentVersion)
 	return text, nil
 }
@@ -412,7 +412,7 @@ func ListChannelUpdates(ctx context.Context, d Deps) (string, error) {
 			text += fmt.Sprintf("- %s: %d new (current_version=%d, your processed_version=%d)\n",
 				quoteAddress(conversationAddress(ctx, d, u.GetConversation())), u.NewMessageCount, u.CurrentVersion, u.ProcessedVersion)
 		}
-		text += "\nPick ONE channel. Call `laelia-agent message read <address> --version <processed_version>` to read the new messages.\n"
+		text += "\nPick ONE channel. Call `laelia-machine message read <address> --version <processed_version>` to read the new messages.\n"
 	}
 	return text, nil
 }
@@ -430,7 +430,7 @@ func AckProcessedVersion(ctx context.Context, d Deps, in AckProcessedVersionInpu
 		return "", localError("MISSING_CONVERSATION", "conversation is required", "")
 	}
 	if in.ProcessedVersion <= 0 {
-		return "", localError("INVALID_ARGUMENT_FAILED", "processed_version must be positive", "Pass --processed-version with the current_version from `laelia-agent message read`.")
+		return "", localError("INVALID_ARGUMENT_FAILED", "processed_version must be positive", "Pass --processed-version with the current_version from `laelia-machine message read`.")
 	}
 
 	resp, err := d.Client.AckProcessedVersion(ctx, connect.NewRequest(&v1pb.AckProcessedVersionRequest{
@@ -518,7 +518,7 @@ func ListFiles(ctx context.Context, d Deps, in ListFilesInput) (string, error) {
 	for _, f := range resp.Msg.Files {
 		text += fmt.Sprintf("- id=%s  name=%s  size=%d  mime=%s\n", f.Id, f.OriginalName, f.SizeBytes, f.MimeType)
 	}
-	text += "\nPass an id to `laelia-agent file download <id>` to fetch a file into your temp workspace.\n"
+	text += "\nPass an id to `laelia-machine file download <id>` to fetch a file into your temp workspace.\n"
 	return text, nil
 }
 
@@ -574,7 +574,7 @@ func ListThreadUpdates(ctx context.Context, d Deps, _ ListThreadUpdatesInput) (s
 		text += fmt.Sprintf("- %s thread %s: %d new replies (latest_version=%d)\n",
 			quoteAddress(addr), u.GetThreadRoot(), u.NewReplyCount, u.LatestVersion)
 	}
-	text += "\nFor each thread, call `laelia-agent thread read <address> --root <thread-root> --version <your processed_version for that conversation>` to read the new replies, then reply with `laelia-agent thread send <address> --root <thread-root>` if you should respond.\n"
+	text += "\nFor each thread, call `laelia-machine thread read <address> --root <thread-root> --version <your processed_version for that conversation>` to read the new replies, then reply with `laelia-machine thread send <address> --root <thread-root>` if you should respond.\n"
 	return text, nil
 }
 
@@ -714,7 +714,7 @@ func PostThreadMessage(ctx context.Context, d Deps, in PostThreadMessageInput) (
 			text += formatMessageLine(ts, m.SenderName, senderTypeString(m.SenderType), m.IsOwn, addr, m.Name, m.RoomVersion, m.Content, m.Attachments)
 		}
 	}
-	text += fmt.Sprintf("\nTo resolve: call `laelia-agent thread read %s --root %s --version %d` to get full context, then call `laelia-agent thread send` again with --base-version %d.",
+	text += fmt.Sprintf("\nTo resolve: call `laelia-machine thread read %s --root %s --version %d` to get full context, then call `laelia-machine thread send` again with --base-version %d.",
 		addr, root, resp.Msg.CurrentVersion, resp.Msg.CurrentVersion)
 	return text, nil
 }

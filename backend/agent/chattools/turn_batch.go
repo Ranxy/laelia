@@ -101,7 +101,7 @@ func BuildTurnBatch(ctx context.Context, d Deps) (string, error) {
 // which does not re-receive the init prompt's step 0 — still checks for due
 // reminders. Cold turns carry it too (redundant with the init procedure, but
 // harmless and keeps the two paths consistent).
-const reminderNudge = "Before ending your turn, also run `laelia-agent reminder list-due` and handle any due scheduled reminders."
+const reminderNudge = "Before ending your turn, also run `laelia-machine reminder list-due` and handle any due scheduled reminders."
 
 // latestChannelMessages fetches the latest turnBatchMaxMessages new messages
 // for one channel (those with room_version > the agent's processed_version).

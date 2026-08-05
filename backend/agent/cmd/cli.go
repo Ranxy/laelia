@@ -18,7 +18,7 @@ import (
 )
 
 // These subcommands are the LLM's interface to Laelia during an autonomous drain
-// session. The LLM shells out to `laelia-agent message ...` / `laelia-agent
+// session. The LLM shells out to `laelia-machine message ...` / `laelia-machine
 // command context ...`; identity and the daemon socket location come from env
 // vars the daemon injected, so no auth flags are needed. On success the daemon's
 // canonical human-readable text goes to stdout (exit 0); on failure a labeled
@@ -51,10 +51,10 @@ func loadIdentity() (*identity, bool) {
 	}
 	switch {
 	case id.socket == "":
-		printError("MISSING_DAEMON", "LAELIA_DAEMON_SOCKET is not set", "Run inside a drain session started by `laelia-agent daemon`.")
+		printError("MISSING_DAEMON", "LAELIA_DAEMON_SOCKET is not set", "Run inside a drain session started by `laelia-machine run`.")
 		return nil, false
 	case id.token == "":
-		printError("TOKEN_MISSING", "LAELIA_SESSION_TOKEN is not set", "Run inside a drain session started by `laelia-agent daemon`.")
+		printError("TOKEN_MISSING", "LAELIA_SESSION_TOKEN is not set", "Run inside a drain session started by `laelia-machine run`.")
 		return nil, false
 	}
 	return id, true
@@ -94,7 +94,7 @@ func call(endpoint string, req daemonsrv.Request) bool {
 
 	// The scheme/host are irrelevant: the transport's DialContext dials the unix
 	// socket directly. http:// is required only so net/url parses a request.
-	httpReq, err := http.NewRequest(http.MethodPost, "http://laelia-agent"+endpoint, bytes.NewReader(body)) //nolint:revive // unix-socket dial ignores scheme/host
+	httpReq, err := http.NewRequest(http.MethodPost, "http://laelia-machine"+endpoint, bytes.NewReader(body)) //nolint:revive // unix-socket dial ignores scheme/host
 	if err != nil {
 		printError("INVALID_ARGUMENT_FAILED", "failed to build request: "+err.Error(), "")
 		return false
@@ -104,7 +104,7 @@ func call(endpoint string, req daemonsrv.Request) bool {
 
 	resp, err := newDaemonClient(id.socket).Do(httpReq)
 	if err != nil {
-		printError("DAEMON_UNAVAILABLE", "cannot reach daemon socket: "+err.Error(), "Ensure `laelia-agent daemon` is running and LAELIA_DAEMON_SOCKET points at its socket.")
+		printError("DAEMON_UNAVAILABLE", "cannot reach daemon socket: "+err.Error(), "Ensure `laelia-machine run` is running and LAELIA_DAEMON_SOCKET points at its socket.")
 		return false
 	}
 	defer resp.Body.Close()

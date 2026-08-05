@@ -2,7 +2,7 @@
 
 ## Context
 
-当前 laelia-agent 启动 LLM agent 时,需要管理员在配置页**手填** ACP 协议参数(`executable / args / allow_env`),没有任何 provider 概念、没有 model 选择、没有 key-value 自定义 env。这带来两个问题:
+当前 laelia-machine 启动 LLM agent 时,需要管理员在配置页**手填** ACP 协议参数(`executable / args / allow_env`),没有任何 provider 概念、没有 model 选择、没有 key-value 自定义 env。这带来两个问题:
 
 1. 用户必须知道每个 LLM agent 的准确启动命令(npx 包名、opencode 子命令等),门槛高且易错。
 2. model 完全不可控——`AgentACPConfig` 里没有 model 字段,模型由 LLM agent 自身默认配置决定,前端无法干预。

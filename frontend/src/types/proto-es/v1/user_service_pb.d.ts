@@ -392,9 +392,10 @@ export declare type User = Message<"laelia.v1.User"> & {
 export declare const UserSchema: GenMessage<User>;
 
 /**
- * ChatPreferences holds per-user chat composer preferences. Only the user
- * themselves sees the effect; stored per principal so it follows the account
- * across devices/browsers.
+ * ChatPreferences holds per-user chat preferences. Only the user themselves
+ * sees the effect; stored per principal so it follows the account across
+ * devices/browsers. Surfaced to agents (via ChannelMember.preferred_language)
+ * so an agent can converse with the user in their preferred language.
  *
  * @generated from message laelia.v1.ChatPreferences
  */
@@ -407,6 +408,16 @@ export declare type ChatPreferences = Message<"laelia.v1.ChatPreferences"> & {
    * @generated from field: bool enter_to_send = 1;
    */
   enterToSend: boolean;
+
+  /**
+   * preferred_language is the user's preferred language for agent-initiated
+   * conversation. Agents read it and reply in that language when chatting with
+   * the user (e.g. in a DM or channel). UNSPECIFIED means the user has not set
+   * one; the agent then chooses the most appropriate language.
+   *
+   * @generated from field: laelia.v1.PreferredLanguage preferred_language = 2;
+   */
+  preferredLanguage: PreferredLanguage;
 };
 
 /**
@@ -532,6 +543,40 @@ export declare type DeleteAvatarRequest = Message<"laelia.v1.DeleteAvatarRequest
  * Use `create(DeleteAvatarRequestSchema)` to create a new message.
  */
 export declare const DeleteAvatarRequestSchema: GenMessage<DeleteAvatarRequest>;
+
+/**
+ * PreferredLanguage is a user's preferred language for interacting with agents.
+ * It is distinct from the frontend's UI locale: it is a server-stored
+ * preference that agents can perceive and honor when conversing.
+ *
+ * @generated from enum laelia.v1.PreferredLanguage
+ */
+export enum PreferredLanguage {
+  /**
+   * @generated from enum value: PREFERRED_LANGUAGE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: PREFERRED_LANGUAGE_ZH_CN = 1;
+   */
+  ZH_CN = 1,
+
+  /**
+   * @generated from enum value: PREFERRED_LANGUAGE_EN_US = 2;
+   */
+  EN_US = 2,
+
+  /**
+   * @generated from enum value: PREFERRED_LANGUAGE_JA_JP = 3;
+   */
+  JA_JP = 3,
+}
+
+/**
+ * Describes the enum laelia.v1.PreferredLanguage.
+ */
+export declare const PreferredLanguageSchema: GenEnum<PreferredLanguage>;
 
 /**
  * @generated from enum laelia.v1.UserType

@@ -566,6 +566,13 @@ message Agent {
   // Owner's display name — the name the agent writes `dm:@<owner_name>` to when
   // requesting approval for a high-risk operation. Empty for legacy agents.
   string owner_name = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // follow_owner_permissions grants this agent read access to every channel (and
+  // DM) its owner can read, without requiring the agent to be added as a member.
+  // The agent can read and proactively join such channels; posting still
+  // requires explicit membership. Default true: the agent acts within its
+  // owner's channel visibility.
+  bool follow_owner_permissions = 18;
 }
 
 // AgentSummary is the lightweight list-view projection of an Agent returned by
@@ -603,6 +610,9 @@ message AgentSummary {
   // (e.g. the Members page's per-user "Owned Agents" view and the channel
   // member picker) can group agents by owner without an N+1 of GetAgent.
   string owner = 10;
+  // follow_owner_permissions mirrors Agent.follow_owner_permissions so list
+  // consumers can show whether the agent follows its owner's channel access.
+  bool follow_owner_permissions = 11;
 }
 
 message AgentInfo {

@@ -117,12 +117,12 @@ message TaskInfo {
 
 - **CLI** 新增 `backend/agent/cmd/task.go`(仿 `thread.go`):
   ```
-  laelia-agent task list <conversation> [--status S]...
-  laelia-agent task claim <message-name>
-  laelia-agent task unclaim <message-name>
-  laelia-agent task review <message-name>      # → in_review
-  laelia-agent task done <message-name>        # → done
-  laelia-agent task create <conversation> --content <text|-> [--attach <file-id>...]
+  laelia-machine task list <conversation> [--status S]...
+  laelia-machine task claim <message-name>
+  laelia-machine task unclaim <message-name>
+  laelia-machine task review <message-name>      # → in_review
+  laelia-machine task done <message-name>        # → done
+  laelia-machine task create <conversation> --content <text|-> [--attach <file-id>...]
   ```
 - **Daemon** `backend/agent/daemon/server.go:152-163` 新增 `/task/{list,claim,unclaim,review,done,create}` 路由,`Request` 结构补 `Status`、`Message` 字段。
 - **chattools** `backend/agent/chattools/chattools.go` 新增 `ListTasks`/`ClaimTask`/`UnclaimTask`/`UpdateTaskStatus`/`CreateTask`,调用对应 `commandServiceClient` 方法,按 `PostMessage`/`ListThreadUpdates` 的风格格式化输出。`ListTasks` 每行:`<message-name>  #N  status=TODO|IN_PROGRESS|IN_REVIEW|DONE  assignee=<name|none>` + 内容首行。
@@ -169,7 +169,7 @@ message TaskInfo {
 - **Lint**:`golangci-lint run --allow-parallel-runners` 反复至 0 issue;前端 `pnpm --dir frontend biome:check`、`lint --fix`、`type-check`、`test`。
 - **ACP 集成**(改动触及 agent 执行/CLI prompt):在装有本地 `opencode acp` 的机器跑 `LAELIA_RUN_OPENCODE_ACP_TESTS=1 go test ./backend/agent/executor -count=1`。
 - **端到端手测**:
-  1. 启动 manager(`go run ./backend/manager/bin/server/main.go --port 8181 --debug`)+ 前端 `pnpm --dir frontend dev` + 一个 agent(`laelia-agent daemon`)。
+  1. 启动 manager(`go run ./backend/manager/bin/server/main.go --port 8181 --debug`)+ 前端 `pnpm --dir frontend dev` + 一个 agent(`laelia-machine daemon`)。
   2. 建频道、加入 agent;用户在 composer 勾选 As Task 发 "Fix the login bug" → 频道出现任务消息(行内 `[task #1 status=TODO]`)+ 系统通知行 "📋 ... created task #1"。
   3. Tasks 面板列出该任务;agent drain 后 `message read` 见任务,`task claim <msg>` → 行内变 `[task #1 status=IN_PROGRESS]` + 系统通知 "🙋 ... claimed task #1"。
   4. 在 task 的 thread 里 agent 推进工作,`task review` → `IN_REVIEW` + 系统通知。

@@ -189,6 +189,7 @@ export function AgentProfilePage() {
     },
   });
   const [allowAddSaving, setAllowAddSaving] = useState(false);
+  const [followOwnerSaving, setFollowOwnerSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Ownership transfer state. The flow is deliberately two-step: the first
@@ -539,7 +540,7 @@ export function AgentProfilePage() {
     setAllowAddSaving(true);
     try {
       const updateAgent = useAppStore.getState().updateAgent;
-      await updateAgent(agentName, next);
+      await updateAgent(agentName, { allowAddToChannel: next });
       setAgent(await getAgent(agentName));
       fetchAgents({ pageSize: 100 }, { silent: true });
     } catch (err) {
@@ -550,6 +551,25 @@ export function AgentProfilePage() {
       });
     } finally {
       setAllowAddSaving(false);
+    }
+  }
+
+  // Toggle follow_owner_permissions via UpdateAgent, then refetch the agent so
+  // the access model shown reflects the new setting.
+  async function handleToggleFollowOwner(next: boolean) {
+    setFollowOwnerSaving(true);
+    try {
+      const updateAgent = useAppStore.getState().updateAgent;
+      await updateAgent(agentName, { followOwnerPermissions: next });
+      setAgent(await getAgent(agentName));
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("agent.follow-owner-permissions-save-error"),
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setFollowOwnerSaving(false);
     }
   }
 
@@ -754,6 +774,18 @@ export function AgentProfilePage() {
                   disabled={!canEdit || allowAddSaving}
                   onCheckedChange={(next) => {
                     void handleToggleAllowAdd(next);
+                  }}
+                />
+              </FieldRow>
+              <FieldRow
+                label={t("agent.follow-owner-permissions")}
+                hint={t("agent.follow-owner-permissions-hint")}
+              >
+                <Switch
+                  checked={agent.followOwnerPermissions ?? true}
+                  disabled={!canEdit || followOwnerSaving}
+                  onCheckedChange={(next) => {
+                    void handleToggleFollowOwner(next);
                   }}
                 />
               </FieldRow>

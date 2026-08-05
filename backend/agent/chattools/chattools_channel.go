@@ -59,6 +59,21 @@ func memberRoleString(r int32) string {
 	return ""
 }
 
+// preferredLanguageString renders a ChannelMember preferred_language for roster
+// output, or "" when unset (UNSPECIFIED), in which case the agent picks the most
+// appropriate language on its own.
+func preferredLanguageString(l v1pb.PreferredLanguage) string {
+	switch l {
+	case v1pb.PreferredLanguage_PREFERRED_LANGUAGE_ZH_CN:
+		return "zh-CN"
+	case v1pb.PreferredLanguage_PREFERRED_LANGUAGE_EN_US:
+		return "en-US"
+	case v1pb.PreferredLanguage_PREFERRED_LANGUAGE_JA_JP:
+		return "ja-JP"
+	}
+	return ""
+}
+
 // formatMemberLine renders one roster entry: the header line (type, display
 // name, agents/<id> handle for agents, role when meaningful), followed by the
 // member's full description as an indented block when present — for users this
@@ -75,6 +90,11 @@ func formatMemberLine(m *v1pb.ChannelMember) string {
 	}
 	if role := memberRoleString(m.MemberRole); role != "" {
 		line += fmt.Sprintf(" (%s)", role)
+	}
+	if m.MemberType == memberTypeUser {
+		if lang := preferredLanguageString(m.PreferredLanguage); lang != "" {
+			line += fmt.Sprintf(" (language: %s)", lang)
+		}
 	}
 	line += "\n"
 	if desc := strings.TrimSpace(m.Description); desc != "" {
@@ -101,7 +121,7 @@ func ListMembers(ctx context.Context, d Deps, in ListMembersInput) (string, erro
 		return "", err
 	}
 	if name == "" {
-		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the address from the batch header or `laelia-agent message check`, e.g. #general or dm:@alice)", "")
+		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the address from the batch header or `laelia-machine message check`, e.g. #general or dm:@alice)", "")
 	}
 
 	if root := bareRootID(in.Root); root != "" {

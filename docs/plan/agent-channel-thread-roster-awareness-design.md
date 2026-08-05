@@ -10,7 +10,7 @@ extra reasoning steps that easily break. Since `persona_prompt` and user
 self-descriptions are short, they are now carried **inline, untruncated** in the
 roster itself. The implemented design:
 
-- One tool: `laelia-agent members <conversation> [--root <root-msg-id>]`. No
+- One tool: `laelia-machine members <conversation> [--root <root-msg-id>]`. No
   `--root` → channel members; with `--root` → thread participants. Server-side
   `ListChannelMembers` and `ListThreadParticipants` RPCs remain (different data
   sources: membership table vs message senders); the single CLI command routes
@@ -139,9 +139,9 @@ Tidying (opportunistic, in `chattools_reminder.go`):
 - Register routes in `Server.Start()` (near L151-175): `/channel/members`, `/thread/participants`, `/agent/profile`.
 
 `backend/agent/cmd/`:
-- New `channel.go` with `laelia-agent channel members --conversation <c>` (model on `file.go`).
-- Extend thread command (or new `thread.go`) with `laelia-agent thread participants --conversation <c> --root <r>`.
-- New `agent.go` with `laelia-agent agent detail --conversation <c> --agent <a>` (or accept a display-name and resolve via members list — simpler to require the agent resource id as returned by `channel members`).
+- New `channel.go` with `laelia-machine channel members --conversation <c>` (model on `file.go`).
+- Extend thread command (or new `thread.go`) with `laelia-machine thread participants --conversation <c> --root <r>`.
+- New `agent.go` with `laelia-machine agent detail --conversation <c> --agent <a>` (or accept a display-name and resolve via members list — simpler to require the agent resource id as returned by `channel members`).
 - All read `LAELIA_*` env via existing `loadIdentity` and call `cmd.call("/<path>", Request{...})`.
 
 `backend/agent/executor/prompt/communication.md`:
@@ -180,7 +180,7 @@ Backend:
 - `go build -ldflags "-w -s" -p=16 -o ./build/laelia ./backend/manager/bin/server/main.go`.
 - If ACP stdio integration touched: `LAELIA_RUN_OPENCODE_ACP_TESTS=1 go test ./backend/agent/executor -count=1` (expect known pre-existing failures per memory; skip `TestACPSessionUpdate`).
 
-End-to-end (manual): start manager `--port 8181 --debug`; in a channel with ≥1 user (description set) and ≥2 agents (persona_prompt set), trigger an agent drain and have the agent run `laelia-agent channel members` — verify roster shows both types with descriptions. Have the agent `thread send --root <r> @<other-agent>`; verify the `@`-mentioned agent is subscribed (thread_participant row) and woken on next drain, and that the posted message's `mentions` field is populated. Frontend: open `/settings/profile`, set a description, reload, confirm it persists and appears in the admin edit Sheet and member picker.
+End-to-end (manual): start manager `--port 8181 --debug`; in a channel with ≥1 user (description set) and ≥2 agents (persona_prompt set), trigger an agent drain and have the agent run `laelia-machine channel members` — verify roster shows both types with descriptions. Have the agent `thread send --root <r> @<other-agent>`; verify the `@`-mentioned agent is subscribed (thread_participant row) and woken on next drain, and that the posted message's `mentions` field is populated. Frontend: open `/settings/profile`, set a description, reload, confirm it persists and appears in the admin edit Sheet and member picker.
 
 Frontend:
 - `pnpm --dir frontend biome:check`; `pnpm --dir frontend lint --fix`; `pnpm --dir frontend type-check`; `pnpm --dir frontend test`.

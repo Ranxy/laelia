@@ -449,7 +449,7 @@ func (e *ACPExecutor) run() {
 	// (e.g. @agentclientprotocol/claude-agent-acp) validate the field with a
 	// strict array schema and reject a missing/null value with -32602 Invalid
 	// params. We expose no MCP servers — the LLM drives the chat loop via the
-	// `laelia-agent` CLI instead.
+	// `laelia-machine` CLI instead.
 	mcpServers := []acp.McpServer{}
 	extraDirs := additionalRoots(e.allowedRoots, e.workingDir)
 
@@ -1387,7 +1387,7 @@ func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []st
 		values[key] = value
 	}
 
-	// Inject the CLI bootstrap env so the LLM can call `laelia-agent` from its
+	// Inject the CLI bootstrap env so the LLM can call `laelia-machine` from its
 	// shell with no flags. These overlay the (filtered) inherited env, so they
 	// pass through regardless of the agent's AllowEnv whitelist. The session
 	// token + socket path are stable for the whole daemon lifetime; the live
@@ -1404,7 +1404,7 @@ func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []st
 	if req.CommandID != "" {
 		values["LAELIA_COMMAND"] = req.CommandID
 	}
-	// Prepend the agent binary's directory to PATH so `laelia-agent` resolves
+	// Prepend the agent binary's directory to PATH so `laelia-machine` resolves
 	// regardless of the host's PATH configuration.
 	if req.BinaryDir != "" {
 		existing := values["PATH"]

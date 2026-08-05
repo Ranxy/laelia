@@ -57,7 +57,7 @@ pi (`@earendil-works/pi-coding-agent`) has four modes; we use **RPC mode**:
 - Auth: API key via env var (`DEEPSEEK_API_KEY` / `OPENROUTER_API_KEY`) — cleanest for per-agent
   secret injection. (auth.json priority > env, but env is sufficient and avoids writing files.)
 - Tools: pi ships `read`/`write`/`edit`/`bash`. `--approve` (or `defaultProjectTrust=always`)
-  makes them run autonomously, so the LLM can shell out to `laelia-agent` exactly like the ACP
+  makes them run autonomously, so the LLM can shell out to `laelia-machine` exactly like the ACP
   agents.
 - Session resume across machine restart: pi persists sessions to `--session-dir`; on runner start
   we `switch_session` to the last session id (recorded in `pi-session.json`, mirroring the existing
@@ -87,7 +87,7 @@ runner (per agent)
 
 `PiExecutor` implements the existing `executor.Runtime` interface (`Start/Cancel/OutputChannel/
 EventChannel/ResultChannel/Done`) so the rest of the drain loop (`runCommand` event/progress/result
-pump, manager `HandleProgress/HandleEvent/HandleResult`, the daemon + `laelia-agent` CLI) carries
+pump, manager `HandleProgress/HandleEvent/HandleResult`, the daemon + `laelia-machine` CLI) carries
 over unchanged.
 
 ---
@@ -275,7 +275,7 @@ a wrapper) keeps the `BinaryPath()` contract intact.
 4. **Integration (local pi):** with a real bundled `pi` binary and a real deepseek key, run a
    machine, create a `builtin-pi` agent, post in a channel, and confirm:
    - streaming text appears token-by-token;
-   - a tool call (e.g. `bash` invoking `laelia-agent message ...`) emits
+   - a tool call (e.g. `bash` invoking `laelia-machine message ...`) emits
      `ToolCallStarted`/`ToolCallFinished` and the message lands in the channel;
    - a second turn resumes the same pi session (no cold restart during active use — the
      conversation is warm) and the agent retains context; an idle-evicted session respawns once

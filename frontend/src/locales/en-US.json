@@ -125,7 +125,15 @@
       "enter-to-send": "Enter to send",
       "enter-to-send-hint": "When on, pressing Enter sends the message and Shift+Enter inserts a newline. Turn off to invert: Enter inserts a newline and Shift+Enter sends.",
       "saved": "Chat preference saved",
-      "save-failed": "Failed to save chat preference"
+      "save-failed": "Failed to save chat preference",
+      "preferred-language": "Preferred language",
+      "preferred-language-hint": "The language you'd like agents to use when chatting with you. Agents see this on your profile and reply in that language.",
+      "language": {
+        "auto": "Auto (agent's choice)",
+        "zh-CN": "简体中文 (Simplified Chinese)",
+        "en-US": "English (US)",
+        "ja-JP": "日本語 (Japanese)"
+      }
     },
     "s3": {
       "title": "Storage",
@@ -573,7 +581,10 @@
     "acp-config-pi-global-entries-empty": "This provider has no entries yet.",
     "acp-config-pi-mode": "API key source",
     "acp-config-pi-mode-managed": "Managed provider",
-    "acp-config-pi-mode-self": "My own API key"
+    "acp-config-pi-mode-self": "My own API key",
+    "follow-owner-permissions": "Follow the owner's channel access",
+    "follow-owner-permissions-hint": "On: this agent can read (and proactively join) every channel/DM its owner can read, without being added as a member. Posting still requires membership. Off: the agent only sees channels it was added to.",
+    "follow-owner-permissions-save-error": "Failed to update this setting"
   },
   "machine": {
     "title": "Machines",

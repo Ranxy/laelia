@@ -39,6 +39,10 @@ type AgentMessage struct {
 	// channel. False (default) restricts adds to the agent's owner or a
 	// workspace admin.
 	AllowAddToChannel bool
+	// FollowOwnerPermissions reports whether the agent inherits its owner's
+	// channel read access (channels/DMs the owner can read). True (default):
+	// the agent can read and proactively join anything its owner can see.
+	FollowOwnerPermissions bool
 	// AvatarS3Key is the S3 object key of the agent's uploaded avatar image,
 	// empty when the agent has not uploaded one.
 	AvatarS3Key string
@@ -68,16 +72,17 @@ type FindAgentMessage struct {
 }
 
 type UpdateAgentMessage struct {
-	ResourceID         *string
-	Name               *string
-	Info               *models.AgentInfo
-	Status             *models.AgentStatus
-	TokenVersion       *int
-	LastTokenRotatedAt *time.Time
-	Delete             *bool
-	AvatarS3Key        *string
-	AllowAddToChannel  *bool
-	OwnerID            *int
+	ResourceID             *string
+	Name                   *string
+	Info                   *models.AgentInfo
+	Status                 *models.AgentStatus
+	TokenVersion           *int
+	LastTokenRotatedAt     *time.Time
+	Delete                 *bool
+	AvatarS3Key            *string
+	AllowAddToChannel      *bool
+	FollowOwnerPermissions *bool
+	OwnerID                *int
 }
 
 func (s *Store) GetAgent(ctx context.Context, id int) (*AgentMessage, error) {
@@ -180,6 +185,7 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 		agent.created_by,
 		agent.owner_id,
 		agent.allow_add_to_channel,
+		agent.follow_owner_permissions,
 		agent.avatar_s3_key,
 		agent.machine_id,
 		machine.resource_id
@@ -220,6 +226,7 @@ func listAgentImpl(ctx context.Context, txn *sql.Tx, find *FindAgentMessage) ([]
 			&agentMessage.CreatedBy,
 			&agentMessage.OwnerID,
 			&agentMessage.AllowAddToChannel,
+			&agentMessage.FollowOwnerPermissions,
 			&agentMessage.AvatarS3Key,
 			&machineID,
 			&machineResourceID,
@@ -289,6 +296,10 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 		machineIDArg = create.MachineID
 	}
 
+	// follow_owner_permissions is deliberately omitted from the INSERT so the
+	// column's DEFAULT TRUE governs: a fresh agent always starts with owner-follow
+	// on (a proto3 bool cannot express "unset" vs false on CreateAgent); toggle it
+	// via UpdateAgent.
 	var agentID int
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO agent (
@@ -315,17 +326,18 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 	}
 
 	agent := &AgentMessage{
-		ID:                agentID,
-		ResourceID:        resourceID,
-		Name:              create.Name,
-		TokenVersion:      create.TokenVersion,
-		CreatedAt:         create.CreatedAt,
-		Info:              create.Info,
-		Status:            create.Status,
-		CreatedBy:         create.CreatedBy,
-		OwnerID:           create.OwnerID,
-		AllowAddToChannel: create.AllowAddToChannel,
-		MachineID:         create.MachineID,
+		ID:                     agentID,
+		ResourceID:             resourceID,
+		Name:                   create.Name,
+		TokenVersion:           create.TokenVersion,
+		CreatedAt:              create.CreatedAt,
+		Info:                   create.Info,
+		Status:                 create.Status,
+		CreatedBy:              create.CreatedBy,
+		OwnerID:                create.OwnerID,
+		AllowAddToChannel:      create.AllowAddToChannel,
+		FollowOwnerPermissions: true,
+		MachineID:              create.MachineID,
 	}
 	s.agentIDCache.Add(agent.ID, agent)
 	s.agentResourceIDCache.Add(agent.ResourceID, agent)
@@ -368,6 +380,9 @@ func (s *Store) UpdateAgent(ctx context.Context, current *AgentMessage, patch *U
 	}
 	if v := patch.AllowAddToChannel; v != nil {
 		sets, args = append(sets, fmt.Sprintf("allow_add_to_channel = $%d", len(args)+1)), append(args, *v)
+	}
+	if v := patch.FollowOwnerPermissions; v != nil {
+		sets, args = append(sets, fmt.Sprintf("follow_owner_permissions = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := patch.OwnerID; v != nil {
 		sets, args = append(sets, fmt.Sprintf("owner_id = $%d", len(args)+1)), append(args, *v)

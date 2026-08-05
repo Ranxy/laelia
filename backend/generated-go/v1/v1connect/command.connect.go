@@ -180,6 +180,12 @@ const (
 	// CommandServiceListChannelUpdatesProcedure is the fully-qualified name of the CommandService's
 	// ListChannelUpdates RPC.
 	CommandServiceListChannelUpdatesProcedure = "/laelia.v1.CommandService/ListChannelUpdates"
+	// CommandServiceListAccessibleChannelsProcedure is the fully-qualified name of the CommandService's
+	// ListAccessibleChannels RPC.
+	CommandServiceListAccessibleChannelsProcedure = "/laelia.v1.CommandService/ListAccessibleChannels"
+	// CommandServiceJoinChannelProcedure is the fully-qualified name of the CommandService's
+	// JoinChannel RPC.
+	CommandServiceJoinChannelProcedure = "/laelia.v1.CommandService/JoinChannel"
 	// CommandServiceListThreadUpdatesProcedure is the fully-qualified name of the CommandService's
 	// ListThreadUpdates RPC.
 	CommandServiceListThreadUpdatesProcedure = "/laelia.v1.CommandService/ListThreadUpdates"
@@ -350,6 +356,8 @@ type CommandServiceClient interface {
 	// from the auth context.
 	ListDueReminders(context.Context, *connect.Request[v1.ListDueRemindersRequest]) (*connect.Response[v1.ListDueRemindersResponse], error)
 	ListChannelUpdates(context.Context, *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error)
+	ListAccessibleChannels(context.Context, *connect.Request[v1.ListAccessibleChannelsRequest]) (*connect.Response[v1.ListAccessibleChannelsResponse], error)
+	JoinChannel(context.Context, *connect.Request[v1.JoinChannelRequest]) (*connect.Response[v1.JoinChannelResponse], error)
 	ListThreadUpdates(context.Context, *connect.Request[v1.ListThreadUpdatesRequest]) (*connect.Response[v1.ListThreadUpdatesResponse], error)
 	AckProcessedVersion(context.Context, *connect.Request[v1.AckProcessedVersionRequest]) (*connect.Response[v1.AckProcessedVersionResponse], error)
 	FetchConversationActivity(context.Context, *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error)
@@ -677,6 +685,18 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("ListChannelUpdates")),
 			connect.WithClientOptions(opts...),
 		),
+		listAccessibleChannels: connect.NewClient[v1.ListAccessibleChannelsRequest, v1.ListAccessibleChannelsResponse](
+			httpClient,
+			baseURL+CommandServiceListAccessibleChannelsProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("ListAccessibleChannels")),
+			connect.WithClientOptions(opts...),
+		),
+		joinChannel: connect.NewClient[v1.JoinChannelRequest, v1.JoinChannelResponse](
+			httpClient,
+			baseURL+CommandServiceJoinChannelProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("JoinChannel")),
+			connect.WithClientOptions(opts...),
+		),
 		listThreadUpdates: connect.NewClient[v1.ListThreadUpdatesRequest, v1.ListThreadUpdatesResponse](
 			httpClient,
 			baseURL+CommandServiceListThreadUpdatesProcedure,
@@ -790,6 +810,8 @@ type commandServiceClient struct {
 	failReminder              *connect.Client[v1.FailReminderRequest, v1.FailReminderResponse]
 	listDueReminders          *connect.Client[v1.ListDueRemindersRequest, v1.ListDueRemindersResponse]
 	listChannelUpdates        *connect.Client[v1.ListChannelUpdatesRequest, v1.ListChannelUpdatesResponse]
+	listAccessibleChannels    *connect.Client[v1.ListAccessibleChannelsRequest, v1.ListAccessibleChannelsResponse]
+	joinChannel               *connect.Client[v1.JoinChannelRequest, v1.JoinChannelResponse]
 	listThreadUpdates         *connect.Client[v1.ListThreadUpdatesRequest, v1.ListThreadUpdatesResponse]
 	ackProcessedVersion       *connect.Client[v1.AckProcessedVersionRequest, v1.AckProcessedVersionResponse]
 	fetchConversationActivity *connect.Client[v1.FetchConversationActivityRequest, v1.FetchConversationActivityResponse]
@@ -1042,6 +1064,16 @@ func (c *commandServiceClient) ListChannelUpdates(ctx context.Context, req *conn
 	return c.listChannelUpdates.CallUnary(ctx, req)
 }
 
+// ListAccessibleChannels calls laelia.v1.CommandService.ListAccessibleChannels.
+func (c *commandServiceClient) ListAccessibleChannels(ctx context.Context, req *connect.Request[v1.ListAccessibleChannelsRequest]) (*connect.Response[v1.ListAccessibleChannelsResponse], error) {
+	return c.listAccessibleChannels.CallUnary(ctx, req)
+}
+
+// JoinChannel calls laelia.v1.CommandService.JoinChannel.
+func (c *commandServiceClient) JoinChannel(ctx context.Context, req *connect.Request[v1.JoinChannelRequest]) (*connect.Response[v1.JoinChannelResponse], error) {
+	return c.joinChannel.CallUnary(ctx, req)
+}
+
 // ListThreadUpdates calls laelia.v1.CommandService.ListThreadUpdates.
 func (c *commandServiceClient) ListThreadUpdates(ctx context.Context, req *connect.Request[v1.ListThreadUpdatesRequest]) (*connect.Response[v1.ListThreadUpdatesResponse], error) {
 	return c.listThreadUpdates.CallUnary(ctx, req)
@@ -1227,6 +1259,8 @@ type CommandServiceHandler interface {
 	// from the auth context.
 	ListDueReminders(context.Context, *connect.Request[v1.ListDueRemindersRequest]) (*connect.Response[v1.ListDueRemindersResponse], error)
 	ListChannelUpdates(context.Context, *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error)
+	ListAccessibleChannels(context.Context, *connect.Request[v1.ListAccessibleChannelsRequest]) (*connect.Response[v1.ListAccessibleChannelsResponse], error)
+	JoinChannel(context.Context, *connect.Request[v1.JoinChannelRequest]) (*connect.Response[v1.JoinChannelResponse], error)
 	ListThreadUpdates(context.Context, *connect.Request[v1.ListThreadUpdatesRequest]) (*connect.Response[v1.ListThreadUpdatesResponse], error)
 	AckProcessedVersion(context.Context, *connect.Request[v1.AckProcessedVersionRequest]) (*connect.Response[v1.AckProcessedVersionResponse], error)
 	FetchConversationActivity(context.Context, *connect.Request[v1.FetchConversationActivityRequest]) (*connect.Response[v1.FetchConversationActivityResponse], error)
@@ -1550,6 +1584,18 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("ListChannelUpdates")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceListAccessibleChannelsHandler := connect.NewUnaryHandler(
+		CommandServiceListAccessibleChannelsProcedure,
+		svc.ListAccessibleChannels,
+		connect.WithSchema(commandServiceMethods.ByName("ListAccessibleChannels")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceJoinChannelHandler := connect.NewUnaryHandler(
+		CommandServiceJoinChannelProcedure,
+		svc.JoinChannel,
+		connect.WithSchema(commandServiceMethods.ByName("JoinChannel")),
+		connect.WithHandlerOptions(opts...),
+	)
 	commandServiceListThreadUpdatesHandler := connect.NewUnaryHandler(
 		CommandServiceListThreadUpdatesProcedure,
 		svc.ListThreadUpdates,
@@ -1708,6 +1754,10 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceListDueRemindersHandler.ServeHTTP(w, r)
 		case CommandServiceListChannelUpdatesProcedure:
 			commandServiceListChannelUpdatesHandler.ServeHTTP(w, r)
+		case CommandServiceListAccessibleChannelsProcedure:
+			commandServiceListAccessibleChannelsHandler.ServeHTTP(w, r)
+		case CommandServiceJoinChannelProcedure:
+			commandServiceJoinChannelHandler.ServeHTTP(w, r)
 		case CommandServiceListThreadUpdatesProcedure:
 			commandServiceListThreadUpdatesHandler.ServeHTTP(w, r)
 		case CommandServiceAckProcessedVersionProcedure:
@@ -1927,6 +1977,14 @@ func (UnimplementedCommandServiceHandler) ListDueReminders(context.Context, *con
 
 func (UnimplementedCommandServiceHandler) ListChannelUpdates(context.Context, *connect.Request[v1.ListChannelUpdatesRequest]) (*connect.Response[v1.ListChannelUpdatesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListChannelUpdates is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) ListAccessibleChannels(context.Context, *connect.Request[v1.ListAccessibleChannelsRequest]) (*connect.Response[v1.ListAccessibleChannelsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.ListAccessibleChannels is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) JoinChannel(context.Context, *connect.Request[v1.JoinChannelRequest]) (*connect.Response[v1.JoinChannelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.JoinChannel is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) ListThreadUpdates(context.Context, *connect.Request[v1.ListThreadUpdatesRequest]) (*connect.Response[v1.ListThreadUpdatesResponse], error) {

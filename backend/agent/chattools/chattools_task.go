@@ -115,7 +115,7 @@ func ListTasks(ctx context.Context, d Deps, in ListTasksInput) (string, error) {
 		return "", err
 	}
 	if name == "" {
-		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the address from the batch header or `laelia-agent message check`, e.g. #general or dm:@alice)", "")
+		return "", localError("MISSING_CONVERSATION", "conversation is required (pass the address from the batch header or `laelia-machine message check`, e.g. #general or dm:@alice)", "")
 	}
 
 	// Default to non-done: an agent draining a channel cares about work still
@@ -166,11 +166,11 @@ func ListTasks(ctx context.Context, d Deps, in ListTasksInput) (string, error) {
 	for _, t := range tasks {
 		text += formatTaskLine(addr, t)
 	}
-	text += "\nPass a task's `<address>:<message-id>` handle to `laelia-agent task claim` (TODO→IN_PROGRESS), `task review` (IN_PROGRESS→IN_REVIEW), or `task done` (IN_REVIEW→DONE).\n"
+	text += "\nPass a task's `<address>:<message-id>` handle to `laelia-machine task claim` (TODO→IN_PROGRESS), `task review` (IN_PROGRESS→IN_REVIEW), or `task done` (IN_REVIEW→DONE).\n"
 	if next := resp.Msg.GetNextPageToken(); next != "" {
 		// Surface the cursor so the agent can fetch older tasks itself; it never
 		// needs to guess. Quote the token so it pastes verbatim as one arg.
-		text += fmt.Sprintf("\nOlder tasks remain. See them with: laelia-agent task list %s --page-token %q\n", quoteAddress(addr), next)
+		text += fmt.Sprintf("\nOlder tasks remain. See them with: laelia-machine task list %s --page-token %q\n", quoteAddress(addr), next)
 	}
 	return text, nil
 }
@@ -182,7 +182,7 @@ func ListTasks(ctx context.Context, d Deps, in ListTasksInput) (string, error) {
 // other tasks rather than retry.
 func ClaimTask(ctx context.Context, d Deps, in ClaimTaskInput) (string, error) {
 	if in.Message == "" {
-		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the task's `<address>:<message-id>` handle from `task list`)", "Pass the message handle from `laelia-agent task list`.")
+		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the task's `<address>:<message-id>` handle from `task list`)", "Pass the message handle from `laelia-machine task list`.")
 	}
 	message, err := resolveMessageName(ctx, d, in.Message)
 	if err != nil {
@@ -211,7 +211,7 @@ func ClaimTask(ctx context.Context, d Deps, in ClaimTaskInput) (string, error) {
 // so another agent may claim it. DONE is terminal and cannot be unclaimed.
 func UnclaimTask(ctx context.Context, d Deps, in UnclaimTaskInput) (string, error) {
 	if in.Message == "" {
-		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the task's `<address>:<message-id>` handle)", "Pass the message handle from `laelia-agent task list`.")
+		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the task's `<address>:<message-id>` handle)", "Pass the message handle from `laelia-machine task list`.")
 	}
 	message, err := resolveMessageName(ctx, d, in.Message)
 	if err != nil {
@@ -231,7 +231,7 @@ func UnclaimTask(ctx context.Context, d Deps, in UnclaimTaskInput) (string, erro
 // ClaimTask, not here.
 func UpdateTaskStatus(ctx context.Context, d Deps, in UpdateTaskStatusInput) (string, error) {
 	if in.Message == "" {
-		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the task's `<address>:<message-id>` handle)", "Pass the message handle from `laelia-agent task list`.")
+		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the task's `<address>:<message-id>` handle)", "Pass the message handle from `laelia-machine task list`.")
 	}
 	target, ok := parseTaskStatus(in.Status)
 	if !ok || target == v1pb.TaskStatus_TASK_STATUS_TODO || target == v1pb.TaskStatus_TASK_STATUS_UNSPECIFIED {

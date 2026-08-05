@@ -110,7 +110,7 @@ func parseFireAtTime(s string) (time.Time, error) {
 // the schedule (one-shot fire_at, or recurring cron + tz).
 func ConvertMessageToReminder(ctx context.Context, d Deps, in ConvertMessageToReminderInput) (string, error) {
 	if in.Message == "" {
-		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the trigger message's `<address>:<message-id>` handle)", "Pass the message handle from `laelia-agent message read`.")
+		return "", localError("INVALID_ARGUMENT_FAILED", "message is required (the trigger message's `<address>:<message-id>` handle)", "Pass the message handle from `laelia-machine message read`.")
 	}
 	if strings.TrimSpace(in.TaskContent) == "" {
 		return "", localError("INVALID_ARGUMENT_FAILED", "task_content is required (a structured summary of the scheduled work)", "Pass --task-content with the work summary.")
@@ -230,7 +230,7 @@ func ListDueReminders(ctx context.Context, d Deps, _ ListDueRemindersInput) (str
 	for _, r := range resp.Msg.Reminders {
 		text += formatReminderLine(r)
 	}
-	text += "\nFor each due reminder: do the work, then run `laelia-agent reminder complete <name> --result \"...\"` (or `reminder fail <name> --error \"...\"`).\n"
+	text += "\nFor each due reminder: do the work, then run `laelia-machine reminder complete <name> --result \"...\"` (or `reminder fail <name> --error \"...\"`).\n"
 	return text, nil
 }
 
@@ -239,7 +239,7 @@ func ListDueReminders(ctx context.Context, d Deps, _ ListDueRemindersInput) (str
 // thread yourself. Recurring reminders reschedule to the next cron fire.
 func CompleteReminder(ctx context.Context, d Deps, in CompleteReminderInput) (string, error) {
 	if in.Name == "" {
-		return "", localError("INVALID_ARGUMENT_FAILED", "name is required (the reminder's reminders/{message_id} name from `reminder list-due`)", "Pass the name from `laelia-agent reminder list-due`.")
+		return "", localError("INVALID_ARGUMENT_FAILED", "name is required (the reminder's reminders/{message_id} name from `reminder list-due`)", "Pass the name from `laelia-machine reminder list-due`.")
 	}
 	if strings.TrimSpace(in.Result) == "" {
 		return "", localError("INVALID_ARGUMENT_FAILED", "result is required (the completion report, posted to the reminder's thread)", "Pass --result with the completion report.")
@@ -256,7 +256,7 @@ func CompleteReminder(ctx context.Context, d Deps, in CompleteReminderInput) (st
 // Recurring reminders reschedule; one-shot reminders stay FAILED.
 func FailReminder(ctx context.Context, d Deps, in FailReminderInput) (string, error) {
 	if in.Name == "" {
-		return "", localError("INVALID_ARGUMENT_FAILED", "name is required", "Pass the name from `laelia-agent reminder list-due`.")
+		return "", localError("INVALID_ARGUMENT_FAILED", "name is required", "Pass the name from `laelia-machine reminder list-due`.")
 	}
 	if strings.TrimSpace(in.Error) == "" {
 		return "", localError("INVALID_ARGUMENT_FAILED", "error is required (the failure reason, posted to the thread)", "Pass --error with the failure reason.")

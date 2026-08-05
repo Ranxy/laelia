@@ -83,6 +83,7 @@
     - [ChatPreferences](#laelia-store-ChatPreferences)
     - [UserProfile](#laelia-store-UserProfile)
   
+    - [PreferredLanguage](#laelia-store-PreferredLanguage)
     - [PrincipalType](#laelia-store-PrincipalType)
   
 - [Scalar Value Types](#scalar-value-types)
@@ -1194,6 +1195,7 @@ true), so a nil pointer in the store layer signals &#34;unset&#34;.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | enter_to_send | [bool](#bool) |  |  |
+| preferred_language | [PreferredLanguage](#laelia-store-PreferredLanguage) |  |  |
 
 
 
@@ -1217,6 +1219,20 @@ true), so a nil pointer in the store layer signals &#34;unset&#34;.
 
 
  
+
+
+<a name="laelia-store-PreferredLanguage"></a>
+
+### PreferredLanguage
+PreferredLanguage mirrors laelia.v1.PreferredLanguage.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| PREFERRED_LANGUAGE_UNSPECIFIED | 0 |  |
+| PREFERRED_LANGUAGE_ZH_CN | 1 |  |
+| PREFERRED_LANGUAGE_EN_US | 2 |  |
+| PREFERRED_LANGUAGE_JA_JP | 3 |  |
+
 
 
 <a name="laelia-store-PrincipalType"></a>

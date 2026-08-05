@@ -160,6 +160,9 @@ CREATE TABLE agent (
     -- allow_add_to_channel: whether other users may add this agent to a channel.
     -- Default FALSE = only the agent's owner or a workspace admin may add it.
     allow_add_to_channel boolean NOT NULL DEFAULT FALSE,
+    -- follow_owner_permissions: whether the agent inherits its owner's channel
+    -- read access (channels/DMs the owner can read). Default TRUE.
+    follow_owner_permissions boolean NOT NULL DEFAULT TRUE,
     -- S3 object key of the agent's uploaded avatar image, empty when the agent
     -- has not uploaded one (frontend renders a deterministic pixel identicon instead).
     avatar_s3_key text NOT NULL DEFAULT ''
@@ -174,6 +177,10 @@ ALTER TABLE agent ADD COLUMN IF NOT EXISTS avatar_s3_key text NOT NULL DEFAULT '
 -- allow_add_to_channel: whether other users may add this agent to a channel.
 -- Default FALSE = only the agent's owner or a workspace admin may add it.
 ALTER TABLE agent ADD COLUMN IF NOT EXISTS allow_add_to_channel boolean NOT NULL DEFAULT FALSE;
+
+-- follow_owner_permissions: whether the agent inherits its owner's channel
+-- read access. Default TRUE.
+ALTER TABLE agent ADD COLUMN IF NOT EXISTS follow_owner_permissions boolean NOT NULL DEFAULT TRUE;
 
 -- owner_id: authorization authority for the agent, backfilled from created_by
 -- (mirrors the conversation table's created_by -> owner_id migration).

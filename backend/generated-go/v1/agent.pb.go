@@ -2182,9 +2182,15 @@ type Agent struct {
 	Owner string `protobuf:"bytes,16,opt,name=owner,proto3" json:"owner,omitempty"`
 	// Owner's display name — the name the agent writes `dm:@<owner_name>` to when
 	// requesting approval for a high-risk operation. Empty for legacy agents.
-	OwnerName     string `protobuf:"bytes,17,opt,name=owner_name,json=ownerName,proto3" json:"owner_name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	OwnerName string `protobuf:"bytes,17,opt,name=owner_name,json=ownerName,proto3" json:"owner_name,omitempty"`
+	// follow_owner_permissions grants this agent read access to every channel (and
+	// DM) its owner can read, without requiring the agent to be added as a member.
+	// The agent can read and proactively join such channels; posting still
+	// requires explicit membership. Default true: the agent acts within its
+	// owner's channel visibility.
+	FollowOwnerPermissions bool `protobuf:"varint,18,opt,name=follow_owner_permissions,json=followOwnerPermissions,proto3" json:"follow_owner_permissions,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *Agent) Reset() {
@@ -2329,6 +2335,13 @@ func (x *Agent) GetOwnerName() string {
 	return ""
 }
 
+func (x *Agent) GetFollowOwnerPermissions() bool {
+	if x != nil {
+		return x.FollowOwnerPermissions
+	}
+	return false
+}
+
 // AgentSummary is the lightweight list-view projection of an Agent returned by
 // ListAgents. It carries only the fields list/header views need: identity,
 // lifecycle state, connection status, and the provider/executable signal that
@@ -2364,9 +2377,12 @@ type AgentSummary struct {
 	// agents with no recorded owner. Surfaced on the summary so list consumers
 	// (e.g. the Members page's per-user "Owned Agents" view and the channel
 	// member picker) can group agents by owner without an N+1 of GetAgent.
-	Owner         string `protobuf:"bytes,10,opt,name=owner,proto3" json:"owner,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Owner string `protobuf:"bytes,10,opt,name=owner,proto3" json:"owner,omitempty"`
+	// follow_owner_permissions mirrors Agent.follow_owner_permissions so list
+	// consumers can show whether the agent follows its owner's channel access.
+	FollowOwnerPermissions bool `protobuf:"varint,11,opt,name=follow_owner_permissions,json=followOwnerPermissions,proto3" json:"follow_owner_permissions,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *AgentSummary) Reset() {
@@ -2467,6 +2483,13 @@ func (x *AgentSummary) GetOwner() string {
 		return x.Owner
 	}
 	return ""
+}
+
+func (x *AgentSummary) GetFollowOwnerPermissions() bool {
+	if x != nil {
+		return x.FollowOwnerPermissions
+	}
+	return false
 }
 
 type AgentInfo struct {
@@ -3323,7 +3346,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\fHelloRequest\"Y\n" +
 	"\rHelloResponse\x12!\n" +
 	"\fcurrent_time\x18\x01 \x01(\x03R\vcurrentTime\x12%\n" +
-	"\x0eserver_version\x18\x02 \x01(\tR\rserverVersion\"\xf3\x05\n" +
+	"\x0eserver_version\x18\x02 \x01(\tR\rserverVersion\"\xad\x06\n" +
 	"\x05Agent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -3344,11 +3367,12 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x14allow_add_to_channel\x18\x0f \x01(\bR\x11allowAddToChannel\x12\x19\n" +
 	"\x05owner\x18\x10 \x01(\tB\x03\xe0A\x03R\x05owner\x12\"\n" +
 	"\n" +
-	"owner_name\x18\x11 \x01(\tB\x03\xe0A\x03R\townerName\x1a9\n" +
+	"owner_name\x18\x11 \x01(\tB\x03\xe0A\x03R\townerName\x128\n" +
+	"\x18follow_owner_permissions\x18\x12 \x01(\bR\x16followOwnerPermissions\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:!\xeaA\x1e\n" +
-	"\flaelia/Agent\x12\x0eagents/{agent}J\x04\b\x04\x10\x05R\x05token\"\xcc\x02\n" +
+	"\flaelia/Agent\x12\x0eagents/{agent}J\x04\b\x04\x10\x05R\x05token\"\x86\x03\n" +
 	"\fAgentSummary\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -3363,7 +3387,8 @@ const file_v1_agent_proto_rawDesc = "" +
 	"created_by\x18\b \x01(\tR\tcreatedBy\x12/\n" +
 	"\x14allow_add_to_channel\x18\t \x01(\bR\x11allowAddToChannel\x12\x14\n" +
 	"\x05owner\x18\n" +
-	" \x01(\tR\x05owner\"\xce\x03\n" +
+	" \x01(\tR\x05owner\x128\n" +
+	"\x18follow_owner_permissions\x18\v \x01(\bR\x16followOwnerPermissions\"\xce\x03\n" +
 	"\tAgentInfo\x12\x1d\n" +
 	"\n" +
 	"agent_type\x18\x01 \x01(\tR\tagentType\x12\x1a\n" +

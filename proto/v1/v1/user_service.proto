@@ -289,14 +289,31 @@ message User {
   ChatPreferences chat_preferences = 20;
 }
 
-// ChatPreferences holds per-user chat composer preferences. Only the user
-// themselves sees the effect; stored per principal so it follows the account
-// across devices/browsers.
+// ChatPreferences holds per-user chat preferences. Only the user themselves
+// sees the effect; stored per principal so it follows the account across
+// devices/browsers. Surfaced to agents (via ChannelMember.preferred_language)
+// so an agent can converse with the user in their preferred language.
 message ChatPreferences {
   // enter_to_send is true when pressing Enter sends the message and Shift+Enter
   // inserts a newline (the historic default). When false the keybinding is
   // inverted: Enter inserts a newline and Shift+Enter sends.
   bool enter_to_send = 1;
+
+  // preferred_language is the user's preferred language for agent-initiated
+  // conversation. Agents read it and reply in that language when chatting with
+  // the user (e.g. in a DM or channel). UNSPECIFIED means the user has not set
+  // one; the agent then chooses the most appropriate language.
+  PreferredLanguage preferred_language = 2;
+}
+
+// PreferredLanguage is a user's preferred language for interacting with agents.
+// It is distinct from the frontend's UI locale: it is a server-stored
+// preference that agents can perceive and honor when conversing.
+enum PreferredLanguage {
+  PREFERRED_LANGUAGE_UNSPECIFIED = 0;
+  PREFERRED_LANGUAGE_ZH_CN = 1;
+  PREFERRED_LANGUAGE_EN_US = 2;
+  PREFERRED_LANGUAGE_JA_JP = 3;
 }
 
 enum UserType {

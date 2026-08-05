@@ -53,7 +53,7 @@ type Request struct {
 	ReanchorPrompt string
 	// DaemonSocket / SessionToken / BinaryDir configure the CLI the LLM shells
 	// out to. The executor injects them into the ACP subprocess env so the
-	// `laelia-agent message ...` / `laelia-agent command context` subcommands can
+	// `laelia-machine message ...` / `laelia-machine command context` subcommands can
 	// reach the local daemon (which holds the live access token) and find the
 	// binary on PATH without any flags.
 	DaemonSocket string

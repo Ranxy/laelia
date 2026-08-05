@@ -1,5 +1,5 @@
 // Package daemon hosts the local loopback server that the LLM-driven CLI
-// subcommands (`laelia-agent message ...` / `laelia-agent command context`)
+// subcommands (`laelia-machine message ...` / `laelia-machine command context`)
 // call into. It replaces the former MCP HTTP server: the LLM now invokes the
 // agent binary directly from its shell, and the CLI forwards each call over a
 // unix socket to this daemon, which holds the agent's live (rotating) access
@@ -255,6 +255,8 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/file/list", s.handleFileList)
 	mux.HandleFunc("/members", s.handleMembers)
 	mux.HandleFunc("/agent/list", s.handleAgentList)
+	mux.HandleFunc("/channel/list", s.handleChannelList)
+	mux.HandleFunc("/channel/join", s.handleChannelJoin)
 
 	s.httpServer = &http.Server{Handler: mux}
 	go func() {
@@ -809,6 +811,28 @@ func (s *Server) handleMembers(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAgentList(w http.ResponseWriter, r *http.Request) {
 	s.run(w, r, func(req Request) (string, *chattools.Error) {
 		text, err := chattools.ListPeerAgents(r.Context(), s.deps(req), chattools.ListPeerAgentsInput{})
+		return text, asChatError(err)
+	})
+}
+
+// handleChannelList serves the on-demand channel discovery tool: every
+// conversation the agent can read (its memberships plus, when
+// follow_owner_permissions is enabled, its owner's channels/DMs), each tagged
+// [joined] or [visible].
+func (s *Server) handleChannelList(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.ListAccessibleChannels(r.Context(), s.deps(req), chattools.ListAccessibleChannelsInput{})
+		return text, asChatError(err)
+	})
+}
+
+// handleChannelJoin makes the agent a real member of a channel it can read,
+// seeding its cursor so the channel appears in `message check` from then on.
+func (s *Server) handleChannelJoin(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.JoinChannel(r.Context(), s.deps(req), chattools.JoinChannelInput{
+			Conversation: req.Conversation,
+		})
 		return text, asChatError(err)
 	})
 }

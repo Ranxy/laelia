@@ -97,7 +97,7 @@ type PiConfig struct {
 	PiBinaryPath string
 
 	// Agent identity + daemon bootstrap, stable for the machine lifetime. The
-	// runner injects these so the LLM can shell out to `laelia-agent`.
+	// runner injects these so the LLM can shell out to `laelia-machine`.
 	AgentResourceID string
 	DaemonSocket    string
 	SessionToken    string
@@ -207,7 +207,7 @@ func (c *PiConfig) LaunchFingerprint() string {
 }
 
 // buildPiEnv constructs the subprocess env: the whitelisted host env, overlaid
-// with the LLM API key (named per api_provider) and the laelia-agent bootstrap
+// with the LLM API key (named per api_provider) and the laelia-machine bootstrap
 // vars. commandID is the opening turn's command id; the session is persistent so
 // later turns inherit it (the manager treats CommandId as attribution only —
 // see AckProcessedVersion, which advances the cursor via agent+version, not
@@ -232,7 +232,7 @@ func (c *PiConfig) buildPiEnv(commandID string) []string {
 		values[spec.keyEnv] = c.APIKey
 	}
 
-	// laelia-agent bootstrap so the LLM can drive the chat loop from its shell.
+	// laelia-machine bootstrap so the LLM can drive the chat loop from its shell.
 	if c.DaemonSocket != "" {
 		values["LAELIA_DAEMON_SOCKET"] = c.DaemonSocket
 	}

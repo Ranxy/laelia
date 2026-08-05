@@ -282,8 +282,8 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 	return connect.NewResponse(out), nil
 }
 
-// UpdateAgent patches a single mutable agent field. Only allow_add_to_channel
-// is supported initially; any other update_mask path is rejected. The IAM
+// UpdateAgent patches one or more mutable agent fields (allow_add_to_channel,
+// follow_owner_permissions); any other update_mask path is rejected. The IAM
 // interceptor skips this RPC (no permission annotation — agents.edit is
 // admin-only), so authorization is enforced here for the agent's owner or a
 // workspace admin.
@@ -296,15 +296,24 @@ func (s *AgentService) UpdateAgent(ctx context.Context, req *connect.Request[v1p
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
-	// Only allow_add_to_channel is supported; reject any other path. Empty mask
-	// defaults to allow_add_to_channel (the sole mutable field).
+	// allow_add_to_channel and follow_owner_permissions are the supported mutable
+	// fields; reject any other path. Empty mask defaults to allow_add_to_channel
+	// (the original sole field).
 	paths := req.Msg.UpdateMask.GetPaths()
 	if len(paths) == 0 {
 		paths = []string{"allow_add_to_channel"}
 	}
+	patch := &store.UpdateAgentMessage{}
 	for _, p := range paths {
-		if p != "allow_add_to_channel" {
-			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("update_mask path %q is not supported; only allow_add_to_channel", p))
+		switch p {
+		case "allow_add_to_channel":
+			allowAdd := req.Msg.Agent.GetAllowAddToChannel()
+			patch.AllowAddToChannel = &allowAdd
+		case "follow_owner_permissions":
+			follow := req.Msg.Agent.GetFollowOwnerPermissions()
+			patch.FollowOwnerPermissions = &follow
+		default:
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("update_mask path %q is not supported; only allow_add_to_channel and follow_owner_permissions", p))
 		}
 	}
 
@@ -321,8 +330,7 @@ func (s *AgentService) UpdateAgent(ctx context.Context, req *connect.Request[v1p
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a workspace admin can modify this agent"))
 	}
 
-	allowAdd := req.Msg.Agent.GetAllowAddToChannel()
-	updated, err := s.store.UpdateAgent(ctx, agent, &store.UpdateAgentMessage{AllowAddToChannel: &allowAdd})
+	updated, err := s.store.UpdateAgent(ctx, agent, patch)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent, error: %v", err))
 	}
@@ -1134,15 +1142,16 @@ func (s *AgentService) convertToAgent(ctx context.Context, agent *store.AgentMes
 	status := convertToV1AgentStatus(agent.Status, agent.Deleted, connected)
 
 	result := &v1pb.Agent{
-		Name:              name,
-		State:             state,
-		Title:             agent.Name,
-		Info:              convertToV1AgentInfo(agent.Info),
-		Status:            status,
-		CreatedAt:         timestamppb.New(agent.CreatedAt),
-		TokenVersion:      int32(agent.TokenVersion),
-		AllowAddToChannel: agent.AllowAddToChannel,
-		Machine:           common.FormatMachineUID(agent.MachineResourceID),
+		Name:                   name,
+		State:                  state,
+		Title:                  agent.Name,
+		Info:                   convertToV1AgentInfo(agent.Info),
+		Status:                 status,
+		CreatedAt:              timestamppb.New(agent.CreatedAt),
+		TokenVersion:           int32(agent.TokenVersion),
+		AllowAddToChannel:      agent.AllowAddToChannel,
+		FollowOwnerPermissions: agent.FollowOwnerPermissions,
+		Machine:                common.FormatMachineUID(agent.MachineResourceID),
 	}
 	if !agent.LastTokenRotatedAt.IsZero() {
 		result.LastTokenRotatedAt = timestamppb.New(agent.LastTokenRotatedAt)
@@ -1179,12 +1188,13 @@ func convertToAgentSummary(agent *store.AgentMessage, connected bool) *v1pb.Agen
 		state = v1pb.State_DELETED
 	}
 	summary := &v1pb.AgentSummary{
-		Name:              common.FormatAgentUID(agent.ResourceID),
-		State:             state,
-		Title:             agent.Name,
-		Status:            convertToV1AgentStatus(agent.Status, agent.Deleted, connected),
-		AllowAddToChannel: agent.AllowAddToChannel,
-		Machine:           common.FormatMachineUID(agent.MachineResourceID),
+		Name:                   common.FormatAgentUID(agent.ResourceID),
+		State:                  state,
+		Title:                  agent.Name,
+		Status:                 convertToV1AgentStatus(agent.Status, agent.Deleted, connected),
+		AllowAddToChannel:      agent.AllowAddToChannel,
+		FollowOwnerPermissions: agent.FollowOwnerPermissions,
+		Machine:                common.FormatMachineUID(agent.MachineResourceID),
 	}
 	if agent.Info != nil && agent.Info.AcpConfig != nil {
 		summary.Provider = agent.Info.AcpConfig.Provider

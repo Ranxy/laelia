@@ -479,6 +479,10 @@ type UserConversation struct {
 	// Conversation.UpdatedAt so pinned items don't drift as new messages arrive.
 	Pinned   bool
 	PinnedAt sql.NullTime
+	// IsMember reports whether the requesting agent is a direct member of the
+	// conversation (vs only readable via owner-follow). Populated by
+	// ListAccessibleChannels.
+	IsMember bool
 }
 
 // ListUserConversationsWithUnread returns every conversation the user is a
@@ -584,6 +588,65 @@ func (s *Store) ListAgentConversations(ctx context.Context, agentResourceID stri
 	}
 	if err := rows.Err(); err != nil {
 		return nil, errors.Wrapf(err, "failed to iterate agent conversations")
+	}
+	return convs, nil
+}
+
+// ListAccessibleChannels returns every conversation the agent can read: its own
+// memberships (conversation_member_meta member_type=AGENT) unioned — when
+// followOwner is true — with every conversation its owner is a member of
+// (member_type=USER). It is the on-demand discovery surface for the agent's
+// "channel list" tool; it deliberately excludes the drain-loop inbox
+// (ListChannelsWithUpdates), which stays limited to joined conversations. The
+// IsMember flag reports whether the agent is a direct member (only joined
+// conversations accept posts or appear in the agent's inbox).
+func (s *Store) ListAccessibleChannels(ctx context.Context, agentResourceID string, ownerID int, followOwner bool, limit, offset int) ([]*UserConversation, error) {
+	args := []any{MemberTypeAgent, agentResourceID}
+	ownerClause := "FALSE"
+	if followOwner {
+		args = append(args, MemberTypeUser, fmt.Sprintf("%d", ownerID))
+		ownerClause = `EXISTS (
+			SELECT 1 FROM conversation_member_meta cmo
+			WHERE cmo.conversation_id = c.id AND cmo.member_type = $3 AND cmo.member_id = $4
+		)`
+	}
+	args = append(args, limit, offset)
+	query := `
+		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version,
+		       EXISTS (
+		         SELECT 1 FROM conversation_member_meta cm
+		         WHERE cm.conversation_id = c.id AND cm.member_type = $1 AND cm.member_id = $2
+		       )
+		FROM conversation c
+		WHERE EXISTS (
+		        SELECT 1 FROM conversation_member_meta cm
+		        WHERE cm.conversation_id = c.id AND cm.member_type = $1 AND cm.member_id = $2
+		      )
+		   OR (` + ownerClause + `)
+		ORDER BY c.updated_at DESC
+		LIMIT $` + itoa(len(args)-1) + ` OFFSET $` + itoa(len(args))
+
+	rows, err := s.GetDB().QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list accessible channels")
+	}
+	defer rows.Close()
+
+	var convs []*UserConversation
+	for rows.Next() {
+		var uc UserConversation
+		conv := &uc.Conversation
+		if err := rows.Scan(
+			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
+			&uc.IsMember,
+		); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan accessible channel")
+		}
+		uc.UnreadCount = 0
+		convs = append(convs, &uc)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate accessible channels")
 	}
 	return convs, nil
 }

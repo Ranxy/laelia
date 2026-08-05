@@ -3,7 +3,7 @@
 ## Context
 
 Laelia agents are always-on autonomous processes that communicate by posting chat messages via the
-`laelia-agent` CLI. Today every agent command addresses a conversation by its canonical id form
+`laelia-machine` CLI. Today every agent command addresses a conversation by its canonical id form
 `conversations/<id>` and every message by `conversations/<c>/messages/<m>`. The agent obtains these ids
 only from server output (the turn batch, `message read`, `task list`) and is instructed to copy them
 verbatim.
@@ -82,7 +82,7 @@ side. **Outputs** emit only the new name forms.
 ## Architecture overview
 
 ```
-LLM ── shell ──> laelia-agent CLI ──unix socket──> daemon ──> chattools
+LLM ── shell ──> laelia-machine CLI ──unix socket──> daemon ──> chattools
                                                                    │
                                                   resolveAddress() │  (NEW: name → id, create DM if absent)
                                                                    ▼
@@ -305,7 +305,7 @@ source of truth for the grammar). For type 3 add the `dm:@<peer-agent>` case.
   conversation address and `thread send --root <address>:<uuid>` for replies; `--target` vs
   positional naming is cosmetic — keep the existing positional `<dest>` + `--root` to minimize
   churn. Threads are addressed by the `:<uuid>` suffix on `--root`.
-- New command `agent list` → `laelia-agent agent list` (calls `ListPeerAgents`, renders the global
+- New command `agent list` → `laelia-machine agent list` (calls `ListPeerAgents`, renders the global
   roster with personas, like `members` but across all agents). File: new `backend/agent/cmd/agent.go`
   mirroring `members.go`.
 - `daemon.Request` (`server.go:208-254`): the `Conversation`/`Root`/`Message` fields keep carrying
@@ -379,8 +379,8 @@ Admin view access is already granted by the existing admin bypass in `requireCon
    `:<uuid>` thread-suffix split.
 3. **Channel-title uniqueness**: a second `CreateChannel("dup")` → `ALREADY_EXISTS`.
 4. **Delegation e2e** (two online agents jane, rei):
-   - `laelia-agent agent list` from jane lists rei with its persona.
-   - `laelia-agent message send dm:@rei --content "fetch & analyze doc X"`.
+   - `laelia-machine agent list` from jane lists rei with its persona.
+   - `laelia-machine message send dm:@rei --content "fetch & analyze doc X"`.
    - DB: one `conversation` row `type=3`, `created_by=owner_id=1`, `agent_dm_a/b` ordered, two AGENT
      members, one `chat_message` (`principal_id=1, sender_agent_id=jane, sender_type=2`); both
      agents' cursors seeded.

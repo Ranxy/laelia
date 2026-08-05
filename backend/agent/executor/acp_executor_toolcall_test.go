@@ -146,7 +146,7 @@ func sessionUpdate(t *testing.T, e *ACPExecutor, upd acp.SessionUpdate) {
 // STARTED+FINISHED pair per tool call.
 func TestSessionUpdateOpenCodeToolCallFlow(t *testing.T) {
 	e := newToolCallTestExecutor(provider.OpenCodeAdapter{})
-	realTitle := "laelia-agent reminder list-due"
+	realTitle := "laelia-machine reminder list-due"
 
 	sessionUpdate(t, e, acp.SessionUpdate{ToolCall: &acp.SessionUpdateToolCall{
 		ToolCallId: "tc-1", Title: "bash",
@@ -157,13 +157,13 @@ func TestSessionUpdateOpenCodeToolCallFlow(t *testing.T) {
 		Status: ptrStatus(acp.ToolCallStatusInProgress),
 		RawInput: map[string]any{
 			"cwd":     "/home/ran",
-			"command": "laelia-agent reminder list-due",
+			"command": "laelia-machine reminder list-due",
 		},
 	}})
 	// A repeated in_progress update must not re-emit STARTED or a FINISHED.
 	sessionUpdate(t, e, acp.SessionUpdate{ToolCallUpdate: &acp.SessionToolCallUpdate{
 		ToolCallId: "tc-1", Status: ptrStatus(acp.ToolCallStatusInProgress),
-		RawInput: map[string]any{"cwd": "/home/ran", "command": "laelia-agent reminder list-due"},
+		RawInput: map[string]any{"cwd": "/home/ran", "command": "laelia-machine reminder list-due"},
 	}})
 	sessionUpdate(t, e, acp.SessionUpdate{ToolCallUpdate: &acp.SessionToolCallUpdate{
 		ToolCallId: "tc-1", Status: ptrStatus(acp.ToolCallStatusCompleted),
@@ -188,8 +188,8 @@ func TestSessionUpdateOpenCodeToolCallFlow(t *testing.T) {
 	}
 	require.NotNil(t, st)
 	require.NotNil(t, fin)
-	assert.Equal(t, "laelia-agent reminder list-due", st.GetTitle())
-	assert.Equal(t, "laelia-agent reminder list-due", st.GetRawInput().AsMap()["command"])
+	assert.Equal(t, "laelia-machine reminder list-due", st.GetTitle())
+	assert.Equal(t, "laelia-machine reminder list-due", st.GetRawInput().AsMap()["command"])
 	assert.Equal(t, "completed", fin.GetStatus())
 	assert.Equal(t, "no due reminders", fin.GetRawOutput().AsMap()["output"])
 }
@@ -251,14 +251,14 @@ func TestSessionUpdateGenericToolCallFlow(t *testing.T) {
 // in_progress updates emits a STARTED but no FINISHED.
 func TestSessionUpdateOpenCodeNeverReachesTerminal(t *testing.T) {
 	e := newToolCallTestExecutor(provider.OpenCodeAdapter{})
-	realTitle := "laelia-agent reminder list-due"
+	realTitle := "laelia-machine reminder list-due"
 
 	sessionUpdate(t, e, acp.SessionUpdate{ToolCall: &acp.SessionUpdateToolCall{
 		ToolCallId: "tc-1", Title: "bash", RawInput: map[string]any{"cwd": "/home/ran"},
 	}})
 	sessionUpdate(t, e, acp.SessionUpdate{ToolCallUpdate: &acp.SessionToolCallUpdate{
 		ToolCallId: "tc-1", Title: &realTitle, Status: ptrStatus(acp.ToolCallStatusInProgress),
-		RawInput: map[string]any{"cwd": "/home/ran", "command": "laelia-agent reminder list-due"},
+		RawInput: map[string]any{"cwd": "/home/ran", "command": "laelia-machine reminder list-due"},
 	}})
 
 	started, finished := countToolCallEvents(drainToolCallEvents(e.eventCh))

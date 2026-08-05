@@ -72,7 +72,7 @@ var messageSearchCmd = &cobra.Command{
 	Short: "Search past chat messages by keyword and optional time range",
 	RunE: func(_ *cobra.Command, _ []string) error {
 		if messageSearchQuery == "" {
-			printError("INVALID_ARGUMENT_FAILED", "--query is required", "Run `laelia-agent message search --help` for usage.")
+			printError("INVALID_ARGUMENT_FAILED", "--query is required", "Run `laelia-machine message search --help` for usage.")
 			return ErrCLIFailed
 		}
 		if !call("/message/search", daemonsrv.Request{
