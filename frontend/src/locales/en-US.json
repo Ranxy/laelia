@@ -102,6 +102,7 @@
       "enable": "Enable desktop notifications",
       "enabled": "Enabled",
       "disabled": "Disabled",
+      "updating": "Updating…",
       "loading": "Checking notification status…",
       "not-configured": "Web Push is not configured on this server.",
       "permission-denied": "Notification permission was blocked. Re-enable it from your browser's site settings for this origin.",

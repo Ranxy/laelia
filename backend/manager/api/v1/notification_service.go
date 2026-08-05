@@ -86,6 +86,30 @@ func (s *NotificationService) UpdatePushConfig(ctx context.Context, req *connect
 	return connect.NewResponse(&v1pb.UpdatePushConfigResponse{HttpProxy: proxy}), nil
 }
 
+// ListPushSubscriptions returns every push subscription registered for the
+// authenticated user, one per device/browser, ordered by creation time (oldest
+// first). The frontend uses it to render whether the current browser is
+// subscribed and to reconcile a browser-side subscription that is missing
+// server-side.
+func (s *NotificationService) ListPushSubscriptions(ctx context.Context, _ *connect.Request[v1pb.ListPushSubscriptionsRequest]) (*connect.Response[v1pb.ListPushSubscriptionsResponse], error) {
+	user, ok := GetUserFromContext(ctx)
+	if !ok || user == nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("ListPushSubscriptions is for authenticated users"))
+	}
+	subs, err := s.store.ListWebPushSubscriptions(ctx, user.ID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to list push subscriptions"))
+	}
+	resp := &v1pb.ListPushSubscriptionsResponse{}
+	for _, sub := range subs {
+		resp.PushSubscriptions = append(resp.PushSubscriptions, &v1pb.PushSubscription{
+			Name:     pushSubscriptionName(user.ID, sub.Endpoint),
+			Endpoint: sub.Endpoint,
+		})
+	}
+	return connect.NewResponse(resp), nil
+}
+
 // CreatePushSubscription registers (or refreshes) a browser push subscription
 // for the authenticated user. Idempotent on (user, endpoint). Returns
 // FailedPrecondition when Web Push is disabled, InvalidArgument when required

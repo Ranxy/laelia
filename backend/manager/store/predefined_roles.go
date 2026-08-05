@@ -69,6 +69,7 @@ var memberBaselinePermissions = permissionSet(
 	permission.PushConfigGet,
 	permission.PushSubscriptionsCreate,
 	permission.PushSubscriptionsDelete,
+	permission.PushSubscriptionsList,
 	permission.FilesUpload,
 	permission.GroupsGet,
 	permission.GroupsList,

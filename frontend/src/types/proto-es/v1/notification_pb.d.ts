@@ -121,6 +121,37 @@ export declare type PushSubscription = Message<"laelia.v1.PushSubscription"> & {
 export declare const PushSubscriptionSchema: GenMessage<PushSubscription>;
 
 /**
+ * @generated from message laelia.v1.ListPushSubscriptionsRequest
+ */
+export declare type ListPushSubscriptionsRequest = Message<"laelia.v1.ListPushSubscriptionsRequest"> & {
+};
+
+/**
+ * Describes the message laelia.v1.ListPushSubscriptionsRequest.
+ * Use `create(ListPushSubscriptionsRequestSchema)` to create a new message.
+ */
+export declare const ListPushSubscriptionsRequestSchema: GenMessage<ListPushSubscriptionsRequest>;
+
+/**
+ * @generated from message laelia.v1.ListPushSubscriptionsResponse
+ */
+export declare type ListPushSubscriptionsResponse = Message<"laelia.v1.ListPushSubscriptionsResponse"> & {
+  /**
+   * push_subscriptions are the caller's registered browser push endpoints, one
+   * per device/browser, ordered by creation time (oldest first).
+   *
+   * @generated from field: repeated laelia.v1.PushSubscription push_subscriptions = 1;
+   */
+  pushSubscriptions: PushSubscription[];
+};
+
+/**
+ * Describes the message laelia.v1.ListPushSubscriptionsResponse.
+ * Use `create(ListPushSubscriptionsResponseSchema)` to create a new message.
+ */
+export declare const ListPushSubscriptionsResponseSchema: GenMessage<ListPushSubscriptionsResponse>;
+
+/**
  * @generated from message laelia.v1.CreatePushSubscriptionRequest
  */
 export declare type CreatePushSubscriptionRequest = Message<"laelia.v1.CreatePushSubscriptionRequest"> & {
@@ -210,6 +241,19 @@ export declare const NotificationService: GenService<{
     methodKind: "unary";
     input: typeof UpdatePushConfigRequestSchema;
     output: typeof UpdatePushConfigResponseSchema;
+  },
+  /**
+   * ListPushSubscriptions returns every push subscription registered for the
+   * authenticated user, one per device/browser. The frontend uses it to render
+   * whether the current browser is subscribed and to reconcile a browser-side
+   * subscription that is missing server-side.
+   *
+   * @generated from rpc laelia.v1.NotificationService.ListPushSubscriptions
+   */
+  listPushSubscriptions: {
+    methodKind: "unary";
+    input: typeof ListPushSubscriptionsRequestSchema;
+    output: typeof ListPushSubscriptionsResponseSchema;
   },
   /**
    * CreatePushSubscription registers a browser push subscription for the

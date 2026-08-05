@@ -1,5 +1,5 @@
 import { Bell, Loader2, Network, Save } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PageLoading } from "@/components/settings-page";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,7 @@ import { toastManager } from "@/lib/toast";
 import {
   disableDesktopNotifications,
   enableDesktopNotifications,
-  getStoredEnabled,
-  PUSH_ENABLED_KEY,
+  isDeviceSubscribed,
   webPushSupported,
 } from "@/lib/web-push";
 import { useHasPermission } from "@/stores/permissions";
@@ -23,6 +22,9 @@ export function SettingsNotificationsPage() {
   const [status, setStatus] = useState<Status>("loading");
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
+  // busyRef guards against a rapid double-click landing before the disabled
+  // Switch re-renders; the toggle operation is async and must not re-enter.
+  const busyRef = useRef(false);
 
   // Admin-only outbound HTTP proxy for push delivery. The server only returns
   // the stored proxy to callers holding laelia.pushConfig.update, so a non-admin
@@ -66,7 +68,14 @@ export function SettingsNotificationsPage() {
         return;
       }
       setStatus("ready");
-      setEnabled(getStoredEnabled() && permission === "granted");
+      // The toggle reflects whether this browser's subscription is registered
+      // server-side (ListPushSubscriptions), not a local intent flag.
+      try {
+        const subscribed = await isDeviceSubscribed();
+        if (!cancelled) setEnabled(subscribed);
+      } catch {
+        // list failed; keep the toggle off until the user acts.
+      }
     })();
     return () => {
       cancelled = true;
@@ -74,15 +83,15 @@ export function SettingsNotificationsPage() {
   }, []);
 
   async function handleToggle(next: boolean) {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       if (next) {
         await enableDesktopNotifications();
-        setEnabled(true);
         setStatus("ready");
       } else {
         await disableDesktopNotifications();
-        setEnabled(false);
       }
     } catch (err) {
       const code = err instanceof Error ? err.message : String(err);
@@ -107,22 +116,19 @@ export function SettingsNotificationsPage() {
           description: code,
         });
       }
+      return;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
-  }
-
-  // Refresh the toggle when the stored intent changes elsewhere (e.g. another
-  // tab). storage events fire cross-tab; same-tab writes are handled inline.
-  useEffect(() => {
-    function onStorage(event: StorageEvent) {
-      if (event.key === PUSH_ENABLED_KEY) {
-        setEnabled(event.newValue === "true");
-      }
+    // Re-derive the toggle from the server after the subscription changed; a
+    // failure here just leaves the previous value.
+    try {
+      setEnabled(await isDeviceSubscribed());
+    } catch {
+      // ignore
     }
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
+  }
 
   // handleToggleProxy turns the proxy on or off. Turning it on just reveals the
   // input (the value is saved explicitly via handleSaveProxy). Turning it off
@@ -202,9 +208,16 @@ export function SettingsNotificationsPage() {
                     {t("settings.notifications.enable")}
                   </div>
                   <div className="mt-0.5 text-xs text-control-light">
-                    {enabled
-                      ? t("settings.notifications.enabled")
-                      : t("settings.notifications.disabled")}
+                    {busy ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Loader2 className="size-3 animate-spin" />
+                        {t("settings.notifications.updating")}
+                      </span>
+                    ) : enabled ? (
+                      t("settings.notifications.enabled")
+                    ) : (
+                      t("settings.notifications.disabled")
+                    )}
                   </div>
                 </div>
               </div>

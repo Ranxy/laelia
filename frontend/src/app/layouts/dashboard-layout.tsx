@@ -4,7 +4,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { DesktopSidebar, MobileSidebar } from "@/components/sidebar";
 import { UserMenu } from "@/components/user-menu";
 import { toastManager } from "@/lib/toast";
-import { reSubscribeIfEnabled, suppressRoute } from "@/lib/web-push";
+import { reconcilePushSubscription, suppressRoute } from "@/lib/web-push";
 import { useAppStore } from "@/stores";
 
 // The overlays/dialog are code-split so markstream-react (and the
@@ -80,13 +80,13 @@ export function DashboardLayout() {
     setMobileOpen(false);
   }, [location.pathname]);
 
-  // Web Push: re-establish the push subscription on boot if the user previously
-  // enabled it (handles browser-rotated subscriptions across reloads), tell the
-  // service worker which conversation the page is currently viewing so pushes
-  // for it are suppressed (the user is already looking at them), and listen for
-  // PUSH_SUPPRESSED / NOTIFICATION_CLICK messages from the SW.
+  // Web Push: on boot, refresh the server-side keys for this browser's push
+  // subscription when it is already registered (browsers rotate keys across
+  // reloads), tell the service worker which conversation the page is currently
+  // viewing so pushes for it are suppressed (the user is already looking at
+  // them), and listen for PUSH_SUPPRESSED / NOTIFICATION_CLICK messages.
   useEffect(() => {
-    void reSubscribeIfEnabled();
+    void reconcilePushSubscription();
   }, []);
 
   useEffect(() => {

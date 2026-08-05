@@ -43,6 +43,16 @@ service NotificationService {
     option (laelia.v1.permission) = "laelia.pushConfig.update";
   }
 
+  // ListPushSubscriptions returns every push subscription registered for the
+  // authenticated user, one per device/browser. The frontend uses it to render
+  // whether the current browser is subscribed and to reconcile a browser-side
+  // subscription that is missing server-side.
+  rpc ListPushSubscriptions(ListPushSubscriptionsRequest) returns (ListPushSubscriptionsResponse) {
+    option (google.api.http) = {get: "/v1/pushSubscriptions"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.pushSubscriptions.list";
+  }
+
   // CreatePushSubscription registers a browser push subscription for the
   // authenticated user. Idempotent on (user, endpoint): re-subscribing the
   // same browser refreshes its p256dh/auth keys. Returns FailedPrecondition
@@ -98,6 +108,14 @@ message UpdatePushConfigResponse {
 message PushSubscription {
   string name = 1;
   string endpoint = 2;
+}
+
+message ListPushSubscriptionsRequest {}
+
+message ListPushSubscriptionsResponse {
+  // push_subscriptions are the caller's registered browser push endpoints, one
+  // per device/browser, ordered by creation time (oldest first).
+  repeated PushSubscription push_subscriptions = 1;
 }
 
 message CreatePushSubscriptionRequest {

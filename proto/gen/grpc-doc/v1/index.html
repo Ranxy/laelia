@@ -1640,6 +1640,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ListPushSubscriptionsRequest"><span class="badge">M</span>ListPushSubscriptionsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListPushSubscriptionsResponse"><span class="badge">M</span>ListPushSubscriptionsResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.PushSubscription"><span class="badge">M</span>PushSubscription</a>
                 </li>
               
@@ -16688,6 +16696,38 @@ non-admins or when no proxy is configured. </p></td>
 
         
       
+        <h3 id="laelia.v1.ListPushSubscriptionsRequest">ListPushSubscriptionsRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.ListPushSubscriptionsResponse">ListPushSubscriptionsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>push_subscriptions</td>
+                  <td><a href="#laelia.v1.PushSubscription">PushSubscription</a></td>
+                  <td>repeated</td>
+                  <td><p>push_subscriptions are the caller&#39;s registered browser push endpoints, one
+per device/browser, ordered by creation time (oldest first). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.PushSubscription">PushSubscription</h3>
         <p>PushSubscription is a registered browser push endpoint for a user. The</p><p>resource name is "users/{user}/pushSubscriptions/{endpointKey}".</p>
 
@@ -16803,6 +16843,16 @@ immediately on the running manager.</p></td>
               </tr>
             
               <tr>
+                <td>ListPushSubscriptions</td>
+                <td><a href="#laelia.v1.ListPushSubscriptionsRequest">ListPushSubscriptionsRequest</a></td>
+                <td><a href="#laelia.v1.ListPushSubscriptionsResponse">ListPushSubscriptionsResponse</a></td>
+                <td><p>ListPushSubscriptions returns every push subscription registered for the
+authenticated user, one per device/browser. The frontend uses it to render
+whether the current browser is subscribed and to reconcile a browser-side
+subscription that is missing server-side.</p></td>
+              </tr>
+            
+              <tr>
                 <td>CreatePushSubscription</td>
                 <td><a href="#laelia.v1.CreatePushSubscriptionRequest">CreatePushSubscriptionRequest</a></td>
                 <td><a href="#laelia.v1.PushSubscription">PushSubscription</a></td>
@@ -16857,6 +16907,16 @@ user must be the caller.</p></td>
                 <td>PATCH</td>
                 <td>/v1/pushConfig</td>
                 <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListPushSubscriptions</td>
+                <td>GET</td>
+                <td>/v1/pushSubscriptions</td>
+                <td></td>
               </tr>
               
             

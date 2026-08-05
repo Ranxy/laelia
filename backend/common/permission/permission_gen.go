@@ -38,6 +38,7 @@ const (
 	PushConfigUpdate           Permission = "laelia.pushConfig.update"
 	PushSubscriptionsCreate    Permission = "laelia.pushSubscriptions.create"
 	PushSubscriptionsDelete    Permission = "laelia.pushSubscriptions.delete"
+	PushSubscriptionsList      Permission = "laelia.pushSubscriptions.list"
 	FilesUpload                Permission = "laelia.files.upload"
 	FilesDownload              Permission = "laelia.files.download"
 	FilesList                  Permission = "laelia.files.list"
@@ -106,6 +107,7 @@ var allPermissions = []Permission{
 	PushConfigUpdate,
 	PushSubscriptionsCreate,
 	PushSubscriptionsDelete,
+	PushSubscriptionsList,
 	FilesUpload,
 	FilesDownload,
 	FilesList,

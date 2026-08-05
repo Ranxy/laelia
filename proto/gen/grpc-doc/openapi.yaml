@@ -3273,6 +3273,28 @@ paths:
                             schema:
                                 $ref: '#/components/schemas/Status'
     /v1/pushSubscriptions:
+        get:
+            tags:
+                - NotificationService
+            description: |-
+                ListPushSubscriptions returns every push subscription registered for the
+                 authenticated user, one per device/browser. The frontend uses it to render
+                 whether the current browser is subscribed and to reconcile a browser-side
+                 subscription that is missing server-side.
+            operationId: NotificationService_ListPushSubscriptions
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListPushSubscriptionsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
         post:
             tags:
                 - NotificationService
@@ -6106,6 +6128,16 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/PiModel'
+        ListPushSubscriptionsResponse:
+            type: object
+            properties:
+                pushSubscriptions:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/PushSubscription'
+                    description: |-
+                        push_subscriptions are the caller's registered browser push endpoints, one
+                         per device/browser, ordered by creation time (oldest first).
         ListRemindersResponse:
             type: object
             properties:

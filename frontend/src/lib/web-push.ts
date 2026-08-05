@@ -1,10 +1,13 @@
 import { notificationServiceClient } from "@/connect";
 
-// localStorage key recording the user's intent to receive desktop notifications.
-// The boot hook re-registers the service worker + re-subscribes when this is
-// "true" and the browser still grants permission, so a page reload (or a
-// browser-rotated subscription) silently re-establishes push.
-export const PUSH_ENABLED_KEY = "laelia.push.enabled";
+// Web Push device state is derived entirely from the server: a browser is
+// "subscribed" when its current PushSubscription endpoint appears in the
+// user's registered-subscription list (ListPushSubscriptions). No localStorage
+// intent flag is involved, so the settings toggle always reflects what the
+// server will actually deliver to. The boot hook only refreshes an endpoint
+// the server already knows (browsers rotate p256dh/auth keys), and never
+// creates a row for an unknown endpoint — so a deliberately-disabled device is
+// never silently re-enabled.
 
 const SW_URL = "/sw.js";
 
@@ -27,22 +30,11 @@ export function webPushSupported(): boolean {
   );
 }
 
-// getStoredEnabled reads the user's persisted intent.
-export function getStoredEnabled(): boolean {
-  try {
-    return localStorage.getItem(PUSH_ENABLED_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function setStoredEnabled(value: boolean) {
-  try {
-    if (value) localStorage.setItem(PUSH_ENABLED_KEY, "true");
-    else localStorage.removeItem(PUSH_ENABLED_KEY);
-  } catch {
-    // ignore storage errors (private mode etc.)
-  }
+// listSubscriptions returns the current user's registered browser push
+// endpoints (one per device/browser).
+async function listSubscriptions(): Promise<string[]> {
+  const res = await notificationServiceClient.listPushSubscriptions({});
+  return res.pushSubscriptions.map((s) => s.endpoint);
 }
 
 // urlBase64ToUint8Array converts a base64url VAPID public key into the
@@ -115,40 +107,39 @@ async function registerWithBackend(sub: PushSubscription): Promise<void> {
 }
 
 // enable turns desktop notifications on: registers the service worker, asks
-// permission, subscribes, and persists the intent. Throws with a code the UI
-// can branch on ("denied" | "not-configured" | other).
+// permission, subscribes, and registers the subscription server-side. Throws
+// with a code the UI can branch on ("denied" | "not-configured" | other).
 export async function enableDesktopNotifications(): Promise<void> {
   if (!webPushSupported()) throw new Error("unsupported");
   const perm = await Notification.requestPermission();
   if (perm !== "granted") throw new Error("denied");
   const reg = await getRegistration();
   await subscribe(reg);
-  setStoredEnabled(true);
 }
 
-// disable turns desktop notifications off: unsubscribes the browser and
-// deletes the backend subscription. Best-effort on the backend delete so a
-// network failure still clears the local intent.
+// disable turns desktop notifications off: deletes the server subscription
+// (so delivery stops immediately) and unsubscribes the browser. Both are
+// best-effort and independent: a leftover server row is cleaned by the
+// 404/410 path on the next push attempt, and a leftover browser subscription
+// is never re-registered (the boot hook only refreshes endpoints the server
+// already knows), so a failed unsubscribe cannot silently re-enable push.
 export async function disableDesktopNotifications(): Promise<void> {
-  setStoredEnabled(false);
   if (!webPushSupported()) return;
+  const reg = await getRegistration();
+  const sub = await reg.pushManager.getSubscription();
+  if (!sub) return;
+  const endpoint = sub.endpoint;
   try {
-    const reg = await getRegistration();
-    const sub = await reg.pushManager.getSubscription();
-    if (sub) {
-      const endpoint = sub.endpoint;
-      await sub.unsubscribe();
-      try {
-        await notificationServiceClient.deletePushSubscription({
-          name: subscriptionName(endpoint),
-        });
-      } catch {
-        // already unsubscribed locally; a stale backend row will be cleaned up
-        // by the 404/410 path on the next push attempt.
-      }
-    }
+    await notificationServiceClient.deletePushSubscription({
+      name: subscriptionName(endpoint),
+    });
   } catch {
-    // ignore — the user asked to disable, so surface nothing further.
+    // ignore — stale row cleaned by the 404/410 path on the next push attempt.
+  }
+  try {
+    await sub.unsubscribe();
+  } catch {
+    // ignore — the browser subscription is best-effort.
   }
 }
 
@@ -170,21 +161,35 @@ function endpointKey(endpoint: string): string {
     .replace(/=+$/, "");
 }
 
-// reSubscribeIfEnabled is called on app boot: if the user previously enabled
-// notifications and permission is still granted, re-register the SW and
-// re-subscribe idempotently (handles browser-rotated subscriptions). Silently
-// clears the stored intent if permission was revoked.
-export async function reSubscribeIfEnabled(): Promise<void> {
-  if (!getStoredEnabled() || !webPushSupported()) return;
-  if (Notification.permission !== "granted") {
-    setStoredEnabled(false);
-    return;
-  }
-  try {
-    const reg = await getRegistration();
-    await subscribe(reg);
-  } catch {
-    // best-effort; the user can re-enable from settings.
+// isDeviceSubscribed reports whether the current browser is registered for
+// push: its PushSubscription endpoint must appear in the user's server-side
+// subscription list. This is the source of truth for the settings toggle.
+export async function isDeviceSubscribed(): Promise<boolean> {
+  if (!webPushSupported()) return false;
+  const reg = await getRegistration();
+  const browserSub = await reg.pushManager.getSubscription();
+  if (!browserSub) return false;
+  const endpoints = await listSubscriptions();
+  return endpoints.includes(browserSub.endpoint);
+}
+
+// reconcilePushSubscription is called on app boot. It refreshes the server-side
+// keys for this browser's subscription when its endpoint is already registered
+// (browsers rotate p256dh/auth keys, which would otherwise break encryption),
+// and leaves unknown endpoints alone so a disabled device is never resurrected.
+export async function reconcilePushSubscription(): Promise<void> {
+  if (!webPushSupported()) return;
+  if (Notification.permission !== "granted") return;
+  const reg = await getRegistration();
+  const browserSub = await reg.pushManager.getSubscription();
+  if (!browserSub) return;
+  const endpoints = await listSubscriptions();
+  if (endpoints.includes(browserSub.endpoint)) {
+    try {
+      await registerWithBackend(browserSub);
+    } catch {
+      // best-effort; the user can re-enable from settings.
+    }
   }
 }
 

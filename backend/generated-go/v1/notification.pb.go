@@ -271,6 +271,88 @@ func (x *PushSubscription) GetEndpoint() string {
 	return ""
 }
 
+type ListPushSubscriptionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPushSubscriptionsRequest) Reset() {
+	*x = ListPushSubscriptionsRequest{}
+	mi := &file_v1_notification_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPushSubscriptionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPushSubscriptionsRequest) ProtoMessage() {}
+
+func (x *ListPushSubscriptionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_notification_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPushSubscriptionsRequest.ProtoReflect.Descriptor instead.
+func (*ListPushSubscriptionsRequest) Descriptor() ([]byte, []int) {
+	return file_v1_notification_proto_rawDescGZIP(), []int{5}
+}
+
+type ListPushSubscriptionsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// push_subscriptions are the caller's registered browser push endpoints, one
+	// per device/browser, ordered by creation time (oldest first).
+	PushSubscriptions []*PushSubscription `protobuf:"bytes,1,rep,name=push_subscriptions,json=pushSubscriptions,proto3" json:"push_subscriptions,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ListPushSubscriptionsResponse) Reset() {
+	*x = ListPushSubscriptionsResponse{}
+	mi := &file_v1_notification_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPushSubscriptionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPushSubscriptionsResponse) ProtoMessage() {}
+
+func (x *ListPushSubscriptionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_notification_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPushSubscriptionsResponse.ProtoReflect.Descriptor instead.
+func (*ListPushSubscriptionsResponse) Descriptor() ([]byte, []int) {
+	return file_v1_notification_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListPushSubscriptionsResponse) GetPushSubscriptions() []*PushSubscription {
+	if x != nil {
+		return x.PushSubscriptions
+	}
+	return nil
+}
+
 type CreatePushSubscriptionRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// endpoint is the push service endpoint URL returned by PushSubscription.endpoint.
@@ -285,7 +367,7 @@ type CreatePushSubscriptionRequest struct {
 
 func (x *CreatePushSubscriptionRequest) Reset() {
 	*x = CreatePushSubscriptionRequest{}
-	mi := &file_v1_notification_proto_msgTypes[5]
+	mi := &file_v1_notification_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -297,7 +379,7 @@ func (x *CreatePushSubscriptionRequest) String() string {
 func (*CreatePushSubscriptionRequest) ProtoMessage() {}
 
 func (x *CreatePushSubscriptionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_notification_proto_msgTypes[5]
+	mi := &file_v1_notification_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -310,7 +392,7 @@ func (x *CreatePushSubscriptionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreatePushSubscriptionRequest.ProtoReflect.Descriptor instead.
 func (*CreatePushSubscriptionRequest) Descriptor() ([]byte, []int) {
-	return file_v1_notification_proto_rawDescGZIP(), []int{5}
+	return file_v1_notification_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *CreatePushSubscriptionRequest) GetEndpoint() string {
@@ -344,7 +426,7 @@ type DeletePushSubscriptionRequest struct {
 
 func (x *DeletePushSubscriptionRequest) Reset() {
 	*x = DeletePushSubscriptionRequest{}
-	mi := &file_v1_notification_proto_msgTypes[6]
+	mi := &file_v1_notification_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -356,7 +438,7 @@ func (x *DeletePushSubscriptionRequest) String() string {
 func (*DeletePushSubscriptionRequest) ProtoMessage() {}
 
 func (x *DeletePushSubscriptionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_notification_proto_msgTypes[6]
+	mi := &file_v1_notification_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -369,7 +451,7 @@ func (x *DeletePushSubscriptionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeletePushSubscriptionRequest.ProtoReflect.Descriptor instead.
 func (*DeletePushSubscriptionRequest) Descriptor() ([]byte, []int) {
-	return file_v1_notification_proto_rawDescGZIP(), []int{6}
+	return file_v1_notification_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DeletePushSubscriptionRequest) GetName() string {
@@ -398,16 +480,20 @@ const file_v1_notification_proto_rawDesc = "" +
 	"http_proxy\x18\x01 \x01(\tR\thttpProxy\"B\n" +
 	"\x10PushSubscription\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
-	"\bendpoint\x18\x02 \x01(\tR\bendpoint\"v\n" +
+	"\bendpoint\x18\x02 \x01(\tR\bendpoint\"\x1e\n" +
+	"\x1cListPushSubscriptionsRequest\"k\n" +
+	"\x1dListPushSubscriptionsResponse\x12J\n" +
+	"\x12push_subscriptions\x18\x01 \x03(\v2\x1b.laelia.v1.PushSubscriptionR\x11pushSubscriptions\"v\n" +
 	"\x1dCreatePushSubscriptionRequest\x12\x1f\n" +
 	"\bendpoint\x18\x01 \x01(\tB\x03\xe0A\x02R\bendpoint\x12\x1b\n" +
 	"\x06p256dh\x18\x02 \x01(\tB\x03\xe0A\x02R\x06p256dh\x12\x17\n" +
 	"\x04auth\x18\x03 \x01(\tB\x03\xe0A\x02R\x04auth\"8\n" +
 	"\x1dDeletePushSubscriptionRequest\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x02R\x04name2\x97\x05\n" +
+	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x02R\x04name2\xc8\x06\n" +
 	"\x13NotificationService\x12\x87\x01\n" +
 	"\rGetPushConfig\x12\x1f.laelia.v1.GetPushConfigRequest\x1a .laelia.v1.GetPushConfigResponse\"3\x8a\xea0\x15laelia.pushConfig.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/pushConfig\x12\x96\x01\n" +
-	"\x10UpdatePushConfig\x12\".laelia.v1.UpdatePushConfigRequest\x1a#.laelia.v1.UpdatePushConfigResponse\"9\x8a\xea0\x18laelia.pushConfig.update\x90\xea0\x01\x82\xd3\xe4\x93\x02\x13:\x01*2\x0e/v1/pushConfig\x12\xa8\x01\n" +
+	"\x10UpdatePushConfig\x12\".laelia.v1.UpdatePushConfigRequest\x1a#.laelia.v1.UpdatePushConfigResponse\"9\x8a\xea0\x18laelia.pushConfig.update\x90\xea0\x01\x82\xd3\xe4\x93\x02\x13:\x01*2\x0e/v1/pushConfig\x12\xae\x01\n" +
+	"\x15ListPushSubscriptions\x12'.laelia.v1.ListPushSubscriptionsRequest\x1a(.laelia.v1.ListPushSubscriptionsResponse\"B\x8a\xea0\x1dlaelia.pushSubscriptions.list\x90\xea0\x01\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/pushSubscriptions\x12\xa8\x01\n" +
 	"\x16CreatePushSubscription\x12(.laelia.v1.CreatePushSubscriptionRequest\x1a\x1b.laelia.v1.PushSubscription\"G\x8a\xea0\x1flaelia.pushSubscriptions.create\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/v1/pushSubscriptions\x12\xb1\x01\n" +
 	"\x16DeletePushSubscription\x12(.laelia.v1.DeletePushSubscriptionRequest\x1a\x16.google.protobuf.Empty\"U\x8a\xea0\x1flaelia.pushSubscriptions.delete\x90\xea0\x01\x82\xd3\xe4\x93\x02(*&/v1/{name=users/*/pushSubscriptions/*}B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
@@ -423,31 +509,36 @@ func file_v1_notification_proto_rawDescGZIP() []byte {
 	return file_v1_notification_proto_rawDescData
 }
 
-var file_v1_notification_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_v1_notification_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_v1_notification_proto_goTypes = []any{
 	(*GetPushConfigRequest)(nil),          // 0: laelia.v1.GetPushConfigRequest
 	(*GetPushConfigResponse)(nil),         // 1: laelia.v1.GetPushConfigResponse
 	(*UpdatePushConfigRequest)(nil),       // 2: laelia.v1.UpdatePushConfigRequest
 	(*UpdatePushConfigResponse)(nil),      // 3: laelia.v1.UpdatePushConfigResponse
 	(*PushSubscription)(nil),              // 4: laelia.v1.PushSubscription
-	(*CreatePushSubscriptionRequest)(nil), // 5: laelia.v1.CreatePushSubscriptionRequest
-	(*DeletePushSubscriptionRequest)(nil), // 6: laelia.v1.DeletePushSubscriptionRequest
-	(*emptypb.Empty)(nil),                 // 7: google.protobuf.Empty
+	(*ListPushSubscriptionsRequest)(nil),  // 5: laelia.v1.ListPushSubscriptionsRequest
+	(*ListPushSubscriptionsResponse)(nil), // 6: laelia.v1.ListPushSubscriptionsResponse
+	(*CreatePushSubscriptionRequest)(nil), // 7: laelia.v1.CreatePushSubscriptionRequest
+	(*DeletePushSubscriptionRequest)(nil), // 8: laelia.v1.DeletePushSubscriptionRequest
+	(*emptypb.Empty)(nil),                 // 9: google.protobuf.Empty
 }
 var file_v1_notification_proto_depIdxs = []int32{
-	0, // 0: laelia.v1.NotificationService.GetPushConfig:input_type -> laelia.v1.GetPushConfigRequest
-	2, // 1: laelia.v1.NotificationService.UpdatePushConfig:input_type -> laelia.v1.UpdatePushConfigRequest
-	5, // 2: laelia.v1.NotificationService.CreatePushSubscription:input_type -> laelia.v1.CreatePushSubscriptionRequest
-	6, // 3: laelia.v1.NotificationService.DeletePushSubscription:input_type -> laelia.v1.DeletePushSubscriptionRequest
-	1, // 4: laelia.v1.NotificationService.GetPushConfig:output_type -> laelia.v1.GetPushConfigResponse
-	3, // 5: laelia.v1.NotificationService.UpdatePushConfig:output_type -> laelia.v1.UpdatePushConfigResponse
-	4, // 6: laelia.v1.NotificationService.CreatePushSubscription:output_type -> laelia.v1.PushSubscription
-	7, // 7: laelia.v1.NotificationService.DeletePushSubscription:output_type -> google.protobuf.Empty
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	4, // 0: laelia.v1.ListPushSubscriptionsResponse.push_subscriptions:type_name -> laelia.v1.PushSubscription
+	0, // 1: laelia.v1.NotificationService.GetPushConfig:input_type -> laelia.v1.GetPushConfigRequest
+	2, // 2: laelia.v1.NotificationService.UpdatePushConfig:input_type -> laelia.v1.UpdatePushConfigRequest
+	5, // 3: laelia.v1.NotificationService.ListPushSubscriptions:input_type -> laelia.v1.ListPushSubscriptionsRequest
+	7, // 4: laelia.v1.NotificationService.CreatePushSubscription:input_type -> laelia.v1.CreatePushSubscriptionRequest
+	8, // 5: laelia.v1.NotificationService.DeletePushSubscription:input_type -> laelia.v1.DeletePushSubscriptionRequest
+	1, // 6: laelia.v1.NotificationService.GetPushConfig:output_type -> laelia.v1.GetPushConfigResponse
+	3, // 7: laelia.v1.NotificationService.UpdatePushConfig:output_type -> laelia.v1.UpdatePushConfigResponse
+	6, // 8: laelia.v1.NotificationService.ListPushSubscriptions:output_type -> laelia.v1.ListPushSubscriptionsResponse
+	4, // 9: laelia.v1.NotificationService.CreatePushSubscription:output_type -> laelia.v1.PushSubscription
+	9, // 10: laelia.v1.NotificationService.DeletePushSubscription:output_type -> google.protobuf.Empty
+	6, // [6:11] is the sub-list for method output_type
+	1, // [1:6] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_v1_notification_proto_init() }
@@ -462,7 +553,7 @@ func file_v1_notification_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_notification_proto_rawDesc), len(file_v1_notification_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

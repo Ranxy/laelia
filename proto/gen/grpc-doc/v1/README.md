@@ -378,6 +378,8 @@
     - [DeletePushSubscriptionRequest](#laelia-v1-DeletePushSubscriptionRequest)
     - [GetPushConfigRequest](#laelia-v1-GetPushConfigRequest)
     - [GetPushConfigResponse](#laelia-v1-GetPushConfigResponse)
+    - [ListPushSubscriptionsRequest](#laelia-v1-ListPushSubscriptionsRequest)
+    - [ListPushSubscriptionsResponse](#laelia-v1-ListPushSubscriptionsResponse)
     - [PushSubscription](#laelia-v1-PushSubscription)
     - [UpdatePushConfigRequest](#laelia-v1-UpdatePushConfigRequest)
     - [UpdatePushConfigResponse](#laelia-v1-UpdatePushConfigResponse)
@@ -6378,6 +6380,31 @@ its own AgentChannel.
 
 
 
+<a name="laelia-v1-ListPushSubscriptionsRequest"></a>
+
+### ListPushSubscriptionsRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-ListPushSubscriptionsResponse"></a>
+
+### ListPushSubscriptionsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| push_subscriptions | [PushSubscription](#laelia-v1-PushSubscription) | repeated | push_subscriptions are the caller&#39;s registered browser push endpoints, one per device/browser, ordered by creation time (oldest first). |
+
+
+
+
+
+
 <a name="laelia-v1-PushSubscription"></a>
 
 ### PushSubscription
@@ -6449,6 +6476,7 @@ UpdatePushConfig.
 | ----------- | ------------ | ------------- | ------------|
 | GetPushConfig | [GetPushConfigRequest](#laelia-v1-GetPushConfigRequest) | [GetPushConfigResponse](#laelia-v1-GetPushConfigResponse) | GetPushConfig reports whether Web Push is enabled and, when it is, returns the VAPID public key the browser needs to subscribe. The http_proxy field is populated only for callers holding laelia.pushConfig.update (admins); other callers receive it empty. |
 | UpdatePushConfig | [UpdatePushConfigRequest](#laelia-v1-UpdatePushConfigRequest) | [UpdatePushConfigResponse](#laelia-v1-UpdatePushConfigResponse) | UpdatePushConfig sets the optional outbound HTTP proxy used when the manager posts notifications to browser push services. Admin-only. An empty http_proxy disables the proxy (direct connection). The change takes effect immediately on the running manager. |
+| ListPushSubscriptions | [ListPushSubscriptionsRequest](#laelia-v1-ListPushSubscriptionsRequest) | [ListPushSubscriptionsResponse](#laelia-v1-ListPushSubscriptionsResponse) | ListPushSubscriptions returns every push subscription registered for the authenticated user, one per device/browser. The frontend uses it to render whether the current browser is subscribed and to reconcile a browser-side subscription that is missing server-side. |
 | CreatePushSubscription | [CreatePushSubscriptionRequest](#laelia-v1-CreatePushSubscriptionRequest) | [PushSubscription](#laelia-v1-PushSubscription) | CreatePushSubscription registers a browser push subscription for the authenticated user. Idempotent on (user, endpoint): re-subscribing the same browser refreshes its p256dh/auth keys. Returns FailedPrecondition when Web Push is disabled. |
 | DeletePushSubscription | [DeletePushSubscriptionRequest](#laelia-v1-DeletePushSubscriptionRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | DeletePushSubscription removes a push subscription for the authenticated user. The name is &#34;users/{user}/pushSubscriptions/{endpointKey}&#34; where endpointKey is the URL-safe base64 of the subscription endpoint; the name&#39;s user must be the caller. |
 

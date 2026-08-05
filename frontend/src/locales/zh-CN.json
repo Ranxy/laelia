@@ -102,6 +102,7 @@
       "enable": "开启桌面通知",
       "enabled": "已开启",
       "disabled": "已关闭",
+      "updating": "更新中…",
       "loading": "正在检查通知状态…",
       "not-configured": "服务器尚未配置 Web Push。",
       "permission-denied": "通知权限已被阻止。请在本站点浏览器设置中重新允许通知。",

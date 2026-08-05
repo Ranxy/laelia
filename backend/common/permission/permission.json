@@ -33,6 +33,7 @@
     {"name": "PushConfigUpdate", "id": "laelia.pushConfig.update"},
     {"name": "PushSubscriptionsCreate", "id": "laelia.pushSubscriptions.create"},
     {"name": "PushSubscriptionsDelete", "id": "laelia.pushSubscriptions.delete"},
+    {"name": "PushSubscriptionsList", "id": "laelia.pushSubscriptions.list"},
     {"name": "FilesUpload", "id": "laelia.files.upload"},
     {"name": "FilesDownload", "id": "laelia.files.download"},
     {"name": "FilesList", "id": "laelia.files.list"},

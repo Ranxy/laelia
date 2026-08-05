@@ -40,6 +40,9 @@ const (
 	// NotificationServiceUpdatePushConfigProcedure is the fully-qualified name of the
 	// NotificationService's UpdatePushConfig RPC.
 	NotificationServiceUpdatePushConfigProcedure = "/laelia.v1.NotificationService/UpdatePushConfig"
+	// NotificationServiceListPushSubscriptionsProcedure is the fully-qualified name of the
+	// NotificationService's ListPushSubscriptions RPC.
+	NotificationServiceListPushSubscriptionsProcedure = "/laelia.v1.NotificationService/ListPushSubscriptions"
 	// NotificationServiceCreatePushSubscriptionProcedure is the fully-qualified name of the
 	// NotificationService's CreatePushSubscription RPC.
 	NotificationServiceCreatePushSubscriptionProcedure = "/laelia.v1.NotificationService/CreatePushSubscription"
@@ -60,6 +63,11 @@ type NotificationServiceClient interface {
 	// http_proxy disables the proxy (direct connection). The change takes effect
 	// immediately on the running manager.
 	UpdatePushConfig(context.Context, *connect.Request[v1.UpdatePushConfigRequest]) (*connect.Response[v1.UpdatePushConfigResponse], error)
+	// ListPushSubscriptions returns every push subscription registered for the
+	// authenticated user, one per device/browser. The frontend uses it to render
+	// whether the current browser is subscribed and to reconcile a browser-side
+	// subscription that is missing server-side.
+	ListPushSubscriptions(context.Context, *connect.Request[v1.ListPushSubscriptionsRequest]) (*connect.Response[v1.ListPushSubscriptionsResponse], error)
 	// CreatePushSubscription registers a browser push subscription for the
 	// authenticated user. Idempotent on (user, endpoint): re-subscribing the
 	// same browser refreshes its p256dh/auth keys. Returns FailedPrecondition
@@ -95,6 +103,12 @@ func NewNotificationServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(notificationServiceMethods.ByName("UpdatePushConfig")),
 			connect.WithClientOptions(opts...),
 		),
+		listPushSubscriptions: connect.NewClient[v1.ListPushSubscriptionsRequest, v1.ListPushSubscriptionsResponse](
+			httpClient,
+			baseURL+NotificationServiceListPushSubscriptionsProcedure,
+			connect.WithSchema(notificationServiceMethods.ByName("ListPushSubscriptions")),
+			connect.WithClientOptions(opts...),
+		),
 		createPushSubscription: connect.NewClient[v1.CreatePushSubscriptionRequest, v1.PushSubscription](
 			httpClient,
 			baseURL+NotificationServiceCreatePushSubscriptionProcedure,
@@ -114,6 +128,7 @@ func NewNotificationServiceClient(httpClient connect.HTTPClient, baseURL string,
 type notificationServiceClient struct {
 	getPushConfig          *connect.Client[v1.GetPushConfigRequest, v1.GetPushConfigResponse]
 	updatePushConfig       *connect.Client[v1.UpdatePushConfigRequest, v1.UpdatePushConfigResponse]
+	listPushSubscriptions  *connect.Client[v1.ListPushSubscriptionsRequest, v1.ListPushSubscriptionsResponse]
 	createPushSubscription *connect.Client[v1.CreatePushSubscriptionRequest, v1.PushSubscription]
 	deletePushSubscription *connect.Client[v1.DeletePushSubscriptionRequest, emptypb.Empty]
 }
@@ -126,6 +141,11 @@ func (c *notificationServiceClient) GetPushConfig(ctx context.Context, req *conn
 // UpdatePushConfig calls laelia.v1.NotificationService.UpdatePushConfig.
 func (c *notificationServiceClient) UpdatePushConfig(ctx context.Context, req *connect.Request[v1.UpdatePushConfigRequest]) (*connect.Response[v1.UpdatePushConfigResponse], error) {
 	return c.updatePushConfig.CallUnary(ctx, req)
+}
+
+// ListPushSubscriptions calls laelia.v1.NotificationService.ListPushSubscriptions.
+func (c *notificationServiceClient) ListPushSubscriptions(ctx context.Context, req *connect.Request[v1.ListPushSubscriptionsRequest]) (*connect.Response[v1.ListPushSubscriptionsResponse], error) {
+	return c.listPushSubscriptions.CallUnary(ctx, req)
 }
 
 // CreatePushSubscription calls laelia.v1.NotificationService.CreatePushSubscription.
@@ -150,6 +170,11 @@ type NotificationServiceHandler interface {
 	// http_proxy disables the proxy (direct connection). The change takes effect
 	// immediately on the running manager.
 	UpdatePushConfig(context.Context, *connect.Request[v1.UpdatePushConfigRequest]) (*connect.Response[v1.UpdatePushConfigResponse], error)
+	// ListPushSubscriptions returns every push subscription registered for the
+	// authenticated user, one per device/browser. The frontend uses it to render
+	// whether the current browser is subscribed and to reconcile a browser-side
+	// subscription that is missing server-side.
+	ListPushSubscriptions(context.Context, *connect.Request[v1.ListPushSubscriptionsRequest]) (*connect.Response[v1.ListPushSubscriptionsResponse], error)
 	// CreatePushSubscription registers a browser push subscription for the
 	// authenticated user. Idempotent on (user, endpoint): re-subscribing the
 	// same browser refreshes its p256dh/auth keys. Returns FailedPrecondition
@@ -181,6 +206,12 @@ func NewNotificationServiceHandler(svc NotificationServiceHandler, opts ...conne
 		connect.WithSchema(notificationServiceMethods.ByName("UpdatePushConfig")),
 		connect.WithHandlerOptions(opts...),
 	)
+	notificationServiceListPushSubscriptionsHandler := connect.NewUnaryHandler(
+		NotificationServiceListPushSubscriptionsProcedure,
+		svc.ListPushSubscriptions,
+		connect.WithSchema(notificationServiceMethods.ByName("ListPushSubscriptions")),
+		connect.WithHandlerOptions(opts...),
+	)
 	notificationServiceCreatePushSubscriptionHandler := connect.NewUnaryHandler(
 		NotificationServiceCreatePushSubscriptionProcedure,
 		svc.CreatePushSubscription,
@@ -199,6 +230,8 @@ func NewNotificationServiceHandler(svc NotificationServiceHandler, opts ...conne
 			notificationServiceGetPushConfigHandler.ServeHTTP(w, r)
 		case NotificationServiceUpdatePushConfigProcedure:
 			notificationServiceUpdatePushConfigHandler.ServeHTTP(w, r)
+		case NotificationServiceListPushSubscriptionsProcedure:
+			notificationServiceListPushSubscriptionsHandler.ServeHTTP(w, r)
 		case NotificationServiceCreatePushSubscriptionProcedure:
 			notificationServiceCreatePushSubscriptionHandler.ServeHTTP(w, r)
 		case NotificationServiceDeletePushSubscriptionProcedure:
@@ -218,6 +251,10 @@ func (UnimplementedNotificationServiceHandler) GetPushConfig(context.Context, *c
 
 func (UnimplementedNotificationServiceHandler) UpdatePushConfig(context.Context, *connect.Request[v1.UpdatePushConfigRequest]) (*connect.Response[v1.UpdatePushConfigResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.NotificationService.UpdatePushConfig is not implemented"))
+}
+
+func (UnimplementedNotificationServiceHandler) ListPushSubscriptions(context.Context, *connect.Request[v1.ListPushSubscriptionsRequest]) (*connect.Response[v1.ListPushSubscriptionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.NotificationService.ListPushSubscriptions is not implemented"))
 }
 
 func (UnimplementedNotificationServiceHandler) CreatePushSubscription(context.Context, *connect.Request[v1.CreatePushSubscriptionRequest]) (*connect.Response[v1.PushSubscription], error) {

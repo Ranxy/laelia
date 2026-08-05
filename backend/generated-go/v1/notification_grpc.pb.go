@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	NotificationService_GetPushConfig_FullMethodName          = "/laelia.v1.NotificationService/GetPushConfig"
 	NotificationService_UpdatePushConfig_FullMethodName       = "/laelia.v1.NotificationService/UpdatePushConfig"
+	NotificationService_ListPushSubscriptions_FullMethodName  = "/laelia.v1.NotificationService/ListPushSubscriptions"
 	NotificationService_CreatePushSubscription_FullMethodName = "/laelia.v1.NotificationService/CreatePushSubscription"
 	NotificationService_DeletePushSubscription_FullMethodName = "/laelia.v1.NotificationService/DeletePushSubscription"
 )
@@ -51,6 +52,11 @@ type NotificationServiceClient interface {
 	// http_proxy disables the proxy (direct connection). The change takes effect
 	// immediately on the running manager.
 	UpdatePushConfig(ctx context.Context, in *UpdatePushConfigRequest, opts ...grpc.CallOption) (*UpdatePushConfigResponse, error)
+	// ListPushSubscriptions returns every push subscription registered for the
+	// authenticated user, one per device/browser. The frontend uses it to render
+	// whether the current browser is subscribed and to reconcile a browser-side
+	// subscription that is missing server-side.
+	ListPushSubscriptions(ctx context.Context, in *ListPushSubscriptionsRequest, opts ...grpc.CallOption) (*ListPushSubscriptionsResponse, error)
 	// CreatePushSubscription registers a browser push subscription for the
 	// authenticated user. Idempotent on (user, endpoint): re-subscribing the
 	// same browser refreshes its p256dh/auth keys. Returns FailedPrecondition
@@ -85,6 +91,16 @@ func (c *notificationServiceClient) UpdatePushConfig(ctx context.Context, in *Up
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdatePushConfigResponse)
 	err := c.cc.Invoke(ctx, NotificationService_UpdatePushConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *notificationServiceClient) ListPushSubscriptions(ctx context.Context, in *ListPushSubscriptionsRequest, opts ...grpc.CallOption) (*ListPushSubscriptionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPushSubscriptionsResponse)
+	err := c.cc.Invoke(ctx, NotificationService_ListPushSubscriptions_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +152,11 @@ type NotificationServiceServer interface {
 	// http_proxy disables the proxy (direct connection). The change takes effect
 	// immediately on the running manager.
 	UpdatePushConfig(context.Context, *UpdatePushConfigRequest) (*UpdatePushConfigResponse, error)
+	// ListPushSubscriptions returns every push subscription registered for the
+	// authenticated user, one per device/browser. The frontend uses it to render
+	// whether the current browser is subscribed and to reconcile a browser-side
+	// subscription that is missing server-side.
+	ListPushSubscriptions(context.Context, *ListPushSubscriptionsRequest) (*ListPushSubscriptionsResponse, error)
 	// CreatePushSubscription registers a browser push subscription for the
 	// authenticated user. Idempotent on (user, endpoint): re-subscribing the
 	// same browser refreshes its p256dh/auth keys. Returns FailedPrecondition
@@ -161,6 +182,9 @@ func (UnimplementedNotificationServiceServer) GetPushConfig(context.Context, *Ge
 }
 func (UnimplementedNotificationServiceServer) UpdatePushConfig(context.Context, *UpdatePushConfigRequest) (*UpdatePushConfigResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdatePushConfig not implemented")
+}
+func (UnimplementedNotificationServiceServer) ListPushSubscriptions(context.Context, *ListPushSubscriptionsRequest) (*ListPushSubscriptionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPushSubscriptions not implemented")
 }
 func (UnimplementedNotificationServiceServer) CreatePushSubscription(context.Context, *CreatePushSubscriptionRequest) (*PushSubscription, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreatePushSubscription not implemented")
@@ -225,6 +249,24 @@ func _NotificationService_UpdatePushConfig_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NotificationService_ListPushSubscriptions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPushSubscriptionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).ListPushSubscriptions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_ListPushSubscriptions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).ListPushSubscriptions(ctx, req.(*ListPushSubscriptionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _NotificationService_CreatePushSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreatePushSubscriptionRequest)
 	if err := dec(in); err != nil {
@@ -275,6 +317,10 @@ var NotificationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdatePushConfig",
 			Handler:    _NotificationService_UpdatePushConfig_Handler,
+		},
+		{
+			MethodName: "ListPushSubscriptions",
+			Handler:    _NotificationService_ListPushSubscriptions_Handler,
 		},
 		{
 			MethodName: "CreatePushSubscription",
