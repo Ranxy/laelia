@@ -83,6 +83,10 @@ type mcpCallResult struct {
 }
 
 func runMcpProxy() error {
+	return runMcpProxyIO(os.Stdin, os.Stdout)
+}
+
+func runMcpProxyIO(stdin io.Reader, stdout io.Writer) error {
 	agent := os.Getenv("LAELIA_AGENT")
 	socket := os.Getenv("LAELIA_DAEMON_SOCKET")
 	token := os.Getenv("LAELIA_SESSION_TOKEN")
@@ -90,8 +94,8 @@ func runMcpProxy() error {
 		return errors.New("mcp-proxy: LAELIA_AGENT / LAELIA_DAEMON_SOCKET / LAELIA_SESSION_TOKEN are required")
 	}
 
-	reader := bufio.NewReaderSize(os.Stdin, 64*1024)
-	writer := bufio.NewWriter(os.Stdout)
+	reader := bufio.NewReaderSize(stdin, 64*1024)
+	writer := bufio.NewWriter(stdout)
 	encoder := json.NewEncoder(writer)
 	ctx := context.Background()
 
