@@ -1526,14 +1526,14 @@ service CommandService {
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.conversations.manage";
+    option (laelia.v1.permission) = "laelia.conversations.manageMembers";
     option (laelia.v1.audit) = true;
   }
 
   rpc RemoveChannelMember(RemoveChannelMemberRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/v1/{conversation=conversations/*}/members/{member_id}"};
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.conversations.manage";
+    option (laelia.v1.permission) = "laelia.conversations.manageMembers";
     option (laelia.v1.audit) = true;
   }
 

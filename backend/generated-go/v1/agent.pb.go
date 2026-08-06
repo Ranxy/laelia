@@ -2246,9 +2246,16 @@ type Agent struct {
 	// mcp_servers is the set of MCP server resource names (mcpServers/{id})
 	// enabled on this agent. The manager resolves them into a tool catalog when
 	// the agent starts; the machine never receives transport configuration.
-	McpServers    []string `protobuf:"bytes,19,rep,name=mcp_servers,json=mcpServers,proto3" json:"mcp_servers,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	McpServers []string `protobuf:"bytes,19,rep,name=mcp_servers,json=mcpServers,proto3" json:"mcp_servers,omitempty"`
+	// can_manage_channel_members grants this agent the ability to add/remove
+	// members in a channel where its owner is a channel Admin or Owner. This is
+	// separate from follow_owner_permissions (which controls read visibility):
+	// the agent acts on its owner's behalf for member management only — it never
+	// inherits the owner's other manage powers (rename, delete, transfer, roles).
+	// Default true.
+	CanManageChannelMembers bool `protobuf:"varint,20,opt,name=can_manage_channel_members,json=canManageChannelMembers,proto3" json:"can_manage_channel_members,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *Agent) Reset() {
@@ -2407,6 +2414,13 @@ func (x *Agent) GetMcpServers() []string {
 	return nil
 }
 
+func (x *Agent) GetCanManageChannelMembers() bool {
+	if x != nil {
+		return x.CanManageChannelMembers
+	}
+	return false
+}
+
 // AgentSummary is the lightweight list-view projection of an Agent returned by
 // ListAgents. It carries only the fields list/header views need: identity,
 // lifecycle state, connection status, and the provider/executable signal that
@@ -2446,8 +2460,12 @@ type AgentSummary struct {
 	// follow_owner_permissions mirrors Agent.follow_owner_permissions so list
 	// consumers can show whether the agent follows its owner's channel access.
 	FollowOwnerPermissions bool `protobuf:"varint,11,opt,name=follow_owner_permissions,json=followOwnerPermissions,proto3" json:"follow_owner_permissions,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// can_manage_channel_members mirrors Agent.can_manage_channel_members so list
+	// consumers can show whether the agent may manage members on its owner's
+	// behalf.
+	CanManageChannelMembers bool `protobuf:"varint,12,opt,name=can_manage_channel_members,json=canManageChannelMembers,proto3" json:"can_manage_channel_members,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *AgentSummary) Reset() {
@@ -2553,6 +2571,13 @@ func (x *AgentSummary) GetOwner() string {
 func (x *AgentSummary) GetFollowOwnerPermissions() bool {
 	if x != nil {
 		return x.FollowOwnerPermissions
+	}
+	return false
+}
+
+func (x *AgentSummary) GetCanManageChannelMembers() bool {
+	if x != nil {
+		return x.CanManageChannelMembers
 	}
 	return false
 }
@@ -3416,7 +3441,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\fHelloRequest\"Y\n" +
 	"\rHelloResponse\x12!\n" +
 	"\fcurrent_time\x18\x01 \x01(\x03R\vcurrentTime\x12%\n" +
-	"\x0eserver_version\x18\x02 \x01(\tR\rserverVersion\"\xce\x06\n" +
+	"\x0eserver_version\x18\x02 \x01(\tR\rserverVersion\"\x8b\a\n" +
 	"\x05Agent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -3440,11 +3465,12 @@ const file_v1_agent_proto_rawDesc = "" +
 	"owner_name\x18\x11 \x01(\tB\x03\xe0A\x03R\townerName\x128\n" +
 	"\x18follow_owner_permissions\x18\x12 \x01(\bR\x16followOwnerPermissions\x12\x1f\n" +
 	"\vmcp_servers\x18\x13 \x03(\tR\n" +
-	"mcpServers\x1a9\n" +
+	"mcpServers\x12;\n" +
+	"\x1acan_manage_channel_members\x18\x14 \x01(\bR\x17canManageChannelMembers\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:!\xeaA\x1e\n" +
-	"\flaelia/Agent\x12\x0eagents/{agent}J\x04\b\x04\x10\x05R\x05token\"\x86\x03\n" +
+	"\flaelia/Agent\x12\x0eagents/{agent}J\x04\b\x04\x10\x05R\x05token\"\xc3\x03\n" +
 	"\fAgentSummary\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -3460,7 +3486,8 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x14allow_add_to_channel\x18\t \x01(\bR\x11allowAddToChannel\x12\x14\n" +
 	"\x05owner\x18\n" +
 	" \x01(\tR\x05owner\x128\n" +
-	"\x18follow_owner_permissions\x18\v \x01(\bR\x16followOwnerPermissions\"\xce\x03\n" +
+	"\x18follow_owner_permissions\x18\v \x01(\bR\x16followOwnerPermissions\x12;\n" +
+	"\x1acan_manage_channel_members\x18\f \x01(\bR\x17canManageChannelMembers\"\xce\x03\n" +
 	"\tAgentInfo\x12\x1d\n" +
 	"\n" +
 	"agent_type\x18\x01 \x01(\tR\tagentType\x12\x1a\n" +

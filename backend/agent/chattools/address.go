@@ -124,6 +124,39 @@ func findPeerAgentByName(ctx context.Context, d Deps, peer string) (*v1pb.PeerAg
 	return match, nil
 }
 
+// findUserByName returns the single user whose display name (title) matches
+// name, or nil when no user matches so the caller can report a not-found. More
+// than one match is an ambiguous-name error; a ListUsers failure is propagated.
+// The UserServiceClient is optional (Deps.UserClient may be nil for callers
+// that never resolve users); a nil client is a PERMISSION_FAILED, not a panic.
+func findUserByName(ctx context.Context, d Deps, name string) (*v1pb.User, error) {
+	if d.UserClient == nil {
+		return nil, localError("PERMISSION_FAILED", "user lookup is unavailable in this context", "Use users/<id> to add a user by id.")
+	}
+	var match *v1pb.User
+	pageToken := ""
+	for {
+		resp, err := d.UserClient.ListUsers(ctx, connect.NewRequest(&v1pb.ListUsersRequest{PageToken: pageToken, PageSize: 100}))
+		if err != nil {
+			return nil, wrapManagerError(err)
+		}
+		for _, u := range resp.Msg.GetUsers() {
+			if u.GetTitle() == name {
+				if match != nil {
+					return nil, localError("AMBIGUOUS_USER", fmt.Sprintf("multiple users named %q; address one as users/<id>", name), "Run `members <address>` or use users/<id> to disambiguate.")
+				}
+				match = u
+			}
+		}
+		next := resp.Msg.GetNextPageToken()
+		if next == "" || len(resp.Msg.GetUsers()) == 0 {
+			break
+		}
+		pageToken = next
+	}
+	return match, nil
+}
+
 // createAgentDM opens or reuses the type-3 agent DM with the peer given as the
 // "agents/<id>" resource name. The manager rejects self-address and unknown
 // agents; those reach the caller as wrapped manager errors.

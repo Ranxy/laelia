@@ -81,6 +81,11 @@ type Server struct {
 	mcpProxyBase   string
 	mcpProxyTokens map[string]string
 	mcpProxyAgents map[string]string
+
+	// userClients caches a per-agent UserServiceClient (same token + agent
+	// header), used by `channel add-member` to resolve user display names.
+	userClientsMu sync.Mutex
+	userClients   map[string]v1connect.UserServiceClient
 }
 
 // New creates a daemon bound to a unix socket at
@@ -116,6 +121,7 @@ func New(managerURL, machineResourceID string, getToken func() string, httpClien
 		mcpClients:        make(map[string]v1connect.McpGatewayServiceClient),
 		mcpProxyTokens:    make(map[string]string),
 		mcpProxyAgents:    make(map[string]string),
+		userClients:       make(map[string]v1connect.UserServiceClient),
 	}, nil
 }
 
@@ -130,7 +136,7 @@ func (s *Server) SessionToken() string { return s.sessionToken }
 // agents/<id>/commands/<id> resource names. Each agent runner passes its own
 // agent id.
 func (s *Server) BatchDeps(agentBareID string) chattools.Deps {
-	return chattools.Deps{Client: s.agentClient(agentBareID), Agent: agentBareID}
+	return chattools.Deps{Client: s.agentClient(agentBareID), UserClient: s.userClient(agentBareID), Agent: agentBareID}
 }
 
 // agentClient returns a cached CommandServiceClient for the agent identified by
@@ -154,6 +160,28 @@ func (s *Server) agentClient(agentBareID string) v1connect.CommandServiceClient 
 		connect.WithInterceptors(s.authInterceptor(agentBareID)),
 	)
 	s.agentClients[agentBareID] = c
+	return c
+}
+
+// userClient returns a cached UserServiceClient for the agent identified by
+// agentBareID, stamped with the same token + X-Laelia-Agent header as
+// agentClient so the manager resolves the caller as that agent. Used by
+// `channel add-member` to resolve user display names to principal ids.
+func (s *Server) userClient(agentBareID string) v1connect.UserServiceClient {
+	s.userClientsMu.Lock()
+	defer s.userClientsMu.Unlock()
+	if s.userClients == nil {
+		s.userClients = make(map[string]v1connect.UserServiceClient)
+	}
+	if c, ok := s.userClients[agentBareID]; ok {
+		return c
+	}
+	c := v1connect.NewUserServiceClient(
+		s.httpClient,
+		s.managerURL,
+		connect.WithInterceptors(s.authInterceptor(agentBareID)),
+	)
+	s.userClients[agentBareID] = c
 	return c
 }
 
@@ -482,6 +510,9 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/channel/join", s.handleChannelJoin)
 	mux.HandleFunc("/mcp/tools", s.handleMcpTools)
 	mux.HandleFunc("/mcp/call", s.handleMcpCall)
+	mux.HandleFunc("/channel/leave", s.handleChannelLeave)
+	mux.HandleFunc("/channel/add-member", s.handleChannelAddMember)
+	mux.HandleFunc("/channel/remove-member", s.handleChannelRemoveMember)
 
 	s.httpServer = &http.Server{Handler: mux}
 	go func() {
@@ -544,6 +575,10 @@ type Request struct {
 	// AttachmentIDs are file ids to attach to a posted message.
 	AttachmentIDs []string `json:"attachment_ids,omitempty"`
 
+	// Members are the member arguments of `channel add-member` (display names or
+	// agents/<id> / users/<id> handles).
+	Members []string `json:"members,omitempty"`
+
 	// Reminder fields. Name is a reminder resource name
 	// ("reminders/{message_id}"). FireAt is an RFC3339 timestamp; CronExpr is a
 	// 5-field cron expression (empty = one-shot); Tz is an IANA timezone.
@@ -574,9 +609,10 @@ func (s *Server) deps(r Request) chattools.Deps {
 	// empty value is passed through and fails server-side caller resolution
 	// rather than silently routing to a default.
 	return chattools.Deps{
-		Client:  s.agentClient(r.Agent),
-		Agent:   r.Agent,
-		Command: r.Command,
+		Client:     s.agentClient(r.Agent),
+		UserClient: s.userClient(r.Agent),
+		Agent:      r.Agent,
+		Command:    r.Command,
 	}
 }
 
@@ -1057,6 +1093,45 @@ func (s *Server) handleChannelJoin(w http.ResponseWriter, r *http.Request) {
 	s.run(w, r, func(req Request) (string, *chattools.Error) {
 		text, err := chattools.JoinChannel(r.Context(), s.deps(req), chattools.JoinChannelInput{
 			Conversation: req.Conversation,
+		})
+		return text, asChatError(err)
+	})
+}
+
+// handleChannelLeave removes the agent from a channel it is a member of, so the
+// channel stops appearing in `message check` and the agent can no longer post.
+func (s *Server) handleChannelLeave(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.LeaveChannel(r.Context(), s.deps(req), chattools.LeaveChannelInput{
+			Conversation: req.Conversation,
+		})
+		return text, asChatError(err)
+	})
+}
+
+// handleChannelAddMember adds members (users or agents) to a channel the agent
+// manages. The manager enforces the same rules as a user adding members: the
+// caller must hold conversations.manageMembers (channel Admin/Owner, or an agent
+// whose owner is a channel Admin/Owner with can_manage_channel_members enabled),
+// and a private agent (allow_add_to_channel=false) cannot be added by another
+// agent.
+func (s *Server) handleChannelAddMember(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.AddChannelMember(r.Context(), s.deps(req), chattools.AddChannelMemberInput{
+			Conversation: req.Conversation,
+			Members:      req.Members,
+		})
+		return text, asChatError(err)
+	})
+}
+
+// handleChannelRemoveMember removes members (users or agents) from a channel the
+// agent manages, under the same conversations.manageMembers rule as adding.
+func (s *Server) handleChannelRemoveMember(w http.ResponseWriter, r *http.Request) {
+	s.run(w, r, func(req Request) (string, *chattools.Error) {
+		text, err := chattools.RemoveChannelMember(r.Context(), s.deps(req), chattools.RemoveChannelMemberInput{
+			Conversation: req.Conversation,
+			Members:      req.Members,
 		})
 		return text, asChatError(err)
 	})

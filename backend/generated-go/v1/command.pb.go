@@ -11226,7 +11226,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x1aACTIVITY_STATE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15ACTIVITY_STATE_UNREAD\x10\x01\x12\x17\n" +
 	"\x13ACTIVITY_STATE_READ\x10\x02\x12\x17\n" +
-	"\x13ACTIVITY_STATE_DONE\x10\x032\xcfL\n" +
+	"\x13ACTIVITY_STATE_DONE\x10\x032\xddL\n" +
 	"\x0eCommandService\x12\x91\x01\n" +
 	"\fListCommands\x12\x1e.laelia.v1.ListCommandsRequest\x1a\x1f.laelia.v1.ListCommandsResponse\"@\x8a\xea0\x13laelia.commands.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1f\x12\x1d/v1/{agent=agents/*}/commands\x12\x81\x01\n" +
 	"\n" +
@@ -11252,9 +11252,9 @@ const file_v1_command_proto_rawDesc = "" +
 	"\n" +
 	"GetChannel\x12\x1c.laelia.v1.GetChannelRequest\x1a\x17.laelia.v1.Conversation\"C\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1c\x12\x1a/v1/{name=conversations/*}\x12\xaf\x01\n" +
 	"\rUpdateChannel\x12\x1f.laelia.v1.UpdateChannelRequest\x1a\x17.laelia.v1.Conversation\"d\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x027:\fconversation2'/v1/{conversation.name=conversations/*}\x12\x93\x01\n" +
-	"\rDeleteChannel\x12\x1f.laelia.v1.DeleteChannelRequest\x1a\x16.google.protobuf.Empty\"I\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1c*\x1a/v1/{name=conversations/*}\x12\xb9\x01\n" +
-	"\x10AddChannelMember\x12\".laelia.v1.AddChannelMemberRequest\x1a#.laelia.v1.AddChannelMemberResponse\"\\\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02/:\x01*\"*/v1/{conversation=conversations/*}/members\x12\xbb\x01\n" +
-	"\x13RemoveChannelMember\x12%.laelia.v1.RemoveChannelMemberRequest\x1a\x16.google.protobuf.Empty\"e\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x028*6/v1/{conversation=conversations/*}/members/{member_id}\x12\xdb\x01\n" +
+	"\rDeleteChannel\x12\x1f.laelia.v1.DeleteChannelRequest\x1a\x16.google.protobuf.Empty\"I\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1c*\x1a/v1/{name=conversations/*}\x12\xc0\x01\n" +
+	"\x10AddChannelMember\x12\".laelia.v1.AddChannelMemberRequest\x1a#.laelia.v1.AddChannelMemberResponse\"c\x8a\xea0\"laelia.conversations.manageMembers\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02/:\x01*\"*/v1/{conversation=conversations/*}/members\x12\xc2\x01\n" +
+	"\x13RemoveChannelMember\x12%.laelia.v1.RemoveChannelMemberRequest\x1a\x16.google.protobuf.Empty\"l\x8a\xea0\"laelia.conversations.manageMembers\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x028*6/v1/{conversation=conversations/*}/members/{member_id}\x12\xdb\x01\n" +
 	"\x18TransferChannelOwnership\x12*.laelia.v1.TransferChannelOwnershipRequest\x1a+.laelia.v1.TransferChannelOwnershipResponse\"f\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{conversation=conversations/*}:transferOwnership\x12\xd3\x01\n" +
 	"\x17UpdateChannelMemberRole\x12).laelia.v1.UpdateChannelMemberRoleRequest\x1a\x18.laelia.v1.ChannelMember\"s\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02F:\x01*\"A/v1/{conversation=conversations/*}/members/{member_id}:updateRole\x12\xa0\x01\n" +
 	"\fLeaveChannel\x12\x1e.laelia.v1.LeaveChannelRequest\x1a\x16.google.protobuf.Empty\"X\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02-:\x01*\"(/v1/{conversation=conversations/*}:leave\x12\xb6\x01\n" +

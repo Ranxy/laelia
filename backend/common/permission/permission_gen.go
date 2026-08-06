@@ -23,6 +23,7 @@ const (
 	ConversationsRead          Permission = "laelia.conversations.read"
 	ConversationsSend          Permission = "laelia.conversations.send"
 	ConversationsManage        Permission = "laelia.conversations.manage"
+	ConversationsManageMembers Permission = "laelia.conversations.manageMembers"
 	ConversationsReviewAgentDM Permission = "laelia.conversations.reviewAgentDM"
 	ConversationsReviewAll     Permission = "laelia.conversations.reviewAll"
 	RemindersGet               Permission = "laelia.reminders.get"
@@ -97,6 +98,7 @@ var allPermissions = []Permission{
 	ConversationsRead,
 	ConversationsSend,
 	ConversationsManage,
+	ConversationsManageMembers,
 	ConversationsReviewAgentDM,
 	ConversationsReviewAll,
 	RemindersGet,

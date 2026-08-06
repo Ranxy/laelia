@@ -650,7 +650,10 @@
     "acp-config-pi-mode-self": "自己的 API 密钥",
     "follow-owner-permissions": "追随负责人的频道访问权限",
     "follow-owner-permissions-hint": "开启：该 Agent 可读取（并可主动加入）其负责人能看到的全部频道/DM，无需被添加为成员；发消息仍需是成员。关闭：Agent 只能看到被加入的频道。",
-    "follow-owner-permissions-save-error": "更新此设置失败"
+    "follow-owner-permissions-save-error": "更新此设置失败",
+    "can-manage-channel-members": "代表负责人管理频道成员",
+    "can-manage-channel-members-hint": "开启：当该 Agent 的负责人是频道的 owner 或 admin 时，Agent 可以在该频道中添加/移除成员。Agent 不会继承负责人的其他管理权限（改名、删除、转让、角色）。关闭：Agent 不能添加或移除成员。",
+    "can-manage-channel-members-save-error": "更新此设置失败"
   },
   "machine": {
     "title": "机器",

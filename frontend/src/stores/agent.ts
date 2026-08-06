@@ -101,7 +101,11 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
   // never overwrites a flag it did not touch.
   async updateAgent(
     name: string,
-    fields: { allowAddToChannel?: boolean; followOwnerPermissions?: boolean }
+    fields: {
+      allowAddToChannel?: boolean;
+      followOwnerPermissions?: boolean;
+      canManageChannelMembers?: boolean;
+    }
   ) {
     const agent = create(AgentSchema, { name });
     const paths: string[] = [];
@@ -112,6 +116,10 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
     if (fields.followOwnerPermissions !== undefined) {
       agent.followOwnerPermissions = fields.followOwnerPermissions;
       paths.push("follow_owner_permissions");
+    }
+    if (fields.canManageChannelMembers !== undefined) {
+      agent.canManageChannelMembers = fields.canManageChannelMembers;
+      paths.push("can_manage_channel_members");
     }
     return agentServiceClient.updateAgent(
       create(UpdateAgentRequestSchema, {

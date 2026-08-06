@@ -51,19 +51,20 @@ func Exists(permissions ...string) bool {
 // (reviewAgentDM, reviewAll) are workspace-scope and intentionally NOT in this
 // set.
 var resourceScopedPermissions = map[Permission]bool{
-	ConversationsRead:   true,
-	ConversationsSend:   true,
-	ConversationsManage: true,
-	AgentsEdit:          true,
-	CommandsGet:         true,
-	CommandsWatch:       true,
-	CommandsCancel:      true,
-	RemindersGet:        true,
-	RemindersUpdate:     true,
-	RemindersCancel:     true,
-	FilesDownload:       true,
-	FilesList:           true,
-	MachinesCreateAgent: true,
+	ConversationsRead:          true,
+	ConversationsSend:          true,
+	ConversationsManage:        true,
+	ConversationsManageMembers: true,
+	AgentsEdit:                 true,
+	CommandsGet:                true,
+	CommandsWatch:              true,
+	CommandsCancel:             true,
+	RemindersGet:               true,
+	RemindersUpdate:            true,
+	RemindersCancel:            true,
+	FilesDownload:              true,
+	FilesList:                  true,
+	MachinesCreateAgent:        true,
 }
 
 // IsResourceScoped reports whether perm is authorized by a per-resource IAM

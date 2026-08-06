@@ -303,9 +303,10 @@ func (s *AgentService) UpdateAgent(ctx context.Context, req *connect.Request[v1p
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
-	// allow_add_to_channel and follow_owner_permissions are the supported mutable
-	// fields; reject any other path. Empty mask defaults to allow_add_to_channel
-	// (the original sole field).
+	// allow_add_to_channel, follow_owner_permissions, and
+	// can_manage_channel_members are the supported mutable fields; reject any
+	// other path. Empty mask defaults to allow_add_to_channel (the original sole
+	// field).
 	paths := req.Msg.UpdateMask.GetPaths()
 	if len(paths) == 0 {
 		paths = []string{"allow_add_to_channel"}
@@ -319,8 +320,11 @@ func (s *AgentService) UpdateAgent(ctx context.Context, req *connect.Request[v1p
 		case "follow_owner_permissions":
 			follow := req.Msg.Agent.GetFollowOwnerPermissions()
 			patch.FollowOwnerPermissions = &follow
+		case "can_manage_channel_members":
+			canManage := req.Msg.Agent.GetCanManageChannelMembers()
+			patch.CanManageChannelMembers = &canManage
 		default:
-			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("update_mask path %q is not supported; only allow_add_to_channel and follow_owner_permissions", p))
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("update_mask path %q is not supported; only allow_add_to_channel, follow_owner_permissions, and can_manage_channel_members", p))
 		}
 	}
 
@@ -1149,16 +1153,17 @@ func (s *AgentService) convertToAgent(ctx context.Context, agent *store.AgentMes
 	status := convertToV1AgentStatus(agent.Status, agent.Deleted, connected)
 
 	result := &v1pb.Agent{
-		Name:                   name,
-		State:                  state,
-		Title:                  agent.Name,
-		Info:                   convertToV1AgentInfo(agent.Info),
-		Status:                 status,
-		CreatedAt:              timestamppb.New(agent.CreatedAt),
-		TokenVersion:           int32(agent.TokenVersion),
-		AllowAddToChannel:      agent.AllowAddToChannel,
-		FollowOwnerPermissions: agent.FollowOwnerPermissions,
-		Machine:                common.FormatMachineUID(agent.MachineResourceID),
+		Name:                    name,
+		State:                   state,
+		Title:                   agent.Name,
+		Info:                    convertToV1AgentInfo(agent.Info),
+		Status:                  status,
+		CreatedAt:               timestamppb.New(agent.CreatedAt),
+		TokenVersion:            int32(agent.TokenVersion),
+		AllowAddToChannel:       agent.AllowAddToChannel,
+		FollowOwnerPermissions:  agent.FollowOwnerPermissions,
+		CanManageChannelMembers: agent.CanManageChannelMembers,
+		Machine:                 common.FormatMachineUID(agent.MachineResourceID),
 	}
 	if !agent.LastTokenRotatedAt.IsZero() {
 		result.LastTokenRotatedAt = timestamppb.New(agent.LastTokenRotatedAt)
@@ -1195,13 +1200,14 @@ func convertToAgentSummary(agent *store.AgentMessage, connected bool) *v1pb.Agen
 		state = v1pb.State_DELETED
 	}
 	summary := &v1pb.AgentSummary{
-		Name:                   common.FormatAgentUID(agent.ResourceID),
-		State:                  state,
-		Title:                  agent.Name,
-		Status:                 convertToV1AgentStatus(agent.Status, agent.Deleted, connected),
-		AllowAddToChannel:      agent.AllowAddToChannel,
-		FollowOwnerPermissions: agent.FollowOwnerPermissions,
-		Machine:                common.FormatMachineUID(agent.MachineResourceID),
+		Name:                    common.FormatAgentUID(agent.ResourceID),
+		State:                   state,
+		Title:                   agent.Name,
+		Status:                  convertToV1AgentStatus(agent.Status, agent.Deleted, connected),
+		AllowAddToChannel:       agent.AllowAddToChannel,
+		FollowOwnerPermissions:  agent.FollowOwnerPermissions,
+		CanManageChannelMembers: agent.CanManageChannelMembers,
+		Machine:                 common.FormatMachineUID(agent.MachineResourceID),
 	}
 	if agent.Info != nil && agent.Info.AcpConfig != nil {
 		summary.Provider = agent.Info.AcpConfig.Provider

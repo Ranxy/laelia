@@ -20,6 +20,7 @@ const (
 
 	memberRoleOwner  int32 = 1
 	memberRoleMember int32 = 2
+	memberRoleAdmin  int32 = 3
 )
 
 // --- Members input -------------------------------------------------------
@@ -55,6 +56,8 @@ func memberRoleString(r int32) string {
 		return "owner"
 	case memberRoleMember:
 		return "member"
+	case memberRoleAdmin:
+		return "admin"
 	}
 	return ""
 }

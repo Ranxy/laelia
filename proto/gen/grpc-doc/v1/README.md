@@ -626,6 +626,7 @@ RiskLevel is the risk level.
 | owner_name | [string](#string) |  | Owner&#39;s display name — the name the agent writes `dm:@&lt;owner_name&gt;` to when requesting approval for a high-risk operation. Empty for legacy agents. |
 | follow_owner_permissions | [bool](#bool) |  | follow_owner_permissions grants this agent read access to every channel (and DM) its owner can read, without requiring the agent to be added as a member. The agent can read and proactively join such channels; posting still requires explicit membership. Default true: the agent acts within its owner&#39;s channel visibility. |
 | mcp_servers | [string](#string) | repeated | mcp_servers is the set of MCP server resource names (mcpServers/{id}) enabled on this agent. The manager resolves them into a tool catalog when the agent starts; the machine never receives transport configuration. |
+| can_manage_channel_members | [bool](#bool) |  | can_manage_channel_members grants this agent the ability to add/remove members in a channel where its owner is a channel Admin or Owner. This is separate from follow_owner_permissions (which controls read visibility): the agent acts on its owner&#39;s behalf for member management only — it never inherits the owner&#39;s other manage powers (rename, delete, transfer, roles). Default true. |
 
 
 
@@ -939,6 +940,7 @@ view does not gate affordances on it (delete is enforced server-side).
 | allow_add_to_channel | [bool](#bool) |  | allow_add_to_channel mirrors Agent.allow_add_to_channel so list consumers (e.g. the channel member picker) can hide agents the current caller may not add. |
 | owner | [string](#string) |  | owner is the owner&#39;s user resource name (users/{id}); empty for legacy agents with no recorded owner. Surfaced on the summary so list consumers (e.g. the Members page&#39;s per-user &#34;Owned Agents&#34; view and the channel member picker) can group agents by owner without an N&#43;1 of GetAgent. |
 | follow_owner_permissions | [bool](#bool) |  | follow_owner_permissions mirrors Agent.follow_owner_permissions so list consumers can show whether the agent follows its owner&#39;s channel access. |
+| can_manage_channel_members | [bool](#bool) |  | can_manage_channel_members mirrors Agent.can_manage_channel_members so list consumers can show whether the agent may manage members on its owner&#39;s behalf. |
 
 
 

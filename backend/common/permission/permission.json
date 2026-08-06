@@ -18,6 +18,7 @@
     {"name": "ConversationsRead", "id": "laelia.conversations.read"},
     {"name": "ConversationsSend", "id": "laelia.conversations.send"},
     {"name": "ConversationsManage", "id": "laelia.conversations.manage"},
+    {"name": "ConversationsManageMembers", "id": "laelia.conversations.manageMembers"},
     {"name": "ConversationsReviewAgentDM", "id": "laelia.conversations.reviewAgentDM"},
     {"name": "ConversationsReviewAll", "id": "laelia.conversations.reviewAll"},
     {"name": "RemindersGet", "id": "laelia.reminders.get"},

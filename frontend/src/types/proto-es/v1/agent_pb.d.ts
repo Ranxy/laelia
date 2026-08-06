@@ -1088,6 +1088,18 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
    * @generated from field: repeated string mcp_servers = 19;
    */
   mcpServers: string[];
+
+  /**
+   * can_manage_channel_members grants this agent the ability to add/remove
+   * members in a channel where its owner is a channel Admin or Owner. This is
+   * separate from follow_owner_permissions (which controls read visibility):
+   * the agent acts on its owner's behalf for member management only — it never
+   * inherits the owner's other manage powers (rename, delete, transfer, roles).
+   * Default true.
+   *
+   * @generated from field: bool can_manage_channel_members = 20;
+   */
+  canManageChannelMembers: boolean;
 };
 
 /**
@@ -1187,6 +1199,15 @@ export declare type AgentSummary = Message<"laelia.v1.AgentSummary"> & {
    * @generated from field: bool follow_owner_permissions = 11;
    */
   followOwnerPermissions: boolean;
+
+  /**
+   * can_manage_channel_members mirrors Agent.can_manage_channel_members so list
+   * consumers can show whether the agent may manage members on its owner's
+   * behalf.
+   *
+   * @generated from field: bool can_manage_channel_members = 12;
+   */
+  canManageChannelMembers: boolean;
 };
 
 /**

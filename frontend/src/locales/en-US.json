@@ -650,7 +650,10 @@
     "acp-config-pi-mode-self": "My own API key",
     "follow-owner-permissions": "Follow the owner's channel access",
     "follow-owner-permissions-hint": "On: this agent can read (and proactively join) every channel/DM its owner can read, without being added as a member. Posting still requires membership. Off: the agent only sees channels it was added to.",
-    "follow-owner-permissions-save-error": "Failed to update this setting"
+    "follow-owner-permissions-save-error": "Failed to update this setting",
+    "can-manage-channel-members": "Manage channel members on the owner's behalf",
+    "can-manage-channel-members-hint": "On: this agent can add/remove members in a channel where its owner is a channel owner or admin. The agent never inherits the owner's other manage powers (rename, delete, transfer, roles). Off: the agent cannot add or remove members.",
+    "can-manage-channel-members-save-error": "Failed to update this setting"
   },
   "machine": {
     "title": "Machines",

@@ -2367,6 +2367,18 @@ enabled on this agent. The manager resolves them into a tool catalog when
 the agent starts; the machine never receives transport configuration. </p></td>
                 </tr>
               
+                <tr>
+                  <td>can_manage_channel_members</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>can_manage_channel_members grants this agent the ability to add/remove
+members in a channel where its owner is a channel Admin or Owner. This is
+separate from follow_owner_permissions (which controls read visibility):
+the agent acts on its owner&#39;s behalf for member management only — it never
+inherits the owner&#39;s other manage powers (rename, delete, transfer, roles).
+Default true. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -3273,6 +3285,15 @@ member picker) can group agents by owner without an N&#43;1 of GetAgent. </p></t
                   <td></td>
                   <td><p>follow_owner_permissions mirrors Agent.follow_owner_permissions so list
 consumers can show whether the agent follows its owner&#39;s channel access. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>can_manage_channel_members</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>can_manage_channel_members mirrors Agent.can_manage_channel_members so list
+consumers can show whether the agent may manage members on its owner&#39;s
+behalf. </p></td>
                 </tr>
               
             </tbody>

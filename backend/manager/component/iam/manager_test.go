@@ -107,8 +107,11 @@ func TestChatRolePermissionsResolve(t *testing.T) {
 	}{
 		{store.MemberRoleMember, permission.ConversationsRead, true},
 		{store.MemberRoleMember, permission.ConversationsManage, false},
+		{store.MemberRoleMember, permission.ConversationsManageMembers, false},
 		{store.MemberRoleAdmin, permission.ConversationsManage, true},
+		{store.MemberRoleAdmin, permission.ConversationsManageMembers, true},
 		{store.MemberRoleOwner, permission.ConversationsManage, true},
+		{store.MemberRoleOwner, permission.ConversationsManageMembers, true},
 		{0, permission.ConversationsRead, false},
 	}
 	for _, c := range cases {

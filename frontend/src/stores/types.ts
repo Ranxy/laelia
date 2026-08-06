@@ -196,11 +196,16 @@ export interface AgentSlice {
     allowAddToChannel?: boolean
   ) => Promise<CreateAgentResponse>;
   // updateAgent patches the agent's mutable flag fields (allow_add_to_channel,
-  // follow_owner_permissions); only the keys present in `fields` are sent.
-  // Authorized server-side for the agent's owner or a workspace admin.
+  // follow_owner_permissions, can_manage_channel_members); only the keys present
+  // in `fields` are sent. Authorized server-side for the agent's owner or a
+  // workspace admin.
   updateAgent: (
     name: string,
-    fields: { allowAddToChannel?: boolean; followOwnerPermissions?: boolean }
+    fields: {
+      allowAddToChannel?: boolean;
+      followOwnerPermissions?: boolean;
+      canManageChannelMembers?: boolean;
+    }
   ) => Promise<Agent>;
   deleteAgent: (name: string) => Promise<void>;
   rotateAgentToken: (

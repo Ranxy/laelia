@@ -25,11 +25,14 @@ import (
 // access token, plus the identity that the manager scopes the call to. Agent is
 // the "agents/<id>" resource name (used to resolve command context). Command is
 // the drain session's command_id, linked to post_message/ack so the frontend
-// can attribute the conversation activity.
+// can attribute the conversation activity. UserClient resolves user display
+// names to principal ids for channel add-member; it may be nil for callers that
+// never resolve users (the user-name path then fails with PERMISSION_FAILED).
 type Deps struct {
-	Client  v1connect.CommandServiceClient
-	Agent   string
-	Command string
+	Client     v1connect.CommandServiceClient
+	UserClient v1connect.UserServiceClient
+	Agent      string
+	Command    string
 }
 
 // Error is the canonical failure envelope. Code is a stable machine-oriented

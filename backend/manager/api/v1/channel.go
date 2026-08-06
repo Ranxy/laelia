@@ -599,10 +599,13 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 // when the agent does not allow being added to channels, the caller must be the
 // agent's owner or a workspace admin. The channel-side manage check is already
 // enforced by the IAM interceptor, so this only adds the agent's own opt-in gate.
+// An agent caller is never a user, so it can never satisfy the owner/admin
+// bypass — the error explains the reason and the recovery so the agent knows to
+// ask the target's owner to enable the switch.
 func (s *CommandService) checkAgentAddableByCaller(ctx context.Context, agent *store.AgentMessage) error {
 	user, ok := GetUserFromContext(ctx)
 	if !ok || user == nil {
-		return connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a workspace admin may add this agent"))
+		return agentNotAddableError(agent)
 	}
 	if agent.OwnerID != 0 && agent.OwnerID == user.ID {
 		return nil
@@ -614,7 +617,22 @@ func (s *CommandService) checkAgentAddableByCaller(ctx context.Context, agent *s
 	if isAdmin {
 		return nil
 	}
-	return connect.NewError(connect.CodePermissionDenied, errors.Errorf("agent %s does not allow being added to channels; only its owner or a workspace admin may add it", agent.ResourceID))
+	return agentNotAddableError(agent)
+}
+
+// agentNotAddableError builds the permission-denied error for the
+// allow_add_to_channel gate. The message is self-contained: it names the target
+// agent, states the reason (the switch is off), and tells the caller the
+// recovery (ask the target's owner to enable it) — an agent caller reads this
+// verbatim and must know what to do next.
+func agentNotAddableError(target *store.AgentMessage) error {
+	display := target.Name
+	if display == "" {
+		display = target.ResourceID
+	}
+	return connect.NewError(connect.CodePermissionDenied, errors.Errorf(
+		"agent %s does not allow being added to channels (allow_add_to_channel is off); only its owner or a workspace admin may add it; ask %s's owner to enable 'allow being added to channels' on the agent, then retry",
+		target.ResourceID, display))
 }
 
 func (s *CommandService) RemoveChannelMember(ctx context.Context, req *connect.Request[v1pb.RemoveChannelMemberRequest]) (*connect.Response[emptypb.Empty], error) {

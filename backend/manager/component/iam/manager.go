@@ -194,6 +194,28 @@ func (m *Manager) checkConversationPermission(ctx context.Context, perm permissi
 		}
 	}
 
+	// Owner-follow member management: when the calling agent has
+	// can_manage_channel_members enabled, it may add/remove members in any
+	// channel its owner manages (Admin/Owner). Deliberately scoped to
+	// manageMembers — the agent never inherits the owner's other manage powers
+	// (rename, delete, transfer, roles). Gated by can_manage_channel_members,
+	// not follow_owner_permissions: the two are independent (visibility vs.
+	// member management).
+	if perm == permission.ConversationsManageMembers && agent != nil && agent.CanManageChannelMembers {
+		owner, err := m.store.GetUserByID(ctx, agent.OwnerID)
+		if err != nil {
+			return false, err
+		}
+		if owner != nil && !owner.MemberDeleted {
+			for _, binding := range utils.GetUserIAMPolicyBindings(ctx, m.store, owner, policy.Policy) {
+				rolePerms := m.conversationRolePermissions(ctx, binding.GetRole())
+				if rolePerms != nil && rolePerms[perm] {
+					return true, nil
+				}
+			}
+		}
+	}
+
 	// Non-member override: a user holding the grantable reviewAgentDM workspace
 	// permission may read (not send/manage) an agent-to-agent DM.
 	if perm == permission.ConversationsRead && user != nil {
@@ -290,6 +312,7 @@ var (
 		permission.ConversationsRead,
 		permission.ConversationsSend,
 		permission.ConversationsManage,
+		permission.ConversationsManageMembers,
 		permission.CommandsGet,
 		permission.CommandsWatch,
 		permission.FilesList,
@@ -298,6 +321,7 @@ var (
 		permission.ConversationsRead,
 		permission.ConversationsSend,
 		permission.ConversationsManage,
+		permission.ConversationsManageMembers,
 		permission.CommandsGet,
 		permission.CommandsWatch,
 		permission.FilesList,

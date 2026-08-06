@@ -167,3 +167,16 @@ func requireArgs(cmd *cobra.Command, n int, args []string) bool {
 	}
 	return true
 }
+
+// requireMinArgs fails with a canonical error if fewer than n args are given
+// (for commands with a variable tail, e.g. `channel add-member <address>
+// <member>...`).
+func requireMinArgs(cmd *cobra.Command, n int, args []string) bool {
+	if len(args) < n {
+		printError("INVALID_ARGUMENT_FAILED",
+			fmt.Sprintf("%s expects at least %d positional argument(s), got %d", cmd.CommandPath(), n, len(args)),
+			fmt.Sprintf("Run `%s --help` for usage.", cmd.CommandPath()))
+		return false
+	}
+	return true
+}

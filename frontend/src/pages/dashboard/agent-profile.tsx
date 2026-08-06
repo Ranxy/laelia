@@ -233,6 +233,7 @@ export function AgentProfilePage() {
   });
   const [allowAddSaving, setAllowAddSaving] = useState(false);
   const [followOwnerSaving, setFollowOwnerSaving] = useState(false);
+  const [canManageMembersSaving, setCanManageMembersSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Ownership transfer state. The flow is deliberately two-step: the first
@@ -648,6 +649,25 @@ export function AgentProfilePage() {
     }
   }
 
+  // Toggle can_manage_channel_members via UpdateAgent, then refetch the agent so
+  // the member-management access model shown reflects the new setting.
+  async function handleToggleCanManageMembers(next: boolean) {
+    setCanManageMembersSaving(true);
+    try {
+      const updateAgent = useAppStore.getState().updateAgent;
+      await updateAgent(agentName, { canManageChannelMembers: next });
+      setAgent(await getAgent(agentName));
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("agent.can-manage-channel-members-save-error"),
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setCanManageMembersSaving(false);
+    }
+  }
+
   // userTitle resolves a user resource name (users/{id}) to the roster's display
   // title, falling back to the raw name so a stale/deleted user never renders
   // empty. Used for the owner/creator display rows.
@@ -861,6 +881,18 @@ export function AgentProfilePage() {
                   disabled={!canEdit || followOwnerSaving}
                   onCheckedChange={(next) => {
                     void handleToggleFollowOwner(next);
+                  }}
+                />
+              </FieldRow>
+              <FieldRow
+                label={t("agent.can-manage-channel-members")}
+                hint={t("agent.can-manage-channel-members-hint")}
+              >
+                <Switch
+                  checked={agent.canManageChannelMembers ?? true}
+                  disabled={!canEdit || canManageMembersSaving}
+                  onCheckedChange={(next) => {
+                    void handleToggleCanManageMembers(next);
                   }}
                 />
               </FieldRow>

@@ -601,6 +601,14 @@ message Agent {
   // enabled on this agent. The manager resolves them into a tool catalog when
   // the agent starts; the machine never receives transport configuration.
   repeated string mcp_servers = 19;
+
+  // can_manage_channel_members grants this agent the ability to add/remove
+  // members in a channel where its owner is a channel Admin or Owner. This is
+  // separate from follow_owner_permissions (which controls read visibility):
+  // the agent acts on its owner's behalf for member management only — it never
+  // inherits the owner's other manage powers (rename, delete, transfer, roles).
+  // Default true.
+  bool can_manage_channel_members = 20;
 }
 
 // AgentSummary is the lightweight list-view projection of an Agent returned by
@@ -641,6 +649,10 @@ message AgentSummary {
   // follow_owner_permissions mirrors Agent.follow_owner_permissions so list
   // consumers can show whether the agent follows its owner's channel access.
   bool follow_owner_permissions = 11;
+  // can_manage_channel_members mirrors Agent.can_manage_channel_members so list
+  // consumers can show whether the agent may manage members on its owner's
+  // behalf.
+  bool can_manage_channel_members = 12;
 }
 
 message AgentInfo {

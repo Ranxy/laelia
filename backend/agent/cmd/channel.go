@@ -10,12 +10,15 @@ func init() {
 	rootCmd.AddCommand(channelCmd)
 	channelCmd.AddCommand(channelListCmd)
 	channelCmd.AddCommand(channelJoinCmd)
+	channelCmd.AddCommand(channelLeaveCmd)
+	channelCmd.AddCommand(channelAddMemberCmd)
+	channelCmd.AddCommand(channelRemoveMemberCmd)
 }
 
 // channel is the parent command for channel discovery and membership.
 var channelCmd = &cobra.Command{
 	Use:   "channel",
-	Short: "Discover and join channels",
+	Short: "Discover, join, leave, and manage channels",
 }
 
 // channel list — every conversation the agent can read: its memberships plus
@@ -48,6 +51,59 @@ var channelJoinCmd = &cobra.Command{
 			return ErrCLIFailed
 		}
 		if !call("/channel/join", daemonsrv.Request{Conversation: args[0]}) {
+			return ErrCLIFailed
+		}
+		return nil
+	},
+}
+
+// channel leave <address> — remove the agent from a channel it is a member of.
+// The channel stops appearing in `message check` and the agent can no longer
+// post; rejoin with `channel join` if it can still read the channel.
+var channelLeaveCmd = &cobra.Command{
+	Use:   "leave <address>",
+	Short: "Leave a channel you are a member of",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if !requireArgs(cmd, 1, args) {
+			return ErrCLIFailed
+		}
+		if !call("/channel/leave", daemonsrv.Request{Conversation: args[0]}) {
+			return ErrCLIFailed
+		}
+		return nil
+	},
+}
+
+// channel add-member <address> <member>... — add members (users or agents) to a
+// channel the agent manages. The manager enforces the same rules as a user
+// adding members: the caller must be a channel Admin/Owner (or an agent whose
+// owner is a channel Admin/Owner with can_manage_channel_members enabled), and a
+// private agent (allow_add_to_channel=false) cannot be added by another agent.
+var channelAddMemberCmd = &cobra.Command{
+	Use:   "add-member <address> <member>...",
+	Short: "Add members to a channel you manage (Admin/Owner)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if !requireMinArgs(cmd, 2, args) {
+			return ErrCLIFailed
+		}
+		if !call("/channel/add-member", daemonsrv.Request{Conversation: args[0], Members: args[1:]}) {
+			return ErrCLIFailed
+		}
+		return nil
+	},
+}
+
+// channel remove-member <address> <member>... — remove members (users or agents)
+// from a channel the agent manages, under the same conversations.manageMembers
+// rule as adding.
+var channelRemoveMemberCmd = &cobra.Command{
+	Use:   "remove-member <address> <member>...",
+	Short: "Remove members from a channel you manage (Admin/Owner)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if !requireMinArgs(cmd, 2, args) {
+			return ErrCLIFailed
+		}
+		if !call("/channel/remove-member", daemonsrv.Request{Conversation: args[0], Members: args[1:]}) {
 			return ErrCLIFailed
 		}
 		return nil

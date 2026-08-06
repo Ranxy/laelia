@@ -42,3 +42,13 @@ func TestCatalogMatchesSource(t *testing.T) {
 		t.Error("unknown permission must not exist")
 	}
 }
+
+// TestManageMembersIsResourceScoped guards the interceptor contract: the
+// manageMembers permission is authorized per-conversation (via the caller's chat
+// role or an agent's owner-follow), so the IAM interceptor must resolve the
+// request's conversation resource for it.
+func TestManageMembersIsResourceScoped(t *testing.T) {
+	if !IsResourceScoped(ConversationsManageMembers) {
+		t.Error("conversations.manageMembers must be resource-scoped")
+	}
+}
