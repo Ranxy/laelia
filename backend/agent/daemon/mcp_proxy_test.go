@@ -69,9 +69,11 @@ func TestHandleMcpProxyRoutesToGateway(t *testing.T) {
 	var catalog struct {
 		CatalogVersion int `json:"catalogVersion"`
 		Tools          []struct {
-			McpServerID string `json:"mcpServerId"`
-			ToolName    string `json:"toolName"`
-			RuntimeName string `json:"runtimeName"`
+			McpServerID       string `json:"mcpServerId"`
+			ToolName          string `json:"toolName"`
+			RuntimeName       string `json:"runtimeName"`
+			ConfigVersion     int64  `json:"configVersion"`
+			AssignmentVersion int64  `json:"assignmentVersion"`
 		} `json:"tools"`
 	}
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&catalog))
@@ -79,6 +81,8 @@ func TestHandleMcpProxyRoutesToGateway(t *testing.T) {
 	require.Len(t, catalog.Tools, 1)
 	assert.Equal(t, "mcpServers/srv-1", catalog.Tools[0].McpServerID)
 	assert.Equal(t, "r123_do_it", catalog.Tools[0].RuntimeName)
+	assert.EqualValues(t, 1, catalog.Tools[0].ConfigVersion)
+	assert.EqualValues(t, 2, catalog.Tools[0].AssignmentVersion)
 
 	callResp, err := http.Post(
 		ts.URL+"/mcp/tok/call",
@@ -96,16 +100,15 @@ func TestHandleMcpProxyRoutesToGateway(t *testing.T) {
 	require.Equal(t, http.StatusOK, callResp.StatusCode)
 	var result struct {
 		Content []struct {
-			Text *struct {
-				Text string `json:"text"`
-			} `json:"text"`
+			Type string `json:"type"`
+			Text string `json:"text"`
 		} `json:"content"`
 		IsError bool `json:"isError"`
 	}
 	require.NoError(t, json.NewDecoder(callResp.Body).Decode(&result))
 	require.Len(t, result.Content, 1)
-	require.NotNil(t, result.Content[0].Text)
-	assert.Equal(t, "ok", result.Content[0].Text.Text)
+	assert.Equal(t, "text", result.Content[0].Type)
+	assert.Equal(t, "ok", result.Content[0].Text)
 	assert.False(t, result.IsError)
 
 	require.NotNil(t, fake.gotCall)

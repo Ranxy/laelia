@@ -26,8 +26,6 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/pkg/errors"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/Ranxy/laelia/backend/agent/chattools"
@@ -278,7 +276,7 @@ func (s *Server) handleMcpProxy(w http.ResponseWriter, r *http.Request) {
 			mcpProxyError(w, http.StatusBadGateway, err.Error())
 			return
 		}
-		writeProtoJSON(w, catalog)
+		writeMcpCatalogJSON(w, catalog)
 	case "call":
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -313,20 +311,62 @@ func (s *Server) handleMcpProxy(w http.ResponseWriter, r *http.Request) {
 			mcpProxyError(w, http.StatusBadGateway, err.Error())
 			return
 		}
-		writeProtoJSON(w, result)
+		writeMcpCallResultJSON(w, result)
 	default:
 		http.NotFound(w, r)
 	}
 }
 
-func writeProtoJSON(w http.ResponseWriter, msg proto.Message) {
-	raw, err := protojson.Marshal(msg)
-	if err != nil {
-		mcpProxyError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
+// writeJSON writes a JSON payload with MCP wire naming.
+func writeJSON(w http.ResponseWriter, payload any) {
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(raw)
+	_ = json.NewEncoder(w).Encode(payload)
+}
+
+// writeMcpCatalogJSON writes a GetMcpCatalogResponse as the JSON shape the
+// managed-MCP consumers (pi extension and ACP mcp-proxy) expect. protojson is
+// not used because it serializes int64 version fields as strings; consumers
+// expect numbers.
+func writeMcpCatalogJSON(w http.ResponseWriter, catalog *v1pb.GetMcpCatalogResponse) {
+	tools := make([]map[string]any, 0, len(catalog.Tools))
+	for _, tool := range catalog.Tools {
+		entry := map[string]any{
+			"mcpServerId":       tool.McpServerId,
+			"serverName":        tool.ServerName,
+			"toolName":          tool.ToolName,
+			"runtimeName":       tool.RuntimeName,
+			"title":             tool.Title,
+			"description":       tool.Description,
+			"configVersion":     tool.ConfigVersion,
+			"assignmentVersion": tool.AssignmentVersion,
+		}
+		if tool.InputSchema != nil {
+			entry["inputSchema"] = tool.InputSchema.AsMap()
+		}
+		tools = append(tools, entry)
+	}
+	writeJSON(w, map[string]any{"catalogVersion": catalog.CatalogVersion, "tools": tools})
+}
+
+// writeMcpCallResultJSON writes a CallMcpToolResponse as MCP wire content
+// blocks (explicit type), the shape the pi extension and ACP mcp-proxy expect.
+// protojson would nest blocks as {"text":{"text":"..."}} and drop the type.
+func writeMcpCallResultJSON(w http.ResponseWriter, result *v1pb.CallMcpToolResponse) {
+	blocks := make([]map[string]any, 0, len(result.Content))
+	for _, block := range result.Content {
+		switch kind := block.Kind.(type) {
+		case *v1pb.McpContentBlock_Text:
+			blocks = append(blocks, map[string]any{"type": "text", "text": kind.Text.GetText()})
+		case *v1pb.McpContentBlock_Image:
+			blocks = append(blocks, map[string]any{"type": "image", "data": kind.Image.GetData(), "mimeType": kind.Image.GetMimeType()})
+		default:
+		}
+	}
+	payload := map[string]any{"content": blocks, "isError": result.IsError}
+	if result.StructuredContent != nil {
+		payload["structuredContent"] = result.StructuredContent.AsMap()
+	}
+	writeJSON(w, payload)
 }
 
 func mcpProxyError(w http.ResponseWriter, status int, message string) {
@@ -1058,13 +1098,7 @@ func (s *Server) handleMcpTools(w http.ResponseWriter, r *http.Request) {
 		writeError(w, &chattools.Error{Code: "MCP_GATEWAY_FAILED", Message: err.Error()})
 		return
 	}
-	raw, err := protojson.Marshal(catalog)
-	if err != nil {
-		writeError(w, &chattools.Error{Code: "MCP_GATEWAY_FAILED", Message: err.Error()})
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(raw)
+	writeMcpCatalogJSON(w, catalog)
 }
 
 func (s *Server) handleMcpCall(w http.ResponseWriter, r *http.Request) {
@@ -1102,11 +1136,5 @@ func (s *Server) handleMcpCall(w http.ResponseWriter, r *http.Request) {
 		writeError(w, &chattools.Error{Code: "MCP_GATEWAY_FAILED", Message: err.Error()})
 		return
 	}
-	raw, err := protojson.Marshal(result)
-	if err != nil {
-		writeError(w, &chattools.Error{Code: "MCP_GATEWAY_FAILED", Message: err.Error()})
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(raw)
+	writeMcpCallResultJSON(w, result)
 }
