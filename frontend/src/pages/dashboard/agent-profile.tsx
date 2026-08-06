@@ -133,6 +133,12 @@ export function AgentProfilePage() {
   // Global API providers the caller may use (handler-gated server-side), for
   // the builtin-pi runtime's provider/entry pickers.
   const apiProviders = useAppStore((s) => s.apiProviders);
+  // MCP servers the caller may use (handler-gated server-side), for the agent's
+  // enabled-MCP picker.
+  const mcpServers = useAppStore((s) => s.mcpServers);
+  const fetchMcpServers = useAppStore((s) => s.fetchMcpServers);
+  const [selectedMcpServers, setSelectedMcpServers] = useState<string[]>([]);
+  const [mcpSaving, setMcpSaving] = useState(false);
 
   const configRef = useRef({
     executable: "",
@@ -202,6 +208,28 @@ export function AgentProfilePage() {
   const [transferConfirmOpen, setTransferConfirmOpen] = useState(false);
   const [transferBusy, setTransferBusy] = useState(false);
   const [transferError, setTransferError] = useState("");
+
+  async function saveMcpServers() {
+    if (!canEdit) return;
+    setMcpSaving(true);
+    try {
+      const updateAgentMcpConfig = useAppStore.getState().updateAgentMcpConfig;
+      await updateAgentMcpConfig(agentName, selectedMcpServers);
+      setAgent(await getAgent(agentName));
+      toastManager.add({
+        type: "success",
+        title: t("agent.mcp-saved"),
+      });
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("agent.mcp-save-failed"),
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setMcpSaving(false);
+    }
+  }
 
   async function loadAgent() {
     if (!agentId) return;
@@ -286,8 +314,18 @@ export function AgentProfilePage() {
     setPersonaDraft(cfg?.personaPrompt ?? "");
     setPersonaEditing(false);
     setSaveStatus("idle");
+    setSelectedMcpServers(agent?.mcpServers ? [...agent.mcpServers] : []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent?.name]);
+
+  // Load the MCP server roster the caller may use (once) for the enabled-MCP
+  // picker.
+  useEffect(() => {
+    if (mcpServers.length === 0) {
+      void fetchMcpServers({ pageSize: 100 }, { silent: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Clear any pending debounce when the editor unmounts. Lives before the
   // `if (!agent)` early return so the hook order is stable (Rules of Hooks).
@@ -1363,6 +1401,78 @@ export function AgentProfilePage() {
                   )}
                 </div>
               </fieldset>
+            </Card>
+          </div>
+
+          {/* Managed MCP servers */}
+          <div>
+            <Card
+              title={t("agent.mcp-section-title")}
+              actions={
+                mcpSaving ? (
+                  <span className="flex items-center gap-1 text-xs text-control-light">
+                    <Loader2 className="size-3 animate-spin" />
+                    {t("agent.mcp-saving")}
+                  </span>
+                ) : null
+              }
+            >
+              <div className="flex flex-col gap-3">
+                <p className="text-xs text-control-light">
+                  {t("agent.mcp-section-hint")}
+                </p>
+                {mcpServers.length === 0 ? (
+                  <p className="text-xs text-control-placeholder">
+                    {t("agent.mcp-empty")}
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    {mcpServers.map((server) => {
+                      const enabled = selectedMcpServers.includes(server.name);
+                      return (
+                        <label
+                          key={server.name}
+                          className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-xs hover:bg-control-bg cursor-pointer"
+                        >
+                          <span className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-sm truncate">
+                              {server.title}
+                            </span>
+                            <span className="text-xs text-control-placeholder truncate">
+                              {server.transport.value?.url ?? ""}
+                            </span>
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={enabled}
+                            disabled={!canEdit}
+                            onChange={() =>
+                              setSelectedMcpServers((prev) =>
+                                enabled
+                                  ? prev.filter((n) => n !== server.name)
+                                  : [...prev, server.name]
+                              )
+                            }
+                            className="accent-accent"
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                {canEdit && mcpServers.length > 0 && (
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={mcpSaving}
+                      onClick={() => void saveMcpServers()}
+                    >
+                      {t("agent.mcp-save")}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </Card>
           </div>
         </div>

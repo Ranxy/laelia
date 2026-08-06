@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"time"
 
+	acp "github.com/coder/acp-go-sdk"
+
 	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
@@ -82,6 +84,10 @@ type ACPConfig struct {
 	SupportsDiff          bool              `yaml:"supports_diff"`
 	SupportsRawEvents     bool              `yaml:"supports_raw_events"`
 	SupportsToolTraces    bool              `yaml:"supports_tool_traces"`
+	// McpServers are passed to ACP NewSession/ResumeSession. The runner fills
+	// them per turn with the local MCP stdio proxy for the agent's managed MCP
+	// tools; never user-authored.
+	McpServers []acp.McpServer `yaml:"mcp_servers"`
 }
 
 // AgentWorkingDir returns the per-agent persistent working directory under

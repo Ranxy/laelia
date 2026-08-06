@@ -125,6 +125,10 @@ type PiConfig struct {
 	// disables eviction (the process stays resident, useful for debug or
 	// batch-dense agents). Defaults to defaultIdleTimeout.
 	IdleTimeout time.Duration
+
+	// McpProxyURL is the localhost daemon proxy URL the managed-MCP pi
+	// extension calls (LAELIA_MCP_PROXY_URL). Empty disables managed MCP tools.
+	McpProxyURL string
 }
 
 // BuildPiConfig resolves the user-configurable AgentACPConfig into a PiConfig
@@ -253,6 +257,9 @@ func (c *PiConfig) buildPiEnv(commandID string) []string {
 			values["PATH"] = c.BinaryDir + string(os.PathListSeparator) + existing
 		}
 	}
+	if c.McpProxyURL != "" {
+		values["LAELIA_MCP_PROXY_URL"] = c.McpProxyURL
+	}
 
 	env := make([]string, 0, len(values))
 	for k, v := range values {
@@ -261,17 +268,17 @@ func (c *PiConfig) buildPiEnv(commandID string) []string {
 	return env
 }
 
-// launchArgs builds the `pi --mode rpc` argv. --no-extensions/-no-skills etc.
+// launchArgs builds the `pi --mode rpc` argv. --no-skills/-no-prompt-templates
 // keep the agent minimal and free of extension-UI dialogs that would block the
-// headless drain loop; --approve trusts the working dir so AGENTS.md/CLAUDE.md
-// and project settings load.
+// headless drain loop; extensions stay enabled so the managed-MCP extension
+// (written under .pi/extensions) can register MCP tools. --approve trusts the
+// working dir so AGENTS.md/CLAUDE.md and project settings load.
 func (c *PiConfig) launchArgs() []string {
 	return []string{
 		"--mode", "rpc",
 		"--provider", apiProviders[c.APIProvider].piProvider,
 		"--model", c.Model,
 		"--session-dir", c.WorkingDir,
-		"--no-extensions",
 		"--no-skills",
 		"--no-prompt-templates",
 		"--approve",

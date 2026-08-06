@@ -119,7 +119,7 @@ func (s *APIProviderService) CreateAPIProvider(ctx context.Context, req *connect
 	if err != nil {
 		return nil, err
 	}
-	members, err := validateAndNormalizeAPIProviderMembers(in.Members)
+	members, err := validateAndNormalizeMembers(in.Members)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func (s *APIProviderService) UpdateAPIProvider(ctx context.Context, req *connect
 	if err := s.checkRemovedEntryReferences(ctx, current, entries); err != nil {
 		return nil, err
 	}
-	members, err := validateAndNormalizeAPIProviderMembers(in.Members)
+	members, err := validateAndNormalizeMembers(in.Members)
 	if err != nil {
 		return nil, err
 	}
@@ -390,9 +390,9 @@ func (s *APIProviderService) checkRemovedEntryReferences(ctx context.Context, pr
 	return nil
 }
 
-// validateAndNormalizeAPIProviderMembers checks the IAM member format of each
-// member and deduplicates.
-func validateAndNormalizeAPIProviderMembers(in []string) ([]string, error) {
+// validateAndNormalizeMembers checks the IAM member format of each member and
+// deduplicates. Shared by api_provider and mcp_server member lists.
+func validateAndNormalizeMembers(in []string) ([]string, error) {
 	seen := make(map[string]bool, len(in))
 	out := make([]string, 0, len(in))
 	for _, m := range in {

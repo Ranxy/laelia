@@ -712,6 +712,30 @@ export declare type UpdateAgentACPConfigRequest = Message<"laelia.v1.UpdateAgent
 export declare const UpdateAgentACPConfigRequestSchema: GenMessage<UpdateAgentACPConfigRequest>;
 
 /**
+ * @generated from message laelia.v1.UpdateAgentMcpConfigRequest
+ */
+export declare type UpdateAgentMcpConfigRequest = Message<"laelia.v1.UpdateAgentMcpConfigRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * mcp_servers is the full replacement set of enabled MCP server resource
+   * names (mcpServers/{id}).
+   *
+   * @generated from field: repeated string mcp_servers = 2;
+   */
+  mcpServers: string[];
+};
+
+/**
+ * Describes the message laelia.v1.UpdateAgentMcpConfigRequest.
+ * Use `create(UpdateAgentMcpConfigRequestSchema)` to create a new message.
+ */
+export declare const UpdateAgentMcpConfigRequestSchema: GenMessage<UpdateAgentMcpConfigRequest>;
+
+/**
  * @generated from message laelia.v1.RefreshAgentProvidersRequest
  */
 export declare type RefreshAgentProvidersRequest = Message<"laelia.v1.RefreshAgentProvidersRequest"> & {
@@ -1055,6 +1079,15 @@ export declare type Agent = Message<"laelia.v1.Agent"> & {
    * @generated from field: bool follow_owner_permissions = 18;
    */
   followOwnerPermissions: boolean;
+
+  /**
+   * mcp_servers is the set of MCP server resource names (mcpServers/{id})
+   * enabled on this agent. The manager resolves them into a tool catalog when
+   * the agent starts; the machine never receives transport configuration.
+   *
+   * @generated from field: repeated string mcp_servers = 19;
+   */
+  mcpServers: string[];
 };
 
 /**
@@ -1717,6 +1750,19 @@ export declare const AgentService: GenService<{
   updateAgentACPConfig: {
     methodKind: "unary";
     input: typeof UpdateAgentACPConfigRequestSchema;
+    output: typeof EmptySchema;
+  },
+  /**
+   * UpdateAgentMcpConfig replaces the MCP servers enabled on an agent. Only
+   * servers the caller may use (members of the server's user/group list, or
+   * workspace admin) are accepted. Handler-gated like UpdateAgentACPConfig:
+   * the agent's owner or a workspace admin may update it.
+   *
+   * @generated from rpc laelia.v1.AgentService.UpdateAgentMcpConfig
+   */
+  updateAgentMcpConfig: {
+    methodKind: "unary";
+    input: typeof UpdateAgentMcpConfigRequestSchema;
     output: typeof EmptySchema;
   },
   /**

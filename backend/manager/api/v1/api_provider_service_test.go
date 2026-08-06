@@ -14,7 +14,7 @@ import (
 // and dedup: users, groups (email or id), allUsers are accepted; anything else
 // is rejected.
 func TestValidateAndNormalizeAPIProviderMembers(t *testing.T) {
-	got, err := validateAndNormalizeAPIProviderMembers([]string{
+	got, err := validateAndNormalizeMembers([]string{
 		"users/101",
 		"groups/eng@example.com",
 		"groups/group-id",
@@ -35,7 +35,7 @@ func TestValidateAndNormalizeAPIProviderMembers(t *testing.T) {
 		}
 	}
 
-	if _, err := validateAndNormalizeAPIProviderMembers([]string{"not-a-member"}); err == nil {
+	if _, err := validateAndNormalizeMembers([]string{"not-a-member"}); err == nil {
 		t.Fatal("expected invalid member to be rejected")
 	}
 }

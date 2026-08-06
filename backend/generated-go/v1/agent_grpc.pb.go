@@ -31,6 +31,7 @@ const (
 	AgentService_ForceDisconnectAgent_FullMethodName   = "/laelia.v1.AgentService/ForceDisconnectAgent"
 	AgentService_ListAgentSessions_FullMethodName      = "/laelia.v1.AgentService/ListAgentSessions"
 	AgentService_UpdateAgentACPConfig_FullMethodName   = "/laelia.v1.AgentService/UpdateAgentACPConfig"
+	AgentService_UpdateAgentMcpConfig_FullMethodName   = "/laelia.v1.AgentService/UpdateAgentMcpConfig"
 	AgentService_RefreshAgentProviders_FullMethodName  = "/laelia.v1.AgentService/RefreshAgentProviders"
 	AgentService_ListPiModels_FullMethodName           = "/laelia.v1.AgentService/ListPiModels"
 	AgentService_ConnectAgent_FullMethodName           = "/laelia.v1.AgentService/ConnectAgent"
@@ -82,6 +83,11 @@ type AgentServiceClient interface {
 	// inline api_provider/api_key additionally requires laelia.agents.edit (only
 	// workspace admin today); owners without it must use a global provider.
 	UpdateAgentACPConfig(ctx context.Context, in *UpdateAgentACPConfigRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// UpdateAgentMcpConfig replaces the MCP servers enabled on an agent. Only
+	// servers the caller may use (members of the server's user/group list, or
+	// workspace admin) are accepted. Handler-gated like UpdateAgentACPConfig:
+	// the agent's owner or a workspace admin may update it.
+	UpdateAgentMcpConfig(ctx context.Context, in *UpdateAgentMcpConfigRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Ask the agent daemon to re-probe its host for installed LLM agent providers
 	// and their models. Returns the freshly discovered provider list (also
 	// persisted into agent.info.available_providers). Admin only.
@@ -232,6 +238,16 @@ func (c *agentServiceClient) UpdateAgentACPConfig(ctx context.Context, in *Updat
 	return out, nil
 }
 
+func (c *agentServiceClient) UpdateAgentMcpConfig(ctx context.Context, in *UpdateAgentMcpConfigRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AgentService_UpdateAgentMcpConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *agentServiceClient) RefreshAgentProviders(ctx context.Context, in *RefreshAgentProvidersRequest, opts ...grpc.CallOption) (*RefreshAgentProvidersResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RefreshAgentProvidersResponse)
@@ -371,6 +387,11 @@ type AgentServiceServer interface {
 	// inline api_provider/api_key additionally requires laelia.agents.edit (only
 	// workspace admin today); owners without it must use a global provider.
 	UpdateAgentACPConfig(context.Context, *UpdateAgentACPConfigRequest) (*emptypb.Empty, error)
+	// UpdateAgentMcpConfig replaces the MCP servers enabled on an agent. Only
+	// servers the caller may use (members of the server's user/group list, or
+	// workspace admin) are accepted. Handler-gated like UpdateAgentACPConfig:
+	// the agent's owner or a workspace admin may update it.
+	UpdateAgentMcpConfig(context.Context, *UpdateAgentMcpConfigRequest) (*emptypb.Empty, error)
 	// Ask the agent daemon to re-probe its host for installed LLM agent providers
 	// and their models. Returns the freshly discovered provider list (also
 	// persisted into agent.info.available_providers). Admin only.
@@ -443,6 +464,9 @@ func (UnimplementedAgentServiceServer) ListAgentSessions(context.Context, *ListA
 }
 func (UnimplementedAgentServiceServer) UpdateAgentACPConfig(context.Context, *UpdateAgentACPConfigRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateAgentACPConfig not implemented")
+}
+func (UnimplementedAgentServiceServer) UpdateAgentMcpConfig(context.Context, *UpdateAgentMcpConfigRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateAgentMcpConfig not implemented")
 }
 func (UnimplementedAgentServiceServer) RefreshAgentProviders(context.Context, *RefreshAgentProvidersRequest) (*RefreshAgentProvidersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RefreshAgentProviders not implemented")
@@ -693,6 +717,24 @@ func _AgentService_UpdateAgentACPConfig_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AgentService_UpdateAgentMcpConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAgentMcpConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).UpdateAgentMcpConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_UpdateAgentMcpConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).UpdateAgentMcpConfig(ctx, req.(*UpdateAgentMcpConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AgentService_RefreshAgentProviders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RefreshAgentProvidersRequest)
 	if err := dec(in); err != nil {
@@ -923,6 +965,10 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateAgentACPConfig",
 			Handler:    _AgentService_UpdateAgentACPConfig_Handler,
+		},
+		{
+			MethodName: "UpdateAgentMcpConfig",
+			Handler:    _AgentService_UpdateAgentMcpConfig_Handler,
 		},
 		{
 			MethodName: "RefreshAgentProviders",

@@ -77,7 +77,7 @@ func (x AgentStatus_ConnectionState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AgentStatus_ConnectionState.Descriptor instead.
 func (AgentStatus_ConnectionState) EnumDescriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{44, 0}
+	return file_v1_agent_proto_rawDescGZIP(), []int{45, 0}
 }
 
 type CreateAgentRequest struct {
@@ -1604,6 +1604,60 @@ func (x *UpdateAgentACPConfigRequest) GetAcpConfig() *AgentACPConfig {
 	return nil
 }
 
+type UpdateAgentMcpConfigRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// mcp_servers is the full replacement set of enabled MCP server resource
+	// names (mcpServers/{id}).
+	McpServers    []string `protobuf:"bytes,2,rep,name=mcp_servers,json=mcpServers,proto3" json:"mcp_servers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAgentMcpConfigRequest) Reset() {
+	*x = UpdateAgentMcpConfigRequest{}
+	mi := &file_v1_agent_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAgentMcpConfigRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAgentMcpConfigRequest) ProtoMessage() {}
+
+func (x *UpdateAgentMcpConfigRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_agent_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAgentMcpConfigRequest.ProtoReflect.Descriptor instead.
+func (*UpdateAgentMcpConfigRequest) Descriptor() ([]byte, []int) {
+	return file_v1_agent_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *UpdateAgentMcpConfigRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *UpdateAgentMcpConfigRequest) GetMcpServers() []string {
+	if x != nil {
+		return x.McpServers
+	}
+	return nil
+}
+
 type RefreshAgentProvidersRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -1613,7 +1667,7 @@ type RefreshAgentProvidersRequest struct {
 
 func (x *RefreshAgentProvidersRequest) Reset() {
 	*x = RefreshAgentProvidersRequest{}
-	mi := &file_v1_agent_proto_msgTypes[26]
+	mi := &file_v1_agent_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1625,7 +1679,7 @@ func (x *RefreshAgentProvidersRequest) String() string {
 func (*RefreshAgentProvidersRequest) ProtoMessage() {}
 
 func (x *RefreshAgentProvidersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[26]
+	mi := &file_v1_agent_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1638,7 +1692,7 @@ func (x *RefreshAgentProvidersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshAgentProvidersRequest.ProtoReflect.Descriptor instead.
 func (*RefreshAgentProvidersRequest) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{26}
+	return file_v1_agent_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *RefreshAgentProvidersRequest) GetName() string {
@@ -1657,7 +1711,7 @@ type RefreshAgentProvidersResponse struct {
 
 func (x *RefreshAgentProvidersResponse) Reset() {
 	*x = RefreshAgentProvidersResponse{}
-	mi := &file_v1_agent_proto_msgTypes[27]
+	mi := &file_v1_agent_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1669,7 +1723,7 @@ func (x *RefreshAgentProvidersResponse) String() string {
 func (*RefreshAgentProvidersResponse) ProtoMessage() {}
 
 func (x *RefreshAgentProvidersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[27]
+	mi := &file_v1_agent_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1682,7 +1736,7 @@ func (x *RefreshAgentProvidersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshAgentProvidersResponse.ProtoReflect.Descriptor instead.
 func (*RefreshAgentProvidersResponse) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{27}
+	return file_v1_agent_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *RefreshAgentProvidersResponse) GetProviders() []*AgentProviderInfo {
@@ -1704,7 +1758,7 @@ type ListPiModelsRequest struct {
 
 func (x *ListPiModelsRequest) Reset() {
 	*x = ListPiModelsRequest{}
-	mi := &file_v1_agent_proto_msgTypes[28]
+	mi := &file_v1_agent_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1716,7 +1770,7 @@ func (x *ListPiModelsRequest) String() string {
 func (*ListPiModelsRequest) ProtoMessage() {}
 
 func (x *ListPiModelsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[28]
+	mi := &file_v1_agent_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1729,7 +1783,7 @@ func (x *ListPiModelsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPiModelsRequest.ProtoReflect.Descriptor instead.
 func (*ListPiModelsRequest) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{28}
+	return file_v1_agent_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ListPiModelsRequest) GetApiProvider() string {
@@ -1755,7 +1809,7 @@ type ListPiModelsResponse struct {
 
 func (x *ListPiModelsResponse) Reset() {
 	*x = ListPiModelsResponse{}
-	mi := &file_v1_agent_proto_msgTypes[29]
+	mi := &file_v1_agent_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1767,7 +1821,7 @@ func (x *ListPiModelsResponse) String() string {
 func (*ListPiModelsResponse) ProtoMessage() {}
 
 func (x *ListPiModelsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[29]
+	mi := &file_v1_agent_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1780,7 +1834,7 @@ func (x *ListPiModelsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPiModelsResponse.ProtoReflect.Descriptor instead.
 func (*ListPiModelsResponse) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{29}
+	return file_v1_agent_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ListPiModelsResponse) GetModels() []*PiModel {
@@ -1801,7 +1855,7 @@ type PiModel struct {
 
 func (x *PiModel) Reset() {
 	*x = PiModel{}
-	mi := &file_v1_agent_proto_msgTypes[30]
+	mi := &file_v1_agent_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1813,7 +1867,7 @@ func (x *PiModel) String() string {
 func (*PiModel) ProtoMessage() {}
 
 func (x *PiModel) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[30]
+	mi := &file_v1_agent_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1826,7 +1880,7 @@ func (x *PiModel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PiModel.ProtoReflect.Descriptor instead.
 func (*PiModel) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{30}
+	return file_v1_agent_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *PiModel) GetId() string {
@@ -1854,7 +1908,7 @@ type UploadAgentAvatarRequest struct {
 
 func (x *UploadAgentAvatarRequest) Reset() {
 	*x = UploadAgentAvatarRequest{}
-	mi := &file_v1_agent_proto_msgTypes[31]
+	mi := &file_v1_agent_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1866,7 +1920,7 @@ func (x *UploadAgentAvatarRequest) String() string {
 func (*UploadAgentAvatarRequest) ProtoMessage() {}
 
 func (x *UploadAgentAvatarRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[31]
+	mi := &file_v1_agent_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1879,7 +1933,7 @@ func (x *UploadAgentAvatarRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadAgentAvatarRequest.ProtoReflect.Descriptor instead.
 func (*UploadAgentAvatarRequest) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{31}
+	return file_v1_agent_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *UploadAgentAvatarRequest) GetName() string {
@@ -1912,7 +1966,7 @@ type DownloadAgentAvatarRequest struct {
 
 func (x *DownloadAgentAvatarRequest) Reset() {
 	*x = DownloadAgentAvatarRequest{}
-	mi := &file_v1_agent_proto_msgTypes[32]
+	mi := &file_v1_agent_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1924,7 +1978,7 @@ func (x *DownloadAgentAvatarRequest) String() string {
 func (*DownloadAgentAvatarRequest) ProtoMessage() {}
 
 func (x *DownloadAgentAvatarRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[32]
+	mi := &file_v1_agent_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1937,7 +1991,7 @@ func (x *DownloadAgentAvatarRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadAgentAvatarRequest.ProtoReflect.Descriptor instead.
 func (*DownloadAgentAvatarRequest) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{32}
+	return file_v1_agent_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *DownloadAgentAvatarRequest) GetName() string {
@@ -1958,7 +2012,7 @@ type DownloadAgentAvatarResponse struct {
 
 func (x *DownloadAgentAvatarResponse) Reset() {
 	*x = DownloadAgentAvatarResponse{}
-	mi := &file_v1_agent_proto_msgTypes[33]
+	mi := &file_v1_agent_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1970,7 +2024,7 @@ func (x *DownloadAgentAvatarResponse) String() string {
 func (*DownloadAgentAvatarResponse) ProtoMessage() {}
 
 func (x *DownloadAgentAvatarResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[33]
+	mi := &file_v1_agent_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1983,7 +2037,7 @@ func (x *DownloadAgentAvatarResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadAgentAvatarResponse.ProtoReflect.Descriptor instead.
 func (*DownloadAgentAvatarResponse) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{33}
+	return file_v1_agent_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *DownloadAgentAvatarResponse) GetData() []byte {
@@ -2016,7 +2070,7 @@ type DeleteAgentAvatarRequest struct {
 
 func (x *DeleteAgentAvatarRequest) Reset() {
 	*x = DeleteAgentAvatarRequest{}
-	mi := &file_v1_agent_proto_msgTypes[34]
+	mi := &file_v1_agent_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2028,7 +2082,7 @@ func (x *DeleteAgentAvatarRequest) String() string {
 func (*DeleteAgentAvatarRequest) ProtoMessage() {}
 
 func (x *DeleteAgentAvatarRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[34]
+	mi := &file_v1_agent_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2041,7 +2095,7 @@ func (x *DeleteAgentAvatarRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAgentAvatarRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAgentAvatarRequest) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{34}
+	return file_v1_agent_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *DeleteAgentAvatarRequest) GetName() string {
@@ -2059,7 +2113,7 @@ type HelloRequest struct {
 
 func (x *HelloRequest) Reset() {
 	*x = HelloRequest{}
-	mi := &file_v1_agent_proto_msgTypes[35]
+	mi := &file_v1_agent_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2071,7 +2125,7 @@ func (x *HelloRequest) String() string {
 func (*HelloRequest) ProtoMessage() {}
 
 func (x *HelloRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[35]
+	mi := &file_v1_agent_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2084,7 +2138,7 @@ func (x *HelloRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HelloRequest.ProtoReflect.Descriptor instead.
 func (*HelloRequest) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{35}
+	return file_v1_agent_proto_rawDescGZIP(), []int{36}
 }
 
 type HelloResponse struct {
@@ -2097,7 +2151,7 @@ type HelloResponse struct {
 
 func (x *HelloResponse) Reset() {
 	*x = HelloResponse{}
-	mi := &file_v1_agent_proto_msgTypes[36]
+	mi := &file_v1_agent_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2109,7 +2163,7 @@ func (x *HelloResponse) String() string {
 func (*HelloResponse) ProtoMessage() {}
 
 func (x *HelloResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[36]
+	mi := &file_v1_agent_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2122,7 +2176,7 @@ func (x *HelloResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HelloResponse.ProtoReflect.Descriptor instead.
 func (*HelloResponse) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{36}
+	return file_v1_agent_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *HelloResponse) GetCurrentTime() int64 {
@@ -2189,13 +2243,17 @@ type Agent struct {
 	// requires explicit membership. Default true: the agent acts within its
 	// owner's channel visibility.
 	FollowOwnerPermissions bool `protobuf:"varint,18,opt,name=follow_owner_permissions,json=followOwnerPermissions,proto3" json:"follow_owner_permissions,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// mcp_servers is the set of MCP server resource names (mcpServers/{id})
+	// enabled on this agent. The manager resolves them into a tool catalog when
+	// the agent starts; the machine never receives transport configuration.
+	McpServers    []string `protobuf:"bytes,19,rep,name=mcp_servers,json=mcpServers,proto3" json:"mcp_servers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Agent) Reset() {
 	*x = Agent{}
-	mi := &file_v1_agent_proto_msgTypes[37]
+	mi := &file_v1_agent_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2207,7 +2265,7 @@ func (x *Agent) String() string {
 func (*Agent) ProtoMessage() {}
 
 func (x *Agent) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[37]
+	mi := &file_v1_agent_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2220,7 +2278,7 @@ func (x *Agent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Agent.ProtoReflect.Descriptor instead.
 func (*Agent) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{37}
+	return file_v1_agent_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *Agent) GetName() string {
@@ -2342,6 +2400,13 @@ func (x *Agent) GetFollowOwnerPermissions() bool {
 	return false
 }
 
+func (x *Agent) GetMcpServers() []string {
+	if x != nil {
+		return x.McpServers
+	}
+	return nil
+}
+
 // AgentSummary is the lightweight list-view projection of an Agent returned by
 // ListAgents. It carries only the fields list/header views need: identity,
 // lifecycle state, connection status, and the provider/executable signal that
@@ -2387,7 +2452,7 @@ type AgentSummary struct {
 
 func (x *AgentSummary) Reset() {
 	*x = AgentSummary{}
-	mi := &file_v1_agent_proto_msgTypes[38]
+	mi := &file_v1_agent_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2399,7 +2464,7 @@ func (x *AgentSummary) String() string {
 func (*AgentSummary) ProtoMessage() {}
 
 func (x *AgentSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[38]
+	mi := &file_v1_agent_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2412,7 +2477,7 @@ func (x *AgentSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentSummary.ProtoReflect.Descriptor instead.
 func (*AgentSummary) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{38}
+	return file_v1_agent_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *AgentSummary) GetName() string {
@@ -2510,7 +2575,7 @@ type AgentInfo struct {
 
 func (x *AgentInfo) Reset() {
 	*x = AgentInfo{}
-	mi := &file_v1_agent_proto_msgTypes[39]
+	mi := &file_v1_agent_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2522,7 +2587,7 @@ func (x *AgentInfo) String() string {
 func (*AgentInfo) ProtoMessage() {}
 
 func (x *AgentInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[39]
+	mi := &file_v1_agent_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2535,7 +2600,7 @@ func (x *AgentInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentInfo.ProtoReflect.Descriptor instead.
 func (*AgentInfo) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{39}
+	return file_v1_agent_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *AgentInfo) GetAgentType() string {
@@ -2627,7 +2692,7 @@ type AgentProviderInfo struct {
 
 func (x *AgentProviderInfo) Reset() {
 	*x = AgentProviderInfo{}
-	mi := &file_v1_agent_proto_msgTypes[40]
+	mi := &file_v1_agent_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2639,7 +2704,7 @@ func (x *AgentProviderInfo) String() string {
 func (*AgentProviderInfo) ProtoMessage() {}
 
 func (x *AgentProviderInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[40]
+	mi := &file_v1_agent_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2652,7 +2717,7 @@ func (x *AgentProviderInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentProviderInfo.ProtoReflect.Descriptor instead.
 func (*AgentProviderInfo) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{40}
+	return file_v1_agent_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *AgentProviderInfo) GetProviderId() string {
@@ -2717,7 +2782,7 @@ type AgentModelOption struct {
 
 func (x *AgentModelOption) Reset() {
 	*x = AgentModelOption{}
-	mi := &file_v1_agent_proto_msgTypes[41]
+	mi := &file_v1_agent_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2729,7 +2794,7 @@ func (x *AgentModelOption) String() string {
 func (*AgentModelOption) ProtoMessage() {}
 
 func (x *AgentModelOption) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[41]
+	mi := &file_v1_agent_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2742,7 +2807,7 @@ func (x *AgentModelOption) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentModelOption.ProtoReflect.Descriptor instead.
 func (*AgentModelOption) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{41}
+	return file_v1_agent_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *AgentModelOption) GetValue() string {
@@ -2801,7 +2866,7 @@ type AgentACPConfig struct {
 
 func (x *AgentACPConfig) Reset() {
 	*x = AgentACPConfig{}
-	mi := &file_v1_agent_proto_msgTypes[42]
+	mi := &file_v1_agent_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2813,7 +2878,7 @@ func (x *AgentACPConfig) String() string {
 func (*AgentACPConfig) ProtoMessage() {}
 
 func (x *AgentACPConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[42]
+	mi := &file_v1_agent_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2826,7 +2891,7 @@ func (x *AgentACPConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentACPConfig.ProtoReflect.Descriptor instead.
 func (*AgentACPConfig) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{42}
+	return file_v1_agent_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *AgentACPConfig) GetExecutable() string {
@@ -2926,7 +2991,7 @@ type AgentCapability struct {
 
 func (x *AgentCapability) Reset() {
 	*x = AgentCapability{}
-	mi := &file_v1_agent_proto_msgTypes[43]
+	mi := &file_v1_agent_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2938,7 +3003,7 @@ func (x *AgentCapability) String() string {
 func (*AgentCapability) ProtoMessage() {}
 
 func (x *AgentCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[43]
+	mi := &file_v1_agent_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2951,7 +3016,7 @@ func (x *AgentCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentCapability.ProtoReflect.Descriptor instead.
 func (*AgentCapability) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{43}
+	return file_v1_agent_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *AgentCapability) GetSupportsAcp() bool {
@@ -3030,7 +3095,7 @@ type AgentStatus struct {
 
 func (x *AgentStatus) Reset() {
 	*x = AgentStatus{}
-	mi := &file_v1_agent_proto_msgTypes[44]
+	mi := &file_v1_agent_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3042,7 +3107,7 @@ func (x *AgentStatus) String() string {
 func (*AgentStatus) ProtoMessage() {}
 
 func (x *AgentStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[44]
+	mi := &file_v1_agent_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3055,7 +3120,7 @@ func (x *AgentStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentStatus.ProtoReflect.Descriptor instead.
 func (*AgentStatus) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{44}
+	return file_v1_agent_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *AgentStatus) GetState() AgentStatus_ConnectionState {
@@ -3108,7 +3173,7 @@ type AgentMetrics struct {
 
 func (x *AgentMetrics) Reset() {
 	*x = AgentMetrics{}
-	mi := &file_v1_agent_proto_msgTypes[45]
+	mi := &file_v1_agent_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3120,7 +3185,7 @@ func (x *AgentMetrics) String() string {
 func (*AgentMetrics) ProtoMessage() {}
 
 func (x *AgentMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_agent_proto_msgTypes[45]
+	mi := &file_v1_agent_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3133,7 +3198,7 @@ func (x *AgentMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentMetrics.ProtoReflect.Descriptor instead.
 func (*AgentMetrics) Descriptor() ([]byte, []int) {
-	return file_v1_agent_proto_rawDescGZIP(), []int{45}
+	return file_v1_agent_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *AgentMetrics) GetCpuPercent() float64 {
@@ -3314,7 +3379,12 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tB\x14\xe0A\x02\xfaA\x0e\n" +
 	"\flaelia/AgentR\x04name\x12=\n" +
 	"\n" +
-	"acp_config\x18\x02 \x01(\v2\x19.laelia.v1.AgentACPConfigB\x03\xe0A\x02R\tacpConfig\"H\n" +
+	"acp_config\x18\x02 \x01(\v2\x19.laelia.v1.AgentACPConfigB\x03\xe0A\x02R\tacpConfig\"h\n" +
+	"\x1bUpdateAgentMcpConfigRequest\x12(\n" +
+	"\x04name\x18\x01 \x01(\tB\x14\xe0A\x02\xfaA\x0e\n" +
+	"\flaelia/AgentR\x04name\x12\x1f\n" +
+	"\vmcp_servers\x18\x02 \x03(\tR\n" +
+	"mcpServers\"H\n" +
 	"\x1cRefreshAgentProvidersRequest\x12(\n" +
 	"\x04name\x18\x01 \x01(\tB\x14\xe0A\x02\xfaA\x0e\n" +
 	"\flaelia/AgentR\x04name\"[\n" +
@@ -3346,7 +3416,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\fHelloRequest\"Y\n" +
 	"\rHelloResponse\x12!\n" +
 	"\fcurrent_time\x18\x01 \x01(\x03R\vcurrentTime\x12%\n" +
-	"\x0eserver_version\x18\x02 \x01(\tR\rserverVersion\"\xad\x06\n" +
+	"\x0eserver_version\x18\x02 \x01(\tR\rserverVersion\"\xce\x06\n" +
 	"\x05Agent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -3368,7 +3438,9 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x05owner\x18\x10 \x01(\tB\x03\xe0A\x03R\x05owner\x12\"\n" +
 	"\n" +
 	"owner_name\x18\x11 \x01(\tB\x03\xe0A\x03R\townerName\x128\n" +
-	"\x18follow_owner_permissions\x18\x12 \x01(\bR\x16followOwnerPermissions\x1a9\n" +
+	"\x18follow_owner_permissions\x18\x12 \x01(\bR\x16followOwnerPermissions\x12\x1f\n" +
+	"\vmcp_servers\x18\x13 \x03(\tR\n" +
+	"mcpServers\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:!\xeaA\x1e\n" +
@@ -3475,7 +3547,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x0fdisk_used_bytes\x18\x04 \x01(\x04R\rdiskUsedBytes\x12(\n" +
 	"\x10disk_total_bytes\x18\x05 \x01(\x04R\x0ediskTotalBytes\x12%\n" +
 	"\x0euptime_seconds\x18\x06 \x01(\rR\ruptimeSeconds\x12'\n" +
-	"\x0fgoroutine_count\x18\a \x01(\rR\x0egoroutineCount2\xc3\x16\n" +
+	"\x0fgoroutine_count\x18\a \x01(\rR\x0egoroutineCount2\xd4\x17\n" +
 	"\fAgentService\x12o\n" +
 	"\vCreateAgent\x12\x1d.laelia.v1.CreateAgentRequest\x1a\x1e.laelia.v1.CreateAgentResponse\"!\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x13:\x05agent\"\n" +
 	"/v1/agents\x12v\n" +
@@ -3490,7 +3562,8 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x10RevokeAgentToken\x12\".laelia.v1.RevokeAgentTokenRequest\x1a#.laelia.v1.RevokeAgentTokenResponse\"H\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/{name=agents/*}:revokeToken\x12\xa4\x01\n" +
 	"\x14ForceDisconnectAgent\x12&.laelia.v1.ForceDisconnectAgentRequest\x1a\x16.google.protobuf.Empty\"L\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*\"#/v1/{name=agents/*}:forceDisconnect\x12\xa6\x01\n" +
 	"\x11ListAgentSessions\x12#.laelia.v1.ListAgentSessionsRequest\x1a$.laelia.v1.ListAgentSessionsResponse\"F\x8a\xea0\x1alaelia.agents.listSessions\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1e\x12\x1c/v1/{name=agents/*}/sessions\x12\x8e\x01\n" +
-	"\x14UpdateAgentACPConfig\x12&.laelia.v1.UpdateAgentACPConfigRequest\x1a\x16.google.protobuf.Empty\"6\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*2#/v1/{name=agents/*}:updateAcpConfig\x12\xb9\x01\n" +
+	"\x14UpdateAgentACPConfig\x12&.laelia.v1.UpdateAgentACPConfigRequest\x1a\x16.google.protobuf.Empty\"6\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*2#/v1/{name=agents/*}:updateAcpConfig\x12\x8e\x01\n" +
+	"\x14UpdateAgentMcpConfig\x12&.laelia.v1.UpdateAgentMcpConfigRequest\x1a\x16.google.protobuf.Empty\"6\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*2#/v1/{name=agents/*}:updateMcpConfig\x12\xb9\x01\n" +
 	"\x15RefreshAgentProviders\x12'.laelia.v1.RefreshAgentProvidersRequest\x1a(.laelia.v1.RefreshAgentProvidersResponse\"M\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02):\x01*\"$/v1/{name=agents/*}:refreshProviders\x12\x8b\x01\n" +
 	"\fListPiModels\x12\x1e.laelia.v1.ListPiModelsRequest\x1a\x1f.laelia.v1.ListPiModelsResponse\":\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/pi:listModels\x12v\n" +
 	"\fConnectAgent\x12\x1e.laelia.v1.ConnectAgentRequest\x1a\x1f.laelia.v1.ConnectAgentResponse\"%\x90\xea0\x02\x98\xea0\x01\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/v1/agents:connect\x12z\n" +
@@ -3515,7 +3588,7 @@ func file_v1_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 50)
+var file_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
 var file_v1_agent_proto_goTypes = []any{
 	(AgentStatus_ConnectionState)(0),       // 0: laelia.v1.AgentStatus.ConnectionState
 	(*CreateAgentRequest)(nil),             // 1: laelia.v1.CreateAgentRequest
@@ -3544,78 +3617,79 @@ var file_v1_agent_proto_goTypes = []any{
 	(*GetAgentRequest)(nil),                // 24: laelia.v1.GetAgentRequest
 	(*DeleteAgentRequest)(nil),             // 25: laelia.v1.DeleteAgentRequest
 	(*UpdateAgentACPConfigRequest)(nil),    // 26: laelia.v1.UpdateAgentACPConfigRequest
-	(*RefreshAgentProvidersRequest)(nil),   // 27: laelia.v1.RefreshAgentProvidersRequest
-	(*RefreshAgentProvidersResponse)(nil),  // 28: laelia.v1.RefreshAgentProvidersResponse
-	(*ListPiModelsRequest)(nil),            // 29: laelia.v1.ListPiModelsRequest
-	(*ListPiModelsResponse)(nil),           // 30: laelia.v1.ListPiModelsResponse
-	(*PiModel)(nil),                        // 31: laelia.v1.PiModel
-	(*UploadAgentAvatarRequest)(nil),       // 32: laelia.v1.UploadAgentAvatarRequest
-	(*DownloadAgentAvatarRequest)(nil),     // 33: laelia.v1.DownloadAgentAvatarRequest
-	(*DownloadAgentAvatarResponse)(nil),    // 34: laelia.v1.DownloadAgentAvatarResponse
-	(*DeleteAgentAvatarRequest)(nil),       // 35: laelia.v1.DeleteAgentAvatarRequest
-	(*HelloRequest)(nil),                   // 36: laelia.v1.HelloRequest
-	(*HelloResponse)(nil),                  // 37: laelia.v1.HelloResponse
-	(*Agent)(nil),                          // 38: laelia.v1.Agent
-	(*AgentSummary)(nil),                   // 39: laelia.v1.AgentSummary
-	(*AgentInfo)(nil),                      // 40: laelia.v1.AgentInfo
-	(*AgentProviderInfo)(nil),              // 41: laelia.v1.AgentProviderInfo
-	(*AgentModelOption)(nil),               // 42: laelia.v1.AgentModelOption
-	(*AgentACPConfig)(nil),                 // 43: laelia.v1.AgentACPConfig
-	(*AgentCapability)(nil),                // 44: laelia.v1.AgentCapability
-	(*AgentStatus)(nil),                    // 45: laelia.v1.AgentStatus
-	(*AgentMetrics)(nil),                   // 46: laelia.v1.AgentMetrics
-	nil,                                    // 47: laelia.v1.PendingCommandHint.EnvEntry
-	nil,                                    // 48: laelia.v1.Agent.LabelsEntry
-	nil,                                    // 49: laelia.v1.AgentInfo.LabelsEntry
-	nil,                                    // 50: laelia.v1.AgentACPConfig.CustomEnvEntry
-	(*fieldmaskpb.FieldMask)(nil),          // 51: google.protobuf.FieldMask
-	(*timestamppb.Timestamp)(nil),          // 52: google.protobuf.Timestamp
-	(State)(0),                             // 53: laelia.v1.State
-	(*emptypb.Empty)(nil),                  // 54: google.protobuf.Empty
+	(*UpdateAgentMcpConfigRequest)(nil),    // 27: laelia.v1.UpdateAgentMcpConfigRequest
+	(*RefreshAgentProvidersRequest)(nil),   // 28: laelia.v1.RefreshAgentProvidersRequest
+	(*RefreshAgentProvidersResponse)(nil),  // 29: laelia.v1.RefreshAgentProvidersResponse
+	(*ListPiModelsRequest)(nil),            // 30: laelia.v1.ListPiModelsRequest
+	(*ListPiModelsResponse)(nil),           // 31: laelia.v1.ListPiModelsResponse
+	(*PiModel)(nil),                        // 32: laelia.v1.PiModel
+	(*UploadAgentAvatarRequest)(nil),       // 33: laelia.v1.UploadAgentAvatarRequest
+	(*DownloadAgentAvatarRequest)(nil),     // 34: laelia.v1.DownloadAgentAvatarRequest
+	(*DownloadAgentAvatarResponse)(nil),    // 35: laelia.v1.DownloadAgentAvatarResponse
+	(*DeleteAgentAvatarRequest)(nil),       // 36: laelia.v1.DeleteAgentAvatarRequest
+	(*HelloRequest)(nil),                   // 37: laelia.v1.HelloRequest
+	(*HelloResponse)(nil),                  // 38: laelia.v1.HelloResponse
+	(*Agent)(nil),                          // 39: laelia.v1.Agent
+	(*AgentSummary)(nil),                   // 40: laelia.v1.AgentSummary
+	(*AgentInfo)(nil),                      // 41: laelia.v1.AgentInfo
+	(*AgentProviderInfo)(nil),              // 42: laelia.v1.AgentProviderInfo
+	(*AgentModelOption)(nil),               // 43: laelia.v1.AgentModelOption
+	(*AgentACPConfig)(nil),                 // 44: laelia.v1.AgentACPConfig
+	(*AgentCapability)(nil),                // 45: laelia.v1.AgentCapability
+	(*AgentStatus)(nil),                    // 46: laelia.v1.AgentStatus
+	(*AgentMetrics)(nil),                   // 47: laelia.v1.AgentMetrics
+	nil,                                    // 48: laelia.v1.PendingCommandHint.EnvEntry
+	nil,                                    // 49: laelia.v1.Agent.LabelsEntry
+	nil,                                    // 50: laelia.v1.AgentInfo.LabelsEntry
+	nil,                                    // 51: laelia.v1.AgentACPConfig.CustomEnvEntry
+	(*fieldmaskpb.FieldMask)(nil),          // 52: google.protobuf.FieldMask
+	(*timestamppb.Timestamp)(nil),          // 53: google.protobuf.Timestamp
+	(State)(0),                             // 54: laelia.v1.State
+	(*emptypb.Empty)(nil),                  // 55: google.protobuf.Empty
 }
 var file_v1_agent_proto_depIdxs = []int32{
-	38, // 0: laelia.v1.CreateAgentRequest.agent:type_name -> laelia.v1.Agent
-	38, // 1: laelia.v1.CreateAgentResponse.agent:type_name -> laelia.v1.Agent
-	38, // 2: laelia.v1.UpdateAgentRequest.agent:type_name -> laelia.v1.Agent
-	51, // 3: laelia.v1.UpdateAgentRequest.update_mask:type_name -> google.protobuf.FieldMask
-	38, // 4: laelia.v1.TransferAgentOwnershipResponse.agent:type_name -> laelia.v1.Agent
+	39, // 0: laelia.v1.CreateAgentRequest.agent:type_name -> laelia.v1.Agent
+	39, // 1: laelia.v1.CreateAgentResponse.agent:type_name -> laelia.v1.Agent
+	39, // 2: laelia.v1.UpdateAgentRequest.agent:type_name -> laelia.v1.Agent
+	52, // 3: laelia.v1.UpdateAgentRequest.update_mask:type_name -> google.protobuf.FieldMask
+	39, // 4: laelia.v1.TransferAgentOwnershipResponse.agent:type_name -> laelia.v1.Agent
 	13, // 5: laelia.v1.ListAgentSessionsResponse.sessions:type_name -> laelia.v1.AgentSession
-	52, // 6: laelia.v1.AgentSession.connected_at:type_name -> google.protobuf.Timestamp
-	52, // 7: laelia.v1.AgentSession.last_heartbeat_at:type_name -> google.protobuf.Timestamp
-	52, // 8: laelia.v1.AgentSession.disconnected_at:type_name -> google.protobuf.Timestamp
+	53, // 6: laelia.v1.AgentSession.connected_at:type_name -> google.protobuf.Timestamp
+	53, // 7: laelia.v1.AgentSession.last_heartbeat_at:type_name -> google.protobuf.Timestamp
+	53, // 8: laelia.v1.AgentSession.disconnected_at:type_name -> google.protobuf.Timestamp
 	0,  // 9: laelia.v1.AgentSession.state:type_name -> laelia.v1.AgentStatus.ConnectionState
-	40, // 10: laelia.v1.ConnectAgentRequest.info:type_name -> laelia.v1.AgentInfo
-	52, // 11: laelia.v1.ConnectAgentResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
-	45, // 12: laelia.v1.ConnectAgentResponse.initial_status:type_name -> laelia.v1.AgentStatus
-	43, // 13: laelia.v1.ConnectAgentResponse.acp_config:type_name -> laelia.v1.AgentACPConfig
-	46, // 14: laelia.v1.AgentHeartbeatRequest.metrics:type_name -> laelia.v1.AgentMetrics
-	52, // 15: laelia.v1.AgentHeartbeatResponse.next_heartbeat_at:type_name -> google.protobuf.Timestamp
-	52, // 16: laelia.v1.AgentHeartbeatResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
+	41, // 10: laelia.v1.ConnectAgentRequest.info:type_name -> laelia.v1.AgentInfo
+	53, // 11: laelia.v1.ConnectAgentResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
+	46, // 12: laelia.v1.ConnectAgentResponse.initial_status:type_name -> laelia.v1.AgentStatus
+	44, // 13: laelia.v1.ConnectAgentResponse.acp_config:type_name -> laelia.v1.AgentACPConfig
+	47, // 14: laelia.v1.AgentHeartbeatRequest.metrics:type_name -> laelia.v1.AgentMetrics
+	53, // 15: laelia.v1.AgentHeartbeatResponse.next_heartbeat_at:type_name -> google.protobuf.Timestamp
+	53, // 16: laelia.v1.AgentHeartbeatResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
 	18, // 17: laelia.v1.AgentHeartbeatResponse.pending_command_hint:type_name -> laelia.v1.PendingCommandHint
-	47, // 18: laelia.v1.PendingCommandHint.env:type_name -> laelia.v1.PendingCommandHint.EnvEntry
-	52, // 19: laelia.v1.RefreshAgentTokenResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
-	39, // 20: laelia.v1.ListAgentsResponse.agents:type_name -> laelia.v1.AgentSummary
-	43, // 21: laelia.v1.UpdateAgentACPConfigRequest.acp_config:type_name -> laelia.v1.AgentACPConfig
-	41, // 22: laelia.v1.RefreshAgentProvidersResponse.providers:type_name -> laelia.v1.AgentProviderInfo
-	31, // 23: laelia.v1.ListPiModelsResponse.models:type_name -> laelia.v1.PiModel
-	53, // 24: laelia.v1.Agent.state:type_name -> laelia.v1.State
-	40, // 25: laelia.v1.Agent.info:type_name -> laelia.v1.AgentInfo
-	45, // 26: laelia.v1.Agent.status:type_name -> laelia.v1.AgentStatus
-	52, // 27: laelia.v1.Agent.created_at:type_name -> google.protobuf.Timestamp
-	48, // 28: laelia.v1.Agent.labels:type_name -> laelia.v1.Agent.LabelsEntry
-	52, // 29: laelia.v1.Agent.last_token_rotated_at:type_name -> google.protobuf.Timestamp
-	53, // 30: laelia.v1.AgentSummary.state:type_name -> laelia.v1.State
-	45, // 31: laelia.v1.AgentSummary.status:type_name -> laelia.v1.AgentStatus
-	49, // 32: laelia.v1.AgentInfo.labels:type_name -> laelia.v1.AgentInfo.LabelsEntry
-	44, // 33: laelia.v1.AgentInfo.capability:type_name -> laelia.v1.AgentCapability
-	41, // 34: laelia.v1.AgentInfo.available_providers:type_name -> laelia.v1.AgentProviderInfo
-	43, // 35: laelia.v1.AgentInfo.acp_config:type_name -> laelia.v1.AgentACPConfig
-	42, // 36: laelia.v1.AgentProviderInfo.models:type_name -> laelia.v1.AgentModelOption
-	52, // 37: laelia.v1.AgentProviderInfo.detected_at:type_name -> google.protobuf.Timestamp
-	50, // 38: laelia.v1.AgentACPConfig.custom_env:type_name -> laelia.v1.AgentACPConfig.CustomEnvEntry
+	48, // 18: laelia.v1.PendingCommandHint.env:type_name -> laelia.v1.PendingCommandHint.EnvEntry
+	53, // 19: laelia.v1.RefreshAgentTokenResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
+	40, // 20: laelia.v1.ListAgentsResponse.agents:type_name -> laelia.v1.AgentSummary
+	44, // 21: laelia.v1.UpdateAgentACPConfigRequest.acp_config:type_name -> laelia.v1.AgentACPConfig
+	42, // 22: laelia.v1.RefreshAgentProvidersResponse.providers:type_name -> laelia.v1.AgentProviderInfo
+	32, // 23: laelia.v1.ListPiModelsResponse.models:type_name -> laelia.v1.PiModel
+	54, // 24: laelia.v1.Agent.state:type_name -> laelia.v1.State
+	41, // 25: laelia.v1.Agent.info:type_name -> laelia.v1.AgentInfo
+	46, // 26: laelia.v1.Agent.status:type_name -> laelia.v1.AgentStatus
+	53, // 27: laelia.v1.Agent.created_at:type_name -> google.protobuf.Timestamp
+	49, // 28: laelia.v1.Agent.labels:type_name -> laelia.v1.Agent.LabelsEntry
+	53, // 29: laelia.v1.Agent.last_token_rotated_at:type_name -> google.protobuf.Timestamp
+	54, // 30: laelia.v1.AgentSummary.state:type_name -> laelia.v1.State
+	46, // 31: laelia.v1.AgentSummary.status:type_name -> laelia.v1.AgentStatus
+	50, // 32: laelia.v1.AgentInfo.labels:type_name -> laelia.v1.AgentInfo.LabelsEntry
+	45, // 33: laelia.v1.AgentInfo.capability:type_name -> laelia.v1.AgentCapability
+	42, // 34: laelia.v1.AgentInfo.available_providers:type_name -> laelia.v1.AgentProviderInfo
+	44, // 35: laelia.v1.AgentInfo.acp_config:type_name -> laelia.v1.AgentACPConfig
+	43, // 36: laelia.v1.AgentProviderInfo.models:type_name -> laelia.v1.AgentModelOption
+	53, // 37: laelia.v1.AgentProviderInfo.detected_at:type_name -> google.protobuf.Timestamp
+	51, // 38: laelia.v1.AgentACPConfig.custom_env:type_name -> laelia.v1.AgentACPConfig.CustomEnvEntry
 	0,  // 39: laelia.v1.AgentStatus.state:type_name -> laelia.v1.AgentStatus.ConnectionState
-	52, // 40: laelia.v1.AgentStatus.last_heartbeat_time:type_name -> google.protobuf.Timestamp
-	52, // 41: laelia.v1.AgentStatus.connected_time:type_name -> google.protobuf.Timestamp
+	53, // 40: laelia.v1.AgentStatus.last_heartbeat_time:type_name -> google.protobuf.Timestamp
+	53, // 41: laelia.v1.AgentStatus.connected_time:type_name -> google.protobuf.Timestamp
 	1,  // 42: laelia.v1.AgentService.CreateAgent:input_type -> laelia.v1.CreateAgentRequest
 	22, // 43: laelia.v1.AgentService.ListAgents:input_type -> laelia.v1.ListAgentsRequest
 	24, // 44: laelia.v1.AgentService.GetAgent:input_type -> laelia.v1.GetAgentRequest
@@ -3627,39 +3701,41 @@ var file_v1_agent_proto_depIdxs = []int32{
 	10, // 50: laelia.v1.AgentService.ForceDisconnectAgent:input_type -> laelia.v1.ForceDisconnectAgentRequest
 	11, // 51: laelia.v1.AgentService.ListAgentSessions:input_type -> laelia.v1.ListAgentSessionsRequest
 	26, // 52: laelia.v1.AgentService.UpdateAgentACPConfig:input_type -> laelia.v1.UpdateAgentACPConfigRequest
-	27, // 53: laelia.v1.AgentService.RefreshAgentProviders:input_type -> laelia.v1.RefreshAgentProvidersRequest
-	29, // 54: laelia.v1.AgentService.ListPiModels:input_type -> laelia.v1.ListPiModelsRequest
-	14, // 55: laelia.v1.AgentService.ConnectAgent:input_type -> laelia.v1.ConnectAgentRequest
-	16, // 56: laelia.v1.AgentService.AgentHeartbeat:input_type -> laelia.v1.AgentHeartbeatRequest
-	19, // 57: laelia.v1.AgentService.AgentDisconnect:input_type -> laelia.v1.AgentDisconnectRequest
-	20, // 58: laelia.v1.AgentService.RefreshAgentToken:input_type -> laelia.v1.RefreshAgentTokenRequest
-	32, // 59: laelia.v1.AgentService.UploadAgentAvatar:input_type -> laelia.v1.UploadAgentAvatarRequest
-	33, // 60: laelia.v1.AgentService.DownloadAgentAvatar:input_type -> laelia.v1.DownloadAgentAvatarRequest
-	35, // 61: laelia.v1.AgentService.DeleteAgentAvatar:input_type -> laelia.v1.DeleteAgentAvatarRequest
-	36, // 62: laelia.v1.AgentService.Hello:input_type -> laelia.v1.HelloRequest
-	2,  // 63: laelia.v1.AgentService.CreateAgent:output_type -> laelia.v1.CreateAgentResponse
-	23, // 64: laelia.v1.AgentService.ListAgents:output_type -> laelia.v1.ListAgentsResponse
-	38, // 65: laelia.v1.AgentService.GetAgent:output_type -> laelia.v1.Agent
-	38, // 66: laelia.v1.AgentService.UpdateAgent:output_type -> laelia.v1.Agent
-	5,  // 67: laelia.v1.AgentService.TransferAgentOwnership:output_type -> laelia.v1.TransferAgentOwnershipResponse
-	54, // 68: laelia.v1.AgentService.DeleteAgent:output_type -> google.protobuf.Empty
-	7,  // 69: laelia.v1.AgentService.RotateAgentToken:output_type -> laelia.v1.RotateAgentTokenResponse
-	9,  // 70: laelia.v1.AgentService.RevokeAgentToken:output_type -> laelia.v1.RevokeAgentTokenResponse
-	54, // 71: laelia.v1.AgentService.ForceDisconnectAgent:output_type -> google.protobuf.Empty
-	12, // 72: laelia.v1.AgentService.ListAgentSessions:output_type -> laelia.v1.ListAgentSessionsResponse
-	54, // 73: laelia.v1.AgentService.UpdateAgentACPConfig:output_type -> google.protobuf.Empty
-	28, // 74: laelia.v1.AgentService.RefreshAgentProviders:output_type -> laelia.v1.RefreshAgentProvidersResponse
-	30, // 75: laelia.v1.AgentService.ListPiModels:output_type -> laelia.v1.ListPiModelsResponse
-	15, // 76: laelia.v1.AgentService.ConnectAgent:output_type -> laelia.v1.ConnectAgentResponse
-	17, // 77: laelia.v1.AgentService.AgentHeartbeat:output_type -> laelia.v1.AgentHeartbeatResponse
-	54, // 78: laelia.v1.AgentService.AgentDisconnect:output_type -> google.protobuf.Empty
-	21, // 79: laelia.v1.AgentService.RefreshAgentToken:output_type -> laelia.v1.RefreshAgentTokenResponse
-	38, // 80: laelia.v1.AgentService.UploadAgentAvatar:output_type -> laelia.v1.Agent
-	34, // 81: laelia.v1.AgentService.DownloadAgentAvatar:output_type -> laelia.v1.DownloadAgentAvatarResponse
-	38, // 82: laelia.v1.AgentService.DeleteAgentAvatar:output_type -> laelia.v1.Agent
-	37, // 83: laelia.v1.AgentService.Hello:output_type -> laelia.v1.HelloResponse
-	63, // [63:84] is the sub-list for method output_type
-	42, // [42:63] is the sub-list for method input_type
+	27, // 53: laelia.v1.AgentService.UpdateAgentMcpConfig:input_type -> laelia.v1.UpdateAgentMcpConfigRequest
+	28, // 54: laelia.v1.AgentService.RefreshAgentProviders:input_type -> laelia.v1.RefreshAgentProvidersRequest
+	30, // 55: laelia.v1.AgentService.ListPiModels:input_type -> laelia.v1.ListPiModelsRequest
+	14, // 56: laelia.v1.AgentService.ConnectAgent:input_type -> laelia.v1.ConnectAgentRequest
+	16, // 57: laelia.v1.AgentService.AgentHeartbeat:input_type -> laelia.v1.AgentHeartbeatRequest
+	19, // 58: laelia.v1.AgentService.AgentDisconnect:input_type -> laelia.v1.AgentDisconnectRequest
+	20, // 59: laelia.v1.AgentService.RefreshAgentToken:input_type -> laelia.v1.RefreshAgentTokenRequest
+	33, // 60: laelia.v1.AgentService.UploadAgentAvatar:input_type -> laelia.v1.UploadAgentAvatarRequest
+	34, // 61: laelia.v1.AgentService.DownloadAgentAvatar:input_type -> laelia.v1.DownloadAgentAvatarRequest
+	36, // 62: laelia.v1.AgentService.DeleteAgentAvatar:input_type -> laelia.v1.DeleteAgentAvatarRequest
+	37, // 63: laelia.v1.AgentService.Hello:input_type -> laelia.v1.HelloRequest
+	2,  // 64: laelia.v1.AgentService.CreateAgent:output_type -> laelia.v1.CreateAgentResponse
+	23, // 65: laelia.v1.AgentService.ListAgents:output_type -> laelia.v1.ListAgentsResponse
+	39, // 66: laelia.v1.AgentService.GetAgent:output_type -> laelia.v1.Agent
+	39, // 67: laelia.v1.AgentService.UpdateAgent:output_type -> laelia.v1.Agent
+	5,  // 68: laelia.v1.AgentService.TransferAgentOwnership:output_type -> laelia.v1.TransferAgentOwnershipResponse
+	55, // 69: laelia.v1.AgentService.DeleteAgent:output_type -> google.protobuf.Empty
+	7,  // 70: laelia.v1.AgentService.RotateAgentToken:output_type -> laelia.v1.RotateAgentTokenResponse
+	9,  // 71: laelia.v1.AgentService.RevokeAgentToken:output_type -> laelia.v1.RevokeAgentTokenResponse
+	55, // 72: laelia.v1.AgentService.ForceDisconnectAgent:output_type -> google.protobuf.Empty
+	12, // 73: laelia.v1.AgentService.ListAgentSessions:output_type -> laelia.v1.ListAgentSessionsResponse
+	55, // 74: laelia.v1.AgentService.UpdateAgentACPConfig:output_type -> google.protobuf.Empty
+	55, // 75: laelia.v1.AgentService.UpdateAgentMcpConfig:output_type -> google.protobuf.Empty
+	29, // 76: laelia.v1.AgentService.RefreshAgentProviders:output_type -> laelia.v1.RefreshAgentProvidersResponse
+	31, // 77: laelia.v1.AgentService.ListPiModels:output_type -> laelia.v1.ListPiModelsResponse
+	15, // 78: laelia.v1.AgentService.ConnectAgent:output_type -> laelia.v1.ConnectAgentResponse
+	17, // 79: laelia.v1.AgentService.AgentHeartbeat:output_type -> laelia.v1.AgentHeartbeatResponse
+	55, // 80: laelia.v1.AgentService.AgentDisconnect:output_type -> google.protobuf.Empty
+	21, // 81: laelia.v1.AgentService.RefreshAgentToken:output_type -> laelia.v1.RefreshAgentTokenResponse
+	39, // 82: laelia.v1.AgentService.UploadAgentAvatar:output_type -> laelia.v1.Agent
+	35, // 83: laelia.v1.AgentService.DownloadAgentAvatar:output_type -> laelia.v1.DownloadAgentAvatarResponse
+	39, // 84: laelia.v1.AgentService.DeleteAgentAvatar:output_type -> laelia.v1.Agent
+	38, // 85: laelia.v1.AgentService.Hello:output_type -> laelia.v1.HelloResponse
+	64, // [64:86] is the sub-list for method output_type
+	42, // [42:64] is the sub-list for method input_type
 	42, // [42:42] is the sub-list for extension type_name
 	42, // [42:42] is the sub-list for extension extendee
 	0,  // [0:42] is the sub-list for field type_name
@@ -3678,7 +3754,7 @@ func file_v1_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_agent_proto_rawDesc), len(file_v1_agent_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   50,
+			NumMessages:   51,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

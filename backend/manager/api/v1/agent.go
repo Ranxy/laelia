@@ -279,6 +279,13 @@ func (s *AgentService) GetAgent(ctx context.Context, req *connect.Request[v1pb.G
 			out.Info.AcpConfig.ApiKey = ""
 		}
 	}
+	mcpServers, err := s.store.ListAgentMcpServers(ctx, agent.ID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to list agent mcp servers"))
+	}
+	for _, m := range mcpServers {
+		out.McpServers = append(out.McpServers, common.FormatMcpServerUID(m.ServerResourceID))
+	}
 	return connect.NewResponse(out), nil
 }
 
@@ -1622,6 +1629,84 @@ func (s *AgentService) UpdateAgentACPConfig(ctx context.Context, req *connect.Re
 		}
 		if pushErr := s.dispatcher.SendAgentConfigUpdate(agent.MachineID, common.FormatAgentUID(agent.ResourceID), resolvedAcp); pushErr != nil {
 			slog.Info("best-effort agent config update push skipped", "agent", agent.ResourceID, "machineID", agent.MachineID, "error", pushErr)
+		}
+	}
+	return connect.NewResponse(&emptypb.Empty{}), nil
+}
+
+// UpdateAgentMcpConfig replaces the MCP servers enabled on an agent. Handler-
+// gated (the proto carries no permission annotation): the agent's owner or a
+// workspace admin may update it, and only MCP servers the caller may use
+// (members of the server's user/group list, or workspace admin) are accepted.
+func (s *AgentService) UpdateAgentMcpConfig(ctx context.Context, req *connect.Request[v1pb.UpdateAgentMcpConfigRequest]) (*connect.Response[emptypb.Empty], error) {
+	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get agent"))
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+
+	user, _ := GetUserFromContext(ctx)
+	if !s.canEditAgent(ctx, user, agent) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a workspace admin can modify this agent"))
+	}
+
+	seen := make(map[string]bool, len(req.Msg.McpServers))
+	var serverResourceIDs []string
+	for _, name := range req.Msg.McpServers {
+		serverResourceID, err := common.GetMcpServerResourceID(name)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+		if seen[serverResourceID] {
+			continue
+		}
+		server, err := s.store.GetMcpServerByResourceID(ctx, serverResourceID)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get mcp server"))
+		}
+		if server == nil {
+			return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("mcp server %q not found", name))
+		}
+		ok, err := canUseMcpServer(ctx, s.iam, s.store, user, server)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve mcp server access"))
+		}
+		if !ok {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("you are not allowed to use mcp server %q", name))
+		}
+		seen[serverResourceID] = true
+		serverResourceIDs = append(serverResourceIDs, serverResourceID)
+	}
+
+	if err := s.store.ReplaceAgentMcpServers(ctx, agent.ID, serverResourceIDs); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update agent mcp servers"))
+	}
+
+	// Best-effort full assignment reload so a pi agent's launch fingerprint
+	// (which includes the MCP selection) changes and the subprocess restarts on
+	// the next turn. ACP agents re-fetch the catalog every turn anyway. A missed
+	// push (machine offline) is recovered on reconnect.
+	if s.dispatcher != nil && agent.MachineID > 0 {
+		resolvedAcp, resolveErr := resolveAcpConfigForDaemon(ctx, s.store, convertToV1AgentACPConfig(agent.Info.GetAcpConfig()))
+		if resolveErr != nil {
+			slog.Info("failed to resolve acp config for mcp reload push", "agent", agent.ResourceID, log.WithError(resolveErr))
+		}
+		agentName := common.FormatAgentUID(agent.ResourceID)
+		if pushErr := s.dispatcher.SendReloadAgentAssignment(agent.MachineID, &v1pb.ReloadAgentAssignment{
+			AgentName: agentName,
+			Assignment: &v1pb.AgentAssignment{
+				AgentName:        agentName,
+				AgentDisplayName: agent.Name,
+				AcpConfig:        resolvedAcp,
+			},
+		}); pushErr != nil {
+			slog.Info("best-effort agent reload push skipped after mcp update", "agent", agent.ResourceID, "machineID", agent.MachineID, "error", pushErr)
 		}
 	}
 	return connect.NewResponse(&emptypb.Empty{}), nil

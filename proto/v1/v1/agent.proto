@@ -135,6 +135,19 @@ service AgentService {
     option (laelia.v1.audit) = true;
   }
 
+  // UpdateAgentMcpConfig replaces the MCP servers enabled on an agent. Only
+  // servers the caller may use (members of the server's user/group list, or
+  // workspace admin) are accepted. Handler-gated like UpdateAgentACPConfig:
+  // the agent's owner or a workspace admin may update it.
+  rpc UpdateAgentMcpConfig(UpdateAgentMcpConfigRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      patch: "/v1/{name=agents/*}:updateMcpConfig"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+
   // Ask the agent daemon to re-probe its host for installed LLM agent providers
   // and their models. Returns the freshly discovered provider list (also
   // persisted into agent.info.available_providers). Admin only.
@@ -438,6 +451,16 @@ message UpdateAgentACPConfigRequest {
   AgentACPConfig acp_config = 2 [(google.api.field_behavior) = REQUIRED];
 }
 
+message UpdateAgentMcpConfigRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+  // mcp_servers is the full replacement set of enabled MCP server resource
+  // names (mcpServers/{id}).
+  repeated string mcp_servers = 2;
+}
+
 message RefreshAgentProvidersRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
@@ -573,6 +596,11 @@ message Agent {
   // requires explicit membership. Default true: the agent acts within its
   // owner's channel visibility.
   bool follow_owner_permissions = 18;
+
+  // mcp_servers is the set of MCP server resource names (mcpServers/{id})
+  // enabled on this agent. The manager resolves them into a tool catalog when
+  // the agent starts; the machine never receives transport configuration.
+  repeated string mcp_servers = 19;
 }
 
 // AgentSummary is the lightweight list-view projection of an Agent returned by

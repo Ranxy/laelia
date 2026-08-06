@@ -23,6 +23,7 @@ const (
 	ConversationNamePrefix     = "conversations/"
 	APIProviderNamePrefix      = "apiProviders/"
 	APIProviderEntryPrefix     = "entries/"
+	McpServerNamePrefix        = "mcpServers/"
 )
 
 // GetUserID returns the user ID from a resource name.
@@ -261,4 +262,20 @@ func ParseAPIProviderEntryName(name string) (providerID, entryID string, err err
 		return "", "", err
 	}
 	return tokens[0], tokens[1], nil
+}
+
+// GetMcpServerResourceID returns the MCP server resource id (uuid) from a
+// mcpServers/{id} resource name.
+func GetMcpServerResourceID(name string) (string, error) {
+	tokens, err := GetNameParentTokens(name, McpServerNamePrefix)
+	if err != nil {
+		return "", err
+	}
+	return tokens[0], nil
+}
+
+// FormatMcpServerUID returns the mcpServers/{id} resource name for the given
+// resource id.
+func FormatMcpServerUID(id string) string {
+	return fmt.Sprintf("%s%s", McpServerNamePrefix, id)
 }

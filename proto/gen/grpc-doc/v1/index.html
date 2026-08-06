@@ -433,6 +433,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.UpdateAgentMcpConfigRequest"><span class="badge">M</span>UpdateAgentMcpConfigRequest</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.UpdateAgentRequest"><span class="badge">M</span>UpdateAgentRequest</a>
                 </li>
               
@@ -1644,6 +1648,101 @@
         
           
           <li>
+            <a href="#v1%2fmcp.proto">v1/mcp.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#laelia.v1.CallMcpToolRequest"><span class="badge">M</span>CallMcpToolRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.CallMcpToolResponse"><span class="badge">M</span>CallMcpToolResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.CreateMcpServerRequest"><span class="badge">M</span>CreateMcpServerRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DeleteMcpServerRequest"><span class="badge">M</span>DeleteMcpServerRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetMcpCatalogRequest"><span class="badge">M</span>GetMcpCatalogRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetMcpCatalogResponse"><span class="badge">M</span>GetMcpCatalogResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetMcpServerRequest"><span class="badge">M</span>GetMcpServerRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListMcpServersRequest"><span class="badge">M</span>ListMcpServersRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListMcpServersResponse"><span class="badge">M</span>ListMcpServersResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.McpContentBlock"><span class="badge">M</span>McpContentBlock</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.McpHeader"><span class="badge">M</span>McpHeader</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.McpHttpTransport"><span class="badge">M</span>McpHttpTransport</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.McpImageContent"><span class="badge">M</span>McpImageContent</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.McpServer"><span class="badge">M</span>McpServer</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.McpServerChange"><span class="badge">M</span>McpServerChange</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.McpSseTransport"><span class="badge">M</span>McpSseTransport</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.McpTextContent"><span class="badge">M</span>McpTextContent</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.McpTool"><span class="badge">M</span>McpTool</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateMcpServerRequest"><span class="badge">M</span>UpdateMcpServerRequest</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#laelia.v1.McpGatewayService"><span class="badge">S</span>McpGatewayService</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.McpServerService"><span class="badge">S</span>McpServerService</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
             <a href="#v1%2fnotification.proto">v1/notification.proto</a>
             <ul>
               
@@ -2237,6 +2336,15 @@ DM) its owner can read, without requiring the agent to be added as a member.
 The agent can read and proactively join such channels; posting still
 requires explicit membership. Default true: the agent acts within its
 owner&#39;s channel visibility. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mcp_servers</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>mcp_servers is the set of MCP server resource names (mcpServers/{id})
+enabled on this agent. The manager resolves them into a tool catalog when
+the agent starts; the machine never receives transport configuration. </p></td>
                 </tr>
               
             </tbody>
@@ -4141,6 +4249,38 @@ the list to agents bound to that machine. Empty lists all agents. </p></td>
 
         
       
+        <h3 id="laelia.v1.UpdateAgentMcpConfigRequest">UpdateAgentMcpConfigRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mcp_servers</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>mcp_servers is the full replacement set of enabled MCP server resource
+names (mcpServers/{id}). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.UpdateAgentRequest">UpdateAgentRequest</h3>
         <p></p>
 
@@ -4359,6 +4499,16 @@ workspace admin today); owners without it must use a global provider.</p></td>
               </tr>
             
               <tr>
+                <td>UpdateAgentMcpConfig</td>
+                <td><a href="#laelia.v1.UpdateAgentMcpConfigRequest">UpdateAgentMcpConfigRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p>UpdateAgentMcpConfig replaces the MCP servers enabled on an agent. Only
+servers the caller may use (members of the server&#39;s user/group list, or
+workspace admin) are accepted. Handler-gated like UpdateAgentACPConfig:
+the agent&#39;s owner or a workspace admin may update it.</p></td>
+              </tr>
+            
+              <tr>
                 <td>RefreshAgentProviders</td>
                 <td><a href="#laelia.v1.RefreshAgentProvidersRequest">RefreshAgentProvidersRequest</a></td>
                 <td><a href="#laelia.v1.RefreshAgentProvidersResponse">RefreshAgentProvidersResponse</a></td>
@@ -4562,6 +4712,16 @@ Requires laelia.agents.edit on the agent.</p></td>
                 <td>UpdateAgentACPConfig</td>
                 <td>PATCH</td>
                 <td>/v1/{name=agents/*}:updateAcpConfig</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateAgentMcpConfig</td>
+                <td>PATCH</td>
+                <td>/v1/{name=agents/*}:updateMcpConfig</td>
                 <td>*</td>
               </tr>
               
@@ -16848,6 +17008,837 @@ machine must host (so the machine app can open an AgentChannel for each).</p></t
           </tbody>
         </table>
 
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="v1/mcp.proto">v1/mcp.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="laelia.v1.CallMcpToolRequest">CallMcpToolRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>mcp_server_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>tool_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>arguments</td>
+                  <td><a href="#google.protobuf.Struct">google.protobuf.Struct</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>expected_config_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>expected_assignment_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.CallMcpToolResponse">CallMcpToolResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>content</td>
+                  <td><a href="#laelia.v1.McpContentBlock">McpContentBlock</a></td>
+                  <td>repeated</td>
+                  <td><p>Content blocks of the MCP tool result (text/image). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>is_error</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>structured_content</td>
+                  <td><a href="#google.protobuf.Struct">google.protobuf.Struct</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.CreateMcpServerRequest">CreateMcpServerRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>mcp_server</td>
+                  <td><a href="#laelia.v1.McpServer">McpServer</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DeleteMcpServerRequest">DeleteMcpServerRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetMcpCatalogRequest">GetMcpCatalogRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.GetMcpCatalogResponse">GetMcpCatalogResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>catalog_version</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>catalog_version is the catalog contract version. Currently always 1. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>tools</td>
+                  <td><a href="#laelia.v1.McpTool">McpTool</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.GetMcpServerRequest">GetMcpServerRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListMcpServersRequest">ListMcpServersRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListMcpServersResponse">ListMcpServersResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>mcp_servers</td>
+                  <td><a href="#laelia.v1.McpServer">McpServer</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.McpContentBlock">McpContentBlock</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>text</td>
+                  <td><a href="#laelia.v1.McpTextContent">McpTextContent</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>image</td>
+                  <td><a href="#laelia.v1.McpImageContent">McpImageContent</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.McpHeader">McpHeader</h3>
+        <p>McpHeader is one HTTP header attached to MCP transport requests. On write a</p><p>masked ("****"-prefixed) or empty value means "keep the stored value".</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>masked_value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.McpHttpTransport">McpHttpTransport</h3>
+        <p>McpHttpTransport is a streamable-HTTP MCP transport.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The MCP streamable HTTP endpoint URL, e.g. &#34;https://mcp.example.com/mcp&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>headers</td>
+                  <td><a href="#laelia.v1.McpHeader">McpHeader</a></td>
+                  <td>repeated</td>
+                  <td><p>Headers sent with every request to the MCP server (typically
+Authorization). Values are stored server-side and masked on read. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.McpImageContent">McpImageContent</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>base64-encoded image data </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mime_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.McpServer">McpServer</h3>
+        <p>McpServer is a workspace-global, admin-managed MCP service. The manager holds</p><p>the full transport configuration (URL and header values) and only exposes a</p><p>per-agent tool catalog to machines; header values are masked on read.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The resource name of the MCP server, in the form `mcpServers/{id}`. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Human-readable title. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Longer description of the MCP server. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>http</td>
+                  <td><a href="#laelia.v1.McpHttpTransport">McpHttpTransport</a></td>
+                  <td></td>
+                  <td><p>Streamable HTTP transport. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sse</td>
+                  <td><a href="#laelia.v1.McpSseTransport">McpSseTransport</a></td>
+                  <td></td>
+                  <td><p>SSE transport. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>members</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>Users or groups allowed to use this MCP server, in IAM member format:
+`users/{uid}`, `groups/{email}`, `groups/{id}`, or `allUsers`. Access is
+checked when an agent references the server (and again at call time). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>updated_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_by</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Creator&#39;s user resource name (users/{id}). Display-only. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>config_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p>config_version increments on every update. The agent gateway returns it in
+the tool catalog and re-checks it at call time so stale catalogs fail
+closed instead of silently running against changed server configuration. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.McpServerChange">McpServerChange</h3>
+        <p>McpServerChange is the audit payload recorded for a successful</p><p>CreateMcpServer/UpdateMcpServer. It carries only the server resource name —</p><p>never header values.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>server</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.McpSseTransport">McpSseTransport</h3>
+        <p>McpSseTransport is an SSE MCP transport. The messages endpoint is derived</p><p>from the standard MCP SSE layout (`GET url` for the event stream and</p><p>`POST /messages?session_id=...` on the same origin).</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The MCP SSE endpoint URL, e.g. &#34;https://mcp.example.com/sse&#34;. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>headers</td>
+                  <td><a href="#laelia.v1.McpHeader">McpHeader</a></td>
+                  <td>repeated</td>
+                  <td><p>Headers sent with requests to the MCP server. Values are stored
+server-side and masked on read. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.McpTextContent">McpTextContent</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>text</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.McpTool">McpTool</h3>
+        <p>McpTool is one tool in a per-agent MCP tool catalog. The catalog is computed</p><p>by the manager from the agent's enabled MCP servers and the servers' current</p><p>tool lists; machines never see the transport configuration.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>mcp_server_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>mcp_servers/{id} the tool belongs to. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>server_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Display name of the MCP server. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>tool_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The real MCP tool name on the server. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>runtime_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name exposed to the runtime; collision-scoped per server. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>description</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>input_schema</td>
+                  <td><a href="#google.protobuf.Struct">google.protobuf.Struct</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>config_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>assignment_version</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateMcpServerRequest">UpdateMcpServerRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>mcp_server</td>
+                  <td><a href="#laelia.v1.McpServer">McpServer</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>update_mask</td>
+                  <td><a href="#google.protobuf.FieldMask">google.protobuf.FieldMask</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="laelia.v1.McpGatewayService">McpGatewayService</h3>
+        <p>McpGatewayService is the agent-facing gateway: machines call it to fetch the</p><p>current authorized MCP tool catalog for an agent and to invoke allowlisted</p><p>tools. Callers are authenticated as an agent (machine token + X-Laelia-Agent</p><p>header); every call re-checks the caller's current authorization.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GetMcpCatalog</td>
+                <td><a href="#laelia.v1.GetMcpCatalogRequest">GetMcpCatalogRequest</a></td>
+                <td><a href="#laelia.v1.GetMcpCatalogResponse">GetMcpCatalogResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>CallMcpTool</td>
+                <td><a href="#laelia.v1.CallMcpToolRequest">CallMcpToolRequest</a></td>
+                <td><a href="#laelia.v1.CallMcpToolResponse">CallMcpToolResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+        <h3 id="laelia.v1.McpServerService">McpServerService</h3>
+        <p>McpServerService manages the workspace MCP server registry. Management RPCs</p><p>are gated by the IAM interceptor with the laelia.mcpServers.* permissions</p><p>(held by workspaceAdmin or an authorized custom role). ListMcpServers is</p><p>handler-gated instead: it returns only the servers the caller may use, so</p><p>the agent config form can list them without a management permission.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GetMcpServer</td>
+                <td><a href="#laelia.v1.GetMcpServerRequest">GetMcpServerRequest</a></td>
+                <td><a href="#laelia.v1.McpServer">McpServer</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ListMcpServers</td>
+                <td><a href="#laelia.v1.ListMcpServersRequest">ListMcpServersRequest</a></td>
+                <td><a href="#laelia.v1.ListMcpServersResponse">ListMcpServersResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>CreateMcpServer</td>
+                <td><a href="#laelia.v1.CreateMcpServerRequest">CreateMcpServerRequest</a></td>
+                <td><a href="#laelia.v1.McpServer">McpServer</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateMcpServer</td>
+                <td><a href="#laelia.v1.UpdateMcpServerRequest">UpdateMcpServerRequest</a></td>
+                <td><a href="#laelia.v1.McpServer">McpServer</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>DeleteMcpServer</td>
+                <td><a href="#laelia.v1.DeleteMcpServerRequest">DeleteMcpServerRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+          
+          
+          <h4>Methods with HTTP bindings</h4>
+          <table>
+            <thead>
+              <tr>
+                <td>Method Name</td>
+                <td>Method</td>
+                <td>Pattern</td>
+                <td>Body</td>
+              </tr>
+            </thead>
+            <tbody>
+            
+              
+              
+              <tr>
+                <td>GetMcpServer</td>
+                <td>GET</td>
+                <td>/v1/{name=mcpServers/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListMcpServers</td>
+                <td>GET</td>
+                <td>/v1/mcpServers</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>CreateMcpServer</td>
+                <td>POST</td>
+                <td>/v1/mcpServers</td>
+                <td>mcp_server</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateMcpServer</td>
+                <td>PATCH</td>
+                <td>/v1/{mcp_server.name=mcpServers/*}</td>
+                <td>mcp_server</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>DeleteMcpServer</td>
+                <td>DELETE</td>
+                <td>/v1/{name=mcpServers/*}</td>
+                <td></td>
+              </tr>
+              
+            
+            </tbody>
+          </table>
+          
         
     
       

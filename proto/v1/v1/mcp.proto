@@ -1,0 +1,250 @@
+syntax = "proto3";
+
+package laelia.v1;
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "v1/annotation.proto";
+
+option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
+
+// McpServer is a workspace-global, admin-managed MCP service. The manager holds
+// the full transport configuration (URL and header values) and only exposes a
+// per-agent tool catalog to machines; header values are masked on read.
+message McpServer {
+  option (google.api.resource) = {
+    type: "laelia/McpServer"
+    pattern: "mcpServers/{server}"
+  };
+
+  // The resource name of the MCP server, in the form `mcpServers/{id}`.
+  string name = 1 [
+    (google.api.field_behavior) = IDENTIFIER,
+    (google.api.field_behavior) = REQUIRED
+  ];
+
+  // Human-readable title.
+  string title = 2;
+
+  // Longer description of the MCP server.
+  string description = 3;
+
+  // Transport configuration. Exactly one of http/sse must be set.
+  oneof transport {
+    // Streamable HTTP transport.
+    McpHttpTransport http = 4;
+    // SSE transport.
+    McpSseTransport sse = 5;
+  }
+
+  // Users or groups allowed to use this MCP server, in IAM member format:
+  // `users/{uid}`, `groups/{email}`, `groups/{id}`, or `allUsers`. Access is
+  // checked when an agent references the server (and again at call time).
+  repeated string members = 6;
+
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+
+  // Creator's user resource name (users/{id}). Display-only.
+  string created_by = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // config_version increments on every update. The agent gateway returns it in
+  // the tool catalog and re-checks it at call time so stale catalogs fail
+  // closed instead of silently running against changed server configuration.
+  int64 config_version = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// McpHttpTransport is a streamable-HTTP MCP transport.
+message McpHttpTransport {
+  // The MCP streamable HTTP endpoint URL, e.g. "https://mcp.example.com/mcp".
+  string url = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Headers sent with every request to the MCP server (typically
+  // Authorization). Values are stored server-side and masked on read.
+  repeated McpHeader headers = 2;
+}
+
+// McpSseTransport is an SSE MCP transport. The messages endpoint is derived
+// from the standard MCP SSE layout (`GET url` for the event stream and
+// `POST /messages?session_id=...` on the same origin).
+message McpSseTransport {
+  // The MCP SSE endpoint URL, e.g. "https://mcp.example.com/sse".
+  string url = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Headers sent with requests to the MCP server. Values are stored
+  // server-side and masked on read.
+  repeated McpHeader headers = 2;
+}
+
+// McpHeader is one HTTP header attached to MCP transport requests. On write a
+// masked ("****"-prefixed) or empty value means "keep the stored value".
+message McpHeader {
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+  string value = 2 [(google.api.field_behavior) = INPUT_ONLY];
+  string masked_value = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message GetMcpServerRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/McpServer"}
+  ];
+}
+
+message ListMcpServersRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListMcpServersResponse {
+  repeated McpServer mcp_servers = 1;
+  string next_page_token = 2;
+}
+
+message CreateMcpServerRequest {
+  McpServer mcp_server = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateMcpServerRequest {
+  McpServer mcp_server = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteMcpServerRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/McpServer"}
+  ];
+}
+
+// McpServerChange is the audit payload recorded for a successful
+// CreateMcpServer/UpdateMcpServer. It carries only the server resource name —
+// never header values.
+message McpServerChange {
+  string server = 1;
+}
+
+// McpServerService manages the workspace MCP server registry. Management RPCs
+// are gated by the IAM interceptor with the laelia.mcpServers.* permissions
+// (held by workspaceAdmin or an authorized custom role). ListMcpServers is
+// handler-gated instead: it returns only the servers the caller may use, so
+// the agent config form can list them without a management permission.
+service McpServerService {
+  rpc GetMcpServer(GetMcpServerRequest) returns (McpServer) {
+    option (google.api.http) = {get: "/v1/{name=mcpServers/*}"};
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.mcpServers.get";
+  }
+
+  rpc ListMcpServers(ListMcpServersRequest) returns (ListMcpServersResponse) {
+    option (google.api.http) = {get: "/v1/mcpServers"};
+    option (laelia.v1.auth_method) = IAM;
+  }
+
+  rpc CreateMcpServer(CreateMcpServerRequest) returns (McpServer) {
+    option (google.api.http) = {
+      post: "/v1/mcpServers"
+      body: "mcp_server"
+    };
+    option (google.api.method_signature) = "mcp_server";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.mcpServers.create";
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc UpdateMcpServer(UpdateMcpServerRequest) returns (McpServer) {
+    option (google.api.http) = {
+      patch: "/v1/{mcp_server.name=mcpServers/*}"
+      body: "mcp_server"
+    };
+    option (google.api.method_signature) = "mcp_server,update_mask";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.mcpServers.update";
+    option (laelia.v1.audit) = true;
+  }
+
+  rpc DeleteMcpServer(DeleteMcpServerRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/{name=mcpServers/*}"};
+    option (google.api.method_signature) = "name";
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.mcpServers.delete";
+    option (laelia.v1.audit) = true;
+  }
+}
+
+// --- Agent-facing MCP gateway ---
+
+// McpTool is one tool in a per-agent MCP tool catalog. The catalog is computed
+// by the manager from the agent's enabled MCP servers and the servers' current
+// tool lists; machines never see the transport configuration.
+message McpTool {
+  // mcp_servers/{id} the tool belongs to.
+  string mcp_server_id = 1;
+  // Display name of the MCP server.
+  string server_name = 2;
+  // The real MCP tool name on the server.
+  string tool_name = 3;
+  // The name exposed to the runtime; collision-scoped per server.
+  string runtime_name = 4;
+  string title = 5;
+  string description = 6;
+  google.protobuf.Struct input_schema = 7;
+  int64 config_version = 8;
+  int64 assignment_version = 9;
+}
+
+message GetMcpCatalogRequest {}
+
+message GetMcpCatalogResponse {
+  // catalog_version is the catalog contract version. Currently always 1.
+  int32 catalog_version = 1;
+  repeated McpTool tools = 2;
+}
+
+message CallMcpToolRequest {
+  string mcp_server_id = 1;
+  string tool_name = 2;
+  google.protobuf.Struct arguments = 3;
+  int64 expected_config_version = 4;
+  int64 expected_assignment_version = 5;
+}
+
+message CallMcpToolResponse {
+  // Content blocks of the MCP tool result (text/image).
+  repeated McpContentBlock content = 1;
+  bool is_error = 2;
+  google.protobuf.Struct structured_content = 3;
+}
+
+message McpContentBlock {
+  oneof kind {
+    McpTextContent text = 1;
+    McpImageContent image = 2;
+  }
+}
+
+message McpTextContent {
+  string text = 1;
+}
+
+message McpImageContent {
+  string data = 1; // base64-encoded image data
+  string mime_type = 2;
+}
+
+// McpGatewayService is the agent-facing gateway: machines call it to fetch the
+// current authorized MCP tool catalog for an agent and to invoke allowlisted
+// tools. Callers are authenticated as an agent (machine token + X-Laelia-Agent
+// header); every call re-checks the caller's current authorization.
+service McpGatewayService {
+  rpc GetMcpCatalog(GetMcpCatalogRequest) returns (GetMcpCatalogResponse);
+
+  rpc CallMcpTool(CallMcpToolRequest) returns (CallMcpToolResponse);
+}

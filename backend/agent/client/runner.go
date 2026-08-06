@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	acp "github.com/coder/acp-go-sdk"
+
 	"github.com/Ranxy/laelia/backend/agent/chattools"
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	"github.com/Ranxy/laelia/backend/agent/executor"
@@ -77,6 +79,11 @@ func (r *agentRunner) buildPiConfig(assignment *v1pb.AgentAssignment) *pi.PiConf
 	)
 	if cfg == nil {
 		return nil
+	}
+	if proxyURL, proxyErr := r.daemon.McpProxyURLForAgent(r.agentID); proxyErr != nil {
+		slog.Warn("failed to resolve managed mcp proxy for pi agent", "agent", r.agentName, "error", proxyErr)
+	} else {
+		cfg.McpProxyURL = proxyURL
 	}
 	if err := os.MkdirAll(cfg.WorkingDir, 0o700); err != nil {
 		slog.Warn("failed to create agent working dir", "dir", cfg.WorkingDir, "error", err)
@@ -304,7 +311,53 @@ func (r *agentRunner) buildRuntimeForAgent(req executor.Request) (executor.Runti
 	if piCfg != nil {
 		return pi.NewPi(ereq, sess, piCfg)
 	}
-	return executor.NewACP(ereq, r.currentConfig())
+	cfg := r.currentConfig()
+	if cfg == nil {
+		return executor.NewACP(ereq, nil)
+	}
+	copyCfg := *cfg
+	copyCfg.McpServers = r.buildMcpServers(ereq)
+	return executor.NewACP(ereq, &copyCfg)
+}
+
+// buildMcpServers discovers the agent's managed MCP tools through the daemon
+// and returns an ACP stdio MCP server entry pointing at `laelia-machine
+// mcp-proxy`. The proxy is spawned per turn by the ACP runtime and forwards
+// tools/list / tools/call to the local daemon, so the machine never holds MCP
+// transport secrets. Returns nil (no MCP servers) when discovery fails or the
+// catalog is empty — MCP unavailability degrades gracefully.
+func (r *agentRunner) buildMcpServers(req executor.Request) []acp.McpServer {
+	if req.DaemonSocket == "" || req.SessionToken == "" || req.AgentResourceID == "" {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	catalog, err := r.daemon.McpTools(ctx, r.agentName)
+	if err != nil || catalog == nil || len(catalog.Tools) == 0 {
+		if err != nil {
+			slog.Warn("managed mcp discovery unavailable; continuing without mcp", "agent", r.agentName, "error", err)
+		}
+		return nil
+	}
+	path := req.BinaryDir
+	if existing := os.Getenv("PATH"); existing != "" {
+		path = path + string(os.PathListSeparator) + existing
+	}
+	return []acp.McpServer{
+		{
+			Stdio: &acp.McpServerStdio{
+				Name:    "laelia-mcp",
+				Command: "laelia-machine",
+				Args:    []string{"mcp-proxy"},
+				Env: []acp.EnvVariable{
+					{Name: "PATH", Value: path},
+					{Name: "LAELIA_DAEMON_SOCKET", Value: req.DaemonSocket},
+					{Name: "LAELIA_SESSION_TOKEN", Value: req.SessionToken},
+					{Name: "LAELIA_AGENT", Value: req.AgentResourceID},
+				},
+			},
+		},
+	}
 }
 
 // stop cancels the runner's drain loop, tears down any pi subprocess, and

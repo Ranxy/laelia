@@ -92,6 +92,8 @@ func configureGrpcRouters(
 	iamService := apiv1.NewIamService(stores, iamManager)
 	groupService := apiv1.NewGroupService(stores, iamManager)
 	apiProviderService := apiv1.NewAPIProviderService(stores, iamManager)
+	mcpServerService := apiv1.NewMcpServerService(stores, iamManager)
+	mcpGatewayService := apiv1.NewMcpGatewayService(stores, iamManager)
 	auditLogService := apiv1.NewAuditLogService(stores)
 
 	// Web Push: load the auto-generated VAPID keypair from the setting table
@@ -169,6 +171,10 @@ func configureGrpcRouters(
 	connectHandlers[groupPath] = groupHandler
 	apiProviderPath, apiProviderHandler := v1connect.NewApiProviderServiceHandler(apiProviderService, handlerOpts)
 	connectHandlers[apiProviderPath] = apiProviderHandler
+	mcpServerPath, mcpServerHandler := v1connect.NewMcpServerServiceHandler(mcpServerService, handlerOpts)
+	connectHandlers[mcpServerPath] = mcpServerHandler
+	mcpGatewayPath, mcpGatewayHandler := v1connect.NewMcpGatewayServiceHandler(mcpGatewayService, handlerOpts)
+	connectHandlers[mcpGatewayPath] = mcpGatewayHandler
 	auditLogPath, auditLogHandler := v1connect.NewAuditLogServiceHandler(auditLogService, handlerOpts)
 	connectHandlers[auditLogPath] = auditLogHandler
 	notificationPath, notificationHandler := v1connect.NewNotificationServiceHandler(notificationService, handlerOpts)
@@ -187,6 +193,8 @@ func configureGrpcRouters(
 		v1connect.IamServiceName,
 		v1connect.GroupServiceName,
 		v1connect.ApiProviderServiceName,
+		v1connect.McpServerServiceName,
+		v1connect.McpGatewayServiceName,
 		v1connect.AuditLogServiceName,
 		v1connect.NotificationServiceName,
 	)

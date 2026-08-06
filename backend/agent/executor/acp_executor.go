@@ -445,12 +445,14 @@ func (e *ACPExecutor) run() {
 		e.initializedAgent = initResp.AgentInfo.Name
 	}
 
-	// mcpServers is sent as an empty array (not omitted): some ACP servers
-	// (e.g. @agentclientprotocol/claude-agent-acp) validate the field with a
-	// strict array schema and reject a missing/null value with -32602 Invalid
-	// params. We expose no MCP servers — the LLM drives the chat loop via the
-	// `laelia-machine` CLI instead.
-	mcpServers := []acp.McpServer{}
+	// mcpServers is sent as an empty array (not omitted) when none are
+	// configured: some ACP servers (e.g.
+	// @agentclientprotocol/claude-agent-acp) validate the field with a strict
+	// array schema and reject a missing/null value with -32602 Invalid params.
+	mcpServers := e.config.McpServers
+	if mcpServers == nil {
+		mcpServers = []acp.McpServer{}
+	}
 	extraDirs := additionalRoots(e.allowedRoots, e.workingDir)
 
 	// Session inheritance: each turn spawns a fresh subprocess but resumes the

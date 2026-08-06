@@ -1099,6 +1099,39 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}:updateMcpConfig:
+        patch:
+            tags:
+                - AgentService
+            description: |-
+                UpdateAgentMcpConfig replaces the MCP servers enabled on an agent. Only
+                 servers the caller may use (members of the server's user/group list, or
+                 workspace admin) are accepted. Handler-gated like UpdateAgentACPConfig:
+                 the agent's owner or a workspace admin may update it.
+            operationId: AgentService_UpdateAgentMcpConfig
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UpdateAgentMcpConfigRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents:connect:
         post:
             tags:
@@ -3250,6 +3283,138 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/mcpServers:
+        get:
+            tags:
+                - McpServerService
+            operationId: McpServerService_ListMcpServers
+            parameters:
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListMcpServersResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - McpServerService
+            operationId: McpServerService_CreateMcpServer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/McpServer'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/McpServer'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/mcpServers/{mcpServer}:
+        get:
+            tags:
+                - McpServerService
+            operationId: McpServerService_GetMcpServer
+            parameters:
+                - name: mcpServer
+                  in: path
+                  description: The mcpServer id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/McpServer'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        delete:
+            tags:
+                - McpServerService
+            operationId: McpServerService_DeleteMcpServer
+            parameters:
+                - name: mcpServer
+                  in: path
+                  description: The mcpServer id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - McpServerService
+            operationId: McpServerService_UpdateMcpServer
+            parameters:
+                - name: mcpServer
+                  in: path
+                  description: The mcpServer id.
+                  required: true
+                  schema:
+                    type: string
+                - name: updateMask
+                  in: query
+                  schema:
+                    type: string
+                    format: field-mask
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/McpServer'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/McpServer'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/pi:listModels:
         post:
             tags:
@@ -4473,6 +4638,14 @@ components:
                          The agent can read and proactively join such channels; posting still
                          requires explicit membership. Default true: the agent acts within its
                          owner's channel visibility.
+                mcpServers:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        mcp_servers is the set of MCP server resource names (mcpServers/{id})
+                         enabled on this agent. The manager resolves them into a tool catalog when
+                         the agent starts; the machine never receives transport configuration.
         AgentACPConfig:
             type: object
             properties:
@@ -6241,6 +6414,15 @@ components:
                         $ref: '#/components/schemas/MachineSummary'
                 nextPageToken:
                     type: string
+        ListMcpServersResponse:
+            type: object
+            properties:
+                mcpServers:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/McpServer'
+                nextPageToken:
+                    type: string
         ListPeerAgentsResponse:
             type: object
             properties:
@@ -6595,6 +6777,108 @@ components:
             properties:
                 readVersion:
                     type: string
+        McpHeader:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                value:
+                    writeOnly: true
+                    type: string
+                maskedValue:
+                    readOnly: true
+                    type: string
+            description: |-
+                McpHeader is one HTTP header attached to MCP transport requests. On write a
+                 masked ("****"-prefixed) or empty value means "keep the stored value".
+        McpHttpTransport:
+            required:
+                - url
+            type: object
+            properties:
+                url:
+                    type: string
+                    description: The MCP streamable HTTP endpoint URL, e.g. "https://mcp.example.com/mcp".
+                headers:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/McpHeader'
+                    description: |-
+                        Headers sent with every request to the MCP server (typically
+                         Authorization). Values are stored server-side and masked on read.
+            description: McpHttpTransport is a streamable-HTTP MCP transport.
+        McpServer:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: The resource name of the MCP server, in the form `mcpServers/{id}`.
+                title:
+                    type: string
+                    description: Human-readable title.
+                description:
+                    type: string
+                    description: Longer description of the MCP server.
+                http:
+                    allOf:
+                        - $ref: '#/components/schemas/McpHttpTransport'
+                    description: Streamable HTTP transport.
+                sse:
+                    allOf:
+                        - $ref: '#/components/schemas/McpSseTransport'
+                    description: SSE transport.
+                members:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        Users or groups allowed to use this MCP server, in IAM member format:
+                         `users/{uid}`, `groups/{email}`, `groups/{id}`, or `allUsers`. Access is
+                         checked when an agent references the server (and again at call time).
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
+                createdBy:
+                    readOnly: true
+                    type: string
+                    description: Creator's user resource name (users/{id}). Display-only.
+                configVersion:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        config_version increments on every update. The agent gateway returns it in
+                         the tool catalog and re-checks it at call time so stale catalogs fail
+                         closed instead of silently running against changed server configuration.
+            description: |-
+                McpServer is a workspace-global, admin-managed MCP service. The manager holds
+                 the full transport configuration (URL and header values) and only exposes a
+                 per-agent tool catalog to machines; header values are masked on read.
+        McpSseTransport:
+            required:
+                - url
+            type: object
+            properties:
+                url:
+                    type: string
+                    description: The MCP SSE endpoint URL, e.g. "https://mcp.example.com/sse".
+                headers:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/McpHeader'
+                    description: |-
+                        Headers sent with requests to the MCP server. Values are stored
+                         server-side and masked on read.
+            description: |-
+                McpSseTransport is an SSE MCP transport. The messages endpoint is derived
+                 from the standard MCP SSE layout (`GET url` for the event stream and
+                 `POST /messages?session_id=...` on the same origin).
         Mention:
             type: object
             properties:
@@ -7302,6 +7586,20 @@ components:
                     type: string
                 acpConfig:
                     $ref: '#/components/schemas/AgentACPConfig'
+        UpdateAgentMcpConfigRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                mcpServers:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        mcp_servers is the full replacement set of enabled MCP server resource
+                         names (mcpServers/{id}).
         UpdateChannelMemberRoleRequest:
             required:
                 - conversation
@@ -7569,6 +7867,13 @@ tags:
          machine app calls to register itself. A machine authenticates once with a
          registration token and then hosts one or more agents, each running its own
          AgentChannel over the machine's access token.
+    - name: McpServerService
+      description: |-
+        McpServerService manages the workspace MCP server registry. Management RPCs
+         are gated by the IAM interceptor with the laelia.mcpServers.* permissions
+         (held by workspaceAdmin or an authorized custom role). ListMcpServers is
+         handler-gated instead: it returns only the servers the caller may use, so
+         the agent config form can list them without a management permission.
     - name: NotificationService
       description: |-
         NotificationService manages per-user browser Web Push subscriptions so the

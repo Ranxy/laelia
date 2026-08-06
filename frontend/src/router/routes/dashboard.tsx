@@ -21,6 +21,7 @@ import {
   SETTINGS_ROUTE_CHAT,
   SETTINGS_ROUTE_GROUPS,
   SETTINGS_ROUTE_IAM,
+  SETTINGS_ROUTE_MCP_SERVERS,
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_PROFILE,
   SETTINGS_ROUTE_ROLES,
@@ -310,6 +311,14 @@ export const dashboardRoutes: RouteObject[] = [
             lazy: () =>
               import("@/pages/dashboard/settings-api-providers").then((m) => ({
                 Component: m.SettingsApiProvidersPage,
+              })),
+          },
+          {
+            path: "mcp-servers",
+            handle: { name: SETTINGS_ROUTE_MCP_SERVERS },
+            lazy: () =>
+              import("@/pages/dashboard/settings-mcp-servers").then((m) => ({
+                Component: m.SettingsMcpServersPage,
               })),
           },
           {

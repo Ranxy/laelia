@@ -62,6 +62,11 @@
     {"name": "ApiProvidersGet", "id": "laelia.apiProviders.get"},
     {"name": "ApiProvidersList", "id": "laelia.apiProviders.list"},
     {"name": "ApiProvidersUpdate", "id": "laelia.apiProviders.update"},
-    {"name": "ApiProvidersDelete", "id": "laelia.apiProviders.delete"}
+    {"name": "ApiProvidersDelete", "id": "laelia.apiProviders.delete"},
+    {"name": "McpServersCreate", "id": "laelia.mcpServers.create"},
+    {"name": "McpServersGet", "id": "laelia.mcpServers.get"},
+    {"name": "McpServersList", "id": "laelia.mcpServers.list"},
+    {"name": "McpServersUpdate", "id": "laelia.mcpServers.update"},
+    {"name": "McpServersDelete", "id": "laelia.mcpServers.delete"}
   ]
 }

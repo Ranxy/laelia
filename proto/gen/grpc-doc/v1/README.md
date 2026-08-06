@@ -68,6 +68,7 @@
     - [TransferAgentOwnershipRequest](#laelia-v1-TransferAgentOwnershipRequest)
     - [TransferAgentOwnershipResponse](#laelia-v1-TransferAgentOwnershipResponse)
     - [UpdateAgentACPConfigRequest](#laelia-v1-UpdateAgentACPConfigRequest)
+    - [UpdateAgentMcpConfigRequest](#laelia-v1-UpdateAgentMcpConfigRequest)
     - [UpdateAgentRequest](#laelia-v1-UpdateAgentRequest)
     - [UploadAgentAvatarRequest](#laelia-v1-UploadAgentAvatarRequest)
   
@@ -379,6 +380,30 @@
     - [MachineService](#laelia-v1-MachineService)
     - [MachineStreamService](#laelia-v1-MachineStreamService)
   
+- [v1/mcp.proto](#v1_mcp-proto)
+    - [CallMcpToolRequest](#laelia-v1-CallMcpToolRequest)
+    - [CallMcpToolResponse](#laelia-v1-CallMcpToolResponse)
+    - [CreateMcpServerRequest](#laelia-v1-CreateMcpServerRequest)
+    - [DeleteMcpServerRequest](#laelia-v1-DeleteMcpServerRequest)
+    - [GetMcpCatalogRequest](#laelia-v1-GetMcpCatalogRequest)
+    - [GetMcpCatalogResponse](#laelia-v1-GetMcpCatalogResponse)
+    - [GetMcpServerRequest](#laelia-v1-GetMcpServerRequest)
+    - [ListMcpServersRequest](#laelia-v1-ListMcpServersRequest)
+    - [ListMcpServersResponse](#laelia-v1-ListMcpServersResponse)
+    - [McpContentBlock](#laelia-v1-McpContentBlock)
+    - [McpHeader](#laelia-v1-McpHeader)
+    - [McpHttpTransport](#laelia-v1-McpHttpTransport)
+    - [McpImageContent](#laelia-v1-McpImageContent)
+    - [McpServer](#laelia-v1-McpServer)
+    - [McpServerChange](#laelia-v1-McpServerChange)
+    - [McpSseTransport](#laelia-v1-McpSseTransport)
+    - [McpTextContent](#laelia-v1-McpTextContent)
+    - [McpTool](#laelia-v1-McpTool)
+    - [UpdateMcpServerRequest](#laelia-v1-UpdateMcpServerRequest)
+  
+    - [McpGatewayService](#laelia-v1-McpGatewayService)
+    - [McpServerService](#laelia-v1-McpServerService)
+  
 - [v1/notification.proto](#v1_notification-proto)
     - [CreatePushSubscriptionRequest](#laelia-v1-CreatePushSubscriptionRequest)
     - [DeletePushSubscriptionRequest](#laelia-v1-DeletePushSubscriptionRequest)
@@ -594,6 +619,7 @@ RiskLevel is the risk level.
 | owner | [string](#string) |  | Owner&#39;s user resource name (users/{id}); empty for legacy agents with no recorded owner. The owner is the human responsible for the agent: only the owner or a workspace admin may modify it, the owner may transfer ownership to another user (TransferAgentOwnership), and non-owners&#39; high-risk requests to the agent require the owner&#39;s approval (see the agent prompt&#39;s Ownership &amp; Safety section). Defaults to the creator on CreateAgent and is backfilled from created_by for existing agents. |
 | owner_name | [string](#string) |  | Owner&#39;s display name — the name the agent writes `dm:@&lt;owner_name&gt;` to when requesting approval for a high-risk operation. Empty for legacy agents. |
 | follow_owner_permissions | [bool](#bool) |  | follow_owner_permissions grants this agent read access to every channel (and DM) its owner can read, without requiring the agent to be added as a member. The agent can read and proactively join such channels; posting still requires explicit membership. Default true: the agent acts within its owner&#39;s channel visibility. |
+| mcp_servers | [string](#string) | repeated | mcp_servers is the set of MCP server resource names (mcpServers/{id}) enabled on this agent. The manager resolves them into a tool catalog when the agent starts; the machine never receives transport configuration. |
 
 
 
@@ -1419,6 +1445,22 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 
 
 
+<a name="laelia-v1-UpdateAgentMcpConfigRequest"></a>
+
+### UpdateAgentMcpConfigRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| mcp_servers | [string](#string) | repeated | mcp_servers is the full replacement set of enabled MCP server resource names (mcpServers/{id}). |
+
+
+
+
+
+
 <a name="laelia-v1-UpdateAgentRequest"></a>
 
 ### UpdateAgentRequest
@@ -1491,6 +1533,7 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 | ForceDisconnectAgent | [ForceDisconnectAgentRequest](#laelia-v1-ForceDisconnectAgentRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Admin force disconnects an agent connection |
 | ListAgentSessions | [ListAgentSessionsRequest](#laelia-v1-ListAgentSessionsRequest) | [ListAgentSessionsResponse](#laelia-v1-ListAgentSessionsResponse) | List agent sessions |
 | UpdateAgentACPConfig | [UpdateAgentACPConfigRequest](#laelia-v1-UpdateAgentACPConfigRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Update the agent&#39;s ACP config. Handler-gated (no permission annotation): the agent&#39;s owner or a workspace admin may update it. Setting a legacy inline api_provider/api_key additionally requires laelia.agents.edit (only workspace admin today); owners without it must use a global provider. |
+| UpdateAgentMcpConfig | [UpdateAgentMcpConfigRequest](#laelia-v1-UpdateAgentMcpConfigRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | UpdateAgentMcpConfig replaces the MCP servers enabled on an agent. Only servers the caller may use (members of the server&#39;s user/group list, or workspace admin) are accepted. Handler-gated like UpdateAgentACPConfig: the agent&#39;s owner or a workspace admin may update it. |
 | RefreshAgentProviders | [RefreshAgentProvidersRequest](#laelia-v1-RefreshAgentProvidersRequest) | [RefreshAgentProvidersResponse](#laelia-v1-RefreshAgentProvidersResponse) | Ask the agent daemon to re-probe its host for installed LLM agent providers and their models. Returns the freshly discovered provider list (also persisted into agent.info.available_providers). Admin only. |
 | ListPiModels | [ListPiModelsRequest](#laelia-v1-ListPiModelsRequest) | [ListPiModelsResponse](#laelia-v1-ListPiModelsResponse) | List the models a built-in pi agent&#39;s LLM API provider exposes. The manager proxies the provider&#39;s model-listing HTTP API (DeepSeek `GET /models` with the caller&#39;s api_key; OpenRouter `GET /models`, public) so the model list is fetched dynamically rather than hardcoded. Not agent-scoped: the add-agent form calls it before the agent exists. Admin (agents.edit) only. |
 | ConnectAgent | [ConnectAgentRequest](#laelia-v1-ConnectAgentRequest) | [ConnectAgentResponse](#laelia-v1-ConnectAgentResponse) | Agent initial connection using bootstrap token |
@@ -6430,6 +6473,376 @@ its own AgentChannel.
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | MachineChannel | [MachineStreamMessage](#laelia-v1-MachineStreamMessage) stream | [ManagerMachineStreamMessage](#laelia-v1-ManagerMachineStreamMessage) stream |  |
+
+ 
+
+
+
+<a name="v1_mcp-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/mcp.proto
+
+
+
+<a name="laelia-v1-CallMcpToolRequest"></a>
+
+### CallMcpToolRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| mcp_server_id | [string](#string) |  |  |
+| tool_name | [string](#string) |  |  |
+| arguments | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
+| expected_config_version | [int64](#int64) |  |  |
+| expected_assignment_version | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-CallMcpToolResponse"></a>
+
+### CallMcpToolResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| content | [McpContentBlock](#laelia-v1-McpContentBlock) | repeated | Content blocks of the MCP tool result (text/image). |
+| is_error | [bool](#bool) |  |  |
+| structured_content | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-CreateMcpServerRequest"></a>
+
+### CreateMcpServerRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| mcp_server | [McpServer](#laelia-v1-McpServer) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-DeleteMcpServerRequest"></a>
+
+### DeleteMcpServerRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetMcpCatalogRequest"></a>
+
+### GetMcpCatalogRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-GetMcpCatalogResponse"></a>
+
+### GetMcpCatalogResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| catalog_version | [int32](#int32) |  | catalog_version is the catalog contract version. Currently always 1. |
+| tools | [McpTool](#laelia-v1-McpTool) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-GetMcpServerRequest"></a>
+
+### GetMcpServerRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListMcpServersRequest"></a>
+
+### ListMcpServersRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListMcpServersResponse"></a>
+
+### ListMcpServersResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| mcp_servers | [McpServer](#laelia-v1-McpServer) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-McpContentBlock"></a>
+
+### McpContentBlock
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| text | [McpTextContent](#laelia-v1-McpTextContent) |  |  |
+| image | [McpImageContent](#laelia-v1-McpImageContent) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-McpHeader"></a>
+
+### McpHeader
+McpHeader is one HTTP header attached to MCP transport requests. On write a
+masked (&#34;****&#34;-prefixed) or empty value means &#34;keep the stored value&#34;.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+| masked_value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-McpHttpTransport"></a>
+
+### McpHttpTransport
+McpHttpTransport is a streamable-HTTP MCP transport.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| url | [string](#string) |  | The MCP streamable HTTP endpoint URL, e.g. &#34;https://mcp.example.com/mcp&#34;. |
+| headers | [McpHeader](#laelia-v1-McpHeader) | repeated | Headers sent with every request to the MCP server (typically Authorization). Values are stored server-side and masked on read. |
+
+
+
+
+
+
+<a name="laelia-v1-McpImageContent"></a>
+
+### McpImageContent
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| data | [string](#string) |  | base64-encoded image data |
+| mime_type | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-McpServer"></a>
+
+### McpServer
+McpServer is a workspace-global, admin-managed MCP service. The manager holds
+the full transport configuration (URL and header values) and only exposes a
+per-agent tool catalog to machines; header values are masked on read.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The resource name of the MCP server, in the form `mcpServers/{id}`. |
+| title | [string](#string) |  | Human-readable title. |
+| description | [string](#string) |  | Longer description of the MCP server. |
+| http | [McpHttpTransport](#laelia-v1-McpHttpTransport) |  | Streamable HTTP transport. |
+| sse | [McpSseTransport](#laelia-v1-McpSseTransport) |  | SSE transport. |
+| members | [string](#string) | repeated | Users or groups allowed to use this MCP server, in IAM member format: `users/{uid}`, `groups/{email}`, `groups/{id}`, or `allUsers`. Access is checked when an agent references the server (and again at call time). |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| updated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}). Display-only. |
+| config_version | [int64](#int64) |  | config_version increments on every update. The agent gateway returns it in the tool catalog and re-checks it at call time so stale catalogs fail closed instead of silently running against changed server configuration. |
+
+
+
+
+
+
+<a name="laelia-v1-McpServerChange"></a>
+
+### McpServerChange
+McpServerChange is the audit payload recorded for a successful
+CreateMcpServer/UpdateMcpServer. It carries only the server resource name —
+never header values.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| server | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-McpSseTransport"></a>
+
+### McpSseTransport
+McpSseTransport is an SSE MCP transport. The messages endpoint is derived
+from the standard MCP SSE layout (`GET url` for the event stream and
+`POST /messages?session_id=...` on the same origin).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| url | [string](#string) |  | The MCP SSE endpoint URL, e.g. &#34;https://mcp.example.com/sse&#34;. |
+| headers | [McpHeader](#laelia-v1-McpHeader) | repeated | Headers sent with requests to the MCP server. Values are stored server-side and masked on read. |
+
+
+
+
+
+
+<a name="laelia-v1-McpTextContent"></a>
+
+### McpTextContent
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| text | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-McpTool"></a>
+
+### McpTool
+McpTool is one tool in a per-agent MCP tool catalog. The catalog is computed
+by the manager from the agent&#39;s enabled MCP servers and the servers&#39; current
+tool lists; machines never see the transport configuration.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| mcp_server_id | [string](#string) |  | mcp_servers/{id} the tool belongs to. |
+| server_name | [string](#string) |  | Display name of the MCP server. |
+| tool_name | [string](#string) |  | The real MCP tool name on the server. |
+| runtime_name | [string](#string) |  | The name exposed to the runtime; collision-scoped per server. |
+| title | [string](#string) |  |  |
+| description | [string](#string) |  |  |
+| input_schema | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
+| config_version | [int64](#int64) |  |  |
+| assignment_version | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateMcpServerRequest"></a>
+
+### UpdateMcpServerRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| mcp_server | [McpServer](#laelia-v1-McpServer) |  |  |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  |  |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="laelia-v1-McpGatewayService"></a>
+
+### McpGatewayService
+McpGatewayService is the agent-facing gateway: machines call it to fetch the
+current authorized MCP tool catalog for an agent and to invoke allowlisted
+tools. Callers are authenticated as an agent (machine token &#43; X-Laelia-Agent
+header); every call re-checks the caller&#39;s current authorization.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetMcpCatalog | [GetMcpCatalogRequest](#laelia-v1-GetMcpCatalogRequest) | [GetMcpCatalogResponse](#laelia-v1-GetMcpCatalogResponse) |  |
+| CallMcpTool | [CallMcpToolRequest](#laelia-v1-CallMcpToolRequest) | [CallMcpToolResponse](#laelia-v1-CallMcpToolResponse) |  |
+
+
+<a name="laelia-v1-McpServerService"></a>
+
+### McpServerService
+McpServerService manages the workspace MCP server registry. Management RPCs
+are gated by the IAM interceptor with the laelia.mcpServers.* permissions
+(held by workspaceAdmin or an authorized custom role). ListMcpServers is
+handler-gated instead: it returns only the servers the caller may use, so
+the agent config form can list them without a management permission.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetMcpServer | [GetMcpServerRequest](#laelia-v1-GetMcpServerRequest) | [McpServer](#laelia-v1-McpServer) |  |
+| ListMcpServers | [ListMcpServersRequest](#laelia-v1-ListMcpServersRequest) | [ListMcpServersResponse](#laelia-v1-ListMcpServersResponse) |  |
+| CreateMcpServer | [CreateMcpServerRequest](#laelia-v1-CreateMcpServerRequest) | [McpServer](#laelia-v1-McpServer) |  |
+| UpdateMcpServer | [UpdateMcpServerRequest](#laelia-v1-UpdateMcpServerRequest) | [McpServer](#laelia-v1-McpServer) |  |
+| DeleteMcpServer | [DeleteMcpServerRequest](#laelia-v1-DeleteMcpServerRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 
  
 

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { AppStoreState } from "./types";
 import { createAuthSlice } from "./auth";
 import { createAPIProviderSlice } from "./api-provider";
+import { createMcpServerSlice } from "./mcp";
 import { createAgentSlice } from "./agent";
 import { createMachineSlice } from "./machine";
 import { createMembersSlice } from "./members";
@@ -21,6 +22,7 @@ export const useAppStore = create<AppStoreState>()((...args) => {
   return {
     ...createAuthSlice(...args),
     ...createAPIProviderSlice(...args),
+    ...createMcpServerSlice(...args),
     ...createAgentSlice(...args),
     ...createMachineSlice(...args),
     ...createMembersSlice(...args),

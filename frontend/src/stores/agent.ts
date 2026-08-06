@@ -19,6 +19,7 @@ import {
   RotateAgentTokenRequestSchema,
   TransferAgentOwnershipRequestSchema,
   UpdateAgentACPConfigRequestSchema,
+  UpdateAgentMcpConfigRequestSchema,
   UpdateAgentRequestSchema,
 } from "@/types/proto-es/v1/agent_pb";
 import type { AgentACPConfigInput, AgentSlice, AppSliceCreator } from "./types";
@@ -146,6 +147,15 @@ export const createAgentSlice: AppSliceCreator<AgentSlice> = (set, get) => ({
       create(UpdateAgentACPConfigRequestSchema, {
         name,
         acpConfig: create(AgentACPConfigSchema, acpConfig),
+      })
+    );
+  },
+
+  async updateAgentMcpConfig(name: string, mcpServers: string[]) {
+    await agentServiceClient.updateAgentMcpConfig(
+      create(UpdateAgentMcpConfigRequestSchema, {
+        name,
+        mcpServers,
       })
     );
   },

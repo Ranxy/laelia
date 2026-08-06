@@ -129,7 +129,6 @@ func TestLaunchArgs(t *testing.T) {
 		"--provider", "openrouter",
 		"--model", "anthropic/claude-3.5-sonnet",
 		"--session-dir", "/work",
-		"--no-extensions",
 		"--no-skills",
 		"--no-prompt-templates",
 		"--approve",

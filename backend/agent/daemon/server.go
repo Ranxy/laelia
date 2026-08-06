@@ -26,8 +26,13 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/Ranxy/laelia/backend/agent/chattools"
+	"github.com/Ranxy/laelia/backend/common"
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
 
@@ -65,6 +70,19 @@ type Server struct {
 	// client varies per agent even though the token is shared.
 	agentClientsMu sync.Mutex
 	agentClients   map[string]v1connect.CommandServiceClient
+
+	// mcpClients caches per-agent McpGatewayService clients using the same
+	// machine token + X-Laelia-Agent routing as agentClients.
+	mcpClientsMu sync.Mutex
+	mcpClients   map[string]v1connect.McpGatewayServiceClient
+
+	// mcpProxy* is the localhost TCP proxy pi extensions call. Tokens map to
+	// the agent resource name; the proxy forwards to the manager gateway.
+	mcpProxyMu     sync.Mutex
+	mcpProxyServer *http.Server
+	mcpProxyBase   string
+	mcpProxyTokens map[string]string
+	mcpProxyAgents map[string]string
 }
 
 // New creates a daemon bound to a unix socket at
@@ -97,6 +115,9 @@ func New(managerURL, machineResourceID string, getToken func() string, httpClien
 		socketPath:        socketPath,
 		sessionToken:      sessionToken,
 		agentClients:      make(map[string]v1connect.CommandServiceClient),
+		mcpClients:        make(map[string]v1connect.McpGatewayServiceClient),
+		mcpProxyTokens:    make(map[string]string),
+		mcpProxyAgents:    make(map[string]string),
 	}, nil
 }
 
@@ -153,6 +174,165 @@ func (s *Server) authInterceptor(agentBareID string) connect.UnaryInterceptorFun
 			return next(ctx, req)
 		}
 	}
+}
+
+// mcpClient returns a cached McpGatewayServiceClient for the agent identified
+// by agentBareID. Every call it makes carries the live machine access token and
+// the X-Laelia-Agent header, mirroring agentClient.
+func (s *Server) mcpClient(agentBareID string) v1connect.McpGatewayServiceClient {
+	s.mcpClientsMu.Lock()
+	defer s.mcpClientsMu.Unlock()
+	if s.mcpClients == nil {
+		s.mcpClients = make(map[string]v1connect.McpGatewayServiceClient)
+	}
+	if c, ok := s.mcpClients[agentBareID]; ok {
+		return c
+	}
+	c := v1connect.NewMcpGatewayServiceClient(
+		s.httpClient,
+		s.managerURL,
+		connect.WithInterceptors(s.authInterceptor(agentBareID)),
+	)
+	s.mcpClients[agentBareID] = c
+	return c
+}
+
+// McpTools fetches the server-authorized MCP tool catalog for the agent
+// identified by the given agents/{id} resource name.
+func (s *Server) McpTools(ctx context.Context, agent string) (*v1pb.GetMcpCatalogResponse, error) {
+	resp, err := s.mcpClient(bareAgentID(agent)).GetMcpCatalog(ctx, connect.NewRequest(&v1pb.GetMcpCatalogRequest{}))
+	if err != nil {
+		return nil, err
+	}
+	return resp.Msg, nil
+}
+
+// McpCall forwards one managed MCP tool call to the manager gateway.
+func (s *Server) McpCall(ctx context.Context, agent string, req *v1pb.CallMcpToolRequest) (*v1pb.CallMcpToolResponse, error) {
+	resp, err := s.mcpClient(bareAgentID(agent)).CallMcpTool(ctx, connect.NewRequest(req))
+	if err != nil {
+		return nil, err
+	}
+	return resp.Msg, nil
+}
+
+// McpProxyURLForAgent returns the localhost TCP proxy URL the agent's pi
+// extension calls to fetch the managed MCP catalog and invoke tools. The URL is
+// stable per agent for the daemon lifetime and is authenticated by an
+// unguessable per-agent token.
+func (s *Server) McpProxyURLForAgent(agent string) (string, error) {
+	s.mcpProxyMu.Lock()
+	defer s.mcpProxyMu.Unlock()
+	if s.mcpProxyServer == nil {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			return "", errors.Wrap(err, "bind mcp proxy")
+		}
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", s.handleMcpProxy)
+		s.mcpProxyServer = &http.Server{Handler: mux}
+		s.mcpProxyBase = "http://" + listener.Addr().String()
+		go func() {
+			if err := s.mcpProxyServer.Serve(listener); err != nil && err != http.ErrServerClosed {
+				slog.Error("mcp proxy serve error", "error", err)
+			}
+		}()
+	}
+	if token, ok := s.mcpProxyAgents[agent]; ok {
+		return s.mcpProxyBase + "/mcp/" + token, nil
+	}
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return "", errors.Wrap(err, "generate mcp proxy token")
+	}
+	token := hex.EncodeToString(tokenBytes)
+	s.mcpProxyTokens[token] = agent
+	s.mcpProxyAgents[agent] = token
+	return s.mcpProxyBase + "/mcp/" + token, nil
+}
+
+// handleMcpProxy serves the localhost REST proxy for pi extensions:
+// GET /mcp/{token}/tools and POST /mcp/{token}/call.
+func (s *Server) handleMcpProxy(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) != 3 || parts[0] != "mcp" {
+		http.NotFound(w, r)
+		return
+	}
+	s.mcpProxyMu.Lock()
+	agent := s.mcpProxyTokens[parts[1]]
+	s.mcpProxyMu.Unlock()
+	if agent == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	switch parts[2] {
+	case "tools":
+		if r.Method != http.MethodGet && r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		catalog, err := s.McpTools(r.Context(), agent)
+		if err != nil {
+			mcpProxyError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		writeProtoJSON(w, catalog)
+	case "call":
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			McpServerID               string          `json:"mcpServerId"`
+			ToolName                  string          `json:"toolName"`
+			Arguments                 json.RawMessage `json:"arguments"`
+			ExpectedConfigVersion     int64           `json:"expectedConfigVersion"`
+			ExpectedAssignmentVersion int64           `json:"expectedAssignmentVersion"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			mcpProxyError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+			return
+		}
+		args := &structpb.Struct{}
+		if len(req.Arguments) > 0 {
+			if err := common.ProtojsonUnmarshaler.Unmarshal(req.Arguments, args); err != nil {
+				mcpProxyError(w, http.StatusBadRequest, "invalid arguments: "+err.Error())
+				return
+			}
+		}
+		result, err := s.McpCall(r.Context(), agent, &v1pb.CallMcpToolRequest{
+			McpServerId:               req.McpServerID,
+			ToolName:                  req.ToolName,
+			Arguments:                 args,
+			ExpectedConfigVersion:     req.ExpectedConfigVersion,
+			ExpectedAssignmentVersion: req.ExpectedAssignmentVersion,
+		})
+		if err != nil {
+			mcpProxyError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		writeProtoJSON(w, result)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func writeProtoJSON(w http.ResponseWriter, msg proto.Message) {
+	raw, err := protojson.Marshal(msg)
+	if err != nil {
+		mcpProxyError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(raw)
+}
+
+func mcpProxyError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
 // agentResourceName converts a bare agent id to its full resource name
@@ -257,6 +437,8 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/agent/list", s.handleAgentList)
 	mux.HandleFunc("/channel/list", s.handleChannelList)
 	mux.HandleFunc("/channel/join", s.handleChannelJoin)
+	mux.HandleFunc("/mcp/tools", s.handleMcpTools)
+	mux.HandleFunc("/mcp/call", s.handleMcpCall)
 
 	s.httpServer = &http.Server{Handler: mux}
 	go func() {
@@ -857,4 +1039,74 @@ func (s *Server) ensureStaleSocket() error {
 func sha256Prefix(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])[:12]
+}
+
+func (s *Server) handleMcpTools(w http.ResponseWriter, r *http.Request) {
+	if e := s.authorize(r); e != nil {
+		writeError(w, e)
+		return
+	}
+	var req struct {
+		Agent string `json:"agent"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, &chattools.Error{Code: "INVALID_ARGUMENT_FAILED", Message: "failed to decode request body: " + err.Error()})
+		return
+	}
+	catalog, err := s.McpTools(r.Context(), req.Agent)
+	if err != nil {
+		writeError(w, &chattools.Error{Code: "MCP_GATEWAY_FAILED", Message: err.Error()})
+		return
+	}
+	raw, err := protojson.Marshal(catalog)
+	if err != nil {
+		writeError(w, &chattools.Error{Code: "MCP_GATEWAY_FAILED", Message: err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(raw)
+}
+
+func (s *Server) handleMcpCall(w http.ResponseWriter, r *http.Request) {
+	if e := s.authorize(r); e != nil {
+		writeError(w, e)
+		return
+	}
+	var req struct {
+		Agent                     string          `json:"agent"`
+		McpServerID               string          `json:"mcp_server_id"`
+		ToolName                  string          `json:"tool_name"`
+		Arguments                 json.RawMessage `json:"arguments"`
+		ExpectedConfigVersion     int64           `json:"expected_config_version"`
+		ExpectedAssignmentVersion int64           `json:"expected_assignment_version"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, &chattools.Error{Code: "INVALID_ARGUMENT_FAILED", Message: "failed to decode request body: " + err.Error()})
+		return
+	}
+	args := &structpb.Struct{}
+	if len(req.Arguments) > 0 {
+		if err := common.ProtojsonUnmarshaler.Unmarshal(req.Arguments, args); err != nil {
+			writeError(w, &chattools.Error{Code: "INVALID_ARGUMENT_FAILED", Message: "invalid arguments: " + err.Error()})
+			return
+		}
+	}
+	result, err := s.McpCall(r.Context(), req.Agent, &v1pb.CallMcpToolRequest{
+		McpServerId:               req.McpServerID,
+		ToolName:                  req.ToolName,
+		Arguments:                 args,
+		ExpectedConfigVersion:     req.ExpectedConfigVersion,
+		ExpectedAssignmentVersion: req.ExpectedAssignmentVersion,
+	})
+	if err != nil {
+		writeError(w, &chattools.Error{Code: "MCP_GATEWAY_FAILED", Message: err.Error()})
+		return
+	}
+	raw, err := protojson.Marshal(result)
+	if err != nil {
+		writeError(w, &chattools.Error{Code: "MCP_GATEWAY_FAILED", Message: err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(raw)
 }

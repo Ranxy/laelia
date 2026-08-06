@@ -30,6 +30,7 @@ import type {
   MachineSummary,
   RotateMachineTokenResponse,
 } from "@/types/proto-es/v1/machine_pb";
+import type { McpServer } from "@/types/proto-es/v1/mcp_pb";
 import type {
   ChatPreferences,
   User,
@@ -211,6 +212,9 @@ export interface AgentSlice {
     name: string,
     acpConfig: AgentACPConfigInput
   ) => Promise<void>;
+  // updateAgentMcpConfig replaces the MCP servers enabled on an agent. Only
+  // servers the caller may use are accepted server-side.
+  updateAgentMcpConfig: (name: string, mcpServers: string[]) => Promise<void>;
   // transferAgentOwnership reassigns the agent's owner to another user.
   // Unilateral and immediately effective (the target user does not accept);
   // authorized server-side for the current owner or a workspace admin.
@@ -559,8 +563,22 @@ export interface ApiProviderSlice {
   ) => Promise<{ nextPageToken: string } | undefined>;
 }
 
+// McpServerSlice owns the workspace MCP server roster. The backend
+// handler-gates ListMcpServers: admins/managers see every server, other
+// callers see only the servers they may use.
+export interface McpServerSlice {
+  mcpServers: McpServer[];
+  mcpServersLoading: boolean;
+
+  fetchMcpServers: (
+    params?: { pageSize?: number; pageToken?: string },
+    opts?: { silent?: boolean }
+  ) => Promise<{ nextPageToken: string } | undefined>;
+}
+
 export type AppStoreState = AuthSlice &
   ApiProviderSlice &
+  McpServerSlice &
   AgentSlice &
   MachineSlice &
   MembersSlice &

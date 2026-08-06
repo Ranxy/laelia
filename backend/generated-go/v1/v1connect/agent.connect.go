@@ -65,6 +65,9 @@ const (
 	// AgentServiceUpdateAgentACPConfigProcedure is the fully-qualified name of the AgentService's
 	// UpdateAgentACPConfig RPC.
 	AgentServiceUpdateAgentACPConfigProcedure = "/laelia.v1.AgentService/UpdateAgentACPConfig"
+	// AgentServiceUpdateAgentMcpConfigProcedure is the fully-qualified name of the AgentService's
+	// UpdateAgentMcpConfig RPC.
+	AgentServiceUpdateAgentMcpConfigProcedure = "/laelia.v1.AgentService/UpdateAgentMcpConfig"
 	// AgentServiceRefreshAgentProvidersProcedure is the fully-qualified name of the AgentService's
 	// RefreshAgentProviders RPC.
 	AgentServiceRefreshAgentProvidersProcedure = "/laelia.v1.AgentService/RefreshAgentProviders"
@@ -133,6 +136,11 @@ type AgentServiceClient interface {
 	// inline api_provider/api_key additionally requires laelia.agents.edit (only
 	// workspace admin today); owners without it must use a global provider.
 	UpdateAgentACPConfig(context.Context, *connect.Request[v1.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error)
+	// UpdateAgentMcpConfig replaces the MCP servers enabled on an agent. Only
+	// servers the caller may use (members of the server's user/group list, or
+	// workspace admin) are accepted. Handler-gated like UpdateAgentACPConfig:
+	// the agent's owner or a workspace admin may update it.
+	UpdateAgentMcpConfig(context.Context, *connect.Request[v1.UpdateAgentMcpConfigRequest]) (*connect.Response[emptypb.Empty], error)
 	// Ask the agent daemon to re-probe its host for installed LLM agent providers
 	// and their models. Returns the freshly discovered provider list (also
 	// persisted into agent.info.available_providers). Admin only.
@@ -242,6 +250,12 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(agentServiceMethods.ByName("UpdateAgentACPConfig")),
 			connect.WithClientOptions(opts...),
 		),
+		updateAgentMcpConfig: connect.NewClient[v1.UpdateAgentMcpConfigRequest, emptypb.Empty](
+			httpClient,
+			baseURL+AgentServiceUpdateAgentMcpConfigProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("UpdateAgentMcpConfig")),
+			connect.WithClientOptions(opts...),
+		),
 		refreshAgentProviders: connect.NewClient[v1.RefreshAgentProvidersRequest, v1.RefreshAgentProvidersResponse](
 			httpClient,
 			baseURL+AgentServiceRefreshAgentProvidersProcedure,
@@ -318,6 +332,7 @@ type agentServiceClient struct {
 	forceDisconnectAgent   *connect.Client[v1.ForceDisconnectAgentRequest, emptypb.Empty]
 	listAgentSessions      *connect.Client[v1.ListAgentSessionsRequest, v1.ListAgentSessionsResponse]
 	updateAgentACPConfig   *connect.Client[v1.UpdateAgentACPConfigRequest, emptypb.Empty]
+	updateAgentMcpConfig   *connect.Client[v1.UpdateAgentMcpConfigRequest, emptypb.Empty]
 	refreshAgentProviders  *connect.Client[v1.RefreshAgentProvidersRequest, v1.RefreshAgentProvidersResponse]
 	listPiModels           *connect.Client[v1.ListPiModelsRequest, v1.ListPiModelsResponse]
 	connectAgent           *connect.Client[v1.ConnectAgentRequest, v1.ConnectAgentResponse]
@@ -383,6 +398,11 @@ func (c *agentServiceClient) ListAgentSessions(ctx context.Context, req *connect
 // UpdateAgentACPConfig calls laelia.v1.AgentService.UpdateAgentACPConfig.
 func (c *agentServiceClient) UpdateAgentACPConfig(ctx context.Context, req *connect.Request[v1.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error) {
 	return c.updateAgentACPConfig.CallUnary(ctx, req)
+}
+
+// UpdateAgentMcpConfig calls laelia.v1.AgentService.UpdateAgentMcpConfig.
+func (c *agentServiceClient) UpdateAgentMcpConfig(ctx context.Context, req *connect.Request[v1.UpdateAgentMcpConfigRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.updateAgentMcpConfig.CallUnary(ctx, req)
 }
 
 // RefreshAgentProviders calls laelia.v1.AgentService.RefreshAgentProviders.
@@ -472,6 +492,11 @@ type AgentServiceHandler interface {
 	// inline api_provider/api_key additionally requires laelia.agents.edit (only
 	// workspace admin today); owners without it must use a global provider.
 	UpdateAgentACPConfig(context.Context, *connect.Request[v1.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error)
+	// UpdateAgentMcpConfig replaces the MCP servers enabled on an agent. Only
+	// servers the caller may use (members of the server's user/group list, or
+	// workspace admin) are accepted. Handler-gated like UpdateAgentACPConfig:
+	// the agent's owner or a workspace admin may update it.
+	UpdateAgentMcpConfig(context.Context, *connect.Request[v1.UpdateAgentMcpConfigRequest]) (*connect.Response[emptypb.Empty], error)
 	// Ask the agent daemon to re-probe its host for installed LLM agent providers
 	// and their models. Returns the freshly discovered provider list (also
 	// persisted into agent.info.available_providers). Admin only.
@@ -577,6 +602,12 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(agentServiceMethods.ByName("UpdateAgentACPConfig")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentServiceUpdateAgentMcpConfigHandler := connect.NewUnaryHandler(
+		AgentServiceUpdateAgentMcpConfigProcedure,
+		svc.UpdateAgentMcpConfig,
+		connect.WithSchema(agentServiceMethods.ByName("UpdateAgentMcpConfig")),
+		connect.WithHandlerOptions(opts...),
+	)
 	agentServiceRefreshAgentProvidersHandler := connect.NewUnaryHandler(
 		AgentServiceRefreshAgentProvidersProcedure,
 		svc.RefreshAgentProviders,
@@ -661,6 +692,8 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 			agentServiceListAgentSessionsHandler.ServeHTTP(w, r)
 		case AgentServiceUpdateAgentACPConfigProcedure:
 			agentServiceUpdateAgentACPConfigHandler.ServeHTTP(w, r)
+		case AgentServiceUpdateAgentMcpConfigProcedure:
+			agentServiceUpdateAgentMcpConfigHandler.ServeHTTP(w, r)
 		case AgentServiceRefreshAgentProvidersProcedure:
 			agentServiceRefreshAgentProvidersHandler.ServeHTTP(w, r)
 		case AgentServiceListPiModelsProcedure:
@@ -732,6 +765,10 @@ func (UnimplementedAgentServiceHandler) ListAgentSessions(context.Context, *conn
 
 func (UnimplementedAgentServiceHandler) UpdateAgentACPConfig(context.Context, *connect.Request[v1.UpdateAgentACPConfigRequest]) (*connect.Response[emptypb.Empty], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.UpdateAgentACPConfig is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) UpdateAgentMcpConfig(context.Context, *connect.Request[v1.UpdateAgentMcpConfigRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.UpdateAgentMcpConfig is not implemented"))
 }
 
 func (UnimplementedAgentServiceHandler) RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error) {

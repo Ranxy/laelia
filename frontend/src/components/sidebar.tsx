@@ -29,6 +29,7 @@ import {
   SETTINGS_ROUTE_CHAT,
   SETTINGS_ROUTE_GROUPS,
   SETTINGS_ROUTE_IAM,
+  SETTINGS_ROUTE_MCP_SERVERS,
   SETTINGS_ROUTE_NOTIFICATIONS,
   SETTINGS_ROUTE_ROLES,
   SETTINGS_ROUTE_STORAGE,
@@ -105,6 +106,7 @@ function useSidebarItems(): SidebarItem[] {
   const canViewIam = useHasPermission("laelia.iam.getPolicy");
   const canViewGroups = useHasPermission("laelia.groups.list");
   const canViewApiProviders = useHasPermission("laelia.apiProviders.list");
+  const canViewMcpServers = useHasPermission("laelia.mcpServers.list");
   const canViewAudit = useHasPermission("laelia.auditLogs.search");
 
   return useMemo(
@@ -192,6 +194,12 @@ function useSidebarItems(): SidebarItem[] {
             hide: !canViewApiProviders,
           },
           {
+            title: t("sidebar.settings-mcp-servers"),
+            name: SETTINGS_ROUTE_MCP_SERVERS,
+            type: "route",
+            hide: !canViewMcpServers,
+          },
+          {
             title: t("sidebar.settings-audit"),
             name: SETTINGS_ROUTE_AUDIT,
             type: "route",
@@ -208,6 +216,7 @@ function useSidebarItems(): SidebarItem[] {
       canViewIam,
       canViewGroups,
       canViewApiProviders,
+      canViewMcpServers,
       canViewAudit,
     ]
   );
