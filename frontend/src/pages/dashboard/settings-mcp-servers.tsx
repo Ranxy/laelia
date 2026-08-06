@@ -399,7 +399,9 @@ export function SettingsMcpServersPage() {
       />
       <McpServerSheet
         open={editOpen}
-        title={t("settings.mcp-servers.edit-title")}
+        title={t("settings.mcp-servers.edit-title", {
+          title: editTarget?.title ?? "",
+        })}
         description={t("settings.mcp-servers.edit-description")}
         form={editForm}
         users={users}
