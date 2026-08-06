@@ -26,11 +26,12 @@ const managedMcpExtensionTemplate = `export default async function (pi: any) {
   try {
     const tools = await loadTools();
     for (const tool of tools) {
+      const serverLabel = tool.serverName + (tool.serverDescription ? " - " + tool.serverDescription : "");
       pi.registerTool({
         name: tool.runtimeName,
-        label: tool.title || (tool.serverName + ": " + tool.toolName),
-        description: tool.description || ("Call " + tool.toolName + " on " + tool.serverName + "."),
-        promptSnippet: tool.runtimeName + ": " + (tool.description || ("Call " + tool.toolName + " on " + tool.serverName)),
+        label: serverLabel + ": " + (tool.title || tool.toolName),
+        description: serverLabel + ": " + (tool.description || ("Call " + tool.toolName + " on " + tool.serverName + ".")),
+        promptSnippet: tool.runtimeName + ": " + serverLabel + ": " + (tool.description || ("Call " + tool.toolName + " on " + tool.serverName)),
         parameters: tool.inputSchema || { type: "object" },
         async execute(_toolCallId: any, params: any) {
           const res = await fetch(proxyUrl + "/call", {

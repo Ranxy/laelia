@@ -6785,6 +6785,7 @@ tool lists; machines never see the transport configuration.
 | input_schema | [google.protobuf.Struct](#google-protobuf-Struct) |  |  |
 | config_version | [int64](#int64) |  |  |
 | assignment_version | [int64](#int64) |  |  |
+| server_description | [string](#string) |  | Display description of the MCP server. |
 
 
 

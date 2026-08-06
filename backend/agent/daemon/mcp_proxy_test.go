@@ -43,6 +43,7 @@ func TestHandleMcpProxyRoutesToGateway(t *testing.T) {
 				{
 					McpServerId:       "mcpServers/srv-1",
 					ServerName:        "GitHub",
+					ServerDescription: "GitHub tools",
 					ToolName:          "do_it",
 					RuntimeName:       "r123_do_it",
 					Description:       "does it",
@@ -70,6 +71,8 @@ func TestHandleMcpProxyRoutesToGateway(t *testing.T) {
 		CatalogVersion int `json:"catalogVersion"`
 		Tools          []struct {
 			McpServerID       string `json:"mcpServerId"`
+			ServerName        string `json:"serverName"`
+			ServerDescription string `json:"serverDescription"`
 			ToolName          string `json:"toolName"`
 			RuntimeName       string `json:"runtimeName"`
 			ConfigVersion     int64  `json:"configVersion"`
@@ -80,6 +83,8 @@ func TestHandleMcpProxyRoutesToGateway(t *testing.T) {
 	require.Equal(t, 1, catalog.CatalogVersion)
 	require.Len(t, catalog.Tools, 1)
 	assert.Equal(t, "mcpServers/srv-1", catalog.Tools[0].McpServerID)
+	assert.Equal(t, "GitHub", catalog.Tools[0].ServerName)
+	assert.Equal(t, "GitHub tools", catalog.Tools[0].ServerDescription)
 	assert.Equal(t, "r123_do_it", catalog.Tools[0].RuntimeName)
 	assert.EqualValues(t, 1, catalog.Tools[0].ConfigVersion)
 	assert.EqualValues(t, 2, catalog.Tools[0].AssignmentVersion)

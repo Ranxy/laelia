@@ -198,6 +198,8 @@ message McpTool {
   google.protobuf.Struct input_schema = 7;
   int64 config_version = 8;
   int64 assignment_version = 9;
+  // Display description of the MCP server.
+  string server_description = 10;
 }
 
 message GetMcpCatalogRequest {}

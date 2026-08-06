@@ -718,6 +718,8 @@ type McpTool struct {
 	InputSchema       *structpb.Struct `protobuf:"bytes,7,opt,name=input_schema,json=inputSchema,proto3" json:"input_schema,omitempty"`
 	ConfigVersion     int64            `protobuf:"varint,8,opt,name=config_version,json=configVersion,proto3" json:"config_version,omitempty"`
 	AssignmentVersion int64            `protobuf:"varint,9,opt,name=assignment_version,json=assignmentVersion,proto3" json:"assignment_version,omitempty"`
+	// Display description of the MCP server.
+	ServerDescription string `protobuf:"bytes,10,opt,name=server_description,json=serverDescription,proto3" json:"server_description,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -813,6 +815,13 @@ func (x *McpTool) GetAssignmentVersion() int64 {
 		return x.AssignmentVersion
 	}
 	return 0
+}
+
+func (x *McpTool) GetServerDescription() string {
+	if x != nil {
+		return x.ServerDescription
+	}
+	return ""
 }
 
 type GetMcpCatalogRequest struct {
@@ -1274,7 +1283,7 @@ const file_v1_mcp_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tB\x18\xe0A\x02\xfaA\x12\n" +
 	"\x10laelia/McpServerR\x04name\")\n" +
 	"\x0fMcpServerChange\x12\x16\n" +
-	"\x06server\x18\x01 \x01(\tR\x06server\"\xd8\x02\n" +
+	"\x06server\x18\x01 \x01(\tR\x06server\"\x87\x03\n" +
 	"\aMcpTool\x12\"\n" +
 	"\rmcp_server_id\x18\x01 \x01(\tR\vmcpServerId\x12\x1f\n" +
 	"\vserver_name\x18\x02 \x01(\tR\n" +
@@ -1285,7 +1294,9 @@ const file_v1_mcp_proto_rawDesc = "" +
 	"\vdescription\x18\x06 \x01(\tR\vdescription\x12:\n" +
 	"\finput_schema\x18\a \x01(\v2\x17.google.protobuf.StructR\vinputSchema\x12%\n" +
 	"\x0econfig_version\x18\b \x01(\x03R\rconfigVersion\x12-\n" +
-	"\x12assignment_version\x18\t \x01(\x03R\x11assignmentVersion\"\x16\n" +
+	"\x12assignment_version\x18\t \x01(\x03R\x11assignmentVersion\x12-\n" +
+	"\x12server_description\x18\n" +
+	" \x01(\tR\x11serverDescription\"\x16\n" +
 	"\x14GetMcpCatalogRequest\"j\n" +
 	"\x15GetMcpCatalogResponse\x12'\n" +
 	"\x0fcatalog_version\x18\x01 \x01(\x05R\x0ecatalogVersion\x12(\n" +

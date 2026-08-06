@@ -340,6 +340,9 @@ func writeMcpCatalogJSON(w http.ResponseWriter, catalog *v1pb.GetMcpCatalogRespo
 			"configVersion":     tool.ConfigVersion,
 			"assignmentVersion": tool.AssignmentVersion,
 		}
+		if tool.ServerDescription != "" {
+			entry["serverDescription"] = tool.ServerDescription
+		}
 		if tool.InputSchema != nil {
 			entry["inputSchema"] = tool.InputSchema.AsMap()
 		}

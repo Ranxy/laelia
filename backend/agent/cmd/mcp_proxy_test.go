@@ -34,6 +34,7 @@ func TestMcpProxyRoundTrip(t *testing.T) {
 			"tools": [{
 				"mcpServerId": "mcpServers/srv-1",
 				"serverName": "GitHub",
+				"serverDescription": "GitHub tools",
 				"toolName": "do_it",
 				"runtimeName": "r123_do_it",
 				"description": "does it",
@@ -97,6 +98,7 @@ func TestMcpProxyRoundTrip(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(lines[1]), &listResp))
 	require.Len(t, listResp.Result.Tools, 1)
 	require.Equal(t, "r123_do_it", listResp.Result.Tools[0]["name"])
+	require.Equal(t, "GitHub - GitHub tools: does it", listResp.Result.Tools[0]["description"])
 
 	var callResp struct {
 		Result struct {

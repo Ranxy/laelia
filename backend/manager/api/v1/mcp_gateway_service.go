@@ -105,6 +105,7 @@ func (s *McpGatewayService) GetMcpCatalog(ctx context.Context, _ *connect.Reques
 			response.Tools = append(response.Tools, &v1pb.McpTool{
 				McpServerId:       common.FormatMcpServerUID(server.ResourceID),
 				ServerName:        server.Title,
+				ServerDescription: server.Description,
 				ToolName:          tool.Name,
 				RuntimeName:       nativeMcpToolName(server.ResourceID, tool.Name),
 				Title:             tool.Title,

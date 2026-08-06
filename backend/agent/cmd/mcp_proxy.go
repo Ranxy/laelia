@@ -60,6 +60,7 @@ type mcpRPCResponse struct {
 type mcpCatalogTool struct {
 	McpServerID       string          `json:"mcpServerId"`
 	ServerName        string          `json:"serverName"`
+	ServerDescription string          `json:"serverDescription,omitempty"`
 	ToolName          string          `json:"toolName"`
 	RuntimeName       string          `json:"runtimeName"`
 	Title             string          `json:"title,omitempty"`
@@ -154,10 +155,14 @@ func handleMcpProxyRPC(ctx context.Context, agent, socket, token string, req mcp
 		}
 		tools := make([]map[string]any, 0, len(catalog))
 		for _, tool := range catalog {
+			serverLabel := tool.ServerName
+			if tool.ServerDescription != "" {
+				serverLabel += " - " + tool.ServerDescription
+			}
 			entry := map[string]any{
 				"name":        tool.RuntimeName,
 				"title":       tool.Title,
-				"description": tool.Description,
+				"description": serverLabel + ": " + tool.Description,
 			}
 			if len(tool.InputSchema) > 0 {
 				entry["inputSchema"] = json.RawMessage(tool.InputSchema)

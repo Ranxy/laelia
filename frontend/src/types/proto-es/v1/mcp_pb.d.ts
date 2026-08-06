@@ -383,6 +383,13 @@ export declare type McpTool = Message<"laelia.v1.McpTool"> & {
    * @generated from field: int64 assignment_version = 9;
    */
   assignmentVersion: bigint;
+
+  /**
+   * Display description of the MCP server.
+   *
+   * @generated from field: string server_description = 10;
+   */
+  serverDescription: string;
 };
 
 /**
