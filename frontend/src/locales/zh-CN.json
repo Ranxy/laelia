@@ -378,6 +378,7 @@
       "no-my-servers": "还没有个人 MCP 服务。",
       "no-user-servers": "还没有用户配置个人 MCP 服务。",
       "header-owner": "创建人",
+      "search-creator-placeholder": "按创建人搜索",
       "title-required": "名称必填。",
       "url-required": "URL 必填。",
       "field-title": "名称",

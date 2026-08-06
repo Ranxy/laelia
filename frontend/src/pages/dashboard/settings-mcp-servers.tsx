@@ -158,6 +158,7 @@ export function SettingsMcpServersPage() {
   const [userServers, setUserServers] = useState<McpServer[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [creatorQuery, setCreatorQuery] = useState("");
   const [allowUserMcp, setAllowUserMcp] = useState(true);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<McpTab>(
@@ -347,6 +348,22 @@ export function SettingsMcpServersPage() {
     setDeleteOpen(true);
   };
 
+  const filteredUserServers = useMemo(() => {
+    const query = creatorQuery.trim().toLowerCase();
+    if (!query) return userServers;
+    return userServers.filter((server) => {
+      const creator = memberLabel(
+        server.createdBy,
+        users,
+        groups
+      ).toLowerCase();
+      return (
+        creator.includes(query) ||
+        server.createdBy.toLowerCase().includes(query)
+      );
+    });
+  }, [creatorQuery, userServers, users, groups]);
+
   return (
     <SettingsPage
       title={t("settings.mcp-servers.title")}
@@ -430,8 +447,14 @@ export function SettingsMcpServersPage() {
             <p className="mb-3 text-xs text-control-light">
               {t("settings.mcp-servers.users-hint")}
             </p>
+            <Input
+              value={creatorQuery}
+              onChange={(e) => setCreatorQuery(e.target.value)}
+              placeholder={t("settings.mcp-servers.search-creator-placeholder")}
+              className="mb-3 max-w-xs"
+            />
             <McpServerTable
-              servers={userServers}
+              servers={filteredUserServers}
               loading={loading}
               emptyText={t("settings.mcp-servers.no-user-servers")}
               showCreator

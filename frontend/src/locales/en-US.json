@@ -378,6 +378,7 @@
       "no-my-servers": "No personal MCP servers yet.",
       "no-user-servers": "No user has configured a personal MCP server yet.",
       "header-owner": "Owner",
+      "search-creator-placeholder": "Search by owner",
       "title-required": "Title is required.",
       "url-required": "URL is required.",
       "field-title": "Title",
