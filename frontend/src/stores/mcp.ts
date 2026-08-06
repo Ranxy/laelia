@@ -1,4 +1,4 @@
-import { mcpServerServiceClient } from "@/connect";
+import { mcpServerServiceClient, settingServiceClient } from "@/connect";
 import type { AppSliceCreator, McpServerSlice } from "./types";
 
 export const createMcpServerSlice: AppSliceCreator<McpServerSlice> = (
@@ -8,19 +8,33 @@ export const createMcpServerSlice: AppSliceCreator<McpServerSlice> = (
   mcpServers: [],
   mcpServersLoading: false,
 
-  // fetchMcpServers is handler-gated server-side: admins/managers see every
-  // server, other callers see only the servers they may use. The same list
-  // feeds the settings page and the agent config form.
+  // fetchMcpServers merges the workspace servers the caller may use with the
+  // caller's own personal servers (skipped while the personal-MCP setting is
+  // disabled). The combined list feeds the agent config form.
   async fetchMcpServers(params, opts) {
     const silent = opts?.silent;
     if (!silent) set({ mcpServersLoading: true });
     try {
-      const res = await mcpServerServiceClient.listMcpServers({
-        pageSize: params?.pageSize ?? 100,
-        pageToken: params?.pageToken ?? "",
+      const [wsRes, myRes, cfgRes] = await Promise.all([
+        mcpServerServiceClient.listMcpServers({
+          pageSize: params?.pageSize ?? 1000,
+          pageToken: params?.pageToken ?? "",
+        }),
+        mcpServerServiceClient.listMyMcpServers({
+          pageSize: params?.pageSize ?? 1000,
+          pageToken: params?.pageToken ?? "",
+        }),
+        settingServiceClient.getUserMcpConfig({}),
+      ]);
+      const personalEnabled = cfgRes.config?.allowUserMcpServers ?? true;
+      set({
+        mcpServers: [
+          ...(wsRes.mcpServers ?? []),
+          ...(personalEnabled ? (myRes.mcpServers ?? []) : []),
+        ],
+        mcpServersLoading: false,
       });
-      set({ mcpServers: res.mcpServers ?? [], mcpServersLoading: false });
-      return { nextPageToken: res.nextPageToken };
+      return { nextPageToken: wsRes.nextPageToken };
     } catch {
       if (!silent) set({ mcpServers: [], mcpServersLoading: false });
       return undefined;

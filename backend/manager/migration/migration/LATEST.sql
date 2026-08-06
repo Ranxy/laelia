@@ -891,10 +891,12 @@ CREATE TABLE mcp_server (
     headers JSONB NOT NULL DEFAULT '{}',
     config_version BIGINT NOT NULL DEFAULT 1,
     created_by BIGINT NOT NULL DEFAULT 0,
+    owner_id BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX idx_mcp_server_resource_id ON mcp_server(resource_id);
+CREATE INDEX idx_mcp_server_owner_id ON mcp_server(owner_id);
 
 CREATE TABLE mcp_server_member (
     server_id BIGINT NOT NULL REFERENCES mcp_server(id) ON DELETE CASCADE,

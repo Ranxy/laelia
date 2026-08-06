@@ -3415,6 +3415,34 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/myMcpServers:
+        get:
+            tags:
+                - McpServerService
+            operationId: McpServerService_ListMyMcpServers
+            parameters:
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListMcpServersResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/pi:listModels:
         post:
             tags:
@@ -3966,6 +3994,82 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/GetSetupStatusResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/userMcpConfig:
+        get:
+            tags:
+                - SettingService
+            description: |-
+                GetUserMcpConfig reads whether users may configure personal MCP servers.
+                 It is handler-gated (no permission annotation) so any authenticated user
+                 can render the personal MCP settings page.
+            operationId: SettingService_GetUserMcpConfig
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetUserMcpConfigResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - SettingService
+            description: |-
+                UpdateUserMcpConfig updates whether users may configure personal MCP
+                 servers. Admin (laelia.settings.update) only.
+            operationId: SettingService_UpdateUserMcpConfig
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UserMcpConfigSetting'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UpdateUserMcpConfigResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/userMcpServers:
+        get:
+            tags:
+                - McpServerService
+            operationId: McpServerService_ListUserMcpServers
+            parameters:
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListMcpServersResponse'
                 default:
                     description: Default error response
                     content:
@@ -6085,6 +6189,11 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/SetupItem'
+        GetUserMcpConfigResponse:
+            type: object
+            properties:
+                config:
+                    $ref: '#/components/schemas/UserMcpConfigSetting'
         GoogleProtobufAny:
             type: object
             properties:
@@ -6856,10 +6965,23 @@ components:
                         config_version increments on every update. The agent gateway returns it in
                          the tool catalog and re-checks it at call time so stale catalogs fail
                          closed instead of silently running against changed server configuration.
+                scope:
+                    enum:
+                        - MCP_SERVER_SCOPE_UNSPECIFIED
+                        - MCP_SERVER_SCOPE_WORKSPACE
+                        - MCP_SERVER_SCOPE_USER
+                    type: string
+                    description: |-
+                        Scope of the server. On Create, WORKSPACE requires the management
+                         permission and USER requires the "users may configure MCP servers"
+                         workspace setting; the value is fixed for the lifetime of the server.
+                    format: enum
             description: |-
-                McpServer is a workspace-global, admin-managed MCP service. The manager holds
-                 the full transport configuration (URL and header values) and only exposes a
-                 per-agent tool catalog to machines; header values are masked on read.
+                McpServer is a managed MCP service. WORKSPACE servers are admin-managed and
+                 shared through the members list; USER servers are private to their creator.
+                 The manager holds the full transport configuration (URL and header values)
+                 and only exposes a per-agent tool catalog to machines; header values are
+                 masked on read.
         McpSseTransport:
             required:
                 - url
@@ -7711,6 +7833,11 @@ components:
             properties:
                 message:
                     $ref: '#/components/schemas/ChatMessage'
+        UpdateUserMcpConfigResponse:
+            type: object
+            properties:
+                config:
+                    $ref: '#/components/schemas/UserMcpConfigSetting'
         User:
             type: object
             properties:
@@ -7814,6 +7941,20 @@ components:
                          UpdateUser with update_mask "chat_preferences". When unset (the user has
                          never customized it) the server returns the default {enter_to_send = true}
                          so the historic behavior is preserved.
+        UserMcpConfigSetting:
+            type: object
+            properties:
+                allowUserMcpServers:
+                    type: boolean
+                    description: |-
+                        allow_user_mcp_servers gates personal MCP servers: when true, any user may
+                         create/edit/delete their own servers and enable them on their agents;
+                         when false, personal servers are hidden from agent catalogs and creation
+                         is rejected (existing rows are retained and restored on re-enable).
+            description: |-
+                UserMcpConfigSetting is the workspace-level personal MCP configuration. The
+                 only knob today is whether users may configure their own personal MCP
+                 servers and enable them on their own agents. Defaults to enabled when unset.
         UserProfile:
             type: object
             properties:
@@ -7869,11 +8010,13 @@ tags:
          AgentChannel over the machine's access token.
     - name: McpServerService
       description: |-
-        McpServerService manages the workspace MCP server registry. Management RPCs
-         are gated by the IAM interceptor with the laelia.mcpServers.* permissions
-         (held by workspaceAdmin or an authorized custom role). ListMcpServers is
-         handler-gated instead: it returns only the servers the caller may use, so
-         the agent config form can list them without a management permission.
+        McpServerService manages the MCP server registry. Get/Create/Update/Delete
+         are handler-gated: workspace servers require the laelia.mcpServers.*
+         permissions, while personal servers may be managed by their owner.
+         ListMcpServers returns workspace servers only (admin: all; other callers:
+         the servers they may use). ListMyMcpServers returns the caller's personal
+         servers; ListUserMcpServers is an admin read-only view of every personal
+         server.
     - name: NotificationService
       description: |-
         NotificationService manages per-user browser Web Push subscriptions so the

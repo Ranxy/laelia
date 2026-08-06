@@ -38,6 +38,7 @@ const (
 	SettingName_S3_CONFIG                   SettingName = 10
 	SettingName_WEB_PUSH_CONFIG             SettingName = 11
 	SettingName_LLM_AGENT_CONFIG            SettingName = 12
+	SettingName_USER_MCP_CONFIG             SettingName = 13
 )
 
 // Enum value maps for SettingName.
@@ -56,6 +57,7 @@ var (
 		10: "S3_CONFIG",
 		11: "WEB_PUSH_CONFIG",
 		12: "LLM_AGENT_CONFIG",
+		13: "USER_MCP_CONFIG",
 	}
 	SettingName_value = map[string]int32{
 		"SETTING_NAME_UNSPECIFIED":    0,
@@ -71,6 +73,7 @@ var (
 		"S3_CONFIG":                   10,
 		"WEB_PUSH_CONFIG":             11,
 		"LLM_AGENT_CONFIG":            12,
+		"USER_MCP_CONFIG":             13,
 	}
 )
 
@@ -772,6 +775,57 @@ func (x *LlmAgentConfigSetting) GetAllowUserSelfProvidedKeys() bool {
 	return false
 }
 
+// UserMcpConfigSetting is the workspace-level personal MCP configuration. The
+// only knob today is whether users may configure their own personal MCP
+// servers and enable them on their own agents. Defaults to enabled when unset.
+type UserMcpConfigSetting struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// allow_user_mcp_servers gates personal MCP servers: when true, any user may
+	// create/edit/delete their own servers and enable them on their agents;
+	// when false, personal servers are hidden from agent catalogs and creation
+	// is rejected (existing rows are retained and restored on re-enable).
+	AllowUserMcpServers bool `protobuf:"varint,1,opt,name=allow_user_mcp_servers,json=allowUserMcpServers,proto3" json:"allow_user_mcp_servers,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *UserMcpConfigSetting) Reset() {
+	*x = UserMcpConfigSetting{}
+	mi := &file_store_setting_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserMcpConfigSetting) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserMcpConfigSetting) ProtoMessage() {}
+
+func (x *UserMcpConfigSetting) ProtoReflect() protoreflect.Message {
+	mi := &file_store_setting_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserMcpConfigSetting.ProtoReflect.Descriptor instead.
+func (*UserMcpConfigSetting) Descriptor() ([]byte, []int) {
+	return file_store_setting_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *UserMcpConfigSetting) GetAllowUserMcpServers() bool {
+	if x != nil {
+		return x.AllowUserMcpServers
+	}
+	return false
+}
+
 type EnvironmentSetting_Environment struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -784,7 +838,7 @@ type EnvironmentSetting_Environment struct {
 
 func (x *EnvironmentSetting_Environment) Reset() {
 	*x = EnvironmentSetting_Environment{}
-	mi := &file_store_setting_proto_msgTypes[7]
+	mi := &file_store_setting_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -796,7 +850,7 @@ func (x *EnvironmentSetting_Environment) String() string {
 func (*EnvironmentSetting_Environment) ProtoMessage() {}
 
 func (x *EnvironmentSetting_Environment) ProtoReflect() protoreflect.Message {
-	mi := &file_store_setting_proto_msgTypes[7]
+	mi := &file_store_setting_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -904,7 +958,9 @@ const file_store_setting_proto_rawDesc = "" +
 	"\n" +
 	"http_proxy\x18\x04 \x01(\tR\thttpProxy\"Y\n" +
 	"\x15LlmAgentConfigSetting\x12@\n" +
-	"\x1dallow_user_self_provided_keys\x18\x01 \x01(\bR\x19allowUserSelfProvidedKeys*\xaa\x02\n" +
+	"\x1dallow_user_self_provided_keys\x18\x01 \x01(\bR\x19allowUserSelfProvidedKeys\"K\n" +
+	"\x14UserMcpConfigSetting\x123\n" +
+	"\x16allow_user_mcp_servers\x18\x01 \x01(\bR\x13allowUserMcpServers*\xbf\x02\n" +
 	"\vSettingName\x12\x1c\n" +
 	"\x18SETTING_NAME_UNSPECIFIED\x10\x00\x12\x0f\n" +
 	"\vAUTH_SECRET\x10\x01\x12\x11\n" +
@@ -919,7 +975,8 @@ const file_store_setting_proto_rawDesc = "" +
 	"\tS3_CONFIG\x10\n" +
 	"\x12\x13\n" +
 	"\x0fWEB_PUSH_CONFIG\x10\v\x12\x14\n" +
-	"\x10LLM_AGENT_CONFIG\x10\f*\x83\x01\n" +
+	"\x10LLM_AGENT_CONFIG\x10\f\x12\x13\n" +
+	"\x0fUSER_MCP_CONFIG\x10\r*\x83\x01\n" +
 	"\x12IPValidationPolicy\x12$\n" +
 	" IP_VALIDATION_POLICY_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11IP_VALIDATION_OFF\x10\x01\x12\x16\n" +
@@ -939,7 +996,7 @@ func file_store_setting_proto_rawDescGZIP() []byte {
 }
 
 var file_store_setting_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_store_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_store_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_store_setting_proto_goTypes = []any{
 	(SettingName)(0),                       // 0: laelia.store.SettingName
 	(IPValidationPolicy)(0),                // 1: laelia.store.IPValidationPolicy
@@ -950,20 +1007,21 @@ var file_store_setting_proto_goTypes = []any{
 	(*S3ConfigSetting)(nil),                // 6: laelia.store.S3ConfigSetting
 	(*WebPushSetting)(nil),                 // 7: laelia.store.WebPushSetting
 	(*LlmAgentConfigSetting)(nil),          // 8: laelia.store.LlmAgentConfigSetting
-	(*EnvironmentSetting_Environment)(nil), // 9: laelia.store.EnvironmentSetting.Environment
-	nil,                                    // 10: laelia.store.EnvironmentSetting.Environment.TagsEntry
-	(*durationpb.Duration)(nil),            // 11: google.protobuf.Duration
+	(*UserMcpConfigSetting)(nil),           // 9: laelia.store.UserMcpConfigSetting
+	(*EnvironmentSetting_Environment)(nil), // 10: laelia.store.EnvironmentSetting.Environment
+	nil,                                    // 11: laelia.store.EnvironmentSetting.Environment.TagsEntry
+	(*durationpb.Duration)(nil),            // 12: google.protobuf.Duration
 }
 var file_store_setting_proto_depIdxs = []int32{
-	11, // 0: laelia.store.WorkspaceProfileSetting.token_duration:type_name -> google.protobuf.Duration
-	11, // 1: laelia.store.WorkspaceProfileSetting.maximum_role_expiration:type_name -> google.protobuf.Duration
-	11, // 2: laelia.store.PasswordRestrictionSetting.password_rotation:type_name -> google.protobuf.Duration
-	9,  // 3: laelia.store.EnvironmentSetting.environments:type_name -> laelia.store.EnvironmentSetting.Environment
-	11, // 4: laelia.store.AgentSecuritySetting.bootstrap_token_duration:type_name -> google.protobuf.Duration
-	11, // 5: laelia.store.AgentSecuritySetting.access_token_duration:type_name -> google.protobuf.Duration
-	11, // 6: laelia.store.AgentSecuritySetting.refresh_token_duration:type_name -> google.protobuf.Duration
+	12, // 0: laelia.store.WorkspaceProfileSetting.token_duration:type_name -> google.protobuf.Duration
+	12, // 1: laelia.store.WorkspaceProfileSetting.maximum_role_expiration:type_name -> google.protobuf.Duration
+	12, // 2: laelia.store.PasswordRestrictionSetting.password_rotation:type_name -> google.protobuf.Duration
+	10, // 3: laelia.store.EnvironmentSetting.environments:type_name -> laelia.store.EnvironmentSetting.Environment
+	12, // 4: laelia.store.AgentSecuritySetting.bootstrap_token_duration:type_name -> google.protobuf.Duration
+	12, // 5: laelia.store.AgentSecuritySetting.access_token_duration:type_name -> google.protobuf.Duration
+	12, // 6: laelia.store.AgentSecuritySetting.refresh_token_duration:type_name -> google.protobuf.Duration
 	1,  // 7: laelia.store.AgentSecuritySetting.ip_validation_policy:type_name -> laelia.store.IPValidationPolicy
-	10, // 8: laelia.store.EnvironmentSetting.Environment.tags:type_name -> laelia.store.EnvironmentSetting.Environment.TagsEntry
+	11, // 8: laelia.store.EnvironmentSetting.Environment.tags:type_name -> laelia.store.EnvironmentSetting.Environment.TagsEntry
 	9,  // [9:9] is the sub-list for method output_type
 	9,  // [9:9] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
@@ -982,7 +1040,7 @@ func file_store_setting_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_store_setting_proto_rawDesc), len(file_store_setting_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

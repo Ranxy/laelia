@@ -20,25 +20,31 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	McpServerService_GetMcpServer_FullMethodName    = "/laelia.v1.McpServerService/GetMcpServer"
-	McpServerService_ListMcpServers_FullMethodName  = "/laelia.v1.McpServerService/ListMcpServers"
-	McpServerService_CreateMcpServer_FullMethodName = "/laelia.v1.McpServerService/CreateMcpServer"
-	McpServerService_UpdateMcpServer_FullMethodName = "/laelia.v1.McpServerService/UpdateMcpServer"
-	McpServerService_DeleteMcpServer_FullMethodName = "/laelia.v1.McpServerService/DeleteMcpServer"
+	McpServerService_GetMcpServer_FullMethodName       = "/laelia.v1.McpServerService/GetMcpServer"
+	McpServerService_ListMcpServers_FullMethodName     = "/laelia.v1.McpServerService/ListMcpServers"
+	McpServerService_ListMyMcpServers_FullMethodName   = "/laelia.v1.McpServerService/ListMyMcpServers"
+	McpServerService_ListUserMcpServers_FullMethodName = "/laelia.v1.McpServerService/ListUserMcpServers"
+	McpServerService_CreateMcpServer_FullMethodName    = "/laelia.v1.McpServerService/CreateMcpServer"
+	McpServerService_UpdateMcpServer_FullMethodName    = "/laelia.v1.McpServerService/UpdateMcpServer"
+	McpServerService_DeleteMcpServer_FullMethodName    = "/laelia.v1.McpServerService/DeleteMcpServer"
 )
 
 // McpServerServiceClient is the client API for McpServerService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// McpServerService manages the workspace MCP server registry. Management RPCs
-// are gated by the IAM interceptor with the laelia.mcpServers.* permissions
-// (held by workspaceAdmin or an authorized custom role). ListMcpServers is
-// handler-gated instead: it returns only the servers the caller may use, so
-// the agent config form can list them without a management permission.
+// McpServerService manages the MCP server registry. Get/Create/Update/Delete
+// are handler-gated: workspace servers require the laelia.mcpServers.*
+// permissions, while personal servers may be managed by their owner.
+// ListMcpServers returns workspace servers only (admin: all; other callers:
+// the servers they may use). ListMyMcpServers returns the caller's personal
+// servers; ListUserMcpServers is an admin read-only view of every personal
+// server.
 type McpServerServiceClient interface {
 	GetMcpServer(ctx context.Context, in *GetMcpServerRequest, opts ...grpc.CallOption) (*McpServer, error)
 	ListMcpServers(ctx context.Context, in *ListMcpServersRequest, opts ...grpc.CallOption) (*ListMcpServersResponse, error)
+	ListMyMcpServers(ctx context.Context, in *ListMcpServersRequest, opts ...grpc.CallOption) (*ListMcpServersResponse, error)
+	ListUserMcpServers(ctx context.Context, in *ListMcpServersRequest, opts ...grpc.CallOption) (*ListMcpServersResponse, error)
 	CreateMcpServer(ctx context.Context, in *CreateMcpServerRequest, opts ...grpc.CallOption) (*McpServer, error)
 	UpdateMcpServer(ctx context.Context, in *UpdateMcpServerRequest, opts ...grpc.CallOption) (*McpServer, error)
 	DeleteMcpServer(ctx context.Context, in *DeleteMcpServerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -66,6 +72,26 @@ func (c *mcpServerServiceClient) ListMcpServers(ctx context.Context, in *ListMcp
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListMcpServersResponse)
 	err := c.cc.Invoke(ctx, McpServerService_ListMcpServers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mcpServerServiceClient) ListMyMcpServers(ctx context.Context, in *ListMcpServersRequest, opts ...grpc.CallOption) (*ListMcpServersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMcpServersResponse)
+	err := c.cc.Invoke(ctx, McpServerService_ListMyMcpServers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mcpServerServiceClient) ListUserMcpServers(ctx context.Context, in *ListMcpServersRequest, opts ...grpc.CallOption) (*ListMcpServersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMcpServersResponse)
+	err := c.cc.Invoke(ctx, McpServerService_ListUserMcpServers_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -106,14 +132,18 @@ func (c *mcpServerServiceClient) DeleteMcpServer(ctx context.Context, in *Delete
 // All implementations must embed UnimplementedMcpServerServiceServer
 // for forward compatibility.
 //
-// McpServerService manages the workspace MCP server registry. Management RPCs
-// are gated by the IAM interceptor with the laelia.mcpServers.* permissions
-// (held by workspaceAdmin or an authorized custom role). ListMcpServers is
-// handler-gated instead: it returns only the servers the caller may use, so
-// the agent config form can list them without a management permission.
+// McpServerService manages the MCP server registry. Get/Create/Update/Delete
+// are handler-gated: workspace servers require the laelia.mcpServers.*
+// permissions, while personal servers may be managed by their owner.
+// ListMcpServers returns workspace servers only (admin: all; other callers:
+// the servers they may use). ListMyMcpServers returns the caller's personal
+// servers; ListUserMcpServers is an admin read-only view of every personal
+// server.
 type McpServerServiceServer interface {
 	GetMcpServer(context.Context, *GetMcpServerRequest) (*McpServer, error)
 	ListMcpServers(context.Context, *ListMcpServersRequest) (*ListMcpServersResponse, error)
+	ListMyMcpServers(context.Context, *ListMcpServersRequest) (*ListMcpServersResponse, error)
+	ListUserMcpServers(context.Context, *ListMcpServersRequest) (*ListMcpServersResponse, error)
 	CreateMcpServer(context.Context, *CreateMcpServerRequest) (*McpServer, error)
 	UpdateMcpServer(context.Context, *UpdateMcpServerRequest) (*McpServer, error)
 	DeleteMcpServer(context.Context, *DeleteMcpServerRequest) (*emptypb.Empty, error)
@@ -132,6 +162,12 @@ func (UnimplementedMcpServerServiceServer) GetMcpServer(context.Context, *GetMcp
 }
 func (UnimplementedMcpServerServiceServer) ListMcpServers(context.Context, *ListMcpServersRequest) (*ListMcpServersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListMcpServers not implemented")
+}
+func (UnimplementedMcpServerServiceServer) ListMyMcpServers(context.Context, *ListMcpServersRequest) (*ListMcpServersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMyMcpServers not implemented")
+}
+func (UnimplementedMcpServerServiceServer) ListUserMcpServers(context.Context, *ListMcpServersRequest) (*ListMcpServersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListUserMcpServers not implemented")
 }
 func (UnimplementedMcpServerServiceServer) CreateMcpServer(context.Context, *CreateMcpServerRequest) (*McpServer, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateMcpServer not implemented")
@@ -195,6 +231,42 @@ func _McpServerService_ListMcpServers_Handler(srv interface{}, ctx context.Conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(McpServerServiceServer).ListMcpServers(ctx, req.(*ListMcpServersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _McpServerService_ListMyMcpServers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMcpServersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(McpServerServiceServer).ListMyMcpServers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: McpServerService_ListMyMcpServers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(McpServerServiceServer).ListMyMcpServers(ctx, req.(*ListMcpServersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _McpServerService_ListUserMcpServers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMcpServersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(McpServerServiceServer).ListUserMcpServers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: McpServerService_ListUserMcpServers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(McpServerServiceServer).ListUserMcpServers(ctx, req.(*ListMcpServersRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -267,6 +339,14 @@ var McpServerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListMcpServers",
 			Handler:    _McpServerService_ListMcpServers_Handler,
+		},
+		{
+			MethodName: "ListMyMcpServers",
+			Handler:    _McpServerService_ListMyMcpServers_Handler,
+		},
+		{
+			MethodName: "ListUserMcpServers",
+			Handler:    _McpServerService_ListUserMcpServers_Handler,
 		},
 		{
 			MethodName: "CreateMcpServer",

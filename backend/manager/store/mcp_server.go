@@ -12,9 +12,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-// McpServerMessage is the storage-layer representation of a workspace MCP
-// server. Header values are plaintext-at-rest (consistent with api_provider
-// keys); the service layer masks them before they cross the API.
+// McpServerMessage is the storage-layer representation of an MCP server.
+// OwnerID 0 means workspace-global (admin-managed); OwnerID > 0 means the
+// server is private to that user. Header values are plaintext-at-rest
+// (consistent with api_provider keys); the service layer masks them before
+// they cross the API.
 type McpServerMessage struct {
 	ID            int64
 	ResourceID    string
@@ -25,6 +27,7 @@ type McpServerMessage struct {
 	Headers       map[string]string
 	ConfigVersion int64
 	CreatedBy     int
+	OwnerID       int64
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	Members       []string
@@ -63,17 +66,33 @@ func (s *Store) GetMcpServerByResourceID(ctx context.Context, resourceID string)
 	return servers[0], nil
 }
 
-// ListMcpServers returns every MCP server (with members), ordered by creation
-// time. Workspace-level config is small, so no pagination is applied; callers
-// filter by member access in the service layer.
+// ListMcpServers returns every workspace-global MCP server (with members),
+// ordered by creation time. Workspace-level config is small, so no pagination
+// is applied; callers filter by member access in the service layer.
 func (s *Store) ListMcpServers(ctx context.Context) ([]*McpServerMessage, error) {
+	return s.listMcpServersWhere(ctx, "owner_id = 0")
+}
+
+// ListMyMcpServers returns the personal MCP servers owned by the given user.
+func (s *Store) ListMyMcpServers(ctx context.Context, ownerID int) ([]*McpServerMessage, error) {
+	return s.listMcpServersWhere(ctx, "owner_id = $1", ownerID)
+}
+
+// ListUserMcpServers returns every personal MCP server (with members, which
+// are always empty for personal servers), ordered by creation time. It backs
+// the admin read-only view.
+func (s *Store) ListUserMcpServers(ctx context.Context) ([]*McpServerMessage, error) {
+	return s.listMcpServersWhere(ctx, "owner_id <> 0")
+}
+
+func (s *Store) listMcpServersWhere(ctx context.Context, where string, args ...any) ([]*McpServerMessage, error) {
 	tx, err := s.GetDB().BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 
-	servers, err := listMcpServerRows(ctx, tx, "TRUE", nil)
+	servers, err := listMcpServerRows(ctx, tx, where, args)
 	if err != nil {
 		return nil, err
 	}
@@ -103,10 +122,10 @@ func (s *Store) CreateMcpServer(ctx context.Context, create *McpServerMessage) (
 	var id int64
 	var createdAt, updatedAt time.Time
 	if err := tx.QueryRowContext(ctx, `
-		INSERT INTO mcp_server (resource_id, title, description, transport_type, url, headers, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO mcp_server (resource_id, title, description, transport_type, url, headers, created_by, owner_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, created_at, updated_at
-	`, resourceID, create.Title, create.Description, create.TransportType, create.URL, headers, create.CreatedBy,
+	`, resourceID, create.Title, create.Description, create.TransportType, create.URL, headers, create.CreatedBy, create.OwnerID,
 	).Scan(&id, &createdAt, &updatedAt); err != nil {
 		return nil, err
 	}
@@ -121,6 +140,7 @@ func (s *Store) CreateMcpServer(ctx context.Context, create *McpServerMessage) (
 		Headers:       cloneHeaderMap(create.Headers),
 		ConfigVersion: 1,
 		CreatedBy:     create.CreatedBy,
+		OwnerID:       create.OwnerID,
 		CreatedAt:     createdAt,
 		UpdatedAt:     updatedAt,
 	}
@@ -174,6 +194,7 @@ func (s *Store) UpdateMcpServer(ctx context.Context, current *McpServerMessage, 
 		Headers:       cloneHeaderMap(patch.Headers),
 		ConfigVersion: current.ConfigVersion + 1,
 		CreatedBy:     current.CreatedBy,
+		OwnerID:       current.OwnerID,
 		CreatedAt:     current.CreatedAt,
 		UpdatedAt:     time.Now(),
 		Members:       append([]string(nil), patch.Members...),
@@ -309,7 +330,7 @@ func (s *Store) ReplaceAgentMcpServers(ctx context.Context, agentID int, serverR
 func listMcpServerRows(ctx context.Context, txn *sql.Tx, where string, args []any) ([]*McpServerMessage, error) {
 	rows, err := txn.QueryContext(ctx, `
 		SELECT id, resource_id, title, description, transport_type, url, headers, config_version,
-		       created_by, created_at, updated_at
+		       created_by, owner_id, created_at, updated_at
 		FROM mcp_server
 		WHERE `+where+` ORDER BY created_at ASC`, args...)
 	if err != nil {
@@ -322,7 +343,7 @@ func listMcpServerRows(ctx context.Context, txn *sql.Tx, where string, args []an
 		var s McpServerMessage
 		var headers []byte
 		if err := rows.Scan(&s.ID, &s.ResourceID, &s.Title, &s.Description, &s.TransportType, &s.URL,
-			&headers, &s.ConfigVersion, &s.CreatedBy, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			&headers, &s.ConfigVersion, &s.CreatedBy, &s.OwnerID, &s.CreatedAt, &s.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(headers, &s.Headers); err != nil {

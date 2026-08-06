@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import { Bot, Loader2 } from "lucide-react";
+import { Bot, Loader2, Server } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsPage } from "@/components/settings-page";
@@ -8,7 +8,10 @@ import { settingServiceClient } from "@/connect";
 import { describeError } from "@/lib/connect-errors";
 import { toastManager } from "@/lib/toast";
 import { useHasPermission } from "@/stores/permissions";
-import { LlmAgentConfigSettingSchema } from "@/types/proto-es/store/setting_pb";
+import {
+  LlmAgentConfigSettingSchema,
+  UserMcpConfigSettingSchema,
+} from "@/types/proto-es/store/setting_pb";
 
 // SettingsAgentsPage hosts workspace-level agent/LLM configuration. Today the
 // single toggle controls whether users may self-provide an inline
@@ -21,16 +24,21 @@ export function SettingsAgentsPage() {
   // Default to enabled to match the server's missing-row default; flip to the
   // actual value once the config loads.
   const [enabled, setEnabled] = useState(true);
+  const [userMcpEnabled, setUserMcpEnabled] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [userMcpSaving, setUserMcpSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    void settingServiceClient
-      .getLlmAgentConfig({})
-      .then((res) => {
+    void Promise.all([
+      settingServiceClient.getLlmAgentConfig({}),
+      settingServiceClient.getUserMcpConfig({}),
+    ])
+      .then(([llmRes, mcpRes]) => {
         if (cancelled) return;
-        setEnabled(res.config?.allowUserSelfProvidedKeys ?? true);
+        setEnabled(llmRes.config?.allowUserSelfProvidedKeys ?? true);
+        setUserMcpEnabled(mcpRes.config?.allowUserMcpServers ?? true);
         setLoaded(true);
       })
       .catch(() => {
@@ -63,6 +71,30 @@ export function SettingsAgentsPage() {
     }
   }
 
+  async function handleUserMcpToggle(next: boolean) {
+    setUserMcpSaving(true);
+    try {
+      await settingServiceClient.updateUserMcpConfig({
+        config: create(UserMcpConfigSettingSchema, {
+          allowUserMcpServers: next,
+        }),
+      });
+      setUserMcpEnabled(next);
+      toastManager.add({
+        type: "success",
+        title: t("settings.agents.saved"),
+      });
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("settings.agents.save-failed"),
+        description: describeError(err),
+      });
+    } finally {
+      setUserMcpSaving(false);
+    }
+  }
+
   return (
     <SettingsPage
       title={t("settings.agents.title")}
@@ -91,6 +123,26 @@ export function SettingsAgentsPage() {
               checked={enabled}
               onCheckedChange={handleToggle}
               disabled={saving || !canUpdate}
+              size="md"
+              className="shrink-0"
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-md border border-control-border p-4">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <Server className="mt-0.5 size-4 shrink-0 text-control-light" />
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-main">
+                  {t("settings.agents.allow-user-mcp")}
+                </div>
+                <div className="mt-0.5 text-xs text-control-light">
+                  {t("settings.agents.allow-user-mcp-hint")}
+                </div>
+              </div>
+            </div>
+            <Switch
+              checked={userMcpEnabled}
+              onCheckedChange={handleUserMcpToggle}
+              disabled={userMcpSaving || !canUpdate}
               size="md"
               className="shrink-0"
             />

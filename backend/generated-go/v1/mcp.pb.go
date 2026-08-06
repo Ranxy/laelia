@@ -26,9 +26,62 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// McpServer is a workspace-global, admin-managed MCP service. The manager holds
-// the full transport configuration (URL and header values) and only exposes a
-// per-agent tool catalog to machines; header values are masked on read.
+// McpServerScope distinguishes workspace-global servers (admin-managed) from
+// personal servers (owned by a single user and usable only by that user).
+type McpServerScope int32
+
+const (
+	McpServerScope_MCP_SERVER_SCOPE_UNSPECIFIED McpServerScope = 0
+	McpServerScope_MCP_SERVER_SCOPE_WORKSPACE   McpServerScope = 1
+	McpServerScope_MCP_SERVER_SCOPE_USER        McpServerScope = 2
+)
+
+// Enum value maps for McpServerScope.
+var (
+	McpServerScope_name = map[int32]string{
+		0: "MCP_SERVER_SCOPE_UNSPECIFIED",
+		1: "MCP_SERVER_SCOPE_WORKSPACE",
+		2: "MCP_SERVER_SCOPE_USER",
+	}
+	McpServerScope_value = map[string]int32{
+		"MCP_SERVER_SCOPE_UNSPECIFIED": 0,
+		"MCP_SERVER_SCOPE_WORKSPACE":   1,
+		"MCP_SERVER_SCOPE_USER":        2,
+	}
+)
+
+func (x McpServerScope) Enum() *McpServerScope {
+	p := new(McpServerScope)
+	*p = x
+	return p
+}
+
+func (x McpServerScope) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (McpServerScope) Descriptor() protoreflect.EnumDescriptor {
+	return file_v1_mcp_proto_enumTypes[0].Descriptor()
+}
+
+func (McpServerScope) Type() protoreflect.EnumType {
+	return &file_v1_mcp_proto_enumTypes[0]
+}
+
+func (x McpServerScope) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use McpServerScope.Descriptor instead.
+func (McpServerScope) EnumDescriptor() ([]byte, []int) {
+	return file_v1_mcp_proto_rawDescGZIP(), []int{0}
+}
+
+// McpServer is a managed MCP service. WORKSPACE servers are admin-managed and
+// shared through the members list; USER servers are private to their creator.
+// The manager holds the full transport configuration (URL and header values)
+// and only exposes a per-agent tool catalog to machines; header values are
+// masked on read.
 type McpServer struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The resource name of the MCP server, in the form `mcpServers/{id}`.
@@ -56,6 +109,10 @@ type McpServer struct {
 	// the tool catalog and re-checks it at call time so stale catalogs fail
 	// closed instead of silently running against changed server configuration.
 	ConfigVersion int64 `protobuf:"varint,10,opt,name=config_version,json=configVersion,proto3" json:"config_version,omitempty"`
+	// Scope of the server. On Create, WORKSPACE requires the management
+	// permission and USER requires the "users may configure MCP servers"
+	// workspace setting; the value is fixed for the lifetime of the server.
+	Scope         McpServerScope `protobuf:"varint,11,opt,name=scope,proto3,enum=laelia.v1.McpServerScope" json:"scope,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -169,6 +226,13 @@ func (x *McpServer) GetConfigVersion() int64 {
 		return x.ConfigVersion
 	}
 	return 0
+}
+
+func (x *McpServer) GetScope() McpServerScope {
+	if x != nil {
+		return x.Scope
+	}
+	return McpServerScope_MCP_SERVER_SCOPE_UNSPECIFIED
 }
 
 type isMcpServer_Transport interface {
@@ -1232,7 +1296,7 @@ var File_v1_mcp_proto protoreflect.FileDescriptor
 
 const file_v1_mcp_proto_rawDesc = "" +
 	"\n" +
-	"\fv1/mcp.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13v1/annotation.proto\"\xdb\x03\n" +
+	"\fv1/mcp.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13v1/annotation.proto\"\x8c\x04\n" +
 	"\tMcpServer\x12\x1a\n" +
 	"\x04name\x18\x01 \x01(\tB\x06\xe0A\b\xe0A\x02R\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -1247,7 +1311,8 @@ const file_v1_mcp_proto_rawDesc = "" +
 	"\n" +
 	"created_by\x18\t \x01(\tB\x03\xe0A\x03R\tcreatedBy\x12*\n" +
 	"\x0econfig_version\x18\n" +
-	" \x01(\x03B\x03\xe0A\x03R\rconfigVersion:*\xeaA'\n" +
+	" \x01(\x03B\x03\xe0A\x03R\rconfigVersion\x12/\n" +
+	"\x05scope\x18\v \x01(\x0e2\x19.laelia.v1.McpServerScopeR\x05scope:*\xeaA'\n" +
 	"\x10laelia/McpServer\x12\x13mcpServers/{server}B\v\n" +
 	"\ttransport\"Y\n" +
 	"\x10McpHttpTransport\x12\x15\n" +
@@ -1319,16 +1384,22 @@ const file_v1_mcp_proto_rawDesc = "" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"B\n" +
 	"\x0fMcpImageContent\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\tR\x04data\x12\x1b\n" +
-	"\tmime_type\x18\x02 \x01(\tR\bmimeType2\x90\x06\n" +
-	"\x10McpServerService\x12\x89\x01\n" +
-	"\fGetMcpServer\x12\x1e.laelia.v1.GetMcpServerRequest\x1a\x14.laelia.v1.McpServer\"C\xdaA\x04name\x8a\xea0\x15laelia.mcpServers.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x19\x12\x17/v1/{name=mcpServers/*}\x12q\n" +
-	"\x0eListMcpServers\x12 .laelia.v1.ListMcpServersRequest\x1a!.laelia.v1.ListMcpServersResponse\"\x1a\x90\xea0\x01\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/mcpServers\x12\x9f\x01\n" +
-	"\x0fCreateMcpServer\x12!.laelia.v1.CreateMcpServerRequest\x1a\x14.laelia.v1.McpServer\"S\xdaA\n" +
-	"mcp_server\x8a\xea0\x18laelia.mcpServers.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1c:\n" +
-	"mcp_server\"\x0e/v1/mcpServers\x12\xbf\x01\n" +
-	"\x0fUpdateMcpServer\x12!.laelia.v1.UpdateMcpServerRequest\x1a\x14.laelia.v1.McpServer\"s\xdaA\x16mcp_server,update_mask\x8a\xea0\x18laelia.mcpServers.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x020:\n" +
-	"mcp_server2\"/v1/{mcp_server.name=mcpServers/*}\x12\x98\x01\n" +
-	"\x0fDeleteMcpServer\x12!.laelia.v1.DeleteMcpServerRequest\x1a\x16.google.protobuf.Empty\"J\xdaA\x04name\x8a\xea0\x18laelia.mcpServers.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x19*\x17/v1/{name=mcpServers/*}2\xb5\x01\n" +
+	"\tmime_type\x18\x02 \x01(\tR\bmimeType*m\n" +
+	"\x0eMcpServerScope\x12 \n" +
+	"\x1cMCP_SERVER_SCOPE_UNSPECIFIED\x10\x00\x12\x1e\n" +
+	"\x1aMCP_SERVER_SCOPE_WORKSPACE\x10\x01\x12\x19\n" +
+	"\x15MCP_SERVER_SCOPE_USER\x10\x022\xae\a\n" +
+	"\x10McpServerService\x12p\n" +
+	"\fGetMcpServer\x12\x1e.laelia.v1.GetMcpServerRequest\x1a\x14.laelia.v1.McpServer\"*\xdaA\x04name\x90\xea0\x01\x82\xd3\xe4\x93\x02\x19\x12\x17/v1/{name=mcpServers/*}\x12q\n" +
+	"\x0eListMcpServers\x12 .laelia.v1.ListMcpServersRequest\x1a!.laelia.v1.ListMcpServersResponse\"\x1a\x90\xea0\x01\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/mcpServers\x12u\n" +
+	"\x10ListMyMcpServers\x12 .laelia.v1.ListMcpServersRequest\x1a!.laelia.v1.ListMcpServersResponse\"\x1c\x90\xea0\x01\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/myMcpServers\x12\x93\x01\n" +
+	"\x12ListUserMcpServers\x12 .laelia.v1.ListMcpServersRequest\x1a!.laelia.v1.ListMcpServersResponse\"8\x8a\xea0\x16laelia.mcpServers.list\x90\xea0\x01\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/userMcpServers\x12\x83\x01\n" +
+	"\x0fCreateMcpServer\x12!.laelia.v1.CreateMcpServerRequest\x1a\x14.laelia.v1.McpServer\"7\xdaA\n" +
+	"mcp_server\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1c:\n" +
+	"mcp_server\"\x0e/v1/mcpServers\x12\xa3\x01\n" +
+	"\x0fUpdateMcpServer\x12!.laelia.v1.UpdateMcpServerRequest\x1a\x14.laelia.v1.McpServer\"W\xdaA\x16mcp_server,update_mask\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x020:\n" +
+	"mcp_server2\"/v1/{mcp_server.name=mcpServers/*}\x12|\n" +
+	"\x0fDeleteMcpServer\x12!.laelia.v1.DeleteMcpServerRequest\x1a\x16.google.protobuf.Empty\".\xdaA\x04name\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x19*\x17/v1/{name=mcpServers/*}2\xb5\x01\n" +
 	"\x11McpGatewayService\x12R\n" +
 	"\rGetMcpCatalog\x12\x1f.laelia.v1.GetMcpCatalogRequest\x1a .laelia.v1.GetMcpCatalogResponse\x12L\n" +
 	"\vCallMcpTool\x12\x1d.laelia.v1.CallMcpToolRequest\x1a\x1e.laelia.v1.CallMcpToolResponseB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
@@ -1345,69 +1416,76 @@ func file_v1_mcp_proto_rawDescGZIP() []byte {
 	return file_v1_mcp_proto_rawDescData
 }
 
+var file_v1_mcp_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_v1_mcp_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_v1_mcp_proto_goTypes = []any{
-	(*McpServer)(nil),              // 0: laelia.v1.McpServer
-	(*McpHttpTransport)(nil),       // 1: laelia.v1.McpHttpTransport
-	(*McpSseTransport)(nil),        // 2: laelia.v1.McpSseTransport
-	(*McpHeader)(nil),              // 3: laelia.v1.McpHeader
-	(*GetMcpServerRequest)(nil),    // 4: laelia.v1.GetMcpServerRequest
-	(*ListMcpServersRequest)(nil),  // 5: laelia.v1.ListMcpServersRequest
-	(*ListMcpServersResponse)(nil), // 6: laelia.v1.ListMcpServersResponse
-	(*CreateMcpServerRequest)(nil), // 7: laelia.v1.CreateMcpServerRequest
-	(*UpdateMcpServerRequest)(nil), // 8: laelia.v1.UpdateMcpServerRequest
-	(*DeleteMcpServerRequest)(nil), // 9: laelia.v1.DeleteMcpServerRequest
-	(*McpServerChange)(nil),        // 10: laelia.v1.McpServerChange
-	(*McpTool)(nil),                // 11: laelia.v1.McpTool
-	(*GetMcpCatalogRequest)(nil),   // 12: laelia.v1.GetMcpCatalogRequest
-	(*GetMcpCatalogResponse)(nil),  // 13: laelia.v1.GetMcpCatalogResponse
-	(*CallMcpToolRequest)(nil),     // 14: laelia.v1.CallMcpToolRequest
-	(*CallMcpToolResponse)(nil),    // 15: laelia.v1.CallMcpToolResponse
-	(*McpContentBlock)(nil),        // 16: laelia.v1.McpContentBlock
-	(*McpTextContent)(nil),         // 17: laelia.v1.McpTextContent
-	(*McpImageContent)(nil),        // 18: laelia.v1.McpImageContent
-	(*timestamppb.Timestamp)(nil),  // 19: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),  // 20: google.protobuf.FieldMask
-	(*structpb.Struct)(nil),        // 21: google.protobuf.Struct
-	(*emptypb.Empty)(nil),          // 22: google.protobuf.Empty
+	(McpServerScope)(0),            // 0: laelia.v1.McpServerScope
+	(*McpServer)(nil),              // 1: laelia.v1.McpServer
+	(*McpHttpTransport)(nil),       // 2: laelia.v1.McpHttpTransport
+	(*McpSseTransport)(nil),        // 3: laelia.v1.McpSseTransport
+	(*McpHeader)(nil),              // 4: laelia.v1.McpHeader
+	(*GetMcpServerRequest)(nil),    // 5: laelia.v1.GetMcpServerRequest
+	(*ListMcpServersRequest)(nil),  // 6: laelia.v1.ListMcpServersRequest
+	(*ListMcpServersResponse)(nil), // 7: laelia.v1.ListMcpServersResponse
+	(*CreateMcpServerRequest)(nil), // 8: laelia.v1.CreateMcpServerRequest
+	(*UpdateMcpServerRequest)(nil), // 9: laelia.v1.UpdateMcpServerRequest
+	(*DeleteMcpServerRequest)(nil), // 10: laelia.v1.DeleteMcpServerRequest
+	(*McpServerChange)(nil),        // 11: laelia.v1.McpServerChange
+	(*McpTool)(nil),                // 12: laelia.v1.McpTool
+	(*GetMcpCatalogRequest)(nil),   // 13: laelia.v1.GetMcpCatalogRequest
+	(*GetMcpCatalogResponse)(nil),  // 14: laelia.v1.GetMcpCatalogResponse
+	(*CallMcpToolRequest)(nil),     // 15: laelia.v1.CallMcpToolRequest
+	(*CallMcpToolResponse)(nil),    // 16: laelia.v1.CallMcpToolResponse
+	(*McpContentBlock)(nil),        // 17: laelia.v1.McpContentBlock
+	(*McpTextContent)(nil),         // 18: laelia.v1.McpTextContent
+	(*McpImageContent)(nil),        // 19: laelia.v1.McpImageContent
+	(*timestamppb.Timestamp)(nil),  // 20: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),  // 21: google.protobuf.FieldMask
+	(*structpb.Struct)(nil),        // 22: google.protobuf.Struct
+	(*emptypb.Empty)(nil),          // 23: google.protobuf.Empty
 }
 var file_v1_mcp_proto_depIdxs = []int32{
-	1,  // 0: laelia.v1.McpServer.http:type_name -> laelia.v1.McpHttpTransport
-	2,  // 1: laelia.v1.McpServer.sse:type_name -> laelia.v1.McpSseTransport
-	19, // 2: laelia.v1.McpServer.created_at:type_name -> google.protobuf.Timestamp
-	19, // 3: laelia.v1.McpServer.updated_at:type_name -> google.protobuf.Timestamp
-	3,  // 4: laelia.v1.McpHttpTransport.headers:type_name -> laelia.v1.McpHeader
-	3,  // 5: laelia.v1.McpSseTransport.headers:type_name -> laelia.v1.McpHeader
-	0,  // 6: laelia.v1.ListMcpServersResponse.mcp_servers:type_name -> laelia.v1.McpServer
-	0,  // 7: laelia.v1.CreateMcpServerRequest.mcp_server:type_name -> laelia.v1.McpServer
-	0,  // 8: laelia.v1.UpdateMcpServerRequest.mcp_server:type_name -> laelia.v1.McpServer
-	20, // 9: laelia.v1.UpdateMcpServerRequest.update_mask:type_name -> google.protobuf.FieldMask
-	21, // 10: laelia.v1.McpTool.input_schema:type_name -> google.protobuf.Struct
-	11, // 11: laelia.v1.GetMcpCatalogResponse.tools:type_name -> laelia.v1.McpTool
-	21, // 12: laelia.v1.CallMcpToolRequest.arguments:type_name -> google.protobuf.Struct
-	16, // 13: laelia.v1.CallMcpToolResponse.content:type_name -> laelia.v1.McpContentBlock
-	21, // 14: laelia.v1.CallMcpToolResponse.structured_content:type_name -> google.protobuf.Struct
-	17, // 15: laelia.v1.McpContentBlock.text:type_name -> laelia.v1.McpTextContent
-	18, // 16: laelia.v1.McpContentBlock.image:type_name -> laelia.v1.McpImageContent
-	4,  // 17: laelia.v1.McpServerService.GetMcpServer:input_type -> laelia.v1.GetMcpServerRequest
-	5,  // 18: laelia.v1.McpServerService.ListMcpServers:input_type -> laelia.v1.ListMcpServersRequest
-	7,  // 19: laelia.v1.McpServerService.CreateMcpServer:input_type -> laelia.v1.CreateMcpServerRequest
-	8,  // 20: laelia.v1.McpServerService.UpdateMcpServer:input_type -> laelia.v1.UpdateMcpServerRequest
-	9,  // 21: laelia.v1.McpServerService.DeleteMcpServer:input_type -> laelia.v1.DeleteMcpServerRequest
-	12, // 22: laelia.v1.McpGatewayService.GetMcpCatalog:input_type -> laelia.v1.GetMcpCatalogRequest
-	14, // 23: laelia.v1.McpGatewayService.CallMcpTool:input_type -> laelia.v1.CallMcpToolRequest
-	0,  // 24: laelia.v1.McpServerService.GetMcpServer:output_type -> laelia.v1.McpServer
-	6,  // 25: laelia.v1.McpServerService.ListMcpServers:output_type -> laelia.v1.ListMcpServersResponse
-	0,  // 26: laelia.v1.McpServerService.CreateMcpServer:output_type -> laelia.v1.McpServer
-	0,  // 27: laelia.v1.McpServerService.UpdateMcpServer:output_type -> laelia.v1.McpServer
-	22, // 28: laelia.v1.McpServerService.DeleteMcpServer:output_type -> google.protobuf.Empty
-	13, // 29: laelia.v1.McpGatewayService.GetMcpCatalog:output_type -> laelia.v1.GetMcpCatalogResponse
-	15, // 30: laelia.v1.McpGatewayService.CallMcpTool:output_type -> laelia.v1.CallMcpToolResponse
-	24, // [24:31] is the sub-list for method output_type
-	17, // [17:24] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	2,  // 0: laelia.v1.McpServer.http:type_name -> laelia.v1.McpHttpTransport
+	3,  // 1: laelia.v1.McpServer.sse:type_name -> laelia.v1.McpSseTransport
+	20, // 2: laelia.v1.McpServer.created_at:type_name -> google.protobuf.Timestamp
+	20, // 3: laelia.v1.McpServer.updated_at:type_name -> google.protobuf.Timestamp
+	0,  // 4: laelia.v1.McpServer.scope:type_name -> laelia.v1.McpServerScope
+	4,  // 5: laelia.v1.McpHttpTransport.headers:type_name -> laelia.v1.McpHeader
+	4,  // 6: laelia.v1.McpSseTransport.headers:type_name -> laelia.v1.McpHeader
+	1,  // 7: laelia.v1.ListMcpServersResponse.mcp_servers:type_name -> laelia.v1.McpServer
+	1,  // 8: laelia.v1.CreateMcpServerRequest.mcp_server:type_name -> laelia.v1.McpServer
+	1,  // 9: laelia.v1.UpdateMcpServerRequest.mcp_server:type_name -> laelia.v1.McpServer
+	21, // 10: laelia.v1.UpdateMcpServerRequest.update_mask:type_name -> google.protobuf.FieldMask
+	22, // 11: laelia.v1.McpTool.input_schema:type_name -> google.protobuf.Struct
+	12, // 12: laelia.v1.GetMcpCatalogResponse.tools:type_name -> laelia.v1.McpTool
+	22, // 13: laelia.v1.CallMcpToolRequest.arguments:type_name -> google.protobuf.Struct
+	17, // 14: laelia.v1.CallMcpToolResponse.content:type_name -> laelia.v1.McpContentBlock
+	22, // 15: laelia.v1.CallMcpToolResponse.structured_content:type_name -> google.protobuf.Struct
+	18, // 16: laelia.v1.McpContentBlock.text:type_name -> laelia.v1.McpTextContent
+	19, // 17: laelia.v1.McpContentBlock.image:type_name -> laelia.v1.McpImageContent
+	5,  // 18: laelia.v1.McpServerService.GetMcpServer:input_type -> laelia.v1.GetMcpServerRequest
+	6,  // 19: laelia.v1.McpServerService.ListMcpServers:input_type -> laelia.v1.ListMcpServersRequest
+	6,  // 20: laelia.v1.McpServerService.ListMyMcpServers:input_type -> laelia.v1.ListMcpServersRequest
+	6,  // 21: laelia.v1.McpServerService.ListUserMcpServers:input_type -> laelia.v1.ListMcpServersRequest
+	8,  // 22: laelia.v1.McpServerService.CreateMcpServer:input_type -> laelia.v1.CreateMcpServerRequest
+	9,  // 23: laelia.v1.McpServerService.UpdateMcpServer:input_type -> laelia.v1.UpdateMcpServerRequest
+	10, // 24: laelia.v1.McpServerService.DeleteMcpServer:input_type -> laelia.v1.DeleteMcpServerRequest
+	13, // 25: laelia.v1.McpGatewayService.GetMcpCatalog:input_type -> laelia.v1.GetMcpCatalogRequest
+	15, // 26: laelia.v1.McpGatewayService.CallMcpTool:input_type -> laelia.v1.CallMcpToolRequest
+	1,  // 27: laelia.v1.McpServerService.GetMcpServer:output_type -> laelia.v1.McpServer
+	7,  // 28: laelia.v1.McpServerService.ListMcpServers:output_type -> laelia.v1.ListMcpServersResponse
+	7,  // 29: laelia.v1.McpServerService.ListMyMcpServers:output_type -> laelia.v1.ListMcpServersResponse
+	7,  // 30: laelia.v1.McpServerService.ListUserMcpServers:output_type -> laelia.v1.ListMcpServersResponse
+	1,  // 31: laelia.v1.McpServerService.CreateMcpServer:output_type -> laelia.v1.McpServer
+	1,  // 32: laelia.v1.McpServerService.UpdateMcpServer:output_type -> laelia.v1.McpServer
+	23, // 33: laelia.v1.McpServerService.DeleteMcpServer:output_type -> google.protobuf.Empty
+	14, // 34: laelia.v1.McpGatewayService.GetMcpCatalog:output_type -> laelia.v1.GetMcpCatalogResponse
+	16, // 35: laelia.v1.McpGatewayService.CallMcpTool:output_type -> laelia.v1.CallMcpToolResponse
+	27, // [27:36] is the sub-list for method output_type
+	18, // [18:27] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_v1_mcp_proto_init() }
@@ -1429,13 +1507,14 @@ func file_v1_mcp_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_mcp_proto_rawDesc), len(file_v1_mcp_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
 		GoTypes:           file_v1_mcp_proto_goTypes,
 		DependencyIndexes: file_v1_mcp_proto_depIdxs,
+		EnumInfos:         file_v1_mcp_proto_enumTypes,
 		MessageInfos:      file_v1_mcp_proto_msgTypes,
 	}.Build()
 	File_v1_mcp_proto = out.File

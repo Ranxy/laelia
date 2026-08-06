@@ -45,6 +45,12 @@ const (
 	// SettingServiceUpdateLlmAgentConfigProcedure is the fully-qualified name of the SettingService's
 	// UpdateLlmAgentConfig RPC.
 	SettingServiceUpdateLlmAgentConfigProcedure = "/laelia.v1.SettingService/UpdateLlmAgentConfig"
+	// SettingServiceGetUserMcpConfigProcedure is the fully-qualified name of the SettingService's
+	// GetUserMcpConfig RPC.
+	SettingServiceGetUserMcpConfigProcedure = "/laelia.v1.SettingService/GetUserMcpConfig"
+	// SettingServiceUpdateUserMcpConfigProcedure is the fully-qualified name of the SettingService's
+	// UpdateUserMcpConfig RPC.
+	SettingServiceUpdateUserMcpConfigProcedure = "/laelia.v1.SettingService/UpdateUserMcpConfig"
 	// SettingServiceGetSetupStatusProcedure is the fully-qualified name of the SettingService's
 	// GetSetupStatus RPC.
 	SettingServiceGetSetupStatusProcedure = "/laelia.v1.SettingService/GetSetupStatus"
@@ -67,6 +73,13 @@ type SettingServiceClient interface {
 	// UpdateLlmAgentConfig updates the workspace LLM agent configuration.
 	// Admin (laelia.settings.update) only.
 	UpdateLlmAgentConfig(context.Context, *connect.Request[v1.UpdateLlmAgentConfigRequest]) (*connect.Response[v1.UpdateLlmAgentConfigResponse], error)
+	// GetUserMcpConfig reads whether users may configure personal MCP servers.
+	// It is handler-gated (no permission annotation) so any authenticated user
+	// can render the personal MCP settings page.
+	GetUserMcpConfig(context.Context, *connect.Request[v1.GetUserMcpConfigRequest]) (*connect.Response[v1.GetUserMcpConfigResponse], error)
+	// UpdateUserMcpConfig updates whether users may configure personal MCP
+	// servers. Admin (laelia.settings.update) only.
+	UpdateUserMcpConfig(context.Context, *connect.Request[v1.UpdateUserMcpConfigRequest]) (*connect.Response[v1.UpdateUserMcpConfigResponse], error)
 	// GetSetupStatus reports which required-config items are not yet configured,
 	// so the frontend can guide an admin to finish setting up the workspace.
 	GetSetupStatus(context.Context, *connect.Request[v1.GetSetupStatusRequest]) (*connect.Response[v1.GetSetupStatusResponse], error)
@@ -109,6 +122,18 @@ func NewSettingServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(settingServiceMethods.ByName("UpdateLlmAgentConfig")),
 			connect.WithClientOptions(opts...),
 		),
+		getUserMcpConfig: connect.NewClient[v1.GetUserMcpConfigRequest, v1.GetUserMcpConfigResponse](
+			httpClient,
+			baseURL+SettingServiceGetUserMcpConfigProcedure,
+			connect.WithSchema(settingServiceMethods.ByName("GetUserMcpConfig")),
+			connect.WithClientOptions(opts...),
+		),
+		updateUserMcpConfig: connect.NewClient[v1.UpdateUserMcpConfigRequest, v1.UpdateUserMcpConfigResponse](
+			httpClient,
+			baseURL+SettingServiceUpdateUserMcpConfigProcedure,
+			connect.WithSchema(settingServiceMethods.ByName("UpdateUserMcpConfig")),
+			connect.WithClientOptions(opts...),
+		),
 		getSetupStatus: connect.NewClient[v1.GetSetupStatusRequest, v1.GetSetupStatusResponse](
 			httpClient,
 			baseURL+SettingServiceGetSetupStatusProcedure,
@@ -136,6 +161,8 @@ type settingServiceClient struct {
 	updateS3Config       *connect.Client[v1.UpdateS3ConfigRequest, v1.UpdateS3ConfigResponse]
 	getLlmAgentConfig    *connect.Client[v1.GetLlmAgentConfigRequest, v1.GetLlmAgentConfigResponse]
 	updateLlmAgentConfig *connect.Client[v1.UpdateLlmAgentConfigRequest, v1.UpdateLlmAgentConfigResponse]
+	getUserMcpConfig     *connect.Client[v1.GetUserMcpConfigRequest, v1.GetUserMcpConfigResponse]
+	updateUserMcpConfig  *connect.Client[v1.UpdateUserMcpConfigRequest, v1.UpdateUserMcpConfigResponse]
 	getSetupStatus       *connect.Client[v1.GetSetupStatusRequest, v1.GetSetupStatusResponse]
 	getDebugConfig       *connect.Client[v1.GetDebugConfigRequest, v1.GetDebugConfigResponse]
 	updateDebugConfig    *connect.Client[v1.UpdateDebugConfigRequest, v1.UpdateDebugConfigResponse]
@@ -159,6 +186,16 @@ func (c *settingServiceClient) GetLlmAgentConfig(ctx context.Context, req *conne
 // UpdateLlmAgentConfig calls laelia.v1.SettingService.UpdateLlmAgentConfig.
 func (c *settingServiceClient) UpdateLlmAgentConfig(ctx context.Context, req *connect.Request[v1.UpdateLlmAgentConfigRequest]) (*connect.Response[v1.UpdateLlmAgentConfigResponse], error) {
 	return c.updateLlmAgentConfig.CallUnary(ctx, req)
+}
+
+// GetUserMcpConfig calls laelia.v1.SettingService.GetUserMcpConfig.
+func (c *settingServiceClient) GetUserMcpConfig(ctx context.Context, req *connect.Request[v1.GetUserMcpConfigRequest]) (*connect.Response[v1.GetUserMcpConfigResponse], error) {
+	return c.getUserMcpConfig.CallUnary(ctx, req)
+}
+
+// UpdateUserMcpConfig calls laelia.v1.SettingService.UpdateUserMcpConfig.
+func (c *settingServiceClient) UpdateUserMcpConfig(ctx context.Context, req *connect.Request[v1.UpdateUserMcpConfigRequest]) (*connect.Response[v1.UpdateUserMcpConfigResponse], error) {
+	return c.updateUserMcpConfig.CallUnary(ctx, req)
 }
 
 // GetSetupStatus calls laelia.v1.SettingService.GetSetupStatus.
@@ -187,6 +224,13 @@ type SettingServiceHandler interface {
 	// UpdateLlmAgentConfig updates the workspace LLM agent configuration.
 	// Admin (laelia.settings.update) only.
 	UpdateLlmAgentConfig(context.Context, *connect.Request[v1.UpdateLlmAgentConfigRequest]) (*connect.Response[v1.UpdateLlmAgentConfigResponse], error)
+	// GetUserMcpConfig reads whether users may configure personal MCP servers.
+	// It is handler-gated (no permission annotation) so any authenticated user
+	// can render the personal MCP settings page.
+	GetUserMcpConfig(context.Context, *connect.Request[v1.GetUserMcpConfigRequest]) (*connect.Response[v1.GetUserMcpConfigResponse], error)
+	// UpdateUserMcpConfig updates whether users may configure personal MCP
+	// servers. Admin (laelia.settings.update) only.
+	UpdateUserMcpConfig(context.Context, *connect.Request[v1.UpdateUserMcpConfigRequest]) (*connect.Response[v1.UpdateUserMcpConfigResponse], error)
 	// GetSetupStatus reports which required-config items are not yet configured,
 	// so the frontend can guide an admin to finish setting up the workspace.
 	GetSetupStatus(context.Context, *connect.Request[v1.GetSetupStatusRequest]) (*connect.Response[v1.GetSetupStatusResponse], error)
@@ -225,6 +269,18 @@ func NewSettingServiceHandler(svc SettingServiceHandler, opts ...connect.Handler
 		connect.WithSchema(settingServiceMethods.ByName("UpdateLlmAgentConfig")),
 		connect.WithHandlerOptions(opts...),
 	)
+	settingServiceGetUserMcpConfigHandler := connect.NewUnaryHandler(
+		SettingServiceGetUserMcpConfigProcedure,
+		svc.GetUserMcpConfig,
+		connect.WithSchema(settingServiceMethods.ByName("GetUserMcpConfig")),
+		connect.WithHandlerOptions(opts...),
+	)
+	settingServiceUpdateUserMcpConfigHandler := connect.NewUnaryHandler(
+		SettingServiceUpdateUserMcpConfigProcedure,
+		svc.UpdateUserMcpConfig,
+		connect.WithSchema(settingServiceMethods.ByName("UpdateUserMcpConfig")),
+		connect.WithHandlerOptions(opts...),
+	)
 	settingServiceGetSetupStatusHandler := connect.NewUnaryHandler(
 		SettingServiceGetSetupStatusProcedure,
 		svc.GetSetupStatus,
@@ -253,6 +309,10 @@ func NewSettingServiceHandler(svc SettingServiceHandler, opts ...connect.Handler
 			settingServiceGetLlmAgentConfigHandler.ServeHTTP(w, r)
 		case SettingServiceUpdateLlmAgentConfigProcedure:
 			settingServiceUpdateLlmAgentConfigHandler.ServeHTTP(w, r)
+		case SettingServiceGetUserMcpConfigProcedure:
+			settingServiceGetUserMcpConfigHandler.ServeHTTP(w, r)
+		case SettingServiceUpdateUserMcpConfigProcedure:
+			settingServiceUpdateUserMcpConfigHandler.ServeHTTP(w, r)
 		case SettingServiceGetSetupStatusProcedure:
 			settingServiceGetSetupStatusHandler.ServeHTTP(w, r)
 		case SettingServiceGetDebugConfigProcedure:
@@ -282,6 +342,14 @@ func (UnimplementedSettingServiceHandler) GetLlmAgentConfig(context.Context, *co
 
 func (UnimplementedSettingServiceHandler) UpdateLlmAgentConfig(context.Context, *connect.Request[v1.UpdateLlmAgentConfigRequest]) (*connect.Response[v1.UpdateLlmAgentConfigResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.UpdateLlmAgentConfig is not implemented"))
+}
+
+func (UnimplementedSettingServiceHandler) GetUserMcpConfig(context.Context, *connect.Request[v1.GetUserMcpConfigRequest]) (*connect.Response[v1.GetUserMcpConfigResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.GetUserMcpConfig is not implemented"))
+}
+
+func (UnimplementedSettingServiceHandler) UpdateUserMcpConfig(context.Context, *connect.Request[v1.UpdateUserMcpConfigRequest]) (*connect.Response[v1.UpdateUserMcpConfigResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.SettingService.UpdateUserMcpConfig is not implemented"))
 }
 
 func (UnimplementedSettingServiceHandler) GetSetupStatus(context.Context, *connect.Request[v1.GetSetupStatusRequest]) (*connect.Response[v1.GetSetupStatusResponse], error) {

@@ -105,3 +105,28 @@ export declare type LlmAgentConfigSetting = Message<"laelia.store.LlmAgentConfig
  */
 export declare const LlmAgentConfigSettingSchema: GenMessage<LlmAgentConfigSetting>;
 
+/**
+ * UserMcpConfigSetting is the workspace-level personal MCP configuration. The
+ * only knob today is whether users may configure their own personal MCP
+ * servers and enable them on their own agents. Defaults to enabled when unset.
+ *
+ * @generated from message laelia.store.UserMcpConfigSetting
+ */
+export declare type UserMcpConfigSetting = Message<"laelia.store.UserMcpConfigSetting"> & {
+  /**
+   * allow_user_mcp_servers gates personal MCP servers: when true, any user may
+   * create/edit/delete their own servers and enable them on their agents;
+   * when false, personal servers are hidden from agent catalogs and creation
+   * is rejected (existing rows are retained and restored on re-enable).
+   *
+   * @generated from field: bool allow_user_mcp_servers = 1;
+   */
+  allowUserMcpServers: boolean;
+};
+
+/**
+ * Describes the message laelia.store.UserMcpConfigSetting.
+ * Use `create(UserMcpConfigSettingSchema)` to create a new message.
+ */
+export declare const UserMcpConfigSettingSchema: GenMessage<UserMcpConfigSetting>;
+

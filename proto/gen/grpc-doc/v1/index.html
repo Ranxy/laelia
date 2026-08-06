@@ -1728,6 +1728,10 @@
                 </li>
               
               
+                <li>
+                  <a href="#laelia.v1.McpServerScope"><span class="badge">E</span>McpServerScope</a>
+                </li>
+              
               
               
                 <li>
@@ -1873,6 +1877,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.GetUserMcpConfigRequest"><span class="badge">M</span>GetUserMcpConfigRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.GetUserMcpConfigResponse"><span class="badge">M</span>GetUserMcpConfigResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.SetupItem"><span class="badge">M</span>SetupItem</a>
                 </li>
               
@@ -1898,6 +1910,14 @@
               
                 <li>
                   <a href="#laelia.v1.UpdateS3ConfigResponse"><span class="badge">M</span>UpdateS3ConfigResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateUserMcpConfigRequest"><span class="badge">M</span>UpdateUserMcpConfigRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.UpdateUserMcpConfigResponse"><span class="badge">M</span>UpdateUserMcpConfigResponse</a>
                 </li>
               
               
@@ -17412,7 +17432,7 @@ Authorization). Values are stored server-side and masked on read. </p></td>
         
       
         <h3 id="laelia.v1.McpServer">McpServer</h3>
-        <p>McpServer is a workspace-global, admin-managed MCP service. The manager holds</p><p>the full transport configuration (URL and header values) and only exposes a</p><p>per-agent tool catalog to machines; header values are masked on read.</p>
+        <p>McpServer is a managed MCP service. WORKSPACE servers are admin-managed and</p><p>shared through the members list; USER servers are private to their creator.</p><p>The manager holds the full transport configuration (URL and header values)</p><p>and only exposes a per-agent tool catalog to machines; header values are</p><p>masked on read.</p>
 
         
           <table class="field-table">
@@ -17493,6 +17513,15 @@ checked when an agent references the server (and again at call time). </p></td>
                   <td><p>config_version increments on every update. The agent gateway returns it in
 the tool catalog and re-checks it at call time so stale catalogs fail
 closed instead of silently running against changed server configuration. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>scope</td>
+                  <td><a href="#laelia.v1.McpServerScope">McpServerScope</a></td>
+                  <td></td>
+                  <td><p>Scope of the server. On Create, WORKSPACE requires the management
+permission and USER requires the &#34;users may configure MCP servers&#34;
+workspace setting; the value is fixed for the lifetime of the server. </p></td>
                 </tr>
               
             </tbody>
@@ -17702,6 +17731,35 @@ server-side and masked on read. </p></td>
       
 
       
+        <h3 id="laelia.v1.McpServerScope">McpServerScope</h3>
+        <p>McpServerScope distinguishes workspace-global servers (admin-managed) from</p><p>personal servers (owned by a single user and usable only by that user).</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>MCP_SERVER_SCOPE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>MCP_SERVER_SCOPE_WORKSPACE</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>MCP_SERVER_SCOPE_USER</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
 
       
 
@@ -17733,7 +17791,7 @@ server-side and masked on read. </p></td>
 
         
         <h3 id="laelia.v1.McpServerService">McpServerService</h3>
-        <p>McpServerService manages the workspace MCP server registry. Management RPCs</p><p>are gated by the IAM interceptor with the laelia.mcpServers.* permissions</p><p>(held by workspaceAdmin or an authorized custom role). ListMcpServers is</p><p>handler-gated instead: it returns only the servers the caller may use, so</p><p>the agent config form can list them without a management permission.</p>
+        <p>McpServerService manages the MCP server registry. Get/Create/Update/Delete</p><p>are handler-gated: workspace servers require the laelia.mcpServers.*</p><p>permissions, while personal servers may be managed by their owner.</p><p>ListMcpServers returns workspace servers only (admin: all; other callers:</p><p>the servers they may use). ListMyMcpServers returns the caller's personal</p><p>servers; ListUserMcpServers is an admin read-only view of every personal</p><p>server.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -17749,6 +17807,20 @@ server-side and masked on read. </p></td>
             
               <tr>
                 <td>ListMcpServers</td>
+                <td><a href="#laelia.v1.ListMcpServersRequest">ListMcpServersRequest</a></td>
+                <td><a href="#laelia.v1.ListMcpServersResponse">ListMcpServersResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ListMyMcpServers</td>
+                <td><a href="#laelia.v1.ListMcpServersRequest">ListMcpServersRequest</a></td>
+                <td><a href="#laelia.v1.ListMcpServersResponse">ListMcpServersResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ListUserMcpServers</td>
                 <td><a href="#laelia.v1.ListMcpServersRequest">ListMcpServersRequest</a></td>
                 <td><a href="#laelia.v1.ListMcpServersResponse">ListMcpServersResponse</a></td>
                 <td><p></p></td>
@@ -17809,6 +17881,26 @@ server-side and masked on read. </p></td>
                 <td>ListMcpServers</td>
                 <td>GET</td>
                 <td>/v1/mcpServers</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListMyMcpServers</td>
+                <td>GET</td>
+                <td>/v1/myMcpServers</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListUserMcpServers</td>
+                <td>GET</td>
+                <td>/v1/userMcpServers</td>
                 <td></td>
               </tr>
               
@@ -18693,6 +18785,37 @@ string from the permission catalog. </p></td>
 
         
       
+        <h3 id="laelia.v1.GetUserMcpConfigRequest">GetUserMcpConfigRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="laelia.v1.GetUserMcpConfigResponse">GetUserMcpConfigResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>config</td>
+                  <td><a href="#laelia.store.UserMcpConfigSetting">laelia.store.UserMcpConfigSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.SetupItem">SetupItem</h3>
         <p>SetupItem describes one required-config item the admin onboarding overlay</p><p>surfaces. The backend is the source of truth for `configured`; the frontend</p><p>owns presentation (title/description/route) keyed by `id`.</p>
 
@@ -18868,6 +18991,54 @@ string from the permission catalog. </p></td>
 
         
       
+        <h3 id="laelia.v1.UpdateUserMcpConfigRequest">UpdateUserMcpConfigRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>config</td>
+                  <td><a href="#laelia.store.UserMcpConfigSetting">laelia.store.UserMcpConfigSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.UpdateUserMcpConfigResponse">UpdateUserMcpConfigResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>config</td>
+                  <td><a href="#laelia.store.UserMcpConfigSetting">laelia.store.UserMcpConfigSetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
 
       
 
@@ -18911,6 +19082,23 @@ which members use — can read the toggle without a settings permission.</p></td
                 <td><a href="#laelia.v1.UpdateLlmAgentConfigResponse">UpdateLlmAgentConfigResponse</a></td>
                 <td><p>UpdateLlmAgentConfig updates the workspace LLM agent configuration.
 Admin (laelia.settings.update) only.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetUserMcpConfig</td>
+                <td><a href="#laelia.v1.GetUserMcpConfigRequest">GetUserMcpConfigRequest</a></td>
+                <td><a href="#laelia.v1.GetUserMcpConfigResponse">GetUserMcpConfigResponse</a></td>
+                <td><p>GetUserMcpConfig reads whether users may configure personal MCP servers.
+It is handler-gated (no permission annotation) so any authenticated user
+can render the personal MCP settings page.</p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateUserMcpConfig</td>
+                <td><a href="#laelia.v1.UpdateUserMcpConfigRequest">UpdateUserMcpConfigRequest</a></td>
+                <td><a href="#laelia.v1.UpdateUserMcpConfigResponse">UpdateUserMcpConfigResponse</a></td>
+                <td><p>UpdateUserMcpConfig updates whether users may configure personal MCP
+servers. Admin (laelia.settings.update) only.</p></td>
               </tr>
             
               <tr>
@@ -18989,6 +19177,26 @@ so the frontend can guide an admin to finish setting up the workspace.</p></td>
                 <td>UpdateLlmAgentConfig</td>
                 <td>PATCH</td>
                 <td>/v1/llmAgentConfig</td>
+                <td>config</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetUserMcpConfig</td>
+                <td>GET</td>
+                <td>/v1/userMcpConfig</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateUserMcpConfig</td>
+                <td>PATCH</td>
+                <td>/v1/userMcpConfig</td>
                 <td>config</td>
               </tr>
               

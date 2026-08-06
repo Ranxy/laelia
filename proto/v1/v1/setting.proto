@@ -37,6 +37,20 @@ message UpdateLlmAgentConfigResponse {
   laelia.store.LlmAgentConfigSetting config = 1;
 }
 
+message GetUserMcpConfigRequest {}
+
+message GetUserMcpConfigResponse {
+  laelia.store.UserMcpConfigSetting config = 1;
+}
+
+message UpdateUserMcpConfigRequest {
+  laelia.store.UserMcpConfigSetting config = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateUserMcpConfigResponse {
+  laelia.store.UserMcpConfigSetting config = 1;
+}
+
 message GetSetupStatusRequest {}
 
 // SetupItem describes one required-config item the admin onboarding overlay
@@ -99,6 +113,26 @@ service SettingService {
   rpc UpdateLlmAgentConfig(UpdateLlmAgentConfigRequest) returns (UpdateLlmAgentConfigResponse) {
     option (google.api.http) = {
       patch: "/v1/llmAgentConfig"
+      body: "config"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.settings.update";
+    option (laelia.v1.audit) = true;
+  }
+
+  // GetUserMcpConfig reads whether users may configure personal MCP servers.
+  // It is handler-gated (no permission annotation) so any authenticated user
+  // can render the personal MCP settings page.
+  rpc GetUserMcpConfig(GetUserMcpConfigRequest) returns (GetUserMcpConfigResponse) {
+    option (google.api.http) = {get: "/v1/userMcpConfig"};
+    option (laelia.v1.auth_method) = IAM;
+  }
+
+  // UpdateUserMcpConfig updates whether users may configure personal MCP
+  // servers. Admin (laelia.settings.update) only.
+  rpc UpdateUserMcpConfig(UpdateUserMcpConfigRequest) returns (UpdateUserMcpConfigResponse) {
+    option (google.api.http) = {
+      patch: "/v1/userMcpConfig"
       body: "config"
     };
     option (laelia.v1.auth_method) = IAM;

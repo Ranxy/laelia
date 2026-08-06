@@ -1673,7 +1673,7 @@ func (s *AgentService) UpdateAgentMcpConfig(ctx context.Context, req *connect.Re
 		if server == nil {
 			return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("mcp server %q not found", name))
 		}
-		ok, err := canUseMcpServer(ctx, s.iam, s.store, user, server)
+		ok, err := agentCanUseMcpServer(ctx, s.store, s.iam, agent, server)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to resolve mcp server access"))
 		}

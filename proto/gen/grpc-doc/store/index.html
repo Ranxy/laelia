@@ -456,6 +456,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.store.UserMcpConfigSetting"><span class="badge">M</span>UserMcpConfigSetting</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.store.WebPushSetting"><span class="badge">M</span>WebPushSetting</a>
                 </li>
               
@@ -2882,6 +2886,33 @@ stores; false for AWS virtual-host style). </p></td>
 
         
       
+        <h3 id="laelia.store.UserMcpConfigSetting">UserMcpConfigSetting</h3>
+        <p>UserMcpConfigSetting is the workspace-level personal MCP configuration. The</p><p>only knob today is whether users may configure their own personal MCP</p><p>servers and enable them on their own agents. Defaults to enabled when unset.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>allow_user_mcp_servers</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>allow_user_mcp_servers gates personal MCP servers: when true, any user may
+create/edit/delete their own servers and enable them on their agents;
+when false, personal servers are hidden from agent catalogs and creation
+is rejected (existing rows are retained and restored on re-enable). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.store.WebPushSetting">WebPushSetting</h3>
         <p>WebPushSetting holds the VAPID keypair (RFC 8292) used to sign Web Push</p><p>notifications. The keypair is auto-generated on first boot and stored here so</p><p>a self-hosted SaaS deployment needs no env config; rotating the keys</p><p>invalidates every existing push subscription, so the values must stay stable.</p><p>Stored as plaintext (same mechanism as AUTH_SECRET); the private key is never</p><p>returned by any RPC — GetPushConfig only exposes the public key.</p>
 
@@ -3131,6 +3162,12 @@ endpoints directly. Only http:// and https:// schemes are supported. </p></td>
               <tr>
                 <td>LLM_AGENT_CONFIG</td>
                 <td>12</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>USER_MCP_CONFIG</td>
+                <td>13</td>
                 <td><p></p></td>
               </tr>
             

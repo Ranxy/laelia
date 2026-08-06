@@ -2,7 +2,7 @@
 // @generated from file v1/mcp.proto (package laelia.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { JsonObject, Message } from "@bufbuild/protobuf";
 import type { EmptySchema, FieldMask, Timestamp } from "@bufbuild/protobuf/wkt";
 
@@ -12,9 +12,11 @@ import type { EmptySchema, FieldMask, Timestamp } from "@bufbuild/protobuf/wkt";
 export declare const file_v1_mcp: GenFile;
 
 /**
- * McpServer is a workspace-global, admin-managed MCP service. The manager holds
- * the full transport configuration (URL and header values) and only exposes a
- * per-agent tool catalog to machines; header values are masked on read.
+ * McpServer is a managed MCP service. WORKSPACE servers are admin-managed and
+ * shared through the members list; USER servers are private to their creator.
+ * The manager holds the full transport configuration (URL and header values)
+ * and only exposes a per-agent tool catalog to machines; header values are
+ * masked on read.
  *
  * @generated from message laelia.v1.McpServer
  */
@@ -97,6 +99,15 @@ export declare type McpServer = Message<"laelia.v1.McpServer"> & {
    * @generated from field: int64 config_version = 10;
    */
   configVersion: bigint;
+
+  /**
+   * Scope of the server. On Create, WORKSPACE requires the management
+   * permission and USER requires the "users may configure MCP servers"
+   * workspace setting; the value is fixed for the lifetime of the server.
+   *
+   * @generated from field: laelia.v1.McpServerScope scope = 11;
+   */
+  scope: McpServerScope;
 };
 
 /**
@@ -565,11 +576,41 @@ export declare type McpImageContent = Message<"laelia.v1.McpImageContent"> & {
 export declare const McpImageContentSchema: GenMessage<McpImageContent>;
 
 /**
- * McpServerService manages the workspace MCP server registry. Management RPCs
- * are gated by the IAM interceptor with the laelia.mcpServers.* permissions
- * (held by workspaceAdmin or an authorized custom role). ListMcpServers is
- * handler-gated instead: it returns only the servers the caller may use, so
- * the agent config form can list them without a management permission.
+ * McpServerScope distinguishes workspace-global servers (admin-managed) from
+ * personal servers (owned by a single user and usable only by that user).
+ *
+ * @generated from enum laelia.v1.McpServerScope
+ */
+export enum McpServerScope {
+  /**
+   * @generated from enum value: MCP_SERVER_SCOPE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: MCP_SERVER_SCOPE_WORKSPACE = 1;
+   */
+  WORKSPACE = 1,
+
+  /**
+   * @generated from enum value: MCP_SERVER_SCOPE_USER = 2;
+   */
+  USER = 2,
+}
+
+/**
+ * Describes the enum laelia.v1.McpServerScope.
+ */
+export declare const McpServerScopeSchema: GenEnum<McpServerScope>;
+
+/**
+ * McpServerService manages the MCP server registry. Get/Create/Update/Delete
+ * are handler-gated: workspace servers require the laelia.mcpServers.*
+ * permissions, while personal servers may be managed by their owner.
+ * ListMcpServers returns workspace servers only (admin: all; other callers:
+ * the servers they may use). ListMyMcpServers returns the caller's personal
+ * servers; ListUserMcpServers is an admin read-only view of every personal
+ * server.
  *
  * @generated from service laelia.v1.McpServerService
  */
@@ -586,6 +627,22 @@ export declare const McpServerService: GenService<{
    * @generated from rpc laelia.v1.McpServerService.ListMcpServers
    */
   listMcpServers: {
+    methodKind: "unary";
+    input: typeof ListMcpServersRequestSchema;
+    output: typeof ListMcpServersResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.McpServerService.ListMyMcpServers
+   */
+  listMyMcpServers: {
+    methodKind: "unary";
+    input: typeof ListMcpServersRequestSchema;
+    output: typeof ListMcpServersResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.McpServerService.ListUserMcpServers
+   */
+  listUserMcpServers: {
     methodKind: "unary";
     input: typeof ListMcpServersRequestSchema;
     output: typeof ListMcpServersResponseSchema;

@@ -4,7 +4,7 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { LlmAgentConfigSetting, S3ConfigSetting } from "../store/setting_pb";
+import type { LlmAgentConfigSetting, S3ConfigSetting, UserMcpConfigSetting } from "../store/setting_pb";
 
 /**
  * Describes the file v1/setting.proto.
@@ -130,6 +130,66 @@ export declare type UpdateLlmAgentConfigResponse = Message<"laelia.v1.UpdateLlmA
  * Use `create(UpdateLlmAgentConfigResponseSchema)` to create a new message.
  */
 export declare const UpdateLlmAgentConfigResponseSchema: GenMessage<UpdateLlmAgentConfigResponse>;
+
+/**
+ * @generated from message laelia.v1.GetUserMcpConfigRequest
+ */
+export declare type GetUserMcpConfigRequest = Message<"laelia.v1.GetUserMcpConfigRequest"> & {
+};
+
+/**
+ * Describes the message laelia.v1.GetUserMcpConfigRequest.
+ * Use `create(GetUserMcpConfigRequestSchema)` to create a new message.
+ */
+export declare const GetUserMcpConfigRequestSchema: GenMessage<GetUserMcpConfigRequest>;
+
+/**
+ * @generated from message laelia.v1.GetUserMcpConfigResponse
+ */
+export declare type GetUserMcpConfigResponse = Message<"laelia.v1.GetUserMcpConfigResponse"> & {
+  /**
+   * @generated from field: laelia.store.UserMcpConfigSetting config = 1;
+   */
+  config?: UserMcpConfigSetting | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.GetUserMcpConfigResponse.
+ * Use `create(GetUserMcpConfigResponseSchema)` to create a new message.
+ */
+export declare const GetUserMcpConfigResponseSchema: GenMessage<GetUserMcpConfigResponse>;
+
+/**
+ * @generated from message laelia.v1.UpdateUserMcpConfigRequest
+ */
+export declare type UpdateUserMcpConfigRequest = Message<"laelia.v1.UpdateUserMcpConfigRequest"> & {
+  /**
+   * @generated from field: laelia.store.UserMcpConfigSetting config = 1;
+   */
+  config?: UserMcpConfigSetting | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateUserMcpConfigRequest.
+ * Use `create(UpdateUserMcpConfigRequestSchema)` to create a new message.
+ */
+export declare const UpdateUserMcpConfigRequestSchema: GenMessage<UpdateUserMcpConfigRequest>;
+
+/**
+ * @generated from message laelia.v1.UpdateUserMcpConfigResponse
+ */
+export declare type UpdateUserMcpConfigResponse = Message<"laelia.v1.UpdateUserMcpConfigResponse"> & {
+  /**
+   * @generated from field: laelia.store.UserMcpConfigSetting config = 1;
+   */
+  config?: UserMcpConfigSetting | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.UpdateUserMcpConfigResponse.
+ * Use `create(UpdateUserMcpConfigResponseSchema)` to create a new message.
+ */
+export declare const UpdateUserMcpConfigResponseSchema: GenMessage<UpdateUserMcpConfigResponse>;
 
 /**
  * @generated from message laelia.v1.GetSetupStatusRequest
@@ -291,6 +351,29 @@ export declare const SettingService: GenService<{
     methodKind: "unary";
     input: typeof UpdateLlmAgentConfigRequestSchema;
     output: typeof UpdateLlmAgentConfigResponseSchema;
+  },
+  /**
+   * GetUserMcpConfig reads whether users may configure personal MCP servers.
+   * It is handler-gated (no permission annotation) so any authenticated user
+   * can render the personal MCP settings page.
+   *
+   * @generated from rpc laelia.v1.SettingService.GetUserMcpConfig
+   */
+  getUserMcpConfig: {
+    methodKind: "unary";
+    input: typeof GetUserMcpConfigRequestSchema;
+    output: typeof GetUserMcpConfigResponseSchema;
+  },
+  /**
+   * UpdateUserMcpConfig updates whether users may configure personal MCP
+   * servers. Admin (laelia.settings.update) only.
+   *
+   * @generated from rpc laelia.v1.SettingService.UpdateUserMcpConfig
+   */
+  updateUserMcpConfig: {
+    methodKind: "unary";
+    input: typeof UpdateUserMcpConfigRequestSchema;
+    output: typeof UpdateUserMcpConfigResponseSchema;
   },
   /**
    * GetSetupStatus reports which required-config items are not yet configured,

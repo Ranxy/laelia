@@ -73,6 +73,7 @@
     - [LlmAgentConfigSetting](#laelia-store-LlmAgentConfigSetting)
     - [PasswordRestrictionSetting](#laelia-store-PasswordRestrictionSetting)
     - [S3ConfigSetting](#laelia-store-S3ConfigSetting)
+    - [UserMcpConfigSetting](#laelia-store-UserMcpConfigSetting)
     - [WebPushSetting](#laelia-store-WebPushSetting)
     - [WorkspaceProfileSetting](#laelia-store-WorkspaceProfileSetting)
   
@@ -1085,6 +1086,23 @@ considered unconfigured and upload/download endpoints reject with
 
 
 
+<a name="laelia-store-UserMcpConfigSetting"></a>
+
+### UserMcpConfigSetting
+UserMcpConfigSetting is the workspace-level personal MCP configuration. The
+only knob today is whether users may configure their own personal MCP
+servers and enable them on their own agents. Defaults to enabled when unset.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| allow_user_mcp_servers | [bool](#bool) |  | allow_user_mcp_servers gates personal MCP servers: when true, any user may create/edit/delete their own servers and enable them on their agents; when false, personal servers are hidden from agent catalogs and creation is rejected (existing rows are retained and restored on re-enable). |
+
+
+
+
+
+
 <a name="laelia-store-WebPushSetting"></a>
 
 ### WebPushSetting
@@ -1167,6 +1185,7 @@ IP validation policy for agent connections.
 | S3_CONFIG | 10 |  |
 | WEB_PUSH_CONFIG | 11 |  |
 | LLM_AGENT_CONFIG | 12 |  |
+| USER_MCP_CONFIG | 13 |  |
 
 
  

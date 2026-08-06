@@ -8,7 +8,7 @@ import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
  * Describes the file store/setting.proto.
  */
 export const file_store_setting = /*@__PURE__*/
-  fileDesc("ChNzdG9yZS9zZXR0aW5nLnByb3RvEgxsYWVsaWEuc3RvcmUilgEKD1MzQ29uZmlnU2V0dGluZxIQCghlbmRwb2ludBgBIAEoCRIOCgZyZWdpb24YAiABKAkSDgoGYnVja2V0GAMgASgJEhIKCmFjY2Vzc19rZXkYBCABKAkSEgoKc2VjcmV0X2tleRgFIAEoCRIYChBmb3JjZV9wYXRoX3N0eWxlGAYgASgIEg8KB3VzZV9zc2wYByABKAgiPgoVTGxtQWdlbnRDb25maWdTZXR0aW5nEiUKHWFsbG93X3VzZXJfc2VsZl9wcm92aWRlZF9rZXlzGAEgASgIQjRaMmdpdGh1Yi5jb20vUmFueHkvbGFlbGlhL2JhY2tlbmQvZ2VuZXJhdGVkLWdvL3N0b3JlYgZwcm90bzM");
+  fileDesc("ChNzdG9yZS9zZXR0aW5nLnByb3RvEgxsYWVsaWEuc3RvcmUilgEKD1MzQ29uZmlnU2V0dGluZxIQCghlbmRwb2ludBgBIAEoCRIOCgZyZWdpb24YAiABKAkSDgoGYnVja2V0GAMgASgJEhIKCmFjY2Vzc19rZXkYBCABKAkSEgoKc2VjcmV0X2tleRgFIAEoCRIYChBmb3JjZV9wYXRoX3N0eWxlGAYgASgIEg8KB3VzZV9zc2wYByABKAgiPgoVTGxtQWdlbnRDb25maWdTZXR0aW5nEiUKHWFsbG93X3VzZXJfc2VsZl9wcm92aWRlZF9rZXlzGAEgASgIIjYKFFVzZXJNY3BDb25maWdTZXR0aW5nEh4KFmFsbG93X3VzZXJfbWNwX3NlcnZlcnMYASABKAhCNFoyZ2l0aHViLmNvbS9SYW54eS9sYWVsaWEvYmFja2VuZC9nZW5lcmF0ZWQtZ28vc3RvcmViBnByb3RvMw");
 
 /**
  * Describes the message laelia.store.S3ConfigSetting.
@@ -23,4 +23,11 @@ export const S3ConfigSettingSchema = /*@__PURE__*/
  */
 export const LlmAgentConfigSettingSchema = /*@__PURE__*/
   messageDesc(file_store_setting, 1);
+
+/**
+ * Describes the message laelia.store.UserMcpConfigSetting.
+ * Use `create(UserMcpConfigSettingSchema)` to create a new message.
+ */
+export const UserMcpConfigSettingSchema = /*@__PURE__*/
+  messageDesc(file_store_setting, 2);
 

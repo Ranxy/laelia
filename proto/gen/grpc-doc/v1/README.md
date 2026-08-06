@@ -401,6 +401,8 @@
     - [McpTool](#laelia-v1-McpTool)
     - [UpdateMcpServerRequest](#laelia-v1-UpdateMcpServerRequest)
   
+    - [McpServerScope](#laelia-v1-McpServerScope)
+  
     - [McpGatewayService](#laelia-v1-McpGatewayService)
     - [McpServerService](#laelia-v1-McpServerService)
   
@@ -437,6 +439,8 @@
     - [GetS3ConfigResponse](#laelia-v1-GetS3ConfigResponse)
     - [GetSetupStatusRequest](#laelia-v1-GetSetupStatusRequest)
     - [GetSetupStatusResponse](#laelia-v1-GetSetupStatusResponse)
+    - [GetUserMcpConfigRequest](#laelia-v1-GetUserMcpConfigRequest)
+    - [GetUserMcpConfigResponse](#laelia-v1-GetUserMcpConfigResponse)
     - [SetupItem](#laelia-v1-SetupItem)
     - [UpdateDebugConfigRequest](#laelia-v1-UpdateDebugConfigRequest)
     - [UpdateDebugConfigResponse](#laelia-v1-UpdateDebugConfigResponse)
@@ -444,6 +448,8 @@
     - [UpdateLlmAgentConfigResponse](#laelia-v1-UpdateLlmAgentConfigResponse)
     - [UpdateS3ConfigRequest](#laelia-v1-UpdateS3ConfigRequest)
     - [UpdateS3ConfigResponse](#laelia-v1-UpdateS3ConfigResponse)
+    - [UpdateUserMcpConfigRequest](#laelia-v1-UpdateUserMcpConfigRequest)
+    - [UpdateUserMcpConfigResponse](#laelia-v1-UpdateUserMcpConfigResponse)
   
     - [SettingService](#laelia-v1-SettingService)
   
@@ -6693,9 +6699,11 @@ McpHttpTransport is a streamable-HTTP MCP transport.
 <a name="laelia-v1-McpServer"></a>
 
 ### McpServer
-McpServer is a workspace-global, admin-managed MCP service. The manager holds
-the full transport configuration (URL and header values) and only exposes a
-per-agent tool catalog to machines; header values are masked on read.
+McpServer is a managed MCP service. WORKSPACE servers are admin-managed and
+shared through the members list; USER servers are private to their creator.
+The manager holds the full transport configuration (URL and header values)
+and only exposes a per-agent tool catalog to machines; header values are
+masked on read.
 
 
 | Field | Type | Label | Description |
@@ -6710,6 +6718,7 @@ per-agent tool catalog to machines; header values are masked on read.
 | updated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}). Display-only. |
 | config_version | [int64](#int64) |  | config_version increments on every update. The agent gateway returns it in the tool catalog and re-checks it at call time so stale catalogs fail closed instead of silently running against changed server configuration. |
+| scope | [McpServerScope](#laelia-v1-McpServerScope) |  | Scope of the server. On Create, WORKSPACE requires the management permission and USER requires the &#34;users may configure MCP servers&#34; workspace setting; the value is fixed for the lifetime of the server. |
 
 
 
@@ -6809,6 +6818,20 @@ tool lists; machines never see the transport configuration.
 
  
 
+
+<a name="laelia-v1-McpServerScope"></a>
+
+### McpServerScope
+McpServerScope distinguishes workspace-global servers (admin-managed) from
+personal servers (owned by a single user and usable only by that user).
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| MCP_SERVER_SCOPE_UNSPECIFIED | 0 |  |
+| MCP_SERVER_SCOPE_WORKSPACE | 1 |  |
+| MCP_SERVER_SCOPE_USER | 2 |  |
+
+
  
 
  
@@ -6831,16 +6854,20 @@ header); every call re-checks the caller&#39;s current authorization.
 <a name="laelia-v1-McpServerService"></a>
 
 ### McpServerService
-McpServerService manages the workspace MCP server registry. Management RPCs
-are gated by the IAM interceptor with the laelia.mcpServers.* permissions
-(held by workspaceAdmin or an authorized custom role). ListMcpServers is
-handler-gated instead: it returns only the servers the caller may use, so
-the agent config form can list them without a management permission.
+McpServerService manages the MCP server registry. Get/Create/Update/Delete
+are handler-gated: workspace servers require the laelia.mcpServers.*
+permissions, while personal servers may be managed by their owner.
+ListMcpServers returns workspace servers only (admin: all; other callers:
+the servers they may use). ListMyMcpServers returns the caller&#39;s personal
+servers; ListUserMcpServers is an admin read-only view of every personal
+server.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | GetMcpServer | [GetMcpServerRequest](#laelia-v1-GetMcpServerRequest) | [McpServer](#laelia-v1-McpServer) |  |
 | ListMcpServers | [ListMcpServersRequest](#laelia-v1-ListMcpServersRequest) | [ListMcpServersResponse](#laelia-v1-ListMcpServersResponse) |  |
+| ListMyMcpServers | [ListMcpServersRequest](#laelia-v1-ListMcpServersRequest) | [ListMcpServersResponse](#laelia-v1-ListMcpServersResponse) |  |
+| ListUserMcpServers | [ListMcpServersRequest](#laelia-v1-ListMcpServersRequest) | [ListMcpServersResponse](#laelia-v1-ListMcpServersResponse) |  |
 | CreateMcpServer | [CreateMcpServerRequest](#laelia-v1-CreateMcpServerRequest) | [McpServer](#laelia-v1-McpServer) |  |
 | UpdateMcpServer | [UpdateMcpServerRequest](#laelia-v1-UpdateMcpServerRequest) | [McpServer](#laelia-v1-McpServer) |  |
 | DeleteMcpServer | [DeleteMcpServerRequest](#laelia-v1-DeleteMcpServerRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
@@ -7275,6 +7302,31 @@ laelia.roles.* permissions.
 
 
 
+<a name="laelia-v1-GetUserMcpConfigRequest"></a>
+
+### GetUserMcpConfigRequest
+
+
+
+
+
+
+
+<a name="laelia-v1-GetUserMcpConfigResponse"></a>
+
+### GetUserMcpConfigResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| config | [laelia.store.UserMcpConfigSetting](#laelia-store-UserMcpConfigSetting) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-SetupItem"></a>
 
 ### SetupItem
@@ -7382,6 +7434,36 @@ owns presentation (title/description/route) keyed by `id`.
 
 
 
+
+<a name="laelia-v1-UpdateUserMcpConfigRequest"></a>
+
+### UpdateUserMcpConfigRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| config | [laelia.store.UserMcpConfigSetting](#laelia-store-UserMcpConfigSetting) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-UpdateUserMcpConfigResponse"></a>
+
+### UpdateUserMcpConfigResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| config | [laelia.store.UserMcpConfigSetting](#laelia-store-UserMcpConfigSetting) |  |  |
+
+
+
+
+
  
 
  
@@ -7403,6 +7485,8 @@ an update carrying a masked secret preserves the stored value.
 | UpdateS3Config | [UpdateS3ConfigRequest](#laelia-v1-UpdateS3ConfigRequest) | [UpdateS3ConfigResponse](#laelia-v1-UpdateS3ConfigResponse) |  |
 | GetLlmAgentConfig | [GetLlmAgentConfigRequest](#laelia-v1-GetLlmAgentConfigRequest) | [GetLlmAgentConfigResponse](#laelia-v1-GetLlmAgentConfigResponse) | GetLlmAgentConfig reads the workspace LLM agent configuration. It is handler-gated (no permission annotation) so the agent create/edit forms — which members use — can read the toggle without a settings permission. |
 | UpdateLlmAgentConfig | [UpdateLlmAgentConfigRequest](#laelia-v1-UpdateLlmAgentConfigRequest) | [UpdateLlmAgentConfigResponse](#laelia-v1-UpdateLlmAgentConfigResponse) | UpdateLlmAgentConfig updates the workspace LLM agent configuration. Admin (laelia.settings.update) only. |
+| GetUserMcpConfig | [GetUserMcpConfigRequest](#laelia-v1-GetUserMcpConfigRequest) | [GetUserMcpConfigResponse](#laelia-v1-GetUserMcpConfigResponse) | GetUserMcpConfig reads whether users may configure personal MCP servers. It is handler-gated (no permission annotation) so any authenticated user can render the personal MCP settings page. |
+| UpdateUserMcpConfig | [UpdateUserMcpConfigRequest](#laelia-v1-UpdateUserMcpConfigRequest) | [UpdateUserMcpConfigResponse](#laelia-v1-UpdateUserMcpConfigResponse) | UpdateUserMcpConfig updates whether users may configure personal MCP servers. Admin (laelia.settings.update) only. |
 | GetSetupStatus | [GetSetupStatusRequest](#laelia-v1-GetSetupStatusRequest) | [GetSetupStatusResponse](#laelia-v1-GetSetupStatusResponse) | GetSetupStatus reports which required-config items are not yet configured, so the frontend can guide an admin to finish setting up the workspace. |
 | GetDebugConfig | [GetDebugConfigRequest](#laelia-v1-GetDebugConfigRequest) | [GetDebugConfigResponse](#laelia-v1-GetDebugConfigResponse) |  |
 | UpdateDebugConfig | [UpdateDebugConfigRequest](#laelia-v1-UpdateDebugConfigRequest) | [UpdateDebugConfigResponse](#laelia-v1-UpdateDebugConfigResponse) |  |

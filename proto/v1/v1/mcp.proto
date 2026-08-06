@@ -14,9 +14,19 @@ import "v1/annotation.proto";
 
 option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
 
-// McpServer is a workspace-global, admin-managed MCP service. The manager holds
-// the full transport configuration (URL and header values) and only exposes a
-// per-agent tool catalog to machines; header values are masked on read.
+// McpServerScope distinguishes workspace-global servers (admin-managed) from
+// personal servers (owned by a single user and usable only by that user).
+enum McpServerScope {
+  MCP_SERVER_SCOPE_UNSPECIFIED = 0;
+  MCP_SERVER_SCOPE_WORKSPACE = 1;
+  MCP_SERVER_SCOPE_USER = 2;
+}
+
+// McpServer is a managed MCP service. WORKSPACE servers are admin-managed and
+// shared through the members list; USER servers are private to their creator.
+// The manager holds the full transport configuration (URL and header values)
+// and only exposes a per-agent tool catalog to machines; header values are
+// masked on read.
 message McpServer {
   option (google.api.resource) = {
     type: "laelia/McpServer"
@@ -58,6 +68,11 @@ message McpServer {
   // the tool catalog and re-checks it at call time so stale catalogs fail
   // closed instead of silently running against changed server configuration.
   int64 config_version = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Scope of the server. On Create, WORKSPACE requires the management
+  // permission and USER requires the "users may configure MCP servers"
+  // workspace setting; the value is fixed for the lifetime of the server.
+  McpServerScope scope = 11;
 }
 
 // McpHttpTransport is a streamable-HTTP MCP transport.
@@ -130,22 +145,34 @@ message McpServerChange {
   string server = 1;
 }
 
-// McpServerService manages the workspace MCP server registry. Management RPCs
-// are gated by the IAM interceptor with the laelia.mcpServers.* permissions
-// (held by workspaceAdmin or an authorized custom role). ListMcpServers is
-// handler-gated instead: it returns only the servers the caller may use, so
-// the agent config form can list them without a management permission.
+// McpServerService manages the MCP server registry. Get/Create/Update/Delete
+// are handler-gated: workspace servers require the laelia.mcpServers.*
+// permissions, while personal servers may be managed by their owner.
+// ListMcpServers returns workspace servers only (admin: all; other callers:
+// the servers they may use). ListMyMcpServers returns the caller's personal
+// servers; ListUserMcpServers is an admin read-only view of every personal
+// server.
 service McpServerService {
   rpc GetMcpServer(GetMcpServerRequest) returns (McpServer) {
     option (google.api.http) = {get: "/v1/{name=mcpServers/*}"};
     option (google.api.method_signature) = "name";
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.mcpServers.get";
   }
 
   rpc ListMcpServers(ListMcpServersRequest) returns (ListMcpServersResponse) {
     option (google.api.http) = {get: "/v1/mcpServers"};
     option (laelia.v1.auth_method) = IAM;
+  }
+
+  rpc ListMyMcpServers(ListMcpServersRequest) returns (ListMcpServersResponse) {
+    option (google.api.http) = {get: "/v1/myMcpServers"};
+    option (laelia.v1.auth_method) = IAM;
+  }
+
+  rpc ListUserMcpServers(ListMcpServersRequest) returns (ListMcpServersResponse) {
+    option (google.api.http) = {get: "/v1/userMcpServers"};
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.mcpServers.list";
   }
 
   rpc CreateMcpServer(CreateMcpServerRequest) returns (McpServer) {
@@ -155,7 +182,6 @@ service McpServerService {
     };
     option (google.api.method_signature) = "mcp_server";
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.mcpServers.create";
     option (laelia.v1.audit) = true;
   }
 
@@ -166,7 +192,6 @@ service McpServerService {
     };
     option (google.api.method_signature) = "mcp_server,update_mask";
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.mcpServers.update";
     option (laelia.v1.audit) = true;
   }
 
@@ -174,7 +199,6 @@ service McpServerService {
     option (google.api.http) = {delete: "/v1/{name=mcpServers/*}"};
     option (google.api.method_signature) = "name";
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.mcpServers.delete";
     option (laelia.v1.audit) = true;
   }
 }

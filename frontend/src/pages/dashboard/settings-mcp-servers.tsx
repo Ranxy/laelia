@@ -3,7 +3,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MemberPicker } from "@/components/member-picker";
-import { PermissionNotice, SettingsPage } from "@/components/settings-page";
+import { SettingsPage } from "@/components/settings-page";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -40,9 +40,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
 import {
   groupServiceClient,
   mcpServerServiceClient,
+  settingServiceClient,
   userServiceClient,
 } from "@/connect";
 import { describeError } from "@/lib/connect-errors";
@@ -54,6 +56,7 @@ import {
   McpHeaderSchema,
   McpHttpTransportSchema,
   type McpServer,
+  McpServerScope,
   McpSseTransportSchema,
 } from "@/types/proto-es/v1/mcp_pb";
 import { type User } from "@/types/proto-es/v1/user_service_pb";
@@ -71,9 +74,10 @@ interface McpServerForm {
   url: string;
   headers: HeaderForm[];
   members: string[];
+  scope: "workspace" | "user";
 }
 
-function emptyForm(): McpServerForm {
+function emptyForm(scope: "workspace" | "user"): McpServerForm {
   return {
     title: "",
     description: "",
@@ -81,6 +85,7 @@ function emptyForm(): McpServerForm {
     url: "",
     headers: [],
     members: [],
+    scope,
   };
 }
 
@@ -99,6 +104,7 @@ function serverToForm(server: McpServer): McpServerForm {
     url: transport?.url ?? "",
     headers,
     members: [...server.members],
+    scope: server.scope === McpServerScope.USER ? "user" : "workspace",
   };
 }
 
@@ -139,24 +145,36 @@ function toProtoTransport(form: McpServerForm) {
   };
 }
 
+type McpTab = "workspace" | "my" | "users";
+
 export function SettingsMcpServersPage() {
   const { t } = useTranslation();
-  const canList = useHasPermission("laelia.mcpServers.list");
-  const canCreate = useHasPermission("laelia.mcpServers.create");
-  const canUpdate = useHasPermission("laelia.mcpServers.update");
+  const isAdmin = useHasPermission("laelia.mcpServers.list");
+  const canCreateWorkspace = useHasPermission("laelia.mcpServers.create");
+  const canUpdateWorkspace = useHasPermission("laelia.mcpServers.update");
 
-  const [servers, setServers] = useState<McpServer[]>([]);
+  const [workspaceServers, setWorkspaceServers] = useState<McpServer[]>([]);
+  const [myServers, setMyServers] = useState<McpServer[]>([]);
+  const [userServers, setUserServers] = useState<McpServer[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [allowUserMcp, setAllowUserMcp] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<McpTab>(
+    isAdmin ? "workspace" : "my"
+  );
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState<McpServerForm>(emptyForm());
+  const [createForm, setCreateForm] = useState<McpServerForm>(() =>
+    emptyForm("workspace")
+  );
   const [creating, setCreating] = useState(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<McpServer | null>(null);
-  const [editForm, setEditForm] = useState<McpServerForm>(emptyForm());
+  const [editForm, setEditForm] = useState<McpServerForm>(() =>
+    emptyForm("workspace")
+  );
   const [saving, setSaving] = useState(false);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -166,14 +184,29 @@ export function SettingsMcpServersPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [serverRes, userRes, groupRes] = await Promise.all([
-        mcpServerServiceClient.listMcpServers({ pageSize: 1000 }),
-        userServiceClient.listUsers({ pageSize: 1000 }),
-        groupServiceClient.listGroups({ pageSize: 1000 }),
+      const [cfgRes, myRes] = await Promise.all([
+        settingServiceClient.getUserMcpConfig({}),
+        mcpServerServiceClient.listMyMcpServers({ pageSize: 1000 }),
       ]);
-      setServers(serverRes.mcpServers ?? []);
-      setUsers(userRes.users ?? []);
-      setGroups(groupRes.groups ?? []);
+      setAllowUserMcp(cfgRes.config?.allowUserMcpServers ?? true);
+      setMyServers(myRes.mcpServers ?? []);
+      if (isAdmin) {
+        const [wsRes, allUserRes, userRes, groupRes] = await Promise.all([
+          mcpServerServiceClient.listMcpServers({ pageSize: 1000 }),
+          mcpServerServiceClient.listUserMcpServers({ pageSize: 1000 }),
+          userServiceClient.listUsers({ pageSize: 1000 }),
+          groupServiceClient.listGroups({ pageSize: 1000 }),
+        ]);
+        setWorkspaceServers(wsRes.mcpServers ?? []);
+        setUserServers(allUserRes.mcpServers ?? []);
+        setUsers(userRes.users ?? []);
+        setGroups(groupRes.groups ?? []);
+      } else {
+        setWorkspaceServers([]);
+        setUserServers([]);
+        setUsers([]);
+        setGroups([]);
+      }
     } catch (err) {
       toastManager.add({
         type: "error",
@@ -183,12 +216,11 @@ export function SettingsMcpServersPage() {
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [isAdmin, t]);
 
   useEffect(() => {
-    if (canList) load();
-    else setLoading(false);
-  }, [canList, load]);
+    void load();
+  }, [load]);
 
   const validateForm = (form: McpServerForm) => {
     if (!form.title.trim()) {
@@ -218,7 +250,11 @@ export function SettingsMcpServersPage() {
           title: createForm.title.trim(),
           description: createForm.description.trim(),
           transport,
-          members: createForm.members,
+          members: createForm.scope === "user" ? [] : createForm.members,
+          scope:
+            createForm.scope === "user"
+              ? McpServerScope.USER
+              : McpServerScope.WORKSPACE,
         },
       });
       toastManager.add({
@@ -226,8 +262,7 @@ export function SettingsMcpServersPage() {
         title: t("settings.mcp-servers.created"),
       });
       setCreateOpen(false);
-      setCreateForm(emptyForm());
-      load();
+      void load();
     } catch (err) {
       toastManager.add({
         type: "error",
@@ -252,6 +287,7 @@ export function SettingsMcpServersPage() {
           description: editForm.description.trim(),
           transport,
           members: editForm.members,
+          scope: editTarget.scope,
         },
         updateMask: {
           paths: ["title", "description", editForm.transportType, "members"],
@@ -263,7 +299,7 @@ export function SettingsMcpServersPage() {
       });
       setEditOpen(false);
       setEditTarget(null);
-      load();
+      void load();
     } catch (err) {
       toastManager.add({
         type: "error",
@@ -288,7 +324,7 @@ export function SettingsMcpServersPage() {
       });
       setDeleteOpen(false);
       setDeleteTarget(null);
-      load();
+      void load();
     } catch (err) {
       toastManager.add({
         type: "error",
@@ -300,95 +336,120 @@ export function SettingsMcpServersPage() {
     }
   };
 
-  if (!canList) {
-    return <PermissionNotice message={t("settings.mcp-servers.not-allowed")} />;
-  }
+  const openEdit = (server: McpServer) => {
+    setEditTarget(server);
+    setEditForm(serverToForm(server));
+    setEditOpen(true);
+  };
+
+  const openDelete = (server: McpServer) => {
+    setDeleteTarget(server);
+    setDeleteOpen(true);
+  };
 
   return (
     <SettingsPage
       title={t("settings.mcp-servers.title")}
       description={t("settings.mcp-servers.description")}
       actions={
-        canCreate && (
-          <Button onClick={() => setCreateOpen(true)}>
+        activeTab === "workspace" && canCreateWorkspace ? (
+          <Button
+            onClick={() => {
+              setCreateForm(emptyForm("workspace"));
+              setCreateOpen(true);
+            }}
+          >
             <Plus className="w-4 h-4" />
             {t("settings.mcp-servers.create")}
           </Button>
-        )
+        ) : activeTab === "my" && allowUserMcp ? (
+          <Button
+            onClick={() => {
+              setCreateForm(emptyForm("user"));
+              setCreateOpen(true);
+            }}
+          >
+            <Plus className="w-4 h-4" />
+            {t("settings.mcp-servers.create-my")}
+          </Button>
+        ) : undefined
       }
     >
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t("settings.mcp-servers.header-title")}</TableHead>
-            <TableHead>{t("settings.mcp-servers.header-type")}</TableHead>
-            <TableHead>{t("settings.mcp-servers.header-url")}</TableHead>
-            <TableHead>{t("settings.mcp-servers.header-members")}</TableHead>
-            <TableHead>{t("settings.mcp-servers.header-actions")}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {servers.map((server) => (
-            <TableRow key={server.name}>
-              <TableCell className="font-medium">{server.title}</TableCell>
-              <TableCell>
-                <Badge variant="secondary">
-                  {server.transport.case === "sse" ? "SSE" : "HTTP"}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-control-placeholder max-w-64 truncate">
-                {server.transport.value?.url ?? ""}
-              </TableCell>
-              <TableCell>{server.members.length}</TableCell>
-              <TableCell>
-                <div className="flex gap-1">
-                  {canUpdate && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setEditTarget(server);
-                        setEditForm(serverToForm(server));
-                        setEditOpen(true);
-                      }}
-                      aria-label={t("common.edit")}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-danger"
-                    onClick={() => {
-                      setDeleteTarget(server);
-                      setDeleteOpen(true);
-                    }}
-                    aria-label={t("common.delete")}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-          {servers.length === 0 && !loading && (
-            <TableRow>
-              <TableCell
-                colSpan={5}
-                className="text-center text-control-placeholder py-8"
-              >
-                {t("settings.mcp-servers.no-servers")}
-              </TableCell>
-            </TableRow>
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => {
+          if (v) setActiveTab(v as McpTab);
+        }}
+      >
+        <TabsList>
+          {isAdmin && (
+            <TabsTrigger value="workspace">
+              {t("settings.mcp-servers.tab-workspace")}
+            </TabsTrigger>
           )}
-        </TableBody>
-      </Table>
+          <TabsTrigger value="my">
+            {t("settings.mcp-servers.tab-my")}
+          </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="users">
+              {t("settings.mcp-servers.tab-users")}
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        {isAdmin && (
+          <TabsPanel value="workspace">
+            <McpServerTable
+              servers={workspaceServers}
+              loading={loading}
+              emptyText={t("settings.mcp-servers.no-servers")}
+              showMembers
+              onEdit={canUpdateWorkspace ? openEdit : undefined}
+              onDelete={canUpdateWorkspace ? openDelete : undefined}
+            />
+          </TabsPanel>
+        )}
+
+        <TabsPanel value="my">
+          {!allowUserMcp && (
+            <div className="mb-3 rounded-md border border-control-border bg-control-bg px-3 py-2 text-xs text-control-light">
+              {t("settings.mcp-servers.feature-disabled")}
+            </div>
+          )}
+          <McpServerTable
+            servers={myServers}
+            loading={loading}
+            emptyText={t("settings.mcp-servers.no-my-servers")}
+            onEdit={allowUserMcp ? openEdit : undefined}
+            onDelete={openDelete}
+          />
+        </TabsPanel>
+
+        {isAdmin && (
+          <TabsPanel value="users">
+            <p className="mb-3 text-xs text-control-light">
+              {t("settings.mcp-servers.users-hint")}
+            </p>
+            <McpServerTable
+              servers={userServers}
+              loading={loading}
+              emptyText={t("settings.mcp-servers.no-user-servers")}
+              showCreator
+              creatorLabel={(name) => memberLabel(name, users, groups)}
+            />
+          </TabsPanel>
+        )}
+      </Tabs>
 
       <McpServerSheet
         open={createOpen}
         title={t("settings.mcp-servers.create-title")}
-        description={t("settings.mcp-servers.create-description")}
+        description={
+          createForm.scope === "user"
+            ? t("settings.mcp-servers.create-my-description")
+            : t("settings.mcp-servers.create-description")
+        }
+        personal={createForm.scope === "user"}
         form={createForm}
         users={users}
         groups={groups}
@@ -402,7 +463,12 @@ export function SettingsMcpServersPage() {
         title={t("settings.mcp-servers.edit-title", {
           title: editTarget?.title ?? "",
         })}
-        description={t("settings.mcp-servers.edit-description")}
+        description={
+          editForm.scope === "user"
+            ? t("settings.mcp-servers.edit-my-description")
+            : t("settings.mcp-servers.edit-description")
+        }
+        personal={editForm.scope === "user"}
         form={editForm}
         users={users}
         groups={groups}
@@ -441,10 +507,118 @@ export function SettingsMcpServersPage() {
   );
 }
 
+interface McpServerTableProps {
+  servers: McpServer[];
+  loading: boolean;
+  emptyText: string;
+  showMembers?: boolean;
+  showCreator?: boolean;
+  creatorLabel?: (name: string) => string;
+  onEdit?: (server: McpServer) => void;
+  onDelete?: (server: McpServer) => void;
+}
+
+function McpServerTable({
+  servers,
+  loading,
+  emptyText,
+  showMembers,
+  showCreator,
+  creatorLabel,
+  onEdit,
+  onDelete,
+}: McpServerTableProps) {
+  const { t } = useTranslation();
+  const showActions = Boolean(onEdit || onDelete);
+  const colSpan =
+    3 + (showMembers ? 1 : 0) + (showCreator ? 1 : 0) + (showActions ? 1 : 0);
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{t("settings.mcp-servers.header-title")}</TableHead>
+          <TableHead>{t("settings.mcp-servers.header-type")}</TableHead>
+          <TableHead>{t("settings.mcp-servers.header-url")}</TableHead>
+          {showMembers && (
+            <TableHead>{t("settings.mcp-servers.header-members")}</TableHead>
+          )}
+          {showCreator && (
+            <TableHead>{t("settings.mcp-servers.header-owner")}</TableHead>
+          )}
+          {showActions && (
+            <TableHead>{t("settings.mcp-servers.header-actions")}</TableHead>
+          )}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {servers.map((server) => (
+          <TableRow key={server.name}>
+            <TableCell className="font-medium">{server.title}</TableCell>
+            <TableCell>
+              <Badge variant="secondary">
+                {server.transport.case === "sse" ? "SSE" : "HTTP"}
+              </Badge>
+            </TableCell>
+            <TableCell className="text-control-placeholder max-w-64 truncate">
+              {server.transport.value?.url ?? ""}
+            </TableCell>
+            {showMembers && <TableCell>{server.members.length}</TableCell>}
+            {showCreator && (
+              <TableCell className="text-control-placeholder">
+                {creatorLabel
+                  ? creatorLabel(server.createdBy)
+                  : server.createdBy}
+              </TableCell>
+            )}
+            {showActions && (
+              <TableCell>
+                <div className="flex gap-1">
+                  {onEdit && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onEdit(server)}
+                      aria-label={t("common.edit")}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                  )}
+                  {onDelete && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-danger"
+                      onClick={() => onDelete(server)}
+                      aria-label={t("common.delete")}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </TableCell>
+            )}
+          </TableRow>
+        ))}
+        {servers.length === 0 && !loading && (
+          <TableRow>
+            <TableCell
+              colSpan={colSpan}
+              className="text-center text-control-placeholder py-8"
+            >
+              {emptyText}
+            </TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
+  );
+}
+
 interface McpServerSheetProps {
   open: boolean;
   title: string;
   description: string;
+  personal?: boolean;
   form: McpServerForm;
   users: User[];
   groups: Group[];
@@ -458,6 +632,7 @@ function McpServerSheet({
   open,
   title,
   description,
+  personal = false,
   form,
   users,
   groups,
@@ -622,50 +797,52 @@ function McpServerSheet({
             </div>
           </FieldRow>
 
-          <div className="flex flex-col gap-2">
-            <FieldRow
-              label={t("settings.mcp-servers.field-members")}
-              hint={t("settings.mcp-servers.field-members-hint")}
-            >
-              <div className="flex flex-col gap-2">
-                {form.members.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {form.members.map((m) => (
-                      <Badge key={m} variant="secondary" className="gap-1.5">
-                        {memberLabel(m, users, groups)}
-                        <button
-                          type="button"
-                          className="text-control-placeholder hover:text-danger"
-                          onClick={() =>
-                            onFormChange({
-                              ...form,
-                              members: form.members.filter((x) => x !== m),
-                            })
-                          }
-                          aria-label={t("common.remove")}
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                <MemberPicker
-                  users={users}
-                  groups={groups}
-                  value=""
-                  allowAllUsers
-                  onSelect={(member) => {
-                    if (!member || usedMembers.has(member)) return;
-                    onFormChange({
-                      ...form,
-                      members: [...form.members, member],
-                    });
-                  }}
-                />
-              </div>
-            </FieldRow>
-          </div>
+          {!personal && (
+            <div className="flex flex-col gap-2">
+              <FieldRow
+                label={t("settings.mcp-servers.field-members")}
+                hint={t("settings.mcp-servers.field-members-hint")}
+              >
+                <div className="flex flex-col gap-2">
+                  {form.members.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {form.members.map((m) => (
+                        <Badge key={m} variant="secondary" className="gap-1.5">
+                          {memberLabel(m, users, groups)}
+                          <button
+                            type="button"
+                            className="text-control-placeholder hover:text-danger"
+                            onClick={() =>
+                              onFormChange({
+                                ...form,
+                                members: form.members.filter((x) => x !== m),
+                              })
+                            }
+                            aria-label={t("common.remove")}
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <MemberPicker
+                    users={users}
+                    groups={groups}
+                    value=""
+                    allowAllUsers
+                    onSelect={(member) => {
+                      if (!member || usedMembers.has(member)) return;
+                      onFormChange({
+                        ...form,
+                        members: [...form.members, member],
+                      });
+                    }}
+                  />
+                </div>
+              </FieldRow>
+            </div>
+          )}
         </SheetBody>
         <SheetFooter>
           <Button onClick={onSubmit} disabled={submitting}>

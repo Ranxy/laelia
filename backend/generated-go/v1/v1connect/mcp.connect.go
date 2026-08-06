@@ -42,6 +42,12 @@ const (
 	// McpServerServiceListMcpServersProcedure is the fully-qualified name of the McpServerService's
 	// ListMcpServers RPC.
 	McpServerServiceListMcpServersProcedure = "/laelia.v1.McpServerService/ListMcpServers"
+	// McpServerServiceListMyMcpServersProcedure is the fully-qualified name of the McpServerService's
+	// ListMyMcpServers RPC.
+	McpServerServiceListMyMcpServersProcedure = "/laelia.v1.McpServerService/ListMyMcpServers"
+	// McpServerServiceListUserMcpServersProcedure is the fully-qualified name of the McpServerService's
+	// ListUserMcpServers RPC.
+	McpServerServiceListUserMcpServersProcedure = "/laelia.v1.McpServerService/ListUserMcpServers"
 	// McpServerServiceCreateMcpServerProcedure is the fully-qualified name of the McpServerService's
 	// CreateMcpServer RPC.
 	McpServerServiceCreateMcpServerProcedure = "/laelia.v1.McpServerService/CreateMcpServer"
@@ -63,6 +69,8 @@ const (
 type McpServerServiceClient interface {
 	GetMcpServer(context.Context, *connect.Request[v1.GetMcpServerRequest]) (*connect.Response[v1.McpServer], error)
 	ListMcpServers(context.Context, *connect.Request[v1.ListMcpServersRequest]) (*connect.Response[v1.ListMcpServersResponse], error)
+	ListMyMcpServers(context.Context, *connect.Request[v1.ListMcpServersRequest]) (*connect.Response[v1.ListMcpServersResponse], error)
+	ListUserMcpServers(context.Context, *connect.Request[v1.ListMcpServersRequest]) (*connect.Response[v1.ListMcpServersResponse], error)
 	CreateMcpServer(context.Context, *connect.Request[v1.CreateMcpServerRequest]) (*connect.Response[v1.McpServer], error)
 	UpdateMcpServer(context.Context, *connect.Request[v1.UpdateMcpServerRequest]) (*connect.Response[v1.McpServer], error)
 	DeleteMcpServer(context.Context, *connect.Request[v1.DeleteMcpServerRequest]) (*connect.Response[emptypb.Empty], error)
@@ -91,6 +99,18 @@ func NewMcpServerServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(mcpServerServiceMethods.ByName("ListMcpServers")),
 			connect.WithClientOptions(opts...),
 		),
+		listMyMcpServers: connect.NewClient[v1.ListMcpServersRequest, v1.ListMcpServersResponse](
+			httpClient,
+			baseURL+McpServerServiceListMyMcpServersProcedure,
+			connect.WithSchema(mcpServerServiceMethods.ByName("ListMyMcpServers")),
+			connect.WithClientOptions(opts...),
+		),
+		listUserMcpServers: connect.NewClient[v1.ListMcpServersRequest, v1.ListMcpServersResponse](
+			httpClient,
+			baseURL+McpServerServiceListUserMcpServersProcedure,
+			connect.WithSchema(mcpServerServiceMethods.ByName("ListUserMcpServers")),
+			connect.WithClientOptions(opts...),
+		),
 		createMcpServer: connect.NewClient[v1.CreateMcpServerRequest, v1.McpServer](
 			httpClient,
 			baseURL+McpServerServiceCreateMcpServerProcedure,
@@ -114,11 +134,13 @@ func NewMcpServerServiceClient(httpClient connect.HTTPClient, baseURL string, op
 
 // mcpServerServiceClient implements McpServerServiceClient.
 type mcpServerServiceClient struct {
-	getMcpServer    *connect.Client[v1.GetMcpServerRequest, v1.McpServer]
-	listMcpServers  *connect.Client[v1.ListMcpServersRequest, v1.ListMcpServersResponse]
-	createMcpServer *connect.Client[v1.CreateMcpServerRequest, v1.McpServer]
-	updateMcpServer *connect.Client[v1.UpdateMcpServerRequest, v1.McpServer]
-	deleteMcpServer *connect.Client[v1.DeleteMcpServerRequest, emptypb.Empty]
+	getMcpServer       *connect.Client[v1.GetMcpServerRequest, v1.McpServer]
+	listMcpServers     *connect.Client[v1.ListMcpServersRequest, v1.ListMcpServersResponse]
+	listMyMcpServers   *connect.Client[v1.ListMcpServersRequest, v1.ListMcpServersResponse]
+	listUserMcpServers *connect.Client[v1.ListMcpServersRequest, v1.ListMcpServersResponse]
+	createMcpServer    *connect.Client[v1.CreateMcpServerRequest, v1.McpServer]
+	updateMcpServer    *connect.Client[v1.UpdateMcpServerRequest, v1.McpServer]
+	deleteMcpServer    *connect.Client[v1.DeleteMcpServerRequest, emptypb.Empty]
 }
 
 // GetMcpServer calls laelia.v1.McpServerService.GetMcpServer.
@@ -129,6 +151,16 @@ func (c *mcpServerServiceClient) GetMcpServer(ctx context.Context, req *connect.
 // ListMcpServers calls laelia.v1.McpServerService.ListMcpServers.
 func (c *mcpServerServiceClient) ListMcpServers(ctx context.Context, req *connect.Request[v1.ListMcpServersRequest]) (*connect.Response[v1.ListMcpServersResponse], error) {
 	return c.listMcpServers.CallUnary(ctx, req)
+}
+
+// ListMyMcpServers calls laelia.v1.McpServerService.ListMyMcpServers.
+func (c *mcpServerServiceClient) ListMyMcpServers(ctx context.Context, req *connect.Request[v1.ListMcpServersRequest]) (*connect.Response[v1.ListMcpServersResponse], error) {
+	return c.listMyMcpServers.CallUnary(ctx, req)
+}
+
+// ListUserMcpServers calls laelia.v1.McpServerService.ListUserMcpServers.
+func (c *mcpServerServiceClient) ListUserMcpServers(ctx context.Context, req *connect.Request[v1.ListMcpServersRequest]) (*connect.Response[v1.ListMcpServersResponse], error) {
+	return c.listUserMcpServers.CallUnary(ctx, req)
 }
 
 // CreateMcpServer calls laelia.v1.McpServerService.CreateMcpServer.
@@ -150,6 +182,8 @@ func (c *mcpServerServiceClient) DeleteMcpServer(ctx context.Context, req *conne
 type McpServerServiceHandler interface {
 	GetMcpServer(context.Context, *connect.Request[v1.GetMcpServerRequest]) (*connect.Response[v1.McpServer], error)
 	ListMcpServers(context.Context, *connect.Request[v1.ListMcpServersRequest]) (*connect.Response[v1.ListMcpServersResponse], error)
+	ListMyMcpServers(context.Context, *connect.Request[v1.ListMcpServersRequest]) (*connect.Response[v1.ListMcpServersResponse], error)
+	ListUserMcpServers(context.Context, *connect.Request[v1.ListMcpServersRequest]) (*connect.Response[v1.ListMcpServersResponse], error)
 	CreateMcpServer(context.Context, *connect.Request[v1.CreateMcpServerRequest]) (*connect.Response[v1.McpServer], error)
 	UpdateMcpServer(context.Context, *connect.Request[v1.UpdateMcpServerRequest]) (*connect.Response[v1.McpServer], error)
 	DeleteMcpServer(context.Context, *connect.Request[v1.DeleteMcpServerRequest]) (*connect.Response[emptypb.Empty], error)
@@ -172,6 +206,18 @@ func NewMcpServerServiceHandler(svc McpServerServiceHandler, opts ...connect.Han
 		McpServerServiceListMcpServersProcedure,
 		svc.ListMcpServers,
 		connect.WithSchema(mcpServerServiceMethods.ByName("ListMcpServers")),
+		connect.WithHandlerOptions(opts...),
+	)
+	mcpServerServiceListMyMcpServersHandler := connect.NewUnaryHandler(
+		McpServerServiceListMyMcpServersProcedure,
+		svc.ListMyMcpServers,
+		connect.WithSchema(mcpServerServiceMethods.ByName("ListMyMcpServers")),
+		connect.WithHandlerOptions(opts...),
+	)
+	mcpServerServiceListUserMcpServersHandler := connect.NewUnaryHandler(
+		McpServerServiceListUserMcpServersProcedure,
+		svc.ListUserMcpServers,
+		connect.WithSchema(mcpServerServiceMethods.ByName("ListUserMcpServers")),
 		connect.WithHandlerOptions(opts...),
 	)
 	mcpServerServiceCreateMcpServerHandler := connect.NewUnaryHandler(
@@ -198,6 +244,10 @@ func NewMcpServerServiceHandler(svc McpServerServiceHandler, opts ...connect.Han
 			mcpServerServiceGetMcpServerHandler.ServeHTTP(w, r)
 		case McpServerServiceListMcpServersProcedure:
 			mcpServerServiceListMcpServersHandler.ServeHTTP(w, r)
+		case McpServerServiceListMyMcpServersProcedure:
+			mcpServerServiceListMyMcpServersHandler.ServeHTTP(w, r)
+		case McpServerServiceListUserMcpServersProcedure:
+			mcpServerServiceListUserMcpServersHandler.ServeHTTP(w, r)
 		case McpServerServiceCreateMcpServerProcedure:
 			mcpServerServiceCreateMcpServerHandler.ServeHTTP(w, r)
 		case McpServerServiceUpdateMcpServerProcedure:
@@ -219,6 +269,14 @@ func (UnimplementedMcpServerServiceHandler) GetMcpServer(context.Context, *conne
 
 func (UnimplementedMcpServerServiceHandler) ListMcpServers(context.Context, *connect.Request[v1.ListMcpServersRequest]) (*connect.Response[v1.ListMcpServersResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.McpServerService.ListMcpServers is not implemented"))
+}
+
+func (UnimplementedMcpServerServiceHandler) ListMyMcpServers(context.Context, *connect.Request[v1.ListMcpServersRequest]) (*connect.Response[v1.ListMcpServersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.McpServerService.ListMyMcpServers is not implemented"))
+}
+
+func (UnimplementedMcpServerServiceHandler) ListUserMcpServers(context.Context, *connect.Request[v1.ListMcpServersRequest]) (*connect.Response[v1.ListMcpServersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.McpServerService.ListUserMcpServers is not implemented"))
 }
 
 func (UnimplementedMcpServerServiceHandler) CreateMcpServer(context.Context, *connect.Request[v1.CreateMcpServerRequest]) (*connect.Response[v1.McpServer], error) {

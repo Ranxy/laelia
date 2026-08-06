@@ -95,6 +95,30 @@ func (s *SettingService) UpdateLlmAgentConfig(ctx context.Context, req *connect.
 	return connect.NewResponse(&v1pb.UpdateLlmAgentConfigResponse{Config: in}), nil
 }
 
+// GetUserMcpConfig reads whether users may configure personal MCP servers. It
+// is handler-gated (no permission annotation): the personal MCP settings page
+// and agent profile render the toggle state for any authenticated user.
+func (s *SettingService) GetUserMcpConfig(ctx context.Context, _ *connect.Request[v1pb.GetUserMcpConfigRequest]) (*connect.Response[v1pb.GetUserMcpConfigResponse], error) {
+	cfg, err := s.store.GetUserMcpConfigSetting(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to get user mcp config"))
+	}
+	return connect.NewResponse(&v1pb.GetUserMcpConfigResponse{Config: cfg}), nil
+}
+
+// UpdateUserMcpConfig updates whether users may configure personal MCP
+// servers. Gated by the IAM interceptor on laelia.settings.update (admin).
+func (s *SettingService) UpdateUserMcpConfig(ctx context.Context, req *connect.Request[v1pb.UpdateUserMcpConfigRequest]) (*connect.Response[v1pb.UpdateUserMcpConfigResponse], error) {
+	in := req.Msg.GetConfig()
+	if in == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("config is required"))
+	}
+	if _, err := s.store.UpsertUserMcpConfigSetting(ctx, in); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update user mcp config"))
+	}
+	return connect.NewResponse(&v1pb.UpdateUserMcpConfigResponse{Config: in}), nil
+}
+
 // setupCheck reports whether one required-config item is fully configured.
 type setupCheck func(ctx context.Context) (bool, error)
 

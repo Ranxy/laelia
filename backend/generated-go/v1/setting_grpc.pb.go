@@ -23,6 +23,8 @@ const (
 	SettingService_UpdateS3Config_FullMethodName       = "/laelia.v1.SettingService/UpdateS3Config"
 	SettingService_GetLlmAgentConfig_FullMethodName    = "/laelia.v1.SettingService/GetLlmAgentConfig"
 	SettingService_UpdateLlmAgentConfig_FullMethodName = "/laelia.v1.SettingService/UpdateLlmAgentConfig"
+	SettingService_GetUserMcpConfig_FullMethodName     = "/laelia.v1.SettingService/GetUserMcpConfig"
+	SettingService_UpdateUserMcpConfig_FullMethodName  = "/laelia.v1.SettingService/UpdateUserMcpConfig"
 	SettingService_GetSetupStatus_FullMethodName       = "/laelia.v1.SettingService/GetSetupStatus"
 	SettingService_GetDebugConfig_FullMethodName       = "/laelia.v1.SettingService/GetDebugConfig"
 	SettingService_UpdateDebugConfig_FullMethodName    = "/laelia.v1.SettingService/UpdateDebugConfig"
@@ -46,6 +48,13 @@ type SettingServiceClient interface {
 	// UpdateLlmAgentConfig updates the workspace LLM agent configuration.
 	// Admin (laelia.settings.update) only.
 	UpdateLlmAgentConfig(ctx context.Context, in *UpdateLlmAgentConfigRequest, opts ...grpc.CallOption) (*UpdateLlmAgentConfigResponse, error)
+	// GetUserMcpConfig reads whether users may configure personal MCP servers.
+	// It is handler-gated (no permission annotation) so any authenticated user
+	// can render the personal MCP settings page.
+	GetUserMcpConfig(ctx context.Context, in *GetUserMcpConfigRequest, opts ...grpc.CallOption) (*GetUserMcpConfigResponse, error)
+	// UpdateUserMcpConfig updates whether users may configure personal MCP
+	// servers. Admin (laelia.settings.update) only.
+	UpdateUserMcpConfig(ctx context.Context, in *UpdateUserMcpConfigRequest, opts ...grpc.CallOption) (*UpdateUserMcpConfigResponse, error)
 	// GetSetupStatus reports which required-config items are not yet configured,
 	// so the frontend can guide an admin to finish setting up the workspace.
 	GetSetupStatus(ctx context.Context, in *GetSetupStatusRequest, opts ...grpc.CallOption) (*GetSetupStatusResponse, error)
@@ -101,6 +110,26 @@ func (c *settingServiceClient) UpdateLlmAgentConfig(ctx context.Context, in *Upd
 	return out, nil
 }
 
+func (c *settingServiceClient) GetUserMcpConfig(ctx context.Context, in *GetUserMcpConfigRequest, opts ...grpc.CallOption) (*GetUserMcpConfigResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetUserMcpConfigResponse)
+	err := c.cc.Invoke(ctx, SettingService_GetUserMcpConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *settingServiceClient) UpdateUserMcpConfig(ctx context.Context, in *UpdateUserMcpConfigRequest, opts ...grpc.CallOption) (*UpdateUserMcpConfigResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateUserMcpConfigResponse)
+	err := c.cc.Invoke(ctx, SettingService_UpdateUserMcpConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *settingServiceClient) GetSetupStatus(ctx context.Context, in *GetSetupStatusRequest, opts ...grpc.CallOption) (*GetSetupStatusResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetSetupStatusResponse)
@@ -149,6 +178,13 @@ type SettingServiceServer interface {
 	// UpdateLlmAgentConfig updates the workspace LLM agent configuration.
 	// Admin (laelia.settings.update) only.
 	UpdateLlmAgentConfig(context.Context, *UpdateLlmAgentConfigRequest) (*UpdateLlmAgentConfigResponse, error)
+	// GetUserMcpConfig reads whether users may configure personal MCP servers.
+	// It is handler-gated (no permission annotation) so any authenticated user
+	// can render the personal MCP settings page.
+	GetUserMcpConfig(context.Context, *GetUserMcpConfigRequest) (*GetUserMcpConfigResponse, error)
+	// UpdateUserMcpConfig updates whether users may configure personal MCP
+	// servers. Admin (laelia.settings.update) only.
+	UpdateUserMcpConfig(context.Context, *UpdateUserMcpConfigRequest) (*UpdateUserMcpConfigResponse, error)
 	// GetSetupStatus reports which required-config items are not yet configured,
 	// so the frontend can guide an admin to finish setting up the workspace.
 	GetSetupStatus(context.Context, *GetSetupStatusRequest) (*GetSetupStatusResponse, error)
@@ -175,6 +211,12 @@ func (UnimplementedSettingServiceServer) GetLlmAgentConfig(context.Context, *Get
 }
 func (UnimplementedSettingServiceServer) UpdateLlmAgentConfig(context.Context, *UpdateLlmAgentConfigRequest) (*UpdateLlmAgentConfigResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateLlmAgentConfig not implemented")
+}
+func (UnimplementedSettingServiceServer) GetUserMcpConfig(context.Context, *GetUserMcpConfigRequest) (*GetUserMcpConfigResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUserMcpConfig not implemented")
+}
+func (UnimplementedSettingServiceServer) UpdateUserMcpConfig(context.Context, *UpdateUserMcpConfigRequest) (*UpdateUserMcpConfigResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateUserMcpConfig not implemented")
 }
 func (UnimplementedSettingServiceServer) GetSetupStatus(context.Context, *GetSetupStatusRequest) (*GetSetupStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSetupStatus not implemented")
@@ -278,6 +320,42 @@ func _SettingService_UpdateLlmAgentConfig_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SettingService_GetUserMcpConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUserMcpConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingServiceServer).GetUserMcpConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingService_GetUserMcpConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingServiceServer).GetUserMcpConfig(ctx, req.(*GetUserMcpConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SettingService_UpdateUserMcpConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateUserMcpConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingServiceServer).UpdateUserMcpConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingService_UpdateUserMcpConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingServiceServer).UpdateUserMcpConfig(ctx, req.(*UpdateUserMcpConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SettingService_GetSetupStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetSetupStatusRequest)
 	if err := dec(in); err != nil {
@@ -354,6 +432,14 @@ var SettingService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateLlmAgentConfig",
 			Handler:    _SettingService_UpdateLlmAgentConfig_Handler,
+		},
+		{
+			MethodName: "GetUserMcpConfig",
+			Handler:    _SettingService_GetUserMcpConfig_Handler,
+		},
+		{
+			MethodName: "UpdateUserMcpConfig",
+			Handler:    _SettingService_UpdateUserMcpConfig_Handler,
 		},
 		{
 			MethodName: "GetSetupStatus",

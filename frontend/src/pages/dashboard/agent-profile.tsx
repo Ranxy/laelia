@@ -62,7 +62,38 @@ import {
   type AgentProviderInfo,
   type PiModel,
 } from "@/types/proto-es/v1/agent_pb";
+import { type McpServer, McpServerScope } from "@/types/proto-es/v1/mcp_pb";
 import { agentLifecycle, lifecycleLabel } from "./agents";
+
+function McpServerCheckboxRow({
+  server,
+  enabled,
+  canEdit,
+  onToggle,
+}: {
+  server: McpServer;
+  enabled: boolean;
+  canEdit: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-xs hover:bg-control-bg cursor-pointer">
+      <span className="flex flex-col gap-0.5 min-w-0">
+        <span className="text-sm truncate">{server.title}</span>
+        <span className="text-xs text-control-placeholder truncate">
+          {server.transport.value?.url ?? ""}
+        </span>
+      </span>
+      <input
+        type="checkbox"
+        checked={enabled}
+        disabled={!canEdit}
+        onChange={onToggle}
+        className="accent-accent"
+      />
+    </label>
+  );
+}
 
 export function AgentProfilePage() {
   const { t } = useTranslation();
@@ -139,6 +170,12 @@ export function AgentProfilePage() {
   const fetchMcpServers = useAppStore((s) => s.fetchMcpServers);
   const [selectedMcpServers, setSelectedMcpServers] = useState<string[]>([]);
   const [mcpSaving, setMcpSaving] = useState(false);
+  const workspaceMcpServers = mcpServers.filter(
+    (s) => s.scope !== McpServerScope.USER
+  );
+  const myMcpServers = mcpServers.filter(
+    (s) => s.scope === McpServerScope.USER
+  );
 
   const configRef = useRef({
     executable: "",
@@ -1426,38 +1463,61 @@ export function AgentProfilePage() {
                     {t("agent.mcp-empty")}
                   </p>
                 ) : (
-                  <div className="flex flex-col gap-1.5">
-                    {mcpServers.map((server) => {
-                      const enabled = selectedMcpServers.includes(server.name);
-                      return (
-                        <label
-                          key={server.name}
-                          className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-xs hover:bg-control-bg cursor-pointer"
-                        >
-                          <span className="flex flex-col gap-0.5 min-w-0">
-                            <span className="text-sm truncate">
-                              {server.title}
-                            </span>
-                            <span className="text-xs text-control-placeholder truncate">
-                              {server.transport.value?.url ?? ""}
-                            </span>
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={enabled}
-                            disabled={!canEdit}
-                            onChange={() =>
-                              setSelectedMcpServers((prev) =>
-                                enabled
-                                  ? prev.filter((n) => n !== server.name)
-                                  : [...prev, server.name]
-                              )
-                            }
-                            className="accent-accent"
-                          />
-                        </label>
-                      );
-                    })}
+                  <div className="flex flex-col gap-3">
+                    {workspaceMcpServers.length > 0 && (
+                      <div className="flex flex-col gap-1.5">
+                        <div className="text-xs font-medium text-main">
+                          {t("agent.mcp-workspace-section")}
+                        </div>
+                        {workspaceMcpServers.map((server) => {
+                          const enabled = selectedMcpServers.includes(
+                            server.name
+                          );
+                          return (
+                            <McpServerCheckboxRow
+                              key={server.name}
+                              server={server}
+                              enabled={enabled}
+                              canEdit={canEdit}
+                              onToggle={() =>
+                                setSelectedMcpServers((prev) =>
+                                  enabled
+                                    ? prev.filter((n) => n !== server.name)
+                                    : [...prev, server.name]
+                                )
+                              }
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                    {myMcpServers.length > 0 && (
+                      <div className="flex flex-col gap-1.5">
+                        <div className="text-xs font-medium text-main">
+                          {t("agent.mcp-my-section")}
+                        </div>
+                        {myMcpServers.map((server) => {
+                          const enabled = selectedMcpServers.includes(
+                            server.name
+                          );
+                          return (
+                            <McpServerCheckboxRow
+                              key={server.name}
+                              server={server}
+                              enabled={enabled}
+                              canEdit={canEdit}
+                              onToggle={() =>
+                                setSelectedMcpServers((prev) =>
+                                  enabled
+                                    ? prev.filter((n) => n !== server.name)
+                                    : [...prev, server.name]
+                                )
+                              }
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
                 {canEdit && mcpServers.length > 0 && (

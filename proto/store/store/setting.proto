@@ -20,6 +20,7 @@ enum SettingName {
   S3_CONFIG = 10;
   WEB_PUSH_CONFIG = 11;
   LLM_AGENT_CONFIG = 12;
+  USER_MCP_CONFIG = 13;
 }
 
 message WorkspaceProfileSetting {
@@ -164,4 +165,15 @@ message LlmAgentConfigSetting {
   // agents.edit (workspace admin) may, and everyone else must use a global
   // provider. Default true.
   bool allow_user_self_provided_keys = 1;
+}
+
+// UserMcpConfigSetting is the workspace-level personal MCP configuration. The
+// only knob today is whether users may configure their own personal MCP
+// servers and enable them on their own agents. Defaults to enabled when unset.
+message UserMcpConfigSetting {
+  // allow_user_mcp_servers gates personal MCP servers: when true, any user may
+  // create/edit/delete their own servers and enable them on their agents;
+  // when false, personal servers are hidden from agent catalogs and creation
+  // is rejected (existing rows are retained and restored on re-enable).
+  bool allow_user_mcp_servers = 1;
 }
