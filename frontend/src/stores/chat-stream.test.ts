@@ -16,6 +16,10 @@ const mock = vi.hoisted(() => ({
   listMessagesRejecters: [] as Array<(e: unknown) => void>,
   sendMessageReplies: [] as Array<unknown>,
   sendMessageCalls: 0,
+  // When false, sendMessage stays pending until resolveNextSendMessage is
+  // called, so a test can order the send echo after the watcher echo.
+  sendMessageAutoResolve: true,
+  sendMessageResolvers: [] as Array<() => void>,
   activityReplies: [] as Array<{ activities: unknown[] }>,
   activityCalls: 0,
 }));
@@ -39,7 +43,11 @@ vi.mock("@/connect", () => ({
     },
     async sendMessage() {
       mock.sendMessageCalls += 1;
-      return mock.sendMessageReplies.shift() ?? {};
+      const reply = mock.sendMessageReplies.shift() ?? {};
+      if (mock.sendMessageAutoResolve) return reply;
+      return new Promise((resolve) => {
+        mock.sendMessageResolvers.push(() => resolve(reply));
+      });
     },
     async fetchConversationActivity() {
       mock.activityCalls += 1;
@@ -81,6 +89,10 @@ function rejectNextListMessage() {
   mock.listMessagesRejecters.shift()?.(new Error("network down"));
 }
 
+function resolveNextSendMessage() {
+  mock.sendMessageResolvers.shift()?.();
+}
+
 beforeEach(() => {
   // Clear any lingering watcher loops from prior tests, then reset store.
   const state = useAppStore.getState();
@@ -105,6 +117,8 @@ beforeEach(() => {
   mock.listMessagesRejecters = [];
   mock.sendMessageReplies = [];
   mock.sendMessageCalls = 0;
+  mock.sendMessageAutoResolve = true;
+  mock.sendMessageResolvers = [];
   mock.activityReplies = [];
   mock.activityCalls = 0;
 });
@@ -207,5 +221,38 @@ describe("channel watcher long-poll loop", () => {
     await vi.advanceTimersByTimeAsync(1000);
     expect(mock.listMessagesCalls).toBe(2);
     vi.useRealTimers();
+  });
+});
+
+describe("send vs watcher echo race", () => {
+  it("shows the sent message once when the watcher echo lands first", async () => {
+    // The reply must be queued before the watcher issues its first request:
+    // the mock captures the reply at call time.
+    const echo = backendMsg({ name: "m1", role: 1, content: "hello" });
+    mock.listMessagesReplies.push({ messages: [echo], currentVersion: 1n });
+    mock.sendMessageReplies.push(echo);
+    mock.sendMessageAutoResolve = false;
+
+    // Long poll #1 is in flight when the user sends; the commit wakes it, so
+    // its echo (same server id) can land before the send response.
+    useAppStore.getState().startWatchingChannel("conversations/c");
+    expect(mock.listMessagesCalls).toBe(1);
+
+    const sendPromise = useAppStore.getState().sendChannelMessage("c", "hello");
+
+    // Watcher wins the race and appends the echo first.
+    resolveNextListMessage();
+    await vi.waitFor(() => {
+      expect(
+        useAppStore.getState().chatMessages["conversations/c"]
+      ).toHaveLength(1);
+    });
+
+    // The send append must dedup against the already-present echo.
+    resolveNextSendMessage();
+    await sendPromise;
+    expect(useAppStore.getState().chatMessages["conversations/c"]).toHaveLength(
+      1
+    );
   });
 });

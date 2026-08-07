@@ -193,13 +193,18 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
       })
     );
     const chatMsg: ChatMessageUI = toUiMessage(res);
+    // Dedup against the watcher echo. The long-poll watcher is woken by the
+    // server the moment this message commits, so its delta echo can land
+    // before the send response; both carry the same server id, and an
+    // unconditional append would show the message twice. appendNewMessages
+    // keeps the first copy and skips the duplicate.
     set((state) => ({
       chatMessages: {
         ...state.chatMessages,
-        [conversationName]: [
-          ...(state.chatMessages[conversationName] ?? []),
-          chatMsg,
-        ],
+        [conversationName]: appendNewMessages(
+          state.chatMessages[conversationName] ?? [],
+          [chatMsg]
+        ),
       },
     }));
 
