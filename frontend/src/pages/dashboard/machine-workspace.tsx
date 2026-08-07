@@ -1,17 +1,9 @@
-import { FolderTree, Loader2, RefreshCw, Trash } from "lucide-react";
+import { FolderTree, Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { formatBytes } from "@/components/chat/file-card";
 import { Alert } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogClose,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -22,7 +14,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatTimestamp } from "@/lib/command-status";
-import { toastManager } from "@/lib/toast";
 import { MACHINE_ROUTE_PROFILE } from "@/router/handles";
 import { resolvePath } from "@/router/route-index";
 import { useAppStore } from "@/stores";
@@ -32,8 +23,7 @@ import type {
 } from "@/types/proto-es/v1/machine_pb";
 
 // MachineWorkspacePage lists every agent workspace directory on the machine
-// with usage stats and a destructive delete action (owner/admin only, gated on
-// machine.canManage like the layout's tab).
+// with usage stats (gated on machine.canManage like the layout's tab).
 export function MachineWorkspacePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -41,17 +31,12 @@ export function MachineWorkspacePage() {
   const machineName = `machines/${machineId ?? ""}`;
   const getMachine = useAppStore((s) => s.getMachine);
   const listMachineWorkspaces = useAppStore((s) => s.listMachineWorkspaces);
-  const deleteMachineWorkspace = useAppStore((s) => s.deleteMachineWorkspace);
 
   const [machine, setMachine] = useState<Machine | undefined>(undefined);
   const [checking, setChecking] = useState(true);
   const [workspaces, setWorkspaces] = useState<MachineWorkspaceSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [confirmTarget, setConfirmTarget] =
-    useState<MachineWorkspaceSummary | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -86,27 +71,6 @@ export function MachineWorkspacePage() {
   useEffect(() => {
     if (machine?.canManage) void load();
   }, [machine?.canManage, load]);
-
-  async function confirmDelete() {
-    if (!confirmTarget) return;
-    setDeleting(true);
-    setDeleteError("");
-    try {
-      await deleteMachineWorkspace(machineName, confirmTarget.directoryName);
-      toastManager.add({
-        type: "success",
-        title: t("workspace.deleted"),
-      });
-      setConfirmTarget(null);
-      await load();
-    } catch (err) {
-      setDeleteError(
-        err instanceof Error ? err.message : t("workspace.delete-error")
-      );
-    } finally {
-      setDeleting(false);
-    }
-  }
 
   if (checking || !machine?.canManage) {
     return (
@@ -153,7 +117,6 @@ export function MachineWorkspacePage() {
                 <TableHead>{t("workspace.size")}</TableHead>
                 <TableHead>{t("workspace.file-count")}</TableHead>
                 <TableHead>{t("workspace.last-modified")}</TableHead>
-                <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -165,54 +128,12 @@ export function MachineWorkspacePage() {
                   <TableCell>{formatBytes(ws.totalSizeBytes)}</TableCell>
                   <TableCell>{ws.fileCount.toString()}</TableCell>
                   <TableCell>{formatTimestamp(ws.lastModified)}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-danger"
-                      onClick={() => {
-                        setDeleteError("");
-                        setConfirmTarget(ws);
-                      }}
-                    >
-                      <Trash className="size-4" />
-                      {t("workspace.delete")}
-                    </Button>
-                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         )}
       </div>
-
-      <AlertDialog
-        open={!!confirmTarget}
-        onOpenChange={(open) => !open && setConfirmTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogTitle>{t("workspace.delete-confirm")}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {confirmTarget?.directoryName}
-          </AlertDialogDescription>
-          {deleteError && <Alert variant="error" description={deleteError} />}
-          <AlertDialogFooter>
-            <AlertDialogClose>
-              <Button variant="outline" disabled={deleting}>
-                {t("common.cancel")}
-              </Button>
-            </AlertDialogClose>
-            <Button
-              variant="destructive"
-              disabled={deleting}
-              onClick={() => void confirmDelete()}
-            >
-              {deleting && <Loader2 className="size-4 animate-spin" />}
-              {t("workspace.delete")}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

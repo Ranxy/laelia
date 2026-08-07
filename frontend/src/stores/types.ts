@@ -599,10 +599,6 @@ export interface WorkspaceSlice {
     path: string
   ) => Promise<WorkspaceReadResponse>;
   listMachineWorkspaces: (name: string) => Promise<MachineWorkspaceSummary[]>;
-  deleteMachineWorkspace: (
-    name: string,
-    directoryName: string
-  ) => Promise<void>;
 }
 
 export type AppStoreState = AuthSlice &

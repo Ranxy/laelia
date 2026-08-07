@@ -10,10 +10,7 @@ import {
   WorkspaceReadResponseSchema,
 } from "@/types/proto-es/v1/agent_pb";
 import type { MachineWorkspaceSummary } from "@/types/proto-es/v1/machine_pb";
-import {
-  DeleteMachineWorkspaceRequestSchema,
-  ListMachineWorkspacesRequestSchema,
-} from "@/types/proto-es/v1/machine_pb";
+import { ListMachineWorkspacesRequestSchema } from "@/types/proto-es/v1/machine_pb";
 import type { AppSliceCreator, WorkspaceSlice } from "./types";
 
 // createWorkspaceSlice exposes the workspace browser RPCs. Authorization is
@@ -48,11 +45,5 @@ export const createWorkspaceSlice: AppSliceCreator<WorkspaceSlice> = () => ({
       create(ListMachineWorkspacesRequestSchema, { name })
     );
     return res.workspaces;
-  },
-
-  async deleteMachineWorkspace(name: string, directoryName: string) {
-    await machineServiceClient.deleteMachineWorkspace(
-      create(DeleteMachineWorkspaceRequestSchema, { name, directoryName })
-    );
   },
 });
