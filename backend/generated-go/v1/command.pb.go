@@ -3187,6 +3187,13 @@ type ListConversationMessagesRequest struct {
 	PageToken     string                 `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	AfterVersion  int64                  `protobuf:"varint,4,opt,name=after_version,json=afterVersion,proto3" json:"after_version,omitempty"`
 	BeforeVersion int64                  `protobuf:"varint,5,opt,name=before_version,json=beforeVersion,proto3" json:"before_version,omitempty"`
+	// wait_ms turns the read into a long poll: when no messages exist beyond
+	// after_version, the server holds the request until a new message lands or
+	// wait_ms elapses, then returns the delta (possibly empty) with the current
+	// version so the client can advance its cursor and re-issue. Only valid
+	// with after_version > 0; 0 (default) returns immediately. Capped
+	// server-side at 30000.
+	WaitMs        int32 `protobuf:"varint,6,opt,name=wait_ms,json=waitMs,proto3" json:"wait_ms,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3252,6 +3259,13 @@ func (x *ListConversationMessagesRequest) GetAfterVersion() int64 {
 func (x *ListConversationMessagesRequest) GetBeforeVersion() int64 {
 	if x != nil {
 		return x.BeforeVersion
+	}
+	return 0
+}
+
+func (x *ListConversationMessagesRequest) GetWaitMs() int32 {
+	if x != nil {
+		return x.WaitMs
 	}
 	return 0
 }
@@ -3332,6 +3346,11 @@ type ListThreadMessagesRequest struct {
 	PageToken     string `protobuf:"bytes,4,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	AfterVersion  int64  `protobuf:"varint,5,opt,name=after_version,json=afterVersion,proto3" json:"after_version,omitempty"`
 	BeforeVersion int64  `protobuf:"varint,6,opt,name=before_version,json=beforeVersion,proto3" json:"before_version,omitempty"`
+	// wait_ms turns the read into a long poll, mirroring
+	// ListConversationMessagesRequest.wait_ms: the server holds the request
+	// until a new reply lands or wait_ms elapses. Only valid with after_version
+	// > 0; 0 (default) returns immediately. Capped server-side at 30000.
+	WaitMs        int32 `protobuf:"varint,7,opt,name=wait_ms,json=waitMs,proto3" json:"wait_ms,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3404,6 +3423,13 @@ func (x *ListThreadMessagesRequest) GetAfterVersion() int64 {
 func (x *ListThreadMessagesRequest) GetBeforeVersion() int64 {
 	if x != nil {
 		return x.BeforeVersion
+	}
+	return 0
+}
+
+func (x *ListThreadMessagesRequest) GetWaitMs() int32 {
+	if x != nil {
+		return x.WaitMs
 	}
 	return 0
 }
@@ -10875,7 +10901,7 @@ const file_v1_command_proto_rawDesc = "" +
 	"\tjoined_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bjoinedAt\x12 \n" +
 	"\vdescription\x18\x06 \x01(\tR\vdescription\x12\x16\n" +
 	"\x06avatar\x18\a \x01(\tR\x06avatar\x12K\n" +
-	"\x12preferred_language\x18\b \x01(\x0e2\x1c.laelia.v1.PreferredLanguageR\x11preferredLanguage\"\xea\x01\n" +
+	"\x12preferred_language\x18\b \x01(\x0e2\x1c.laelia.v1.PreferredLanguageR\x11preferredLanguage\"\x83\x02\n" +
 	"\x1fListConversationMessagesRequest\x12?\n" +
 	"\fconversation\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
 	"\x13laelia/ConversationR\fconversation\x12\x1b\n" +
@@ -10883,11 +10909,12 @@ const file_v1_command_proto_rawDesc = "" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tR\tpageToken\x12#\n" +
 	"\rafter_version\x18\x04 \x01(\x03R\fafterVersion\x12%\n" +
-	"\x0ebefore_version\x18\x05 \x01(\x03R\rbeforeVersion\"\xa7\x01\n" +
+	"\x0ebefore_version\x18\x05 \x01(\x03R\rbeforeVersion\x12\x17\n" +
+	"\await_ms\x18\x06 \x01(\x05R\x06waitMs\"\xa7\x01\n" +
 	" ListConversationMessagesResponse\x122\n" +
 	"\bmessages\x18\x01 \x03(\v2\x16.laelia.v1.ChatMessageR\bmessages\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12'\n" +
-	"\x0fcurrent_version\x18\x03 \x01(\x03R\x0ecurrentVersion\"\x8a\x02\n" +
+	"\x0fcurrent_version\x18\x03 \x01(\x03R\x0ecurrentVersion\"\xa3\x02\n" +
 	"\x19ListThreadMessagesRequest\x12?\n" +
 	"\fconversation\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x15\n" +
 	"\x13laelia/ConversationR\fconversation\x12$\n" +
@@ -10897,7 +10924,8 @@ const file_v1_command_proto_rawDesc = "" +
 	"\n" +
 	"page_token\x18\x04 \x01(\tR\tpageToken\x12#\n" +
 	"\rafter_version\x18\x05 \x01(\x03R\fafterVersion\x12%\n" +
-	"\x0ebefore_version\x18\x06 \x01(\x03R\rbeforeVersion\"\xa1\x01\n" +
+	"\x0ebefore_version\x18\x06 \x01(\x03R\rbeforeVersion\x12\x17\n" +
+	"\await_ms\x18\a \x01(\x05R\x06waitMs\"\xa1\x01\n" +
 	"\x1aListThreadMessagesResponse\x122\n" +
 	"\bmessages\x18\x01 \x03(\v2\x16.laelia.v1.ChatMessageR\bmessages\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12'\n" +

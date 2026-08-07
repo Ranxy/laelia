@@ -4091,6 +4091,7 @@ drain loop. The agent identity is resolved from the auth context.
 | page_token | [string](#string) |  |  |
 | after_version | [int64](#int64) |  |  |
 | before_version | [int64](#int64) |  |  |
+| wait_ms | [int32](#int32) |  | wait_ms turns the read into a long poll: when no messages exist beyond after_version, the server holds the request until a new message lands or wait_ms elapses, then returns the delta (possibly empty) with the current version so the client can advance its cursor and re-issue. Only valid with after_version &gt; 0; 0 (default) returns immediately. Capped server-side at 30000. |
 
 
 
@@ -4319,6 +4320,7 @@ pivot, and the default returns the latest N replies.
 | page_token | [string](#string) |  |  |
 | after_version | [int64](#int64) |  |  |
 | before_version | [int64](#int64) |  |  |
+| wait_ms | [int32](#int32) |  | wait_ms turns the read into a long poll, mirroring ListConversationMessagesRequest.wait_ms: the server holds the request until a new reply lands or wait_ms elapses. Only valid with after_version &gt; 0; 0 (default) returns immediately. Capped server-side at 30000. |
 
 
 

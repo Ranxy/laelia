@@ -22,6 +22,7 @@ import (
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
+	"github.com/Ranxy/laelia/backend/manager/component/roomhub"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -32,10 +33,11 @@ type CommandService struct {
 	dispatcher      *dispatcher.Dispatcher
 	s3clientManager *s3client.Client
 	iam             *iam.Manager
+	roomhub         *roomhub.Hub
 }
 
-func NewCommandService(s *store.Store, d *dispatcher.Dispatcher, s3clientManager *s3client.Client, iamManager *iam.Manager) *CommandService {
-	return &CommandService{store: s, dispatcher: d, s3clientManager: s3clientManager, iam: iamManager}
+func NewCommandService(s *store.Store, d *dispatcher.Dispatcher, s3clientManager *s3client.Client, iamManager *iam.Manager, hub *roomhub.Hub) *CommandService {
+	return &CommandService{store: s, dispatcher: d, s3clientManager: s3clientManager, iam: iamManager, roomhub: hub}
 }
 
 func (s *CommandService) ListCommands(ctx context.Context, req *connect.Request[v1pb.ListCommandsRequest]) (*connect.Response[v1pb.ListCommandsResponse], error) {
@@ -582,6 +584,56 @@ func (s *CommandService) GetOrCreateUserUserDM(ctx context.Context, req *connect
 	}), nil
 }
 
+// maxLongPollWaitMs caps wait_ms so a single request can never pin a
+// connection (and a room-hub waiter) for more than 30s.
+const maxLongPollWaitMs = 30000
+
+// longPollDelta holds a delta read until new messages are visible, the wait
+// elapses, or the request is canceled. It subscribes to the room hub before
+// re-reading so a change that landed between the caller's first read and the
+// subscription is not missed, and re-reads on every wake because not every
+// room-version bump produces messages this read can see (e.g. a thread reply
+// bumps the conversation version but is excluded from ListConversationMessages).
+// On timeout it returns the empty delta with the last-read current version so
+// the client can advance its cursor and re-issue. A nil hub (unit tests) skips
+// the wait and returns the re-read immediately.
+func (s *CommandService) longPollDelta(ctx context.Context, convID uuid.UUID, waitMs int32, readDelta func() ([]*store.ChatMessage, int64, error)) ([]*store.ChatMessage, int64, error) {
+	if s.roomhub == nil {
+		return readDelta()
+	}
+	ch := s.roomhub.Subscribe(convID)
+	defer s.roomhub.Unsubscribe(convID, ch)
+
+	msgs, currentVersion, err := readDelta()
+	if err != nil {
+		return nil, 0, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list messages"))
+	}
+	if len(msgs) > 0 {
+		return msgs, currentVersion, nil
+	}
+
+	timer := time.NewTimer(time.Duration(waitMs) * time.Millisecond)
+	defer timer.Stop()
+	for {
+		select {
+		case <-ch:
+			msgs, currentVersion, err = readDelta()
+			if err != nil {
+				return nil, 0, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list messages"))
+			}
+			if len(msgs) > 0 {
+				return msgs, currentVersion, nil
+			}
+			// Spurious wake (a bump this read cannot see): keep waiting on the
+			// same timer so the total hold stays bounded by wait_ms.
+		case <-timer.C:
+			return nil, currentVersion, nil
+		case <-ctx.Done():
+			return nil, 0, connect.NewError(connect.CodeCanceled, errors.Wrap(ctx.Err(), "long poll canceled"))
+		}
+	}
+}
+
 func (s *CommandService) ListConversationMessages(ctx context.Context, req *connect.Request[v1pb.ListConversationMessagesRequest]) (*connect.Response[v1pb.ListConversationMessagesResponse], error) {
 	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
@@ -607,6 +659,16 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 	//     paginated with a forward page token.
 	//   - neither (default): one-shot latest-N — the newest `limit` messages,
 	//     so opening a conversation shows recent history, not the oldest page.
+	// wait_ms turns the after_version read into a long poll: when the delta is
+	// empty the request is held (via the room hub) until a new message lands or
+	// wait_ms elapses, then returns the empty delta with the current version so
+	// the client can advance its cursor and re-issue. Capped server-side; only
+	// meaningful with after_version > 0 (ignored otherwise).
+	waitMs := req.Msg.WaitMs
+	if waitMs > maxLongPollWaitMs {
+		waitMs = maxLongPollWaitMs
+	}
+
 	var msgs []*store.ChatMessage
 	var currentVersion int64
 	switch {
@@ -617,9 +679,18 @@ func (s *CommandService) ListConversationMessages(ctx context.Context, req *conn
 		}
 	case req.Msg.AfterVersion > 0:
 		limitPlusOne := offset.limit + 1
-		msgs, currentVersion, err = s.store.ListConversationMessages(ctx, convID, req.Msg.AfterVersion, 0, limitPlusOne, offset.offset)
+		readDelta := func() ([]*store.ChatMessage, int64, error) {
+			return s.store.ListConversationMessages(ctx, convID, req.Msg.AfterVersion, 0, limitPlusOne, offset.offset)
+		}
+		msgs, currentVersion, err = readDelta()
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list conversation messages"))
+		}
+		if len(msgs) == 0 && waitMs > 0 {
+			msgs, currentVersion, err = s.longPollDelta(ctx, convID, waitMs, readDelta)
+			if err != nil {
+				return nil, err
+			}
 		}
 	default:
 		msgs, currentVersion, err = s.store.ListConversationMessages(ctx, convID, 0, 0, offset.limit, 0)
@@ -702,6 +773,15 @@ func (s *CommandService) ListThreadMessages(ctx context.Context, req *connect.Re
 		return nil, err
 	}
 
+	// wait_ms turns the after_version read into a long poll, mirroring
+	// ListConversationMessages: an empty delta holds the request until a new
+	// reply lands or wait_ms elapses. Capped server-side; only meaningful with
+	// after_version > 0 (ignored otherwise).
+	waitMs := req.Msg.WaitMs
+	if waitMs > maxLongPollWaitMs {
+		waitMs = maxLongPollWaitMs
+	}
+
 	var msgs []*store.ChatMessage
 	var currentVersion int64
 	switch {
@@ -709,7 +789,19 @@ func (s *CommandService) ListThreadMessages(ctx context.Context, req *connect.Re
 		msgs, currentVersion, err = s.store.ListThreadMessages(ctx, convID, rootID, 0, req.Msg.BeforeVersion, offset.limit, 0)
 	case req.Msg.AfterVersion > 0:
 		limitPlusOne := offset.limit + 1
-		msgs, currentVersion, err = s.store.ListThreadMessages(ctx, convID, rootID, req.Msg.AfterVersion, 0, limitPlusOne, offset.offset)
+		readDelta := func() ([]*store.ChatMessage, int64, error) {
+			return s.store.ListThreadMessages(ctx, convID, rootID, req.Msg.AfterVersion, 0, limitPlusOne, offset.offset)
+		}
+		msgs, currentVersion, err = readDelta()
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list thread messages"))
+		}
+		if len(msgs) == 0 && waitMs > 0 {
+			msgs, currentVersion, err = s.longPollDelta(ctx, convID, waitMs, readDelta)
+			if err != nil {
+				return nil, err
+			}
+		}
 	default:
 		msgs, currentVersion, err = s.store.ListThreadMessages(ctx, convID, rootID, 0, 0, offset.limit, 0)
 	}

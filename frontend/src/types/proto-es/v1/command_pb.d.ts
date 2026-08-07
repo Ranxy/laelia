@@ -1363,6 +1363,18 @@ export declare type ListConversationMessagesRequest = Message<"laelia.v1.ListCon
    * @generated from field: int64 before_version = 5;
    */
   beforeVersion: bigint;
+
+  /**
+   * wait_ms turns the read into a long poll: when no messages exist beyond
+   * after_version, the server holds the request until a new message lands or
+   * wait_ms elapses, then returns the delta (possibly empty) with the current
+   * version so the client can advance its cursor and re-issue. Only valid
+   * with after_version > 0; 0 (default) returns immediately. Capped
+   * server-side at 30000.
+   *
+   * @generated from field: int32 wait_ms = 6;
+   */
+  waitMs: number;
 };
 
 /**
@@ -1440,6 +1452,16 @@ export declare type ListThreadMessagesRequest = Message<"laelia.v1.ListThreadMes
    * @generated from field: int64 before_version = 6;
    */
   beforeVersion: bigint;
+
+  /**
+   * wait_ms turns the read into a long poll, mirroring
+   * ListConversationMessagesRequest.wait_ms: the server holds the request
+   * until a new reply lands or wait_ms elapses. Only valid with after_version
+   * > 0; 0 (default) returns immediately. Capped server-side at 30000.
+   *
+   * @generated from field: int32 wait_ms = 7;
+   */
+  waitMs: number;
 };
 
 /**

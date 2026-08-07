@@ -538,6 +538,13 @@ func (s *Store) completeReminderTx(ctx context.Context, msgID uuid.UUID, result,
 	if err := tx.Commit(); err != nil {
 		return nil, nil, errors.Wrapf(err, "failed to commit reminder completion tx")
 	}
+
+	// Wake long-polling readers: the pill and result are thread replies, so
+	// only thread watchers see them, but they still bump the room version.
+	if s.roomNotifier != nil {
+		s.roomNotifier.NotifyConversation(convID)
+	}
+
 	posted := []*ChatMessage{
 		{ID: pillID, ConversationID: convID, PrincipalID: 1, SenderType: SenderTypeSystem, ThreadRootMessageID: threadRoot, RoomVersion: pillVersion},
 		{ID: resultID, ConversationID: convID, PrincipalID: principalID, SenderAgentID: sql.NullInt32{Int32: assigneeAgentID, Valid: assigneeAgentID > 0}, SenderType: SenderTypeAgent, ThreadRootMessageID: threadRoot, RoomVersion: resultVersion},
@@ -630,6 +637,13 @@ func (s *Store) MarkMissedAndPostNotification(ctx context.Context, msgID uuid.UU
 	if err := tx.Commit(); err != nil {
 		return nil, nil, errors.Wrapf(err, "failed to commit reminder missed tx")
 	}
+
+	// Wake long-polling readers (thread watchers): the missed notice is a
+	// thread reply that bumps the room version.
+	if s.roomNotifier != nil {
+		s.roomNotifier.NotifyConversation(convID)
+	}
+
 	posted := []*ChatMessage{
 		{ID: missedID, ConversationID: convID, PrincipalID: 1, SenderType: SenderTypeSystem, ThreadRootMessageID: threadRoot, RoomVersion: newVersion},
 	}

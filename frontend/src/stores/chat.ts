@@ -23,9 +23,16 @@ const MAX_DELTA_PAGES = 10;
 // server's current version on a complete read, or the last fetched message's
 // room_version when the delta was too big to finish in one pass — so the next
 // poll continues the catch-up instead of permanently skipping the remainder.
+//
+// opts.waitMs turns the first page into a long poll: when no new messages
+// exist the server holds the request until one lands or waitMs elapses, then
+// returns the empty delta with the current version. Pagination pages never
+// carry waitMs (they must drain a burst without holding the connection).
+// opts.signal aborts the in-flight request (used by the watcher loops).
 export async function fetchConversationDelta(
   conversation: string,
-  afterVersion: bigint
+  afterVersion: bigint,
+  opts?: { waitMs?: number; signal?: AbortSignal }
 ): Promise<{ uiMsgs: ChatMessageUI[]; currentVersion: bigint }> {
   let pageToken = "";
   let uiMsgs: ChatMessageUI[] = [];
@@ -37,7 +44,9 @@ export async function fetchConversationDelta(
         pageSize: 200,
         pageToken,
         afterVersion,
-      })
+        waitMs: page === 0 ? (opts?.waitMs ?? 0) : 0,
+      }),
+      opts?.signal ? { signal: opts.signal } : undefined
     );
     currentVersion = res.currentVersion;
     const pageMsgs = (res.messages ?? []).map(toUiMessage);

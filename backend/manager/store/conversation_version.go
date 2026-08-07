@@ -65,3 +65,19 @@ func (s *Store) GetMessagesAfterVersion(ctx context.Context, conversationID uuid
 	}
 	return msgs, nil
 }
+
+// RoomNotifier wakes long-polling readers when a conversation's room version
+// changes. Implemented by component/roomhub.Hub and injected via
+// SetRoomNotifier to keep the store free of component imports. Nil (the
+// default) disables wake-ups: long polls then run to their timeout, which is
+// correct but slower.
+type RoomNotifier interface {
+	NotifyConversation(conversationID uuid.UUID)
+}
+
+// SetRoomNotifier injects the room-version notifier. Called once from server
+// wiring after both the store and the hub are constructed. Passing nil
+// disables wake-ups.
+func (s *Store) SetRoomNotifier(n RoomNotifier) {
+	s.roomNotifier = n
+}

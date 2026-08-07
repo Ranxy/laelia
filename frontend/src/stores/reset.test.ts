@@ -35,26 +35,29 @@ describe("store reset", () => {
     expect(s.channelMembersByConv).toEqual({});
   });
 
-  it("stops channel and thread watcher intervals before wiping state", () => {
+  it("stops channel and thread watcher loops before wiping state", () => {
     const store = useAppStore;
+    const abortSpy = vi.spyOn(AbortController.prototype, "abort");
     const clearSpy = vi.spyOn(globalThis, "clearInterval");
-    const channelTimer = setInterval(() => {}, 1000);
-    const threadTimer = setInterval(() => {}, 1000);
+    const channelCtrl = new AbortController();
+    const threadCtrl = new AbortController();
+    const badgeTimer = setInterval(() => {}, 1000);
 
     store.setState({
-      channelWatchers: { "conversations/1": channelTimer },
-      threadWatchers: { "conversations/1": threadTimer },
+      channelWatchers: {
+        "conversations/1": { ctrl: channelCtrl, badgeTimer },
+      },
+      threadWatchers: { "conversations/1": { ctrl: threadCtrl } },
     });
 
     store.getState().reset();
 
-    expect(clearSpy).toHaveBeenCalledWith(channelTimer);
-    expect(clearSpy).toHaveBeenCalledWith(threadTimer);
+    expect(abortSpy).toHaveBeenCalledTimes(2);
+    expect(clearSpy).toHaveBeenCalledWith(badgeTimer);
     expect(store.getState().channelWatchers).toEqual({});
     expect(store.getState().threadWatchers).toEqual({});
 
     // Safety net in case the assertion above ever fails before clearing.
-    clearInterval(channelTimer);
-    clearInterval(threadTimer);
+    clearInterval(badgeTimer);
   });
 });

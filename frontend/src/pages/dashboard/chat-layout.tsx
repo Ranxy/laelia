@@ -3,10 +3,11 @@ import { Outlet, useParams } from "react-router-dom";
 import { ConversationList } from "@/components/chat/conversation-list";
 import { useAppStore } from "@/stores";
 
-// Left-rail list refresh cadence. The right pane polls the open conversation's
-// messages every 2s via startWatchingChannel; the list poll is lighter and only
-// refreshes the roster + unread badges so new messages in other conversations
-// surface. 5s is enough for badge updates without doubling the message-poll load.
+// Left-rail list refresh cadence. The right pane long-polls the open
+// conversation's messages via startWatchingChannel (one held request, woken on
+// new messages); the list poll is lighter and only refreshes the roster +
+// unread badges so new messages in other conversations surface. 5s is enough
+// for badge updates without doubling the message-poll load.
 const LIST_POLL_INTERVAL_MS = 5000;
 
 export function ChatLayout() {

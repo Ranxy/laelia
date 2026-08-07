@@ -176,6 +176,12 @@ func (s *Store) CreateChatMessageBumpVersion(ctx context.Context, msg *ChatMessa
 		return nil, 0, errors.Wrapf(err, "failed to commit chat message tx")
 	}
 
+	// Wake long-polling readers (the frontend chat watcher) so they return as
+	// soon as the new message is visible instead of sleeping the full timeout.
+	if s.roomNotifier != nil {
+		s.roomNotifier.NotifyConversation(msg.ConversationID)
+	}
+
 	return &ChatMessage{
 		ID:                  id,
 		ConversationID:      msg.ConversationID,

@@ -43,8 +43,11 @@ export const useAppStore = create<AppStoreState>()((...args) => {
       // keep polling (and re-writing) the freshly reset store. getInitialState()
       // restores the pristine creation-time state (including the same action
       // closures, which are still bound to the live set/get).
-      for (const id of Object.values(get().channelWatchers)) clearInterval(id);
-      for (const id of Object.values(get().threadWatchers)) clearInterval(id);
+      for (const w of Object.values(get().channelWatchers)) {
+        w.ctrl.abort();
+        clearInterval(w.badgeTimer);
+      }
+      for (const w of Object.values(get().threadWatchers)) w.ctrl.abort();
       set(useAppStore.getInitialState());
     },
   };

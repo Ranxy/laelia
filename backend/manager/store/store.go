@@ -22,6 +22,11 @@ type Store struct {
 	// generateActivityRows treats a nil sender as a no-op.
 	webPushSender WebPushSender
 
+	// roomNotifier wakes long-polling readers when a conversation's room
+	// version changes. Injected via SetRoomNotifier after construction; nil
+	// (the default) disables wake-ups (long polls run to their timeout).
+	roomNotifier RoomNotifier
+
 	userIDCache            *lru.Cache[int, *UserMessage]
 	userEmailCache         *lru.Cache[string, *UserMessage]
 	settingCache           *lru.Cache[models.SettingName, *SettingMessage]

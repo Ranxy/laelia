@@ -5,10 +5,16 @@ import {
   SendMessageRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { appendNewMessages, toUiMessage } from "./chat-helpers";
+import { sleep } from "./polling";
 import type { AppSliceCreator, ChatMessageUI, ThreadSlice } from "./types";
 
-// Same cadence as the channel watcher; thread panels poll for new replies.
-const THREAD_POLL_INTERVAL_MS = 2000;
+// Long-poll hold time for the thread watcher (mirrors the channel watcher).
+// The server caps wait_ms at 30000; 25000 leaves headroom for network/proxy
+// latency so the client re-issues before the server would time out the request.
+const THREAD_LONG_POLL_MS = 25000;
+// Backoff between a failed long poll and the next attempt, so a network blip
+// does not turn into a tight retry loop.
+const THREAD_RETRY_DELAY_MS = 1000;
 
 export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
   threadByRoot: {},
@@ -165,9 +171,11 @@ export const createThreadSlice: AppSliceCreator<ThreadSlice> = (set, get) => ({
   },
 });
 
-// startWatcher begins incremental polling for new thread replies. Each tick
-// asks only for replies with room_version after the last seen version, dedups
-// against the cached list, and advances the cursor.
+// startWatcher begins long-polling for new thread replies. Each request asks
+// only for replies with room_version after the last seen version, dedups
+// against the cached list, and advances the cursor. The request is held by the
+// server until a new reply lands or the 25s timeout elapses, then re-issued
+// immediately — the old 2s interval at ~1/12 the request rate.
 function startWatcher(
   set: Parameters<AppSliceCreator<ThreadSlice>>[0],
   get: Parameters<AppSliceCreator<ThreadSlice>>[1],
@@ -176,6 +184,7 @@ function startWatcher(
 ) {
   if (get().threadWatchers[root]) return;
 
+  const ctrl = new AbortController();
   const poll = async () => {
     if (get().activeThreadRoot !== root) return; // panel closed/switched
     try {
@@ -187,7 +196,9 @@ function startWatcher(
           pageSize: 200,
           pageToken: "",
           afterVersion,
-        })
+          waitMs: THREAD_LONG_POLL_MS,
+        }),
+        { signal: ctrl.signal }
       );
       const delta: ChatMessageUI[] = (res.messages ?? []).map(toUiMessage);
       const prev = get().threadByRoot[root]?.messages ?? [];
@@ -195,6 +206,9 @@ function startWatcher(
       const nextVersion = res.currentVersion;
       const prevVersion = get().threadByRoot[root]?.currentVersion ?? 0n;
       if (merged !== prev || nextVersion !== prevVersion) {
+        // Bail if the watcher was stopped/reset while this poll was in flight
+        // (see the channel watcher's guard).
+        if (ctrl.signal.aborted) return;
         set((state) => ({
           threadByRoot: {
             ...state.threadByRoot,
@@ -211,14 +225,17 @@ function startWatcher(
       // also write back to the main list — it only maintains the thread's own
       // messages.
     } catch {
-      // network error — retry on next tick
+      if (ctrl.signal.aborted) return; // stopped — exit the loop
+      // Network error — back off briefly, then re-issue the long poll.
+      await sleep(THREAD_RETRY_DELAY_MS, ctrl.signal);
     }
+    if (ctrl.signal.aborted) return;
+    void poll();
   };
 
   poll();
-  const handle = setInterval(poll, THREAD_POLL_INTERVAL_MS);
   set((state) => ({
-    threadWatchers: { ...state.threadWatchers, [root]: handle },
+    threadWatchers: { ...state.threadWatchers, [root]: { ctrl } },
   }));
 }
 
@@ -227,9 +244,9 @@ function stopWatcher(
   get: Parameters<AppSliceCreator<ThreadSlice>>[1],
   root: string
 ) {
-  const handle = get().threadWatchers[root];
-  if (handle) {
-    clearInterval(handle);
+  const watcher = get().threadWatchers[root];
+  if (watcher) {
+    watcher.ctrl.abort();
     set((state) => {
       const threadWatchers = { ...state.threadWatchers };
       delete threadWatchers[root];

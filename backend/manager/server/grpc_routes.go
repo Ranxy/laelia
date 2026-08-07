@@ -26,6 +26,7 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/iam"
 	"github.com/Ranxy/laelia/backend/manager/component/ratelimit"
+	"github.com/Ranxy/laelia/backend/manager/component/roomhub"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/component/state"
 	"github.com/Ranxy/laelia/backend/manager/component/webpush"
@@ -79,11 +80,21 @@ func configureGrpcRouters(
 
 	cmdDispatcher.StartPingMonitor()
 
+	// Room hub: in-process notifier that wakes long-polling message readers
+	// (ListConversationMessages / ListThreadMessages with wait_ms) as soon as a
+	// new message lands, instead of sleeping the full timeout. Injected into
+	// the store (which fires it after version-bumping inserts) and into the
+	// command service (which subscribes waiters). Single-process only; a
+	// multi-instance deployment needs a shared notifier behind the same
+	// interface.
+	hub := roomhub.New()
+	stores.SetRoomNotifier(hub)
+
 	iamManager := iam.NewManager(stores)
 	userService := apiv1.NewUserService(stores, profile, stateCfg, iamManager, s3clientmanager)
 	authService := apiv1.NewAuthService(stores, secret, profile, stateCfg)
 	agentService := apiv1.NewAgentService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager, s3clientmanager)
-	commandService := apiv1.NewCommandService(stores, cmdDispatcher, s3clientmanager, iamManager)
+	commandService := apiv1.NewCommandService(stores, cmdDispatcher, s3clientmanager, iamManager, hub)
 	agentCommandService := apiv1.NewAgentCommandService(stores, cmdDispatcher)
 	machineService := apiv1.NewMachineService(stores, secret, profile, stateCfg, cmdDispatcher, iamManager)
 	machineStreamService := apiv1.NewMachineStreamService(stores, cmdDispatcher)

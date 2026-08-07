@@ -10815,6 +10815,18 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>wait_ms</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>wait_ms turns the read into a long poll: when no messages exist beyond
+after_version, the server holds the request until a new message lands or
+wait_ms elapses, then returns the delta (possibly empty) with the current
+version so the client can advance its cursor and re-issue. Only valid
+with after_version &gt; 0; 0 (default) returns immediately. Capped
+server-side at 30000. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -11258,6 +11270,16 @@ page is the last. </p></td>
                   <td><a href="#int64">int64</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>wait_ms</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>wait_ms turns the read into a long poll, mirroring
+ListConversationMessagesRequest.wait_ms: the server holds the request
+until a new reply lands or wait_ms elapses. Only valid with after_version
+&gt; 0; 0 (default) returns immediately. Capped server-side at 30000. </p></td>
                 </tr>
               
             </tbody>

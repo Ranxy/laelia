@@ -20,9 +20,20 @@ import {
   SetConversationPinnedRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { appendNewMessages, fetchConversationDelta, toUiMessage } from "./chat";
+import { sleep } from "./polling";
 import type { AppSliceCreator, ChannelSlice, ChatMessageUI } from "./types";
 
+// Badge/activity cadence: thread reply counts, task badges, and agent activity
+// are not covered by the message delta (server-side), so they keep their own
+// 5s poll while the message watcher long-polls (Phase 1 boundary).
 const WATCHER_POLL_INTERVAL_MS = 5000;
+// Long-poll hold time for the message watcher. The server caps wait_ms at
+// 30000; 25000 leaves headroom for network/proxy latency so the client
+// re-issues before the server would time out the request.
+const WATCHER_LONG_POLL_MS = 25000;
+// Backoff between a failed long poll and the next attempt, so a network blip
+// does not turn into a tight retry loop.
+const WATCHER_RETRY_DELAY_MS = 1000;
 
 // agentActivitiesEqual reports whether two activity arrays are visually
 // identical (the fields AgentStatusBar renders: id + display name + status).
@@ -230,10 +241,17 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
   },
 
   startWatchingChannel(conversationName) {
-    // Already watching — avoid duplicate intervals (idempotent).
+    // Already watching — avoid duplicate loops (idempotent).
     if (get().channelWatchers[conversationName]) return;
 
-    const poll = async () => {
+    const ctrl = new AbortController();
+
+    // Long-poll loop: holds one request open until a new message lands or the
+    // server timeout (25s) elapses, then immediately re-issues. Same delta
+    // semantics as the old 5s poll at ~1/5 the request rate; the server returns
+    // the empty delta with the current version on timeout, so the cursor
+    // advances and the next request is a fresh long poll.
+    const pollMessages = async () => {
       try {
         // Incremental fetch: ask only for messages with room_version strictly
         // after the last version we saw (captured by loadMessages). This returns
@@ -247,7 +265,8 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
         // the delta can't finish in one pass so the next tick continues.
         const { uiMsgs, currentVersion } = await fetchConversationDelta(
           conversationName,
-          afterVersion
+          afterVersion,
+          { waitMs: WATCHER_LONG_POLL_MS, signal: ctrl.signal }
         );
         const prev = get().chatMessages[conversationName] ?? [];
         // Append only messages we don't already have. This dedups the optimistic
@@ -258,10 +277,10 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
         const prevVersion = get().chatCurrentVersion[conversationName] ?? 0n;
         if (merged !== prev || nextVersion !== prevVersion) {
           // Bail if the watcher was stopped/reset while this poll was in
-          // flight — clearInterval can't abort an already-running poll, but
+          // flight — abort can't cancel an already-resolved response, but
           // writing here would repopulate a freshly reset store (cross-user
           // data leak on logout/401).
-          if (!get().channelWatchers[conversationName]) return;
+          if (ctrl.signal.aborted) return;
           set((state) => ({
             chatMessages:
               merged !== prev
@@ -277,41 +296,43 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
           }));
         }
       } catch {
-        // network error — will retry on next tick
+        if (ctrl.signal.aborted) return; // stopped — exit the loop
+        // Network error — back off briefly, then re-issue the long poll.
+        await sleep(WATCHER_RETRY_DELAY_MS, ctrl.signal);
       }
-
-      // Refresh root-message reply-count badges. Thread replies are excluded
-      // from the message delta above (server-side), so the watcher cannot
-      // observe a changed reply count on its own. This separate summary poll
-      // covers replies that arrive while the thread panel is closed — notably
-      // an async agent reply to a thread the user has left.
-      refreshChannelThreadCounts(set, get, conversationName);
-
-      // Refresh inline task badges (status/assignee). Task mutations
-      // (convert/claim/review/done) only change the task row + post a system
-      // notification; they do NOT bump the task message's room_version, so the
-      // delta above never re-fetches the task message. This separate poll
-      // re-reads the task board and patches task metadata onto matching
-      // messages in the main list, mirroring refreshChannelThreadCounts.
-      refreshChannelTaskInfo(set, get, conversationName);
-
-      // Also poll agent activity.
-      get().fetchConversationActivity(conversationName);
+      if (ctrl.signal.aborted) return;
+      void pollMessages();
     };
 
-    // Run immediately, then on interval. The interval handle lives in store
+    // Badge/activity refresh: thread reply counts, task badges, and agent
+    // activity are not covered by the message delta (server-side), so they keep
+    // their own 5s cadence instead of riding the long-poll loop. Run once
+    // immediately (the old poll did), then on the interval.
+    refreshChannelThreadCounts(set, get, conversationName, ctrl);
+    refreshChannelTaskInfo(set, get, conversationName, ctrl);
+    get().fetchConversationActivity(conversationName);
+    const badgeTimer = setInterval(() => {
+      refreshChannelThreadCounts(set, get, conversationName, ctrl);
+      refreshChannelTaskInfo(set, get, conversationName, ctrl);
+      get().fetchConversationActivity(conversationName);
+    }, WATCHER_POLL_INTERVAL_MS);
+
+    // Start the long-poll loop immediately. The watcher handle lives in store
     // state so it is testable and stoppable across HMR.
-    poll();
-    const handle = setInterval(poll, WATCHER_POLL_INTERVAL_MS);
+    void pollMessages();
     set((state) => ({
-      channelWatchers: { ...state.channelWatchers, [conversationName]: handle },
+      channelWatchers: {
+        ...state.channelWatchers,
+        [conversationName]: { ctrl, badgeTimer },
+      },
     }));
   },
 
   stopWatchingChannel(conversationName) {
-    const handle = get().channelWatchers[conversationName];
-    if (handle) {
-      clearInterval(handle);
+    const watcher = get().channelWatchers[conversationName];
+    if (watcher) {
+      watcher.ctrl.abort();
+      clearInterval(watcher.badgeTimer);
       set((state) => {
         const channelWatchers = { ...state.channelWatchers };
         delete channelWatchers[conversationName];
@@ -421,7 +442,8 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
 async function refreshChannelThreadCounts(
   set: Parameters<AppSliceCreator<ChannelSlice>>[0],
   get: Parameters<AppSliceCreator<ChannelSlice>>[1],
-  conversationName: string
+  conversationName: string,
+  ctrl: AbortController
 ) {
   const prev = get().chatMessages[conversationName];
   if (!prev || prev.length === 0) return;
@@ -450,7 +472,7 @@ async function refreshChannelThreadCounts(
   });
   if (changed) {
     // Bail if the watcher was stopped/reset mid-flight (see the poll guard).
-    if (!get().channelWatchers[conversationName]) return;
+    if (ctrl.signal.aborted) return;
     set((state) => ({
       chatMessages: { ...state.chatMessages, [conversationName]: next },
     }));
@@ -469,7 +491,8 @@ async function refreshChannelThreadCounts(
 async function refreshChannelTaskInfo(
   set: Parameters<AppSliceCreator<ChannelSlice>>[0],
   get: Parameters<AppSliceCreator<ChannelSlice>>[1],
-  conversationName: string
+  conversationName: string,
+  ctrl: AbortController
 ) {
   const prev = get().chatMessages[conversationName];
   if (!prev || prev.length === 0) return;
@@ -511,7 +534,7 @@ async function refreshChannelTaskInfo(
   });
   if (changed) {
     // Bail if the watcher was stopped/reset mid-flight (see the poll guard).
-    if (!get().channelWatchers[conversationName]) return;
+    if (ctrl.signal.aborted) return;
     set((state) => ({
       chatMessages: { ...state.chatMessages, [conversationName]: next },
     }));

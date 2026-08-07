@@ -356,10 +356,14 @@ export interface ChannelSlice {
   // (`conversations/{id}`). Populated by fetchChannels from the backend and
   // cleared locally by markConversationRead; drives the left-rail badges.
   unreadByConv: Record<string, number>;
-  // Active per-conversation message-poll intervals, keyed by conversation
-  // name. Held in store state (not a module-level registry) so it is testable
-  // and survives HMR without leaking timers.
-  channelWatchers: Record<string, ReturnType<typeof setInterval>>;
+  // Active per-conversation message watchers, keyed by conversation name.
+  // Each handle owns the AbortController that cancels the in-flight long poll
+  // and the 5s badge/activity interval. Held in store state (not a module-level
+  // registry) so it is testable and survives HMR without leaking timers.
+  channelWatchers: Record<
+    string,
+    { ctrl: AbortController; badgeTimer: ReturnType<typeof setInterval> }
+  >;
   // Channels an agent is a member of, keyed by agent resource name
   // (`agents/{id}`). Populated by fetchChannelsForAgent for the agent detail
   // page's Chat tab; unread is always 0 here (the backend does not compute a
@@ -417,7 +421,9 @@ export interface ThreadSlice {
   >;
   activeThreadRoot: string | null;
   activeThreadConversation: string | null;
-  threadWatchers: Record<string, ReturnType<typeof setInterval>>;
+  // Active per-thread long-poll watchers, keyed by thread root id. Each
+  // handle owns the AbortController that cancels the in-flight request.
+  threadWatchers: Record<string, { ctrl: AbortController }>;
 
   openThread: (conversation: string, rootMessageId: string) => Promise<void>;
   closeThread: () => void;
