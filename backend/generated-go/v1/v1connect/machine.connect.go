@@ -91,20 +91,35 @@ type MachineServiceClient interface {
 	CreateMachine(context.Context, *connect.Request[v1.CreateMachineRequest]) (*connect.Response[v1.CreateMachineResponse], error)
 	ListMachines(context.Context, *connect.Request[v1.ListMachinesRequest]) (*connect.Response[v1.ListMachinesResponse], error)
 	GetMachine(context.Context, *connect.Request[v1.GetMachineRequest]) (*connect.Response[v1.Machine], error)
+	// DeleteMachine soft-deletes a machine. Authorized in the handler for the
+	// machine's creator or a holder of laelia.machines.delete (workspace-scope);
+	// no permission annotation so the creator short-circuit can run.
 	DeleteMachine(context.Context, *connect.Request[v1.DeleteMachineRequest]) (*connect.Response[emptypb.Empty], error)
 	// Token rotation: generate a new registration token; the machine app must
 	// re-ConnectMachine with it. Old tokens are revoked and all sessions dropped.
+	// Authorized in the handler for the machine's creator or a holder of
+	// laelia.machines.edit (workspace-scope); no permission annotation so the
+	// creator short-circuit can run.
 	RotateMachineToken(context.Context, *connect.Request[v1.RotateMachineTokenRequest]) (*connect.Response[v1.RotateMachineTokenResponse], error)
-	// Token revocation: revoke all tokens for the machine.
+	// Token revocation: revoke all tokens for the machine. Authorized in the
+	// handler for the machine's creator or a holder of laelia.machines.edit
+	// (workspace-scope); no permission annotation so the creator short-circuit
+	// can run.
 	RevokeMachineToken(context.Context, *connect.Request[v1.RevokeMachineTokenRequest]) (*connect.Response[v1.RevokeMachineTokenResponse], error)
-	// Admin force-disconnects a machine: terminate all its sessions and fail all
-	// in-flight commands for every agent hosted on it.
+	// Force-disconnects a machine: terminate all its sessions and fail all
+	// in-flight commands for every agent hosted on it. Authorized in the handler
+	// for the machine's creator or a holder of laelia.machines.edit
+	// (workspace-scope); no permission annotation so the creator short-circuit
+	// can run.
 	ForceDisconnectMachine(context.Context, *connect.Request[v1.ForceDisconnectMachineRequest]) (*connect.Response[emptypb.Empty], error)
 	// List the agents hosted on a machine.
 	ListMachineAgents(context.Context, *connect.Request[v1.ListMachineAgentsRequest]) (*connect.Response[v1.ListMachineAgentsResponse], error)
 	// Ask the machine app to re-probe its host for installed LLM agent providers
 	// and their models. Returns the freshly discovered provider list (also
-	// persisted into machine.info.available_providers). Admin only.
+	// persisted into machine.info.available_providers). Authorized in the handler
+	// for the machine's creator or a holder of laelia.machines.edit
+	// (workspace-scope); no permission annotation so the creator short-circuit
+	// can run.
 	RefreshMachineProviders(context.Context, *connect.Request[v1.RefreshMachineProvidersRequest]) (*connect.Response[v1.RefreshMachineProvidersResponse], error)
 	// ListMachineWorkspaces summarizes every per-agent workspace directory on a
 	// machine (~/.laelia/<machineID>/). Workspace content is sensitive:
@@ -327,20 +342,35 @@ type MachineServiceHandler interface {
 	CreateMachine(context.Context, *connect.Request[v1.CreateMachineRequest]) (*connect.Response[v1.CreateMachineResponse], error)
 	ListMachines(context.Context, *connect.Request[v1.ListMachinesRequest]) (*connect.Response[v1.ListMachinesResponse], error)
 	GetMachine(context.Context, *connect.Request[v1.GetMachineRequest]) (*connect.Response[v1.Machine], error)
+	// DeleteMachine soft-deletes a machine. Authorized in the handler for the
+	// machine's creator or a holder of laelia.machines.delete (workspace-scope);
+	// no permission annotation so the creator short-circuit can run.
 	DeleteMachine(context.Context, *connect.Request[v1.DeleteMachineRequest]) (*connect.Response[emptypb.Empty], error)
 	// Token rotation: generate a new registration token; the machine app must
 	// re-ConnectMachine with it. Old tokens are revoked and all sessions dropped.
+	// Authorized in the handler for the machine's creator or a holder of
+	// laelia.machines.edit (workspace-scope); no permission annotation so the
+	// creator short-circuit can run.
 	RotateMachineToken(context.Context, *connect.Request[v1.RotateMachineTokenRequest]) (*connect.Response[v1.RotateMachineTokenResponse], error)
-	// Token revocation: revoke all tokens for the machine.
+	// Token revocation: revoke all tokens for the machine. Authorized in the
+	// handler for the machine's creator or a holder of laelia.machines.edit
+	// (workspace-scope); no permission annotation so the creator short-circuit
+	// can run.
 	RevokeMachineToken(context.Context, *connect.Request[v1.RevokeMachineTokenRequest]) (*connect.Response[v1.RevokeMachineTokenResponse], error)
-	// Admin force-disconnects a machine: terminate all its sessions and fail all
-	// in-flight commands for every agent hosted on it.
+	// Force-disconnects a machine: terminate all its sessions and fail all
+	// in-flight commands for every agent hosted on it. Authorized in the handler
+	// for the machine's creator or a holder of laelia.machines.edit
+	// (workspace-scope); no permission annotation so the creator short-circuit
+	// can run.
 	ForceDisconnectMachine(context.Context, *connect.Request[v1.ForceDisconnectMachineRequest]) (*connect.Response[emptypb.Empty], error)
 	// List the agents hosted on a machine.
 	ListMachineAgents(context.Context, *connect.Request[v1.ListMachineAgentsRequest]) (*connect.Response[v1.ListMachineAgentsResponse], error)
 	// Ask the machine app to re-probe its host for installed LLM agent providers
 	// and their models. Returns the freshly discovered provider list (also
-	// persisted into machine.info.available_providers). Admin only.
+	// persisted into machine.info.available_providers). Authorized in the handler
+	// for the machine's creator or a holder of laelia.machines.edit
+	// (workspace-scope); no permission annotation so the creator short-circuit
+	// can run.
 	RefreshMachineProviders(context.Context, *connect.Request[v1.RefreshMachineProvidersRequest]) (*connect.Response[v1.RefreshMachineProvidersResponse], error)
 	// ListMachineWorkspaces summarizes every per-agent workspace directory on a
 	// machine (~/.laelia/<machineID>/). Workspace content is sensitive:

@@ -695,7 +695,7 @@ export function MachineProfilePage() {
                 {actionError && (
                   <Alert variant="error" description={actionError} />
                 )}
-                {!canEdit ? (
+                {!canManage ? (
                   <p className="text-xs text-control-light">
                     {t("machine.profile.edit-not-allowed")}
                   </p>
@@ -777,7 +777,7 @@ export function MachineProfilePage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={refreshing || !canEdit}
+                    disabled={refreshing || !canManage}
                     onClick={handleRefreshProviders}
                   >
                     {refreshing ? (

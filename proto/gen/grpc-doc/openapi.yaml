@@ -3018,6 +3018,10 @@ paths:
         delete:
             tags:
                 - MachineService
+            description: |-
+                DeleteMachine soft-deletes a machine. Authorized in the handler for the
+                 machine's creator or a holder of laelia.machines.delete (workspace-scope);
+                 no permission annotation so the creator short-circuit can run.
             operationId: MachineService_DeleteMachine
             parameters:
                 - name: machine
@@ -3111,8 +3115,11 @@ paths:
             tags:
                 - MachineService
             description: |-
-                Admin force-disconnects a machine: terminate all its sessions and fail all
-                 in-flight commands for every agent hosted on it.
+                Force-disconnects a machine: terminate all its sessions and fail all
+                 in-flight commands for every agent hosted on it. Authorized in the handler
+                 for the machine's creator or a holder of laelia.machines.edit
+                 (workspace-scope); no permission annotation so the creator short-circuit
+                 can run.
             operationId: MachineService_ForceDisconnectMachine
             parameters:
                 - name: machine
@@ -3237,7 +3244,10 @@ paths:
             description: |-
                 Ask the machine app to re-probe its host for installed LLM agent providers
                  and their models. Returns the freshly discovered provider list (also
-                 persisted into machine.info.available_providers). Admin only.
+                 persisted into machine.info.available_providers). Authorized in the handler
+                 for the machine's creator or a holder of laelia.machines.edit
+                 (workspace-scope); no permission annotation so the creator short-circuit
+                 can run.
             operationId: MachineService_RefreshMachineProviders
             parameters:
                 - name: machine
@@ -3269,7 +3279,11 @@ paths:
         post:
             tags:
                 - MachineService
-            description: 'Token revocation: revoke all tokens for the machine.'
+            description: |-
+                Token revocation: revoke all tokens for the machine. Authorized in the
+                 handler for the machine's creator or a holder of laelia.machines.edit
+                 (workspace-scope); no permission annotation so the creator short-circuit
+                 can run.
             operationId: MachineService_RevokeMachineToken
             parameters:
                 - name: machine
@@ -3304,6 +3318,9 @@ paths:
             description: |-
                 Token rotation: generate a new registration token; the machine app must
                  re-ConnectMachine with it. Old tokens are revoked and all sessions dropped.
+                 Authorized in the handler for the machine's creator or a holder of
+                 laelia.machines.edit (workspace-scope); no permission annotation so the
+                 creator short-circuit can run.
             operationId: MachineService_RotateMachineToken
             parameters:
                 - name: machine
@@ -6945,8 +6962,8 @@ components:
                     readOnly: true
                     type: boolean
                     description: |-
-                        can_edit reports whether the current caller may modify this machine
-                         (laelia.machines.edit).
+                        can_edit reports whether the current caller holds laelia.machines.edit
+                         (workspace-scope).
                 canCreateAgent:
                     readOnly: true
                     type: boolean
@@ -7054,6 +7071,28 @@ components:
                 agentCount:
                     type: integer
                     format: int32
+                createdBy:
+                    readOnly: true
+                    type: string
+                    description: Creator's user resource name (users/{id}).
+                canEdit:
+                    readOnly: true
+                    type: boolean
+                    description: |-
+                        can_edit reports whether the current caller holds laelia.machines.edit
+                         (workspace-scope).
+                canManage:
+                    readOnly: true
+                    type: boolean
+                    description: |-
+                        can_manage reports whether the current caller may manage this machine's
+                         IAM policy (the machine's creator or a workspace admin).
+                canDelete:
+                    readOnly: true
+                    type: boolean
+                    description: |-
+                        can_delete reports whether the current caller may delete this machine:
+                         the machine's creator or a holder of laelia.machines.delete.
             description: |-
                 MachineSummary is the lightweight list-view projection of a Machine returned
                  by ListMachines. It carries identity, lifecycle state, connection status, and

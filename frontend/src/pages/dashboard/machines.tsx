@@ -33,6 +33,7 @@ import {
 import { buildMachineRunCommand } from "@/lib/machine-token";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
+import { useHasPermission } from "@/stores/permissions";
 import { MachineStatus_ConnectionState } from "@/types/proto-es/v1/machine_pb";
 
 export function MachinesPage() {
@@ -42,6 +43,12 @@ export function MachinesPage() {
   const fetchMachines = useAppStore((s) => s.fetchMachines);
   const machines = useAppStore((s) => s.machines);
   const loading = useAppStore((s) => s.machinesLoading);
+  // Gate each machine-management affordance on the exact permission its RPC
+  // requires: laelia.machines.create (CreateMachine) and per-machine
+  // canDelete (creator or laelia.machines.delete, populated by ListMachines).
+  // A custom role may hold any subset, so the UI must not offer an action the
+  // server will 403.
+  const canCreate = useHasPermission("laelia.machines.create");
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [token, setToken] = useState<string | null>(null);
@@ -133,9 +140,11 @@ export function MachinesPage() {
           <h1 className="text-sm font-semibold text-main truncate">
             {t("machine.title")}
           </h1>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            {t("machine.create")}
-          </Button>
+          {canCreate && (
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              {t("machine.create")}
+            </Button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto py-1">
@@ -190,22 +199,24 @@ export function MachinesPage() {
                           </span>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="size-6 shrink-0 p-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                        aria-label={t("common.delete")}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteTarget({
-                            name: machine.name,
-                            title: machine.title,
-                          });
-                          setDeleteOpen(true);
-                        }}
-                      >
-                        <Trash className="size-3.5" />
-                      </Button>
+                      {machine.canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="size-6 shrink-0 p-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                          aria-label={t("common.delete")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget({
+                              name: machine.name,
+                              title: machine.title,
+                            });
+                            setDeleteOpen(true);
+                          }}
+                        >
+                          <Trash className="size-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </li>
                 );

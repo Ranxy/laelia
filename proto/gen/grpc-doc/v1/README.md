@@ -6297,7 +6297,7 @@ in full in ConnectMachineResponse.assigned_agents on (re)connect.
 | created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | labels | [Machine.LabelsEntry](#laelia-v1-Machine-LabelsEntry) | repeated |  |
 | created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}). |
-| can_edit | [bool](#bool) |  | can_edit reports whether the current caller may modify this machine (laelia.machines.edit). |
+| can_edit | [bool](#bool) |  | can_edit reports whether the current caller holds laelia.machines.edit (workspace-scope). |
 | can_create_agent | [bool](#bool) |  | can_create_agent reports whether the current caller may create agents on this machine: the machine&#39;s creator, a workspace admin, or a principal bound to roles/machineAgentCreator in the machine&#39;s IAM policy. |
 | can_manage | [bool](#bool) |  | can_manage reports whether the current caller may manage this machine&#39;s IAM policy (the machine&#39;s creator or a workspace admin). |
 
@@ -6494,6 +6494,10 @@ the count of agents bound to the machine.
 | title | [string](#string) |  |  |
 | status | [MachineStatus](#laelia-v1-MachineStatus) |  |  |
 | agent_count | [int32](#int32) |  |  |
+| created_by | [string](#string) |  | Creator&#39;s user resource name (users/{id}). |
+| can_edit | [bool](#bool) |  | can_edit reports whether the current caller holds laelia.machines.edit (workspace-scope). |
+| can_manage | [bool](#bool) |  | can_manage reports whether the current caller may manage this machine&#39;s IAM policy (the machine&#39;s creator or a workspace admin). |
+| can_delete | [bool](#bool) |  | can_delete reports whether the current caller may delete this machine: the machine&#39;s creator or a holder of laelia.machines.delete. |
 
 
 
@@ -6797,12 +6801,12 @@ AgentChannel over the machine&#39;s access token.
 | CreateMachine | [CreateMachineRequest](#laelia-v1-CreateMachineRequest) | [CreateMachineResponse](#laelia-v1-CreateMachineResponse) |  |
 | ListMachines | [ListMachinesRequest](#laelia-v1-ListMachinesRequest) | [ListMachinesResponse](#laelia-v1-ListMachinesResponse) |  |
 | GetMachine | [GetMachineRequest](#laelia-v1-GetMachineRequest) | [Machine](#laelia-v1-Machine) |  |
-| DeleteMachine | [DeleteMachineRequest](#laelia-v1-DeleteMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
-| RotateMachineToken | [RotateMachineTokenRequest](#laelia-v1-RotateMachineTokenRequest) | [RotateMachineTokenResponse](#laelia-v1-RotateMachineTokenResponse) | Token rotation: generate a new registration token; the machine app must re-ConnectMachine with it. Old tokens are revoked and all sessions dropped. |
-| RevokeMachineToken | [RevokeMachineTokenRequest](#laelia-v1-RevokeMachineTokenRequest) | [RevokeMachineTokenResponse](#laelia-v1-RevokeMachineTokenResponse) | Token revocation: revoke all tokens for the machine. |
-| ForceDisconnectMachine | [ForceDisconnectMachineRequest](#laelia-v1-ForceDisconnectMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Admin force-disconnects a machine: terminate all its sessions and fail all in-flight commands for every agent hosted on it. |
+| DeleteMachine | [DeleteMachineRequest](#laelia-v1-DeleteMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | DeleteMachine soft-deletes a machine. Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.delete (workspace-scope); no permission annotation so the creator short-circuit can run. |
+| RotateMachineToken | [RotateMachineTokenRequest](#laelia-v1-RotateMachineTokenRequest) | [RotateMachineTokenResponse](#laelia-v1-RotateMachineTokenResponse) | Token rotation: generate a new registration token; the machine app must re-ConnectMachine with it. Old tokens are revoked and all sessions dropped. Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit (workspace-scope); no permission annotation so the creator short-circuit can run. |
+| RevokeMachineToken | [RevokeMachineTokenRequest](#laelia-v1-RevokeMachineTokenRequest) | [RevokeMachineTokenResponse](#laelia-v1-RevokeMachineTokenResponse) | Token revocation: revoke all tokens for the machine. Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit (workspace-scope); no permission annotation so the creator short-circuit can run. |
+| ForceDisconnectMachine | [ForceDisconnectMachineRequest](#laelia-v1-ForceDisconnectMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Force-disconnects a machine: terminate all its sessions and fail all in-flight commands for every agent hosted on it. Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit (workspace-scope); no permission annotation so the creator short-circuit can run. |
 | ListMachineAgents | [ListMachineAgentsRequest](#laelia-v1-ListMachineAgentsRequest) | [ListMachineAgentsResponse](#laelia-v1-ListMachineAgentsResponse) | List the agents hosted on a machine. |
-| RefreshMachineProviders | [RefreshMachineProvidersRequest](#laelia-v1-RefreshMachineProvidersRequest) | [RefreshMachineProvidersResponse](#laelia-v1-RefreshMachineProvidersResponse) | Ask the machine app to re-probe its host for installed LLM agent providers and their models. Returns the freshly discovered provider list (also persisted into machine.info.available_providers). Admin only. |
+| RefreshMachineProviders | [RefreshMachineProvidersRequest](#laelia-v1-RefreshMachineProvidersRequest) | [RefreshMachineProvidersResponse](#laelia-v1-RefreshMachineProvidersResponse) | Ask the machine app to re-probe its host for installed LLM agent providers and their models. Returns the freshly discovered provider list (also persisted into machine.info.available_providers). Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit (workspace-scope); no permission annotation so the creator short-circuit can run. |
 | ListMachineWorkspaces | [ListMachineWorkspacesRequest](#laelia-v1-ListMachineWorkspacesRequest) | [ListMachineWorkspacesResponse](#laelia-v1-ListMachineWorkspacesResponse) | ListMachineWorkspaces summarizes every per-agent workspace directory on a machine (~/.laelia/&lt;machineID&gt;/). Workspace content is sensitive: authorized in the handler for the machine&#39;s creator or a workspace admin (isMachineAdmin, matching Machine.can_manage); no permission annotation. |
 | DeleteMachineWorkspace | [DeleteMachineWorkspaceRequest](#laelia-v1-DeleteMachineWorkspaceRequest) | [DeleteMachineWorkspaceResponse](#laelia-v1-DeleteMachineWorkspaceResponse) | DeleteMachineWorkspace recursively deletes one agent workspace directory on a machine. Destructive: same handler-gated authorization as ListMachineWorkspaces; the machine app validates the directory name. |
 | ConnectMachine | [ConnectMachineRequest](#laelia-v1-ConnectMachineRequest) | [ConnectMachineResponse](#laelia-v1-ConnectMachineResponse) | Machine initial connection using a registration token. Returns access &#43; refresh tokens, the machine session id, and the full list of agents the machine must host (so the machine app can open an AgentChannel for each). |

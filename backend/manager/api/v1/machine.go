@@ -157,11 +157,48 @@ func (s *MachineService) ListMachines(ctx context.Context, req *connect.Request[
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to count machine agents, error: %v", err))
 	}
 
+	// machines.edit / machines.delete are workspace-scope permissions, so the
+	// IAM lookups are done once for the whole page; per machine only the
+	// creator comparison varies (a page of N machines stays 2 queries, not N+1).
+	caller, _ := GetUserFromContext(ctx)
+	canEdit := s.canEditMachine(ctx, caller)
+	canDelete := canDeleteMachineWorkspace(ctx, s.iam, caller)
 	resp := &v1pb.ListMachinesResponse{NextPageToken: nextPageToken}
 	for _, m := range machines {
-		resp.Machines = append(resp.Machines, convertToMachineSummary(m, agentCounts[m.ID]))
+		summary := convertToMachineSummary(m, agentCounts[m.ID])
+		summary.CanEdit = canEdit
+		summary.CanManage = canEdit || isMachineCreator(caller, m)
+		summary.CanDelete = canDelete || isMachineCreator(caller, m)
+		resp.Machines = append(resp.Machines, summary)
 	}
 	return connect.NewResponse(resp), nil
+}
+
+// isMachineCreator reports whether the caller created the machine.
+func isMachineCreator(user *store.UserMessage, machine *store.MachineMessage) bool {
+	return user != nil && machine.CreatedBy != 0 && machine.CreatedBy == user.ID
+}
+
+// canDeleteMachineWorkspace reports whether the caller holds
+// laelia.machines.delete (workspace-scope). A lookup failure is fail-closed.
+func canDeleteMachineWorkspace(ctx context.Context, im *iam.Manager, user *store.UserMessage) bool {
+	if user == nil || im == nil {
+		return false
+	}
+	ok, err := im.CheckPermission(ctx, permission.MachinesDelete, user, nil, nil)
+	if err != nil {
+		return false
+	}
+	return ok
+}
+
+// canDeleteMachine reports whether the caller may delete the machine: its
+// creator or a holder of laelia.machines.delete (workspace-scope).
+func canDeleteMachine(ctx context.Context, im *iam.Manager, user *store.UserMessage, machine *store.MachineMessage) bool {
+	if isMachineCreator(user, machine) {
+		return true
+	}
+	return canDeleteMachineWorkspace(ctx, im, user)
 }
 
 func (s *MachineService) GetMachine(ctx context.Context, req *connect.Request[v1pb.GetMachineRequest]) (*connect.Response[v1pb.Machine], error) {
@@ -201,15 +238,16 @@ func (s *MachineService) canEditMachine(ctx context.Context, user *store.UserMes
 	return ok
 }
 
-// isMachineAdmin reports whether the caller may manage a machine's IAM policy:
-// the machine's creator or a workspace admin (laelia.machines.edit). Shared by
-// the machine policy handlers and GetMachine (to populate can_manage).
+// isMachineAdmin reports whether the caller may manage a machine: the machine's
+// creator or a workspace admin (laelia.machines.edit). Shared by the machine
+// policy handlers, the token/management RPCs, and the can_manage field on
+// GetMachine and ListMachines.
 func isMachineAdmin(ctx context.Context, im *iam.Manager, user *store.UserMessage, machine *store.MachineMessage) bool {
+	if isMachineCreator(user, machine) {
+		return true
+	}
 	if user == nil || im == nil {
 		return false
-	}
-	if machine.CreatedBy != 0 && machine.CreatedBy == user.ID {
-		return true
 	}
 	ok, err := im.CheckPermission(ctx, permission.MachinesEdit, user, nil, nil)
 	if err != nil {
@@ -222,6 +260,18 @@ func (s *MachineService) DeleteMachine(ctx context.Context, req *connect.Request
 	resourceID, err := common.GetMachineResourceID(req.Msg.Name)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+
+	machine, err := s.store.GetMachineByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get machine, error: %v", err))
+	}
+	if machine == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !canDeleteMachine(ctx, s.iam, user, machine) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can delete this machine"))
 	}
 
 	// Atomically soft-delete iff the machine hosts no live agents, so a
@@ -271,6 +321,10 @@ func (s *MachineService) RotateMachineToken(ctx context.Context, req *connect.Re
 	}
 	if machine == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !isMachineAdmin(ctx, s.iam, user, machine) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can rotate this machine's token"))
 	}
 
 	newTokenVersion := machine.TokenVersion + 1
@@ -332,6 +386,10 @@ func (s *MachineService) RevokeMachineToken(ctx context.Context, req *connect.Re
 	if machine == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
 	}
+	user, _ := GetUserFromContext(ctx)
+	if !isMachineAdmin(ctx, s.iam, user, machine) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can revoke this machine's tokens"))
+	}
 
 	newTokenVersion := machine.TokenVersion + 1
 	nowRotated := time.Now()
@@ -374,6 +432,10 @@ func (s *MachineService) ForceDisconnectMachine(ctx context.Context, req *connec
 	}
 	if machine == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !isMachineAdmin(ctx, s.iam, user, machine) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can force-disconnect this machine"))
 	}
 
 	reason := "admin_forced"
@@ -436,6 +498,10 @@ func (s *MachineService) RefreshMachineProviders(ctx context.Context, req *conne
 	}
 	if machine == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !isMachineAdmin(ctx, s.iam, user, machine) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the machine's creator or a workspace admin can refresh this machine's providers"))
 	}
 	if s.dispatcher == nil || !s.dispatcher.IsMachineConnected(machine.ID) {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("machine is not connected; cannot probe providers"))

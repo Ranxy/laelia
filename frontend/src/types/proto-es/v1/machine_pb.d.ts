@@ -626,8 +626,8 @@ export declare type Machine = Message<"laelia.v1.Machine"> & {
   createdBy: string;
 
   /**
-   * can_edit reports whether the current caller may modify this machine
-   * (laelia.machines.edit).
+   * can_edit reports whether the current caller holds laelia.machines.edit
+   * (workspace-scope).
    *
    * @generated from field: bool can_edit = 12;
    */
@@ -689,6 +689,37 @@ export declare type MachineSummary = Message<"laelia.v1.MachineSummary"> & {
    * @generated from field: int32 agent_count = 5;
    */
   agentCount: number;
+
+  /**
+   * Creator's user resource name (users/{id}).
+   *
+   * @generated from field: string created_by = 6;
+   */
+  createdBy: string;
+
+  /**
+   * can_edit reports whether the current caller holds laelia.machines.edit
+   * (workspace-scope).
+   *
+   * @generated from field: bool can_edit = 7;
+   */
+  canEdit: boolean;
+
+  /**
+   * can_manage reports whether the current caller may manage this machine's
+   * IAM policy (the machine's creator or a workspace admin).
+   *
+   * @generated from field: bool can_manage = 8;
+   */
+  canManage: boolean;
+
+  /**
+   * can_delete reports whether the current caller may delete this machine:
+   * the machine's creator or a holder of laelia.machines.delete.
+   *
+   * @generated from field: bool can_delete = 9;
+   */
+  canDelete: boolean;
 };
 
 /**
@@ -1257,6 +1288,10 @@ export declare const MachineService: GenService<{
     output: typeof MachineSchema;
   },
   /**
+   * DeleteMachine soft-deletes a machine. Authorized in the handler for the
+   * machine's creator or a holder of laelia.machines.delete (workspace-scope);
+   * no permission annotation so the creator short-circuit can run.
+   *
    * @generated from rpc laelia.v1.MachineService.DeleteMachine
    */
   deleteMachine: {
@@ -1267,6 +1302,9 @@ export declare const MachineService: GenService<{
   /**
    * Token rotation: generate a new registration token; the machine app must
    * re-ConnectMachine with it. Old tokens are revoked and all sessions dropped.
+   * Authorized in the handler for the machine's creator or a holder of
+   * laelia.machines.edit (workspace-scope); no permission annotation so the
+   * creator short-circuit can run.
    *
    * @generated from rpc laelia.v1.MachineService.RotateMachineToken
    */
@@ -1276,7 +1314,10 @@ export declare const MachineService: GenService<{
     output: typeof RotateMachineTokenResponseSchema;
   },
   /**
-   * Token revocation: revoke all tokens for the machine.
+   * Token revocation: revoke all tokens for the machine. Authorized in the
+   * handler for the machine's creator or a holder of laelia.machines.edit
+   * (workspace-scope); no permission annotation so the creator short-circuit
+   * can run.
    *
    * @generated from rpc laelia.v1.MachineService.RevokeMachineToken
    */
@@ -1286,8 +1327,11 @@ export declare const MachineService: GenService<{
     output: typeof RevokeMachineTokenResponseSchema;
   },
   /**
-   * Admin force-disconnects a machine: terminate all its sessions and fail all
-   * in-flight commands for every agent hosted on it.
+   * Force-disconnects a machine: terminate all its sessions and fail all
+   * in-flight commands for every agent hosted on it. Authorized in the handler
+   * for the machine's creator or a holder of laelia.machines.edit
+   * (workspace-scope); no permission annotation so the creator short-circuit
+   * can run.
    *
    * @generated from rpc laelia.v1.MachineService.ForceDisconnectMachine
    */
@@ -1309,7 +1353,10 @@ export declare const MachineService: GenService<{
   /**
    * Ask the machine app to re-probe its host for installed LLM agent providers
    * and their models. Returns the freshly discovered provider list (also
-   * persisted into machine.info.available_providers). Admin only.
+   * persisted into machine.info.available_providers). Authorized in the handler
+   * for the machine's creator or a holder of laelia.machines.edit
+   * (workspace-scope); no permission annotation so the creator short-circuit
+   * can run.
    *
    * @generated from rpc laelia.v1.MachineService.RefreshMachineProviders
    */

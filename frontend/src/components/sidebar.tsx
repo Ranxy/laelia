@@ -102,6 +102,7 @@ function useSidebarItems(): SidebarItem[] {
     useHasPermission("laelia.settings.get") ||
     useHasPermission("laelia.settings.update");
   const canViewUsers = useHasPermission("laelia.users.list");
+  const canViewMachines = useHasPermission("laelia.machines.get");
   const canViewRoles = useHasPermission("laelia.roles.list");
   const canViewIam = useHasPermission("laelia.iam.getPolicy");
   const canViewGroups = useHasPermission("laelia.groups.list");
@@ -134,6 +135,7 @@ function useSidebarItems(): SidebarItem[] {
         icon: Monitor,
         name: MACHINE_ROUTE_LIST,
         type: "route",
+        hide: !canViewMachines,
       },
       {
         title: t("sidebar.settings"),

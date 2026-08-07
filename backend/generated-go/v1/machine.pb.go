@@ -1436,8 +1436,8 @@ type Machine struct {
 	Labels    map[string]string      `protobuf:"bytes,8,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Creator's user resource name (users/{id}).
 	CreatedBy string `protobuf:"bytes,11,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	// can_edit reports whether the current caller may modify this machine
-	// (laelia.machines.edit).
+	// can_edit reports whether the current caller holds laelia.machines.edit
+	// (workspace-scope).
 	CanEdit bool `protobuf:"varint,12,opt,name=can_edit,json=canEdit,proto3" json:"can_edit,omitempty"`
 	// can_create_agent reports whether the current caller may create agents on
 	// this machine: the machine's creator, a workspace admin, or a principal
@@ -1561,12 +1561,23 @@ func (x *Machine) GetCanManage() bool {
 // by ListMachines. It carries identity, lifecycle state, connection status, and
 // the count of agents bound to the machine.
 type MachineSummary struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	State         State                  `protobuf:"varint,2,opt,name=state,proto3,enum=laelia.v1.State" json:"state,omitempty"`
-	Title         string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
-	Status        *MachineStatus         `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
-	AgentCount    int32                  `protobuf:"varint,5,opt,name=agent_count,json=agentCount,proto3" json:"agent_count,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Name       string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	State      State                  `protobuf:"varint,2,opt,name=state,proto3,enum=laelia.v1.State" json:"state,omitempty"`
+	Title      string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Status     *MachineStatus         `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	AgentCount int32                  `protobuf:"varint,5,opt,name=agent_count,json=agentCount,proto3" json:"agent_count,omitempty"`
+	// Creator's user resource name (users/{id}).
+	CreatedBy string `protobuf:"bytes,6,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	// can_edit reports whether the current caller holds laelia.machines.edit
+	// (workspace-scope).
+	CanEdit bool `protobuf:"varint,7,opt,name=can_edit,json=canEdit,proto3" json:"can_edit,omitempty"`
+	// can_manage reports whether the current caller may manage this machine's
+	// IAM policy (the machine's creator or a workspace admin).
+	CanManage bool `protobuf:"varint,8,opt,name=can_manage,json=canManage,proto3" json:"can_manage,omitempty"`
+	// can_delete reports whether the current caller may delete this machine:
+	// the machine's creator or a holder of laelia.machines.delete.
+	CanDelete     bool `protobuf:"varint,9,opt,name=can_delete,json=canDelete,proto3" json:"can_delete,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1634,6 +1645,34 @@ func (x *MachineSummary) GetAgentCount() int32 {
 		return x.AgentCount
 	}
 	return 0
+}
+
+func (x *MachineSummary) GetCreatedBy() string {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return ""
+}
+
+func (x *MachineSummary) GetCanEdit() bool {
+	if x != nil {
+		return x.CanEdit
+	}
+	return false
+}
+
+func (x *MachineSummary) GetCanManage() bool {
+	if x != nil {
+		return x.CanManage
+	}
+	return false
+}
+
+func (x *MachineSummary) GetCanDelete() bool {
+	if x != nil {
+		return x.CanDelete
+	}
+	return false
 }
 
 type MachineInfo struct {
@@ -2841,14 +2880,21 @@ const file_v1_machine_proto_rawDesc = "" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:'\xeaA$\n" +
-	"\x0elaelia/Machine\x12\x12machines/{machine}J\x04\b\x04\x10\x05\"\xb5\x01\n" +
+	"\x0elaelia/Machine\x12\x12machines/{machine}J\x04\b\x04\x10\x05\"\xc1\x02\n" +
 	"\x0eMachineSummary\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x120\n" +
 	"\x06status\x18\x04 \x01(\v2\x18.laelia.v1.MachineStatusR\x06status\x12\x1f\n" +
 	"\vagent_count\x18\x05 \x01(\x05R\n" +
-	"agentCount\"\xf9\x02\n" +
+	"agentCount\x12\"\n" +
+	"\n" +
+	"created_by\x18\x06 \x01(\tB\x03\xe0A\x03R\tcreatedBy\x12\x1e\n" +
+	"\bcan_edit\x18\a \x01(\bB\x03\xe0A\x03R\acanEdit\x12\"\n" +
+	"\n" +
+	"can_manage\x18\b \x01(\bB\x03\xe0A\x03R\tcanManage\x12\"\n" +
+	"\n" +
+	"can_delete\x18\t \x01(\bB\x03\xe0A\x03R\tcanDelete\"\xf9\x02\n" +
 	"\vMachineInfo\x12\x1a\n" +
 	"\bhostname\x18\x02 \x01(\tR\bhostname\x12\x0e\n" +
 	"\x02os\x18\x03 \x01(\tR\x02os\x12\x12\n" +
@@ -2943,18 +2989,18 @@ const file_v1_machine_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12%\n" +
 	"\x0edirectory_name\x18\x02 \x01(\tR\rdirectoryName\x12\x18\n" +
-	"\asuccess\x18\x03 \x01(\bR\asuccess2\x99\x12\n" +
+	"\asuccess\x18\x03 \x01(\bR\asuccess2\x9e\x11\n" +
 	"\x0eMachineService\x12\x93\x01\n" +
 	"\rCreateMachine\x12\x1f.laelia.v1.CreateMachineRequest\x1a .laelia.v1.CreateMachineResponse\"?\x8a\xea0\x16laelia.machines.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x17:\amachine\"\f/v1/machines\x12\x80\x01\n" +
 	"\fListMachines\x12\x1e.laelia.v1.ListMachinesRequest\x1a\x1f.laelia.v1.ListMachinesResponse\"/\x8a\xea0\x13laelia.machines.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/machines\x12\x7f\n" +
 	"\n" +
-	"GetMachine\x12\x1c.laelia.v1.GetMachineRequest\x1a\x12.laelia.v1.Machine\"?\xdaA\x04name\x8a\xea0\x13laelia.machines.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/{name=machines/*}\x12\x89\x01\n" +
-	"\rDeleteMachine\x12\x1f.laelia.v1.DeleteMachineRequest\x1a\x16.google.protobuf.Empty\"?\x8a\xea0\x16laelia.machines.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x17*\x15/v1/{name=machines/*}\x12\xaf\x01\n" +
-	"\x12RotateMachineToken\x12$.laelia.v1.RotateMachineTokenRequest\x1a%.laelia.v1.RotateMachineTokenResponse\"L\x8a\xea0\x14laelia.machines.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02&:\x01*\"!/v1/{name=machines/*}:rotateToken\x12\xaf\x01\n" +
-	"\x12RevokeMachineToken\x12$.laelia.v1.RevokeMachineTokenRequest\x1a%.laelia.v1.RevokeMachineTokenResponse\"L\x8a\xea0\x14laelia.machines.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02&:\x01*\"!/v1/{name=machines/*}:revokeToken\x12\xac\x01\n" +
-	"\x16ForceDisconnectMachine\x12(.laelia.v1.ForceDisconnectMachineRequest\x1a\x16.google.protobuf.Empty\"P\x8a\xea0\x14laelia.machines.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=machines/*}:forceDisconnect\x12\x9f\x01\n" +
-	"\x11ListMachineAgents\x12#.laelia.v1.ListMachineAgentsRequest\x1a$.laelia.v1.ListMachineAgentsResponse\"?\x8a\xea0\x13laelia.machines.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1e\x12\x1c/v1/{name=machines/*}/agents\x12\xc3\x01\n" +
-	"\x17RefreshMachineProviders\x12).laelia.v1.RefreshMachineProvidersRequest\x1a*.laelia.v1.RefreshMachineProvidersResponse\"Q\x8a\xea0\x14laelia.machines.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02+:\x01*\"&/v1/{name=machines/*}:refreshProviders\x12\xa3\x01\n" +
+	"GetMachine\x12\x1c.laelia.v1.GetMachineRequest\x1a\x12.laelia.v1.Machine\"?\xdaA\x04name\x8a\xea0\x13laelia.machines.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/{name=machines/*}\x12o\n" +
+	"\rDeleteMachine\x12\x1f.laelia.v1.DeleteMachineRequest\x1a\x16.google.protobuf.Empty\"%\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x17*\x15/v1/{name=machines/*}\x12\x97\x01\n" +
+	"\x12RotateMachineToken\x12$.laelia.v1.RotateMachineTokenRequest\x1a%.laelia.v1.RotateMachineTokenResponse\"4\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02&:\x01*\"!/v1/{name=machines/*}:rotateToken\x12\x97\x01\n" +
+	"\x12RevokeMachineToken\x12$.laelia.v1.RevokeMachineTokenRequest\x1a%.laelia.v1.RevokeMachineTokenResponse\"4\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02&:\x01*\"!/v1/{name=machines/*}:revokeToken\x12\x94\x01\n" +
+	"\x16ForceDisconnectMachine\x12(.laelia.v1.ForceDisconnectMachineRequest\x1a\x16.google.protobuf.Empty\"8\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=machines/*}:forceDisconnect\x12\x9f\x01\n" +
+	"\x11ListMachineAgents\x12#.laelia.v1.ListMachineAgentsRequest\x1a$.laelia.v1.ListMachineAgentsResponse\"?\x8a\xea0\x13laelia.machines.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1e\x12\x1c/v1/{name=machines/*}/agents\x12\xab\x01\n" +
+	"\x17RefreshMachineProviders\x12).laelia.v1.RefreshMachineProvidersRequest\x1a*.laelia.v1.RefreshMachineProvidersResponse\"9\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02+:\x01*\"&/v1/{name=machines/*}:refreshProviders\x12\xa3\x01\n" +
 	"\x15ListMachineWorkspaces\x12'.laelia.v1.ListMachineWorkspacesRequest\x1a(.laelia.v1.ListMachineWorkspacesResponse\"7\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02):\x01*\"$/v1/{name=machines/*}:listWorkspaces\x12\xa7\x01\n" +
 	"\x16DeleteMachineWorkspace\x12(.laelia.v1.DeleteMachineWorkspaceRequest\x1a).laelia.v1.DeleteMachineWorkspaceResponse\"8\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=machines/*}:deleteWorkspace\x12~\n" +
 	"\x0eConnectMachine\x12 .laelia.v1.ConnectMachineRequest\x1a!.laelia.v1.ConnectMachineResponse\"'\x90\xea0\x02\x98\xea0\x01\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/v1/machines:connect\x12\x82\x01\n" +

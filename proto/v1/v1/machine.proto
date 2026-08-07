@@ -46,45 +46,53 @@ service MachineService {
     option (laelia.v1.permission) = "laelia.machines.get";
   }
 
+  // DeleteMachine soft-deletes a machine. Authorized in the handler for the
+  // machine's creator or a holder of laelia.machines.delete (workspace-scope);
+  // no permission annotation so the creator short-circuit can run.
   rpc DeleteMachine(DeleteMachineRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/v1/{name=machines/*}"};
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.machines.delete";
     option (laelia.v1.audit) = true;
   }
 
   // Token rotation: generate a new registration token; the machine app must
   // re-ConnectMachine with it. Old tokens are revoked and all sessions dropped.
+  // Authorized in the handler for the machine's creator or a holder of
+  // laelia.machines.edit (workspace-scope); no permission annotation so the
+  // creator short-circuit can run.
   rpc RotateMachineToken(RotateMachineTokenRequest) returns (RotateMachineTokenResponse) {
     option (google.api.http) = {
       post: "/v1/{name=machines/*}:rotateToken"
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.machines.edit";
     option (laelia.v1.audit) = true;
   }
 
-  // Token revocation: revoke all tokens for the machine.
+  // Token revocation: revoke all tokens for the machine. Authorized in the
+  // handler for the machine's creator or a holder of laelia.machines.edit
+  // (workspace-scope); no permission annotation so the creator short-circuit
+  // can run.
   rpc RevokeMachineToken(RevokeMachineTokenRequest) returns (RevokeMachineTokenResponse) {
     option (google.api.http) = {
       post: "/v1/{name=machines/*}:revokeToken"
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.machines.edit";
     option (laelia.v1.audit) = true;
   }
 
-  // Admin force-disconnects a machine: terminate all its sessions and fail all
-  // in-flight commands for every agent hosted on it.
+  // Force-disconnects a machine: terminate all its sessions and fail all
+  // in-flight commands for every agent hosted on it. Authorized in the handler
+  // for the machine's creator or a holder of laelia.machines.edit
+  // (workspace-scope); no permission annotation so the creator short-circuit
+  // can run.
   rpc ForceDisconnectMachine(ForceDisconnectMachineRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {
       post: "/v1/{name=machines/*}:forceDisconnect"
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.machines.edit";
     option (laelia.v1.audit) = true;
   }
 
@@ -97,14 +105,16 @@ service MachineService {
 
   // Ask the machine app to re-probe its host for installed LLM agent providers
   // and their models. Returns the freshly discovered provider list (also
-  // persisted into machine.info.available_providers). Admin only.
+  // persisted into machine.info.available_providers). Authorized in the handler
+  // for the machine's creator or a holder of laelia.machines.edit
+  // (workspace-scope); no permission annotation so the creator short-circuit
+  // can run.
   rpc RefreshMachineProviders(RefreshMachineProvidersRequest) returns (RefreshMachineProvidersResponse) {
     option (google.api.http) = {
       post: "/v1/{name=machines/*}:refreshProviders"
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.machines.edit";
     option (laelia.v1.audit) = true;
   }
 
@@ -380,8 +390,8 @@ message Machine {
   // Creator's user resource name (users/{id}).
   string created_by = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // can_edit reports whether the current caller may modify this machine
-  // (laelia.machines.edit).
+  // can_edit reports whether the current caller holds laelia.machines.edit
+  // (workspace-scope).
   bool can_edit = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // can_create_agent reports whether the current caller may create agents on
@@ -405,6 +415,20 @@ message MachineSummary {
   string title = 3;
   MachineStatus status = 4;
   int32 agent_count = 5;
+  // Creator's user resource name (users/{id}).
+  string created_by = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // can_edit reports whether the current caller holds laelia.machines.edit
+  // (workspace-scope).
+  bool can_edit = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // can_manage reports whether the current caller may manage this machine's
+  // IAM policy (the machine's creator or a workspace admin).
+  bool can_manage = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // can_delete reports whether the current caller may delete this machine:
+  // the machine's creator or a holder of laelia.machines.delete.
+  bool can_delete = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message MachineInfo {

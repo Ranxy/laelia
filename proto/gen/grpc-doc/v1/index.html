@@ -16522,8 +16522,8 @@ AgentChannel per entry immediately after connect (and on every reconnect). </p><
                   <td>can_edit</td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
-                  <td><p>can_edit reports whether the current caller may modify this machine
-(laelia.machines.edit). </p></td>
+                  <td><p>can_edit reports whether the current caller holds laelia.machines.edit
+(workspace-scope). </p></td>
                 </tr>
               
                 <tr>
@@ -16995,6 +16995,37 @@ Machine-scoped: every agent hosted on this machine selects from this list. </p><
                   <td><a href="#int32">int32</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_by</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Creator&#39;s user resource name (users/{id}). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>can_edit</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>can_edit reports whether the current caller holds laelia.machines.edit
+(workspace-scope). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>can_manage</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>can_manage reports whether the current caller may manage this machine&#39;s
+IAM policy (the machine&#39;s creator or a workspace admin). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>can_delete</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>can_delete reports whether the current caller may delete this machine:
+the machine&#39;s creator or a holder of laelia.machines.delete. </p></td>
                 </tr>
               
             </tbody>
@@ -17591,7 +17622,9 @@ Machine-scoped: every agent hosted on this machine selects from this list. </p><
                 <td>DeleteMachine</td>
                 <td><a href="#laelia.v1.DeleteMachineRequest">DeleteMachineRequest</a></td>
                 <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
-                <td><p></p></td>
+                <td><p>DeleteMachine soft-deletes a machine. Authorized in the handler for the
+machine&#39;s creator or a holder of laelia.machines.delete (workspace-scope);
+no permission annotation so the creator short-circuit can run.</p></td>
               </tr>
             
               <tr>
@@ -17599,22 +17632,31 @@ Machine-scoped: every agent hosted on this machine selects from this list. </p><
                 <td><a href="#laelia.v1.RotateMachineTokenRequest">RotateMachineTokenRequest</a></td>
                 <td><a href="#laelia.v1.RotateMachineTokenResponse">RotateMachineTokenResponse</a></td>
                 <td><p>Token rotation: generate a new registration token; the machine app must
-re-ConnectMachine with it. Old tokens are revoked and all sessions dropped.</p></td>
+re-ConnectMachine with it. Old tokens are revoked and all sessions dropped.
+Authorized in the handler for the machine&#39;s creator or a holder of
+laelia.machines.edit (workspace-scope); no permission annotation so the
+creator short-circuit can run.</p></td>
               </tr>
             
               <tr>
                 <td>RevokeMachineToken</td>
                 <td><a href="#laelia.v1.RevokeMachineTokenRequest">RevokeMachineTokenRequest</a></td>
                 <td><a href="#laelia.v1.RevokeMachineTokenResponse">RevokeMachineTokenResponse</a></td>
-                <td><p>Token revocation: revoke all tokens for the machine.</p></td>
+                <td><p>Token revocation: revoke all tokens for the machine. Authorized in the
+handler for the machine&#39;s creator or a holder of laelia.machines.edit
+(workspace-scope); no permission annotation so the creator short-circuit
+can run.</p></td>
               </tr>
             
               <tr>
                 <td>ForceDisconnectMachine</td>
                 <td><a href="#laelia.v1.ForceDisconnectMachineRequest">ForceDisconnectMachineRequest</a></td>
                 <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
-                <td><p>Admin force-disconnects a machine: terminate all its sessions and fail all
-in-flight commands for every agent hosted on it.</p></td>
+                <td><p>Force-disconnects a machine: terminate all its sessions and fail all
+in-flight commands for every agent hosted on it. Authorized in the handler
+for the machine&#39;s creator or a holder of laelia.machines.edit
+(workspace-scope); no permission annotation so the creator short-circuit
+can run.</p></td>
               </tr>
             
               <tr>
@@ -17630,7 +17672,10 @@ in-flight commands for every agent hosted on it.</p></td>
                 <td><a href="#laelia.v1.RefreshMachineProvidersResponse">RefreshMachineProvidersResponse</a></td>
                 <td><p>Ask the machine app to re-probe its host for installed LLM agent providers
 and their models. Returns the freshly discovered provider list (also
-persisted into machine.info.available_providers). Admin only.</p></td>
+persisted into machine.info.available_providers). Authorized in the handler
+for the machine&#39;s creator or a holder of laelia.machines.edit
+(workspace-scope); no permission annotation so the creator short-circuit
+can run.</p></td>
               </tr>
             
               <tr>
