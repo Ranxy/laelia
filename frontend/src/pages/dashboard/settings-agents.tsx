@@ -106,7 +106,7 @@ export function SettingsAgentsPage() {
           {t("common.loading")}
         </div>
       ) : (
-        <div className="max-w-2xl space-y-4">
+        <div className="mx-auto max-w-2xl space-y-4">
           <div className="flex items-center justify-between rounded-md border border-control-border p-4">
             <div className="flex min-w-0 flex-1 items-start gap-3">
               <Bot className="mt-0.5 size-4 shrink-0 text-control-light" />

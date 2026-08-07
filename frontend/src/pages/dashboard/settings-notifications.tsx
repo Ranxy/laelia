@@ -113,7 +113,7 @@ export function SettingsNotificationsPage() {
       {loading ? (
         <PageLoading message={t("settings.notifications.loading")} />
       ) : (
-        <div className="max-w-2xl">
+        <div className="mx-auto max-w-2xl">
           <Card title={t("settings.notifications.proxy-title")}>
             <div className="flex items-center justify-between">
               <div className="flex items-start gap-3">
