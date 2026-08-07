@@ -128,12 +128,22 @@ type AgentServiceClient interface {
 	// RPC carries no permission annotation (agents.edit is admin-only) and is
 	// handler-gated via canEditAgent.
 	TransferAgentOwnership(context.Context, *connect.Request[v1.TransferAgentOwnershipRequest]) (*connect.Response[v1.TransferAgentOwnershipResponse], error)
+	// DeleteAgent soft-deletes an agent. Authorized in the handler for the
+	// agent's owner or a holder of laelia.agents.edit on the agent; no
+	// permission annotation so the owner short-circuit can run.
 	DeleteAgent(context.Context, *connect.Request[v1.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error)
-	// Token rotation: generate a new bootstrap token, old token invalid after grace period
+	// Token rotation: generate a new bootstrap token, old token invalid after
+	// grace period. Authorized in the handler for the agent's owner or a holder
+	// of laelia.agents.edit on the agent; no permission annotation so the owner
+	// short-circuit can run.
 	RotateAgentToken(context.Context, *connect.Request[v1.RotateAgentTokenRequest]) (*connect.Response[v1.RotateAgentTokenResponse], error)
-	// Token revocation: revoke all tokens for the agent
+	// Token revocation: revoke all tokens for the agent. Authorized in the
+	// handler for the agent's owner or a holder of laelia.agents.edit on the
+	// agent; no permission annotation so the owner short-circuit can run.
 	RevokeAgentToken(context.Context, *connect.Request[v1.RevokeAgentTokenRequest]) (*connect.Response[v1.RevokeAgentTokenResponse], error)
-	// Admin force disconnects an agent connection
+	// Force-disconnects an agent connection. Authorized in the handler for the
+	// agent's owner or a holder of laelia.agents.edit on the agent; no
+	// permission annotation so the owner short-circuit can run.
 	ForceDisconnectAgent(context.Context, *connect.Request[v1.ForceDisconnectAgentRequest]) (*connect.Response[emptypb.Empty], error)
 	// List agent sessions
 	ListAgentSessions(context.Context, *connect.Request[v1.ListAgentSessionsRequest]) (*connect.Response[v1.ListAgentSessionsResponse], error)
@@ -147,9 +157,11 @@ type AgentServiceClient interface {
 	// workspace admin) are accepted. Handler-gated like UpdateAgentACPConfig:
 	// the agent's owner or a workspace admin may update it.
 	UpdateAgentMcpConfig(context.Context, *connect.Request[v1.UpdateAgentMcpConfigRequest]) (*connect.Response[emptypb.Empty], error)
-	// Ask the agent daemon to re-probe its host for installed LLM agent providers
-	// and their models. Returns the freshly discovered provider list (also
-	// persisted into agent.info.available_providers). Admin only.
+	// Ask the agent daemon to re-probe its host for installed LLM agent
+	// providers and their models. Returns the freshly discovered provider list
+	// (also persisted into agent.info.available_providers). Authorized in the
+	// handler for the agent's owner or a holder of laelia.agents.edit on the
+	// agent; no permission annotation so the owner short-circuit can run.
 	RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error)
 	// ListAgentWorkspace lists one directory level of an agent's workspace on its
 	// machine (~/.laelia/<machineID>/<agentID>/), lazily loading the tree level by
@@ -520,12 +532,22 @@ type AgentServiceHandler interface {
 	// RPC carries no permission annotation (agents.edit is admin-only) and is
 	// handler-gated via canEditAgent.
 	TransferAgentOwnership(context.Context, *connect.Request[v1.TransferAgentOwnershipRequest]) (*connect.Response[v1.TransferAgentOwnershipResponse], error)
+	// DeleteAgent soft-deletes an agent. Authorized in the handler for the
+	// agent's owner or a holder of laelia.agents.edit on the agent; no
+	// permission annotation so the owner short-circuit can run.
 	DeleteAgent(context.Context, *connect.Request[v1.DeleteAgentRequest]) (*connect.Response[emptypb.Empty], error)
-	// Token rotation: generate a new bootstrap token, old token invalid after grace period
+	// Token rotation: generate a new bootstrap token, old token invalid after
+	// grace period. Authorized in the handler for the agent's owner or a holder
+	// of laelia.agents.edit on the agent; no permission annotation so the owner
+	// short-circuit can run.
 	RotateAgentToken(context.Context, *connect.Request[v1.RotateAgentTokenRequest]) (*connect.Response[v1.RotateAgentTokenResponse], error)
-	// Token revocation: revoke all tokens for the agent
+	// Token revocation: revoke all tokens for the agent. Authorized in the
+	// handler for the agent's owner or a holder of laelia.agents.edit on the
+	// agent; no permission annotation so the owner short-circuit can run.
 	RevokeAgentToken(context.Context, *connect.Request[v1.RevokeAgentTokenRequest]) (*connect.Response[v1.RevokeAgentTokenResponse], error)
-	// Admin force disconnects an agent connection
+	// Force-disconnects an agent connection. Authorized in the handler for the
+	// agent's owner or a holder of laelia.agents.edit on the agent; no
+	// permission annotation so the owner short-circuit can run.
 	ForceDisconnectAgent(context.Context, *connect.Request[v1.ForceDisconnectAgentRequest]) (*connect.Response[emptypb.Empty], error)
 	// List agent sessions
 	ListAgentSessions(context.Context, *connect.Request[v1.ListAgentSessionsRequest]) (*connect.Response[v1.ListAgentSessionsResponse], error)
@@ -539,9 +561,11 @@ type AgentServiceHandler interface {
 	// workspace admin) are accepted. Handler-gated like UpdateAgentACPConfig:
 	// the agent's owner or a workspace admin may update it.
 	UpdateAgentMcpConfig(context.Context, *connect.Request[v1.UpdateAgentMcpConfigRequest]) (*connect.Response[emptypb.Empty], error)
-	// Ask the agent daemon to re-probe its host for installed LLM agent providers
-	// and their models. Returns the freshly discovered provider list (also
-	// persisted into agent.info.available_providers). Admin only.
+	// Ask the agent daemon to re-probe its host for installed LLM agent
+	// providers and their models. Returns the freshly discovered provider list
+	// (also persisted into agent.info.available_providers). Authorized in the
+	// handler for the agent's owner or a holder of laelia.agents.edit on the
+	// agent; no permission annotation so the owner short-circuit can run.
 	RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error)
 	// ListAgentWorkspace lists one directory level of an agent's workspace on its
 	// machine (~/.laelia/<machineID>/<agentID>/), lazily loading the tree level by

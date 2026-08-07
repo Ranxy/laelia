@@ -378,6 +378,10 @@ paths:
         delete:
             tags:
                 - AgentService
+            description: |-
+                DeleteAgent soft-deletes an agent. Authorized in the handler for the
+                 agent's owner or a holder of laelia.agents.edit on the agent; no
+                 permission annotation so the owner short-circuit can run.
             operationId: AgentService_DeleteAgent
             parameters:
                 - name: agent
@@ -847,7 +851,10 @@ paths:
         post:
             tags:
                 - AgentService
-            description: Admin force disconnects an agent connection
+            description: |-
+                Force-disconnects an agent connection. Authorized in the handler for the
+                 agent's owner or a holder of laelia.agents.edit on the agent; no
+                 permission annotation so the owner short-circuit can run.
             operationId: AgentService_ForceDisconnectAgent
             parameters:
                 - name: agent
@@ -1008,9 +1015,11 @@ paths:
             tags:
                 - AgentService
             description: |-
-                Ask the agent daemon to re-probe its host for installed LLM agent providers
-                 and their models. Returns the freshly discovered provider list (also
-                 persisted into agent.info.available_providers). Admin only.
+                Ask the agent daemon to re-probe its host for installed LLM agent
+                 providers and their models. Returns the freshly discovered provider list
+                 (also persisted into agent.info.available_providers). Authorized in the
+                 handler for the agent's owner or a holder of laelia.agents.edit on the
+                 agent; no permission annotation so the owner short-circuit can run.
             operationId: AgentService_RefreshAgentProviders
             parameters:
                 - name: agent
@@ -1042,7 +1051,10 @@ paths:
         post:
             tags:
                 - AgentService
-            description: 'Token revocation: revoke all tokens for the agent'
+            description: |-
+                Token revocation: revoke all tokens for the agent. Authorized in the
+                 handler for the agent's owner or a holder of laelia.agents.edit on the
+                 agent; no permission annotation so the owner short-circuit can run.
             operationId: AgentService_RevokeAgentToken
             parameters:
                 - name: agent
@@ -1074,7 +1086,11 @@ paths:
         post:
             tags:
                 - AgentService
-            description: 'Token rotation: generate a new bootstrap token, old token invalid after grace period'
+            description: |-
+                Token rotation: generate a new bootstrap token, old token invalid after
+                 grace period. Authorized in the handler for the agent's owner or a holder
+                 of laelia.agents.edit on the agent; no permission annotation so the owner
+                 short-circuit can run.
             operationId: AgentService_RotateAgentToken
             parameters:
                 - name: agent
@@ -5256,6 +5272,12 @@ components:
                         can_manage_channel_members mirrors Agent.can_manage_channel_members so list
                          consumers can show whether the agent may manage members on its owner's
                          behalf.
+                canDelete:
+                    readOnly: true
+                    type: boolean
+                    description: |-
+                        can_delete reports whether the current caller may delete this agent: its
+                         owner or a workspace-scope holder of laelia.agents.edit.
             description: |-
                 AgentSummary is the lightweight list-view projection of an Agent returned by
                  ListAgents. It carries only the fields list/header views need: identity,
@@ -5264,8 +5286,11 @@ components:
                  full Agent (available_providers, the rest of acp_config, capability, host
                  info, token fields, created_by, can_edit) is returned only by GetAgent, so
                  the two RPCs don't overlap. can_edit is intentionally omitted: resolving it
-                 per row would N+1 the IAM policy lookup for non-admin callers, and the list
-                 view does not gate affordances on it (delete is enforced server-side).
+                 per row would N+1 the IAM policy lookup for non-admin callers. can_delete is
+                 the cheap subset the list view gates its delete affordance on: the agent's
+                 owner or a workspace-scope holder of laelia.agents.edit (per-agent policy
+                 bindings are not consulted, so a custom role bound on the agent may still
+                 delete server-side while the list hides the button).
         ApiProvider:
             required:
                 - name

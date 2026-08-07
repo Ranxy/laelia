@@ -245,10 +245,17 @@ func (s *AgentService) ListAgents(ctx context.Context, req *connect.Request[v1pb
 	// info, token fields, created_by, and can_edit — is returned by GetAgent, so
 	// the two RPCs don't overlap. can_edit is omitted here in particular because
 	// resolving it per row would N+1 the IAM policy lookup for non-admin
-	// callers, and the list view does not gate affordances on it (delete is
-	// enforced server-side via agents.edit).
+	// callers. can_delete is the cheap subset the list gates its delete
+	// affordance on: one workspace-scope agents.edit lookup for the page plus
+	// the per-row owner comparison (per-agent policy bindings are not
+	// consulted, so a custom role bound on the agent may still delete
+	// server-side while the list hides the button).
+	caller, _ := GetUserFromContext(ctx)
+	canDelete := canDeleteAgentWorkspace(ctx, s.iam, caller)
 	for _, agent := range agents {
-		response.Agents = append(response.Agents, convertToAgentSummary(agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID)))
+		summary := convertToAgentSummary(agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
+		summary.CanDelete = canDelete || isAgentOwner(caller, agent)
+		response.Agents = append(response.Agents, summary)
 	}
 	return connect.NewResponse(response), nil
 }
@@ -400,6 +407,11 @@ func (s *AgentService) TransferAgentOwnership(ctx context.Context, req *connect.
 	return connect.NewResponse(&v1pb.TransferAgentOwnershipResponse{Agent: out}), nil
 }
 
+// isAgentOwner reports whether the caller owns the agent.
+func isAgentOwner(user *store.UserMessage, agent *store.AgentMessage) bool {
+	return user != nil && agent.OwnerID != 0 && agent.OwnerID == user.ID
+}
+
 // canEditAgent reports whether the caller may modify the agent: its owner, or a
 // holder of laelia.agents.edit on the agent. With the per-agent editor role
 // removed, agents.edit is granted only by the workspaceAdmin role (via the
@@ -412,7 +424,7 @@ func (s *AgentService) canEditAgent(ctx context.Context, user *store.UserMessage
 		return false
 	}
 	// The owner may modify their own agent.
-	if agent.OwnerID != 0 && agent.OwnerID == user.ID {
+	if isAgentOwner(user, agent) {
 		return true
 	}
 	agentName := common.FormatAgentUID(agent.ResourceID)
@@ -422,6 +434,22 @@ func (s *AgentService) canEditAgent(ctx context.Context, user *store.UserMessage
 	})
 	if err != nil {
 		slog.Error("failed to resolve agents.edit", slog.String("agent", agentName), slog.Any("err", err))
+		return false
+	}
+	return ok
+}
+
+// canDeleteAgentWorkspace reports whether the caller holds laelia.agents.edit
+// at workspace scope (workspaceAdmin or a custom workspace role). Per-agent
+// policy bindings are not consulted: the list views use this cheap lookup once
+// per page plus the per-row owner comparison to populate can_delete, so a page
+// of N agents costs one IAM lookup, not N+1. A lookup failure is fail-closed.
+func canDeleteAgentWorkspace(ctx context.Context, im *iam.Manager, user *store.UserMessage) bool {
+	if user == nil || im == nil {
+		return false
+	}
+	ok, err := im.CheckPermission(ctx, permission.AgentsEdit, user, nil, nil)
+	if err != nil {
 		return false
 	}
 	return ok
@@ -438,6 +466,10 @@ func (s *AgentService) DeleteAgent(ctx context.Context, req *connect.Request[v1p
 	}
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !s.canEditAgent(ctx, user, agent) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a holder of laelia.agents.edit can delete this agent"))
 	}
 	if err := s.store.DeleteAgent(ctx, resourceID); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to delete agent, error: %v", err))
@@ -465,6 +497,10 @@ func (s *AgentService) RotateAgentToken(ctx context.Context, req *connect.Reques
 	}
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !s.canEditAgent(ctx, user, agent) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a holder of laelia.agents.edit can rotate this agent's token"))
 	}
 
 	newTokenVersion := agent.TokenVersion + 1
@@ -533,6 +569,10 @@ func (s *AgentService) RevokeAgentToken(ctx context.Context, req *connect.Reques
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
 	}
+	user, _ := GetUserFromContext(ctx)
+	if !s.canEditAgent(ctx, user, agent) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a holder of laelia.agents.edit can revoke this agent's tokens"))
+	}
 
 	newTokenVersion := agent.TokenVersion + 1
 	nowRotated := time.Now()
@@ -569,6 +609,10 @@ func (s *AgentService) ForceDisconnectAgent(ctx context.Context, req *connect.Re
 	}
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !s.canEditAgent(ctx, user, agent) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a holder of laelia.agents.edit can force-disconnect this agent"))
 	}
 
 	reason := "admin_forced"
@@ -1733,6 +1777,10 @@ func (s *AgentService) RefreshAgentProviders(ctx context.Context, req *connect.R
 	}
 	if agent == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !s.canEditAgent(ctx, user, agent) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the agent's owner or a holder of laelia.agents.edit can refresh this agent's providers"))
 	}
 	if !s.dispatcher.IsAgentConnected(agent.ID) {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent is not connected; cannot probe providers"))

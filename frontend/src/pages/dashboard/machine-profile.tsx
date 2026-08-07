@@ -863,19 +863,20 @@ export function MachineProfilePage() {
                             </span>
                             <ConnectionBadge state={agent.status?.state} />
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="size-6 shrink-0 p-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                            aria-label={t("common.delete")}
-                            disabled={!canEdit}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRemoveTarget(agent);
-                            }}
-                          >
-                            <Trash className="size-3.5" />
-                          </Button>
+                          {agent.canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="size-6 shrink-0 p-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                              aria-label={t("common.delete")}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRemoveTarget(agent);
+                              }}
+                            >
+                              <Trash className="size-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </li>
                     );

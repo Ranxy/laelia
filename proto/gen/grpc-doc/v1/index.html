@@ -3262,7 +3262,7 @@ sessions without an ACP executor. </p></td>
         
       
         <h3 id="laelia.v1.AgentSummary">AgentSummary</h3>
-        <p>AgentSummary is the lightweight list-view projection of an Agent returned by</p><p>ListAgents. It carries only the fields list/header views need: identity,</p><p>lifecycle state, connection status, and the provider/executable signal that</p><p>agentLifecycle() reads to classify an agent as ready/pending/offline. The</p><p>full Agent (available_providers, the rest of acp_config, capability, host</p><p>info, token fields, created_by, can_edit) is returned only by GetAgent, so</p><p>the two RPCs don't overlap. can_edit is intentionally omitted: resolving it</p><p>per row would N+1 the IAM policy lookup for non-admin callers, and the list</p><p>view does not gate affordances on it (delete is enforced server-side).</p>
+        <p>AgentSummary is the lightweight list-view projection of an Agent returned by</p><p>ListAgents. It carries only the fields list/header views need: identity,</p><p>lifecycle state, connection status, and the provider/executable signal that</p><p>agentLifecycle() reads to classify an agent as ready/pending/offline. The</p><p>full Agent (available_providers, the rest of acp_config, capability, host</p><p>info, token fields, created_by, can_edit) is returned only by GetAgent, so</p><p>the two RPCs don't overlap. can_edit is intentionally omitted: resolving it</p><p>per row would N+1 the IAM policy lookup for non-admin callers. can_delete is</p><p>the cheap subset the list view gates its delete affordance on: the agent's</p><p>owner or a workspace-scope holder of laelia.agents.edit (per-agent policy</p><p>bindings are not consulted, so a custom role bound on the agent may still</p><p>delete server-side while the list hides the button).</p>
 
         
           <table class="field-table">
@@ -3366,6 +3366,14 @@ consumers can show whether the agent follows its owner&#39;s channel access. </p
                   <td><p>can_manage_channel_members mirrors Agent.can_manage_channel_members so list
 consumers can show whether the agent may manage members on its owner&#39;s
 behalf. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>can_delete</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>can_delete reports whether the current caller may delete this agent: its
+owner or a workspace-scope holder of laelia.agents.edit. </p></td>
                 </tr>
               
             </tbody>
@@ -4812,28 +4820,37 @@ handler-gated via canEditAgent.</p></td>
                 <td>DeleteAgent</td>
                 <td><a href="#laelia.v1.DeleteAgentRequest">DeleteAgentRequest</a></td>
                 <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
-                <td><p></p></td>
+                <td><p>DeleteAgent soft-deletes an agent. Authorized in the handler for the
+agent&#39;s owner or a holder of laelia.agents.edit on the agent; no
+permission annotation so the owner short-circuit can run.</p></td>
               </tr>
             
               <tr>
                 <td>RotateAgentToken</td>
                 <td><a href="#laelia.v1.RotateAgentTokenRequest">RotateAgentTokenRequest</a></td>
                 <td><a href="#laelia.v1.RotateAgentTokenResponse">RotateAgentTokenResponse</a></td>
-                <td><p>Token rotation: generate a new bootstrap token, old token invalid after grace period</p></td>
+                <td><p>Token rotation: generate a new bootstrap token, old token invalid after
+grace period. Authorized in the handler for the agent&#39;s owner or a holder
+of laelia.agents.edit on the agent; no permission annotation so the owner
+short-circuit can run.</p></td>
               </tr>
             
               <tr>
                 <td>RevokeAgentToken</td>
                 <td><a href="#laelia.v1.RevokeAgentTokenRequest">RevokeAgentTokenRequest</a></td>
                 <td><a href="#laelia.v1.RevokeAgentTokenResponse">RevokeAgentTokenResponse</a></td>
-                <td><p>Token revocation: revoke all tokens for the agent</p></td>
+                <td><p>Token revocation: revoke all tokens for the agent. Authorized in the
+handler for the agent&#39;s owner or a holder of laelia.agents.edit on the
+agent; no permission annotation so the owner short-circuit can run.</p></td>
               </tr>
             
               <tr>
                 <td>ForceDisconnectAgent</td>
                 <td><a href="#laelia.v1.ForceDisconnectAgentRequest">ForceDisconnectAgentRequest</a></td>
                 <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
-                <td><p>Admin force disconnects an agent connection</p></td>
+                <td><p>Force-disconnects an agent connection. Authorized in the handler for the
+agent&#39;s owner or a holder of laelia.agents.edit on the agent; no
+permission annotation so the owner short-circuit can run.</p></td>
               </tr>
             
               <tr>
@@ -4867,9 +4884,11 @@ the agent&#39;s owner or a workspace admin may update it.</p></td>
                 <td>RefreshAgentProviders</td>
                 <td><a href="#laelia.v1.RefreshAgentProvidersRequest">RefreshAgentProvidersRequest</a></td>
                 <td><a href="#laelia.v1.RefreshAgentProvidersResponse">RefreshAgentProvidersResponse</a></td>
-                <td><p>Ask the agent daemon to re-probe its host for installed LLM agent providers
-and their models. Returns the freshly discovered provider list (also
-persisted into agent.info.available_providers). Admin only.</p></td>
+                <td><p>Ask the agent daemon to re-probe its host for installed LLM agent
+providers and their models. Returns the freshly discovered provider list
+(also persisted into agent.info.available_providers). Authorized in the
+handler for the agent&#39;s owner or a holder of laelia.agents.edit on the
+agent; no permission annotation so the owner short-circuit can run.</p></td>
               </tr>
             
               <tr>

@@ -1310,8 +1310,11 @@ export declare const AgentSchema: GenMessage<Agent>;
  * full Agent (available_providers, the rest of acp_config, capability, host
  * info, token fields, created_by, can_edit) is returned only by GetAgent, so
  * the two RPCs don't overlap. can_edit is intentionally omitted: resolving it
- * per row would N+1 the IAM policy lookup for non-admin callers, and the list
- * view does not gate affordances on it (delete is enforced server-side).
+ * per row would N+1 the IAM policy lookup for non-admin callers. can_delete is
+ * the cheap subset the list view gates its delete affordance on: the agent's
+ * owner or a workspace-scope holder of laelia.agents.edit (per-agent policy
+ * bindings are not consulted, so a custom role bound on the agent may still
+ * delete server-side while the list hides the button).
  *
  * @generated from message laelia.v1.AgentSummary
  */
@@ -1402,6 +1405,14 @@ export declare type AgentSummary = Message<"laelia.v1.AgentSummary"> & {
    * @generated from field: bool can_manage_channel_members = 12;
    */
   canManageChannelMembers: boolean;
+
+  /**
+   * can_delete reports whether the current caller may delete this agent: its
+   * owner or a workspace-scope holder of laelia.agents.edit.
+   *
+   * @generated from field: bool can_delete = 13;
+   */
+  canDelete: boolean;
 };
 
 /**
@@ -1907,6 +1918,10 @@ export declare const AgentService: GenService<{
     output: typeof TransferAgentOwnershipResponseSchema;
   },
   /**
+   * DeleteAgent soft-deletes an agent. Authorized in the handler for the
+   * agent's owner or a holder of laelia.agents.edit on the agent; no
+   * permission annotation so the owner short-circuit can run.
+   *
    * @generated from rpc laelia.v1.AgentService.DeleteAgent
    */
   deleteAgent: {
@@ -1915,7 +1930,10 @@ export declare const AgentService: GenService<{
     output: typeof EmptySchema;
   },
   /**
-   * Token rotation: generate a new bootstrap token, old token invalid after grace period
+   * Token rotation: generate a new bootstrap token, old token invalid after
+   * grace period. Authorized in the handler for the agent's owner or a holder
+   * of laelia.agents.edit on the agent; no permission annotation so the owner
+   * short-circuit can run.
    *
    * @generated from rpc laelia.v1.AgentService.RotateAgentToken
    */
@@ -1925,7 +1943,9 @@ export declare const AgentService: GenService<{
     output: typeof RotateAgentTokenResponseSchema;
   },
   /**
-   * Token revocation: revoke all tokens for the agent
+   * Token revocation: revoke all tokens for the agent. Authorized in the
+   * handler for the agent's owner or a holder of laelia.agents.edit on the
+   * agent; no permission annotation so the owner short-circuit can run.
    *
    * @generated from rpc laelia.v1.AgentService.RevokeAgentToken
    */
@@ -1935,7 +1955,9 @@ export declare const AgentService: GenService<{
     output: typeof RevokeAgentTokenResponseSchema;
   },
   /**
-   * Admin force disconnects an agent connection
+   * Force-disconnects an agent connection. Authorized in the handler for the
+   * agent's owner or a holder of laelia.agents.edit on the agent; no
+   * permission annotation so the owner short-circuit can run.
    *
    * @generated from rpc laelia.v1.AgentService.ForceDisconnectAgent
    */
@@ -1981,9 +2003,11 @@ export declare const AgentService: GenService<{
     output: typeof EmptySchema;
   },
   /**
-   * Ask the agent daemon to re-probe its host for installed LLM agent providers
-   * and their models. Returns the freshly discovered provider list (also
-   * persisted into agent.info.available_providers). Admin only.
+   * Ask the agent daemon to re-probe its host for installed LLM agent
+   * providers and their models. Returns the freshly discovered provider list
+   * (also persisted into agent.info.available_providers). Authorized in the
+   * handler for the agent's owner or a holder of laelia.agents.edit on the
+   * agent; no permission annotation so the owner short-circuit can run.
    *
    * @generated from rpc laelia.v1.AgentService.RefreshAgentProviders
    */

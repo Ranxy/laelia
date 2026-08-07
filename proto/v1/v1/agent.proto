@@ -75,43 +75,49 @@ service AgentService {
     option (laelia.v1.audit) = true;
   }
 
+  // DeleteAgent soft-deletes an agent. Authorized in the handler for the
+  // agent's owner or a holder of laelia.agents.edit on the agent; no
+  // permission annotation so the owner short-circuit can run.
   rpc DeleteAgent(DeleteAgentRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/v1/{name=agents/*}"};
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.agents.edit";
     option (laelia.v1.audit) = true;
   }
 
-  // Token rotation: generate a new bootstrap token, old token invalid after grace period
+  // Token rotation: generate a new bootstrap token, old token invalid after
+  // grace period. Authorized in the handler for the agent's owner or a holder
+  // of laelia.agents.edit on the agent; no permission annotation so the owner
+  // short-circuit can run.
   rpc RotateAgentToken(RotateAgentTokenRequest) returns (RotateAgentTokenResponse) {
     option (google.api.http) = {
       post: "/v1/{name=agents/*}:rotateToken"
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.agents.edit";
     option (laelia.v1.audit) = true;
   }
 
-  // Token revocation: revoke all tokens for the agent
+  // Token revocation: revoke all tokens for the agent. Authorized in the
+  // handler for the agent's owner or a holder of laelia.agents.edit on the
+  // agent; no permission annotation so the owner short-circuit can run.
   rpc RevokeAgentToken(RevokeAgentTokenRequest) returns (RevokeAgentTokenResponse) {
     option (google.api.http) = {
       post: "/v1/{name=agents/*}:revokeToken"
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.agents.edit";
     option (laelia.v1.audit) = true;
   }
 
-  // Admin force disconnects an agent connection
+  // Force-disconnects an agent connection. Authorized in the handler for the
+  // agent's owner or a holder of laelia.agents.edit on the agent; no
+  // permission annotation so the owner short-circuit can run.
   rpc ForceDisconnectAgent(ForceDisconnectAgentRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {
       post: "/v1/{name=agents/*}:forceDisconnect"
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.agents.edit";
     option (laelia.v1.audit) = true;
   }
 
@@ -148,16 +154,17 @@ service AgentService {
     option (laelia.v1.audit) = true;
   }
 
-  // Ask the agent daemon to re-probe its host for installed LLM agent providers
-  // and their models. Returns the freshly discovered provider list (also
-  // persisted into agent.info.available_providers). Admin only.
+  // Ask the agent daemon to re-probe its host for installed LLM agent
+  // providers and their models. Returns the freshly discovered provider list
+  // (also persisted into agent.info.available_providers). Authorized in the
+  // handler for the agent's owner or a holder of laelia.agents.edit on the
+  // agent; no permission annotation so the owner short-circuit can run.
   rpc RefreshAgentProviders(RefreshAgentProvidersRequest) returns (RefreshAgentProvidersResponse) {
     option (google.api.http) = {
       post: "/v1/{name=agents/*}:refreshProviders"
       body: "*"
     };
     option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.agents.edit";
     option (laelia.v1.audit) = true;
   }
 
@@ -696,8 +703,11 @@ message Agent {
 // full Agent (available_providers, the rest of acp_config, capability, host
 // info, token fields, created_by, can_edit) is returned only by GetAgent, so
 // the two RPCs don't overlap. can_edit is intentionally omitted: resolving it
-// per row would N+1 the IAM policy lookup for non-admin callers, and the list
-// view does not gate affordances on it (delete is enforced server-side).
+// per row would N+1 the IAM policy lookup for non-admin callers. can_delete is
+// the cheap subset the list view gates its delete affordance on: the agent's
+// owner or a workspace-scope holder of laelia.agents.edit (per-agent policy
+// bindings are not consulted, so a custom role bound on the agent may still
+// delete server-side while the list hides the button).
 message AgentSummary {
   string name = 1;
   State state = 2;
@@ -731,6 +741,9 @@ message AgentSummary {
   // consumers can show whether the agent may manage members on its owner's
   // behalf.
   bool can_manage_channel_members = 12;
+  // can_delete reports whether the current caller may delete this agent: its
+  // owner or a workspace-scope holder of laelia.agents.edit.
+  bool can_delete = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message AgentInfo {

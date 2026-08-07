@@ -2810,8 +2810,11 @@ func (x *Agent) GetCanManageChannelMembers() bool {
 // full Agent (available_providers, the rest of acp_config, capability, host
 // info, token fields, created_by, can_edit) is returned only by GetAgent, so
 // the two RPCs don't overlap. can_edit is intentionally omitted: resolving it
-// per row would N+1 the IAM policy lookup for non-admin callers, and the list
-// view does not gate affordances on it (delete is enforced server-side).
+// per row would N+1 the IAM policy lookup for non-admin callers. can_delete is
+// the cheap subset the list view gates its delete affordance on: the agent's
+// owner or a workspace-scope holder of laelia.agents.edit (per-agent policy
+// bindings are not consulted, so a custom role bound on the agent may still
+// delete server-side while the list hides the button).
 type AgentSummary struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Name   string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -2846,8 +2849,11 @@ type AgentSummary struct {
 	// consumers can show whether the agent may manage members on its owner's
 	// behalf.
 	CanManageChannelMembers bool `protobuf:"varint,12,opt,name=can_manage_channel_members,json=canManageChannelMembers,proto3" json:"can_manage_channel_members,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	// can_delete reports whether the current caller may delete this agent: its
+	// owner or a workspace-scope holder of laelia.agents.edit.
+	CanDelete     bool `protobuf:"varint,13,opt,name=can_delete,json=canDelete,proto3" json:"can_delete,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AgentSummary) Reset() {
@@ -2960,6 +2966,13 @@ func (x *AgentSummary) GetFollowOwnerPermissions() bool {
 func (x *AgentSummary) GetCanManageChannelMembers() bool {
 	if x != nil {
 		return x.CanManageChannelMembers
+	}
+	return false
+}
+
+func (x *AgentSummary) GetCanDelete() bool {
+	if x != nil {
+		return x.CanDelete
 	}
 	return false
 }
@@ -3882,7 +3895,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:!\xeaA\x1e\n" +
-	"\flaelia/Agent\x12\x0eagents/{agent}J\x04\b\x04\x10\x05R\x05token\"\xc3\x03\n" +
+	"\flaelia/Agent\x12\x0eagents/{agent}J\x04\b\x04\x10\x05R\x05token\"\xe7\x03\n" +
 	"\fAgentSummary\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x10.laelia.v1.StateR\x05state\x12\x14\n" +
@@ -3899,7 +3912,9 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x05owner\x18\n" +
 	" \x01(\tR\x05owner\x128\n" +
 	"\x18follow_owner_permissions\x18\v \x01(\bR\x16followOwnerPermissions\x12;\n" +
-	"\x1acan_manage_channel_members\x18\f \x01(\bR\x17canManageChannelMembers\"\xce\x03\n" +
+	"\x1acan_manage_channel_members\x18\f \x01(\bR\x17canManageChannelMembers\x12\"\n" +
+	"\n" +
+	"can_delete\x18\r \x01(\bB\x03\xe0A\x03R\tcanDelete\"\xce\x03\n" +
 	"\tAgentInfo\x12\x1d\n" +
 	"\n" +
 	"agent_type\x18\x01 \x01(\tR\tagentType\x12\x1a\n" +
@@ -3986,7 +4001,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x0fdisk_used_bytes\x18\x04 \x01(\x04R\rdiskUsedBytes\x12(\n" +
 	"\x10disk_total_bytes\x18\x05 \x01(\x04R\x0ediskTotalBytes\x12%\n" +
 	"\x0euptime_seconds\x18\x06 \x01(\rR\ruptimeSeconds\x12'\n" +
-	"\x0fgoroutine_count\x18\a \x01(\rR\x0egoroutineCount2\x98\x1a\n" +
+	"\x0fgoroutine_count\x18\a \x01(\rR\x0egoroutineCount2\xaa\x19\n" +
 	"\fAgentService\x12o\n" +
 	"\vCreateAgent\x12\x1d.laelia.v1.CreateAgentRequest\x1a\x1e.laelia.v1.CreateAgentResponse\"!\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x13:\x05agent\"\n" +
 	"/v1/agents\x12v\n" +
@@ -3995,15 +4010,15 @@ const file_v1_agent_proto_rawDesc = "" +
 	"/v1/agents\x12u\n" +
 	"\bGetAgent\x12\x1a.laelia.v1.GetAgentRequest\x1a\x10.laelia.v1.Agent\";\xdaA\x04name\x8a\xea0\x11laelia.agents.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/{name=agents/*}\x12\x84\x01\n" +
 	"\vUpdateAgent\x12\x1d.laelia.v1.UpdateAgentRequest\x1a\x10.laelia.v1.Agent\"D\xdaA\x11agent,update_mask\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\":\x05agent2\x19/v1/{agent.name=agents/*}\x12\xb8\x01\n" +
-	"\x16TransferAgentOwnership\x12(.laelia.v1.TransferAgentOwnershipRequest\x1a).laelia.v1.TransferAgentOwnershipResponse\"I\xdaA\x0ename,new_owner\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=agents/*}:transferOwnership\x12\x7f\n" +
-	"\vDeleteAgent\x12\x1d.laelia.v1.DeleteAgentRequest\x1a\x16.google.protobuf.Empty\"9\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x15*\x13/v1/{name=agents/*}\x12\xa5\x01\n" +
-	"\x10RotateAgentToken\x12\".laelia.v1.RotateAgentTokenRequest\x1a#.laelia.v1.RotateAgentTokenResponse\"H\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/{name=agents/*}:rotateToken\x12\xa5\x01\n" +
-	"\x10RevokeAgentToken\x12\".laelia.v1.RevokeAgentTokenRequest\x1a#.laelia.v1.RevokeAgentTokenResponse\"H\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/{name=agents/*}:revokeToken\x12\xa4\x01\n" +
-	"\x14ForceDisconnectAgent\x12&.laelia.v1.ForceDisconnectAgentRequest\x1a\x16.google.protobuf.Empty\"L\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*\"#/v1/{name=agents/*}:forceDisconnect\x12\xa6\x01\n" +
+	"\x16TransferAgentOwnership\x12(.laelia.v1.TransferAgentOwnershipRequest\x1a).laelia.v1.TransferAgentOwnershipResponse\"I\xdaA\x0ename,new_owner\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=agents/*}:transferOwnership\x12i\n" +
+	"\vDeleteAgent\x12\x1d.laelia.v1.DeleteAgentRequest\x1a\x16.google.protobuf.Empty\"#\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x15*\x13/v1/{name=agents/*}\x12\x8f\x01\n" +
+	"\x10RotateAgentToken\x12\".laelia.v1.RotateAgentTokenRequest\x1a#.laelia.v1.RotateAgentTokenResponse\"2\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/{name=agents/*}:rotateToken\x12\x8f\x01\n" +
+	"\x10RevokeAgentToken\x12\".laelia.v1.RevokeAgentTokenRequest\x1a#.laelia.v1.RevokeAgentTokenResponse\"2\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/{name=agents/*}:revokeToken\x12\x8e\x01\n" +
+	"\x14ForceDisconnectAgent\x12&.laelia.v1.ForceDisconnectAgentRequest\x1a\x16.google.protobuf.Empty\"6\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*\"#/v1/{name=agents/*}:forceDisconnect\x12\xa6\x01\n" +
 	"\x11ListAgentSessions\x12#.laelia.v1.ListAgentSessionsRequest\x1a$.laelia.v1.ListAgentSessionsResponse\"F\x8a\xea0\x1alaelia.agents.listSessions\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1e\x12\x1c/v1/{name=agents/*}/sessions\x12\x8e\x01\n" +
 	"\x14UpdateAgentACPConfig\x12&.laelia.v1.UpdateAgentACPConfigRequest\x1a\x16.google.protobuf.Empty\"6\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*2#/v1/{name=agents/*}:updateAcpConfig\x12\x8e\x01\n" +
-	"\x14UpdateAgentMcpConfig\x12&.laelia.v1.UpdateAgentMcpConfigRequest\x1a\x16.google.protobuf.Empty\"6\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*2#/v1/{name=agents/*}:updateMcpConfig\x12\xb9\x01\n" +
-	"\x15RefreshAgentProviders\x12'.laelia.v1.RefreshAgentProvidersRequest\x1a(.laelia.v1.RefreshAgentProvidersResponse\"M\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02):\x01*\"$/v1/{name=agents/*}:refreshProviders\x12\x97\x01\n" +
+	"\x14UpdateAgentMcpConfig\x12&.laelia.v1.UpdateAgentMcpConfigRequest\x1a\x16.google.protobuf.Empty\"6\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*2#/v1/{name=agents/*}:updateMcpConfig\x12\xa3\x01\n" +
+	"\x15RefreshAgentProviders\x12'.laelia.v1.RefreshAgentProvidersRequest\x1a(.laelia.v1.RefreshAgentProvidersResponse\"7\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02):\x01*\"$/v1/{name=agents/*}:refreshProviders\x12\x97\x01\n" +
 	"\x12ListAgentWorkspace\x12$.laelia.v1.ListAgentWorkspaceRequest\x1a%.laelia.v1.ListAgentWorkspaceResponse\"4\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02&:\x01*\"!/v1/{name=agents/*}:listWorkspace\x12\xa7\x01\n" +
 	"\x16ReadAgentWorkspaceFile\x12(.laelia.v1.ReadAgentWorkspaceFileRequest\x1a).laelia.v1.ReadAgentWorkspaceFileResponse\"8\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=agents/*}:readWorkspaceFile\x12\x8b\x01\n" +
 	"\fListPiModels\x12\x1e.laelia.v1.ListPiModelsRequest\x1a\x1f.laelia.v1.ListPiModelsResponse\":\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/pi:listModels\x12v\n" +

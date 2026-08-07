@@ -476,9 +476,17 @@ func (s *MachineService) ListMachineAgents(ctx context.Context, req *connect.Req
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to list machine agents, error: %v", err))
 	}
 
+	// can_delete is the cheap subset of canEditAgent: one workspace-scope
+	// agents.edit lookup for the whole roster plus the per-row owner comparison
+	// (per-agent policy bindings are not consulted, so a custom role bound on
+	// the agent may still delete server-side while the UI hides the button).
+	caller, _ := GetUserFromContext(ctx)
+	canDelete := canDeleteAgentWorkspace(ctx, s.iam, caller)
 	resp := &v1pb.ListMachineAgentsResponse{}
 	for _, agent := range agents {
-		resp.Agents = append(resp.Agents, convertToAgentSummary(agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID)))
+		summary := convertToAgentSummary(agent, agentReachable(s.dispatcher, agent.ID, agent.MachineID))
+		summary.CanDelete = canDelete || isAgentOwner(caller, agent)
+		resp.Agents = append(resp.Agents, summary)
 	}
 	return connect.NewResponse(resp), nil
 }
