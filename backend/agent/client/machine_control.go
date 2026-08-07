@@ -102,9 +102,6 @@ func (c *MachineClient) runControlStream(ctx context.Context, _ *daemonsrv.Serve
 				// run it off the receive pump.
 				go c.handleMachineWorkspaceScan(ctx, sendStream, m.MachineWorkspaceScanRequest)
 
-			case *v1pb.ManagerMachineStreamMessage_MachineWorkspaceDeleteRequest:
-				go c.handleMachineWorkspaceDelete(ctx, sendStream, m.MachineWorkspaceDeleteRequest)
-
 			case *v1pb.ManagerMachineStreamMessage_Pong:
 				// pong received, link acknowledged
 
@@ -221,28 +218,6 @@ func (c *MachineClient) handleMachineWorkspaceScan(_ context.Context, send func(
 			MachineWorkspaceScanResponse: &v1pb.MachineWorkspaceScanResponse{
 				RequestId:  req.RequestId,
 				Workspaces: protoSummaries,
-			},
-		},
-	})
-}
-
-// handleMachineWorkspaceDelete recursively removes one agent workspace
-// directory. The workspace package rejects names that could escape the root.
-func (c *MachineClient) handleMachineWorkspaceDelete(_ context.Context, send func(*v1pb.MachineStreamMessage) error, req *v1pb.MachineWorkspaceDeleteRequest) {
-	if req == nil {
-		return
-	}
-	root := filepath.Join(os.Getenv("HOME"), ".laelia", c.machineID)
-	err := workspace.Delete(root, req.DirectoryName)
-	if err != nil {
-		slog.Warn("machine workspace delete failed", "machineID", c.machineID, "directory", req.DirectoryName, "error", err)
-	}
-	_ = send(&v1pb.MachineStreamMessage{
-		Message: &v1pb.MachineStreamMessage_MachineWorkspaceDeleteResponse{
-			MachineWorkspaceDeleteResponse: &v1pb.MachineWorkspaceDeleteResponse{
-				RequestId:     req.RequestId,
-				DirectoryName: req.DirectoryName,
-				Success:       err == nil,
 			},
 		},
 	})

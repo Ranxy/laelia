@@ -453,51 +453,6 @@ func local_request_MachineService_ListMachineWorkspaces_0(ctx context.Context, m
 	return msg, metadata, err
 }
 
-func request_MachineService_DeleteMachineWorkspace_0(ctx context.Context, marshaler runtime.Marshaler, client MachineServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq DeleteMachineWorkspaceRequest
-		metadata runtime.ServerMetadata
-		err      error
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	val, ok := pathParams["name"]
-	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "name")
-	}
-	protoReq.Name, err = runtime.String(val)
-	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "name", err)
-	}
-	if req.Body != nil {
-		_, _ = io.Copy(io.Discard, req.Body)
-	}
-	msg, err := client.DeleteMachineWorkspace(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-}
-
-func local_request_MachineService_DeleteMachineWorkspace_0(ctx context.Context, marshaler runtime.Marshaler, server MachineServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq DeleteMachineWorkspaceRequest
-		metadata runtime.ServerMetadata
-		err      error
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	val, ok := pathParams["name"]
-	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "name")
-	}
-	protoReq.Name, err = runtime.String(val)
-	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "name", err)
-	}
-	msg, err := server.DeleteMachineWorkspace(ctx, &protoReq)
-	return msg, metadata, err
-}
-
 func request_MachineService_ConnectMachine_0(ctx context.Context, marshaler runtime.Marshaler, client MachineServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq ConnectMachineRequest
@@ -812,26 +767,6 @@ func RegisterMachineServiceHandlerServer(ctx context.Context, mux *runtime.Serve
 		}
 		forward_MachineService_ListMachineWorkspaces_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPost, pattern_MachineService_DeleteMachineWorkspace_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		var stream runtime.ServerTransportStream
-		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
-		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/laelia.v1.MachineService/DeleteMachineWorkspace", runtime.WithHTTPPathPattern("/v1/{name=machines/*}:deleteWorkspace"))
-		if err != nil {
-			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		resp, md, err := local_request_MachineService_DeleteMachineWorkspace_0(annotatedContext, inboundMarshaler, server, req, pathParams)
-		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
-		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		forward_MachineService_DeleteMachineWorkspace_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-	})
 	mux.Handle(http.MethodPost, pattern_MachineService_ConnectMachine_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -1122,23 +1057,6 @@ func RegisterMachineServiceHandlerClient(ctx context.Context, mux *runtime.Serve
 		}
 		forward_MachineService_ListMachineWorkspaces_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPost, pattern_MachineService_DeleteMachineWorkspace_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/laelia.v1.MachineService/DeleteMachineWorkspace", runtime.WithHTTPPathPattern("/v1/{name=machines/*}:deleteWorkspace"))
-		if err != nil {
-			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		resp, md, err := request_MachineService_DeleteMachineWorkspace_0(annotatedContext, inboundMarshaler, client, req, pathParams)
-		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		forward_MachineService_DeleteMachineWorkspace_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-	})
 	mux.Handle(http.MethodPost, pattern_MachineService_ConnectMachine_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -1221,7 +1139,6 @@ var (
 	pattern_MachineService_ListMachineAgents_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "machines", "name", "agents"}, ""))
 	pattern_MachineService_RefreshMachineProviders_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "machines", "name"}, "refreshProviders"))
 	pattern_MachineService_ListMachineWorkspaces_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "machines", "name"}, "listWorkspaces"))
-	pattern_MachineService_DeleteMachineWorkspace_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "machines", "name"}, "deleteWorkspace"))
 	pattern_MachineService_ConnectMachine_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "machines"}, "connect"))
 	pattern_MachineService_MachineHeartbeat_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "machines"}, "heartbeat"))
 	pattern_MachineService_MachineDisconnect_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "machines"}, "disconnect"))
@@ -1239,7 +1156,6 @@ var (
 	forward_MachineService_ListMachineAgents_0       = runtime.ForwardResponseMessage
 	forward_MachineService_RefreshMachineProviders_0 = runtime.ForwardResponseMessage
 	forward_MachineService_ListMachineWorkspaces_0   = runtime.ForwardResponseMessage
-	forward_MachineService_DeleteMachineWorkspace_0  = runtime.ForwardResponseMessage
 	forward_MachineService_ConnectMachine_0          = runtime.ForwardResponseMessage
 	forward_MachineService_MachineHeartbeat_0        = runtime.ForwardResponseMessage
 	forward_MachineService_MachineDisconnect_0       = runtime.ForwardResponseMessage

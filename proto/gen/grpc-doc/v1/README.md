@@ -354,8 +354,6 @@
     - [CreateMachineRequest](#laelia-v1-CreateMachineRequest)
     - [CreateMachineResponse](#laelia-v1-CreateMachineResponse)
     - [DeleteMachineRequest](#laelia-v1-DeleteMachineRequest)
-    - [DeleteMachineWorkspaceRequest](#laelia-v1-DeleteMachineWorkspaceRequest)
-    - [DeleteMachineWorkspaceResponse](#laelia-v1-DeleteMachineWorkspaceResponse)
     - [ForceDisconnectMachineRequest](#laelia-v1-ForceDisconnectMachineRequest)
     - [GetMachineRequest](#laelia-v1-GetMachineRequest)
     - [ListMachineAgentsRequest](#laelia-v1-ListMachineAgentsRequest)
@@ -376,8 +374,6 @@
     - [MachineStatus](#laelia-v1-MachineStatus)
     - [MachineStreamMessage](#laelia-v1-MachineStreamMessage)
     - [MachineSummary](#laelia-v1-MachineSummary)
-    - [MachineWorkspaceDeleteRequest](#laelia-v1-MachineWorkspaceDeleteRequest)
-    - [MachineWorkspaceDeleteResponse](#laelia-v1-MachineWorkspaceDeleteResponse)
     - [MachineWorkspaceScanRequest](#laelia-v1-MachineWorkspaceScanRequest)
     - [MachineWorkspaceScanResponse](#laelia-v1-MachineWorkspaceScanResponse)
     - [MachineWorkspaceSummary](#laelia-v1-MachineWorkspaceSummary)
@@ -6127,37 +6123,6 @@ in full in ConnectMachineResponse.assigned_agents on (re)connect.
 
 
 
-<a name="laelia-v1-DeleteMachineWorkspaceRequest"></a>
-
-### DeleteMachineWorkspaceRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  |  |
-| directory_name | [string](#string) |  | bare directory name; validated by the machine app |
-
-
-
-
-
-
-<a name="laelia-v1-DeleteMachineWorkspaceResponse"></a>
-
-### DeleteMachineWorkspaceResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| success | [bool](#bool) |  |  |
-
-
-
-
-
-
 <a name="laelia-v1-ForceDisconnectMachineRequest"></a>
 
 ### ForceDisconnectMachineRequest
@@ -6476,7 +6441,6 @@ in full in ConnectMachineResponse.assigned_agents on (re)connect.
 | providers_discovered | [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered) |  | response to DiscoverProviders |
 | disconnect_notice | [MachineDisconnectNotice](#laelia-v1-MachineDisconnectNotice) |  | graceful shutdown |
 | machine_workspace_scan_response | [MachineWorkspaceScanResponse](#laelia-v1-MachineWorkspaceScanResponse) |  | response to ManagerMachineStreamMessage.machine_workspace_scan_request |
-| machine_workspace_delete_response | [MachineWorkspaceDeleteResponse](#laelia-v1-MachineWorkspaceDeleteResponse) |  | response to ManagerMachineStreamMessage.machine_workspace_delete_request |
 
 
 
@@ -6502,41 +6466,6 @@ the count of agents bound to the machine.
 | can_edit | [bool](#bool) |  | can_edit reports whether the current caller holds laelia.machines.edit (workspace-scope). |
 | can_manage | [bool](#bool) |  | can_manage reports whether the current caller may manage this machine&#39;s IAM policy (the machine&#39;s creator or a workspace admin). |
 | can_delete | [bool](#bool) |  | can_delete reports whether the current caller may delete this machine: the machine&#39;s creator or a holder of laelia.machines.delete. |
-
-
-
-
-
-
-<a name="laelia-v1-MachineWorkspaceDeleteRequest"></a>
-
-### MachineWorkspaceDeleteRequest
-MachineWorkspaceDeleteRequest asks the machine app to recursively delete one
-agent workspace directory. directory_name must be a bare directory name (no
-path separators or &#34;..&#34;) — the machine app validates it.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| request_id | [string](#string) |  | correlation id for the pending unary DeleteMachineWorkspace call |
-| directory_name | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-MachineWorkspaceDeleteResponse"></a>
-
-### MachineWorkspaceDeleteResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| request_id | [string](#string) |  |  |
-| directory_name | [string](#string) |  |  |
-| success | [bool](#bool) |  |  |
 
 
 
@@ -6609,7 +6538,6 @@ MachineWorkspaceSummary is one agent workspace directory&#39;s usage summary.
 | pong | [Pong](#laelia-v1-Pong) |  |  |
 | reload_agent_assignment | [ReloadAgentAssignment](#laelia-v1-ReloadAgentAssignment) |  | full re-sync of one agent |
 | machine_workspace_scan_request | [MachineWorkspaceScanRequest](#laelia-v1-MachineWorkspaceScanRequest) |  | scan per-agent workspace directories on this machine |
-| machine_workspace_delete_request | [MachineWorkspaceDeleteRequest](#laelia-v1-MachineWorkspaceDeleteRequest) |  | delete one agent workspace directory |
 
 
 
@@ -6812,7 +6740,6 @@ AgentChannel over the machine&#39;s access token.
 | ListMachineAgents | [ListMachineAgentsRequest](#laelia-v1-ListMachineAgentsRequest) | [ListMachineAgentsResponse](#laelia-v1-ListMachineAgentsResponse) | List the agents hosted on a machine. |
 | RefreshMachineProviders | [RefreshMachineProvidersRequest](#laelia-v1-RefreshMachineProvidersRequest) | [RefreshMachineProvidersResponse](#laelia-v1-RefreshMachineProvidersResponse) | Ask the machine app to re-probe its host for installed LLM agent providers and their models. Returns the freshly discovered provider list (also persisted into machine.info.available_providers). Authorized in the handler for the machine&#39;s creator or a holder of laelia.machines.edit (workspace-scope); no permission annotation so the creator short-circuit can run. |
 | ListMachineWorkspaces | [ListMachineWorkspacesRequest](#laelia-v1-ListMachineWorkspacesRequest) | [ListMachineWorkspacesResponse](#laelia-v1-ListMachineWorkspacesResponse) | ListMachineWorkspaces summarizes every per-agent workspace directory on a machine (~/.laelia/&lt;machineID&gt;/). Workspace content is sensitive: authorized in the handler for the machine&#39;s creator or a workspace admin (isMachineAdmin, matching Machine.can_manage); no permission annotation. |
-| DeleteMachineWorkspace | [DeleteMachineWorkspaceRequest](#laelia-v1-DeleteMachineWorkspaceRequest) | [DeleteMachineWorkspaceResponse](#laelia-v1-DeleteMachineWorkspaceResponse) | DeleteMachineWorkspace recursively deletes one agent workspace directory on a machine. Destructive: same handler-gated authorization as ListMachineWorkspaces; the machine app validates the directory name. |
 | ConnectMachine | [ConnectMachineRequest](#laelia-v1-ConnectMachineRequest) | [ConnectMachineResponse](#laelia-v1-ConnectMachineResponse) | Machine initial connection using a registration token. Returns access &#43; refresh tokens, the machine session id, and the full list of agents the machine must host (so the machine app can open an AgentChannel for each). |
 | MachineHeartbeat | [MachineHeartbeatRequest](#laelia-v1-MachineHeartbeatRequest) | [MachineHeartbeatResponse](#laelia-v1-MachineHeartbeatResponse) |  |
 | MachineDisconnect | [MachineDisconnectRequest](#laelia-v1-MachineDisconnectRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |

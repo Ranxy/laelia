@@ -1,8 +1,6 @@
 package workspace
 
 import (
-	"errors"
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -41,27 +39,5 @@ func TestScanSummarizesDirectories(t *testing.T) {
 func TestScanMissingRoot(t *testing.T) {
 	if _, err := Scan(filepath.Join(t.TempDir(), "nope")); err == nil {
 		t.Fatal("expected error for missing root")
-	}
-}
-
-func TestDelete(t *testing.T) {
-	root := t.TempDir()
-	mustMkdir(t, root, "agent-a")
-	mustWrite(t, root, "agent-a/file.txt", "x")
-
-	if err := Delete(root, "agent-a"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(root, "agent-a")); !os.IsNotExist(err) {
-		t.Fatalf("directory should be gone, stat err=%v", err)
-	}
-}
-
-func TestDeleteRejectsUnsafeNames(t *testing.T) {
-	root := t.TempDir()
-	for _, name := range []string{"", ".", "..", "../escape", "a/b", `a\b`, "a..b"} {
-		if err := Delete(root, name); !errors.Is(err, ErrInvalidDirectoryName) {
-			t.Fatalf("Delete(%q) = %v, want ErrInvalidDirectoryName", name, err)
-		}
 	}
 }

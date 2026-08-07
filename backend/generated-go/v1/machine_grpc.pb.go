@@ -30,7 +30,6 @@ const (
 	MachineService_ListMachineAgents_FullMethodName       = "/laelia.v1.MachineService/ListMachineAgents"
 	MachineService_RefreshMachineProviders_FullMethodName = "/laelia.v1.MachineService/RefreshMachineProviders"
 	MachineService_ListMachineWorkspaces_FullMethodName   = "/laelia.v1.MachineService/ListMachineWorkspaces"
-	MachineService_DeleteMachineWorkspace_FullMethodName  = "/laelia.v1.MachineService/DeleteMachineWorkspace"
 	MachineService_ConnectMachine_FullMethodName          = "/laelia.v1.MachineService/ConnectMachine"
 	MachineService_MachineHeartbeat_FullMethodName        = "/laelia.v1.MachineService/MachineHeartbeat"
 	MachineService_MachineDisconnect_FullMethodName       = "/laelia.v1.MachineService/MachineDisconnect"
@@ -85,10 +84,6 @@ type MachineServiceClient interface {
 	// authorized in the handler for the machine's creator or a workspace admin
 	// (isMachineAdmin, matching Machine.can_manage); no permission annotation.
 	ListMachineWorkspaces(ctx context.Context, in *ListMachineWorkspacesRequest, opts ...grpc.CallOption) (*ListMachineWorkspacesResponse, error)
-	// DeleteMachineWorkspace recursively deletes one agent workspace directory on
-	// a machine. Destructive: same handler-gated authorization as
-	// ListMachineWorkspaces; the machine app validates the directory name.
-	DeleteMachineWorkspace(ctx context.Context, in *DeleteMachineWorkspaceRequest, opts ...grpc.CallOption) (*DeleteMachineWorkspaceResponse, error)
 	// Machine initial connection using a registration token. Returns access +
 	// refresh tokens, the machine session id, and the full list of agents the
 	// machine must host (so the machine app can open an AgentChannel for each).
@@ -206,16 +201,6 @@ func (c *machineServiceClient) ListMachineWorkspaces(ctx context.Context, in *Li
 	return out, nil
 }
 
-func (c *machineServiceClient) DeleteMachineWorkspace(ctx context.Context, in *DeleteMachineWorkspaceRequest, opts ...grpc.CallOption) (*DeleteMachineWorkspaceResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DeleteMachineWorkspaceResponse)
-	err := c.cc.Invoke(ctx, MachineService_DeleteMachineWorkspace_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *machineServiceClient) ConnectMachine(ctx context.Context, in *ConnectMachineRequest, opts ...grpc.CallOption) (*ConnectMachineResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ConnectMachineResponse)
@@ -304,10 +289,6 @@ type MachineServiceServer interface {
 	// authorized in the handler for the machine's creator or a workspace admin
 	// (isMachineAdmin, matching Machine.can_manage); no permission annotation.
 	ListMachineWorkspaces(context.Context, *ListMachineWorkspacesRequest) (*ListMachineWorkspacesResponse, error)
-	// DeleteMachineWorkspace recursively deletes one agent workspace directory on
-	// a machine. Destructive: same handler-gated authorization as
-	// ListMachineWorkspaces; the machine app validates the directory name.
-	DeleteMachineWorkspace(context.Context, *DeleteMachineWorkspaceRequest) (*DeleteMachineWorkspaceResponse, error)
 	// Machine initial connection using a registration token. Returns access +
 	// refresh tokens, the machine session id, and the full list of agents the
 	// machine must host (so the machine app can open an AgentChannel for each).
@@ -354,9 +335,6 @@ func (UnimplementedMachineServiceServer) RefreshMachineProviders(context.Context
 }
 func (UnimplementedMachineServiceServer) ListMachineWorkspaces(context.Context, *ListMachineWorkspacesRequest) (*ListMachineWorkspacesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListMachineWorkspaces not implemented")
-}
-func (UnimplementedMachineServiceServer) DeleteMachineWorkspace(context.Context, *DeleteMachineWorkspaceRequest) (*DeleteMachineWorkspaceResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method DeleteMachineWorkspace not implemented")
 }
 func (UnimplementedMachineServiceServer) ConnectMachine(context.Context, *ConnectMachineRequest) (*ConnectMachineResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ConnectMachine not implemented")
@@ -571,24 +549,6 @@ func _MachineService_ListMachineWorkspaces_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MachineService_DeleteMachineWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteMachineWorkspaceRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(MachineServiceServer).DeleteMachineWorkspace(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: MachineService_DeleteMachineWorkspace_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MachineServiceServer).DeleteMachineWorkspace(ctx, req.(*DeleteMachineWorkspaceRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _MachineService_ConnectMachine_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ConnectMachineRequest)
 	if err := dec(in); err != nil {
@@ -707,10 +667,6 @@ var MachineService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListMachineWorkspaces",
 			Handler:    _MachineService_ListMachineWorkspaces_Handler,
-		},
-		{
-			MethodName: "DeleteMachineWorkspace",
-			Handler:    _MachineService_DeleteMachineWorkspace_Handler,
 		},
 		{
 			MethodName: "ConnectMachine",

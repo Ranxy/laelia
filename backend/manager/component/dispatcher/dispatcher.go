@@ -197,11 +197,10 @@ type Dispatcher struct {
 	// pendingWorkspace* correlate the workspace request/response round trips
 	// over the per-agent and machine control bidi streams to their waiting
 	// unary RPCs (ListAgentWorkspace / ReadAgentWorkspaceFile /
-	// ListMachineWorkspaces / DeleteMachineWorkspace).
+	// ListMachineWorkspaces).
 	pendingWorkspaceLists *pendingReplies[*v1pb.WorkspaceListResponse]
 	pendingWorkspaceReads *pendingReplies[*v1pb.WorkspaceReadResponse]
 	pendingMachineScans   *pendingReplies[*v1pb.MachineWorkspaceScanResponse]
-	pendingMachineDeletes *pendingReplies[*v1pb.MachineWorkspaceDeleteResponse]
 }
 
 func New(s *store.Store) *Dispatcher {
@@ -219,7 +218,6 @@ func New(s *store.Store) *Dispatcher {
 		pendingWorkspaceLists: newPendingReplies[*v1pb.WorkspaceListResponse](),
 		pendingWorkspaceReads: newPendingReplies[*v1pb.WorkspaceReadResponse](),
 		pendingMachineScans:   newPendingReplies[*v1pb.MachineWorkspaceScanResponse](),
-		pendingMachineDeletes: newPendingReplies[*v1pb.MachineWorkspaceDeleteResponse](),
 		lifecycleCtx:          ctx,
 		lifecycleCancel:       cancel,
 	}
@@ -644,26 +642,6 @@ func (d *Dispatcher) SendMachineWorkspaceScan(machineID int, requestID string) e
 	})
 }
 
-// SendMachineWorkspaceDelete asks a connected machine to recursively delete one
-// agent workspace directory. The reply resolves a pending entry registered via
-// RegisterPendingMachineWorkspaceDelete.
-func (d *Dispatcher) SendMachineWorkspaceDelete(machineID int, requestID, directoryName string) error {
-	d.mu.RLock()
-	sess, ok := d.machines[machineID]
-	d.mu.RUnlock()
-	if !ok {
-		return errors.New("machine is not connected")
-	}
-	return sess.Send(&v1pb.ManagerMachineStreamMessage{
-		Message: &v1pb.ManagerMachineStreamMessage_MachineWorkspaceDeleteRequest{
-			MachineWorkspaceDeleteRequest: &v1pb.MachineWorkspaceDeleteRequest{
-				RequestId:     requestID,
-				DirectoryName: directoryName,
-			},
-		},
-	})
-}
-
 // RegisterPendingWorkspaceList creates a response channel for an in-flight
 // ListAgentWorkspace round trip over the agent's bidi stream.
 func (d *Dispatcher) RegisterPendingWorkspaceList(requestID string) chan *v1pb.WorkspaceListResponse {
@@ -726,28 +704,6 @@ func (d *Dispatcher) CompletePendingMachineWorkspaceScan(msg *v1pb.MachineWorksp
 		return
 	}
 	d.pendingMachineScans.complete(msg.RequestId, msg)
-}
-
-// RegisterPendingMachineWorkspaceDelete creates a response channel for an
-// in-flight DeleteMachineWorkspace round trip over the machine control stream.
-func (d *Dispatcher) RegisterPendingMachineWorkspaceDelete(requestID string) chan *v1pb.MachineWorkspaceDeleteResponse {
-	return d.pendingMachineDeletes.register(requestID)
-}
-
-// CancelPendingMachineWorkspaceDelete removes a pending machine workspace
-// delete entry without delivering a result.
-func (d *Dispatcher) CancelPendingMachineWorkspaceDelete(requestID string) {
-	d.pendingMachineDeletes.cancel(requestID)
-}
-
-// CompletePendingMachineWorkspaceDelete delivers a MachineWorkspaceDeleteResponse
-// to the waiting DeleteMachineWorkspace caller. Called from the MachineChannel
-// receive loop.
-func (d *Dispatcher) CompletePendingMachineWorkspaceDelete(msg *v1pb.MachineWorkspaceDeleteResponse) {
-	if msg == nil {
-		return
-	}
-	d.pendingMachineDeletes.complete(msg.RequestId, msg)
 }
 
 // CurrentCommandID returns the command id the agent is currently running in its

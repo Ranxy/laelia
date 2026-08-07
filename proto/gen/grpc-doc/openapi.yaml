@@ -3091,41 +3091,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1/machines/{machine}:deleteWorkspace:
-        post:
-            tags:
-                - MachineService
-            description: |-
-                DeleteMachineWorkspace recursively deletes one agent workspace directory on
-                 a machine. Destructive: same handler-gated authorization as
-                 ListMachineWorkspaces; the machine app validates the directory name.
-            operationId: MachineService_DeleteMachineWorkspace
-            parameters:
-                - name: machine
-                  in: path
-                  description: The machine id.
-                  required: true
-                  schema:
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/DeleteMachineWorkspaceRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/DeleteMachineWorkspaceResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
     /v1/machines/{machine}:forceDisconnect:
         post:
             tags:
@@ -6167,20 +6132,6 @@ components:
                         message is the newly posted task message, with task populated. The task is
                          created unassigned (status TODO); the posting agent does NOT auto-claim it
                          — call ClaimTask afterwards to own it.
-        DeleteMachineWorkspaceRequest:
-            required:
-                - name
-            type: object
-            properties:
-                name:
-                    type: string
-                directoryName:
-                    type: string
-        DeleteMachineWorkspaceResponse:
-            type: object
-            properties:
-                success:
-                    type: boolean
         DiffEmittedPayload:
             type: object
             properties:

@@ -1,10 +1,8 @@
 package workspace
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -15,10 +13,6 @@ type Summary struct {
 	LastModified   time.Time
 	FileCount      int64
 }
-
-// ErrInvalidDirectoryName is returned when a workspace directory name is not a
-// bare directory name.
-var ErrInvalidDirectoryName = errors.New("invalid workspace directory name")
 
 type workspaceSummary struct {
 	totalSizeBytes int64
@@ -84,23 +78,4 @@ func Scan(root string) ([]Summary, error) {
 		})
 	}
 	return out, nil
-}
-
-// isValidWorkspaceDirectoryName requires a non-empty bare directory name: no
-// path separators and no ".." anywhere. Stricter than raft, which would also
-// accept "" or "." and delete the workspace root itself.
-func isValidWorkspaceDirectoryName(name string) bool {
-	if name == "" || name == "." || name == ".." {
-		return false
-	}
-	return !strings.ContainsAny(name, `/\`) && !strings.Contains(name, "..")
-}
-
-// Delete recursively removes one workspace directory under root. The name must
-// be a bare directory name so the delete can never escape root.
-func Delete(root, directoryName string) error {
-	if !isValidWorkspaceDirectoryName(directoryName) {
-		return ErrInvalidDirectoryName
-	}
-	return os.RemoveAll(filepath.Join(root, directoryName))
 }

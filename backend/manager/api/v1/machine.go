@@ -162,7 +162,7 @@ func (s *MachineService) ListMachines(ctx context.Context, req *connect.Request[
 	// creator comparison varies (a page of N machines stays 2 queries, not N+1).
 	caller, _ := GetUserFromContext(ctx)
 	canEdit := s.canEditMachine(ctx, caller)
-	canDelete := canDeleteMachineWorkspace(ctx, s.iam, caller)
+	canDelete := canDeleteMachineByPermission(ctx, s.iam, caller)
 	resp := &v1pb.ListMachinesResponse{NextPageToken: nextPageToken}
 	for _, m := range machines {
 		summary := convertToMachineSummary(m, agentCounts[m.ID])
@@ -179,9 +179,9 @@ func isMachineCreator(user *store.UserMessage, machine *store.MachineMessage) bo
 	return user != nil && machine.CreatedBy != 0 && machine.CreatedBy == user.ID
 }
 
-// canDeleteMachineWorkspace reports whether the caller holds
+// canDeleteMachineByPermission reports whether the caller holds
 // laelia.machines.delete (workspace-scope). A lookup failure is fail-closed.
-func canDeleteMachineWorkspace(ctx context.Context, im *iam.Manager, user *store.UserMessage) bool {
+func canDeleteMachineByPermission(ctx context.Context, im *iam.Manager, user *store.UserMessage) bool {
 	if user == nil || im == nil {
 		return false
 	}
@@ -198,7 +198,7 @@ func canDeleteMachine(ctx context.Context, im *iam.Manager, user *store.UserMess
 	if isMachineCreator(user, machine) {
 		return true
 	}
-	return canDeleteMachineWorkspace(ctx, im, user)
+	return canDeleteMachineByPermission(ctx, im, user)
 }
 
 func (s *MachineService) GetMachine(ctx context.Context, req *connect.Request[v1pb.GetMachineRequest]) (*connect.Response[v1pb.Machine], error) {
@@ -582,53 +582,6 @@ func (s *MachineService) ListMachineWorkspaces(ctx context.Context, req *connect
 		return connect.NewResponse(&v1pb.ListMachineWorkspacesResponse{Workspaces: msg.Workspaces}), nil
 	case <-time.After(60 * time.Second):
 		return nil, connect.NewError(connect.CodeDeadlineExceeded, errors.New("timed out waiting for workspace scan"))
-	case <-ctx.Done():
-		return nil, connect.NewError(connect.CodeDeadlineExceeded, ctx.Err())
-	}
-}
-
-// DeleteMachineWorkspace recursively deletes one agent workspace directory on
-// a machine. Destructive and same handler-gated authorization as
-// ListMachineWorkspaces; the machine app validates the directory name.
-func (s *MachineService) DeleteMachineWorkspace(ctx context.Context, req *connect.Request[v1pb.DeleteMachineWorkspaceRequest]) (*connect.Response[v1pb.DeleteMachineWorkspaceResponse], error) {
-	resourceID, err := common.GetMachineResourceID(req.Msg.Name)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	}
-	machine, err := s.store.GetMachineByResourceID(ctx, resourceID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
-	if machine == nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
-	}
-	user, _ := GetUserFromContext(ctx)
-	if !isMachineAdmin(ctx, s.iam, user, machine) {
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("workspace access requires machine creator or admin permission"))
-	}
-	if s.dispatcher == nil || !s.dispatcher.IsMachineConnected(machine.ID) {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("machine is not connected; cannot delete workspace"))
-	}
-
-	requestID := uuid.NewString()
-	replyCh := s.dispatcher.RegisterPendingMachineWorkspaceDelete(requestID)
-	defer s.dispatcher.CancelPendingMachineWorkspaceDelete(requestID)
-
-	if err := s.dispatcher.SendMachineWorkspaceDelete(machine.ID, requestID, req.Msg.DirectoryName); err != nil {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Wrap(err, "failed to request workspace delete"))
-	}
-
-	select {
-	case msg := <-replyCh:
-		if msg == nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.New("workspace delete returned no result"))
-		}
-		if !msg.Success {
-			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Errorf("failed to delete workspace %s", msg.DirectoryName))
-		}
-		return connect.NewResponse(&v1pb.DeleteMachineWorkspaceResponse{Success: true}), nil
-	case <-time.After(60 * time.Second):
-		return nil, connect.NewError(connect.CodeDeadlineExceeded, errors.New("timed out waiting for workspace delete"))
 	case <-ctx.Done():
 		return nil, connect.NewError(connect.CodeDeadlineExceeded, ctx.Err())
 	}

@@ -256,45 +256,6 @@ export declare type ListMachineWorkspacesResponse = Message<"laelia.v1.ListMachi
 export declare const ListMachineWorkspacesResponseSchema: GenMessage<ListMachineWorkspacesResponse>;
 
 /**
- * @generated from message laelia.v1.DeleteMachineWorkspaceRequest
- */
-export declare type DeleteMachineWorkspaceRequest = Message<"laelia.v1.DeleteMachineWorkspaceRequest"> & {
-  /**
-   * @generated from field: string name = 1;
-   */
-  name: string;
-
-  /**
-   * bare directory name; validated by the machine app
-   *
-   * @generated from field: string directory_name = 2;
-   */
-  directoryName: string;
-};
-
-/**
- * Describes the message laelia.v1.DeleteMachineWorkspaceRequest.
- * Use `create(DeleteMachineWorkspaceRequestSchema)` to create a new message.
- */
-export declare const DeleteMachineWorkspaceRequestSchema: GenMessage<DeleteMachineWorkspaceRequest>;
-
-/**
- * @generated from message laelia.v1.DeleteMachineWorkspaceResponse
- */
-export declare type DeleteMachineWorkspaceResponse = Message<"laelia.v1.DeleteMachineWorkspaceResponse"> & {
-  /**
-   * @generated from field: bool success = 1;
-   */
-  success: boolean;
-};
-
-/**
- * Describes the message laelia.v1.DeleteMachineWorkspaceResponse.
- * Use `create(DeleteMachineWorkspaceResponseSchema)` to create a new message.
- */
-export declare const DeleteMachineWorkspaceResponseSchema: GenMessage<DeleteMachineWorkspaceResponse>;
-
-/**
  * @generated from message laelia.v1.ConnectMachineRequest
  */
 export declare type ConnectMachineRequest = Message<"laelia.v1.ConnectMachineRequest"> & {
@@ -934,14 +895,6 @@ export declare type MachineStreamMessage = Message<"laelia.v1.MachineStreamMessa
      */
     value: MachineWorkspaceScanResponse;
     case: "machineWorkspaceScanResponse";
-  } | {
-    /**
-     * response to ManagerMachineStreamMessage.machine_workspace_delete_request
-     *
-     * @generated from field: laelia.v1.MachineWorkspaceDeleteResponse machine_workspace_delete_response = 6;
-     */
-    value: MachineWorkspaceDeleteResponse;
-    case: "machineWorkspaceDeleteResponse";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1012,14 +965,6 @@ export declare type ManagerMachineStreamMessage = Message<"laelia.v1.ManagerMach
      */
     value: MachineWorkspaceScanRequest;
     case: "machineWorkspaceScanRequest";
-  } | {
-    /**
-     * delete one agent workspace directory
-     *
-     * @generated from field: laelia.v1.MachineWorkspaceDeleteRequest machine_workspace_delete_request = 8;
-     */
-    value: MachineWorkspaceDeleteRequest;
-    case: "machineWorkspaceDeleteRequest";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1199,59 +1144,6 @@ export declare type MachineWorkspaceScanResponse = Message<"laelia.v1.MachineWor
 export declare const MachineWorkspaceScanResponseSchema: GenMessage<MachineWorkspaceScanResponse>;
 
 /**
- * MachineWorkspaceDeleteRequest asks the machine app to recursively delete one
- * agent workspace directory. directory_name must be a bare directory name (no
- * path separators or "..") — the machine app validates it.
- *
- * @generated from message laelia.v1.MachineWorkspaceDeleteRequest
- */
-export declare type MachineWorkspaceDeleteRequest = Message<"laelia.v1.MachineWorkspaceDeleteRequest"> & {
-  /**
-   * correlation id for the pending unary DeleteMachineWorkspace call
-   *
-   * @generated from field: string request_id = 1;
-   */
-  requestId: string;
-
-  /**
-   * @generated from field: string directory_name = 2;
-   */
-  directoryName: string;
-};
-
-/**
- * Describes the message laelia.v1.MachineWorkspaceDeleteRequest.
- * Use `create(MachineWorkspaceDeleteRequestSchema)` to create a new message.
- */
-export declare const MachineWorkspaceDeleteRequestSchema: GenMessage<MachineWorkspaceDeleteRequest>;
-
-/**
- * @generated from message laelia.v1.MachineWorkspaceDeleteResponse
- */
-export declare type MachineWorkspaceDeleteResponse = Message<"laelia.v1.MachineWorkspaceDeleteResponse"> & {
-  /**
-   * @generated from field: string request_id = 1;
-   */
-  requestId: string;
-
-  /**
-   * @generated from field: string directory_name = 2;
-   */
-  directoryName: string;
-
-  /**
-   * @generated from field: bool success = 3;
-   */
-  success: boolean;
-};
-
-/**
- * Describes the message laelia.v1.MachineWorkspaceDeleteResponse.
- * Use `create(MachineWorkspaceDeleteResponseSchema)` to create a new message.
- */
-export declare const MachineWorkspaceDeleteResponseSchema: GenMessage<MachineWorkspaceDeleteResponse>;
-
-/**
  * MachineService manages machines (a long-lived agent-application process a
  * user runs once on a host) and serves the machine-side authentication RPCs the
  * machine app calls to register itself. A machine authenticates once with a
@@ -1377,18 +1269,6 @@ export declare const MachineService: GenService<{
     methodKind: "unary";
     input: typeof ListMachineWorkspacesRequestSchema;
     output: typeof ListMachineWorkspacesResponseSchema;
-  },
-  /**
-   * DeleteMachineWorkspace recursively deletes one agent workspace directory on
-   * a machine. Destructive: same handler-gated authorization as
-   * ListMachineWorkspaces; the machine app validates the directory name.
-   *
-   * @generated from rpc laelia.v1.MachineService.DeleteMachineWorkspace
-   */
-  deleteMachineWorkspace: {
-    methodKind: "unary";
-    input: typeof DeleteMachineWorkspaceRequestSchema;
-    output: typeof DeleteMachineWorkspaceResponseSchema;
   },
   /**
    * Machine initial connection using a registration token. Returns access +
