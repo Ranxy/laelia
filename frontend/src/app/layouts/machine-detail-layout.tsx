@@ -84,7 +84,7 @@ export function MachineDetailLayout() {
       </div>
       <Tabs value={activeTab} className="flex h-full flex-col overflow-hidden">
         <div className="shrink-0 border-b border-control-border">
-          <div className="flex items-end gap-2 px-4 lg:px-6">
+          <div className="flex items-end gap-2 px-4 pt-2 lg:px-6">
             <TabsList className="gap-x-6 border-b-0!">
               <TabsTrigger
                 value="profile"
