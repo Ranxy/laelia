@@ -73,7 +73,7 @@ export function AgentProfilePage() {
   const fetchAgents = useAppStore((s) => s.fetchAgents);
   const users = useAppStore((s) => s.users);
   const fetchUsers = useAppStore((s) => s.fetchUsers);
-  // The ACP-config/avatar/persona editors hit admin-only RPCs (agents.edit), so
+  // The runtime-config/avatar/persona editors hit admin-only RPCs (agents.edit), so
   // they are gated on canEditAdminOnly even when canEdit is true for the agent's
   // owner. The allow_add_to_channel toggle below is gated on canEdit.
   const canEditAdminOnly = useHasPermission("laelia.agents.edit");
@@ -94,7 +94,7 @@ export function AgentProfilePage() {
   // the profile does not strand the user on a perpetual "Loading…" screen.
   const [loadError, setLoadError] = useState(false);
 
-  // ACP config editor local state, seeded from the agent's persisted config.
+  // Runtime config editor local state, seeded from the agent's persisted config.
   // All fields except personaPrompt auto-persist (selects + add/remove
   // immediately, text inputs on blur); personaPrompt has its own explicit
   // inline edit→save cycle. configRef mirrors the live fields synchronously so
@@ -321,7 +321,7 @@ export function AgentProfilePage() {
 
   // canEdit is server-resolved per-agent (Agent.canEdit): true for the agent's
   // owner or a workspace admin. It gates the allow_add_to_channel toggle.
-  // The ACP-config/avatar/persona editors hit admin-only RPCs (agents.edit), so
+  // The runtime-config/avatar/persona editors hit admin-only RPCs (agents.edit), so
   // they are gated on canEditAdminOnly to avoid offering a 403 to owners.
   const canEdit = agent.canEdit;
 
@@ -728,6 +728,71 @@ export function AgentProfilePage() {
                 )}
               </dl>
 
+              {/* Persona prompt */}
+              <div className="flex flex-col gap-1 pt-2 border-t border-control-border">
+                <div className="flex items-center gap-2">
+                  <div className="text-xs font-semibold uppercase tracking-widest text-control-light">
+                    {t("agent.profile.persona-prompt")}
+                  </div>
+                  {!personaEditing && (
+                    <button
+                      type="button"
+                      aria-label={t("common.edit")}
+                      title={t("common.edit")}
+                      className="text-control-light hover:text-control transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={!canEditAdminOnly}
+                      onClick={() => setPersonaEditing(true)}
+                    >
+                      <Pencil className="size-3" />
+                    </button>
+                  )}
+                </div>
+                {personaEditing ? (
+                  <div className="flex flex-col gap-2">
+                    <Textarea
+                      className="font-mono text-sm min-h-[160px]"
+                      placeholder={t(
+                        "agent.profile.persona-prompt-placeholder"
+                      )}
+                      value={personaDraft}
+                      onChange={(e) => setPersonaDraft(e.target.value)}
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        disabled={!canEditAdminOnly}
+                        onClick={savePersona}
+                      >
+                        {t("common.save")}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setPersonaDraft(
+                            agentRef.current?.info?.acpConfig?.personaPrompt ??
+                              ""
+                          );
+                          setPersonaEditing(false);
+                        }}
+                      >
+                        {t("common.cancel")}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-main whitespace-pre-wrap">
+                    {personaDraft.trim() ? (
+                      personaDraft
+                    ) : (
+                      <span className="italic text-control-light">
+                        {t("agent.profile.persona-empty")}
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
+
               {/* Avatar */}
               <div className="flex items-center gap-4 pt-2 border-t border-control-border">
                 <Avatar seed={agentId || agent.title} src={avatarSrc} />
@@ -823,10 +888,10 @@ export function AgentProfilePage() {
             </Card>
           </div>
 
-          {/* ACP config */}
+          {/* Runtime config */}
           <div>
             <Card
-              title={t("agent.acp-config")}
+              title={t("agent.runtime-config")}
               actions={
                 saveStatus === "saving" ? (
                   <span className="flex items-center gap-1 text-xs text-control-light">
@@ -1283,70 +1348,6 @@ export function AgentProfilePage() {
                         {t("agent.acp-config-derived-command-hint")}
                       </p>
                     )}
-
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <div className="text-xs font-semibold uppercase tracking-widest text-control-light">
-                        {t("agent.acp-config-persona-prompt")}
-                      </div>
-                      {!personaEditing && (
-                        <button
-                          type="button"
-                          aria-label={t("common.edit")}
-                          title={t("common.edit")}
-                          className="text-control-light hover:text-control transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                          disabled={!canEditAdminOnly}
-                          onClick={() => setPersonaEditing(true)}
-                        >
-                          <Pencil className="size-3" />
-                        </button>
-                      )}
-                    </div>
-                    {personaEditing ? (
-                      <div className="flex flex-col gap-2">
-                        <Textarea
-                          className="font-mono text-sm min-h-[160px]"
-                          placeholder={t(
-                            "agent.acp-config-persona-prompt-placeholder"
-                          )}
-                          value={personaDraft}
-                          onChange={(e) => setPersonaDraft(e.target.value)}
-                        />
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            disabled={!canEditAdminOnly}
-                            onClick={savePersona}
-                          >
-                            {t("common.save")}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setPersonaDraft(
-                                agentRef.current?.info?.acpConfig
-                                  ?.personaPrompt ?? ""
-                              );
-                              setPersonaEditing(false);
-                            }}
-                          >
-                            {t("common.cancel")}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-main whitespace-pre-wrap">
-                        {personaDraft.trim() ? (
-                          personaDraft
-                        ) : (
-                          <span className="italic text-control-light">
-                            {t("agent.acp-config-persona-empty")}
-                          </span>
-                        )}
-                      </p>
-                    )}
-                  </div>
 
                   {!isPiProvider && (
                     <KeyValueEnvEditor
