@@ -5,6 +5,7 @@ import {
   ListChecks,
   Loader2,
   MessageSquare,
+  Plug,
   UserCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -14,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AGENT_ROUTE_CHAT,
+  AGENT_ROUTE_MCP,
   AGENT_ROUTE_PROFILE,
   AGENT_ROUTE_WORKSPACE,
   COMMAND_ROUTE_LIST,
@@ -23,11 +25,17 @@ import { resolvePath } from "@/router/route-index";
 import { useAppStore } from "@/stores";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
 
-type TabKey = "profile" | "commands" | "reminders" | "chat" | "workspace";
+type TabKey =
+  | "profile"
+  | "commands"
+  | "reminders"
+  | "chat"
+  | "workspace"
+  | "mcp";
 
 // AgentDetailLayout is the right-pane agent detail embedded in the Members
 // page. It renders the agent tabs (profile / commands / reminders / chat /
-// workspace) and an Outlet for the active child route. The Members left rail
+// workspace / mcp) and an Outlet for the active child route. The Members left rail
 // already conveys the agent's identity and connection state, so — unlike the old
 // standalone /agents page — this layout omits the back + title + status
 // header bar. A slim mobile-only back button returns to the rail on small
@@ -71,6 +79,7 @@ export function AgentDetailLayout() {
     if (afterId === "reminders") return "reminders";
     if (afterId === "chat") return "chat";
     if (afterId === "workspace") return "workspace";
+    if (afterId === "mcp") return "mcp";
     return "profile";
   }, [location.pathname, agentId]);
 
@@ -142,6 +151,16 @@ export function AgentDetailLayout() {
               >
                 <MessageSquare className="size-4" />
                 {t("agent.tab-chat")}
+              </TabsTrigger>
+              <TabsTrigger
+                value="mcp"
+                className="px-1"
+                onClick={() =>
+                  navigate(resolvePath(AGENT_ROUTE_MCP, { agentId }))
+                }
+              >
+                <Plug className="size-4" />
+                {t("agent.tab-mcp")}
               </TabsTrigger>
               {canEdit && (
                 <TabsTrigger

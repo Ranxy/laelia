@@ -2,6 +2,7 @@
 
 export const AGENT_ROUTE_PROFILE = "agent.profile";
 export const AGENT_ROUTE_CHAT = "agent.chat";
+export const AGENT_ROUTE_MCP = "agent.mcp";
 export const AGENT_ROUTE_WORKSPACE = "agent.workspace";
 export const COMMAND_ROUTE_LIST = "command.list";
 export const COMMAND_ROUTE_DETAIL = "command.detail";

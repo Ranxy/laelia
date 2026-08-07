@@ -525,6 +525,7 @@
     "tab-commands": "命令",
     "tab-reminders": "提醒",
     "tab-chat": "聊天",
+    "tab-mcp": "MCP",
     "no-selection": "请选择一个 Agent 查看详情。",
     "chat-empty": "该 Agent 尚未加入任何频道。",
     "chat-agent-dm-row": "Agent 间私信",

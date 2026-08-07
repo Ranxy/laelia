@@ -23,6 +23,9 @@ describe("dashboard route-name index", () => {
     expect(resolvePath("agent.chat", { agentId: "abc" })).toBe(
       "/members/agents/abc/chat"
     );
+    expect(resolvePath("agent.mcp", { agentId: "abc" })).toBe(
+      "/members/agents/abc/mcp"
+    );
   });
 
   it("resolves the command/reminder routes under /members/agents", () => {

@@ -525,6 +525,7 @@
     "tab-commands": "Commands",
     "tab-reminders": "Reminders",
     "tab-chat": "Chat",
+    "tab-mcp": "MCP",
     "no-selection": "Select an agent to view its details.",
     "chat-empty": "This agent has not joined any channels yet.",
     "chat-agent-dm-row": "Agent-to-agent DM",

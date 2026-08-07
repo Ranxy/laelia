@@ -5,6 +5,7 @@ import {
   ACTIVITY_ROUTE,
   ACTIVITY_ROUTE_DETAIL,
   AGENT_ROUTE_CHAT,
+  AGENT_ROUTE_MCP,
   AGENT_ROUTE_PROFILE,
   AGENT_ROUTE_WORKSPACE,
   CHAT_ROUTE,
@@ -165,6 +166,14 @@ export const dashboardRoutes: RouteObject[] = [
                 lazy: () =>
                   import("@/pages/dashboard/agent-chat").then((m) => ({
                     Component: m.AgentChatPage,
+                  })),
+              },
+              {
+                path: "mcp",
+                handle: { name: AGENT_ROUTE_MCP },
+                lazy: () =>
+                  import("@/pages/dashboard/agent-mcp").then((m) => ({
+                    Component: m.AgentMcpPage,
                   })),
               },
               {
