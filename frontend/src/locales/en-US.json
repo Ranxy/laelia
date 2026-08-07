@@ -71,11 +71,11 @@
     "settings-iam": "Access",
     "settings-groups": "Groups",
     "settings-audit": "Audit logs",
-    "settings-notifications": "Notifications",
-    "settings-chat": "Chat",
+    "settings-notifications": "Push delivery",
     "settings-api-providers": "API Providers",
     "settings-mcp-servers": "MCP Servers",
-    "settings-agents": "Agents / LLM"
+    "settings-agents": "Agents / LLM",
+    "settings-profile": "Profile"
   },
   "settings": {
     "title": "Settings",
@@ -95,22 +95,46 @@
       "avatar-uploaded": "Avatar updated",
       "avatar-upload-failed": "Failed to update avatar",
       "avatar-removed": "Avatar removed",
-      "avatar-remove-failed": "Failed to remove avatar"
+      "avatar-remove-failed": "Failed to remove avatar",
+      "section-identity": "Identity & Status",
+      "section-chat": "Chat preferences",
+      "section-notifications": "Notifications",
+      "chat": {
+        "enter-to-send": "Enter to send",
+        "enter-to-send-hint": "When on, pressing Enter sends the message and Shift+Enter inserts a newline. Turn off to invert: Enter inserts a newline and Shift+Enter sends.",
+        "saved": "Chat preference saved",
+        "save-failed": "Failed to save chat preference",
+        "preferred-language": "Preferred language",
+        "preferred-language-hint": "The language you'd like agents to use when chatting with you. Agents see this on your profile and reply in that language.",
+        "language": {
+          "auto": "Auto (agent's choice)",
+          "zh-CN": "简体中文 (Simplified Chinese)",
+          "en-US": "English (US)",
+          "ja-JP": "日本語 (Japanese)"
+        }
+      },
+      "notifications": {
+        "loading": "Checking notification status…",
+        "enable": "Enable desktop notifications",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "updating": "Updating…",
+        "not-configured": "Web Push is not configured on this server.",
+        "permission-denied": "Notification permission was blocked. Re-enable it from your browser's site settings for this origin.",
+        "permission-prompt": "Allow notifications in the browser prompt to enable.",
+        "enable-failed": "Failed to enable notifications",
+        "disable-failed": "Failed to disable notifications",
+        "unsupported": "This browser does not support Web Push notifications."
+      }
     },
     "notifications": {
-      "title": "Desktop notifications",
-      "description": "Get browser notifications for directed messages — @mentions, thread replies, task and reminder updates, and 1:1 DMs — even when this tab is closed.",
-      "enable": "Enable desktop notifications",
+      "title": "Push delivery",
+      "description": "Workspace-level configuration for delivering push notifications to members' browsers.",
+      "loading": "Checking configuration…",
+      "not-allowed": "You don't have permission to view push delivery settings.",
       "enabled": "Enabled",
       "disabled": "Disabled",
-      "updating": "Updating…",
-      "loading": "Checking notification status…",
-      "not-configured": "Web Push is not configured on this server.",
-      "permission-denied": "Notification permission was blocked. Re-enable it from your browser's site settings for this origin.",
-      "permission-prompt": "Allow notifications in the browser prompt to enable.",
-      "enable-failed": "Failed to enable notifications",
-      "disable-failed": "Failed to disable notifications",
-      "unsupported": "This browser does not support Web Push notifications.",
+      "proxy-enable": "Enable delivery proxy",
       "proxy-title": "Delivery proxy (admin)",
       "proxy-description": "Route push delivery through an HTTP(S) proxy when the server cannot reach browser push services directly. Leave empty for a direct connection. Optional, off by default.",
       "proxy-placeholder": "http://proxy.example.com:8080",
@@ -119,22 +143,6 @@
       "proxy-saved": "Proxy saved",
       "proxy-invalid": "Invalid proxy URL. Use an http:// or https:// URL.",
       "proxy-save-failed": "Failed to save proxy"
-    },
-    "chat": {
-      "title": "Chat",
-      "description": "Per-user chat composer preferences. Changes take effect immediately and only apply to you, following your account across devices.",
-      "enter-to-send": "Enter to send",
-      "enter-to-send-hint": "When on, pressing Enter sends the message and Shift+Enter inserts a newline. Turn off to invert: Enter inserts a newline and Shift+Enter sends.",
-      "saved": "Chat preference saved",
-      "save-failed": "Failed to save chat preference",
-      "preferred-language": "Preferred language",
-      "preferred-language-hint": "The language you'd like agents to use when chatting with you. Agents see this on your profile and reply in that language.",
-      "language": {
-        "auto": "Auto (agent's choice)",
-        "zh-CN": "简体中文 (Simplified Chinese)",
-        "en-US": "English (US)",
-        "ja-JP": "日本語 (Japanese)"
-      }
     },
     "s3": {
       "title": "Storage",

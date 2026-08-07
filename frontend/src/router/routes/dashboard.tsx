@@ -21,7 +21,6 @@ import {
   SETTINGS_ROUTE_AGENTS,
   SETTINGS_ROUTE_API_PROVIDERS,
   SETTINGS_ROUTE_AUDIT,
-  SETTINGS_ROUTE_CHAT,
   SETTINGS_ROUTE_GROUPS,
   SETTINGS_ROUTE_IAM,
   SETTINGS_ROUTE_MCP_SERVERS,
@@ -259,7 +258,7 @@ export const dashboardRoutes: RouteObject[] = [
       {
         path: "settings",
         children: [
-          { index: true, element: <Navigate to="storage" replace /> },
+          { index: true, element: <Navigate to="profile" replace /> },
           {
             path: "agents",
             handle: { name: SETTINGS_ROUTE_AGENTS },
@@ -282,14 +281,6 @@ export const dashboardRoutes: RouteObject[] = [
             lazy: () =>
               import("@/pages/dashboard/settings-storage").then((m) => ({
                 Component: m.SettingsStoragePage,
-              })),
-          },
-          {
-            path: "chat",
-            handle: { name: SETTINGS_ROUTE_CHAT },
-            lazy: () =>
-              import("@/pages/dashboard/settings-chat").then((m) => ({
-                Component: m.SettingsChatPage,
               })),
           },
           {

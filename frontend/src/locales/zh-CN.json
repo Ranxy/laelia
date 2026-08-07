@@ -71,11 +71,11 @@
     "settings-iam": "访问控制",
     "settings-groups": "用户组",
     "settings-audit": "审计日志",
-    "settings-notifications": "通知",
-    "settings-chat": "聊天",
+    "settings-notifications": "推送投递",
     "settings-api-providers": "API 提供方",
     "settings-mcp-servers": "MCP 服务",
-    "settings-agents": "Agents / LLM"
+    "settings-agents": "Agents / LLM",
+    "settings-profile": "个人资料"
   },
   "settings": {
     "title": "设置",
@@ -95,23 +95,47 @@
       "avatar-uploaded": "头像已更新",
       "avatar-upload-failed": "更新头像失败",
       "avatar-removed": "头像已移除",
-      "avatar-remove-failed": "移除头像失败"
+      "avatar-remove-failed": "移除头像失败",
+      "section-identity": "身份与状态",
+      "section-chat": "聊天偏好",
+      "section-notifications": "通知",
+      "chat": {
+        "enter-to-send": "按 Enter 发送消息",
+        "enter-to-send-hint": "开启时:Enter 发送消息,Shift+Enter 换行。关闭后则相反:Enter 换行,Shift+Enter 发送。",
+        "saved": "聊天偏好已保存",
+        "save-failed": "保存聊天偏好失败",
+        "preferred-language": "首选语言",
+        "preferred-language-hint": "你希望 agent 与你聊天时使用的语言。agent 会从你的资料中读到该设置,并用对应语言回复。",
+        "language": {
+          "auto": "自动(由 agent 决定)",
+          "zh-CN": "简体中文",
+          "en-US": "英语 (美国)",
+          "ja-JP": "日语"
+        }
+      },
+      "notifications": {
+        "loading": "正在检查通知状态…",
+        "enable": "开启桌面通知",
+        "enabled": "已开启",
+        "disabled": "已关闭",
+        "updating": "更新中…",
+        "not-configured": "服务器尚未配置 Web Push。",
+        "permission-denied": "通知权限已被阻止。请在本站点浏览器设置中重新允许通知。",
+        "permission-prompt": "请在浏览器弹窗中允许通知以开启。",
+        "enable-failed": "开启通知失败",
+        "disable-failed": "关闭通知失败",
+        "unsupported": "此浏览器不支持 Web Push 通知。"
+      }
     },
     "notifications": {
-      "title": "桌面通知",
-      "description": "当有定向消息时接收浏览器通知 —— @提及、你参与的 thread 回复、任务与提醒更新,以及一对一私聊 —— 即使关闭了标签页也能收到。",
-      "enable": "开启桌面通知",
+      "title": "推送投递",
+      "description": "工作区级别的推送通知投递配置。",
+      "loading": "正在检查配置…",
+      "not-allowed": "你没有查看推送投递设置的权限。",
       "enabled": "已开启",
       "disabled": "已关闭",
-      "updating": "更新中…",
-      "loading": "正在检查通知状态…",
-      "not-configured": "服务器尚未配置 Web Push。",
-      "permission-denied": "通知权限已被阻止。请在本站点浏览器设置中重新允许通知。",
-      "permission-prompt": "请在浏览器弹窗中允许通知以开启。",
-      "enable-failed": "开启通知失败",
-      "disable-failed": "关闭通知失败",
-      "unsupported": "此浏览器不支持 Web Push 通知。",
-      "proxy-title": "推送代理(管理员)",
+      "proxy-enable": "开启投递代理",
+      "proxy-title": "投递代理(管理员)",
       "proxy-description": "当服务器无法直接访问浏览器推送服务时,可通过 HTTP(S) 代理转发推送。留空表示直连。可选,默认关闭。",
       "proxy-placeholder": "http://proxy.example.com:8080",
       "proxy-save": "保存代理",
@@ -119,22 +143,6 @@
       "proxy-saved": "代理已保存",
       "proxy-invalid": "代理地址无效。请使用 http:// 或 https:// 开头的地址。",
       "proxy-save-failed": "保存代理失败"
-    },
-    "chat": {
-      "title": "聊天",
-      "description": "聊天输入框的个人偏好。修改后立即生效,仅对你本人有效,并随账号在不同设备间同步。",
-      "enter-to-send": "按 Enter 发送消息",
-      "enter-to-send-hint": "开启时:Enter 发送消息,Shift+Enter 换行。关闭后则相反:Enter 换行,Shift+Enter 发送。",
-      "saved": "聊天偏好已保存",
-      "save-failed": "保存聊天偏好失败",
-      "preferred-language": "首选语言",
-      "preferred-language-hint": "你希望 agent 与你聊天时使用的语言。agent 会从你的资料中读到该设置,并用对应语言回复。",
-      "language": {
-        "auto": "自动(由 agent 决定)",
-        "zh-CN": "简体中文",
-        "en-US": "英语 (美国)",
-        "ja-JP": "日语"
-      }
     },
     "s3": {
       "title": "存储配置",

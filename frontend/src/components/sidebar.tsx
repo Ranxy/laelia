@@ -26,11 +26,11 @@ import {
   SETTINGS_ROUTE_AGENTS,
   SETTINGS_ROUTE_API_PROVIDERS,
   SETTINGS_ROUTE_AUDIT,
-  SETTINGS_ROUTE_CHAT,
   SETTINGS_ROUTE_GROUPS,
   SETTINGS_ROUTE_IAM,
   SETTINGS_ROUTE_MCP_SERVERS,
   SETTINGS_ROUTE_NOTIFICATIONS,
+  SETTINGS_ROUTE_PROFILE,
   SETTINGS_ROUTE_ROLES,
   SETTINGS_ROUTE_STORAGE,
   SETTINGS_ROUTE_USERS,
@@ -107,6 +107,7 @@ function useSidebarItems(): SidebarItem[] {
   const canViewGroups = useHasPermission("laelia.groups.list");
   const canViewApiProviders = useHasPermission("laelia.apiProviders.list");
   const canViewAudit = useHasPermission("laelia.auditLogs.search");
+  const canViewPushConfig = useHasPermission("laelia.pushConfig.update");
 
   return useMemo(
     (): SidebarItem[] => [
@@ -141,6 +142,11 @@ function useSidebarItems(): SidebarItem[] {
         type: "group",
         children: [
           {
+            title: t("sidebar.settings-profile"),
+            name: SETTINGS_ROUTE_PROFILE,
+            type: "route",
+          },
+          {
             title: t("sidebar.settings-storage"),
             name: SETTINGS_ROUTE_STORAGE,
             type: "route",
@@ -153,14 +159,10 @@ function useSidebarItems(): SidebarItem[] {
             hide: !canViewStorage,
           },
           {
-            title: t("sidebar.settings-chat"),
-            name: SETTINGS_ROUTE_CHAT,
-            type: "route",
-          },
-          {
             title: t("sidebar.settings-notifications"),
             name: SETTINGS_ROUTE_NOTIFICATIONS,
             type: "route",
+            hide: !canViewPushConfig,
           },
           {
             title: t("sidebar.settings-users"),
@@ -215,6 +217,7 @@ function useSidebarItems(): SidebarItem[] {
       canViewGroups,
       canViewApiProviders,
       canViewAudit,
+      canViewPushConfig,
     ]
   );
 }

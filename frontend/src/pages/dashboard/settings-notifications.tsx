@@ -1,38 +1,29 @@
-import { Bell, Loader2, Network, Save } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Loader2, Network, Save } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { PageLoading } from "@/components/settings-page";
+import { Card } from "@/components/profile-common";
+import {
+  PageLoading,
+  PermissionNotice,
+  SettingsPage,
+} from "@/components/settings-page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { notificationServiceClient } from "@/connect";
 import { toastManager } from "@/lib/toast";
-import {
-  disableDesktopNotifications,
-  enableDesktopNotifications,
-  isDeviceSubscribed,
-  webPushSupported,
-} from "@/lib/web-push";
 import { useHasPermission } from "@/stores/permissions";
 
-type Status = "loading" | "unsupported" | "not-configured" | "denied" | "ready";
-
+// The per-user desktop-notification toggle lives on /settings/profile; this
+// page keeps only the workspace-level push delivery config: the outbound
+// HTTP(S) proxy used when the server cannot reach browser push services
+// directly. It is admin-only (laelia.pushConfig.update) — the server only
+// returns the stored proxy to callers holding that permission, so a non-admin
+// sees an empty value and the whole page is hidden by canEditProxy.
 export function SettingsNotificationsPage() {
   const { t } = useTranslation();
-  const [status, setStatus] = useState<Status>("loading");
-  const [enabled, setEnabled] = useState(false);
-  const [busy, setBusy] = useState(false);
-  // busyRef guards against a rapid double-click landing before the disabled
-  // Switch re-renders; the toggle operation is async and must not re-enter.
-  const busyRef = useRef(false);
-
-  // Admin-only outbound HTTP proxy for push delivery. The server only returns
-  // the stored proxy to callers holding laelia.pushConfig.update, so a non-admin
-  // sees an empty value and the whole section is hidden by canEditProxy. The
-  // toggle mirrors the desktop-notifications switch: off hides the input and
-  // immediately clears the stored proxy; on reveals the input for the admin to
-  // fill and save.
   const canEditProxy = useHasPermission("laelia.pushConfig.update");
+  const [loading, setLoading] = useState(true);
   const [proxy, setProxy] = useState("");
   const [proxyEnabled, setProxyEnabled] = useState(false);
   const [proxySaving, setProxySaving] = useState(false);
@@ -40,99 +31,31 @@ export function SettingsNotificationsPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const supported = webPushSupported();
-      if (!supported) {
-        if (!cancelled) setStatus("unsupported");
+      if (!canEditProxy) {
+        if (!cancelled) setLoading(false);
         return;
       }
-      let configEnabled = false;
       try {
         const res = await notificationServiceClient.getPushConfig({});
-        configEnabled = res.enabled;
         if (!cancelled) {
           setProxy(res.httpProxy ?? "");
           setProxyEnabled(!!res.httpProxy);
         }
       } catch {
-        // treat a backend error as "not configured" so the user sees a clear
-        // message rather than a half-broken toggle.
-      }
-      if (cancelled) return;
-      if (!configEnabled) {
-        setStatus("not-configured");
-        return;
-      }
-      const permission = Notification.permission;
-      if (permission === "denied") {
-        setStatus("denied");
-        return;
-      }
-      setStatus("ready");
-      // The toggle reflects whether this browser's subscription is registered
-      // server-side (ListPushSubscriptions), not a local intent flag.
-      try {
-        const subscribed = await isDeviceSubscribed();
-        if (!cancelled) setEnabled(subscribed);
-      } catch {
-        // list failed; keep the toggle off until the user acts.
+        // treat a backend error as unset so the admin sees an empty form
+        // rather than a half-broken page.
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [canEditProxy]);
 
-  async function handleToggle(next: boolean) {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    setBusy(true);
-    try {
-      if (next) {
-        await enableDesktopNotifications();
-        setStatus("ready");
-      } else {
-        await disableDesktopNotifications();
-      }
-    } catch (err) {
-      const code = err instanceof Error ? err.message : String(err);
-      if (code === "denied") {
-        setStatus("denied");
-        toastManager.add({
-          type: "warning",
-          title: t("settings.notifications.permission-denied"),
-        });
-      } else if (code === "not-configured") {
-        setStatus("not-configured");
-      } else if (code === "unsupported") {
-        setStatus("unsupported");
-      } else {
-        toastManager.add({
-          type: "error",
-          title: t(
-            next
-              ? "settings.notifications.enable-failed"
-              : "settings.notifications.disable-failed"
-          ),
-          description: code,
-        });
-      }
-      return;
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
-    // Re-derive the toggle from the server after the subscription changed; a
-    // failure here just leaves the previous value.
-    try {
-      setEnabled(await isDeviceSubscribed());
-    } catch {
-      // ignore
-    }
-  }
-
-  // handleToggleProxy turns the proxy on or off. Turning it on just reveals the
-  // input (the value is saved explicitly via handleSaveProxy). Turning it off
-  // immediately clears the stored proxy so delivery reverts to a direct
+  // handleToggleProxy turns the proxy on or off. Turning it on just reveals
+  // the input (the value is saved explicitly via handleSaveProxy). Turning it
+  // off immediately clears the stored proxy so delivery reverts to a direct
   // connection without an extra save step.
   async function handleToggleProxy(next: boolean) {
     if (next) {
@@ -176,131 +99,74 @@ export function SettingsNotificationsPage() {
     }
   }
 
+  if (!canEditProxy) {
+    return (
+      <PermissionNotice message={t("settings.notifications.not-allowed")} />
+    );
+  }
+
   return (
-    <div className="flex h-full overflow-y-auto flex-col">
-      <div className="mx-auto w-full max-w-2xl px-6 py-8">
-        <h1 className="text-lg font-semibold text-main">
-          {t("settings.notifications.title")}
-        </h1>
-        <p className="mt-1 text-sm text-control-light">
-          {t("settings.notifications.description")}
-        </p>
-
-        {status === "loading" ? (
-          <PageLoading message={t("settings.notifications.loading")} />
-        ) : (
-          <div className="mt-6 space-y-4">
-            {status === "unsupported" && (
-              <Notice>{t("settings.notifications.unsupported")}</Notice>
-            )}
-            {status === "not-configured" && (
-              <Notice>{t("settings.notifications.not-configured")}</Notice>
-            )}
-            {status === "denied" && (
-              <Notice>{t("settings.notifications.permission-denied")}</Notice>
-            )}
-
-            <div className="flex items-center justify-between rounded-md border border-control-border p-4">
+    <SettingsPage
+      title={t("settings.notifications.title")}
+      description={t("settings.notifications.description")}
+    >
+      {loading ? (
+        <PageLoading message={t("settings.notifications.loading")} />
+      ) : (
+        <div className="max-w-2xl">
+          <Card title={t("settings.notifications.proxy-title")}>
+            <div className="flex items-center justify-between">
               <div className="flex items-start gap-3">
-                <Bell className="mt-0.5 size-4 text-control-light" />
+                <Network className="mt-0.5 size-4 text-control-light" />
                 <div>
                   <div className="text-sm font-medium text-main">
-                    {t("settings.notifications.enable")}
+                    {t("settings.notifications.proxy-enable")}
                   </div>
                   <div className="mt-0.5 text-xs text-control-light">
-                    {busy ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Loader2 className="size-3 animate-spin" />
-                        {t("settings.notifications.updating")}
-                      </span>
-                    ) : enabled ? (
-                      t("settings.notifications.enabled")
-                    ) : (
-                      t("settings.notifications.disabled")
-                    )}
+                    {proxyEnabled
+                      ? t("settings.notifications.enabled")
+                      : t("settings.notifications.disabled")}
                   </div>
                 </div>
               </div>
               <Switch
-                checked={enabled}
-                onCheckedChange={handleToggle}
-                disabled={busy || status !== "ready"}
+                checked={proxyEnabled}
+                onCheckedChange={handleToggleProxy}
+                disabled={proxySaving}
                 size="md"
               />
             </div>
 
-            {status === "ready" && !enabled && (
-              <p className="text-xs text-control-placeholder">
-                {t("settings.notifications.permission-prompt")}
-              </p>
-            )}
-
-            {canEditProxy && (
-              <div className="rounded-md border border-control-border p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-start gap-3">
-                    <Network className="mt-0.5 size-4 text-control-light" />
-                    <div>
-                      <div className="text-sm font-medium text-main">
-                        {t("settings.notifications.proxy-title")}
-                      </div>
-                      <div className="mt-0.5 text-xs text-control-light">
-                        {proxyEnabled
-                          ? t("settings.notifications.enabled")
-                          : t("settings.notifications.disabled")}
-                      </div>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={proxyEnabled}
-                    onCheckedChange={handleToggleProxy}
-                    disabled={proxySaving}
-                    size="md"
+            {proxyEnabled && (
+              <div>
+                <p className="text-xs text-control-light">
+                  {t("settings.notifications.proxy-description")}
+                </p>
+                <div className="mt-3 flex items-end gap-2">
+                  <Input
+                    value={proxy}
+                    placeholder={t("settings.notifications.proxy-placeholder")}
+                    onChange={(e) => setProxy(e.target.value)}
+                    spellCheck={false}
                   />
+                  <Button onClick={handleSaveProxy} disabled={proxySaving}>
+                    {proxySaving ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Save className="size-4" />
+                    )}
+                    {t(
+                      proxySaving
+                        ? "settings.notifications.proxy-saving"
+                        : "settings.notifications.proxy-save"
+                    )}
+                  </Button>
                 </div>
-
-                {proxyEnabled && (
-                  <div className="mt-3">
-                    <p className="mb-2 text-xs text-control-light">
-                      {t("settings.notifications.proxy-description")}
-                    </p>
-                    <div className="flex items-end gap-2">
-                      <Input
-                        value={proxy}
-                        placeholder={t(
-                          "settings.notifications.proxy-placeholder"
-                        )}
-                        onChange={(e) => setProxy(e.target.value)}
-                        spellCheck={false}
-                      />
-                      <Button onClick={handleSaveProxy} disabled={proxySaving}>
-                        {proxySaving ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <Save className="size-4" />
-                        )}
-                        {t(
-                          proxySaving
-                            ? "settings.notifications.proxy-saving"
-                            : "settings.notifications.proxy-save"
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Notice({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="rounded-md border border-control-border bg-control-bg p-3 text-xs text-control">
-      {children}
-    </p>
+          </Card>
+        </div>
+      )}
+    </SettingsPage>
   );
 }
