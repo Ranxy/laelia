@@ -205,7 +205,8 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
 
     // Agent replies arrive asynchronously on the agent's bidi stream; the
     // frontend has no push channel, so the persistent watcher started by the
-    // channel page polls listConversationMessages every 2s and surfaces them.
+    // channel page long-polls listConversationMessages (one held request,
+    // woken by the server as soon as a new message lands) and surfaces them.
     // We deliberately do NOT start a second polling loop here (the old
     // pollChannelMessages ran a concurrent 30s/2s loop on top of the watcher —
     // a double poll hitting the same conversation every 2s per send).
