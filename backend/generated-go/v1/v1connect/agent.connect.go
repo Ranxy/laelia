@@ -71,6 +71,12 @@ const (
 	// AgentServiceRefreshAgentProvidersProcedure is the fully-qualified name of the AgentService's
 	// RefreshAgentProviders RPC.
 	AgentServiceRefreshAgentProvidersProcedure = "/laelia.v1.AgentService/RefreshAgentProviders"
+	// AgentServiceListAgentWorkspaceProcedure is the fully-qualified name of the AgentService's
+	// ListAgentWorkspace RPC.
+	AgentServiceListAgentWorkspaceProcedure = "/laelia.v1.AgentService/ListAgentWorkspace"
+	// AgentServiceReadAgentWorkspaceFileProcedure is the fully-qualified name of the AgentService's
+	// ReadAgentWorkspaceFile RPC.
+	AgentServiceReadAgentWorkspaceFileProcedure = "/laelia.v1.AgentService/ReadAgentWorkspaceFile"
 	// AgentServiceListPiModelsProcedure is the fully-qualified name of the AgentService's ListPiModels
 	// RPC.
 	AgentServiceListPiModelsProcedure = "/laelia.v1.AgentService/ListPiModels"
@@ -145,6 +151,18 @@ type AgentServiceClient interface {
 	// and their models. Returns the freshly discovered provider list (also
 	// persisted into agent.info.available_providers). Admin only.
 	RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error)
+	// ListAgentWorkspace lists one directory level of an agent's workspace on its
+	// machine (~/.laelia/<machineID>/<agentID>/), lazily loading the tree level by
+	// level. Workspace content is sensitive: authorized in the handler for the
+	// agent's owner or a workspace admin (canEditAgent); like UpdateAgent this
+	// RPC carries no permission annotation (agents.edit is admin-only) and is
+	// handler-gated.
+	ListAgentWorkspace(context.Context, *connect.Request[v1.ListAgentWorkspaceRequest]) (*connect.Response[v1.ListAgentWorkspaceResponse], error)
+	// ReadAgentWorkspaceFile reads a single workspace file for text/image preview.
+	// Same handler-gated authorization as ListAgentWorkspace (owner or workspace
+	// admin). Sensitive files (secret/credential/token patterns) are rejected by
+	// the machine app and surface as a per-file error, not a transport error.
+	ReadAgentWorkspaceFile(context.Context, *connect.Request[v1.ReadAgentWorkspaceFileRequest]) (*connect.Response[v1.ReadAgentWorkspaceFileResponse], error)
 	// List the models a built-in pi agent's LLM API provider exposes. The manager
 	// proxies the provider's model-listing HTTP API (DeepSeek `GET /models` with
 	// the caller's api_key; OpenRouter `GET /models`, public) so the model list is
@@ -262,6 +280,18 @@ func NewAgentServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(agentServiceMethods.ByName("RefreshAgentProviders")),
 			connect.WithClientOptions(opts...),
 		),
+		listAgentWorkspace: connect.NewClient[v1.ListAgentWorkspaceRequest, v1.ListAgentWorkspaceResponse](
+			httpClient,
+			baseURL+AgentServiceListAgentWorkspaceProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("ListAgentWorkspace")),
+			connect.WithClientOptions(opts...),
+		),
+		readAgentWorkspaceFile: connect.NewClient[v1.ReadAgentWorkspaceFileRequest, v1.ReadAgentWorkspaceFileResponse](
+			httpClient,
+			baseURL+AgentServiceReadAgentWorkspaceFileProcedure,
+			connect.WithSchema(agentServiceMethods.ByName("ReadAgentWorkspaceFile")),
+			connect.WithClientOptions(opts...),
+		),
 		listPiModels: connect.NewClient[v1.ListPiModelsRequest, v1.ListPiModelsResponse](
 			httpClient,
 			baseURL+AgentServiceListPiModelsProcedure,
@@ -334,6 +364,8 @@ type agentServiceClient struct {
 	updateAgentACPConfig   *connect.Client[v1.UpdateAgentACPConfigRequest, emptypb.Empty]
 	updateAgentMcpConfig   *connect.Client[v1.UpdateAgentMcpConfigRequest, emptypb.Empty]
 	refreshAgentProviders  *connect.Client[v1.RefreshAgentProvidersRequest, v1.RefreshAgentProvidersResponse]
+	listAgentWorkspace     *connect.Client[v1.ListAgentWorkspaceRequest, v1.ListAgentWorkspaceResponse]
+	readAgentWorkspaceFile *connect.Client[v1.ReadAgentWorkspaceFileRequest, v1.ReadAgentWorkspaceFileResponse]
 	listPiModels           *connect.Client[v1.ListPiModelsRequest, v1.ListPiModelsResponse]
 	connectAgent           *connect.Client[v1.ConnectAgentRequest, v1.ConnectAgentResponse]
 	agentHeartbeat         *connect.Client[v1.AgentHeartbeatRequest, v1.AgentHeartbeatResponse]
@@ -408,6 +440,16 @@ func (c *agentServiceClient) UpdateAgentMcpConfig(ctx context.Context, req *conn
 // RefreshAgentProviders calls laelia.v1.AgentService.RefreshAgentProviders.
 func (c *agentServiceClient) RefreshAgentProviders(ctx context.Context, req *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error) {
 	return c.refreshAgentProviders.CallUnary(ctx, req)
+}
+
+// ListAgentWorkspace calls laelia.v1.AgentService.ListAgentWorkspace.
+func (c *agentServiceClient) ListAgentWorkspace(ctx context.Context, req *connect.Request[v1.ListAgentWorkspaceRequest]) (*connect.Response[v1.ListAgentWorkspaceResponse], error) {
+	return c.listAgentWorkspace.CallUnary(ctx, req)
+}
+
+// ReadAgentWorkspaceFile calls laelia.v1.AgentService.ReadAgentWorkspaceFile.
+func (c *agentServiceClient) ReadAgentWorkspaceFile(ctx context.Context, req *connect.Request[v1.ReadAgentWorkspaceFileRequest]) (*connect.Response[v1.ReadAgentWorkspaceFileResponse], error) {
+	return c.readAgentWorkspaceFile.CallUnary(ctx, req)
 }
 
 // ListPiModels calls laelia.v1.AgentService.ListPiModels.
@@ -501,6 +543,18 @@ type AgentServiceHandler interface {
 	// and their models. Returns the freshly discovered provider list (also
 	// persisted into agent.info.available_providers). Admin only.
 	RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error)
+	// ListAgentWorkspace lists one directory level of an agent's workspace on its
+	// machine (~/.laelia/<machineID>/<agentID>/), lazily loading the tree level by
+	// level. Workspace content is sensitive: authorized in the handler for the
+	// agent's owner or a workspace admin (canEditAgent); like UpdateAgent this
+	// RPC carries no permission annotation (agents.edit is admin-only) and is
+	// handler-gated.
+	ListAgentWorkspace(context.Context, *connect.Request[v1.ListAgentWorkspaceRequest]) (*connect.Response[v1.ListAgentWorkspaceResponse], error)
+	// ReadAgentWorkspaceFile reads a single workspace file for text/image preview.
+	// Same handler-gated authorization as ListAgentWorkspace (owner or workspace
+	// admin). Sensitive files (secret/credential/token patterns) are rejected by
+	// the machine app and surface as a per-file error, not a transport error.
+	ReadAgentWorkspaceFile(context.Context, *connect.Request[v1.ReadAgentWorkspaceFileRequest]) (*connect.Response[v1.ReadAgentWorkspaceFileResponse], error)
 	// List the models a built-in pi agent's LLM API provider exposes. The manager
 	// proxies the provider's model-listing HTTP API (DeepSeek `GET /models` with
 	// the caller's api_key; OpenRouter `GET /models`, public) so the model list is
@@ -614,6 +668,18 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(agentServiceMethods.ByName("RefreshAgentProviders")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentServiceListAgentWorkspaceHandler := connect.NewUnaryHandler(
+		AgentServiceListAgentWorkspaceProcedure,
+		svc.ListAgentWorkspace,
+		connect.WithSchema(agentServiceMethods.ByName("ListAgentWorkspace")),
+		connect.WithHandlerOptions(opts...),
+	)
+	agentServiceReadAgentWorkspaceFileHandler := connect.NewUnaryHandler(
+		AgentServiceReadAgentWorkspaceFileProcedure,
+		svc.ReadAgentWorkspaceFile,
+		connect.WithSchema(agentServiceMethods.ByName("ReadAgentWorkspaceFile")),
+		connect.WithHandlerOptions(opts...),
+	)
 	agentServiceListPiModelsHandler := connect.NewUnaryHandler(
 		AgentServiceListPiModelsProcedure,
 		svc.ListPiModels,
@@ -696,6 +762,10 @@ func NewAgentServiceHandler(svc AgentServiceHandler, opts ...connect.HandlerOpti
 			agentServiceUpdateAgentMcpConfigHandler.ServeHTTP(w, r)
 		case AgentServiceRefreshAgentProvidersProcedure:
 			agentServiceRefreshAgentProvidersHandler.ServeHTTP(w, r)
+		case AgentServiceListAgentWorkspaceProcedure:
+			agentServiceListAgentWorkspaceHandler.ServeHTTP(w, r)
+		case AgentServiceReadAgentWorkspaceFileProcedure:
+			agentServiceReadAgentWorkspaceFileHandler.ServeHTTP(w, r)
 		case AgentServiceListPiModelsProcedure:
 			agentServiceListPiModelsHandler.ServeHTTP(w, r)
 		case AgentServiceConnectAgentProcedure:
@@ -773,6 +843,14 @@ func (UnimplementedAgentServiceHandler) UpdateAgentMcpConfig(context.Context, *c
 
 func (UnimplementedAgentServiceHandler) RefreshAgentProviders(context.Context, *connect.Request[v1.RefreshAgentProvidersRequest]) (*connect.Response[v1.RefreshAgentProvidersResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.RefreshAgentProviders is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) ListAgentWorkspace(context.Context, *connect.Request[v1.ListAgentWorkspaceRequest]) (*connect.Response[v1.ListAgentWorkspaceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.ListAgentWorkspace is not implemented"))
+}
+
+func (UnimplementedAgentServiceHandler) ReadAgentWorkspaceFile(context.Context, *connect.Request[v1.ReadAgentWorkspaceFileRequest]) (*connect.Response[v1.ReadAgentWorkspaceFileResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.AgentService.ReadAgentWorkspaceFile is not implemented"))
 }
 
 func (UnimplementedAgentServiceHandler) ListPiModels(context.Context, *connect.Request[v1.ListPiModelsRequest]) (*connect.Response[v1.ListPiModelsResponse], error) {

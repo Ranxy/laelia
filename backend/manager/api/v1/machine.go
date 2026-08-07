@@ -469,6 +469,97 @@ func (s *MachineService) RefreshMachineProviders(ctx context.Context, req *conne
 	}
 }
 
+// ListMachineWorkspaces summarizes every per-agent workspace directory on a
+// machine's host. Requires the machine creator or a workspace admin
+// (isMachineAdmin, matching Machine.can_manage) and an online machine.
+func (s *MachineService) ListMachineWorkspaces(ctx context.Context, req *connect.Request[v1pb.ListMachineWorkspacesRequest]) (*connect.Response[v1pb.ListMachineWorkspacesResponse], error) {
+	resourceID, err := common.GetMachineResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	machine, err := s.store.GetMachineByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if machine == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !isMachineAdmin(ctx, s.iam, user, machine) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("workspace access requires machine creator or admin permission"))
+	}
+	if s.dispatcher == nil || !s.dispatcher.IsMachineConnected(machine.ID) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("machine is not connected; cannot scan workspaces"))
+	}
+
+	requestID := uuid.NewString()
+	replyCh := s.dispatcher.RegisterPendingMachineWorkspaceScan(requestID)
+	defer s.dispatcher.CancelPendingMachineWorkspaceScan(requestID)
+
+	if err := s.dispatcher.SendMachineWorkspaceScan(machine.ID, requestID); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Wrap(err, "failed to request workspace scan"))
+	}
+
+	select {
+	case msg := <-replyCh:
+		if msg == nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.New("workspace scan returned no result"))
+		}
+		return connect.NewResponse(&v1pb.ListMachineWorkspacesResponse{Workspaces: msg.Workspaces}), nil
+	case <-time.After(60 * time.Second):
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, errors.New("timed out waiting for workspace scan"))
+	case <-ctx.Done():
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, ctx.Err())
+	}
+}
+
+// DeleteMachineWorkspace recursively deletes one agent workspace directory on
+// a machine. Destructive and same handler-gated authorization as
+// ListMachineWorkspaces; the machine app validates the directory name.
+func (s *MachineService) DeleteMachineWorkspace(ctx context.Context, req *connect.Request[v1pb.DeleteMachineWorkspaceRequest]) (*connect.Response[v1pb.DeleteMachineWorkspaceResponse], error) {
+	resourceID, err := common.GetMachineResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	machine, err := s.store.GetMachineByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if machine == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("machine %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !isMachineAdmin(ctx, s.iam, user, machine) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("workspace access requires machine creator or admin permission"))
+	}
+	if s.dispatcher == nil || !s.dispatcher.IsMachineConnected(machine.ID) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("machine is not connected; cannot delete workspace"))
+	}
+
+	requestID := uuid.NewString()
+	replyCh := s.dispatcher.RegisterPendingMachineWorkspaceDelete(requestID)
+	defer s.dispatcher.CancelPendingMachineWorkspaceDelete(requestID)
+
+	if err := s.dispatcher.SendMachineWorkspaceDelete(machine.ID, requestID, req.Msg.DirectoryName); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Wrap(err, "failed to request workspace delete"))
+	}
+
+	select {
+	case msg := <-replyCh:
+		if msg == nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.New("workspace delete returned no result"))
+		}
+		if !msg.Success {
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Errorf("failed to delete workspace %s", msg.DirectoryName))
+		}
+		return connect.NewResponse(&v1pb.DeleteMachineWorkspaceResponse{Success: true}), nil
+	case <-time.After(60 * time.Second):
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, errors.New("timed out waiting for workspace delete"))
+	case <-ctx.Done():
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, ctx.Err())
+	}
+}
+
 // ConnectMachine is the machine app's first (registration token) or subsequent
 // (access token) connection. On success it mints the machine's access + refresh
 // tokens (bootstrap path only), creates a machine session, marks the machine

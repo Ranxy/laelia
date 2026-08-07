@@ -63,6 +63,12 @@ const (
 	// MachineServiceRefreshMachineProvidersProcedure is the fully-qualified name of the
 	// MachineService's RefreshMachineProviders RPC.
 	MachineServiceRefreshMachineProvidersProcedure = "/laelia.v1.MachineService/RefreshMachineProviders"
+	// MachineServiceListMachineWorkspacesProcedure is the fully-qualified name of the MachineService's
+	// ListMachineWorkspaces RPC.
+	MachineServiceListMachineWorkspacesProcedure = "/laelia.v1.MachineService/ListMachineWorkspaces"
+	// MachineServiceDeleteMachineWorkspaceProcedure is the fully-qualified name of the MachineService's
+	// DeleteMachineWorkspace RPC.
+	MachineServiceDeleteMachineWorkspaceProcedure = "/laelia.v1.MachineService/DeleteMachineWorkspace"
 	// MachineServiceConnectMachineProcedure is the fully-qualified name of the MachineService's
 	// ConnectMachine RPC.
 	MachineServiceConnectMachineProcedure = "/laelia.v1.MachineService/ConnectMachine"
@@ -100,6 +106,15 @@ type MachineServiceClient interface {
 	// and their models. Returns the freshly discovered provider list (also
 	// persisted into machine.info.available_providers). Admin only.
 	RefreshMachineProviders(context.Context, *connect.Request[v1.RefreshMachineProvidersRequest]) (*connect.Response[v1.RefreshMachineProvidersResponse], error)
+	// ListMachineWorkspaces summarizes every per-agent workspace directory on a
+	// machine (~/.laelia/<machineID>/). Workspace content is sensitive:
+	// authorized in the handler for the machine's creator or a workspace admin
+	// (isMachineAdmin, matching Machine.can_manage); no permission annotation.
+	ListMachineWorkspaces(context.Context, *connect.Request[v1.ListMachineWorkspacesRequest]) (*connect.Response[v1.ListMachineWorkspacesResponse], error)
+	// DeleteMachineWorkspace recursively deletes one agent workspace directory on
+	// a machine. Destructive: same handler-gated authorization as
+	// ListMachineWorkspaces; the machine app validates the directory name.
+	DeleteMachineWorkspace(context.Context, *connect.Request[v1.DeleteMachineWorkspaceRequest]) (*connect.Response[v1.DeleteMachineWorkspaceResponse], error)
 	// Machine initial connection using a registration token. Returns access +
 	// refresh tokens, the machine session id, and the full list of agents the
 	// machine must host (so the machine app can open an AgentChannel for each).
@@ -174,6 +189,18 @@ func NewMachineServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(machineServiceMethods.ByName("RefreshMachineProviders")),
 			connect.WithClientOptions(opts...),
 		),
+		listMachineWorkspaces: connect.NewClient[v1.ListMachineWorkspacesRequest, v1.ListMachineWorkspacesResponse](
+			httpClient,
+			baseURL+MachineServiceListMachineWorkspacesProcedure,
+			connect.WithSchema(machineServiceMethods.ByName("ListMachineWorkspaces")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteMachineWorkspace: connect.NewClient[v1.DeleteMachineWorkspaceRequest, v1.DeleteMachineWorkspaceResponse](
+			httpClient,
+			baseURL+MachineServiceDeleteMachineWorkspaceProcedure,
+			connect.WithSchema(machineServiceMethods.ByName("DeleteMachineWorkspace")),
+			connect.WithClientOptions(opts...),
+		),
 		connectMachine: connect.NewClient[v1.ConnectMachineRequest, v1.ConnectMachineResponse](
 			httpClient,
 			baseURL+MachineServiceConnectMachineProcedure,
@@ -212,6 +239,8 @@ type machineServiceClient struct {
 	forceDisconnectMachine  *connect.Client[v1.ForceDisconnectMachineRequest, emptypb.Empty]
 	listMachineAgents       *connect.Client[v1.ListMachineAgentsRequest, v1.ListMachineAgentsResponse]
 	refreshMachineProviders *connect.Client[v1.RefreshMachineProvidersRequest, v1.RefreshMachineProvidersResponse]
+	listMachineWorkspaces   *connect.Client[v1.ListMachineWorkspacesRequest, v1.ListMachineWorkspacesResponse]
+	deleteMachineWorkspace  *connect.Client[v1.DeleteMachineWorkspaceRequest, v1.DeleteMachineWorkspaceResponse]
 	connectMachine          *connect.Client[v1.ConnectMachineRequest, v1.ConnectMachineResponse]
 	machineHeartbeat        *connect.Client[v1.MachineHeartbeatRequest, v1.MachineHeartbeatResponse]
 	machineDisconnect       *connect.Client[v1.MachineDisconnectRequest, emptypb.Empty]
@@ -263,6 +292,16 @@ func (c *machineServiceClient) RefreshMachineProviders(ctx context.Context, req 
 	return c.refreshMachineProviders.CallUnary(ctx, req)
 }
 
+// ListMachineWorkspaces calls laelia.v1.MachineService.ListMachineWorkspaces.
+func (c *machineServiceClient) ListMachineWorkspaces(ctx context.Context, req *connect.Request[v1.ListMachineWorkspacesRequest]) (*connect.Response[v1.ListMachineWorkspacesResponse], error) {
+	return c.listMachineWorkspaces.CallUnary(ctx, req)
+}
+
+// DeleteMachineWorkspace calls laelia.v1.MachineService.DeleteMachineWorkspace.
+func (c *machineServiceClient) DeleteMachineWorkspace(ctx context.Context, req *connect.Request[v1.DeleteMachineWorkspaceRequest]) (*connect.Response[v1.DeleteMachineWorkspaceResponse], error) {
+	return c.deleteMachineWorkspace.CallUnary(ctx, req)
+}
+
 // ConnectMachine calls laelia.v1.MachineService.ConnectMachine.
 func (c *machineServiceClient) ConnectMachine(ctx context.Context, req *connect.Request[v1.ConnectMachineRequest]) (*connect.Response[v1.ConnectMachineResponse], error) {
 	return c.connectMachine.CallUnary(ctx, req)
@@ -303,6 +342,15 @@ type MachineServiceHandler interface {
 	// and their models. Returns the freshly discovered provider list (also
 	// persisted into machine.info.available_providers). Admin only.
 	RefreshMachineProviders(context.Context, *connect.Request[v1.RefreshMachineProvidersRequest]) (*connect.Response[v1.RefreshMachineProvidersResponse], error)
+	// ListMachineWorkspaces summarizes every per-agent workspace directory on a
+	// machine (~/.laelia/<machineID>/). Workspace content is sensitive:
+	// authorized in the handler for the machine's creator or a workspace admin
+	// (isMachineAdmin, matching Machine.can_manage); no permission annotation.
+	ListMachineWorkspaces(context.Context, *connect.Request[v1.ListMachineWorkspacesRequest]) (*connect.Response[v1.ListMachineWorkspacesResponse], error)
+	// DeleteMachineWorkspace recursively deletes one agent workspace directory on
+	// a machine. Destructive: same handler-gated authorization as
+	// ListMachineWorkspaces; the machine app validates the directory name.
+	DeleteMachineWorkspace(context.Context, *connect.Request[v1.DeleteMachineWorkspaceRequest]) (*connect.Response[v1.DeleteMachineWorkspaceResponse], error)
 	// Machine initial connection using a registration token. Returns access +
 	// refresh tokens, the machine session id, and the full list of agents the
 	// machine must host (so the machine app can open an AgentChannel for each).
@@ -373,6 +421,18 @@ func NewMachineServiceHandler(svc MachineServiceHandler, opts ...connect.Handler
 		connect.WithSchema(machineServiceMethods.ByName("RefreshMachineProviders")),
 		connect.WithHandlerOptions(opts...),
 	)
+	machineServiceListMachineWorkspacesHandler := connect.NewUnaryHandler(
+		MachineServiceListMachineWorkspacesProcedure,
+		svc.ListMachineWorkspaces,
+		connect.WithSchema(machineServiceMethods.ByName("ListMachineWorkspaces")),
+		connect.WithHandlerOptions(opts...),
+	)
+	machineServiceDeleteMachineWorkspaceHandler := connect.NewUnaryHandler(
+		MachineServiceDeleteMachineWorkspaceProcedure,
+		svc.DeleteMachineWorkspace,
+		connect.WithSchema(machineServiceMethods.ByName("DeleteMachineWorkspace")),
+		connect.WithHandlerOptions(opts...),
+	)
 	machineServiceConnectMachineHandler := connect.NewUnaryHandler(
 		MachineServiceConnectMachineProcedure,
 		svc.ConnectMachine,
@@ -417,6 +477,10 @@ func NewMachineServiceHandler(svc MachineServiceHandler, opts ...connect.Handler
 			machineServiceListMachineAgentsHandler.ServeHTTP(w, r)
 		case MachineServiceRefreshMachineProvidersProcedure:
 			machineServiceRefreshMachineProvidersHandler.ServeHTTP(w, r)
+		case MachineServiceListMachineWorkspacesProcedure:
+			machineServiceListMachineWorkspacesHandler.ServeHTTP(w, r)
+		case MachineServiceDeleteMachineWorkspaceProcedure:
+			machineServiceDeleteMachineWorkspaceHandler.ServeHTTP(w, r)
 		case MachineServiceConnectMachineProcedure:
 			machineServiceConnectMachineHandler.ServeHTTP(w, r)
 		case MachineServiceMachineHeartbeatProcedure:
@@ -468,6 +532,14 @@ func (UnimplementedMachineServiceHandler) ListMachineAgents(context.Context, *co
 
 func (UnimplementedMachineServiceHandler) RefreshMachineProviders(context.Context, *connect.Request[v1.RefreshMachineProvidersRequest]) (*connect.Response[v1.RefreshMachineProvidersResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineService.RefreshMachineProviders is not implemented"))
+}
+
+func (UnimplementedMachineServiceHandler) ListMachineWorkspaces(context.Context, *connect.Request[v1.ListMachineWorkspacesRequest]) (*connect.Response[v1.ListMachineWorkspacesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineService.ListMachineWorkspaces is not implemented"))
+}
+
+func (UnimplementedMachineServiceHandler) DeleteMachineWorkspace(context.Context, *connect.Request[v1.DeleteMachineWorkspaceRequest]) (*connect.Response[v1.DeleteMachineWorkspaceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.MachineService.DeleteMachineWorkspace is not implemented"))
 }
 
 func (UnimplementedMachineServiceHandler) ConnectMachine(context.Context, *connect.Request[v1.ConnectMachineRequest]) (*connect.Response[v1.ConnectMachineResponse], error) {

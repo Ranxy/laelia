@@ -12,10 +12,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	"github.com/Ranxy/laelia/backend/agent/workspace"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
@@ -83,7 +83,7 @@ func (m *mergedText) append(streamType v1pb.CommandOutput_StreamType, text strin
 	return m.builder.Len() >= mergedTextDeltaFlushBytes
 }
 
-func (m *mergedText) flush(stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, state *executor.LocalState) error {
+func (m *mergedText) flush(stream streamSender, commandID string, state *executor.LocalState) error {
 	if !m.started {
 		return nil
 	}
@@ -105,6 +105,26 @@ func (m *mergedText) flush(stream *connect.BidiStreamForClient[v1pb.AgentStreamM
 		},
 	}
 	return sendCommandEvent(stream, commandID, &event)
+}
+
+// streamSender abstracts the agent bidi stream for send serialization.
+// connect-go's Send is not safe to call concurrently, and the workspace reply
+// goroutines send alongside the ping ticker and the drain loop, so mainLoop
+// wraps the raw stream in serializedSender.
+type streamSender interface {
+	Send(*v1pb.AgentStreamMessage) error
+}
+
+// serializedSender serializes Send calls on the underlying stream.
+type serializedSender struct {
+	mu     sync.Mutex
+	stream streamSender
+}
+
+func (s *serializedSender) Send(msg *v1pb.AgentStreamMessage) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.stream.Send(msg)
 }
 
 type commandStream struct {
@@ -257,6 +277,11 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 	// is safe.
 	c.resetCrossConnectionState()
 
+	// serializedSender guards Send: connect-go's Send is not safe to call
+	// concurrently, and the workspace reply goroutines send alongside the ping
+	// ticker and the drain loop.
+	sender := &serializedSender{stream: stream}
+
 	pingTicker := time.NewTicker(cmdPingInterval)
 	defer pingTicker.Stop()
 
@@ -312,6 +337,14 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 					}
 				}
 
+			case *v1pb.ManagerStreamMessage_WorkspaceListRequest:
+				// File reads run on their own goroutine: a slow disk must not
+				// block the receive pump (BeginSession / NewMessages / Cancel).
+				go c.handleWorkspaceList(ctx, sender, m.WorkspaceListRequest)
+
+			case *v1pb.ManagerStreamMessage_WorkspaceReadRequest:
+				go c.handleWorkspaceRead(ctx, sender, m.WorkspaceReadRequest)
+
 			default:
 				slog.Warn("unknown message type from manager")
 			}
@@ -324,7 +357,7 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 	// picks up anything new via the server-side cursor comparison.
 	drainCtx, drainCancel := context.WithCancel(ctx)
 	defer drainCancel()
-	go c.drainLoop(drainCtx, stream, doneCh)
+	go c.drainLoop(drainCtx, sender, doneCh)
 
 	// Kick the drain loop once on connect so missed-offline messages are
 	// discovered immediately (AgentReady already told the manager we're back).
@@ -348,7 +381,7 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 					},
 				},
 			}
-			if err := stream.Send(ping); err != nil {
+			if err := sender.Send(ping); err != nil {
 				return err
 			}
 		}
@@ -359,7 +392,7 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 // repeatedly opens a session (BeginSession) and runs it until the manager
 // reports no channel has updates (idle), at which point it waits for the next
 // wake. One session processes one channel; the outer loop opens the next.
-func (c *commandStream) drainLoop(ctx context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], doneCh <-chan struct{}) {
+func (c *commandStream) drainLoop(ctx context.Context, stream streamSender, doneCh <-chan struct{}) {
 	var lastSessionStart time.Time
 	for {
 	START:
@@ -425,7 +458,7 @@ func (c *commandStream) drainLoop(ctx context.Context, stream *connect.BidiStrea
 // beginSession sends a BeginSession message and waits for the manager's reply.
 // Returns a non-idle response with a command_id to run, or idle=true when no
 // channel has updates.
-func (c *commandStream) beginSession(ctx context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], doneCh <-chan struct{}) (*v1pb.BeginSessionResponse, error) {
+func (c *commandStream) beginSession(ctx context.Context, stream streamSender, doneCh <-chan struct{}) (*v1pb.BeginSessionResponse, error) {
 	if err := stream.Send(&v1pb.AgentStreamMessage{
 		Message: &v1pb.AgentStreamMessage_BeginSession{
 			BeginSession: &v1pb.BeginSession{},
@@ -453,7 +486,7 @@ func (c *commandStream) beginSession(ctx context.Context, stream *connect.BidiSt
 // sequence counter as the pump.
 type contextObserver struct {
 	state      *executor.ContextState
-	stream     *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage]
+	stream     streamSender
 	commandID  string
 	localState *executor.LocalState
 
@@ -467,7 +500,7 @@ type contextObserver struct {
 	lastAgentChunkAt time.Time
 }
 
-func newContextObserver(state *executor.ContextState, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, localState *executor.LocalState) *contextObserver {
+func newContextObserver(state *executor.ContextState, stream streamSender, commandID string, localState *executor.LocalState) *contextObserver {
 	return &contextObserver{
 		state:      state,
 		stream:     stream,
@@ -655,7 +688,7 @@ func (c *commandStream) persistContextState(ctxState *executor.ContextState, res
 // runCommand. The agent itself decides which channel to process and how, by
 // shelling out to the `laelia-machine` CLI over the local daemon. Blocking:
 // returns when the session finishes.
-func (c *commandStream) runSession(ctx context.Context, stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, agentDisplayName, ownerDisplayName string) {
+func (c *commandStream) runSession(ctx context.Context, stream streamSender, commandID string, agentDisplayName, ownerDisplayName string) {
 	// Per-agent context state drives re-anchor / usage-warning decisions for
 	// this turn and is updated from the events below. A load failure disables
 	// context tracking for the turn (never blocks work).
@@ -820,7 +853,7 @@ func (c *commandStream) takeCancelReason() string {
 func (c *commandStream) runCommand(
 	ctx context.Context,
 	runtime executor.Runtime,
-	stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage],
+	stream streamSender,
 	req executor.Request,
 	ctxState *executor.ContextState,
 ) *executor.Result {
@@ -976,7 +1009,7 @@ func (c *commandStream) runCommand(
 func drainOutput(
 	ctx context.Context,
 	runtime executor.Runtime,
-	stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage],
+	stream streamSender,
 	commandID string,
 	state *executor.LocalState,
 	merged *mergedText,
@@ -1030,7 +1063,7 @@ func (c *commandStream) buildRuntime(req executor.Request) (executor.Runtime, er
 	return executor.NewACP(req, c.getAcpConfig())
 }
 
-func sendCommandProgress(stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, chunk executor.OutputChunk) error {
+func sendCommandProgress(stream streamSender, commandID string, chunk executor.OutputChunk) error {
 	return stream.Send(&v1pb.AgentStreamMessage{
 		Message: &v1pb.AgentStreamMessage_Progress{
 			Progress: &v1pb.CommandProgress{
@@ -1043,7 +1076,7 @@ func sendCommandProgress(stream *connect.BidiStreamForClient[v1pb.AgentStreamMes
 	})
 }
 
-func sendCommandEvent(stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], commandID string, event *executor.Event) error {
+func sendCommandEvent(stream streamSender, commandID string, event *executor.Event) error {
 	ce := &v1pb.CommandEvent{
 		CommandId: commandID,
 		SeqNo:     event.SeqNo,
@@ -1087,10 +1120,73 @@ func sendCommandEvent(stream *connect.BidiStreamForClient[v1pb.AgentStreamMessag
 	})
 }
 
-func sendCommandResult(stream *connect.BidiStreamForClient[v1pb.AgentStreamMessage, v1pb.ManagerStreamMessage], result *v1pb.CommandResult) error {
+func sendCommandResult(stream streamSender, result *v1pb.CommandResult) error {
 	return stream.Send(&v1pb.AgentStreamMessage{
 		Message: &v1pb.AgentStreamMessage_Result{
 			Result: result,
+		},
+	})
+}
+
+// handleWorkspaceList lists one directory level of this agent's workspace and
+// replies over the agent stream. The manager gates this by owner/admin
+// permission; the workspace package enforces the never-visible/secret policy.
+func (c *commandStream) handleWorkspaceList(_ context.Context, sender streamSender, req *v1pb.WorkspaceListRequest) {
+	if req == nil {
+		return
+	}
+	entries, err := workspace.List(executor.AgentWorkingDir(c.machineID, c.agentID), req.DirPath, req.IncludeHidden)
+	if err != nil {
+		slog.Warn("workspace list failed", "agentID", c.agentID, "dirPath", req.DirPath, "error", err)
+	}
+	protoEntries := make([]*v1pb.WorkspaceEntry, 0, len(entries))
+	for _, e := range entries {
+		var modifiedAt *timestamppb.Timestamp
+		if !e.ModifiedAt.IsZero() {
+			modifiedAt = timestamppb.New(e.ModifiedAt)
+		}
+		protoEntries = append(protoEntries, &v1pb.WorkspaceEntry{
+			Name:        e.Name,
+			Path:        e.Path,
+			IsDirectory: e.IsDir,
+			Size:        e.Size,
+			ModifiedAt:  modifiedAt,
+			IsHidden:    e.IsHidden,
+		})
+	}
+	_ = sender.Send(&v1pb.AgentStreamMessage{
+		Message: &v1pb.AgentStreamMessage_WorkspaceListResponse{
+			WorkspaceListResponse: &v1pb.WorkspaceListResponse{
+				RequestId: req.RequestId,
+				Entries:   protoEntries,
+			},
+		},
+	})
+}
+
+// handleWorkspaceRead previews one workspace file and replies over the agent
+// stream. Refusals (sensitive file, too large, directory) come back in the
+// response's error field; OS failures are logged and returned as errors too.
+func (c *commandStream) handleWorkspaceRead(_ context.Context, sender streamSender, req *v1pb.WorkspaceReadRequest) {
+	if req == nil {
+		return
+	}
+	result, err := workspace.Read(executor.AgentWorkingDir(c.machineID, c.agentID), req.Path)
+	if err != nil {
+		slog.Warn("workspace read failed", "agentID", c.agentID, "path", req.Path, "error", err)
+		result.Error = err.Error()
+	}
+	_ = sender.Send(&v1pb.AgentStreamMessage{
+		Message: &v1pb.AgentStreamMessage_WorkspaceReadResponse{
+			WorkspaceReadResponse: &v1pb.WorkspaceReadResponse{
+				RequestId: req.RequestId,
+				Content:   result.Content,
+				Binary:    result.Binary,
+				Size:      result.Size,
+				MimeType:  result.MimeType,
+				Encoding:  result.Encoding,
+				Error:     result.Error,
+			},
 		},
 	})
 }

@@ -224,6 +224,77 @@ export declare type RefreshMachineProvidersResponse = Message<"laelia.v1.Refresh
 export declare const RefreshMachineProvidersResponseSchema: GenMessage<RefreshMachineProvidersResponse>;
 
 /**
+ * @generated from message laelia.v1.ListMachineWorkspacesRequest
+ */
+export declare type ListMachineWorkspacesRequest = Message<"laelia.v1.ListMachineWorkspacesRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message laelia.v1.ListMachineWorkspacesRequest.
+ * Use `create(ListMachineWorkspacesRequestSchema)` to create a new message.
+ */
+export declare const ListMachineWorkspacesRequestSchema: GenMessage<ListMachineWorkspacesRequest>;
+
+/**
+ * @generated from message laelia.v1.ListMachineWorkspacesResponse
+ */
+export declare type ListMachineWorkspacesResponse = Message<"laelia.v1.ListMachineWorkspacesResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.MachineWorkspaceSummary workspaces = 1;
+   */
+  workspaces: MachineWorkspaceSummary[];
+};
+
+/**
+ * Describes the message laelia.v1.ListMachineWorkspacesResponse.
+ * Use `create(ListMachineWorkspacesResponseSchema)` to create a new message.
+ */
+export declare const ListMachineWorkspacesResponseSchema: GenMessage<ListMachineWorkspacesResponse>;
+
+/**
+ * @generated from message laelia.v1.DeleteMachineWorkspaceRequest
+ */
+export declare type DeleteMachineWorkspaceRequest = Message<"laelia.v1.DeleteMachineWorkspaceRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * bare directory name; validated by the machine app
+   *
+   * @generated from field: string directory_name = 2;
+   */
+  directoryName: string;
+};
+
+/**
+ * Describes the message laelia.v1.DeleteMachineWorkspaceRequest.
+ * Use `create(DeleteMachineWorkspaceRequestSchema)` to create a new message.
+ */
+export declare const DeleteMachineWorkspaceRequestSchema: GenMessage<DeleteMachineWorkspaceRequest>;
+
+/**
+ * @generated from message laelia.v1.DeleteMachineWorkspaceResponse
+ */
+export declare type DeleteMachineWorkspaceResponse = Message<"laelia.v1.DeleteMachineWorkspaceResponse"> & {
+  /**
+   * @generated from field: bool success = 1;
+   */
+  success: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.DeleteMachineWorkspaceResponse.
+ * Use `create(DeleteMachineWorkspaceResponseSchema)` to create a new message.
+ */
+export declare const DeleteMachineWorkspaceResponseSchema: GenMessage<DeleteMachineWorkspaceResponse>;
+
+/**
  * @generated from message laelia.v1.ConnectMachineRequest
  */
 export declare type ConnectMachineRequest = Message<"laelia.v1.ConnectMachineRequest"> & {
@@ -824,6 +895,22 @@ export declare type MachineStreamMessage = Message<"laelia.v1.MachineStreamMessa
      */
     value: MachineDisconnectNotice;
     case: "disconnectNotice";
+  } | {
+    /**
+     * response to ManagerMachineStreamMessage.machine_workspace_scan_request
+     *
+     * @generated from field: laelia.v1.MachineWorkspaceScanResponse machine_workspace_scan_response = 5;
+     */
+    value: MachineWorkspaceScanResponse;
+    case: "machineWorkspaceScanResponse";
+  } | {
+    /**
+     * response to ManagerMachineStreamMessage.machine_workspace_delete_request
+     *
+     * @generated from field: laelia.v1.MachineWorkspaceDeleteResponse machine_workspace_delete_response = 6;
+     */
+    value: MachineWorkspaceDeleteResponse;
+    case: "machineWorkspaceDeleteResponse";
   } | { case: undefined; value?: undefined };
 };
 
@@ -886,6 +973,22 @@ export declare type ManagerMachineStreamMessage = Message<"laelia.v1.ManagerMach
      */
     value: ReloadAgentAssignment;
     case: "reloadAgentAssignment";
+  } | {
+    /**
+     * scan per-agent workspace directories on this machine
+     *
+     * @generated from field: laelia.v1.MachineWorkspaceScanRequest machine_workspace_scan_request = 7;
+     */
+    value: MachineWorkspaceScanRequest;
+    case: "machineWorkspaceScanRequest";
+  } | {
+    /**
+     * delete one agent workspace directory
+     *
+     * @generated from field: laelia.v1.MachineWorkspaceDeleteRequest machine_workspace_delete_request = 8;
+     */
+    value: MachineWorkspaceDeleteRequest;
+    case: "machineWorkspaceDeleteRequest";
   } | { case: undefined; value?: undefined };
 };
 
@@ -989,6 +1092,135 @@ export declare type ReloadAgentAssignment = Message<"laelia.v1.ReloadAgentAssign
 export declare const ReloadAgentAssignmentSchema: GenMessage<ReloadAgentAssignment>;
 
 /**
+ * MachineWorkspaceScanRequest asks the machine app to summarize every
+ * per-agent workspace directory under ~/.laelia/<machineID>/. The app replies
+ * with MachineStreamMessage.machine_workspace_scan_response.
+ *
+ * @generated from message laelia.v1.MachineWorkspaceScanRequest
+ */
+export declare type MachineWorkspaceScanRequest = Message<"laelia.v1.MachineWorkspaceScanRequest"> & {
+  /**
+   * correlation id for the pending unary ListMachineWorkspaces call
+   *
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+};
+
+/**
+ * Describes the message laelia.v1.MachineWorkspaceScanRequest.
+ * Use `create(MachineWorkspaceScanRequestSchema)` to create a new message.
+ */
+export declare const MachineWorkspaceScanRequestSchema: GenMessage<MachineWorkspaceScanRequest>;
+
+/**
+ * MachineWorkspaceSummary is one agent workspace directory's usage summary.
+ *
+ * @generated from message laelia.v1.MachineWorkspaceSummary
+ */
+export declare type MachineWorkspaceSummary = Message<"laelia.v1.MachineWorkspaceSummary"> & {
+  /**
+   * @generated from field: string directory_name = 1;
+   */
+  directoryName: string;
+
+  /**
+   * @generated from field: int64 total_size_bytes = 2;
+   */
+  totalSizeBytes: bigint;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp last_modified = 3;
+   */
+  lastModified?: Timestamp | undefined;
+
+  /**
+   * @generated from field: int64 file_count = 4;
+   */
+  fileCount: bigint;
+};
+
+/**
+ * Describes the message laelia.v1.MachineWorkspaceSummary.
+ * Use `create(MachineWorkspaceSummarySchema)` to create a new message.
+ */
+export declare const MachineWorkspaceSummarySchema: GenMessage<MachineWorkspaceSummary>;
+
+/**
+ * @generated from message laelia.v1.MachineWorkspaceScanResponse
+ */
+export declare type MachineWorkspaceScanResponse = Message<"laelia.v1.MachineWorkspaceScanResponse"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: repeated laelia.v1.MachineWorkspaceSummary workspaces = 2;
+   */
+  workspaces: MachineWorkspaceSummary[];
+};
+
+/**
+ * Describes the message laelia.v1.MachineWorkspaceScanResponse.
+ * Use `create(MachineWorkspaceScanResponseSchema)` to create a new message.
+ */
+export declare const MachineWorkspaceScanResponseSchema: GenMessage<MachineWorkspaceScanResponse>;
+
+/**
+ * MachineWorkspaceDeleteRequest asks the machine app to recursively delete one
+ * agent workspace directory. directory_name must be a bare directory name (no
+ * path separators or "..") — the machine app validates it.
+ *
+ * @generated from message laelia.v1.MachineWorkspaceDeleteRequest
+ */
+export declare type MachineWorkspaceDeleteRequest = Message<"laelia.v1.MachineWorkspaceDeleteRequest"> & {
+  /**
+   * correlation id for the pending unary DeleteMachineWorkspace call
+   *
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string directory_name = 2;
+   */
+  directoryName: string;
+};
+
+/**
+ * Describes the message laelia.v1.MachineWorkspaceDeleteRequest.
+ * Use `create(MachineWorkspaceDeleteRequestSchema)` to create a new message.
+ */
+export declare const MachineWorkspaceDeleteRequestSchema: GenMessage<MachineWorkspaceDeleteRequest>;
+
+/**
+ * @generated from message laelia.v1.MachineWorkspaceDeleteResponse
+ */
+export declare type MachineWorkspaceDeleteResponse = Message<"laelia.v1.MachineWorkspaceDeleteResponse"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string directory_name = 2;
+   */
+  directoryName: string;
+
+  /**
+   * @generated from field: bool success = 3;
+   */
+  success: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.MachineWorkspaceDeleteResponse.
+ * Use `create(MachineWorkspaceDeleteResponseSchema)` to create a new message.
+ */
+export declare const MachineWorkspaceDeleteResponseSchema: GenMessage<MachineWorkspaceDeleteResponse>;
+
+/**
  * MachineService manages machines (a long-lived agent-application process a
  * user runs once on a host) and serves the machine-side authentication RPCs the
  * machine app calls to register itself. A machine authenticates once with a
@@ -1085,6 +1317,31 @@ export declare const MachineService: GenService<{
     methodKind: "unary";
     input: typeof RefreshMachineProvidersRequestSchema;
     output: typeof RefreshMachineProvidersResponseSchema;
+  },
+  /**
+   * ListMachineWorkspaces summarizes every per-agent workspace directory on a
+   * machine (~/.laelia/<machineID>/). Workspace content is sensitive:
+   * authorized in the handler for the machine's creator or a workspace admin
+   * (isMachineAdmin, matching Machine.can_manage); no permission annotation.
+   *
+   * @generated from rpc laelia.v1.MachineService.ListMachineWorkspaces
+   */
+  listMachineWorkspaces: {
+    methodKind: "unary";
+    input: typeof ListMachineWorkspacesRequestSchema;
+    output: typeof ListMachineWorkspacesResponseSchema;
+  },
+  /**
+   * DeleteMachineWorkspace recursively deletes one agent workspace directory on
+   * a machine. Destructive: same handler-gated authorization as
+   * ListMachineWorkspaces; the machine app validates the directory name.
+   *
+   * @generated from rpc laelia.v1.MachineService.DeleteMachineWorkspace
+   */
+  deleteMachineWorkspace: {
+    methodKind: "unary";
+    input: typeof DeleteMachineWorkspaceRequestSchema;
+    output: typeof DeleteMachineWorkspaceResponseSchema;
   },
   /**
    * Machine initial connection using a registration token. Returns access +

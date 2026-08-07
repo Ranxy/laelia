@@ -4,9 +4,14 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"time"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
+	"github.com/Ranxy/laelia/backend/agent/workspace"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 )
@@ -92,6 +97,14 @@ func (c *MachineClient) runControlStream(ctx context.Context, _ *daemonsrv.Serve
 				// for the whole probe window.
 				go c.handleDiscoverProviders(ctx, sendStream, m.DiscoverProviders.GetRequestId())
 
+			case *v1pb.ManagerMachineStreamMessage_MachineWorkspaceScanRequest:
+				// Scanning the workspace root can take a while on a big disk;
+				// run it off the receive pump.
+				go c.handleMachineWorkspaceScan(ctx, sendStream, m.MachineWorkspaceScanRequest)
+
+			case *v1pb.ManagerMachineStreamMessage_MachineWorkspaceDeleteRequest:
+				go c.handleMachineWorkspaceDelete(ctx, sendStream, m.MachineWorkspaceDeleteRequest)
+
 			case *v1pb.ManagerMachineStreamMessage_Pong:
 				// pong received, link acknowledged
 
@@ -175,4 +188,62 @@ func (c *MachineClient) handleDiscoverProviders(ctx context.Context, send func(*
 	}); err != nil {
 		slog.Error("failed to send providers_discovered", "requestID", requestID, "error", err)
 	}
+}
+
+// handleMachineWorkspaceScan summarizes every per-agent workspace directory
+// under ~/.laelia/<machineID>/ and replies. Machine credentials
+// (machine-token-<id>) live directly under ~/.laelia/, outside the scanned
+// root, so they are never reported.
+func (c *MachineClient) handleMachineWorkspaceScan(_ context.Context, send func(*v1pb.MachineStreamMessage) error, req *v1pb.MachineWorkspaceScanRequest) {
+	if req == nil {
+		return
+	}
+	root := filepath.Join(os.Getenv("HOME"), ".laelia", c.machineID)
+	summaries, err := workspace.Scan(root)
+	if err != nil {
+		slog.Warn("machine workspace scan failed", "machineID", c.machineID, "error", err)
+	}
+	protoSummaries := make([]*v1pb.MachineWorkspaceSummary, 0, len(summaries))
+	for _, sm := range summaries {
+		var lastModified *timestamppb.Timestamp
+		if !sm.LastModified.IsZero() {
+			lastModified = timestamppb.New(sm.LastModified)
+		}
+		protoSummaries = append(protoSummaries, &v1pb.MachineWorkspaceSummary{
+			DirectoryName:  sm.DirectoryName,
+			TotalSizeBytes: sm.TotalSizeBytes,
+			LastModified:   lastModified,
+			FileCount:      sm.FileCount,
+		})
+	}
+	_ = send(&v1pb.MachineStreamMessage{
+		Message: &v1pb.MachineStreamMessage_MachineWorkspaceScanResponse{
+			MachineWorkspaceScanResponse: &v1pb.MachineWorkspaceScanResponse{
+				RequestId:  req.RequestId,
+				Workspaces: protoSummaries,
+			},
+		},
+	})
+}
+
+// handleMachineWorkspaceDelete recursively removes one agent workspace
+// directory. The workspace package rejects names that could escape the root.
+func (c *MachineClient) handleMachineWorkspaceDelete(_ context.Context, send func(*v1pb.MachineStreamMessage) error, req *v1pb.MachineWorkspaceDeleteRequest) {
+	if req == nil {
+		return
+	}
+	root := filepath.Join(os.Getenv("HOME"), ".laelia", c.machineID)
+	err := workspace.Delete(root, req.DirectoryName)
+	if err != nil {
+		slog.Warn("machine workspace delete failed", "machineID", c.machineID, "directory", req.DirectoryName, "error", err)
+	}
+	_ = send(&v1pb.MachineStreamMessage{
+		Message: &v1pb.MachineStreamMessage_MachineWorkspaceDeleteResponse{
+			MachineWorkspaceDeleteResponse: &v1pb.MachineWorkspaceDeleteResponse{
+				RequestId:     req.RequestId,
+				DirectoryName: req.DirectoryName,
+				Success:       err == nil,
+			},
+		},
+	})
 }

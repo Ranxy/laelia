@@ -6,12 +6,14 @@ import {
   ACTIVITY_ROUTE_DETAIL,
   AGENT_ROUTE_CHAT,
   AGENT_ROUTE_PROFILE,
+  AGENT_ROUTE_WORKSPACE,
   CHAT_ROUTE,
   CHAT_ROUTE_DETAIL,
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
   MACHINE_ROUTE_LIST,
   MACHINE_ROUTE_PROFILE,
+  MACHINE_ROUTE_WORKSPACE,
   MEMBERS_ROUTE,
   REMINDER_ROUTE_DETAIL,
   REMINDER_ROUTE_LIST,
@@ -165,6 +167,14 @@ export const dashboardRoutes: RouteObject[] = [
                     Component: m.AgentChatPage,
                   })),
               },
+              {
+                path: "workspace",
+                handle: { name: AGENT_ROUTE_WORKSPACE },
+                lazy: () =>
+                  import("@/pages/dashboard/agent-workspace").then((m) => ({
+                    Component: m.AgentWorkspacePage,
+                  })),
+              },
             ],
           },
           {
@@ -206,6 +216,14 @@ export const dashboardRoutes: RouteObject[] = [
                 lazy: () =>
                   import("@/pages/dashboard/machine-profile").then((m) => ({
                     Component: m.MachineProfilePage,
+                  })),
+              },
+              {
+                path: "workspace",
+                handle: { name: MACHINE_ROUTE_WORKSPACE },
+                lazy: () =>
+                  import("@/pages/dashboard/machine-workspace").then((m) => ({
+                    Component: m.MachineWorkspacePage,
                   })),
               },
             ],

@@ -50,6 +50,8 @@
     - [HelloResponse](#laelia-v1-HelloResponse)
     - [ListAgentSessionsRequest](#laelia-v1-ListAgentSessionsRequest)
     - [ListAgentSessionsResponse](#laelia-v1-ListAgentSessionsResponse)
+    - [ListAgentWorkspaceRequest](#laelia-v1-ListAgentWorkspaceRequest)
+    - [ListAgentWorkspaceResponse](#laelia-v1-ListAgentWorkspaceResponse)
     - [ListAgentsRequest](#laelia-v1-ListAgentsRequest)
     - [ListAgentsResponse](#laelia-v1-ListAgentsResponse)
     - [ListPiModelsRequest](#laelia-v1-ListPiModelsRequest)
@@ -57,6 +59,8 @@
     - [PendingCommandHint](#laelia-v1-PendingCommandHint)
     - [PendingCommandHint.EnvEntry](#laelia-v1-PendingCommandHint-EnvEntry)
     - [PiModel](#laelia-v1-PiModel)
+    - [ReadAgentWorkspaceFileRequest](#laelia-v1-ReadAgentWorkspaceFileRequest)
+    - [ReadAgentWorkspaceFileResponse](#laelia-v1-ReadAgentWorkspaceFileResponse)
     - [RefreshAgentProvidersRequest](#laelia-v1-RefreshAgentProvidersRequest)
     - [RefreshAgentProvidersResponse](#laelia-v1-RefreshAgentProvidersResponse)
     - [RefreshAgentTokenRequest](#laelia-v1-RefreshAgentTokenRequest)
@@ -71,6 +75,8 @@
     - [UpdateAgentMcpConfigRequest](#laelia-v1-UpdateAgentMcpConfigRequest)
     - [UpdateAgentRequest](#laelia-v1-UpdateAgentRequest)
     - [UploadAgentAvatarRequest](#laelia-v1-UploadAgentAvatarRequest)
+    - [WorkspaceEntry](#laelia-v1-WorkspaceEntry)
+    - [WorkspaceReadResponse](#laelia-v1-WorkspaceReadResponse)
   
     - [AgentStatus.ConnectionState](#laelia-v1-AgentStatus-ConnectionState)
   
@@ -290,6 +296,9 @@
     - [WarningPayload](#laelia-v1-WarningPayload)
     - [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest)
     - [WatchCommandRequest](#laelia-v1-WatchCommandRequest)
+    - [WorkspaceListRequest](#laelia-v1-WorkspaceListRequest)
+    - [WorkspaceListResponse](#laelia-v1-WorkspaceListResponse)
+    - [WorkspaceReadRequest](#laelia-v1-WorkspaceReadRequest)
   
     - [ActivityCategory](#laelia-v1-ActivityCategory)
     - [ActivityState](#laelia-v1-ActivityState)
@@ -345,10 +354,14 @@
     - [CreateMachineRequest](#laelia-v1-CreateMachineRequest)
     - [CreateMachineResponse](#laelia-v1-CreateMachineResponse)
     - [DeleteMachineRequest](#laelia-v1-DeleteMachineRequest)
+    - [DeleteMachineWorkspaceRequest](#laelia-v1-DeleteMachineWorkspaceRequest)
+    - [DeleteMachineWorkspaceResponse](#laelia-v1-DeleteMachineWorkspaceResponse)
     - [ForceDisconnectMachineRequest](#laelia-v1-ForceDisconnectMachineRequest)
     - [GetMachineRequest](#laelia-v1-GetMachineRequest)
     - [ListMachineAgentsRequest](#laelia-v1-ListMachineAgentsRequest)
     - [ListMachineAgentsResponse](#laelia-v1-ListMachineAgentsResponse)
+    - [ListMachineWorkspacesRequest](#laelia-v1-ListMachineWorkspacesRequest)
+    - [ListMachineWorkspacesResponse](#laelia-v1-ListMachineWorkspacesResponse)
     - [ListMachinesRequest](#laelia-v1-ListMachinesRequest)
     - [ListMachinesResponse](#laelia-v1-ListMachinesResponse)
     - [Machine](#laelia-v1-Machine)
@@ -363,6 +376,11 @@
     - [MachineStatus](#laelia-v1-MachineStatus)
     - [MachineStreamMessage](#laelia-v1-MachineStreamMessage)
     - [MachineSummary](#laelia-v1-MachineSummary)
+    - [MachineWorkspaceDeleteRequest](#laelia-v1-MachineWorkspaceDeleteRequest)
+    - [MachineWorkspaceDeleteResponse](#laelia-v1-MachineWorkspaceDeleteResponse)
+    - [MachineWorkspaceScanRequest](#laelia-v1-MachineWorkspaceScanRequest)
+    - [MachineWorkspaceScanResponse](#laelia-v1-MachineWorkspaceScanResponse)
+    - [MachineWorkspaceSummary](#laelia-v1-MachineWorkspaceSummary)
     - [ManagerMachineStreamMessage](#laelia-v1-ManagerMachineStreamMessage)
     - [RefreshMachineProvidersRequest](#laelia-v1-RefreshMachineProvidersRequest)
     - [RefreshMachineProvidersResponse](#laelia-v1-RefreshMachineProvidersResponse)
@@ -1169,6 +1187,38 @@ view does not gate affordances on it (delete is enforced server-side).
 
 
 
+<a name="laelia-v1-ListAgentWorkspaceRequest"></a>
+
+### ListAgentWorkspaceRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| dir_path | [string](#string) |  | relative to the workspace root; empty = root |
+| include_hidden | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListAgentWorkspaceResponse"></a>
+
+### ListAgentWorkspaceResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| entries | [WorkspaceEntry](#laelia-v1-WorkspaceEntry) | repeated |  |
+
+
+
+
+
+
 <a name="laelia-v1-ListAgentsRequest"></a>
 
 ### ListAgentsRequest
@@ -1279,6 +1329,37 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 | ----- | ---- | ----- | ----------- |
 | id | [string](#string) |  | model id, the value passed to pi --model |
 | name | [string](#string) |  | optional display name (deepseek echoes id; openrouter has a human-readable name) |
+
+
+
+
+
+
+<a name="laelia-v1-ReadAgentWorkspaceFileRequest"></a>
+
+### ReadAgentWorkspaceFileRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| path | [string](#string) |  | relative to the workspace root |
+
+
+
+
+
+
+<a name="laelia-v1-ReadAgentWorkspaceFileResponse"></a>
+
+### ReadAgentWorkspaceFileResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| file | [WorkspaceReadResponse](#laelia-v1-WorkspaceReadResponse) |  |  |
 
 
 
@@ -1501,6 +1582,51 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 
 
 
+
+<a name="laelia-v1-WorkspaceEntry"></a>
+
+### WorkspaceEntry
+WorkspaceEntry is one file/directory node of a lazily loaded workspace tree.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| path | [string](#string) |  | relative to the workspace root |
+| is_directory | [bool](#bool) |  |  |
+| size | [int64](#int64) |  | file bytes; 0 for directories |
+| modified_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| is_hidden | [bool](#bool) |  | dotfile |
+
+
+
+
+
+
+<a name="laelia-v1-WorkspaceReadResponse"></a>
+
+### WorkspaceReadResponse
+WorkspaceReadResponse carries a previewed file (or an error) from the machine
+app back to the manager. A non-empty error means the file cannot be
+previewed; the unary RPC still succeeds so the frontend can show the reason.
+Shared by the per-agent workspace stream (command.proto) and the unary
+ReadAgentWorkspaceFile RPC.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  |  |
+| content | [string](#string) |  | text: utf-8; image: base64; otherwise empty |
+| binary | [bool](#bool) |  | true for images and other binary files |
+| size | [int64](#int64) |  |  |
+| mime_type | [string](#string) |  | set for images |
+| encoding | [string](#string) |  | &#34;utf-8&#34; / &#34;base64&#34; / &#34;&#34; |
+| error | [string](#string) |  | preview-disabled reason (sensitive file, too large, missing) |
+
+
+
+
+
  
 
 
@@ -1543,6 +1669,8 @@ PiModel is one model id returned by the LLM API provider&#39;s model-listing API
 | UpdateAgentACPConfig | [UpdateAgentACPConfigRequest](#laelia-v1-UpdateAgentACPConfigRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Update the agent&#39;s ACP config. Handler-gated (no permission annotation): the agent&#39;s owner or a workspace admin may update it. Setting a legacy inline api_provider/api_key additionally requires laelia.agents.edit (only workspace admin today); owners without it must use a global provider. |
 | UpdateAgentMcpConfig | [UpdateAgentMcpConfigRequest](#laelia-v1-UpdateAgentMcpConfigRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | UpdateAgentMcpConfig replaces the MCP servers enabled on an agent. Only servers the caller may use (members of the server&#39;s user/group list, or workspace admin) are accepted. Handler-gated like UpdateAgentACPConfig: the agent&#39;s owner or a workspace admin may update it. |
 | RefreshAgentProviders | [RefreshAgentProvidersRequest](#laelia-v1-RefreshAgentProvidersRequest) | [RefreshAgentProvidersResponse](#laelia-v1-RefreshAgentProvidersResponse) | Ask the agent daemon to re-probe its host for installed LLM agent providers and their models. Returns the freshly discovered provider list (also persisted into agent.info.available_providers). Admin only. |
+| ListAgentWorkspace | [ListAgentWorkspaceRequest](#laelia-v1-ListAgentWorkspaceRequest) | [ListAgentWorkspaceResponse](#laelia-v1-ListAgentWorkspaceResponse) | ListAgentWorkspace lists one directory level of an agent&#39;s workspace on its machine (~/.laelia/&lt;machineID&gt;/&lt;agentID&gt;/), lazily loading the tree level by level. Workspace content is sensitive: authorized in the handler for the agent&#39;s owner or a workspace admin (canEditAgent); like UpdateAgent this RPC carries no permission annotation (agents.edit is admin-only) and is handler-gated. |
+| ReadAgentWorkspaceFile | [ReadAgentWorkspaceFileRequest](#laelia-v1-ReadAgentWorkspaceFileRequest) | [ReadAgentWorkspaceFileResponse](#laelia-v1-ReadAgentWorkspaceFileResponse) | ReadAgentWorkspaceFile reads a single workspace file for text/image preview. Same handler-gated authorization as ListAgentWorkspace (owner or workspace admin). Sensitive files (secret/credential/token patterns) are rejected by the machine app and surface as a per-file error, not a transport error. |
 | ListPiModels | [ListPiModelsRequest](#laelia-v1-ListPiModelsRequest) | [ListPiModelsResponse](#laelia-v1-ListPiModelsResponse) | List the models a built-in pi agent&#39;s LLM API provider exposes. The manager proxies the provider&#39;s model-listing HTTP API (DeepSeek `GET /models` with the caller&#39;s api_key; OpenRouter `GET /models`, public) so the model list is fetched dynamically rather than hardcoded. Not agent-scoped: the add-agent form calls it before the agent exists. Admin (agents.edit) only. |
 | ConnectAgent | [ConnectAgentRequest](#laelia-v1-ConnectAgentRequest) | [ConnectAgentResponse](#laelia-v1-ConnectAgentResponse) | Agent initial connection using bootstrap token |
 | AgentHeartbeat | [AgentHeartbeatRequest](#laelia-v1-AgentHeartbeatRequest) | [AgentHeartbeatResponse](#laelia-v1-AgentHeartbeatResponse) | Agent heartbeat |
@@ -2550,6 +2678,8 @@ flags. The resource name is &#34;users/{user}/activities/{message}&#34;.
 | event | [CommandEvent](#laelia-v1-CommandEvent) |  |  |
 | ping | [Ping](#laelia-v1-Ping) |  |  |
 | providers_discovered | [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered) |  | response to ManagerStreamMessage.discover_providers |
+| workspace_list_response | [WorkspaceListResponse](#laelia-v1-WorkspaceListResponse) |  | response to ManagerStreamMessage.workspace_list_request |
+| workspace_read_response | [WorkspaceReadResponse](#laelia-v1-WorkspaceReadResponse) |  | response to ManagerStreamMessage.workspace_read_request |
 
 
 
@@ -4289,6 +4419,8 @@ the drain loop, before acking the conversation cursor.
 | pong | [Pong](#laelia-v1-Pong) |  |  |
 | permission_decision | [PermissionDecision](#laelia-v1-PermissionDecision) |  |  |
 | discover_providers | [DiscoverProviders](#laelia-v1-DiscoverProviders) |  | ask the agent daemon to re-probe installed LLM agent providers |
+| workspace_list_request | [WorkspaceListRequest](#laelia-v1-WorkspaceListRequest) |  | ask the agent daemon to list one level of its workspace |
+| workspace_read_request | [WorkspaceReadRequest](#laelia-v1-WorkspaceReadRequest) |  | ask the agent daemon to read a workspace file |
 
 
 
@@ -5114,6 +5246,63 @@ settable here — ownership only moves via TransferChannelOwnership.
 
 
 
+
+<a name="laelia-v1-WorkspaceListRequest"></a>
+
+### WorkspaceListRequest
+WorkspaceListRequest asks the agent daemon to list one directory level of an
+agent&#39;s workspace (~/.laelia/&lt;machineID&gt;/&lt;agentID&gt;/ on the machine). Paths
+are relative to the workspace root; an empty dir_path lists the root. The
+daemon replies with AgentStreamMessage.workspace_list_response.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  | correlation id for the pending unary ListAgentWorkspace call |
+| dir_path | [string](#string) |  | relative to the workspace root; empty = root |
+| include_hidden | [bool](#bool) |  | show dotfiles (still filtered by the never-visible policy) |
+
+
+
+
+
+
+<a name="laelia-v1-WorkspaceListResponse"></a>
+
+### WorkspaceListResponse
+WorkspaceListResponse carries one directory level back to the manager.
+Entries are sorted directories-first, then by name. WorkspaceEntry is shared
+with the unary ListAgentWorkspace RPC (defined in v1/agent.proto).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  |  |
+| entries | [WorkspaceEntry](#laelia-v1-WorkspaceEntry) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-WorkspaceReadRequest"></a>
+
+### WorkspaceReadRequest
+WorkspaceReadRequest asks the agent daemon to read a workspace file for
+preview. Text and image content is returned inline (see
+WorkspaceReadResponse); other binaries return metadata only. Sensitive files
+(secret/credential/token patterns) are always rejected by the daemon.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  | correlation id for the pending unary ReadAgentWorkspaceFile call |
+| path | [string](#string) |  | relative to the workspace root |
+
+
+
+
+
  
 
 
@@ -5934,6 +6123,37 @@ in full in ConnectMachineResponse.assigned_agents on (re)connect.
 
 
 
+<a name="laelia-v1-DeleteMachineWorkspaceRequest"></a>
+
+### DeleteMachineWorkspaceRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| directory_name | [string](#string) |  | bare directory name; validated by the machine app |
+
+
+
+
+
+
+<a name="laelia-v1-DeleteMachineWorkspaceResponse"></a>
+
+### DeleteMachineWorkspaceResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| success | [bool](#bool) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-ForceDisconnectMachineRequest"></a>
 
 ### ForceDisconnectMachineRequest
@@ -5992,6 +6212,36 @@ in full in ConnectMachineResponse.assigned_agents on (re)connect.
 | ----- | ---- | ----- | ----------- |
 | agents | [AgentSummary](#laelia-v1-AgentSummary) | repeated |  |
 | next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListMachineWorkspacesRequest"></a>
+
+### ListMachineWorkspacesRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-ListMachineWorkspacesResponse"></a>
+
+### ListMachineWorkspacesResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| workspaces | [MachineWorkspaceSummary](#laelia-v1-MachineWorkspaceSummary) | repeated |  |
 
 
 
@@ -6221,6 +6471,8 @@ in full in ConnectMachineResponse.assigned_agents on (re)connect.
 | ping | [Ping](#laelia-v1-Ping) |  |  |
 | providers_discovered | [ProvidersDiscovered](#laelia-v1-ProvidersDiscovered) |  | response to DiscoverProviders |
 | disconnect_notice | [MachineDisconnectNotice](#laelia-v1-MachineDisconnectNotice) |  | graceful shutdown |
+| machine_workspace_scan_response | [MachineWorkspaceScanResponse](#laelia-v1-MachineWorkspaceScanResponse) |  | response to ManagerMachineStreamMessage.machine_workspace_scan_request |
+| machine_workspace_delete_response | [MachineWorkspaceDeleteResponse](#laelia-v1-MachineWorkspaceDeleteResponse) |  | response to ManagerMachineStreamMessage.machine_workspace_delete_request |
 
 
 
@@ -6248,6 +6500,92 @@ the count of agents bound to the machine.
 
 
 
+<a name="laelia-v1-MachineWorkspaceDeleteRequest"></a>
+
+### MachineWorkspaceDeleteRequest
+MachineWorkspaceDeleteRequest asks the machine app to recursively delete one
+agent workspace directory. directory_name must be a bare directory name (no
+path separators or &#34;..&#34;) — the machine app validates it.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  | correlation id for the pending unary DeleteMachineWorkspace call |
+| directory_name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-MachineWorkspaceDeleteResponse"></a>
+
+### MachineWorkspaceDeleteResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  |  |
+| directory_name | [string](#string) |  |  |
+| success | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-MachineWorkspaceScanRequest"></a>
+
+### MachineWorkspaceScanRequest
+MachineWorkspaceScanRequest asks the machine app to summarize every
+per-agent workspace directory under ~/.laelia/&lt;machineID&gt;/. The app replies
+with MachineStreamMessage.machine_workspace_scan_response.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  | correlation id for the pending unary ListMachineWorkspaces call |
+
+
+
+
+
+
+<a name="laelia-v1-MachineWorkspaceScanResponse"></a>
+
+### MachineWorkspaceScanResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  |  |
+| workspaces | [MachineWorkspaceSummary](#laelia-v1-MachineWorkspaceSummary) | repeated |  |
+
+
+
+
+
+
+<a name="laelia-v1-MachineWorkspaceSummary"></a>
+
+### MachineWorkspaceSummary
+MachineWorkspaceSummary is one agent workspace directory&#39;s usage summary.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| directory_name | [string](#string) |  |  |
+| total_size_bytes | [int64](#int64) |  |  |
+| last_modified | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| file_count | [int64](#int64) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-ManagerMachineStreamMessage"></a>
 
 ### ManagerMachineStreamMessage
@@ -6262,6 +6600,8 @@ the count of agents bound to the machine.
 | discover_providers | [DiscoverProviders](#laelia-v1-DiscoverProviders) |  | ask the machine to re-probe |
 | pong | [Pong](#laelia-v1-Pong) |  |  |
 | reload_agent_assignment | [ReloadAgentAssignment](#laelia-v1-ReloadAgentAssignment) |  | full re-sync of one agent |
+| machine_workspace_scan_request | [MachineWorkspaceScanRequest](#laelia-v1-MachineWorkspaceScanRequest) |  | scan per-agent workspace directories on this machine |
+| machine_workspace_delete_request | [MachineWorkspaceDeleteRequest](#laelia-v1-MachineWorkspaceDeleteRequest) |  | delete one agent workspace directory |
 
 
 
@@ -6463,6 +6803,8 @@ AgentChannel over the machine&#39;s access token.
 | ForceDisconnectMachine | [ForceDisconnectMachineRequest](#laelia-v1-ForceDisconnectMachineRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Admin force-disconnects a machine: terminate all its sessions and fail all in-flight commands for every agent hosted on it. |
 | ListMachineAgents | [ListMachineAgentsRequest](#laelia-v1-ListMachineAgentsRequest) | [ListMachineAgentsResponse](#laelia-v1-ListMachineAgentsResponse) | List the agents hosted on a machine. |
 | RefreshMachineProviders | [RefreshMachineProvidersRequest](#laelia-v1-RefreshMachineProvidersRequest) | [RefreshMachineProvidersResponse](#laelia-v1-RefreshMachineProvidersResponse) | Ask the machine app to re-probe its host for installed LLM agent providers and their models. Returns the freshly discovered provider list (also persisted into machine.info.available_providers). Admin only. |
+| ListMachineWorkspaces | [ListMachineWorkspacesRequest](#laelia-v1-ListMachineWorkspacesRequest) | [ListMachineWorkspacesResponse](#laelia-v1-ListMachineWorkspacesResponse) | ListMachineWorkspaces summarizes every per-agent workspace directory on a machine (~/.laelia/&lt;machineID&gt;/). Workspace content is sensitive: authorized in the handler for the machine&#39;s creator or a workspace admin (isMachineAdmin, matching Machine.can_manage); no permission annotation. |
+| DeleteMachineWorkspace | [DeleteMachineWorkspaceRequest](#laelia-v1-DeleteMachineWorkspaceRequest) | [DeleteMachineWorkspaceResponse](#laelia-v1-DeleteMachineWorkspaceResponse) | DeleteMachineWorkspace recursively deletes one agent workspace directory on a machine. Destructive: same handler-gated authorization as ListMachineWorkspaces; the machine app validates the directory name. |
 | ConnectMachine | [ConnectMachineRequest](#laelia-v1-ConnectMachineRequest) | [ConnectMachineResponse](#laelia-v1-ConnectMachineResponse) | Machine initial connection using a registration token. Returns access &#43; refresh tokens, the machine session id, and the full list of agents the machine must host (so the machine app can open an AgentChannel for each). |
 | MachineHeartbeat | [MachineHeartbeatRequest](#laelia-v1-MachineHeartbeatRequest) | [MachineHeartbeatResponse](#laelia-v1-MachineHeartbeatResponse) |  |
 | MachineDisconnect | [MachineDisconnectRequest](#laelia-v1-MachineDisconnectRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |

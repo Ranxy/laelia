@@ -108,6 +108,31 @@ service MachineService {
     option (laelia.v1.audit) = true;
   }
 
+  // ListMachineWorkspaces summarizes every per-agent workspace directory on a
+  // machine (~/.laelia/<machineID>/). Workspace content is sensitive:
+  // authorized in the handler for the machine's creator or a workspace admin
+  // (isMachineAdmin, matching Machine.can_manage); no permission annotation.
+  rpc ListMachineWorkspaces(ListMachineWorkspacesRequest) returns (ListMachineWorkspacesResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=machines/*}:listWorkspaces"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+
+  // DeleteMachineWorkspace recursively deletes one agent workspace directory on
+  // a machine. Destructive: same handler-gated authorization as
+  // ListMachineWorkspaces; the machine app validates the directory name.
+  rpc DeleteMachineWorkspace(DeleteMachineWorkspaceRequest) returns (DeleteMachineWorkspaceResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=machines/*}:deleteWorkspace"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+
   // ========== Machine Connection APIs (CUSTOM auth, machine tokens) ==========
 
   // Machine initial connection using a registration token. Returns access +
@@ -232,6 +257,29 @@ message RefreshMachineProvidersRequest {
 
 message RefreshMachineProvidersResponse {
   repeated AgentProviderInfo providers = 1;
+}
+
+message ListMachineWorkspacesRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Machine"}
+  ];
+}
+
+message ListMachineWorkspacesResponse {
+  repeated MachineWorkspaceSummary workspaces = 1;
+}
+
+message DeleteMachineWorkspaceRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Machine"}
+  ];
+  string directory_name = 2; // bare directory name; validated by the machine app
+}
+
+message DeleteMachineWorkspaceResponse {
+  bool success = 1;
 }
 
 // --- Machine Connection ---
@@ -404,6 +452,8 @@ message MachineStreamMessage {
     Ping ping = 2;
     ProvidersDiscovered providers_discovered = 3; // response to DiscoverProviders
     MachineDisconnectNotice disconnect_notice = 4; // graceful shutdown
+    MachineWorkspaceScanResponse machine_workspace_scan_response = 5; // response to ManagerMachineStreamMessage.machine_workspace_scan_request
+    MachineWorkspaceDeleteResponse machine_workspace_delete_response = 6; // response to ManagerMachineStreamMessage.machine_workspace_delete_request
   }
 }
 
@@ -415,6 +465,8 @@ message ManagerMachineStreamMessage {
     DiscoverProviders discover_providers = 4; // ask the machine to re-probe
     Pong pong = 5;
     ReloadAgentAssignment reload_agent_assignment = 6; // full re-sync of one agent
+    MachineWorkspaceScanRequest machine_workspace_scan_request = 7; // scan per-agent workspace directories on this machine
+    MachineWorkspaceDeleteRequest machine_workspace_delete_request = 8; // delete one agent workspace directory
   }
 }
 
@@ -440,6 +492,40 @@ message MachineDisconnectNotice {
 message ReloadAgentAssignment {
   string agent_name = 1;
   AgentAssignment assignment = 2;
+}
+
+// MachineWorkspaceScanRequest asks the machine app to summarize every
+// per-agent workspace directory under ~/.laelia/<machineID>/. The app replies
+// with MachineStreamMessage.machine_workspace_scan_response.
+message MachineWorkspaceScanRequest {
+  string request_id = 1; // correlation id for the pending unary ListMachineWorkspaces call
+}
+
+// MachineWorkspaceSummary is one agent workspace directory's usage summary.
+message MachineWorkspaceSummary {
+  string directory_name = 1;
+  int64 total_size_bytes = 2;
+  google.protobuf.Timestamp last_modified = 3;
+  int64 file_count = 4;
+}
+
+message MachineWorkspaceScanResponse {
+  string request_id = 1;
+  repeated MachineWorkspaceSummary workspaces = 2;
+}
+
+// MachineWorkspaceDeleteRequest asks the machine app to recursively delete one
+// agent workspace directory. directory_name must be a bare directory name (no
+// path separators or "..") — the machine app validates it.
+message MachineWorkspaceDeleteRequest {
+  string request_id = 1; // correlation id for the pending unary DeleteMachineWorkspace call
+  string directory_name = 2;
+}
+
+message MachineWorkspaceDeleteResponse {
+  string request_id = 1;
+  string directory_name = 2;
+  bool success = 3;
 }
 
 // DiscoverProviders / ProvidersDiscovered are reused from command.proto

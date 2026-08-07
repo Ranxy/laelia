@@ -144,6 +144,12 @@ func (s *AgentStreamService) AgentChannel(
 		case *v1pb.AgentStreamMessage_ProvidersDiscovered:
 			s.dispatcher.CompletePendingDiscover(m.ProvidersDiscovered)
 
+		case *v1pb.AgentStreamMessage_WorkspaceListResponse:
+			s.dispatcher.CompletePendingWorkspaceList(m.WorkspaceListResponse)
+
+		case *v1pb.AgentStreamMessage_WorkspaceReadResponse:
+			s.dispatcher.CompletePendingWorkspaceRead(m.WorkspaceReadResponse)
+
 		default:
 			slog.Warn("unknown agent stream message type")
 		}

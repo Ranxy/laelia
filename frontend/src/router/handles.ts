@@ -2,6 +2,7 @@
 
 export const AGENT_ROUTE_PROFILE = "agent.profile";
 export const AGENT_ROUTE_CHAT = "agent.chat";
+export const AGENT_ROUTE_WORKSPACE = "agent.workspace";
 export const COMMAND_ROUTE_LIST = "command.list";
 export const COMMAND_ROUTE_DETAIL = "command.detail";
 export const REMINDER_ROUTE_LIST = "reminder.list";
@@ -12,6 +13,7 @@ export const ACTIVITY_ROUTE = "activity";
 export const ACTIVITY_ROUTE_DETAIL = "activity.detail";
 export const MACHINE_ROUTE_LIST = "machine.list";
 export const MACHINE_ROUTE_PROFILE = "machine.profile";
+export const MACHINE_ROUTE_WORKSPACE = "machine.workspace";
 export const MEMBERS_ROUTE = "members";
 export const SETTINGS_ROUTE = "settings";
 export const SETTINGS_ROUTE_AGENTS = "settings.agents";

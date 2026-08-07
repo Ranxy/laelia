@@ -1768,6 +1768,98 @@ func (s *AgentService) RefreshAgentProviders(ctx context.Context, req *connect.R
 	}
 }
 
+// ListAgentWorkspace lists one directory level of an agent's workspace on its
+// host machine. Requires the caller to be the agent owner or a workspace admin
+// (canEditAgent), and the agent to be online: the listing runs on the agent's
+// host and is relayed over the bidi stream.
+func (s *AgentService) ListAgentWorkspace(ctx context.Context, req *connect.Request[v1pb.ListAgentWorkspaceRequest]) (*connect.Response[v1pb.ListAgentWorkspaceResponse], error) {
+	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !s.canEditAgent(ctx, user, agent) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("workspace access requires owner or admin permission"))
+	}
+	if !s.dispatcher.IsAgentConnected(agent.ID) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent is not connected; cannot list workspace"))
+	}
+
+	requestID := uuid.NewString()
+	replyCh := s.dispatcher.RegisterPendingWorkspaceList(requestID)
+	defer s.dispatcher.CancelPendingWorkspaceList(requestID)
+
+	if err := s.dispatcher.SendWorkspaceListRequest(agent.ID, requestID, req.Msg.DirPath, req.Msg.IncludeHidden); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Wrap(err, "failed to request workspace listing"))
+	}
+
+	select {
+	case msg := <-replyCh:
+		if msg == nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.New("workspace listing returned no result"))
+		}
+		return connect.NewResponse(&v1pb.ListAgentWorkspaceResponse{Entries: msg.Entries}), nil
+	case <-time.After(60 * time.Second):
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, errors.New("timed out waiting for workspace listing"))
+	case <-ctx.Done():
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, ctx.Err())
+	}
+}
+
+// ReadAgentWorkspaceFile previews one text/image file from an agent's
+// workspace. Same authorization and online requirement as ListAgentWorkspace;
+// the agent side enforces size limits and never serves sensitive files.
+func (s *AgentService) ReadAgentWorkspaceFile(ctx context.Context, req *connect.Request[v1pb.ReadAgentWorkspaceFileRequest]) (*connect.Response[v1pb.ReadAgentWorkspaceFileResponse], error) {
+	resourceID, err := common.GetAgentResourceID(req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	agent, err := s.store.GetAgentByResourceID(ctx, resourceID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if agent == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("agent %s not found", resourceID))
+	}
+	user, _ := GetUserFromContext(ctx)
+	if !s.canEditAgent(ctx, user, agent) {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("workspace access requires owner or admin permission"))
+	}
+	if !s.dispatcher.IsAgentConnected(agent.ID) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent is not connected; cannot read workspace file"))
+	}
+
+	requestID := uuid.NewString()
+	replyCh := s.dispatcher.RegisterPendingWorkspaceRead(requestID)
+	defer s.dispatcher.CancelPendingWorkspaceRead(requestID)
+
+	if err := s.dispatcher.SendWorkspaceReadRequest(agent.ID, requestID, req.Msg.Path); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Wrap(err, "failed to request workspace file read"))
+	}
+
+	select {
+	case msg := <-replyCh:
+		if msg == nil {
+			return nil, connect.NewError(connect.CodeInternal, errors.New("workspace file read returned no result"))
+		}
+		// The machine reports preview-disabled reasons (sensitive file, too
+		// large, missing) in the response's error field instead of failing the
+		// RPC, mirroring raft so the frontend can show the specific reason.
+		return connect.NewResponse(&v1pb.ReadAgentWorkspaceFileResponse{File: msg}), nil
+	case <-time.After(60 * time.Second):
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, errors.New("timed out waiting for workspace file read"))
+	case <-ctx.Done():
+		return nil, connect.NewError(connect.CodeDeadlineExceeded, ctx.Err())
+	}
+}
+
 // ListPiModels proxies an LLM API provider's model-listing API so the agent
 // config form can populate the model picker dynamically (no hardcoded model
 // list). Not agent-scoped — the add-agent form calls it before the agent exists.

@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
@@ -28,6 +29,57 @@ type SendFunc func(*v1pb.ManagerStreamMessage) error
 // MachineSendFunc is the raw send function for a machine's MachineChannel
 // control stream (manager→machine direction).
 type MachineSendFunc func(*v1pb.ManagerMachineStreamMessage) error
+
+// pendingReplies correlates request/response round trips over the bidi streams:
+// a unary RPC registers a buffered channel keyed by request_id, the matching
+// stream reply is delivered into it, and the unary RPC unblocks. Each pending
+// set is typed, so a late or duplicated reply can never resolve the wrong RPC.
+type pendingReplies[T proto.Message] struct {
+	mu sync.Mutex
+	m  map[string]chan T
+}
+
+func newPendingReplies[T proto.Message]() *pendingReplies[T] {
+	return &pendingReplies[T]{m: make(map[string]chan T)}
+}
+
+// register creates a response channel keyed by requestID for an in-flight
+// round trip. cancel must be called if the caller gives up waiting, to avoid
+// leaking the entry.
+func (p *pendingReplies[T]) register(requestID string) chan T {
+	ch := make(chan T, 1)
+	p.mu.Lock()
+	p.m[requestID] = ch
+	p.mu.Unlock()
+	return ch
+}
+
+// cancel removes a pending entry without delivering a result. Safe to call
+// after the reply arrived (it is a no-op in that case).
+func (p *pendingReplies[T]) cancel(requestID string) {
+	p.mu.Lock()
+	delete(p.m, requestID)
+	p.mu.Unlock()
+}
+
+// complete delivers a reply to the waiting caller and removes the pending
+// entry. Called from the bidi receive loops when the machine app replies.
+// Unknown request ids (late replies, already-cancelled callers) are dropped
+// silently.
+func (p *pendingReplies[T]) complete(requestID string, msg T) {
+	p.mu.Lock()
+	ch, ok := p.m[requestID]
+	if ok {
+		delete(p.m, requestID)
+	}
+	p.mu.Unlock()
+	if ok {
+		select {
+		case ch <- msg:
+		default:
+		}
+	}
+}
 
 type AgentSession struct {
 	agentID         int
@@ -141,22 +193,35 @@ type Dispatcher struct {
 	// bidi command stream.
 	discoverMu       sync.Mutex
 	pendingDiscovers map[string]chan *v1pb.ProvidersDiscovered
+
+	// pendingWorkspace* correlate the workspace request/response round trips
+	// over the per-agent and machine control bidi streams to their waiting
+	// unary RPCs (ListAgentWorkspace / ReadAgentWorkspaceFile /
+	// ListMachineWorkspaces / DeleteMachineWorkspace).
+	pendingWorkspaceLists *pendingReplies[*v1pb.WorkspaceListResponse]
+	pendingWorkspaceReads *pendingReplies[*v1pb.WorkspaceReadResponse]
+	pendingMachineScans   *pendingReplies[*v1pb.MachineWorkspaceScanResponse]
+	pendingMachineDeletes *pendingReplies[*v1pb.MachineWorkspaceDeleteResponse]
 }
 
 func New(s *store.Store) *Dispatcher {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Dispatcher{
-		store:            s,
-		sessions:         make(map[int]*AgentSession),
-		machines:         make(map[int]*MachineSession),
-		watchers:         make(map[string]map[chan *v1pb.CommandOutput]struct{}),
-		eventWatchers:    make(map[string]map[chan *v1pb.CommandEvent]struct{}),
-		pingInterval:     15 * time.Second,
-		pingTimeout:      45 * time.Second,
-		grace:            make(map[int]map[string]context.CancelFunc),
-		pendingDiscovers: make(map[string]chan *v1pb.ProvidersDiscovered),
-		lifecycleCtx:     ctx,
-		lifecycleCancel:  cancel,
+		store:                 s,
+		sessions:              make(map[int]*AgentSession),
+		machines:              make(map[int]*MachineSession),
+		watchers:              make(map[string]map[chan *v1pb.CommandOutput]struct{}),
+		eventWatchers:         make(map[string]map[chan *v1pb.CommandEvent]struct{}),
+		pingInterval:          15 * time.Second,
+		pingTimeout:           45 * time.Second,
+		grace:                 make(map[int]map[string]context.CancelFunc),
+		pendingDiscovers:      make(map[string]chan *v1pb.ProvidersDiscovered),
+		pendingWorkspaceLists: newPendingReplies[*v1pb.WorkspaceListResponse](),
+		pendingWorkspaceReads: newPendingReplies[*v1pb.WorkspaceReadResponse](),
+		pendingMachineScans:   newPendingReplies[*v1pb.MachineWorkspaceScanResponse](),
+		pendingMachineDeletes: newPendingReplies[*v1pb.MachineWorkspaceDeleteResponse](),
+		lifecycleCtx:          ctx,
+		lifecycleCancel:       cancel,
 	}
 }
 
@@ -519,6 +584,170 @@ func (d *Dispatcher) SendDiscoverProviders(agentID int, requestID string) error 
 			DiscoverProviders: &v1pb.DiscoverProviders{RequestId: requestID},
 		},
 	})
+}
+
+// SendWorkspaceListRequest asks the agent daemon to list one directory level of
+// its workspace. The reply resolves a pending entry registered via
+// RegisterPendingWorkspaceList.
+func (d *Dispatcher) SendWorkspaceListRequest(agentID int, requestID, dirPath string, includeHidden bool) error {
+	d.mu.RLock()
+	sess, ok := d.sessions[agentID]
+	d.mu.RUnlock()
+	if !ok {
+		return errors.New("agent is not connected")
+	}
+	return sess.Send(&v1pb.ManagerStreamMessage{
+		Message: &v1pb.ManagerStreamMessage_WorkspaceListRequest{
+			WorkspaceListRequest: &v1pb.WorkspaceListRequest{
+				RequestId:     requestID,
+				DirPath:       dirPath,
+				IncludeHidden: includeHidden,
+			},
+		},
+	})
+}
+
+// SendWorkspaceReadRequest asks the agent daemon to read one workspace file for
+// preview. The reply resolves a pending entry registered via
+// RegisterPendingWorkspaceRead.
+func (d *Dispatcher) SendWorkspaceReadRequest(agentID int, requestID, path string) error {
+	d.mu.RLock()
+	sess, ok := d.sessions[agentID]
+	d.mu.RUnlock()
+	if !ok {
+		return errors.New("agent is not connected")
+	}
+	return sess.Send(&v1pb.ManagerStreamMessage{
+		Message: &v1pb.ManagerStreamMessage_WorkspaceReadRequest{
+			WorkspaceReadRequest: &v1pb.WorkspaceReadRequest{
+				RequestId: requestID,
+				Path:      path,
+			},
+		},
+	})
+}
+
+// SendMachineWorkspaceScan asks a connected machine to summarize every
+// per-agent workspace directory. The reply resolves a pending entry registered
+// via RegisterPendingMachineWorkspaceScan.
+func (d *Dispatcher) SendMachineWorkspaceScan(machineID int, requestID string) error {
+	d.mu.RLock()
+	sess, ok := d.machines[machineID]
+	d.mu.RUnlock()
+	if !ok {
+		return errors.New("machine is not connected")
+	}
+	return sess.Send(&v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_MachineWorkspaceScanRequest{
+			MachineWorkspaceScanRequest: &v1pb.MachineWorkspaceScanRequest{RequestId: requestID},
+		},
+	})
+}
+
+// SendMachineWorkspaceDelete asks a connected machine to recursively delete one
+// agent workspace directory. The reply resolves a pending entry registered via
+// RegisterPendingMachineWorkspaceDelete.
+func (d *Dispatcher) SendMachineWorkspaceDelete(machineID int, requestID, directoryName string) error {
+	d.mu.RLock()
+	sess, ok := d.machines[machineID]
+	d.mu.RUnlock()
+	if !ok {
+		return errors.New("machine is not connected")
+	}
+	return sess.Send(&v1pb.ManagerMachineStreamMessage{
+		Message: &v1pb.ManagerMachineStreamMessage_MachineWorkspaceDeleteRequest{
+			MachineWorkspaceDeleteRequest: &v1pb.MachineWorkspaceDeleteRequest{
+				RequestId:     requestID,
+				DirectoryName: directoryName,
+			},
+		},
+	})
+}
+
+// RegisterPendingWorkspaceList creates a response channel for an in-flight
+// ListAgentWorkspace round trip over the agent's bidi stream.
+func (d *Dispatcher) RegisterPendingWorkspaceList(requestID string) chan *v1pb.WorkspaceListResponse {
+	return d.pendingWorkspaceLists.register(requestID)
+}
+
+// CancelPendingWorkspaceList removes a pending workspace list entry without
+// delivering a result.
+func (d *Dispatcher) CancelPendingWorkspaceList(requestID string) {
+	d.pendingWorkspaceLists.cancel(requestID)
+}
+
+// CompletePendingWorkspaceList delivers a WorkspaceListResponse to the waiting
+// ListAgentWorkspace caller. Called from the AgentChannel receive loop.
+func (d *Dispatcher) CompletePendingWorkspaceList(msg *v1pb.WorkspaceListResponse) {
+	if msg == nil {
+		return
+	}
+	d.pendingWorkspaceLists.complete(msg.RequestId, msg)
+}
+
+// RegisterPendingWorkspaceRead creates a response channel for an in-flight
+// ReadAgentWorkspaceFile round trip over the agent's bidi stream.
+func (d *Dispatcher) RegisterPendingWorkspaceRead(requestID string) chan *v1pb.WorkspaceReadResponse {
+	return d.pendingWorkspaceReads.register(requestID)
+}
+
+// CancelPendingWorkspaceRead removes a pending workspace read entry without
+// delivering a result.
+func (d *Dispatcher) CancelPendingWorkspaceRead(requestID string) {
+	d.pendingWorkspaceReads.cancel(requestID)
+}
+
+// CompletePendingWorkspaceRead delivers a WorkspaceReadResponse to the waiting
+// ReadAgentWorkspaceFile caller. Called from the AgentChannel receive loop.
+func (d *Dispatcher) CompletePendingWorkspaceRead(msg *v1pb.WorkspaceReadResponse) {
+	if msg == nil {
+		return
+	}
+	d.pendingWorkspaceReads.complete(msg.RequestId, msg)
+}
+
+// RegisterPendingMachineWorkspaceScan creates a response channel for an
+// in-flight ListMachineWorkspaces round trip over the machine control stream.
+func (d *Dispatcher) RegisterPendingMachineWorkspaceScan(requestID string) chan *v1pb.MachineWorkspaceScanResponse {
+	return d.pendingMachineScans.register(requestID)
+}
+
+// CancelPendingMachineWorkspaceScan removes a pending machine scan entry
+// without delivering a result.
+func (d *Dispatcher) CancelPendingMachineWorkspaceScan(requestID string) {
+	d.pendingMachineScans.cancel(requestID)
+}
+
+// CompletePendingMachineWorkspaceScan delivers a MachineWorkspaceScanResponse
+// to the waiting ListMachineWorkspaces caller. Called from the MachineChannel
+// receive loop.
+func (d *Dispatcher) CompletePendingMachineWorkspaceScan(msg *v1pb.MachineWorkspaceScanResponse) {
+	if msg == nil {
+		return
+	}
+	d.pendingMachineScans.complete(msg.RequestId, msg)
+}
+
+// RegisterPendingMachineWorkspaceDelete creates a response channel for an
+// in-flight DeleteMachineWorkspace round trip over the machine control stream.
+func (d *Dispatcher) RegisterPendingMachineWorkspaceDelete(requestID string) chan *v1pb.MachineWorkspaceDeleteResponse {
+	return d.pendingMachineDeletes.register(requestID)
+}
+
+// CancelPendingMachineWorkspaceDelete removes a pending machine workspace
+// delete entry without delivering a result.
+func (d *Dispatcher) CancelPendingMachineWorkspaceDelete(requestID string) {
+	d.pendingMachineDeletes.cancel(requestID)
+}
+
+// CompletePendingMachineWorkspaceDelete delivers a MachineWorkspaceDeleteResponse
+// to the waiting DeleteMachineWorkspace caller. Called from the MachineChannel
+// receive loop.
+func (d *Dispatcher) CompletePendingMachineWorkspaceDelete(msg *v1pb.MachineWorkspaceDeleteResponse) {
+	if msg == nil {
+		return
+	}
+	d.pendingMachineDeletes.complete(msg.RequestId, msg)
 }
 
 // CurrentCommandID returns the command id the agent is currently running in its

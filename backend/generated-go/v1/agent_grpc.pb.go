@@ -33,6 +33,8 @@ const (
 	AgentService_UpdateAgentACPConfig_FullMethodName   = "/laelia.v1.AgentService/UpdateAgentACPConfig"
 	AgentService_UpdateAgentMcpConfig_FullMethodName   = "/laelia.v1.AgentService/UpdateAgentMcpConfig"
 	AgentService_RefreshAgentProviders_FullMethodName  = "/laelia.v1.AgentService/RefreshAgentProviders"
+	AgentService_ListAgentWorkspace_FullMethodName     = "/laelia.v1.AgentService/ListAgentWorkspace"
+	AgentService_ReadAgentWorkspaceFile_FullMethodName = "/laelia.v1.AgentService/ReadAgentWorkspaceFile"
 	AgentService_ListPiModels_FullMethodName           = "/laelia.v1.AgentService/ListPiModels"
 	AgentService_ConnectAgent_FullMethodName           = "/laelia.v1.AgentService/ConnectAgent"
 	AgentService_AgentHeartbeat_FullMethodName         = "/laelia.v1.AgentService/AgentHeartbeat"
@@ -92,6 +94,18 @@ type AgentServiceClient interface {
 	// and their models. Returns the freshly discovered provider list (also
 	// persisted into agent.info.available_providers). Admin only.
 	RefreshAgentProviders(ctx context.Context, in *RefreshAgentProvidersRequest, opts ...grpc.CallOption) (*RefreshAgentProvidersResponse, error)
+	// ListAgentWorkspace lists one directory level of an agent's workspace on its
+	// machine (~/.laelia/<machineID>/<agentID>/), lazily loading the tree level by
+	// level. Workspace content is sensitive: authorized in the handler for the
+	// agent's owner or a workspace admin (canEditAgent); like UpdateAgent this
+	// RPC carries no permission annotation (agents.edit is admin-only) and is
+	// handler-gated.
+	ListAgentWorkspace(ctx context.Context, in *ListAgentWorkspaceRequest, opts ...grpc.CallOption) (*ListAgentWorkspaceResponse, error)
+	// ReadAgentWorkspaceFile reads a single workspace file for text/image preview.
+	// Same handler-gated authorization as ListAgentWorkspace (owner or workspace
+	// admin). Sensitive files (secret/credential/token patterns) are rejected by
+	// the machine app and surface as a per-file error, not a transport error.
+	ReadAgentWorkspaceFile(ctx context.Context, in *ReadAgentWorkspaceFileRequest, opts ...grpc.CallOption) (*ReadAgentWorkspaceFileResponse, error)
 	// List the models a built-in pi agent's LLM API provider exposes. The manager
 	// proxies the provider's model-listing HTTP API (DeepSeek `GET /models` with
 	// the caller's api_key; OpenRouter `GET /models`, public) so the model list is
@@ -258,6 +272,26 @@ func (c *agentServiceClient) RefreshAgentProviders(ctx context.Context, in *Refr
 	return out, nil
 }
 
+func (c *agentServiceClient) ListAgentWorkspace(ctx context.Context, in *ListAgentWorkspaceRequest, opts ...grpc.CallOption) (*ListAgentWorkspaceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAgentWorkspaceResponse)
+	err := c.cc.Invoke(ctx, AgentService_ListAgentWorkspace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentServiceClient) ReadAgentWorkspaceFile(ctx context.Context, in *ReadAgentWorkspaceFileRequest, opts ...grpc.CallOption) (*ReadAgentWorkspaceFileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReadAgentWorkspaceFileResponse)
+	err := c.cc.Invoke(ctx, AgentService_ReadAgentWorkspaceFile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *agentServiceClient) ListPiModels(ctx context.Context, in *ListPiModelsRequest, opts ...grpc.CallOption) (*ListPiModelsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListPiModelsResponse)
@@ -396,6 +430,18 @@ type AgentServiceServer interface {
 	// and their models. Returns the freshly discovered provider list (also
 	// persisted into agent.info.available_providers). Admin only.
 	RefreshAgentProviders(context.Context, *RefreshAgentProvidersRequest) (*RefreshAgentProvidersResponse, error)
+	// ListAgentWorkspace lists one directory level of an agent's workspace on its
+	// machine (~/.laelia/<machineID>/<agentID>/), lazily loading the tree level by
+	// level. Workspace content is sensitive: authorized in the handler for the
+	// agent's owner or a workspace admin (canEditAgent); like UpdateAgent this
+	// RPC carries no permission annotation (agents.edit is admin-only) and is
+	// handler-gated.
+	ListAgentWorkspace(context.Context, *ListAgentWorkspaceRequest) (*ListAgentWorkspaceResponse, error)
+	// ReadAgentWorkspaceFile reads a single workspace file for text/image preview.
+	// Same handler-gated authorization as ListAgentWorkspace (owner or workspace
+	// admin). Sensitive files (secret/credential/token patterns) are rejected by
+	// the machine app and surface as a per-file error, not a transport error.
+	ReadAgentWorkspaceFile(context.Context, *ReadAgentWorkspaceFileRequest) (*ReadAgentWorkspaceFileResponse, error)
 	// List the models a built-in pi agent's LLM API provider exposes. The manager
 	// proxies the provider's model-listing HTTP API (DeepSeek `GET /models` with
 	// the caller's api_key; OpenRouter `GET /models`, public) so the model list is
@@ -470,6 +516,12 @@ func (UnimplementedAgentServiceServer) UpdateAgentMcpConfig(context.Context, *Up
 }
 func (UnimplementedAgentServiceServer) RefreshAgentProviders(context.Context, *RefreshAgentProvidersRequest) (*RefreshAgentProvidersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RefreshAgentProviders not implemented")
+}
+func (UnimplementedAgentServiceServer) ListAgentWorkspace(context.Context, *ListAgentWorkspaceRequest) (*ListAgentWorkspaceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAgentWorkspace not implemented")
+}
+func (UnimplementedAgentServiceServer) ReadAgentWorkspaceFile(context.Context, *ReadAgentWorkspaceFileRequest) (*ReadAgentWorkspaceFileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadAgentWorkspaceFile not implemented")
 }
 func (UnimplementedAgentServiceServer) ListPiModels(context.Context, *ListPiModelsRequest) (*ListPiModelsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListPiModels not implemented")
@@ -753,6 +805,42 @@ func _AgentService_RefreshAgentProviders_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AgentService_ListAgentWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAgentWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).ListAgentWorkspace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_ListAgentWorkspace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).ListAgentWorkspace(ctx, req.(*ListAgentWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AgentService_ReadAgentWorkspaceFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadAgentWorkspaceFileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).ReadAgentWorkspaceFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_ReadAgentWorkspaceFile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).ReadAgentWorkspaceFile(ctx, req.(*ReadAgentWorkspaceFileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AgentService_ListPiModels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListPiModelsRequest)
 	if err := dec(in); err != nil {
@@ -973,6 +1061,14 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RefreshAgentProviders",
 			Handler:    _AgentService_RefreshAgentProviders_Handler,
+		},
+		{
+			MethodName: "ListAgentWorkspace",
+			Handler:    _AgentService_ListAgentWorkspace_Handler,
+		},
+		{
+			MethodName: "ReadAgentWorkspaceFile",
+			Handler:    _AgentService_ReadAgentWorkspaceFile_Handler,
 		},
 		{
 			MethodName: "ListPiModels",

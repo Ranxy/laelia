@@ -361,6 +361,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.ListAgentWorkspaceRequest"><span class="badge">M</span>ListAgentWorkspaceRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListAgentWorkspaceResponse"><span class="badge">M</span>ListAgentWorkspaceResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ListAgentsRequest"><span class="badge">M</span>ListAgentsRequest</a>
                 </li>
               
@@ -386,6 +394,14 @@
               
                 <li>
                   <a href="#laelia.v1.PiModel"><span class="badge">M</span>PiModel</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ReadAgentWorkspaceFileRequest"><span class="badge">M</span>ReadAgentWorkspaceFileRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ReadAgentWorkspaceFileResponse"><span class="badge">M</span>ReadAgentWorkspaceFileResponse</a>
                 </li>
               
                 <li>
@@ -442,6 +458,14 @@
               
                 <li>
                   <a href="#laelia.v1.UploadAgentAvatarRequest"><span class="badge">M</span>UploadAgentAvatarRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.WorkspaceEntry"><span class="badge">M</span>WorkspaceEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.WorkspaceReadResponse"><span class="badge">M</span>WorkspaceReadResponse</a>
                 </li>
               
               
@@ -1307,6 +1331,18 @@
                   <a href="#laelia.v1.WatchCommandRequest"><span class="badge">M</span>WatchCommandRequest</a>
                 </li>
               
+                <li>
+                  <a href="#laelia.v1.WorkspaceListRequest"><span class="badge">M</span>WorkspaceListRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.WorkspaceListResponse"><span class="badge">M</span>WorkspaceListResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.WorkspaceReadRequest"><span class="badge">M</span>WorkspaceReadRequest</a>
+                </li>
+              
               
                 <li>
                   <a href="#laelia.v1.ActivityCategory"><span class="badge">E</span>ActivityCategory</a>
@@ -1513,6 +1549,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.DeleteMachineWorkspaceRequest"><span class="badge">M</span>DeleteMachineWorkspaceRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.DeleteMachineWorkspaceResponse"><span class="badge">M</span>DeleteMachineWorkspaceResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ForceDisconnectMachineRequest"><span class="badge">M</span>ForceDisconnectMachineRequest</a>
                 </li>
               
@@ -1526,6 +1570,14 @@
               
                 <li>
                   <a href="#laelia.v1.ListMachineAgentsResponse"><span class="badge">M</span>ListMachineAgentsResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListMachineWorkspacesRequest"><span class="badge">M</span>ListMachineWorkspacesRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.ListMachineWorkspacesResponse"><span class="badge">M</span>ListMachineWorkspacesResponse</a>
                 </li>
               
                 <li>
@@ -1582,6 +1634,26 @@
               
                 <li>
                   <a href="#laelia.v1.MachineSummary"><span class="badge">M</span>MachineSummary</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.MachineWorkspaceDeleteRequest"><span class="badge">M</span>MachineWorkspaceDeleteRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.MachineWorkspaceDeleteResponse"><span class="badge">M</span>MachineWorkspaceDeleteResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.MachineWorkspaceScanRequest"><span class="badge">M</span>MachineWorkspaceScanRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.MachineWorkspaceScanResponse"><span class="badge">M</span>MachineWorkspaceScanResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.MachineWorkspaceSummary"><span class="badge">M</span>MachineWorkspaceSummary</a>
                 </li>
               
                 <li>
@@ -3741,6 +3813,68 @@ behalf. </p></td>
 
         
       
+        <h3 id="laelia.v1.ListAgentWorkspaceRequest">ListAgentWorkspaceRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>dir_path</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>relative to the workspace root; empty = root </p></td>
+                </tr>
+              
+                <tr>
+                  <td>include_hidden</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListAgentWorkspaceResponse">ListAgentWorkspaceResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>entries</td>
+                  <td><a href="#laelia.v1.WorkspaceEntry">WorkspaceEntry</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ListAgentsRequest">ListAgentsRequest</h3>
         <p></p>
 
@@ -3978,6 +4112,61 @@ the list to agents bound to that machine. Empty lists all agents. </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>optional display name (deepseek echoes id; openrouter has a human-readable name) </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ReadAgentWorkspaceFileRequest">ReadAgentWorkspaceFileRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>path</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>relative to the workspace root </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ReadAgentWorkspaceFileResponse">ReadAgentWorkspaceFileResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>file</td>
+                  <td><a href="#laelia.v1.WorkspaceReadResponse">WorkspaceReadResponse</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -4391,6 +4580,131 @@ names (mcpServers/{id}). </p></td>
 
         
       
+        <h3 id="laelia.v1.WorkspaceEntry">WorkspaceEntry</h3>
+        <p>WorkspaceEntry is one file/directory node of a lazily loaded workspace tree.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>path</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>relative to the workspace root </p></td>
+                </tr>
+              
+                <tr>
+                  <td>is_directory</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>size</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p>file bytes; 0 for directories </p></td>
+                </tr>
+              
+                <tr>
+                  <td>modified_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>is_hidden</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>dotfile </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.WorkspaceReadResponse">WorkspaceReadResponse</h3>
+        <p>WorkspaceReadResponse carries a previewed file (or an error) from the machine</p><p>app back to the manager. A non-empty error means the file cannot be</p><p>previewed; the unary RPC still succeeds so the frontend can show the reason.</p><p>Shared by the per-agent workspace stream (command.proto) and the unary</p><p>ReadAgentWorkspaceFile RPC.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>content</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>text: utf-8; image: base64; otherwise empty </p></td>
+                </tr>
+              
+                <tr>
+                  <td>binary</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>true for images and other binary files </p></td>
+                </tr>
+              
+                <tr>
+                  <td>size</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mime_type</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>set for images </p></td>
+                </tr>
+              
+                <tr>
+                  <td>encoding</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>&#34;utf-8&#34; / &#34;base64&#34; / &#34;&#34; </p></td>
+                </tr>
+              
+                <tr>
+                  <td>error</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>preview-disabled reason (sensitive file, too large, missing) </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
 
       
         <h3 id="laelia.v1.AgentStatus.ConnectionState">AgentStatus.ConnectionState</h3>
@@ -4556,6 +4870,28 @@ the agent&#39;s owner or a workspace admin may update it.</p></td>
                 <td><p>Ask the agent daemon to re-probe its host for installed LLM agent providers
 and their models. Returns the freshly discovered provider list (also
 persisted into agent.info.available_providers). Admin only.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ListAgentWorkspace</td>
+                <td><a href="#laelia.v1.ListAgentWorkspaceRequest">ListAgentWorkspaceRequest</a></td>
+                <td><a href="#laelia.v1.ListAgentWorkspaceResponse">ListAgentWorkspaceResponse</a></td>
+                <td><p>ListAgentWorkspace lists one directory level of an agent&#39;s workspace on its
+machine (~/.laelia/&lt;machineID&gt;/&lt;agentID&gt;/), lazily loading the tree level by
+level. Workspace content is sensitive: authorized in the handler for the
+agent&#39;s owner or a workspace admin (canEditAgent); like UpdateAgent this
+RPC carries no permission annotation (agents.edit is admin-only) and is
+handler-gated.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ReadAgentWorkspaceFile</td>
+                <td><a href="#laelia.v1.ReadAgentWorkspaceFileRequest">ReadAgentWorkspaceFileRequest</a></td>
+                <td><a href="#laelia.v1.ReadAgentWorkspaceFileResponse">ReadAgentWorkspaceFileResponse</a></td>
+                <td><p>ReadAgentWorkspaceFile reads a single workspace file for text/image preview.
+Same handler-gated authorization as ListAgentWorkspace (owner or workspace
+admin). Sensitive files (secret/credential/token patterns) are rejected by
+the machine app and surface as a per-file error, not a transport error.</p></td>
               </tr>
             
               <tr>
@@ -4773,6 +5109,26 @@ Requires laelia.agents.edit on the agent.</p></td>
                 <td>RefreshAgentProviders</td>
                 <td>POST</td>
                 <td>/v1/{name=agents/*}:refreshProviders</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListAgentWorkspace</td>
+                <td>POST</td>
+                <td>/v1/{name=agents/*}:listWorkspace</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ReadAgentWorkspaceFile</td>
+                <td>POST</td>
+                <td>/v1/{name=agents/*}:readWorkspaceFile</td>
                 <td>*</td>
               </tr>
               
@@ -7344,6 +7700,20 @@ machine app&#39;s per-agent runner; required on the first message. </p></td>
                   <td><a href="#laelia.v1.ProvidersDiscovered">ProvidersDiscovered</a></td>
                   <td></td>
                   <td><p>response to ManagerStreamMessage.discover_providers </p></td>
+                </tr>
+              
+                <tr>
+                  <td>workspace_list_response</td>
+                  <td><a href="#laelia.v1.WorkspaceListResponse">WorkspaceListResponse</a></td>
+                  <td></td>
+                  <td><p>response to ManagerStreamMessage.workspace_list_request </p></td>
+                </tr>
+              
+                <tr>
+                  <td>workspace_read_response</td>
+                  <td><a href="#laelia.v1.WorkspaceReadResponse">WorkspaceReadResponse</a></td>
+                  <td></td>
+                  <td><p>response to ManagerStreamMessage.workspace_read_request </p></td>
                 </tr>
               
             </tbody>
@@ -11072,6 +11442,20 @@ thread participation and is left 0. </p></td>
                   <td><p>ask the agent daemon to re-probe installed LLM agent providers </p></td>
                 </tr>
               
+                <tr>
+                  <td>workspace_list_request</td>
+                  <td><a href="#laelia.v1.WorkspaceListRequest">WorkspaceListRequest</a></td>
+                  <td></td>
+                  <td><p>ask the agent daemon to list one level of its workspace </p></td>
+                </tr>
+              
+                <tr>
+                  <td>workspace_read_request</td>
+                  <td><a href="#laelia.v1.WorkspaceReadRequest">WorkspaceReadRequest</a></td>
+                  <td></td>
+                  <td><p>ask the agent daemon to read a workspace file </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -12824,6 +13208,106 @@ is performed by ClaimTask, not this RPC. </p></td>
                   <td><a href="#int32">int32</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.WorkspaceListRequest">WorkspaceListRequest</h3>
+        <p>WorkspaceListRequest asks the agent daemon to list one directory level of an</p><p>agent's workspace (~/.laelia/<machineID>/<agentID>/ on the machine). Paths</p><p>are relative to the workspace root; an empty dir_path lists the root. The</p><p>daemon replies with AgentStreamMessage.workspace_list_response.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>correlation id for the pending unary ListAgentWorkspace call </p></td>
+                </tr>
+              
+                <tr>
+                  <td>dir_path</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>relative to the workspace root; empty = root </p></td>
+                </tr>
+              
+                <tr>
+                  <td>include_hidden</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>show dotfiles (still filtered by the never-visible policy) </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.WorkspaceListResponse">WorkspaceListResponse</h3>
+        <p>WorkspaceListResponse carries one directory level back to the manager.</p><p>Entries are sorted directories-first, then by name. WorkspaceEntry is shared</p><p>with the unary ListAgentWorkspace RPC (defined in v1/agent.proto).</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>entries</td>
+                  <td><a href="#laelia.v1.WorkspaceEntry">WorkspaceEntry</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.WorkspaceReadRequest">WorkspaceReadRequest</h3>
+        <p>WorkspaceReadRequest asks the agent daemon to read a workspace file for</p><p>preview. Text and image content is returned inline (see</p><p>WorkspaceReadResponse); other binaries return metadata only. Sensitive files</p><p>(secret/credential/token patterns) are always rejected by the daemon.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>correlation id for the pending unary ReadAgentWorkspaceFile call </p></td>
+                </tr>
+              
+                <tr>
+                  <td>path</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>relative to the workspace root </p></td>
                 </tr>
               
             </tbody>
@@ -15672,6 +16156,61 @@ AgentChannel per entry immediately after connect (and on every reconnect). </p><
 
         
       
+        <h3 id="laelia.v1.DeleteMachineWorkspaceRequest">DeleteMachineWorkspaceRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>directory_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>bare directory name; validated by the machine app </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.DeleteMachineWorkspaceResponse">DeleteMachineWorkspaceResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>success</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ForceDisconnectMachineRequest">ForceDisconnectMachineRequest</h3>
         <p></p>
 
@@ -15786,6 +16325,54 @@ AgentChannel per entry immediately after connect (and on every reconnect). </p><
                   <td>next_page_token</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListMachineWorkspacesRequest">ListMachineWorkspacesRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.ListMachineWorkspacesResponse">ListMachineWorkspacesResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>workspaces</td>
+                  <td><a href="#laelia.v1.MachineWorkspaceSummary">MachineWorkspaceSummary</a></td>
+                  <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
               
@@ -16344,6 +16931,20 @@ Machine-scoped: every agent hosted on this machine selects from this list. </p><
                   <td><p>graceful shutdown </p></td>
                 </tr>
               
+                <tr>
+                  <td>machine_workspace_scan_response</td>
+                  <td><a href="#laelia.v1.MachineWorkspaceScanResponse">MachineWorkspaceScanResponse</a></td>
+                  <td></td>
+                  <td><p>response to ManagerMachineStreamMessage.machine_workspace_scan_request </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_workspace_delete_response</td>
+                  <td><a href="#laelia.v1.MachineWorkspaceDeleteResponse">MachineWorkspaceDeleteResponse</a></td>
+                  <td></td>
+                  <td><p>response to ManagerMachineStreamMessage.machine_workspace_delete_request </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -16392,6 +16993,175 @@ Machine-scoped: every agent hosted on this machine selects from this list. </p><
                 <tr>
                   <td>agent_count</td>
                   <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.MachineWorkspaceDeleteRequest">MachineWorkspaceDeleteRequest</h3>
+        <p>MachineWorkspaceDeleteRequest asks the machine app to recursively delete one</p><p>agent workspace directory. directory_name must be a bare directory name (no</p><p>path separators or "..") — the machine app validates it.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>correlation id for the pending unary DeleteMachineWorkspace call </p></td>
+                </tr>
+              
+                <tr>
+                  <td>directory_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.MachineWorkspaceDeleteResponse">MachineWorkspaceDeleteResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>directory_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>success</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.MachineWorkspaceScanRequest">MachineWorkspaceScanRequest</h3>
+        <p>MachineWorkspaceScanRequest asks the machine app to summarize every</p><p>per-agent workspace directory under ~/.laelia/<machineID>/. The app replies</p><p>with MachineStreamMessage.machine_workspace_scan_response.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>correlation id for the pending unary ListMachineWorkspaces call </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.MachineWorkspaceScanResponse">MachineWorkspaceScanResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>workspaces</td>
+                  <td><a href="#laelia.v1.MachineWorkspaceSummary">MachineWorkspaceSummary</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.MachineWorkspaceSummary">MachineWorkspaceSummary</h3>
+        <p>MachineWorkspaceSummary is one agent workspace directory's usage summary.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>directory_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>total_size_bytes</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_modified</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>file_count</td>
+                  <td><a href="#int64">int64</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -16453,6 +17223,20 @@ Machine-scoped: every agent hosted on this machine selects from this list. </p><
                   <td><a href="#laelia.v1.ReloadAgentAssignment">ReloadAgentAssignment</a></td>
                   <td></td>
                   <td><p>full re-sync of one agent </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_workspace_scan_request</td>
+                  <td><a href="#laelia.v1.MachineWorkspaceScanRequest">MachineWorkspaceScanRequest</a></td>
+                  <td></td>
+                  <td><p>scan per-agent workspace directories on this machine </p></td>
+                </tr>
+              
+                <tr>
+                  <td>machine_workspace_delete_request</td>
+                  <td><a href="#laelia.v1.MachineWorkspaceDeleteRequest">MachineWorkspaceDeleteRequest</a></td>
+                  <td></td>
+                  <td><p>delete one agent workspace directory </p></td>
                 </tr>
               
             </tbody>
@@ -16850,6 +17634,25 @@ persisted into machine.info.available_providers). Admin only.</p></td>
               </tr>
             
               <tr>
+                <td>ListMachineWorkspaces</td>
+                <td><a href="#laelia.v1.ListMachineWorkspacesRequest">ListMachineWorkspacesRequest</a></td>
+                <td><a href="#laelia.v1.ListMachineWorkspacesResponse">ListMachineWorkspacesResponse</a></td>
+                <td><p>ListMachineWorkspaces summarizes every per-agent workspace directory on a
+machine (~/.laelia/&lt;machineID&gt;/). Workspace content is sensitive:
+authorized in the handler for the machine&#39;s creator or a workspace admin
+(isMachineAdmin, matching Machine.can_manage); no permission annotation.</p></td>
+              </tr>
+            
+              <tr>
+                <td>DeleteMachineWorkspace</td>
+                <td><a href="#laelia.v1.DeleteMachineWorkspaceRequest">DeleteMachineWorkspaceRequest</a></td>
+                <td><a href="#laelia.v1.DeleteMachineWorkspaceResponse">DeleteMachineWorkspaceResponse</a></td>
+                <td><p>DeleteMachineWorkspace recursively deletes one agent workspace directory on
+a machine. Destructive: same handler-gated authorization as
+ListMachineWorkspaces; the machine app validates the directory name.</p></td>
+              </tr>
+            
+              <tr>
                 <td>ConnectMachine</td>
                 <td><a href="#laelia.v1.ConnectMachineRequest">ConnectMachineRequest</a></td>
                 <td><a href="#laelia.v1.ConnectMachineResponse">ConnectMachineResponse</a></td>
@@ -16983,6 +17786,26 @@ machine must host (so the machine app can open an AgentChannel for each).</p></t
                 <td>RefreshMachineProviders</td>
                 <td>POST</td>
                 <td>/v1/{name=machines/*}:refreshProviders</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListMachineWorkspaces</td>
+                <td>POST</td>
+                <td>/v1/{name=machines/*}:listWorkspaces</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>DeleteMachineWorkspace</td>
+                <td>POST</td>
+                <td>/v1/{name=machines/*}:deleteWorkspace</td>
                 <td>*</td>
               </tr>
               

@@ -6,7 +6,7 @@ import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobu
 import type { JsonObject, Message } from "@bufbuild/protobuf";
 import type { EmptySchema, FieldMask, Timestamp } from "@bufbuild/protobuf/wkt";
 import type { PreferredLanguage } from "./user_service_pb";
-import type { AgentProviderInfo, AgentStatus_ConnectionState } from "./agent_pb";
+import type { AgentProviderInfo, AgentStatus_ConnectionState, WorkspaceEntry, WorkspaceReadResponse } from "./agent_pb";
 
 /**
  * Describes the file v1/command.proto.
@@ -3882,6 +3882,22 @@ export declare type AgentStreamMessage = Message<"laelia.v1.AgentStreamMessage">
      */
     value: ProvidersDiscovered;
     case: "providersDiscovered";
+  } | {
+    /**
+     * response to ManagerStreamMessage.workspace_list_request
+     *
+     * @generated from field: laelia.v1.WorkspaceListResponse workspace_list_response = 10;
+     */
+    value: WorkspaceListResponse;
+    case: "workspaceListResponse";
+  } | {
+    /**
+     * response to ManagerStreamMessage.workspace_read_request
+     *
+     * @generated from field: laelia.v1.WorkspaceReadResponse workspace_read_response = 11;
+     */
+    value: WorkspaceReadResponse;
+    case: "workspaceReadResponse";
   } | { case: undefined; value?: undefined };
 };
 
@@ -3936,6 +3952,22 @@ export declare type ManagerStreamMessage = Message<"laelia.v1.ManagerStreamMessa
      */
     value: DiscoverProviders;
     case: "discoverProviders";
+  } | {
+    /**
+     * ask the agent daemon to list one level of its workspace
+     *
+     * @generated from field: laelia.v1.WorkspaceListRequest workspace_list_request = 10;
+     */
+    value: WorkspaceListRequest;
+    case: "workspaceListRequest";
+  } | {
+    /**
+     * ask the agent daemon to read a workspace file
+     *
+     * @generated from field: laelia.v1.WorkspaceReadRequest workspace_read_request = 11;
+     */
+    value: WorkspaceReadRequest;
+    case: "workspaceReadRequest";
   } | { case: undefined; value?: undefined };
 };
 
@@ -4031,6 +4063,98 @@ export declare type ProvidersDiscovered = Message<"laelia.v1.ProvidersDiscovered
  * Use `create(ProvidersDiscoveredSchema)` to create a new message.
  */
 export declare const ProvidersDiscoveredSchema: GenMessage<ProvidersDiscovered>;
+
+/**
+ * WorkspaceListRequest asks the agent daemon to list one directory level of an
+ * agent's workspace (~/.laelia/<machineID>/<agentID>/ on the machine). Paths
+ * are relative to the workspace root; an empty dir_path lists the root. The
+ * daemon replies with AgentStreamMessage.workspace_list_response.
+ *
+ * @generated from message laelia.v1.WorkspaceListRequest
+ */
+export declare type WorkspaceListRequest = Message<"laelia.v1.WorkspaceListRequest"> & {
+  /**
+   * correlation id for the pending unary ListAgentWorkspace call
+   *
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * relative to the workspace root; empty = root
+   *
+   * @generated from field: string dir_path = 2;
+   */
+  dirPath: string;
+
+  /**
+   * show dotfiles (still filtered by the never-visible policy)
+   *
+   * @generated from field: bool include_hidden = 3;
+   */
+  includeHidden: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.WorkspaceListRequest.
+ * Use `create(WorkspaceListRequestSchema)` to create a new message.
+ */
+export declare const WorkspaceListRequestSchema: GenMessage<WorkspaceListRequest>;
+
+/**
+ * WorkspaceListResponse carries one directory level back to the manager.
+ * Entries are sorted directories-first, then by name. WorkspaceEntry is shared
+ * with the unary ListAgentWorkspace RPC (defined in v1/agent.proto).
+ *
+ * @generated from message laelia.v1.WorkspaceListResponse
+ */
+export declare type WorkspaceListResponse = Message<"laelia.v1.WorkspaceListResponse"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: repeated laelia.v1.WorkspaceEntry entries = 2;
+   */
+  entries: WorkspaceEntry[];
+};
+
+/**
+ * Describes the message laelia.v1.WorkspaceListResponse.
+ * Use `create(WorkspaceListResponseSchema)` to create a new message.
+ */
+export declare const WorkspaceListResponseSchema: GenMessage<WorkspaceListResponse>;
+
+/**
+ * WorkspaceReadRequest asks the agent daemon to read a workspace file for
+ * preview. Text and image content is returned inline (see
+ * WorkspaceReadResponse); other binaries return metadata only. Sensitive files
+ * (secret/credential/token patterns) are always rejected by the daemon.
+ *
+ * @generated from message laelia.v1.WorkspaceReadRequest
+ */
+export declare type WorkspaceReadRequest = Message<"laelia.v1.WorkspaceReadRequest"> & {
+  /**
+   * correlation id for the pending unary ReadAgentWorkspaceFile call
+   *
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * relative to the workspace root
+   *
+   * @generated from field: string path = 2;
+   */
+  path: string;
+};
+
+/**
+ * Describes the message laelia.v1.WorkspaceReadRequest.
+ * Use `create(WorkspaceReadRequestSchema)` to create a new message.
+ */
+export declare const WorkspaceReadRequestSchema: GenMessage<WorkspaceReadRequest>;
 
 /**
  * @generated from message laelia.v1.CommandRequest

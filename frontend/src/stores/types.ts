@@ -8,6 +8,8 @@ import type {
   PiModel,
   RotateAgentTokenResponse,
   TransferAgentOwnershipResponse,
+  WorkspaceEntry,
+  WorkspaceReadResponse,
 } from "@/types/proto-es/v1/agent_pb";
 import type { ApiProvider } from "@/types/proto-es/v1/api_provider_service_pb";
 import type {
@@ -28,6 +30,7 @@ import type {
 import type {
   Machine,
   MachineSummary,
+  MachineWorkspaceSummary,
   RotateMachineTokenResponse,
 } from "@/types/proto-es/v1/machine_pb";
 import type { McpServer } from "@/types/proto-es/v1/mcp_pb";
@@ -581,11 +584,33 @@ export interface McpServerSlice {
   ) => Promise<{ nextPageToken: string } | undefined>;
 }
 
+// WorkspaceSlice exposes the workspace browser RPCs (agent file tree + file
+// preview, machine workspace list + delete). Authorization is handler-gated
+// server-side; the UI additionally hides the workspace tabs without
+// canEdit/canManage.
+export interface WorkspaceSlice {
+  listAgentWorkspaceDir: (
+    name: string,
+    dirPath: string,
+    includeHidden: boolean
+  ) => Promise<WorkspaceEntry[]>;
+  readAgentWorkspaceFile: (
+    name: string,
+    path: string
+  ) => Promise<WorkspaceReadResponse>;
+  listMachineWorkspaces: (name: string) => Promise<MachineWorkspaceSummary[]>;
+  deleteMachineWorkspace: (
+    name: string,
+    directoryName: string
+  ) => Promise<void>;
+}
+
 export type AppStoreState = AuthSlice &
   ApiProviderSlice &
   McpServerSlice &
   AgentSlice &
   MachineSlice &
+  WorkspaceSlice &
   MembersSlice &
   CommandSlice &
   ChatSlice &

@@ -491,7 +491,28 @@
     "description": "You are now signed in to Laelia AI. More features coming soon."
   },
   "workspace": {
-    "back-to-agents": "Back to Agents"
+    "back-to-agents": "Back to agents",
+    "show-hidden": "Show hidden files",
+    "preview": "Preview",
+    "empty": "Empty directory",
+    "load-error": "Failed to load",
+    "sensitive-file": "Preview is disabled for sensitive files",
+    "file-too-large": "File too large to preview",
+    "binary-file": "Binary file; only text and image files are previewable",
+    "delete-confirm": "Delete this agent's workspace directory? This cannot be undone.",
+    "deleted": "Deleted",
+    "loading": "Loading…",
+    "refresh": "Refresh",
+    "directory": "Directory",
+    "file": "File",
+    "size": "Size",
+    "file-count": "Files",
+    "last-modified": "Last modified",
+    "delete": "Delete",
+    "delete-error": "Failed to delete workspace",
+    "no-workspaces": "No agent workspaces found",
+    "close": "Close",
+    "select-file": "Select a file to preview"
   },
   "router": {
     "error-title": "Something went wrong",
@@ -653,7 +674,8 @@
     "follow-owner-permissions-save-error": "Failed to update this setting",
     "can-manage-channel-members": "Manage channel members on the owner's behalf",
     "can-manage-channel-members-hint": "On: this agent can add/remove members in a channel where its owner is a channel owner or admin. The agent never inherits the owner's other manage powers (rename, delete, transfer, roles). Off: the agent cannot add or remove members.",
-    "can-manage-channel-members-save-error": "Failed to update this setting"
+    "can-manage-channel-members-save-error": "Failed to update this setting",
+    "tab-workspace": "Workspace"
   },
   "machine": {
     "title": "Machines",
@@ -737,7 +759,9 @@
     "access-remove-member": "Remove {{email}}",
     "access-add-member": "Add member",
     "access-add-member-hint": "Add a user or group who may create agents on this machine.",
-    "access-etag-mismatch": "Access changed since it was loaded; the latest state has been reloaded. Review and save again."
+    "access-etag-mismatch": "Access changed since it was loaded; the latest state has been reloaded. Review and save again.",
+    "tab-profile": "Profile",
+    "tab-workspace": "Workspace"
   },
   "members": {
     "title": "Members",

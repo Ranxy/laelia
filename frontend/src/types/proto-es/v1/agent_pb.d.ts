@@ -768,6 +768,200 @@ export declare type RefreshAgentProvidersResponse = Message<"laelia.v1.RefreshAg
 export declare const RefreshAgentProvidersResponseSchema: GenMessage<RefreshAgentProvidersResponse>;
 
 /**
+ * WorkspaceEntry is one file/directory node of a lazily loaded workspace tree.
+ *
+ * @generated from message laelia.v1.WorkspaceEntry
+ */
+export declare type WorkspaceEntry = Message<"laelia.v1.WorkspaceEntry"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * relative to the workspace root
+   *
+   * @generated from field: string path = 2;
+   */
+  path: string;
+
+  /**
+   * @generated from field: bool is_directory = 3;
+   */
+  isDirectory: boolean;
+
+  /**
+   * file bytes; 0 for directories
+   *
+   * @generated from field: int64 size = 4;
+   */
+  size: bigint;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp modified_at = 5;
+   */
+  modifiedAt?: Timestamp | undefined;
+
+  /**
+   * dotfile
+   *
+   * @generated from field: bool is_hidden = 6;
+   */
+  isHidden: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.WorkspaceEntry.
+ * Use `create(WorkspaceEntrySchema)` to create a new message.
+ */
+export declare const WorkspaceEntrySchema: GenMessage<WorkspaceEntry>;
+
+/**
+ * WorkspaceReadResponse carries a previewed file (or an error) from the machine
+ * app back to the manager. A non-empty error means the file cannot be
+ * previewed; the unary RPC still succeeds so the frontend can show the reason.
+ * Shared by the per-agent workspace stream (command.proto) and the unary
+ * ReadAgentWorkspaceFile RPC.
+ *
+ * @generated from message laelia.v1.WorkspaceReadResponse
+ */
+export declare type WorkspaceReadResponse = Message<"laelia.v1.WorkspaceReadResponse"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * text: utf-8; image: base64; otherwise empty
+   *
+   * @generated from field: string content = 2;
+   */
+  content: string;
+
+  /**
+   * true for images and other binary files
+   *
+   * @generated from field: bool binary = 3;
+   */
+  binary: boolean;
+
+  /**
+   * @generated from field: int64 size = 4;
+   */
+  size: bigint;
+
+  /**
+   * set for images
+   *
+   * @generated from field: string mime_type = 5;
+   */
+  mimeType: string;
+
+  /**
+   * "utf-8" / "base64" / ""
+   *
+   * @generated from field: string encoding = 6;
+   */
+  encoding: string;
+
+  /**
+   * preview-disabled reason (sensitive file, too large, missing)
+   *
+   * @generated from field: string error = 7;
+   */
+  error: string;
+};
+
+/**
+ * Describes the message laelia.v1.WorkspaceReadResponse.
+ * Use `create(WorkspaceReadResponseSchema)` to create a new message.
+ */
+export declare const WorkspaceReadResponseSchema: GenMessage<WorkspaceReadResponse>;
+
+/**
+ * @generated from message laelia.v1.ListAgentWorkspaceRequest
+ */
+export declare type ListAgentWorkspaceRequest = Message<"laelia.v1.ListAgentWorkspaceRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * relative to the workspace root; empty = root
+   *
+   * @generated from field: string dir_path = 2;
+   */
+  dirPath: string;
+
+  /**
+   * @generated from field: bool include_hidden = 3;
+   */
+  includeHidden: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.ListAgentWorkspaceRequest.
+ * Use `create(ListAgentWorkspaceRequestSchema)` to create a new message.
+ */
+export declare const ListAgentWorkspaceRequestSchema: GenMessage<ListAgentWorkspaceRequest>;
+
+/**
+ * @generated from message laelia.v1.ListAgentWorkspaceResponse
+ */
+export declare type ListAgentWorkspaceResponse = Message<"laelia.v1.ListAgentWorkspaceResponse"> & {
+  /**
+   * @generated from field: repeated laelia.v1.WorkspaceEntry entries = 1;
+   */
+  entries: WorkspaceEntry[];
+};
+
+/**
+ * Describes the message laelia.v1.ListAgentWorkspaceResponse.
+ * Use `create(ListAgentWorkspaceResponseSchema)` to create a new message.
+ */
+export declare const ListAgentWorkspaceResponseSchema: GenMessage<ListAgentWorkspaceResponse>;
+
+/**
+ * @generated from message laelia.v1.ReadAgentWorkspaceFileRequest
+ */
+export declare type ReadAgentWorkspaceFileRequest = Message<"laelia.v1.ReadAgentWorkspaceFileRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * relative to the workspace root
+   *
+   * @generated from field: string path = 2;
+   */
+  path: string;
+};
+
+/**
+ * Describes the message laelia.v1.ReadAgentWorkspaceFileRequest.
+ * Use `create(ReadAgentWorkspaceFileRequestSchema)` to create a new message.
+ */
+export declare const ReadAgentWorkspaceFileRequestSchema: GenMessage<ReadAgentWorkspaceFileRequest>;
+
+/**
+ * @generated from message laelia.v1.ReadAgentWorkspaceFileResponse
+ */
+export declare type ReadAgentWorkspaceFileResponse = Message<"laelia.v1.ReadAgentWorkspaceFileResponse"> & {
+  /**
+   * @generated from field: laelia.v1.WorkspaceReadResponse file = 1;
+   */
+  file?: WorkspaceReadResponse | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.ReadAgentWorkspaceFileResponse.
+ * Use `create(ReadAgentWorkspaceFileResponseSchema)` to create a new message.
+ */
+export declare const ReadAgentWorkspaceFileResponseSchema: GenMessage<ReadAgentWorkspaceFileResponse>;
+
+/**
  * @generated from message laelia.v1.ListPiModelsRequest
  */
 export declare type ListPiModelsRequest = Message<"laelia.v1.ListPiModelsRequest"> & {
@@ -1797,6 +1991,34 @@ export declare const AgentService: GenService<{
     methodKind: "unary";
     input: typeof RefreshAgentProvidersRequestSchema;
     output: typeof RefreshAgentProvidersResponseSchema;
+  },
+  /**
+   * ListAgentWorkspace lists one directory level of an agent's workspace on its
+   * machine (~/.laelia/<machineID>/<agentID>/), lazily loading the tree level by
+   * level. Workspace content is sensitive: authorized in the handler for the
+   * agent's owner or a workspace admin (canEditAgent); like UpdateAgent this
+   * RPC carries no permission annotation (agents.edit is admin-only) and is
+   * handler-gated.
+   *
+   * @generated from rpc laelia.v1.AgentService.ListAgentWorkspace
+   */
+  listAgentWorkspace: {
+    methodKind: "unary";
+    input: typeof ListAgentWorkspaceRequestSchema;
+    output: typeof ListAgentWorkspaceResponseSchema;
+  },
+  /**
+   * ReadAgentWorkspaceFile reads a single workspace file for text/image preview.
+   * Same handler-gated authorization as ListAgentWorkspace (owner or workspace
+   * admin). Sensitive files (secret/credential/token patterns) are rejected by
+   * the machine app and surface as a per-file error, not a transport error.
+   *
+   * @generated from rpc laelia.v1.AgentService.ReadAgentWorkspaceFile
+   */
+  readAgentWorkspaceFile: {
+    methodKind: "unary";
+    input: typeof ReadAgentWorkspaceFileRequestSchema;
+    output: typeof ReadAgentWorkspaceFileResponseSchema;
   },
   /**
    * List the models a built-in pi agent's LLM API provider exposes. The manager

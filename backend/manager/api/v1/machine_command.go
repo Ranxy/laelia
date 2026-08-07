@@ -90,6 +90,12 @@ func (s *MachineStreamService) MachineChannel(
 			// DiscoverProviders request is correlated by request_id.
 			s.dispatcher.CompletePendingDiscover(m.ProvidersDiscovered)
 
+		case *v1pb.MachineStreamMessage_MachineWorkspaceScanResponse:
+			s.dispatcher.CompletePendingMachineWorkspaceScan(m.MachineWorkspaceScanResponse)
+
+		case *v1pb.MachineStreamMessage_MachineWorkspaceDeleteResponse:
+			s.dispatcher.CompletePendingMachineWorkspaceDelete(m.MachineWorkspaceDeleteResponse)
+
 		case *v1pb.MachineStreamMessage_DisconnectNotice:
 			slog.Info("machine announced graceful disconnect", "machineID", machine.ID, "reason", m.DisconnectNotice.GetReason())
 			return nil

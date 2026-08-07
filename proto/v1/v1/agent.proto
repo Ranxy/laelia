@@ -161,6 +161,34 @@ service AgentService {
     option (laelia.v1.audit) = true;
   }
 
+  // ListAgentWorkspace lists one directory level of an agent's workspace on its
+  // machine (~/.laelia/<machineID>/<agentID>/), lazily loading the tree level by
+  // level. Workspace content is sensitive: authorized in the handler for the
+  // agent's owner or a workspace admin (canEditAgent); like UpdateAgent this
+  // RPC carries no permission annotation (agents.edit is admin-only) and is
+  // handler-gated.
+  rpc ListAgentWorkspace(ListAgentWorkspaceRequest) returns (ListAgentWorkspaceResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=agents/*}:listWorkspace"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+
+  // ReadAgentWorkspaceFile reads a single workspace file for text/image preview.
+  // Same handler-gated authorization as ListAgentWorkspace (owner or workspace
+  // admin). Sensitive files (secret/credential/token patterns) are rejected by
+  // the machine app and surface as a per-file error, not a transport error.
+  rpc ReadAgentWorkspaceFile(ReadAgentWorkspaceFileRequest) returns (ReadAgentWorkspaceFileResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=agents/*}:readWorkspaceFile"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.audit) = true;
+  }
+
   // List the models a built-in pi agent's LLM API provider exposes. The manager
   // proxies the provider's model-listing HTTP API (DeepSeek `GET /models` with
   // the caller's api_key; OpenRouter `GET /models`, public) so the model list is
@@ -470,6 +498,56 @@ message RefreshAgentProvidersRequest {
 
 message RefreshAgentProvidersResponse {
   repeated AgentProviderInfo providers = 1;
+}
+
+// WorkspaceEntry is one file/directory node of a lazily loaded workspace tree.
+message WorkspaceEntry {
+  string name = 1;
+  string path = 2; // relative to the workspace root
+  bool is_directory = 3;
+  int64 size = 4; // file bytes; 0 for directories
+  google.protobuf.Timestamp modified_at = 5;
+  bool is_hidden = 6; // dotfile
+}
+
+// WorkspaceReadResponse carries a previewed file (or an error) from the machine
+// app back to the manager. A non-empty error means the file cannot be
+// previewed; the unary RPC still succeeds so the frontend can show the reason.
+// Shared by the per-agent workspace stream (command.proto) and the unary
+// ReadAgentWorkspaceFile RPC.
+message WorkspaceReadResponse {
+  string request_id = 1;
+  string content = 2; // text: utf-8; image: base64; otherwise empty
+  bool binary = 3; // true for images and other binary files
+  int64 size = 4;
+  string mime_type = 5; // set for images
+  string encoding = 6; // "utf-8" / "base64" / ""
+  string error = 7; // preview-disabled reason (sensitive file, too large, missing)
+}
+
+message ListAgentWorkspaceRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+  string dir_path = 2; // relative to the workspace root; empty = root
+  bool include_hidden = 3;
+}
+
+message ListAgentWorkspaceResponse {
+  repeated WorkspaceEntry entries = 1;
+}
+
+message ReadAgentWorkspaceFileRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Agent"}
+  ];
+  string path = 2; // relative to the workspace root
+}
+
+message ReadAgentWorkspaceFileResponse {
+  WorkspaceReadResponse file = 1;
 }
 
 message ListPiModelsRequest {

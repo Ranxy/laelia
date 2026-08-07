@@ -491,7 +491,28 @@
     "description": "您已登录 Laelia AI。更多功能即将上线。"
   },
   "workspace": {
-    "back-to-agents": "返回 Agent 列表"
+    "back-to-agents": "返回 Agent 列表",
+    "show-hidden": "显示隐藏文件",
+    "preview": "预览",
+    "empty": "目录为空",
+    "load-error": "加载失败",
+    "sensitive-file": "敏感文件无法预览",
+    "file-too-large": "文件过大,无法预览",
+    "binary-file": "二进制文件,仅支持文本与图片预览",
+    "delete-confirm": "确认删除该 Agent 的工作目录?此操作不可恢复。",
+    "deleted": "已删除",
+    "loading": "加载中…",
+    "refresh": "刷新",
+    "directory": "目录",
+    "file": "文件",
+    "size": "大小",
+    "file-count": "文件数",
+    "last-modified": "最近修改",
+    "delete": "删除",
+    "delete-error": "删除工作目录失败",
+    "no-workspaces": "未找到 Agent 工作目录",
+    "close": "关闭",
+    "select-file": "选择文件以预览"
   },
   "router": {
     "error-title": "出错了",
@@ -653,7 +674,8 @@
     "follow-owner-permissions-save-error": "更新此设置失败",
     "can-manage-channel-members": "代表负责人管理频道成员",
     "can-manage-channel-members-hint": "开启：当该 Agent 的负责人是频道的 owner 或 admin 时，Agent 可以在该频道中添加/移除成员。Agent 不会继承负责人的其他管理权限（改名、删除、转让、角色）。关闭：Agent 不能添加或移除成员。",
-    "can-manage-channel-members-save-error": "更新此设置失败"
+    "can-manage-channel-members-save-error": "更新此设置失败",
+    "tab-workspace": "工作区"
   },
   "machine": {
     "title": "机器",
@@ -737,7 +759,9 @@
     "access-remove-member": "移除 {{email}}",
     "access-add-member": "添加成员",
     "access-add-member-hint": "添加一个用户或组,允许其在此机器上创建 Agent。",
-    "access-etag-mismatch": "授权信息自加载后已发生变化,已重新加载最新状态,请确认后再次保存。"
+    "access-etag-mismatch": "授权信息自加载后已发生变化,已重新加载最新状态,请确认后再次保存。",
+    "tab-profile": "配置",
+    "tab-workspace": "工作区"
   },
   "members": {
     "title": "成员",

@@ -929,6 +929,80 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}:listWorkspace:
+        post:
+            tags:
+                - AgentService
+            description: |-
+                ListAgentWorkspace lists one directory level of an agent's workspace on its
+                 machine (~/.laelia/<machineID>/<agentID>/), lazily loading the tree level by
+                 level. Workspace content is sensitive: authorized in the handler for the
+                 agent's owner or a workspace admin (canEditAgent); like UpdateAgent this
+                 RPC carries no permission annotation (agents.edit is admin-only) and is
+                 handler-gated.
+            operationId: AgentService_ListAgentWorkspace
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ListAgentWorkspaceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListAgentWorkspaceResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}:readWorkspaceFile:
+        post:
+            tags:
+                - AgentService
+            description: |-
+                ReadAgentWorkspaceFile reads a single workspace file for text/image preview.
+                 Same handler-gated authorization as ListAgentWorkspace (owner or workspace
+                 admin). Sensitive files (secret/credential/token patterns) are rejected by
+                 the machine app and surface as a per-file error, not a transport error.
+            operationId: AgentService_ReadAgentWorkspaceFile
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ReadAgentWorkspaceFileRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ReadAgentWorkspaceFileResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}:refreshProviders:
         post:
             tags:
@@ -2997,6 +3071,41 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/machines/{machine}:deleteWorkspace:
+        post:
+            tags:
+                - MachineService
+            description: |-
+                DeleteMachineWorkspace recursively deletes one agent workspace directory on
+                 a machine. Destructive: same handler-gated authorization as
+                 ListMachineWorkspaces; the machine app validates the directory name.
+            operationId: MachineService_DeleteMachineWorkspace
+            parameters:
+                - name: machine
+                  in: path
+                  description: The machine id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/DeleteMachineWorkspaceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteMachineWorkspaceResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/machines/{machine}:forceDisconnect:
         post:
             tags:
@@ -3079,6 +3188,42 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/IamPolicyView'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/machines/{machine}:listWorkspaces:
+        post:
+            tags:
+                - MachineService
+            description: |-
+                ListMachineWorkspaces summarizes every per-agent workspace directory on a
+                 machine (~/.laelia/<machineID>/). Workspace content is sensitive:
+                 authorized in the handler for the machine's creator or a workspace admin
+                 (isMachineAdmin, matching Machine.can_manage); no permission annotation.
+            operationId: MachineService_ListMachineWorkspaces
+            parameters:
+                - name: machine
+                  in: path
+                  description: The machine id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ListMachineWorkspacesRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListMachineWorkspacesResponse'
                 default:
                     description: Default error response
                     content:
@@ -5980,6 +6125,20 @@ components:
                         message is the newly posted task message, with task populated. The task is
                          created unassigned (status TODO); the posting agent does NOT auto-claim it
                          — call ClaimTask afterwards to own it.
+        DeleteMachineWorkspaceRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                directoryName:
+                    type: string
+        DeleteMachineWorkspaceResponse:
+            type: object
+            properties:
+                success:
+                    type: boolean
         DiffEmittedPayload:
             type: object
             properties:
@@ -6400,6 +6559,24 @@ components:
                         $ref: '#/components/schemas/AgentSession'
                 nextPageToken:
                     type: string
+        ListAgentWorkspaceRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                dirPath:
+                    type: string
+                includeHidden:
+                    type: boolean
+        ListAgentWorkspaceResponse:
+            type: object
+            properties:
+                entries:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/WorkspaceEntry'
         ListAgentsResponse:
             type: object
             properties:
@@ -6529,6 +6706,20 @@ components:
                         $ref: '#/components/schemas/AgentSummary'
                 nextPageToken:
                     type: string
+        ListMachineWorkspacesRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+        ListMachineWorkspacesResponse:
+            type: object
+            properties:
+                workspaces:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/MachineWorkspaceSummary'
         ListMachinesResponse:
             type: object
             properties:
@@ -6867,6 +7058,19 @@ components:
                 MachineSummary is the lightweight list-view projection of a Machine returned
                  by ListMachines. It carries identity, lifecycle state, connection status, and
                  the count of agents bound to the machine.
+        MachineWorkspaceSummary:
+            type: object
+            properties:
+                directoryName:
+                    type: string
+                totalSizeBytes:
+                    type: string
+                lastModified:
+                    type: string
+                    format: date-time
+                fileCount:
+                    type: string
+            description: MachineWorkspaceSummary is one agent workspace directory's usage summary.
         MarkActivityDoneRequest:
             required:
                 - name
@@ -7172,6 +7376,20 @@ components:
             properties:
                 data:
                     type: object
+        ReadAgentWorkspaceFileRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                path:
+                    type: string
+        ReadAgentWorkspaceFileResponse:
+            type: object
+            properties:
+                file:
+                    $ref: '#/components/schemas/WorkspaceReadResponse'
         RefreshAgentProvidersRequest:
             required:
                 - name
@@ -7987,6 +8205,46 @@ components:
             properties:
                 message:
                     type: string
+        WorkspaceEntry:
+            type: object
+            properties:
+                name:
+                    type: string
+                path:
+                    type: string
+                isDirectory:
+                    type: boolean
+                size:
+                    type: string
+                modifiedAt:
+                    type: string
+                    format: date-time
+                isHidden:
+                    type: boolean
+            description: WorkspaceEntry is one file/directory node of a lazily loaded workspace tree.
+        WorkspaceReadResponse:
+            type: object
+            properties:
+                requestId:
+                    type: string
+                content:
+                    type: string
+                binary:
+                    type: boolean
+                size:
+                    type: string
+                mimeType:
+                    type: string
+                encoding:
+                    type: string
+                error:
+                    type: string
+            description: |-
+                WorkspaceReadResponse carries a previewed file (or an error) from the machine
+                 app back to the manager. A non-empty error means the file cannot be
+                 previewed; the unary RPC still succeeds so the frontend can show the reason.
+                 Shared by the per-agent workspace stream (command.proto) and the unary
+                 ReadAgentWorkspaceFile RPC.
 tags:
     - name: AgentService
     - name: ApiProviderService

@@ -1886,6 +1886,8 @@ message AgentStreamMessage {
     CommandEvent event = 7;
     Ping ping = 8;
     ProvidersDiscovered providers_discovered = 9; // response to ManagerStreamMessage.discover_providers
+    WorkspaceListResponse workspace_list_response = 10; // response to ManagerStreamMessage.workspace_list_request
+    WorkspaceReadResponse workspace_read_response = 11; // response to ManagerStreamMessage.workspace_read_request
   }
 }
 
@@ -1897,6 +1899,8 @@ message ManagerStreamMessage {
     Pong pong = 6;
     PermissionDecision permission_decision = 7;
     DiscoverProviders discover_providers = 9; // ask the agent daemon to re-probe installed LLM agent providers
+    WorkspaceListRequest workspace_list_request = 10; // ask the agent daemon to list one level of its workspace
+    WorkspaceReadRequest workspace_read_request = 11; // ask the agent daemon to read a workspace file
   }
 }
 
@@ -1924,6 +1928,33 @@ message DiscoverProviders {
 message ProvidersDiscovered {
   string request_id = 1;
   repeated AgentProviderInfo providers = 2;
+}
+
+// WorkspaceListRequest asks the agent daemon to list one directory level of an
+// agent's workspace (~/.laelia/<machineID>/<agentID>/ on the machine). Paths
+// are relative to the workspace root; an empty dir_path lists the root. The
+// daemon replies with AgentStreamMessage.workspace_list_response.
+message WorkspaceListRequest {
+  string request_id = 1; // correlation id for the pending unary ListAgentWorkspace call
+  string dir_path = 2; // relative to the workspace root; empty = root
+  bool include_hidden = 3; // show dotfiles (still filtered by the never-visible policy)
+}
+
+// WorkspaceListResponse carries one directory level back to the manager.
+// Entries are sorted directories-first, then by name. WorkspaceEntry is shared
+// with the unary ListAgentWorkspace RPC (defined in v1/agent.proto).
+message WorkspaceListResponse {
+  string request_id = 1;
+  repeated WorkspaceEntry entries = 2;
+}
+
+// WorkspaceReadRequest asks the agent daemon to read a workspace file for
+// preview. Text and image content is returned inline (see
+// WorkspaceReadResponse); other binaries return metadata only. Sensitive files
+// (secret/credential/token patterns) are always rejected by the daemon.
+message WorkspaceReadRequest {
+  string request_id = 1; // correlation id for the pending unary ReadAgentWorkspaceFile call
+  string path = 2; // relative to the workspace root
 }
 
 message CommandRequest {
