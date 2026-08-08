@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package laelia.v1;
 
-import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
@@ -154,49 +153,36 @@ message McpServerChange {
 // server.
 service McpServerService {
   rpc GetMcpServer(GetMcpServerRequest) returns (McpServer) {
-    option (google.api.http) = {get: "/v1/{name=mcpServers/*}"};
     option (google.api.method_signature) = "name";
     option (laelia.v1.auth_method) = IAM;
   }
 
   rpc ListMcpServers(ListMcpServersRequest) returns (ListMcpServersResponse) {
-    option (google.api.http) = {get: "/v1/mcpServers"};
     option (laelia.v1.auth_method) = IAM;
   }
 
   rpc ListMyMcpServers(ListMcpServersRequest) returns (ListMcpServersResponse) {
-    option (google.api.http) = {get: "/v1/myMcpServers"};
     option (laelia.v1.auth_method) = IAM;
   }
 
   rpc ListUserMcpServers(ListMcpServersRequest) returns (ListMcpServersResponse) {
-    option (google.api.http) = {get: "/v1/userMcpServers"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.mcpServers.list";
   }
 
   rpc CreateMcpServer(CreateMcpServerRequest) returns (McpServer) {
-    option (google.api.http) = {
-      post: "/v1/mcpServers"
-      body: "mcp_server"
-    };
     option (google.api.method_signature) = "mcp_server";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
 
   rpc UpdateMcpServer(UpdateMcpServerRequest) returns (McpServer) {
-    option (google.api.http) = {
-      patch: "/v1/{mcp_server.name=mcpServers/*}"
-      body: "mcp_server"
-    };
     option (google.api.method_signature) = "mcp_server,update_mask";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
 
   rpc DeleteMcpServer(DeleteMcpServerRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {delete: "/v1/{name=mcpServers/*}"};
     option (google.api.method_signature) = "name";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;

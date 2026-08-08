@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package laelia.v1;
 
-import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/empty.proto";
@@ -1358,63 +1357,48 @@ message MarkActivityDoneResponse {
 
 service CommandService {
   rpc ListCommands(ListCommandsRequest) returns (ListCommandsResponse) {
-    option (google.api.http) = {get: "/v1/{agent=agents/*}/commands"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.commands.get";
   }
 
   rpc GetCommand(GetCommandRequest) returns (Command) {
-    option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.commands.get";
   }
 
   rpc CancelCommand(CancelCommandRequest) returns (Command) {
-    option (google.api.http) = {
-      post: "/v1/{name=agents/*/commands/*}:cancel"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.commands.cancel";
     option (laelia.v1.audit) = true;
   }
 
   rpc WatchCommand(WatchCommandRequest) returns (stream CommandOutput) {
-    option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}:watch"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.commands.watch";
   }
 
   rpc WatchCommandEvents(WatchCommandEventsRequest) returns (stream CommandEvent) {
-    option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}:watchEvents"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.commands.watch";
   }
 
   rpc RespondPermission(RespondPermissionRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      post: "/v1/{name=agents/*/commands/*}:respondPermission"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.commands.watch";
     option (laelia.v1.audit) = true;
   }
 
   rpc SearchChatHistory(SearchChatHistoryRequest) returns (SearchChatHistoryResponse) {
-    option (google.api.http) = {get: "/v1/{agent=agents/*}/chat-history"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }
 
   rpc GetCommandContext(GetCommandContextRequest) returns (GetCommandContextResponse) {
-    option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}/context"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.commands.watch";
   }
 
   rpc GetOrCreateConversation(GetOrCreateConversationRequest) returns (GetOrCreateConversationResponse) {
-    option (google.api.http) = {post: "/v1/{agent=agents/*}/conversations"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.create";
   }
@@ -1424,7 +1408,6 @@ service CommandService {
   // resource name ("users/<id>"); self-address is rejected; the pair is
   // canonicalized by the store. User-user twin of GetOrCreateConversation.
   rpc GetOrCreateUserUserDM(GetOrCreateUserUserDMRequest) returns (GetOrCreateUserUserDMResponse) {
-    option (google.api.http) = {post: "/v1/{peer_user=users/*}/conversations"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.create";
   }
@@ -1433,69 +1416,47 @@ service CommandService {
   // title, returning NOT_FOUND when absent (it never creates one). Agent-
   // callable: no auth_method annotation, identity from GetAgentFromContext.
   // Powers the "#<title>" address resolver.
-  rpc ResolveChannelByTitle(ResolveChannelByTitleRequest) returns (ResolveChannelByTitleResponse) {
-    option (google.api.http) = {get: "/v1/agents/-/channels:resolveByTitle"};
-  }
+  rpc ResolveChannelByTitle(ResolveChannelByTitleRequest) returns (ResolveChannelByTitleResponse) {}
 
   // GetOrCreateUserDM opens (or reuses) the type-1 DM between the calling agent
   // and a named end user. Agent-callable. The peer is resolved by principal
   // display name; ambiguous or unknown names fail. Agent-callable twin of the
   // user-only GetOrCreateConversation. Powers the "dm:@<user>" address resolver.
-  rpc GetOrCreateUserDM(GetOrCreateUserDMRequest) returns (GetOrCreateUserDMResponse) {
-    option (google.api.http) = {
-      post: "/v1/agents/-/userDm:getOrCreate"
-      body: "*"
-    };
-  }
+  rpc GetOrCreateUserDM(GetOrCreateUserDMRequest) returns (GetOrCreateUserDMResponse) {}
 
   // GetOrCreateAgentDM opens (or reuses) the type-3 agent-to-agent DM between
   // the calling agent and a peer agent. Agent-callable. Self-address is rejected.
   // The peer is resolved by agent resource name ("agents/<id>"); the pair is
   // canonicalized by the store. Powers the "dm:@<agent>" address resolver.
-  rpc GetOrCreateAgentDM(GetOrCreateAgentDMRequest) returns (GetOrCreateAgentDMResponse) {
-    option (google.api.http) = {
-      post: "/v1/agents/-/agentDm:getOrCreate"
-      body: "*"
-    };
-  }
+  rpc GetOrCreateAgentDM(GetOrCreateAgentDMRequest) returns (GetOrCreateAgentDMResponse) {}
 
   // ListPeerAgents returns every other agent (the caller excluded) with the
   // display name, persona, and connection state an agent needs to decide whom
   // to address. Agent-callable. Powers the "agent list" discovery tool.
-  rpc ListPeerAgents(ListPeerAgentsRequest) returns (ListPeerAgentsResponse) {
-    option (google.api.http) = {get: "/v1/agents/-/peerAgents"};
-  }
+  rpc ListPeerAgents(ListPeerAgentsRequest) returns (ListPeerAgentsResponse) {}
 
   rpc ListConversationMessages(ListConversationMessagesRequest) returns (ListConversationMessagesResponse) {
-    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/messages"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }
 
   rpc ListThreadMessages(ListThreadMessagesRequest) returns (ListThreadMessagesResponse) {
-    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/threads"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }
 
   rpc ListChannelThreads(ListChannelThreadsRequest) returns (ListChannelThreadsResponse) {
-    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/threads:summarize"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }
 
   rpc CreateChannel(CreateChannelRequest) returns (Conversation) {
-    option (google.api.http) = {
-      post: "/v1/channels"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.create";
     option (laelia.v1.audit) = true;
   }
 
   rpc ListChannels(ListChannelsRequest) returns (ListChannelsResponse) {
-    option (google.api.http) = {get: "/v1/channels"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.list";
   }
@@ -1504,46 +1465,34 @@ service CommandService {
   // of (both direct DMs with users and multi-user channels), used by the agent
   // detail page's "Chat" tab. Admin-scoped: gated by laelia.agents.get.
   rpc ListChannelsForAgent(ListChannelsForAgentRequest) returns (ListChannelsForAgentResponse) {
-    option (google.api.http) = {get: "/v1/{name=agents/*}/channels"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.agents.get";
   }
 
   rpc GetChannel(GetChannelRequest) returns (Conversation) {
-    option (google.api.http) = {get: "/v1/{name=conversations/*}"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }
 
   rpc UpdateChannel(UpdateChannelRequest) returns (Conversation) {
-    option (google.api.http) = {
-      patch: "/v1/{conversation.name=conversations/*}"
-      body: "conversation"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.manage";
     option (laelia.v1.audit) = true;
   }
 
   rpc DeleteChannel(DeleteChannelRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {delete: "/v1/{name=conversations/*}"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.manage";
     option (laelia.v1.audit) = true;
   }
 
   rpc AddChannelMember(AddChannelMemberRequest) returns (AddChannelMemberResponse) {
-    option (google.api.http) = {
-      post: "/v1/{conversation=conversations/*}/members"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.manageMembers";
     option (laelia.v1.audit) = true;
   }
 
   rpc RemoveChannelMember(RemoveChannelMemberRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {delete: "/v1/{conversation=conversations/*}/members/{member_id}"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.manageMembers";
     option (laelia.v1.audit) = true;
@@ -1555,10 +1504,6 @@ service CommandService {
   // (Admin+Owner); the handler additionally enforces that the caller is the
   // current Owner. Only channels (type 2) support ownership transfer.
   rpc TransferChannelOwnership(TransferChannelOwnershipRequest) returns (TransferChannelOwnershipResponse) {
-    option (google.api.http) = {
-      post: "/v1/{conversation=conversations/*}:transferOwnership"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.manage";
     option (laelia.v1.audit) = true;
@@ -1570,10 +1515,6 @@ service CommandService {
   // caller is the Owner and the target role is Member or Admin (never Owner —
   // ownership only moves via TransferChannelOwnership).
   rpc UpdateChannelMemberRole(UpdateChannelMemberRoleRequest) returns (ChannelMember) {
-    option (google.api.http) = {
-      post: "/v1/{conversation=conversations/*}/members/{member_id}:updateRole"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.manage";
     option (laelia.v1.audit) = true;
@@ -1584,17 +1525,12 @@ service CommandService {
   // Owner — an owner must transfer ownership or delete the channel first to
   // avoid orphaning it. Only channels (type 2) support leaving.
   rpc LeaveChannel(LeaveChannelRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      post: "/v1/{conversation=conversations/*}:leave"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
     option (laelia.v1.audit) = true;
   }
 
   rpc ListChannelMembers(ListChannelMembersRequest) returns (ListChannelMembersResponse) {
-    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/members"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }
@@ -1603,26 +1539,17 @@ service CommandService {
   // in a thread. Intended for the agent daemon. The caller must be a member of the
   // conversation.
   rpc ListThreadParticipants(ListThreadParticipantsRequest) returns (ListThreadParticipantsResponse) {
-    option (google.api.http) = {get: "/v1/{conversation=conversations/*}:listThreadParticipants"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }
 
   rpc SendMessage(SendMessageRequest) returns (ChatMessage) {
-    option (google.api.http) = {
-      post: "/v1/{conversation=conversations/*}/messages:send"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.send";
     option (laelia.v1.audit) = true;
   }
 
   rpc PostMessage(PostMessageRequest) returns (PostMessageResponse) {
-    option (google.api.http) = {
-      post: "/v1/{conversation=conversations/*}:postMessage"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.send";
   }
@@ -1631,10 +1558,6 @@ service CommandService {
   // attaching task metadata (number, status=TODO, no assignee). Any channel
   // member (user or agent) may convert. Emits a system notification row.
   rpc ConvertMessageToTask(ConvertMessageToTaskRequest) returns (ConvertMessageToTaskResponse) {
-    option (google.api.http) = {
-      post: "/v1/{message=conversations/*/messages/*}:convertToTask"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.send";
     option (laelia.v1.audit) = true;
@@ -1644,7 +1567,6 @@ service CommandService {
   // channel's tasks (root messages with task metadata), newest first, optionally
   // filtered by status. Use page_size / page_token for pagination.
   rpc ListTasks(ListTasksRequest) returns (ListTasksResponse) {
-    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/tasks"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }
@@ -1652,7 +1574,6 @@ service CommandService {
   // ListTaskCounts returns per-status task totals for a conversation, so the
   // task board summary stays accurate independent of list pagination.
   rpc ListTaskCounts(ListTaskCountsRequest) returns (ListTaskCountsResponse) {
-    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/tasks:counts"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }
@@ -1661,69 +1582,42 @@ service CommandService {
   // to break work into subtasks for others to claim). The new task is created
   // unassigned (status TODO); the posting agent does NOT auto-claim it. Emits a
   // system notification row and wakes other agent members.
-  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {
-    option (google.api.http) = {
-      post: "/v1/{conversation=conversations/*}:createTask"
-      body: "*"
-    };
-  }
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
 
   // ClaimTask atomically transitions a TODO task to IN_PROGRESS and assigns it
   // to the calling agent, subscribing the agent to the task's thread so approval
   // replies wake it. Returns FAILED_PRECONDITION if the task is already
   // claimed or not in TODO. Emits a system notification row.
-  rpc ClaimTask(ClaimTaskRequest) returns (ClaimTaskResponse) {
-    option (google.api.http) = {
-      post: "/v1/{message=conversations/*/messages/*}:claimTask"
-      body: "*"
-    };
-  }
+  rpc ClaimTask(ClaimTaskRequest) returns (ClaimTaskResponse) {}
 
   // UnclaimTask releases the calling agent's claim on a task it owns, setting
   // it back to TODO so another agent may claim it. Not allowed on DONE
   // (terminal). Emits a system notification row.
-  rpc UnclaimTask(UnclaimTaskRequest) returns (UnclaimTaskResponse) {
-    option (google.api.http) = {
-      post: "/v1/{message=conversations/*/messages/*}:unclaimTask"
-      body: "*"
-    };
-  }
+  rpc UnclaimTask(UnclaimTaskRequest) returns (UnclaimTaskResponse) {}
 
   // UpdateTaskStatus advances a task's status. IN_PROGRESS -> IN_REVIEW marks
   // the assignee's work ready for human review; IN_REVIEW -> DONE marks it
   // complete (the assignee should call this only after detecting the human's
   // approval in the task's thread). Only the assignee may call this. Emits a
   // system notification row.
-  rpc UpdateTaskStatus(UpdateTaskStatusRequest) returns (UpdateTaskStatusResponse) {
-    option (google.api.http) = {
-      post: "/v1/{message=conversations/*/messages/*}:updateTaskStatus"
-      body: "*"
-    };
-  }
+  rpc UpdateTaskStatus(UpdateTaskStatusRequest) returns (UpdateTaskStatusResponse) {}
 
   // ConvertMessageToReminder turns an existing top-level message into a
   // scheduled reminder owned by the calling agent (atomic create+claim). The
   // message must be a root in the conversation and not already a reminder. The
   // agent is subscribed to the reminder's thread so discussion replies wake it.
-  rpc ConvertMessageToReminder(ConvertMessageToReminderRequest) returns (ConvertMessageToReminderResponse) {
-    option (google.api.http) = {
-      post: "/v1/{message=conversations/*/messages/*}:convertToReminder"
-      body: "*"
-    };
-  }
+  rpc ConvertMessageToReminder(ConvertMessageToReminderRequest) returns (ConvertMessageToReminderResponse) {}
 
   // ListReminders returns reminders, optionally filtered by owning agent,
   // conversation, and status. Used by the agent-page Reminders tab (user) and
   // the agent CLI (self-list).
   rpc ListReminders(ListRemindersRequest) returns (ListRemindersResponse) {
-    option (google.api.http) = {get: "/v1/reminders"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.reminders.list";
   }
 
   // GetReminder returns a single reminder by its resource name.
   rpc GetReminder(GetReminderRequest) returns (GetReminderResponse) {
-    option (google.api.http) = {get: "/v1/{name=reminders/*}"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.reminders.get";
   }
@@ -1732,10 +1626,6 @@ service CommandService {
   // a reminder. The caller is the owning agent or a workspace admin. Editing a
   // DUE or MISSED reminder resets it to PENDING with the new schedule.
   rpc UpdateReminder(UpdateReminderRequest) returns (UpdateReminderResponse) {
-    option (google.api.http) = {
-      patch: "/v1/{name=reminders/*}"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.reminders.update";
     option (laelia.v1.audit) = true;
@@ -1744,10 +1634,6 @@ service CommandService {
   // CancelReminder cancels a reminder. The caller is the owning agent or a
   // workspace admin. A cancelled reminder is terminal.
   rpc CancelReminder(CancelReminderRequest) returns (CancelReminderResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=reminders/*}:cancel"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.reminders.cancel";
     option (laelia.v1.audit) = true;
@@ -1757,10 +1643,6 @@ service CommandService {
   // result as a single system message in the reminder's thread. Only the owning
   // agent may call this. Recurring reminders reschedule to the next cron fire.
   rpc CompleteReminder(CompleteReminderRequest) returns (CompleteReminderResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=reminders/*}:complete"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.reminders.update";
   }
@@ -1769,10 +1651,6 @@ service CommandService {
   // as a system thread message. Recurring reminders reschedule. Only the owning
   // agent may call this.
   rpc FailReminder(FailReminderRequest) returns (FailReminderResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=reminders/*}:fail"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.reminders.update";
   }
@@ -1780,67 +1658,40 @@ service CommandService {
   // ListDueReminders returns the DUE reminders owned by the calling agent, for
   // the autonomous drain loop to pick up fired work. Agent identity is resolved
   // from the auth context.
-  rpc ListDueReminders(ListDueRemindersRequest) returns (ListDueRemindersResponse) {
-    option (google.api.http) = {get: "/v1/agents/-/dueReminders"};
-  }
+  rpc ListDueReminders(ListDueRemindersRequest) returns (ListDueRemindersResponse) {}
 
-  rpc ListChannelUpdates(ListChannelUpdatesRequest) returns (ListChannelUpdatesResponse) {
-    option (google.api.http) = {get: "/v1/agents/-/channelUpdates"};
-  }
+  rpc ListChannelUpdates(ListChannelUpdatesRequest) returns (ListChannelUpdatesResponse) {}
 
-  rpc ListAccessibleChannels(ListAccessibleChannelsRequest) returns (ListAccessibleChannelsResponse) {
-    option (google.api.http) = {get: "/v1/agents/-:listAccessibleChannels"};
-  }
+  rpc ListAccessibleChannels(ListAccessibleChannelsRequest) returns (ListAccessibleChannelsResponse) {}
 
   rpc JoinChannel(JoinChannelRequest) returns (JoinChannelResponse) {
-    option (google.api.http) = {
-      post: "/v1/{conversation=conversations/*}:join"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
     option (laelia.v1.audit) = true;
   }
 
-  rpc ListThreadUpdates(ListThreadUpdatesRequest) returns (ListThreadUpdatesResponse) {
-    option (google.api.http) = {get: "/v1/agents/-/threadUpdates"};
-  }
+  rpc ListThreadUpdates(ListThreadUpdatesRequest) returns (ListThreadUpdatesResponse) {}
 
-  rpc AckProcessedVersion(AckProcessedVersionRequest) returns (AckProcessedVersionResponse) {
-    option (google.api.http) = {
-      post: "/v1/{conversation=conversations/*}:ackProcessedVersion"
-      body: "*"
-    };
-  }
+  rpc AckProcessedVersion(AckProcessedVersionRequest) returns (AckProcessedVersionResponse) {}
 
   rpc FetchConversationActivity(FetchConversationActivityRequest) returns (FetchConversationActivityResponse) {
-    option (google.api.http) = {get: "/v1/{conversation=conversations/*}/activity"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }
 
   rpc MarkConversationRead(MarkConversationReadRequest) returns (MarkConversationReadResponse) {
-    option (google.api.http) = {
-      post: "/v1/{conversation=conversations/*}:markRead"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }
 
   rpc SetConversationPinned(SetConversationPinnedRequest) returns (SetConversationPinnedResponse) {
-    option (google.api.http) = {
-      post: "/v1/{conversation=conversations/*}:setPinned"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }
 
   // UploadFile stores data in S3 and persists a file row. Intended for the
-  // agent daemon (browser uploads go through the Echo multipart route). No
-  // google.api.http annotation: the agent reaches it via Connect-JSON over the
-  // CommandServiceClient, and avoiding a /v1/files/{id} gateway entry keeps it
+  // agent daemon (browser uploads go through the Echo multipart route); bytes
+  // travel over Connect-JSON, and avoiding a /v1/files/{id} REST entry keeps it
   // from colliding with the browser download route.
   rpc UploadFile(UploadFileRequest) returns (File) {
     option (laelia.v1.auth_method) = IAM;
@@ -1867,7 +1718,6 @@ service CommandService {
   // The caller's own id is the implicit filter; default read_state_filter is
   // UNREAD.
   rpc ListActivities(ListActivitiesRequest) returns (ListActivitiesResponse) {
-    option (google.api.http) = {get: "/v1/activities"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.activities.list";
   }
@@ -1875,10 +1725,6 @@ service CommandService {
   // MarkActivityDone marks a single activity item DONE for the authenticated
   // user, hiding it from All and Unread. The caller's own id must own the row.
   rpc MarkActivityDone(MarkActivityDoneRequest) returns (MarkActivityDoneResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=users/*/activities/*}:markDone"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.activities.markDone";
     option (laelia.v1.audit) = true;

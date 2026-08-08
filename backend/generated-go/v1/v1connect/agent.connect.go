@@ -191,7 +191,7 @@ type AgentServiceClient interface {
 	RefreshAgentToken(context.Context, *connect.Request[v1.RefreshAgentTokenRequest]) (*connect.Response[v1.RefreshAgentTokenResponse], error)
 	// UploadAgentAvatar replaces an agent's avatar image. Requires
 	// laelia.agents.edit on the agent; the caller must be the agent's creator or a
-	// workspace admin. No google.api.http annotation: bytes travel over Connect-JSON.
+	// workspace admin. Bytes travel over Connect-JSON.
 	UploadAgentAvatar(context.Context, *connect.Request[v1.UploadAgentAvatarRequest]) (*connect.Response[v1.Agent], error)
 	// DownloadAgentAvatar fetches an agent's avatar image bytes. Any authenticated
 	// user may download any agent's avatar (workspace-internal profile image).
@@ -595,7 +595,7 @@ type AgentServiceHandler interface {
 	RefreshAgentToken(context.Context, *connect.Request[v1.RefreshAgentTokenRequest]) (*connect.Response[v1.RefreshAgentTokenResponse], error)
 	// UploadAgentAvatar replaces an agent's avatar image. Requires
 	// laelia.agents.edit on the agent; the caller must be the agent's creator or a
-	// workspace admin. No google.api.http annotation: bytes travel over Connect-JSON.
+	// workspace admin. Bytes travel over Connect-JSON.
 	UploadAgentAvatar(context.Context, *connect.Request[v1.UploadAgentAvatarRequest]) (*connect.Response[v1.Agent], error)
 	// DownloadAgentAvatar fetches an agent's avatar image bytes. Any authenticated
 	// user may download any agent's avatar (workspace-internal profile image).

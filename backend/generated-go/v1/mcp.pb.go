@@ -1296,7 +1296,7 @@ var File_v1_mcp_proto protoreflect.FileDescriptor
 
 const file_v1_mcp_proto_rawDesc = "" +
 	"\n" +
-	"\fv1/mcp.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13v1/annotation.proto\"\x8c\x04\n" +
+	"\fv1/mcp.proto\x12\tlaelia.v1\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13v1/annotation.proto\"\x8c\x04\n" +
 	"\tMcpServer\x12\x1a\n" +
 	"\x04name\x18\x01 \x01(\tB\x06\xe0A\b\xe0A\x02R\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -1388,18 +1388,16 @@ const file_v1_mcp_proto_rawDesc = "" +
 	"\x0eMcpServerScope\x12 \n" +
 	"\x1cMCP_SERVER_SCOPE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aMCP_SERVER_SCOPE_WORKSPACE\x10\x01\x12\x19\n" +
-	"\x15MCP_SERVER_SCOPE_USER\x10\x022\xae\a\n" +
-	"\x10McpServerService\x12p\n" +
-	"\fGetMcpServer\x12\x1e.laelia.v1.GetMcpServerRequest\x1a\x14.laelia.v1.McpServer\"*\xdaA\x04name\x90\xea0\x01\x82\xd3\xe4\x93\x02\x19\x12\x17/v1/{name=mcpServers/*}\x12q\n" +
-	"\x0eListMcpServers\x12 .laelia.v1.ListMcpServersRequest\x1a!.laelia.v1.ListMcpServersResponse\"\x1a\x90\xea0\x01\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/mcpServers\x12u\n" +
-	"\x10ListMyMcpServers\x12 .laelia.v1.ListMcpServersRequest\x1a!.laelia.v1.ListMcpServersResponse\"\x1c\x90\xea0\x01\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/myMcpServers\x12\x93\x01\n" +
-	"\x12ListUserMcpServers\x12 .laelia.v1.ListMcpServersRequest\x1a!.laelia.v1.ListMcpServersResponse\"8\x8a\xea0\x16laelia.mcpServers.list\x90\xea0\x01\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/userMcpServers\x12\x83\x01\n" +
-	"\x0fCreateMcpServer\x12!.laelia.v1.CreateMcpServerRequest\x1a\x14.laelia.v1.McpServer\"7\xdaA\n" +
-	"mcp_server\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1c:\n" +
-	"mcp_server\"\x0e/v1/mcpServers\x12\xa3\x01\n" +
-	"\x0fUpdateMcpServer\x12!.laelia.v1.UpdateMcpServerRequest\x1a\x14.laelia.v1.McpServer\"W\xdaA\x16mcp_server,update_mask\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x020:\n" +
-	"mcp_server2\"/v1/{mcp_server.name=mcpServers/*}\x12|\n" +
-	"\x0fDeleteMcpServer\x12!.laelia.v1.DeleteMcpServerRequest\x1a\x16.google.protobuf.Empty\".\xdaA\x04name\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x19*\x17/v1/{name=mcpServers/*}2\xb5\x01\n" +
+	"\x15MCP_SERVER_SCOPE_USER\x10\x022\xcd\x05\n" +
+	"\x10McpServerService\x12Q\n" +
+	"\fGetMcpServer\x12\x1e.laelia.v1.GetMcpServerRequest\x1a\x14.laelia.v1.McpServer\"\v\xdaA\x04name\x90\xea0\x01\x12[\n" +
+	"\x0eListMcpServers\x12 .laelia.v1.ListMcpServersRequest\x1a!.laelia.v1.ListMcpServersResponse\"\x04\x90\xea0\x01\x12]\n" +
+	"\x10ListMyMcpServers\x12 .laelia.v1.ListMcpServersRequest\x1a!.laelia.v1.ListMcpServersResponse\"\x04\x90\xea0\x01\x12y\n" +
+	"\x12ListUserMcpServers\x12 .laelia.v1.ListMcpServersRequest\x1a!.laelia.v1.ListMcpServersResponse\"\x1e\x8a\xea0\x16laelia.mcpServers.list\x90\xea0\x01\x12a\n" +
+	"\x0fCreateMcpServer\x12!.laelia.v1.CreateMcpServerRequest\x1a\x14.laelia.v1.McpServer\"\x15\xdaA\n" +
+	"mcp_server\x90\xea0\x01\x98\xea0\x01\x12m\n" +
+	"\x0fUpdateMcpServer\x12!.laelia.v1.UpdateMcpServerRequest\x1a\x14.laelia.v1.McpServer\"!\xdaA\x16mcp_server,update_mask\x90\xea0\x01\x98\xea0\x01\x12]\n" +
+	"\x0fDeleteMcpServer\x12!.laelia.v1.DeleteMcpServerRequest\x1a\x16.google.protobuf.Empty\"\x0f\xdaA\x04name\x90\xea0\x01\x98\xea0\x012\xb5\x01\n" +
 	"\x11McpGatewayService\x12R\n" +
 	"\rGetMcpCatalog\x12\x1f.laelia.v1.GetMcpCatalogRequest\x1a .laelia.v1.GetMcpCatalogResponse\x12L\n" +
 	"\vCallMcpTool\x12\x1d.laelia.v1.CallMcpToolRequest\x1a\x1e.laelia.v1.CallMcpToolResponseB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"

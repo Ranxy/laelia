@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package laelia.v1;
 
-import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
@@ -23,22 +22,16 @@ service AgentService {
   // it. The machine-scoped check is enforced by the handler via
   // laelia.machines.createAgent against the machine's IAM policy.
   rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse) {
-    option (google.api.http) = {
-      post: "/v1/agents"
-      body: "agent"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
 
   rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse) {
-    option (google.api.http) = {get: "/v1/agents"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.agents.get";
   }
 
   rpc GetAgent(GetAgentRequest) returns (Agent) {
-    option (google.api.http) = {get: "/v1/{name=agents/*}"};
     option (google.api.method_signature) = "name";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.agents.get";
@@ -50,10 +43,6 @@ service AgentService {
   // interceptor's agents.edit is admin-only, so this RPC carries no permission
   // annotation and is handler-gated.
   rpc UpdateAgent(UpdateAgentRequest) returns (Agent) {
-    option (google.api.http) = {
-      patch: "/v1/{agent.name=agents/*}"
-      body: "agent"
-    };
     option (google.api.method_signature) = "agent,update_mask";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
@@ -66,10 +55,6 @@ service AgentService {
   // RPC carries no permission annotation (agents.edit is admin-only) and is
   // handler-gated via canEditAgent.
   rpc TransferAgentOwnership(TransferAgentOwnershipRequest) returns (TransferAgentOwnershipResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=agents/*}:transferOwnership"
-      body: "*"
-    };
     option (google.api.method_signature) = "name,new_owner";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
@@ -79,7 +64,6 @@ service AgentService {
   // agent's owner or a holder of laelia.agents.edit on the agent; no
   // permission annotation so the owner short-circuit can run.
   rpc DeleteAgent(DeleteAgentRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {delete: "/v1/{name=agents/*}"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -89,10 +73,6 @@ service AgentService {
   // of laelia.agents.edit on the agent; no permission annotation so the owner
   // short-circuit can run.
   rpc RotateAgentToken(RotateAgentTokenRequest) returns (RotateAgentTokenResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=agents/*}:rotateToken"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -101,10 +81,6 @@ service AgentService {
   // handler for the agent's owner or a holder of laelia.agents.edit on the
   // agent; no permission annotation so the owner short-circuit can run.
   rpc RevokeAgentToken(RevokeAgentTokenRequest) returns (RevokeAgentTokenResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=agents/*}:revokeToken"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -113,17 +89,12 @@ service AgentService {
   // agent's owner or a holder of laelia.agents.edit on the agent; no
   // permission annotation so the owner short-circuit can run.
   rpc ForceDisconnectAgent(ForceDisconnectAgentRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      post: "/v1/{name=agents/*}:forceDisconnect"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
 
   // List agent sessions
   rpc ListAgentSessions(ListAgentSessionsRequest) returns (ListAgentSessionsResponse) {
-    option (google.api.http) = {get: "/v1/{name=agents/*}/sessions"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.agents.listSessions";
   }
@@ -133,10 +104,6 @@ service AgentService {
   // inline api_provider/api_key additionally requires laelia.agents.edit (only
   // workspace admin today); owners without it must use a global provider.
   rpc UpdateAgentACPConfig(UpdateAgentACPConfigRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      patch: "/v1/{name=agents/*}:updateAcpConfig"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -146,10 +113,6 @@ service AgentService {
   // workspace admin) are accepted. Handler-gated like UpdateAgentACPConfig:
   // the agent's owner or a workspace admin may update it.
   rpc UpdateAgentMcpConfig(UpdateAgentMcpConfigRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      patch: "/v1/{name=agents/*}:updateMcpConfig"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -160,10 +123,6 @@ service AgentService {
   // handler for the agent's owner or a holder of laelia.agents.edit on the
   // agent; no permission annotation so the owner short-circuit can run.
   rpc RefreshAgentProviders(RefreshAgentProvidersRequest) returns (RefreshAgentProvidersResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=agents/*}:refreshProviders"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -175,10 +134,6 @@ service AgentService {
   // RPC carries no permission annotation (agents.edit is admin-only) and is
   // handler-gated.
   rpc ListAgentWorkspace(ListAgentWorkspaceRequest) returns (ListAgentWorkspaceResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=agents/*}:listWorkspace"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -188,10 +143,6 @@ service AgentService {
   // admin). Sensitive files (secret/credential/token patterns) are rejected by
   // the machine app and surface as a per-file error, not a transport error.
   rpc ReadAgentWorkspaceFile(ReadAgentWorkspaceFileRequest) returns (ReadAgentWorkspaceFileResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=agents/*}:readWorkspaceFile"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -202,10 +153,6 @@ service AgentService {
   // fetched dynamically rather than hardcoded. Not agent-scoped: the add-agent
   // form calls it before the agent exists. Admin (agents.edit) only.
   rpc ListPiModels(ListPiModelsRequest) returns (ListPiModelsResponse) {
-    option (google.api.http) = {
-      post: "/v1/pi:listModels"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.agents.edit";
     option (laelia.v1.audit) = true;
@@ -215,46 +162,30 @@ service AgentService {
 
   // Agent initial connection using bootstrap token
   rpc ConnectAgent(ConnectAgentRequest) returns (ConnectAgentResponse) {
-    option (google.api.http) = {
-      post: "/v1/agents:connect"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = CUSTOM;
     option (laelia.v1.audit) = true;
   }
 
   // Agent heartbeat
   rpc AgentHeartbeat(AgentHeartbeatRequest) returns (AgentHeartbeatResponse) {
-    option (google.api.http) = {
-      post: "/v1/agents:heartbeat"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = CUSTOM;
   }
 
   // Agent graceful disconnect
   rpc AgentDisconnect(AgentDisconnectRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      post: "/v1/agents:disconnect"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = CUSTOM;
     option (laelia.v1.audit) = true;
   }
 
   // Agent refreshes access token
   rpc RefreshAgentToken(RefreshAgentTokenRequest) returns (RefreshAgentTokenResponse) {
-    option (google.api.http) = {
-      post: "/v1/agents:refreshToken"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = CUSTOM;
     option (laelia.v1.audit) = true;
   }
 
   // UploadAgentAvatar replaces an agent's avatar image. Requires
   // laelia.agents.edit on the agent; the caller must be the agent's creator or a
-  // workspace admin. No google.api.http annotation: bytes travel over Connect-JSON.
+  // workspace admin. Bytes travel over Connect-JSON.
   rpc UploadAgentAvatar(UploadAgentAvatarRequest) returns (Agent) {
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.agents.edit";
@@ -275,10 +206,6 @@ service AgentService {
 
   // Health check (no auth required)
   rpc Hello(HelloRequest) returns (HelloResponse) {
-    option (google.api.http) = {
-      post: "/v1/agent/hello"
-      body: "*"
-    };
     option (laelia.v1.allow_without_credential) = true;
     option (laelia.v1.audit) = false;
   }

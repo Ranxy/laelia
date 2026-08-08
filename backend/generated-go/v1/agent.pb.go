@@ -3674,7 +3674,7 @@ var File_v1_agent_proto protoreflect.FileDescriptor
 
 const file_v1_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x0ev1/agent.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13v1/annotation.proto\x1a\x0fv1/common.proto\"A\n" +
+	"\x0ev1/agent.proto\x12\tlaelia.v1\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13v1/annotation.proto\x1a\x0fv1/common.proto\"A\n" +
 	"\x12CreateAgentRequest\x12+\n" +
 	"\x05agent\x18\x01 \x01(\v2\x10.laelia.v1.AgentB\x03\xe0A\x02R\x05agent\"f\n" +
 	"\x13CreateAgentResponse\x12&\n" +
@@ -4001,35 +4001,33 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x0fdisk_used_bytes\x18\x04 \x01(\x04R\rdiskUsedBytes\x12(\n" +
 	"\x10disk_total_bytes\x18\x05 \x01(\x04R\x0ediskTotalBytes\x12%\n" +
 	"\x0euptime_seconds\x18\x06 \x01(\rR\ruptimeSeconds\x12'\n" +
-	"\x0fgoroutine_count\x18\a \x01(\rR\x0egoroutineCount2\xaa\x19\n" +
-	"\fAgentService\x12o\n" +
-	"\vCreateAgent\x12\x1d.laelia.v1.CreateAgentRequest\x1a\x1e.laelia.v1.CreateAgentResponse\"!\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x13:\x05agent\"\n" +
-	"/v1/agents\x12v\n" +
+	"\x0fgoroutine_count\x18\a \x01(\rR\x0egoroutineCount2\xa5\x13\n" +
+	"\fAgentService\x12V\n" +
+	"\vCreateAgent\x12\x1d.laelia.v1.CreateAgentRequest\x1a\x1e.laelia.v1.CreateAgentResponse\"\b\x90\xea0\x01\x98\xea0\x01\x12d\n" +
 	"\n" +
-	"ListAgents\x12\x1c.laelia.v1.ListAgentsRequest\x1a\x1d.laelia.v1.ListAgentsResponse\"+\x8a\xea0\x11laelia.agents.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\f\x12\n" +
-	"/v1/agents\x12u\n" +
-	"\bGetAgent\x12\x1a.laelia.v1.GetAgentRequest\x1a\x10.laelia.v1.Agent\";\xdaA\x04name\x8a\xea0\x11laelia.agents.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/{name=agents/*}\x12\x84\x01\n" +
-	"\vUpdateAgent\x12\x1d.laelia.v1.UpdateAgentRequest\x1a\x10.laelia.v1.Agent\"D\xdaA\x11agent,update_mask\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\":\x05agent2\x19/v1/{agent.name=agents/*}\x12\xb8\x01\n" +
-	"\x16TransferAgentOwnership\x12(.laelia.v1.TransferAgentOwnershipRequest\x1a).laelia.v1.TransferAgentOwnershipResponse\"I\xdaA\x0ename,new_owner\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=agents/*}:transferOwnership\x12i\n" +
-	"\vDeleteAgent\x12\x1d.laelia.v1.DeleteAgentRequest\x1a\x16.google.protobuf.Empty\"#\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x15*\x13/v1/{name=agents/*}\x12\x8f\x01\n" +
-	"\x10RotateAgentToken\x12\".laelia.v1.RotateAgentTokenRequest\x1a#.laelia.v1.RotateAgentTokenResponse\"2\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/{name=agents/*}:rotateToken\x12\x8f\x01\n" +
-	"\x10RevokeAgentToken\x12\".laelia.v1.RevokeAgentTokenRequest\x1a#.laelia.v1.RevokeAgentTokenResponse\"2\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/{name=agents/*}:revokeToken\x12\x8e\x01\n" +
-	"\x14ForceDisconnectAgent\x12&.laelia.v1.ForceDisconnectAgentRequest\x1a\x16.google.protobuf.Empty\"6\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*\"#/v1/{name=agents/*}:forceDisconnect\x12\xa6\x01\n" +
-	"\x11ListAgentSessions\x12#.laelia.v1.ListAgentSessionsRequest\x1a$.laelia.v1.ListAgentSessionsResponse\"F\x8a\xea0\x1alaelia.agents.listSessions\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1e\x12\x1c/v1/{name=agents/*}/sessions\x12\x8e\x01\n" +
-	"\x14UpdateAgentACPConfig\x12&.laelia.v1.UpdateAgentACPConfigRequest\x1a\x16.google.protobuf.Empty\"6\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*2#/v1/{name=agents/*}:updateAcpConfig\x12\x8e\x01\n" +
-	"\x14UpdateAgentMcpConfig\x12&.laelia.v1.UpdateAgentMcpConfigRequest\x1a\x16.google.protobuf.Empty\"6\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02(:\x01*2#/v1/{name=agents/*}:updateMcpConfig\x12\xa3\x01\n" +
-	"\x15RefreshAgentProviders\x12'.laelia.v1.RefreshAgentProvidersRequest\x1a(.laelia.v1.RefreshAgentProvidersResponse\"7\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02):\x01*\"$/v1/{name=agents/*}:refreshProviders\x12\x97\x01\n" +
-	"\x12ListAgentWorkspace\x12$.laelia.v1.ListAgentWorkspaceRequest\x1a%.laelia.v1.ListAgentWorkspaceResponse\"4\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02&:\x01*\"!/v1/{name=agents/*}:listWorkspace\x12\xa7\x01\n" +
-	"\x16ReadAgentWorkspaceFile\x12(.laelia.v1.ReadAgentWorkspaceFileRequest\x1a).laelia.v1.ReadAgentWorkspaceFileResponse\"8\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=agents/*}:readWorkspaceFile\x12\x8b\x01\n" +
-	"\fListPiModels\x12\x1e.laelia.v1.ListPiModelsRequest\x1a\x1f.laelia.v1.ListPiModelsResponse\":\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/pi:listModels\x12v\n" +
-	"\fConnectAgent\x12\x1e.laelia.v1.ConnectAgentRequest\x1a\x1f.laelia.v1.ConnectAgentResponse\"%\x90\xea0\x02\x98\xea0\x01\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/v1/agents:connect\x12z\n" +
-	"\x0eAgentHeartbeat\x12 .laelia.v1.AgentHeartbeatRequest\x1a!.laelia.v1.AgentHeartbeatResponse\"#\x90\xea0\x02\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/v1/agents:heartbeat\x12v\n" +
-	"\x0fAgentDisconnect\x12!.laelia.v1.AgentDisconnectRequest\x1a\x16.google.protobuf.Empty\"(\x90\xea0\x02\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/v1/agents:disconnect\x12\x8a\x01\n" +
-	"\x11RefreshAgentToken\x12#.laelia.v1.RefreshAgentTokenRequest\x1a$.laelia.v1.RefreshAgentTokenResponse\"*\x90\xea0\x02\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/agents:refreshToken\x12j\n" +
+	"ListAgents\x12\x1c.laelia.v1.ListAgentsRequest\x1a\x1d.laelia.v1.ListAgentsResponse\"\x19\x8a\xea0\x11laelia.agents.get\x90\xea0\x01\x12Z\n" +
+	"\bGetAgent\x12\x1a.laelia.v1.GetAgentRequest\x1a\x10.laelia.v1.Agent\" \xdaA\x04name\x8a\xea0\x11laelia.agents.get\x90\xea0\x01\x12\\\n" +
+	"\vUpdateAgent\x12\x1d.laelia.v1.UpdateAgentRequest\x1a\x10.laelia.v1.Agent\"\x1c\xdaA\x11agent,update_mask\x90\xea0\x01\x98\xea0\x01\x12\x88\x01\n" +
+	"\x16TransferAgentOwnership\x12(.laelia.v1.TransferAgentOwnershipRequest\x1a).laelia.v1.TransferAgentOwnershipResponse\"\x19\xdaA\x0ename,new_owner\x90\xea0\x01\x98\xea0\x01\x12N\n" +
+	"\vDeleteAgent\x12\x1d.laelia.v1.DeleteAgentRequest\x1a\x16.google.protobuf.Empty\"\b\x90\xea0\x01\x98\xea0\x01\x12e\n" +
+	"\x10RotateAgentToken\x12\".laelia.v1.RotateAgentTokenRequest\x1a#.laelia.v1.RotateAgentTokenResponse\"\b\x90\xea0\x01\x98\xea0\x01\x12e\n" +
+	"\x10RevokeAgentToken\x12\".laelia.v1.RevokeAgentTokenRequest\x1a#.laelia.v1.RevokeAgentTokenResponse\"\b\x90\xea0\x01\x98\xea0\x01\x12`\n" +
+	"\x14ForceDisconnectAgent\x12&.laelia.v1.ForceDisconnectAgentRequest\x1a\x16.google.protobuf.Empty\"\b\x90\xea0\x01\x98\xea0\x01\x12\x82\x01\n" +
+	"\x11ListAgentSessions\x12#.laelia.v1.ListAgentSessionsRequest\x1a$.laelia.v1.ListAgentSessionsResponse\"\"\x8a\xea0\x1alaelia.agents.listSessions\x90\xea0\x01\x12`\n" +
+	"\x14UpdateAgentACPConfig\x12&.laelia.v1.UpdateAgentACPConfigRequest\x1a\x16.google.protobuf.Empty\"\b\x90\xea0\x01\x98\xea0\x01\x12`\n" +
+	"\x14UpdateAgentMcpConfig\x12&.laelia.v1.UpdateAgentMcpConfigRequest\x1a\x16.google.protobuf.Empty\"\b\x90\xea0\x01\x98\xea0\x01\x12t\n" +
+	"\x15RefreshAgentProviders\x12'.laelia.v1.RefreshAgentProvidersRequest\x1a(.laelia.v1.RefreshAgentProvidersResponse\"\b\x90\xea0\x01\x98\xea0\x01\x12k\n" +
+	"\x12ListAgentWorkspace\x12$.laelia.v1.ListAgentWorkspaceRequest\x1a%.laelia.v1.ListAgentWorkspaceResponse\"\b\x90\xea0\x01\x98\xea0\x01\x12w\n" +
+	"\x16ReadAgentWorkspaceFile\x12(.laelia.v1.ReadAgentWorkspaceFileRequest\x1a).laelia.v1.ReadAgentWorkspaceFileResponse\"\b\x90\xea0\x01\x98\xea0\x01\x12o\n" +
+	"\fListPiModels\x12\x1e.laelia.v1.ListPiModelsRequest\x1a\x1f.laelia.v1.ListPiModelsResponse\"\x1e\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x12Y\n" +
+	"\fConnectAgent\x12\x1e.laelia.v1.ConnectAgentRequest\x1a\x1f.laelia.v1.ConnectAgentResponse\"\b\x90\xea0\x02\x98\xea0\x01\x12[\n" +
+	"\x0eAgentHeartbeat\x12 .laelia.v1.AgentHeartbeatRequest\x1a!.laelia.v1.AgentHeartbeatResponse\"\x04\x90\xea0\x02\x12V\n" +
+	"\x0fAgentDisconnect\x12!.laelia.v1.AgentDisconnectRequest\x1a\x16.google.protobuf.Empty\"\b\x90\xea0\x02\x98\xea0\x01\x12h\n" +
+	"\x11RefreshAgentToken\x12#.laelia.v1.RefreshAgentTokenRequest\x1a$.laelia.v1.RefreshAgentTokenResponse\"\b\x90\xea0\x02\x98\xea0\x01\x12j\n" +
 	"\x11UploadAgentAvatar\x12#.laelia.v1.UploadAgentAvatarRequest\x1a\x10.laelia.v1.Agent\"\x1e\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x12d\n" +
 	"\x13DownloadAgentAvatar\x12%.laelia.v1.DownloadAgentAvatarRequest\x1a&.laelia.v1.DownloadAgentAvatarResponse\x12j\n" +
-	"\x11DeleteAgentAvatar\x12#.laelia.v1.DeleteAgentAvatarRequest\x1a\x10.laelia.v1.Agent\"\x1e\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x12^\n" +
-	"\x05Hello\x12\x17.laelia.v1.HelloRequest\x1a\x18.laelia.v1.HelloResponse\"\"\x80\xea0\x01\x98\xea0\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/agent/helloB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"\x11DeleteAgentAvatar\x12#.laelia.v1.DeleteAgentAvatarRequest\x1a\x10.laelia.v1.Agent\"\x1e\x8a\xea0\x12laelia.agents.edit\x90\xea0\x01\x98\xea0\x01\x12D\n" +
+	"\x05Hello\x12\x17.laelia.v1.HelloRequest\x1a\x18.laelia.v1.HelloResponse\"\b\x80\xea0\x01\x98\xea0\x00B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_agent_proto_rawDescOnce sync.Once

@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package laelia.v1;
 
-import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
@@ -24,23 +23,17 @@ service MachineService {
   // ========== Management APIs (IAM auth, admin only) ==========
 
   rpc CreateMachine(CreateMachineRequest) returns (CreateMachineResponse) {
-    option (google.api.http) = {
-      post: "/v1/machines"
-      body: "machine"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.machines.create";
     option (laelia.v1.audit) = true;
   }
 
   rpc ListMachines(ListMachinesRequest) returns (ListMachinesResponse) {
-    option (google.api.http) = {get: "/v1/machines"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.machines.get";
   }
 
   rpc GetMachine(GetMachineRequest) returns (Machine) {
-    option (google.api.http) = {get: "/v1/{name=machines/*}"};
     option (google.api.method_signature) = "name";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.machines.get";
@@ -50,7 +43,6 @@ service MachineService {
   // machine's creator or a holder of laelia.machines.delete (workspace-scope);
   // no permission annotation so the creator short-circuit can run.
   rpc DeleteMachine(DeleteMachineRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {delete: "/v1/{name=machines/*}"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -61,10 +53,6 @@ service MachineService {
   // laelia.machines.edit (workspace-scope); no permission annotation so the
   // creator short-circuit can run.
   rpc RotateMachineToken(RotateMachineTokenRequest) returns (RotateMachineTokenResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=machines/*}:rotateToken"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -74,10 +62,6 @@ service MachineService {
   // (workspace-scope); no permission annotation so the creator short-circuit
   // can run.
   rpc RevokeMachineToken(RevokeMachineTokenRequest) returns (RevokeMachineTokenResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=machines/*}:revokeToken"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -88,17 +72,12 @@ service MachineService {
   // (workspace-scope); no permission annotation so the creator short-circuit
   // can run.
   rpc ForceDisconnectMachine(ForceDisconnectMachineRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      post: "/v1/{name=machines/*}:forceDisconnect"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
 
   // List the agents hosted on a machine.
   rpc ListMachineAgents(ListMachineAgentsRequest) returns (ListMachineAgentsResponse) {
-    option (google.api.http) = {get: "/v1/{name=machines/*}/agents"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.machines.get";
   }
@@ -110,10 +89,6 @@ service MachineService {
   // (workspace-scope); no permission annotation so the creator short-circuit
   // can run.
   rpc RefreshMachineProviders(RefreshMachineProvidersRequest) returns (RefreshMachineProvidersResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=machines/*}:refreshProviders"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -123,10 +98,6 @@ service MachineService {
   // authorized in the handler for the machine's creator or a workspace admin
   // (isMachineAdmin, matching Machine.can_manage); no permission annotation.
   rpc ListMachineWorkspaces(ListMachineWorkspacesRequest) returns (ListMachineWorkspacesResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=machines/*}:listWorkspaces"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }
@@ -137,36 +108,20 @@ service MachineService {
   // refresh tokens, the machine session id, and the full list of agents the
   // machine must host (so the machine app can open an AgentChannel for each).
   rpc ConnectMachine(ConnectMachineRequest) returns (ConnectMachineResponse) {
-    option (google.api.http) = {
-      post: "/v1/machines:connect"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = CUSTOM;
     option (laelia.v1.audit) = true;
   }
 
   rpc MachineHeartbeat(MachineHeartbeatRequest) returns (MachineHeartbeatResponse) {
-    option (google.api.http) = {
-      post: "/v1/machines:heartbeat"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = CUSTOM;
   }
 
   rpc MachineDisconnect(MachineDisconnectRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      post: "/v1/machines:disconnect"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = CUSTOM;
     option (laelia.v1.audit) = true;
   }
 
   rpc RefreshMachineToken(RefreshMachineTokenRequest) returns (RefreshMachineTokenResponse) {
-    option (google.api.http) = {
-      post: "/v1/machines:refreshToken"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = CUSTOM;
     option (laelia.v1.audit) = true;
   }

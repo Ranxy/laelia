@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package laelia.v1;
 
-import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
@@ -18,20 +17,16 @@ service UserService {
   // Get the user.
   // Any authenticated user can get the user.
   rpc GetUser(GetUserRequest) returns (User) {
-    option (google.api.http) = {get: "/v1/{name=users/*}"};
     option (google.api.method_signature) = "name";
   }
 
   // Get the users in batch.
   // Any authenticated user can batch get users.
-  rpc BatchGetUsers(BatchGetUsersRequest) returns (BatchGetUsersResponse) {
-    option (google.api.http) = {get: "/v1/users:batchGet"};
-  }
+  rpc BatchGetUsers(BatchGetUsersRequest) returns (BatchGetUsersResponse) {}
 
   // Get the current authenticated user.
   // Permissions required: None
   rpc GetCurrentUser(google.protobuf.Empty) returns (User) {
-    option (google.api.http) = {get: "/v1/users/me"};
     option (laelia.v1.allow_without_credential) = true;
     option (laelia.v1.auth_method) = CUSTOM;
   }
@@ -39,16 +34,11 @@ service UserService {
   // List all users.
   // Any authenticated user can list users.
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
-    option (google.api.http) = {get: "/v1/users"};
     option (google.api.method_signature) = "parent";
   }
 
   // Create a user.
   rpc CreateUser(CreateUserRequest) returns (User) {
-    option (google.api.http) = {
-      post: "/v1/users"
-      body: "user"
-    };
     option (google.api.method_signature) = "user";
     option (laelia.v1.allow_without_credential) = true;
     option (laelia.v1.auth_method) = CUSTOM;
@@ -57,10 +47,6 @@ service UserService {
 
   // Only the user itself and the user with permission on the workspace can update the user.
   rpc UpdateUser(UpdateUserRequest) returns (User) {
-    option (google.api.http) = {
-      patch: "/v1/{user.name=users/*}"
-      body: "user"
-    };
     option (google.api.method_signature) = "user,update_mask";
     // CUSTOM: the handler allows the target user themselves and otherwise
     // requires laelia.users.update (workspace scope). The permission annotation
@@ -74,7 +60,6 @@ service UserService {
   // Only the user with permission on the workspace can delete the user.
   // The last remaining workspace admin cannot be deleted.
   rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {delete: "/v1/{name=users/*}"};
     option (google.api.method_signature) = "name";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.users.delete";
@@ -83,10 +68,6 @@ service UserService {
 
   // Only the user with permission on the workspace can undelete the user.
   rpc UndeleteUser(UndeleteUserRequest) returns (User) {
-    option (google.api.http) = {
-      post: "/v1/{name=users/*}:undelete"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.users.delete";
     option (laelia.v1.audit) = true;
@@ -95,8 +76,7 @@ service UserService {
   // UploadAvatar replaces the current user's avatar image. Self only: the
   // caller must be the user named by the resource. The image bytes are
   // re-encoded/stored server-side; clients should resize before uploading.
-  // No google.api.http annotation: bytes travel over Connect-JSON like
-  // CommandService.UploadFile.
+  // Bytes travel over Connect-JSON like CommandService.UploadFile.
   rpc UploadAvatar(UploadAvatarRequest) returns (User);
 
   // DownloadAvatar fetches a user's avatar image bytes. Any authenticated

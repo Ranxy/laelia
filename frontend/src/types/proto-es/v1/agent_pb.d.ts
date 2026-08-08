@@ -2101,7 +2101,7 @@ export declare const AgentService: GenService<{
   /**
    * UploadAgentAvatar replaces an agent's avatar image. Requires
    * laelia.agents.edit on the agent; the caller must be the agent's creator or a
-   * workspace admin. No google.api.http annotation: bytes travel over Connect-JSON.
+   * workspace admin. Bytes travel over Connect-JSON.
    *
    * @generated from rpc laelia.v1.AgentService.UploadAgentAvatar
    */

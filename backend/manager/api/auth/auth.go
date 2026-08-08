@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -42,11 +41,8 @@ const (
 
 	AccessTokenCookieName = "access-token"
 
-	GatewayMetadataAccessTokenKey   = "laelia-access-token"
-	GatewayMetadataRequestOriginKey = "laelia-request-origin"
-
-	// DeclaredAgentHeader is the HTTP header (and grpc-gateway metadata key)
-	// a machine app sets on agent-callable RPCs to declare which agent it is
+	// DeclaredAgentHeader is the HTTP header a machine app sets on
+	// agent-callable RPCs to declare which agent it is
 	// acting on behalf of (agents/{agent}). A machine authenticates once with
 	// its access token; per-agent identity is carried per-request by this
 	// header. The auth interceptor resolves it, verifies the machine owns the
@@ -357,28 +353,6 @@ func (in *APIAuthInterceptor) resolveDeclaredAgent(ctx context.Context, machine 
 		return nil, connect.NewError(connect.CodePermissionDenied, errs.Errorf("machine %s does not own agent %s", machine.ResourceID, resourceID))
 	}
 	return agent, nil
-}
-
-func GetTokenFromMetadata(md metadata.MD) (string, error) {
-	authorizationHeaders := md.Get("Authorization")
-	if len(md.Get("Authorization")) > 0 {
-		authHeaderParts := strings.Fields(authorizationHeaders[0])
-		if len(authHeaderParts) != 2 || strings.ToLower(authHeaderParts[0]) != "bearer" {
-			return "", errs.Errorf("authorization header format must be Bearer {token}")
-		}
-		return authHeaderParts[1], nil
-	}
-	// check the HTTP cookie
-	var accessToken string
-	for _, t := range append(md.Get("grpcgateway-cookie"), md.Get("cookie")...) {
-		header := http.Header{}
-		header.Add("Cookie", t)
-		request := http.Request{Header: header}
-		if v, _ := request.Cookie(AccessTokenCookieName); v != nil {
-			accessToken = v.Value
-		}
-	}
-	return accessToken, nil
 }
 
 // GetTokenFromHeaders extracts the access token from HTTP headers for ConnectRPC.

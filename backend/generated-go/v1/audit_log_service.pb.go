@@ -7,7 +7,6 @@
 package v1
 
 import (
-	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -399,7 +398,7 @@ var File_v1_audit_log_service_proto protoreflect.FileDescriptor
 
 const file_v1_audit_log_service_proto_rawDesc = "" +
 	"\n" +
-	"\x1av1/audit_log_service.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13v1/annotation.proto\"\xae\x02\n" +
+	"\x1av1/audit_log_service.proto\x12\tlaelia.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13v1/annotation.proto\"\xae\x02\n" +
 	"\bAuditLog\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06method\x18\x02 \x01(\tR\x06method\x12\x1d\n" +
@@ -429,10 +428,10 @@ const file_v1_audit_log_service_proto_rawDesc = "" +
 	"\border_by\x18\x02 \x01(\tR\aorderBy\x12\x14\n" +
 	"\x05limit\x18\x03 \x01(\x05R\x05limit\"3\n" +
 	"\x17ExportAuditLogsResponse\x12\x18\n" +
-	"\acontent\x18\x01 \x01(\tR\acontent2\xc1\x02\n" +
-	"\x0fAuditLogService\x12\x95\x01\n" +
-	"\x0fSearchAuditLogs\x12!.laelia.v1.SearchAuditLogsRequest\x1a\".laelia.v1.SearchAuditLogsResponse\";\x8a\xea0\x17laelia.auditLogs.search\x90\xea0\x01\x82\xd3\xe4\x93\x02\x16\x12\x14/v1/auditLogs:search\x12\x95\x01\n" +
-	"\x0fExportAuditLogs\x12!.laelia.v1.ExportAuditLogsRequest\x1a\".laelia.v1.ExportAuditLogsResponse\";\x8a\xea0\x17laelia.auditLogs.export\x90\xea0\x01\x82\xd3\xe4\x93\x02\x16\x12\x14/v1/auditLogs:exportB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"\acontent\x18\x01 \x01(\tR\acontent2\x87\x02\n" +
+	"\x0fAuditLogService\x12y\n" +
+	"\x0fSearchAuditLogs\x12!.laelia.v1.SearchAuditLogsRequest\x1a\".laelia.v1.SearchAuditLogsResponse\"\x1f\x8a\xea0\x17laelia.auditLogs.search\x90\xea0\x01\x12y\n" +
+	"\x0fExportAuditLogs\x12!.laelia.v1.ExportAuditLogsRequest\x1a\".laelia.v1.ExportAuditLogsResponse\"\x1f\x8a\xea0\x17laelia.auditLogs.export\x90\xea0\x01B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_audit_log_service_proto_rawDescOnce sync.Once

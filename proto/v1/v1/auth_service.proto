@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package laelia.v1;
 
-import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
 import "v1/annotation.proto";
 import "v1/user_service.proto";
@@ -12,20 +11,12 @@ option go_package = "github.com/Ranxy/laelia/backend/generated-go/v1";
 service AuthService {
   // Permissions required: None
   rpc Login(LoginRequest) returns (LoginResponse) {
-    option (google.api.http) = {
-      post: "/v1/auth/login"
-      body: "*"
-    };
     option (laelia.v1.allow_without_credential) = true;
     option (laelia.v1.audit) = true;
   }
 
   // Permissions required: None
   rpc Logout(LogoutRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      post: "/v1/auth/logout"
-      body: "*"
-    };
     option (laelia.v1.allow_without_credential) = true;
     option (laelia.v1.audit) = true;
   }

@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package laelia.v1;
 
-import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
@@ -157,7 +156,6 @@ message GroupReferences {
 service GroupService {
   // Get a group. Group members and callers holding laelia.groups.get can read.
   rpc GetGroup(GetGroupRequest) returns (Group) {
-    option (google.api.http) = {get: "/v1/{name=groups/*}"};
     option (google.api.method_signature) = "name";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.groups.get";
@@ -165,14 +163,12 @@ service GroupService {
 
   // Batch get groups.
   rpc BatchGetGroups(BatchGetGroupsRequest) returns (BatchGetGroupsResponse) {
-    option (google.api.http) = {get: "/v1/groups:batchGet"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.groups.get";
   }
 
   // List all groups.
   rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse) {
-    option (google.api.http) = {get: "/v1/groups"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.groups.list";
   }
@@ -180,10 +176,6 @@ service GroupService {
   // Create a group. Any authenticated member can create a group; the creator
   // is not automatically added (the request must carry at least one OWNER).
   rpc CreateGroup(CreateGroupRequest) returns (Group) {
-    option (google.api.http) = {
-      post: "/v1/groups"
-      body: "*"
-    };
     option (google.api.method_signature) = "group_email,group";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.groups.create";
@@ -193,10 +185,6 @@ service GroupService {
   // Update a group (title, description, members). The group owner or a caller
   // holding laelia.groups.update may update.
   rpc UpdateGroup(UpdateGroupRequest) returns (Group) {
-    option (google.api.http) = {
-      patch: "/v1/{group.name=groups/*}"
-      body: "group"
-    };
     option (google.api.method_signature) = "group,update_mask";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.groups.update";
@@ -206,7 +194,6 @@ service GroupService {
   // Delete a group. The group owner or a caller holding laelia.groups.delete
   // may delete. Existing IAM bindings referencing the group become no-ops.
   rpc DeleteGroup(DeleteGroupRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {delete: "/v1/{name=groups/*}"};
     option (google.api.method_signature) = "name";
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.groups.delete";
@@ -216,7 +203,6 @@ service GroupService {
   // List the policies that bind this group as a member, so owners/admins can
   // see the impact of deleting it.
   rpc GetGroupReferences(GetGroupRequest) returns (GroupReferences) {
-    option (google.api.http) = {get: "/v1/{name=groups/*}:references"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.groups.get";
   }

@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package laelia.v1;
 
-import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "store/setting.proto";
 import "v1/annotation.proto";
@@ -85,16 +84,11 @@ message UpdateDebugConfigResponse {
 // an update carrying a masked secret preserves the stored value.
 service SettingService {
   rpc GetS3Config(GetS3ConfigRequest) returns (GetS3ConfigResponse) {
-    option (google.api.http) = {get: "/v1/s3Config"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.get";
   }
 
   rpc UpdateS3Config(UpdateS3ConfigRequest) returns (UpdateS3ConfigResponse) {
-    option (google.api.http) = {
-      patch: "/v1/s3Config"
-      body: "config"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.update";
     option (laelia.v1.audit) = true;
@@ -104,17 +98,12 @@ service SettingService {
   // handler-gated (no permission annotation) so the agent create/edit forms —
   // which members use — can read the toggle without a settings permission.
   rpc GetLlmAgentConfig(GetLlmAgentConfigRequest) returns (GetLlmAgentConfigResponse) {
-    option (google.api.http) = {get: "/v1/llmAgentConfig"};
     option (laelia.v1.auth_method) = IAM;
   }
 
   // UpdateLlmAgentConfig updates the workspace LLM agent configuration.
   // Admin (laelia.settings.update) only.
   rpc UpdateLlmAgentConfig(UpdateLlmAgentConfigRequest) returns (UpdateLlmAgentConfigResponse) {
-    option (google.api.http) = {
-      patch: "/v1/llmAgentConfig"
-      body: "config"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.update";
     option (laelia.v1.audit) = true;
@@ -124,17 +113,12 @@ service SettingService {
   // It is handler-gated (no permission annotation) so any authenticated user
   // can render the personal MCP settings page.
   rpc GetUserMcpConfig(GetUserMcpConfigRequest) returns (GetUserMcpConfigResponse) {
-    option (google.api.http) = {get: "/v1/userMcpConfig"};
     option (laelia.v1.auth_method) = IAM;
   }
 
   // UpdateUserMcpConfig updates whether users may configure personal MCP
   // servers. Admin (laelia.settings.update) only.
   rpc UpdateUserMcpConfig(UpdateUserMcpConfigRequest) returns (UpdateUserMcpConfigResponse) {
-    option (google.api.http) = {
-      patch: "/v1/userMcpConfig"
-      body: "config"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.update";
     option (laelia.v1.audit) = true;
@@ -143,22 +127,16 @@ service SettingService {
   // GetSetupStatus reports which required-config items are not yet configured,
   // so the frontend can guide an admin to finish setting up the workspace.
   rpc GetSetupStatus(GetSetupStatusRequest) returns (GetSetupStatusResponse) {
-    option (google.api.http) = {get: "/v1/setupStatus"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.get";
   }
 
   rpc GetDebugConfig(GetDebugConfigRequest) returns (GetDebugConfigResponse) {
-    option (google.api.http) = {get: "/v1/debugConfig"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.get";
   }
 
   rpc UpdateDebugConfig(UpdateDebugConfigRequest) returns (UpdateDebugConfigResponse) {
-    option (google.api.http) = {
-      patch: "/v1/debugConfig"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.settings.update";
     option (laelia.v1.audit) = true;

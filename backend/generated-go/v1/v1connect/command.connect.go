@@ -364,9 +364,8 @@ type CommandServiceClient interface {
 	MarkConversationRead(context.Context, *connect.Request[v1.MarkConversationReadRequest]) (*connect.Response[v1.MarkConversationReadResponse], error)
 	SetConversationPinned(context.Context, *connect.Request[v1.SetConversationPinnedRequest]) (*connect.Response[v1.SetConversationPinnedResponse], error)
 	// UploadFile stores data in S3 and persists a file row. Intended for the
-	// agent daemon (browser uploads go through the Echo multipart route). No
-	// google.api.http annotation: the agent reaches it via Connect-JSON over the
-	// CommandServiceClient, and avoiding a /v1/files/{id} gateway entry keeps it
+	// agent daemon (browser uploads go through the Echo multipart route); bytes
+	// travel over Connect-JSON, and avoiding a /v1/files/{id} REST entry keeps it
 	// from colliding with the browser download route.
 	UploadFile(context.Context, *connect.Request[v1.UploadFileRequest]) (*connect.Response[v1.File], error)
 	// DownloadFile fetches a file's bytes from S3. The caller must be a member of
@@ -1267,9 +1266,8 @@ type CommandServiceHandler interface {
 	MarkConversationRead(context.Context, *connect.Request[v1.MarkConversationReadRequest]) (*connect.Response[v1.MarkConversationReadResponse], error)
 	SetConversationPinned(context.Context, *connect.Request[v1.SetConversationPinnedRequest]) (*connect.Response[v1.SetConversationPinnedResponse], error)
 	// UploadFile stores data in S3 and persists a file row. Intended for the
-	// agent daemon (browser uploads go through the Echo multipart route). No
-	// google.api.http annotation: the agent reaches it via Connect-JSON over the
-	// CommandServiceClient, and avoiding a /v1/files/{id} gateway entry keeps it
+	// agent daemon (browser uploads go through the Echo multipart route); bytes
+	// travel over Connect-JSON, and avoiding a /v1/files/{id} REST entry keeps it
 	// from colliding with the browser download route.
 	UploadFile(context.Context, *connect.Request[v1.UploadFileRequest]) (*connect.Response[v1.File], error)
 	// DownloadFile fetches a file's bytes from S3. The caller must be a member of

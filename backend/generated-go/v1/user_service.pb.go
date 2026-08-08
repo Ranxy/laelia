@@ -1166,7 +1166,7 @@ var File_v1_user_service_proto protoreflect.FileDescriptor
 
 const file_v1_user_service_proto_rawDesc = "" +
 	"\n" +
-	"\x15v1/user_service.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13v1/annotation.proto\x1a\x0fv1/common.proto\"9\n" +
+	"\x15v1/user_service.proto\x12\tlaelia.v1\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x13v1/annotation.proto\x1a\x0fv1/common.proto\"9\n" +
 	"\x0eGetUserRequest\x12'\n" +
 	"\x04name\x18\x01 \x01(\tB\x13\xe0A\x02\xfaA\r\n" +
 	"\vlaelia/UserR\x04name\"A\n" +
@@ -1248,19 +1248,19 @@ const file_v1_user_service_proto_rawDesc = "" +
 	"\x04USER\x10\x01\x12\x13\n" +
 	"\x0fSERVICE_ACCOUNT\x10\x02\x12\x0e\n" +
 	"\n" +
-	"SYSTEM_BOT\x10\x032\xfd\b\n" +
-	"\vUserService\x12X\n" +
-	"\aGetUser\x12\x19.laelia.v1.GetUserRequest\x1a\x0f.laelia.v1.User\"!\xdaA\x04name\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/{name=users/*}\x12n\n" +
-	"\rBatchGetUsers\x12\x1f.laelia.v1.BatchGetUsersRequest\x1a .laelia.v1.BatchGetUsersResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/users:batchGet\x12W\n" +
-	"\x0eGetCurrentUser\x12\x16.google.protobuf.Empty\x1a\x0f.laelia.v1.User\"\x1c\x80\xea0\x01\x90\xea0\x02\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/users/me\x12b\n" +
-	"\tListUsers\x12\x1b.laelia.v1.ListUsersRequest\x1a\x1c.laelia.v1.ListUsersResponse\"\x1a\xdaA\x06parent\x82\xd3\xe4\x93\x02\v\x12\t/v1/users\x12g\n" +
+	"SYSTEM_BOT\x10\x032\xa5\a\n" +
+	"\vUserService\x12>\n" +
+	"\aGetUser\x12\x19.laelia.v1.GetUserRequest\x1a\x0f.laelia.v1.User\"\a\xdaA\x04name\x12T\n" +
+	"\rBatchGetUsers\x12\x1f.laelia.v1.BatchGetUsersRequest\x1a .laelia.v1.BatchGetUsersResponse\"\x00\x12C\n" +
+	"\x0eGetCurrentUser\x12\x16.google.protobuf.Empty\x1a\x0f.laelia.v1.User\"\b\x80\xea0\x01\x90\xea0\x02\x12Q\n" +
+	"\tListUsers\x12\x1b.laelia.v1.ListUsersRequest\x1a\x1c.laelia.v1.ListUsersResponse\"\t\xdaA\x06parent\x12P\n" +
 	"\n" +
-	"CreateUser\x12\x1c.laelia.v1.CreateUserRequest\x1a\x0f.laelia.v1.User\"*\xdaA\x04user\x80\xea0\x01\x90\xea0\x02\x98\xea0\x01\x82\xd3\xe4\x93\x02\x11:\x04user\"\t/v1/users\x12\x94\x01\n" +
+	"CreateUser\x12\x1c.laelia.v1.CreateUserRequest\x1a\x0f.laelia.v1.User\"\x13\xdaA\x04user\x80\xea0\x01\x90\xea0\x02\x98\xea0\x01\x12o\n" +
 	"\n" +
-	"UpdateUser\x12\x1c.laelia.v1.UpdateUserRequest\x1a\x0f.laelia.v1.User\"W\xdaA\x10user,update_mask\x8a\xea0\x13laelia.users.update\x90\xea0\x02\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1f:\x04user2\x17/v1/{user.name=users/*}\x12\x84\x01\n" +
+	"UpdateUser\x12\x1c.laelia.v1.UpdateUserRequest\x1a\x0f.laelia.v1.User\"2\xdaA\x10user,update_mask\x8a\xea0\x13laelia.users.update\x90\xea0\x02\x98\xea0\x01\x12j\n" +
 	"\n" +
-	"DeleteUser\x12\x1c.laelia.v1.DeleteUserRequest\x1a\x16.google.protobuf.Empty\"@\xdaA\x04name\x8a\xea0\x13laelia.users.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x14*\x12/v1/{name=users/*}\x12\x86\x01\n" +
-	"\fUndeleteUser\x12\x1e.laelia.v1.UndeleteUserRequest\x1a\x0f.laelia.v1.User\"E\x8a\xea0\x13laelia.users.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/v1/{name=users/*}:undelete\x12?\n" +
+	"DeleteUser\x12\x1c.laelia.v1.DeleteUserRequest\x1a\x16.google.protobuf.Empty\"&\xdaA\x04name\x8a\xea0\x13laelia.users.delete\x90\xea0\x01\x98\xea0\x01\x12`\n" +
+	"\fUndeleteUser\x12\x1e.laelia.v1.UndeleteUserRequest\x1a\x0f.laelia.v1.User\"\x1f\x8a\xea0\x13laelia.users.delete\x90\xea0\x01\x98\xea0\x01\x12?\n" +
 	"\fUploadAvatar\x12\x1e.laelia.v1.UploadAvatarRequest\x1a\x0f.laelia.v1.User\x12U\n" +
 	"\x0eDownloadAvatar\x12 .laelia.v1.DownloadAvatarRequest\x1a!.laelia.v1.DownloadAvatarResponse\x12?\n" +
 	"\fDeleteAvatar\x12\x1e.laelia.v1.DeleteAvatarRequest\x1a\x0f.laelia.v1.UserB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
