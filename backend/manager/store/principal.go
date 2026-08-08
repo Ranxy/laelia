@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -397,7 +398,7 @@ func listUserImpl(ctx context.Context, txn *sql.Tx, find *FindUserMessage) ([]*U
 		var profileBytes []byte
 		var chatPrefBytes []byte
 		var typeString string
-		var groups []string
+		var groups pq.StringArray
 		if err := rows.Scan(
 			&userMessage.ID,
 			&userMessage.MemberDeleted,
@@ -415,7 +416,7 @@ func listUserImpl(ctx context.Context, txn *sql.Tx, find *FindUserMessage) ([]*U
 		); err != nil {
 			return nil, err
 		}
-		userMessage.Groups = groups
+		userMessage.Groups = []string(groups)
 		if typeValue, ok := models.PrincipalType_value[typeString]; ok {
 			userMessage.Type = models.PrincipalType(typeValue)
 		} else {
