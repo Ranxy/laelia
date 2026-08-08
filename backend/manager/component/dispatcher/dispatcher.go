@@ -1509,6 +1509,8 @@ func marshalEventPayload(event *v1pb.CommandEvent) ([]byte, error) {
 		return protojson.Marshal(event.GetContextCompaction())
 	case v1pb.CommandEventType_CONTEXT_USAGE_UPDATE:
 		return protojson.Marshal(event.GetContextUsage())
+	case v1pb.CommandEventType_TOKEN_USAGE:
+		return protojson.Marshal(event.GetTokenUsage())
 	default:
 		return nil, nil
 	}

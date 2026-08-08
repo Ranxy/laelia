@@ -1268,6 +1268,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.TokenUsagePayload"><span class="badge">M</span>TokenUsagePayload</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.ToolCallFinishedPayload"><span class="badge">M</span>ToolCallFinishedPayload</a>
                 </li>
               
@@ -8723,6 +8727,13 @@ FAILED_PRECONDITION instead and this response is not sent. </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>token_usage</td>
+                  <td><a href="#laelia.v1.TokenUsagePayload">TokenUsagePayload</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -12726,6 +12737,58 @@ the agent&#39;s processed_version for this conversation. </p></td>
 
         
       
+        <h3 id="laelia.v1.TokenUsagePayload">TokenUsagePayload</h3>
+        <p>TokenUsagePayload is the token consumption of a single command execution</p><p>(this turn only, not session-cumulative). Fields are absent/zero when the</p><p>runtime did not report usage.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>input_tokens</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>output_tokens</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>cache_read_tokens</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>cache_write_tokens</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>total_tokens</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.ToolCallFinishedPayload">ToolCallFinishedPayload</h3>
         <p></p>
 
@@ -13524,6 +13587,12 @@ produce no Activity row.</p></td>
               <tr>
                 <td>CONTEXT_USAGE_UPDATE</td>
                 <td>14</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>TOKEN_USAGE</td>
+                <td>15</td>
                 <td><p></p></td>
               </tr>
             

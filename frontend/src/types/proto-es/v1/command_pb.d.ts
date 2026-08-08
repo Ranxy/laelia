@@ -344,6 +344,12 @@ export declare type CommandEvent = Message<"laelia.v1.CommandEvent"> & {
      */
     value: ContextUsagePayload;
     case: "contextUsage";
+  } | {
+    /**
+     * @generated from field: laelia.v1.TokenUsagePayload token_usage = 23;
+     */
+    value: TokenUsagePayload;
+    case: "tokenUsage";
   } | { case: undefined; value?: undefined };
 };
 
@@ -683,6 +689,46 @@ export declare type ContextUsagePayload = Message<"laelia.v1.ContextUsagePayload
  * Use `create(ContextUsagePayloadSchema)` to create a new message.
  */
 export declare const ContextUsagePayloadSchema: GenMessage<ContextUsagePayload>;
+
+/**
+ * TokenUsagePayload is the token consumption of a single command execution
+ * (this turn only, not session-cumulative). Fields are absent/zero when the
+ * runtime did not report usage.
+ *
+ * @generated from message laelia.v1.TokenUsagePayload
+ */
+export declare type TokenUsagePayload = Message<"laelia.v1.TokenUsagePayload"> & {
+  /**
+   * @generated from field: int64 input_tokens = 1;
+   */
+  inputTokens: bigint;
+
+  /**
+   * @generated from field: int64 output_tokens = 2;
+   */
+  outputTokens: bigint;
+
+  /**
+   * @generated from field: int64 cache_read_tokens = 3;
+   */
+  cacheReadTokens: bigint;
+
+  /**
+   * @generated from field: int64 cache_write_tokens = 4;
+   */
+  cacheWriteTokens: bigint;
+
+  /**
+   * @generated from field: int64 total_tokens = 5;
+   */
+  totalTokens: bigint;
+};
+
+/**
+ * Describes the message laelia.v1.TokenUsagePayload.
+ * Use `create(TokenUsagePayloadSchema)` to create a new message.
+ */
+export declare const TokenUsagePayloadSchema: GenMessage<TokenUsagePayload>;
 
 /**
  * @generated from message laelia.v1.SearchChatHistoryRequest
@@ -4919,6 +4965,11 @@ export enum CommandEventType {
    * @generated from enum value: CONTEXT_USAGE_UPDATE = 14;
    */
   CONTEXT_USAGE_UPDATE = 14,
+
+  /**
+   * @generated from enum value: TOKEN_USAGE = 15;
+   */
+  TOKEN_USAGE = 15,
 }
 
 /**

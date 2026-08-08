@@ -317,6 +317,67 @@ func setUnexportedField(t *testing.T, target any, fieldName string, value any) {
 	reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem().Set(reflect.ValueOf(value))
 }
 
+// TestCommandStreamSendsTokenUsageEvent verifies a TOKEN_USAGE executor event
+// is mapped onto the CommandEvent oneof payload so the manager can persist it.
+func TestCommandStreamSendsTokenUsageEvent(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	stream, recorder, cleanup := newTestCommandChannel(t)
+	defer cleanup()
+
+	runtime := newScriptedRuntime(func(runtime *scriptedRuntime) {
+		runtime.eventCh <- executor.Event{
+			Type: v1pb.CommandEventType_TOKEN_USAGE,
+			TokenUsage: &v1pb.TokenUsagePayload{
+				InputTokens:      500,
+				OutputTokens:     300,
+				CacheReadTokens:  100,
+				CacheWriteTokens: 20,
+				TotalTokens:      920,
+			},
+		}
+		close(runtime.outputCh)
+		close(runtime.eventCh)
+		runtime.resultCh <- executor.Result{ExitCode: 0, FinalSummary: "done"}
+		close(runtime.resultCh)
+		close(runtime.doneCh)
+	})
+
+	req := executor.Request{CommandID: "cmd-1", Profile: "opencode"}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		(&commandStream{}).runCommand(ctx, runtime, stream, req, nil)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for runCommand")
+	}
+
+	require.NoError(t, stream.CloseRequest())
+
+	var tokenEvent *v1pb.CommandEvent
+	for _, m := range recorder.Messages() {
+		if ev := m.GetEvent(); ev != nil && ev.Type == v1pb.CommandEventType_TOKEN_USAGE {
+			tokenEvent = ev
+		}
+	}
+	require.NotNil(t, tokenEvent, "TOKEN_USAGE event must be streamed")
+	usage := tokenEvent.GetTokenUsage()
+	require.NotNil(t, usage)
+	assert.Equal(t, int64(500), usage.InputTokens)
+	assert.Equal(t, int64(300), usage.OutputTokens)
+	assert.Equal(t, int64(100), usage.CacheReadTokens)
+	assert.Equal(t, int64(20), usage.CacheWriteTokens)
+	assert.Equal(t, int64(920), usage.TotalTokens)
+}
+
 // TestDrainLoopIdleResponseEndsPass verifies that when BeginSession replies
 // idle=true, the drain loop sends a BeginSession message, builds no runtime,
 // and ends the drain pass without running a session. The drain loop goroutine

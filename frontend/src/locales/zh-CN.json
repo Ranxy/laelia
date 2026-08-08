@@ -839,6 +839,7 @@
     "event-context-compaction-started": "上下文压缩开始",
     "event-context-compaction-finished": "上下文压缩完成",
     "event-context-usage": "上下文用量",
+    "event-token-usage": "Token 用量",
     "duration": "耗时",
     "created": "创建时间",
     "sent-by": "发送者",
@@ -859,7 +860,13 @@
     "back": "返回",
     "details": "详情",
     "collapse": "收起",
-    "row-open-detail": "打开命令详情"
+    "row-open-detail": "打开命令详情",
+    "token-usage": "Token 用量",
+    "token-total": "总计",
+    "token-input": "输入",
+    "token-output": "输出",
+    "token-cache-read": "缓存读取",
+    "token-cache-write": "缓存写入"
   },
   "chat": {
     "with-agent": "与 {{name}} 对话",

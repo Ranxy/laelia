@@ -1149,6 +1149,8 @@ func sendCommandEvent(stream streamSender, commandID string, event *executor.Eve
 		ce.Payload = &v1pb.CommandEvent_ContextCompaction{ContextCompaction: event.ContextCompaction}
 	case v1pb.CommandEventType_CONTEXT_USAGE_UPDATE:
 		ce.Payload = &v1pb.CommandEvent_ContextUsage{ContextUsage: event.ContextUsage}
+	case v1pb.CommandEventType_TOKEN_USAGE:
+		ce.Payload = &v1pb.CommandEvent_TokenUsage{TokenUsage: event.TokenUsage}
 	default:
 	}
 

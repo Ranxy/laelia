@@ -236,6 +236,10 @@ func TestSessionStatsResponseDecode(t *testing.T) {
 
 	var data sessionStatsData
 	require.NoError(t, json.Unmarshal(r.Data, &data))
+	require.NotNil(t, data.Tokens)
+	assert.Equal(t, int64(50000), data.Tokens.Input)
+	assert.Equal(t, int64(10000), data.Tokens.Output)
+	assert.Equal(t, int64(105000), data.Tokens.Total)
 	require.NotNil(t, data.ContextUsage)
 	require.NotNil(t, data.ContextUsage.Tokens)
 	assert.Equal(t, int64(60000), *data.ContextUsage.Tokens)
@@ -316,6 +320,45 @@ func TestUsageEventFromStats(t *testing.T) {
 			},
 		})
 		assert.Nil(t, ev)
+	})
+}
+
+// TestTokenUsageDelta verifies the per-command token delta computation from
+// turn-start/turn-end session snapshots.
+func TestTokenUsageDelta(t *testing.T) {
+	start := &sessionTokens{Input: 1000, Output: 500, CacheRead: 200, CacheWrite: 50, Total: 1750}
+	end := &sessionTokens{Input: 1500, Output: 800, CacheRead: 300, CacheWrite: 80, Total: 2680}
+
+	t.Run("normal delta", func(t *testing.T) {
+		usage := tokenUsageDelta(start, end)
+		require.NotNil(t, usage)
+		assert.Equal(t, int64(500), usage.InputTokens)
+		assert.Equal(t, int64(300), usage.OutputTokens)
+		assert.Equal(t, int64(100), usage.CacheReadTokens)
+		assert.Equal(t, int64(30), usage.CacheWriteTokens)
+		assert.Equal(t, int64(930), usage.TotalTokens)
+	})
+
+	t.Run("nil baseline", func(t *testing.T) {
+		assert.Nil(t, tokenUsageDelta(nil, end))
+		assert.Nil(t, tokenUsageDelta(start, nil))
+		assert.Nil(t, tokenUsageDelta(nil, nil))
+	})
+
+	t.Run("negative delta clamped to zero", func(t *testing.T) {
+		usage := tokenUsageDelta(end, start)
+		require.NotNil(t, usage)
+		assert.Equal(t, int64(0), usage.InputTokens)
+		assert.Equal(t, int64(0), usage.OutputTokens)
+		assert.Equal(t, int64(0), usage.CacheReadTokens)
+		assert.Equal(t, int64(0), usage.CacheWriteTokens)
+		assert.Equal(t, int64(0), usage.TotalTokens)
+	})
+
+	t.Run("zero consumption", func(t *testing.T) {
+		usage := tokenUsageDelta(start, &sessionTokens{Input: 1000, Output: 500, CacheRead: 200, CacheWrite: 50, Total: 1750})
+		require.NotNil(t, usage)
+		assert.Equal(t, int64(0), usage.TotalTokens)
 	})
 }
 

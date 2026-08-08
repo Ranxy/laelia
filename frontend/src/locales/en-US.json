@@ -839,6 +839,7 @@
     "event-context-compaction-started": "Context Compaction Started",
     "event-context-compaction-finished": "Context Compaction Finished",
     "event-context-usage": "Context Usage",
+    "event-token-usage": "Token Usage",
     "duration": "Duration",
     "created": "Created",
     "sent-by": "Sent by",
@@ -859,7 +860,13 @@
     "back": "Back",
     "details": "Details",
     "collapse": "Collapse",
-    "row-open-detail": "Open command details"
+    "row-open-detail": "Open command details",
+    "token-usage": "Token Usage",
+    "token-total": "Total",
+    "token-input": "Input",
+    "token-output": "Output",
+    "token-cache-read": "Cache Read",
+    "token-cache-write": "Cache Write"
   },
   "chat": {
     "with-agent": "Chat with {{name}}",

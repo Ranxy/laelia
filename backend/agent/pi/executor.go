@@ -42,6 +42,10 @@ type PiExecutor struct {
 	seqNo     atomic.Int32
 	cancelled atomic.Bool
 
+	// startTokens is the session-cumulative token usage sampled at turn start;
+	// the per-command TOKEN_USAGE event is the turn-end sample minus this.
+	startTokens *sessionTokens
+
 	toolCallCount atomic.Int32
 	outputLimited atomic.Bool
 	eventLimited  atomic.Bool
@@ -204,8 +208,10 @@ func (e *PiExecutor) run() {
 
 	// Sample context usage at turn start (pi is pull-based, unlike ACP's
 	// pushed UsageUpdate) and keep sampling during long turns. A failed sample
-	// never blocks the turn.
+	// never blocks the turn. The token snapshot is the baseline for the
+	// per-command TOKEN_USAGE delta emitted at finish.
 	e.emitSessionUsage()
+	e.startTokens = e.sampleTokens()
 	e.startUsagePoller()
 
 	events := e.session.beginTurn(e.ctx)
@@ -284,6 +290,74 @@ func (e *PiExecutor) emitSessionUsage() {
 		return
 	}
 	e.sendEvent(*event)
+}
+
+// sampleTokens fetches the session's cumulative token usage, or nil when the
+// stats call fails or pi does not report tokens. It uses a fresh background
+// context so the finish-time sample still works after the turn ctx is done
+// (e.g. timeout/cancel paths).
+func (e *PiExecutor) sampleTokens() *sessionTokens {
+	ctx, cancel := context.WithTimeout(context.Background(), usagePollTimeout)
+	defer cancel()
+	stats, err := e.session.sessionStats(ctx)
+	if err != nil {
+		slog.Debug("pi: get_session_stats failed; skipping token usage", "error", err)
+		return nil
+	}
+	return stats.Tokens
+}
+
+// emitTokenUsage samples the session's cumulative token usage at turn end and
+// emits a TOKEN_USAGE event carrying the per-command delta (turn-end minus the
+// turn-start snapshot). Failures are non-fatal: the turn result is unaffected.
+func (e *PiExecutor) emitTokenUsage() {
+	usage := tokenUsageDelta(e.startTokens, e.sampleTokens())
+	if usage == nil {
+		return
+	}
+	event := executor.Event{
+		Type:       v1pb.CommandEventType_TOKEN_USAGE,
+		Summary:    fmt.Sprintf("Tokens: %d total (%d in / %d out)", usage.TotalTokens, usage.InputTokens, usage.OutputTokens),
+		TokenUsage: usage,
+	}
+	if !e.allowEvent() {
+		return
+	}
+	event.SeqNo = e.nextSeq()
+	event.Timestamp = time.Now()
+	// Send without the turn-ctx gate: finish() runs after the turn ctx is done
+	// on timeout/cancel paths, and the usage must still reach the manager. The
+	// pump drains the channel until the result arrives, so a full buffer is
+	// unlikely; drop rather than block the terminal result.
+	select {
+	case e.eventCh <- event:
+	default:
+		slog.Debug("pi: token usage event dropped (turn channel full)")
+	}
+}
+
+// tokenUsageDelta computes the per-command token consumption as the difference
+// between the turn-end and turn-start session snapshots. A nil snapshot on
+// either side yields nil (no baseline to diff against). Negative deltas are
+// clamped to zero so a stats reset (e.g. session switch) never reports
+// negative usage.
+func tokenUsageDelta(start, end *sessionTokens) *v1pb.TokenUsagePayload {
+	if start == nil || end == nil {
+		return nil
+	}
+	clamp := func(v int64) int64 {
+		if v < 0 {
+			return 0
+		}
+		return v
+	}
+	return &v1pb.TokenUsagePayload{
+		InputTokens:      clamp(end.Input - start.Input),
+		OutputTokens:     clamp(end.Output - start.Output),
+		CacheReadTokens:  clamp(end.CacheRead - start.CacheRead),
+		CacheWriteTokens: clamp(end.CacheWrite - start.CacheWrite),
+		TotalTokens:      clamp(end.Total - start.Total),
+	}
 }
 
 // startUsagePoller re-samples pi usage on a fixed cadence until the turn ends,
@@ -665,6 +739,10 @@ func (e *PiExecutor) finish(err error, resumed bool) {
 	// Flush any buffered tail text before the terminal summary so it streams in
 	// order (the deferred flush in run is a no-op safety net after this).
 	e.buffer.flush(e)
+
+	// Emit the per-command token usage before the terminal summary/result so
+	// the detail page can show it once the command completes.
+	e.emitTokenUsage()
 
 	sessionID := e.session.SessionFile()
 

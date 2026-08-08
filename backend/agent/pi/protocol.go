@@ -73,7 +73,19 @@ type getStateData struct {
 type sessionStatsData struct {
 	SessionFile  string               `json:"sessionFile,omitempty"`
 	SessionID    string               `json:"sessionId,omitempty"`
+	Tokens       *sessionTokens       `json:"tokens,omitempty"`
 	ContextUsage *sessionContextUsage `json:"contextUsage,omitempty"`
+}
+
+// sessionTokens is the cumulative token usage of the whole pi session (all
+// turns, including compaction/branch-summary generation). Per-command usage is
+// derived by subtracting a turn-start snapshot from the turn-end snapshot.
+type sessionTokens struct {
+	Input      int64 `json:"input"`
+	Output     int64 `json:"output"`
+	CacheRead  int64 `json:"cacheRead"`
+	CacheWrite int64 `json:"cacheWrite"`
+	Total      int64 `json:"total"`
 }
 
 // sessionContextUsage is the current context-window estimate. tokens/percent

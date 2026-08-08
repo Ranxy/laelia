@@ -280,6 +280,7 @@
     - [TaskInfo](#laelia-v1-TaskInfo)
     - [TextDeltaPayload](#laelia-v1-TextDeltaPayload)
     - [ThreadUpdate](#laelia-v1-ThreadUpdate)
+    - [TokenUsagePayload](#laelia-v1-TokenUsagePayload)
     - [ToolCallFinishedPayload](#laelia-v1-ToolCallFinishedPayload)
     - [ToolCallStartedPayload](#laelia-v1-ToolCallStartedPayload)
     - [TransferChannelOwnershipRequest](#laelia-v1-TransferChannelOwnershipRequest)
@@ -3025,6 +3026,7 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | permission_decided | [PermissionDecidedPayload](#laelia-v1-PermissionDecidedPayload) |  |  |
 | context_compaction | [ContextCompactionPayload](#laelia-v1-ContextCompactionPayload) |  |  |
 | context_usage | [ContextUsagePayload](#laelia-v1-ContextUsagePayload) |  |  |
+| token_usage | [TokenUsagePayload](#laelia-v1-TokenUsagePayload) |  |  |
 
 
 
@@ -4988,6 +4990,27 @@ ThreadUpdate describes one subscribed thread with unread replies.
 
 
 
+<a name="laelia-v1-TokenUsagePayload"></a>
+
+### TokenUsagePayload
+TokenUsagePayload is the token consumption of a single command execution
+(this turn only, not session-cumulative). Fields are absent/zero when the
+runtime did not report usage.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| input_tokens | [int64](#int64) |  |  |
+| output_tokens | [int64](#int64) |  |  |
+| cache_read_tokens | [int64](#int64) |  |  |
+| cache_write_tokens | [int64](#int64) |  |  |
+| total_tokens | [int64](#int64) |  |  |
+
+
+
+
+
+
 <a name="laelia-v1-ToolCallFinishedPayload"></a>
 
 ### ToolCallFinishedPayload
@@ -5370,6 +5393,7 @@ and Unread. The ACTIVITY_STATE prefix satisfies protobuf C&#43;&#43; scoping rul
 | CONTEXT_COMPACTION_STARTED | 12 |  |
 | CONTEXT_COMPACTION_FINISHED | 13 |  |
 | CONTEXT_USAGE_UPDATE | 14 |  |
+| TOKEN_USAGE | 15 |  |
 
 
 

@@ -6,6 +6,7 @@ import { CommandStatusBadge } from "@/components/command-status-badge";
 import { FinalSummary } from "@/components/command-terminal";
 import { CommandTimeline } from "@/components/command-timeline";
 import { ContextUsageBar } from "@/components/context-usage-bar";
+import { TokenUsageCard } from "@/components/token-usage-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
@@ -38,6 +39,7 @@ const eventTypeColors: Record<number, string> = {
   [CommandEventType.CONTEXT_COMPACTION_STARTED]: "text-warning",
   [CommandEventType.CONTEXT_COMPACTION_FINISHED]: "text-success",
   [CommandEventType.CONTEXT_USAGE_UPDATE]: "text-info",
+  [CommandEventType.TOKEN_USAGE]: "text-info",
 };
 
 function isVisibleEvent(event: CommandEvent): boolean {
@@ -329,6 +331,16 @@ export function CommandDetailPage() {
     return usage.length > 0 ? usage[usage.length - 1] : null;
   }, [visibleEvents]);
 
+  // The per-command token consumption recorded at turn end; shown on the
+  // summary tab once the command completes.
+  const tokenUsage = useMemo(() => {
+    let latest: CommandEvent | undefined;
+    for (const ev of visibleEvents) {
+      if (ev.type === CommandEventType.TOKEN_USAGE) latest = ev;
+    }
+    return latest?.payload.case === "tokenUsage" ? latest.payload.value : null;
+  }, [visibleEvents]);
+
   // Pair TOOL_CALL_STARTED with TOOL_CALL_FINISHED so the Events panel shows
   // one structured card per tool call (input + output) instead of two
   // disconnected rows whose payloads are never expanded today.
@@ -349,8 +361,9 @@ export function CommandDetailPage() {
 
   const renderEvent = (ev: CommandEvent) => {
     // Usage updates are rendered as one live progress bar (latestUsage), not
-    // one row per rate-limited update.
+    // one row per rate-limited update. Token usage is shown on the summary tab.
     if (ev.type === CommandEventType.CONTEXT_USAGE_UPDATE) return null;
+    if (ev.type === CommandEventType.TOKEN_USAGE) return null;
     if (ev.type === CommandEventType.TOOL_CALL_STARTED) {
       const pair = toolPairByStartedSeqNo.get(ev.seqNo);
       return (
@@ -579,7 +592,8 @@ export function CommandDetailPage() {
               keepMounted
               className="flex-1 min-h-0 mt-3"
             >
-              <div className="h-full overflow-y-auto rounded border border-control-border p-3">
+              <div className="h-full overflow-y-auto rounded border border-control-border p-3 flex flex-col gap-3">
+                {tokenUsage && <TokenUsageCard usage={tokenUsage} />}
                 {displayCmd.finalSummary ? (
                   <FinalSummary content={displayCmd.finalSummary} />
                 ) : (

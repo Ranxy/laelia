@@ -48,6 +48,7 @@ const commandEventTypeToI18nKey: Record<CommandEventType, string> = {
   [CommandEventType.CONTEXT_COMPACTION_FINISHED]:
     "command.event-context-compaction-finished",
   [CommandEventType.CONTEXT_USAGE_UPDATE]: "command.event-context-usage",
+  [CommandEventType.TOKEN_USAGE]: "command.event-token-usage",
 };
 
 function formatDuration(ms: number | bigint | undefined): string {

@@ -84,6 +84,7 @@ type Event struct {
 	PermissionDecided   *v1pb.PermissionDecidedPayload
 	ContextCompaction   *v1pb.ContextCompactionPayload
 	ContextUsage        *v1pb.ContextUsagePayload
+	TokenUsage          *v1pb.TokenUsagePayload
 }
 
 type Runtime interface {
