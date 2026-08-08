@@ -71,20 +71,17 @@ type Event struct {
 
 	Timestamp time.Time
 
-	Lifecycle           *v1pb.LifecyclePayload
-	TextDelta           *v1pb.TextDeltaPayload
-	ToolCallStarted     *v1pb.ToolCallStartedPayload
-	ToolCallFinished    *v1pb.ToolCallFinishedPayload
-	DiffEmitted         *v1pb.DiffEmittedPayload
-	Warning             *v1pb.WarningPayload
-	RawAcp              *v1pb.RawAcpPayload
-	FinalSummary        *v1pb.FinalSummaryPayload
-	PermissionRequested *v1pb.PermissionRequestedPayload
-	PermissionTimedOut  *v1pb.PermissionTimedOutPayload
-	PermissionDecided   *v1pb.PermissionDecidedPayload
-	ContextCompaction   *v1pb.ContextCompactionPayload
-	ContextUsage        *v1pb.ContextUsagePayload
-	TokenUsage          *v1pb.TokenUsagePayload
+	Lifecycle         *v1pb.LifecyclePayload
+	TextDelta         *v1pb.TextDeltaPayload
+	ToolCallStarted   *v1pb.ToolCallStartedPayload
+	ToolCallFinished  *v1pb.ToolCallFinishedPayload
+	DiffEmitted       *v1pb.DiffEmittedPayload
+	Warning           *v1pb.WarningPayload
+	RawAcp            *v1pb.RawAcpPayload
+	FinalSummary      *v1pb.FinalSummaryPayload
+	ContextCompaction *v1pb.ContextCompactionPayload
+	ContextUsage      *v1pb.ContextUsagePayload
+	TokenUsage        *v1pb.TokenUsagePayload
 }
 
 type Runtime interface {
@@ -94,10 +91,6 @@ type Runtime interface {
 	EventChannel() <-chan Event
 	ResultChannel() <-chan Result
 	Done() <-chan struct{}
-}
-
-type PermissionResolver interface {
-	ResolvePermission(optionID string)
 }
 
 // SteerResolver lets the command stream inject a follow-up message into the

@@ -281,11 +281,6 @@ func newOpencodeCSConfig(bin string, workspace string, writable bool) *executor.
 		args = append(args, "--agent", agent)
 	}
 
-	toolKinds := []string{"read", "search", "think", "fetch"}
-	if writable {
-		toolKinds = append(toolKinds, "edit", "move")
-	}
-
 	return &executor.ACPConfig{
 		MaxTimeoutSeconds:     120,
 		MaxEventCount:         4000,
@@ -307,11 +302,10 @@ func newOpencodeCSConfig(bin string, workspace string, writable bool) *executor.
 			"GOOGLE_API_KEY",
 			"OPENROUTER_API_KEY",
 		},
-		ReadTextFiles:        true,
-		WriteTextFiles:       writable,
-		AutoApproveToolKinds: toolKinds,
-		SupportsDiff:         writable,
-		SupportsRawEvents:    true,
-		SupportsToolTraces:   true,
+		ReadTextFiles:      true,
+		WriteTextFiles:     writable,
+		SupportsDiff:       writable,
+		SupportsRawEvents:  true,
+		SupportsToolTraces: true,
 	}
 }

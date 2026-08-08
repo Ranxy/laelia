@@ -1043,33 +1043,6 @@ func (d *Dispatcher) SteerCommand(_ context.Context, agentID int, commandID, tex
 	return nil
 }
 
-func (d *Dispatcher) RespondPermission(_ context.Context, agentID int, commandID, optionID string) error {
-	d.mu.RLock()
-	sess, ok := d.sessions[agentID]
-	d.mu.RUnlock()
-
-	if !ok {
-		return errors.New("agent not connected")
-	}
-
-	msg := &v1pb.ManagerStreamMessage{
-		Message: &v1pb.ManagerStreamMessage_PermissionDecision{
-			PermissionDecision: &v1pb.PermissionDecision{
-				CommandId: commandID,
-				OptionId:  optionID,
-			},
-		},
-	}
-
-	if err := sess.deliver(msg); err != nil {
-		slog.Error("failed to send permission decision to agent", "error", err)
-		return errors.Wrapf(err, "failed to send permission decision to agent")
-	}
-
-	slog.Info("permission decision sent to agent", "commandID", commandID, "optionID", optionID, "agentID", agentID)
-	return nil
-}
-
 func (d *Dispatcher) Subscribe(_ context.Context, commandID string) (chan *v1pb.CommandOutput, error) {
 	ch := make(chan *v1pb.CommandOutput, watcherBufSize)
 
@@ -1548,12 +1521,6 @@ func marshalEventPayload(event *v1pb.CommandEvent) ([]byte, error) {
 		return protojson.Marshal(event.GetRawAcp())
 	case v1pb.CommandEventType_FINAL_SUMMARY:
 		return protojson.Marshal(event.GetFinalSummary())
-	case v1pb.CommandEventType_PERMISSION_REQUESTED:
-		return protojson.Marshal(event.GetPermissionRequested())
-	case v1pb.CommandEventType_PERMISSION_TIMED_OUT:
-		return protojson.Marshal(event.GetPermissionTimedOut())
-	case v1pb.CommandEventType_PERMISSION_DECIDED:
-		return protojson.Marshal(event.GetPermissionDecided())
 	case v1pb.CommandEventType_CONTEXT_COMPACTION_STARTED, v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED:
 		return protojson.Marshal(event.GetContextCompaction())
 	case v1pb.CommandEventType_CONTEXT_USAGE_UPDATE:

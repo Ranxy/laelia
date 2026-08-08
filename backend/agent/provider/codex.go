@@ -757,7 +757,7 @@ func (*CodexEventMapper) warning(method string, params map[string]json.RawMessag
 }
 
 // threadStatusChanged maps thread/status/changed: systemError becomes an
-// error event, waiting-on-approval/input flags become a warning.
+// error event, waiting-on-user-input becomes a warning.
 func (*CodexEventMapper) threadStatusChanged(params map[string]json.RawMessage, turnID string) []acp2.Event {
 	raw, ok := params["status"]
 	if !ok {
@@ -794,22 +794,12 @@ func (*CodexEventMapper) threadStatusChanged(params map[string]json.RawMessage, 
 		}
 		return []acp2.Event{{Type: acp2.EventError, TurnID: turnID, Text: msg}}
 	case "active":
-		var wait []string
-		for _, f := range status.ActiveFlags {
-			if f == "waitingOnApproval" || f == "waitingOnUserInput" {
-				wait = append(wait, f)
-			}
+		// Permissions are auto-granted by the runtime, so only user input
+		// (the agent asking the human a question) surfaces as a warning.
+		if containsString(status.ActiveFlags, "waitingOnUserInput") {
+			return []acp2.Event{{Type: acp2.EventWarning, TurnID: turnID, Text: "Codex thread is waiting on user input"}}
 		}
-		if len(wait) == 0 {
-			return nil
-		}
-		label := "user input"
-		if containsString(wait, "waitingOnApproval") && containsString(wait, "waitingOnUserInput") {
-			label = "approval and user input"
-		} else if containsString(wait, "waitingOnApproval") {
-			label = "approval"
-		}
-		return []acp2.Event{{Type: acp2.EventWarning, TurnID: turnID, Text: "Codex thread is waiting on " + label}}
+		return nil
 	default:
 		// Other status types carry no laelia event surface; ignore.
 	}

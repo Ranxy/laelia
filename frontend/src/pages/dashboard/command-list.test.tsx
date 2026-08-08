@@ -60,7 +60,6 @@ function seedStore() {
     watchCommand: vi.fn(async () => true),
     watchCommandEvents: vi.fn(async () => true),
     cancelCommand: vi.fn(async () => ({}) as Command),
-    respondPermission: vi.fn(async () => {}),
     getOrCreateConversation: vi.fn(async () => "conversations/1"),
     fetchChannels: vi.fn(async () => {}),
     sendChatMessage: vi.fn(async () => ({}) as ChatMessage),

@@ -316,24 +316,9 @@ export declare type CommandEvent = Message<"laelia.v1.CommandEvent"> & {
     case: "finalSummary";
   } | {
     /**
-     * @generated from field: laelia.v1.PermissionRequestedPayload permission_requested = 18;
-     */
-    value: PermissionRequestedPayload;
-    case: "permissionRequested";
-  } | {
-    /**
-     * @generated from field: laelia.v1.PermissionTimedOutPayload permission_timed_out = 19;
-     */
-    value: PermissionTimedOutPayload;
-    case: "permissionTimedOut";
-  } | {
-    /**
-     * @generated from field: laelia.v1.PermissionDecidedPayload permission_decided = 20;
-     */
-    value: PermissionDecidedPayload;
-    case: "permissionDecided";
-  } | {
-    /**
+     * 18-20 were permission_requested/timed_out/decided; permissions are now
+     * auto-granted by the runtime, so the payloads are gone.
+     *
      * @generated from field: laelia.v1.ContextCompactionPayload context_compaction = 21;
      */
     value: ContextCompactionPayload;
@@ -521,120 +506,6 @@ export declare type FinalSummaryPayload = Message<"laelia.v1.FinalSummaryPayload
  * Use `create(FinalSummaryPayloadSchema)` to create a new message.
  */
 export declare const FinalSummaryPayloadSchema: GenMessage<FinalSummaryPayload>;
-
-/**
- * @generated from message laelia.v1.PermissionRequestedPayload
- */
-export declare type PermissionRequestedPayload = Message<"laelia.v1.PermissionRequestedPayload"> & {
-  /**
-   * @generated from field: string tool_call_id = 1;
-   */
-  toolCallId: string;
-
-  /**
-   * @generated from field: string kind = 2;
-   */
-  kind: string;
-
-  /**
-   * @generated from field: string title = 3;
-   */
-  title: string;
-
-  /**
-   * @generated from field: repeated laelia.v1.PermissionOptionPayload options = 4;
-   */
-  options: PermissionOptionPayload[];
-
-  /**
-   * @generated from field: int64 expires_at = 5;
-   */
-  expiresAt: bigint;
-};
-
-/**
- * Describes the message laelia.v1.PermissionRequestedPayload.
- * Use `create(PermissionRequestedPayloadSchema)` to create a new message.
- */
-export declare const PermissionRequestedPayloadSchema: GenMessage<PermissionRequestedPayload>;
-
-/**
- * @generated from message laelia.v1.PermissionOptionPayload
- */
-export declare type PermissionOptionPayload = Message<"laelia.v1.PermissionOptionPayload"> & {
-  /**
-   * @generated from field: string option_id = 1;
-   */
-  optionId: string;
-
-  /**
-   * @generated from field: string name = 2;
-   */
-  name: string;
-
-  /**
-   * @generated from field: string kind = 3;
-   */
-  kind: string;
-};
-
-/**
- * Describes the message laelia.v1.PermissionOptionPayload.
- * Use `create(PermissionOptionPayloadSchema)` to create a new message.
- */
-export declare const PermissionOptionPayloadSchema: GenMessage<PermissionOptionPayload>;
-
-/**
- * @generated from message laelia.v1.PermissionTimedOutPayload
- */
-export declare type PermissionTimedOutPayload = Message<"laelia.v1.PermissionTimedOutPayload"> & {
-  /**
-   * @generated from field: string tool_call_id = 1;
-   */
-  toolCallId: string;
-
-  /**
-   * @generated from field: string kind = 2;
-   */
-  kind: string;
-};
-
-/**
- * Describes the message laelia.v1.PermissionTimedOutPayload.
- * Use `create(PermissionTimedOutPayloadSchema)` to create a new message.
- */
-export declare const PermissionTimedOutPayloadSchema: GenMessage<PermissionTimedOutPayload>;
-
-/**
- * @generated from message laelia.v1.PermissionDecidedPayload
- */
-export declare type PermissionDecidedPayload = Message<"laelia.v1.PermissionDecidedPayload"> & {
-  /**
-   * @generated from field: string tool_call_id = 1;
-   */
-  toolCallId: string;
-
-  /**
-   * @generated from field: string kind = 2;
-   */
-  kind: string;
-
-  /**
-   * @generated from field: string option_id = 3;
-   */
-  optionId: string;
-
-  /**
-   * @generated from field: string option_kind = 4;
-   */
-  optionKind: string;
-};
-
-/**
- * Describes the message laelia.v1.PermissionDecidedPayload.
- * Use `create(PermissionDecidedPayloadSchema)` to create a new message.
- */
-export declare const PermissionDecidedPayloadSchema: GenMessage<PermissionDecidedPayload>;
 
 /**
  * ContextCompactionPayload describes a context-window compaction observed on
@@ -4008,12 +3879,8 @@ export declare type ManagerStreamMessage = Message<"laelia.v1.ManagerStreamMessa
     case: "pong";
   } | {
     /**
-     * @generated from field: laelia.v1.PermissionDecision permission_decision = 7;
-     */
-    value: PermissionDecision;
-    case: "permissionDecision";
-  } | {
-    /**
+     * 7 was permission_decision; permissions are now auto-granted.
+     *
      * ask the agent daemon to re-probe installed LLM agent providers
      *
      * @generated from field: laelia.v1.DiscoverProviders discover_providers = 9;
@@ -4611,48 +4478,6 @@ export declare type WatchCommandEventsRequest = Message<"laelia.v1.WatchCommandE
 export declare const WatchCommandEventsRequestSchema: GenMessage<WatchCommandEventsRequest>;
 
 /**
- * @generated from message laelia.v1.PermissionDecision
- */
-export declare type PermissionDecision = Message<"laelia.v1.PermissionDecision"> & {
-  /**
-   * @generated from field: string command_id = 1;
-   */
-  commandId: string;
-
-  /**
-   * @generated from field: string option_id = 2;
-   */
-  optionId: string;
-};
-
-/**
- * Describes the message laelia.v1.PermissionDecision.
- * Use `create(PermissionDecisionSchema)` to create a new message.
- */
-export declare const PermissionDecisionSchema: GenMessage<PermissionDecision>;
-
-/**
- * @generated from message laelia.v1.RespondPermissionRequest
- */
-export declare type RespondPermissionRequest = Message<"laelia.v1.RespondPermissionRequest"> & {
-  /**
-   * @generated from field: string name = 1;
-   */
-  name: string;
-
-  /**
-   * @generated from field: string option_id = 2;
-   */
-  optionId: string;
-};
-
-/**
- * Describes the message laelia.v1.RespondPermissionRequest.
- * Use `create(RespondPermissionRequestSchema)` to create a new message.
- */
-export declare const RespondPermissionRequestSchema: GenMessage<RespondPermissionRequest>;
-
-/**
  * NewMessagesAvailable is a best-effort wake signal pushed from the Manager to
  * an agent over the bidi stream whenever a conversation the agent is a member
  * of produces a new message (from any sender: user, agent, or system). It is
@@ -5224,14 +5049,6 @@ export declare const CommandService: GenService<{
     methodKind: "server_streaming";
     input: typeof WatchCommandEventsRequestSchema;
     output: typeof CommandEventSchema;
-  },
-  /**
-   * @generated from rpc laelia.v1.CommandService.RespondPermission
-   */
-  respondPermission: {
-    methodKind: "unary";
-    input: typeof RespondPermissionRequestSchema;
-    output: typeof EmptySchema;
   },
   /**
    * @generated from rpc laelia.v1.CommandService.SearchChatHistory

@@ -7,7 +7,6 @@ import { FinalSummary } from "@/components/command-terminal";
 import { CommandTimeline } from "@/components/command-timeline";
 import { ContextUsageBar } from "@/components/context-usage-bar";
 import { TokenUsageCard } from "@/components/token-usage-card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
@@ -34,9 +33,6 @@ const eventTypeColors: Record<number, string> = {
   [CommandEventType.WARNING]: "text-warning",
   [CommandEventType.RAW_ACP]: "text-control-light",
   [CommandEventType.FINAL_SUMMARY]: "text-success",
-  [CommandEventType.PERMISSION_REQUESTED]: "text-warning",
-  [CommandEventType.PERMISSION_TIMED_OUT]: "text-error",
-  [CommandEventType.PERMISSION_DECIDED]: "text-success",
   [CommandEventType.CONTEXT_COMPACTION_STARTED]: "text-warning",
   [CommandEventType.CONTEXT_COMPACTION_FINISHED]: "text-success",
   [CommandEventType.CONTEXT_USAGE_UPDATE]: "text-info",
@@ -403,44 +399,6 @@ export function CommandDetailPage() {
     (displayCmd.status === CommandStatus.PENDING ||
       displayCmd.status === CommandStatus.RUNNING);
 
-  const pendingPermission = useMemo(() => {
-    if (!isRunning) return null;
-
-    const requested = events.filter(
-      (ev) => ev.type === CommandEventType.PERMISSION_REQUESTED
-    );
-    if (requested.length === 0) return null;
-
-    const latest = requested[requested.length - 1];
-
-    const decided = events.some(
-      (ev) =>
-        (ev.type === CommandEventType.PERMISSION_TIMED_OUT ||
-          ev.type === CommandEventType.PERMISSION_DECIDED) &&
-        ev.seqNo > latest.seqNo
-    );
-    if (decided) return null;
-
-    return latest;
-  }, [events, isRunning]);
-
-  const respondPermission = useAppStore((s) => s.respondPermission);
-  const [permissionResponded, setPermissionResponded] = useState(false);
-
-  const handleRespondPermission = async (optionId: string) => {
-    if (!cmdName) return;
-    setPermissionResponded(true);
-    try {
-      await respondPermission(cmdName, optionId);
-    } catch {
-      setPermissionResponded(false);
-    }
-  };
-
-  useEffect(() => {
-    setPermissionResponded(false);
-  }, [cmdName]);
-
   const handleCancel = async () => {
     if (!cmdName) return;
     setCancelling(true);
@@ -642,40 +600,6 @@ export function CommandDetailPage() {
           </Tabs>
         )}
       </div>
-
-      {pendingPermission &&
-        pendingPermission.payload.case === "permissionRequested" &&
-        !permissionResponded && (
-          <div className="sticky bottom-0 bg-background border-t border-control-border p-3">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <Badge variant="warning" className="shrink-0">
-                  {pendingPermission.payload.value.kind}
-                </Badge>
-                <span className="text-sm text-main truncate">
-                  {pendingPermission.payload.value.title ||
-                    t("command.permission-required")}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {pendingPermission.payload.value.options.map((opt) => (
-                  <Button
-                    key={opt.optionId}
-                    variant={
-                      opt.kind === "allow_once" || opt.kind === "allow_always"
-                        ? "default"
-                        : "outline"
-                    }
-                    size="sm"
-                    onClick={() => handleRespondPermission(opt.optionId)}
-                  >
-                    {opt.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
     </div>
   );
 }

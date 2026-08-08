@@ -323,7 +323,6 @@ export interface CommandSlice {
   // aborted by the caller or failed with an error.
   watchCommand: (name: string, signal?: AbortSignal) => Promise<boolean>;
   watchCommandEvents: (name: string, signal?: AbortSignal) => Promise<boolean>;
-  respondPermission: (name: string, optionId: string) => Promise<void>;
 }
 
 export interface ChatSlice {
