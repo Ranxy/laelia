@@ -10,6 +10,7 @@ type EventType string
 const (
 	EventLifecycle                 EventType = "lifecycle"
 	EventTextDelta                 EventType = "text_delta"
+	EventThinkingDelta             EventType = "thinking_delta"
 	EventToolCallStarted           EventType = "tool_call_started"
 	EventToolCallFinished          EventType = "tool_call_finished"
 	EventWarning                   EventType = "warning"
@@ -22,9 +23,11 @@ const (
 
 // Event is a provider-neutral event derived from a protocol notification.
 // Unknown notification shapes degrade to EventRaw so nothing is silently
-// dropped.
+// dropped. TurnID is the id of the turn the event belongs to, when the
+// notification carried one; the executor uses it to drive its turn gate.
 type Event struct {
 	Type         EventType
+	TurnID       string
 	Text         string
 	Summary      string
 	ToolCall     *ToolCallInfo
