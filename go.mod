@@ -21,7 +21,6 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/labstack/echo-contrib/v5 v5.0.1
 	github.com/labstack/echo/v5 v5.1.1
-	github.com/lib/pq v1.12.3
 	github.com/nyaruka/phonenumbers v1.8.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
