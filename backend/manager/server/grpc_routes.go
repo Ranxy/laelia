@@ -35,7 +35,7 @@ func configureV1Routers(
 	stateCfg *state.State,
 	s3clientmanager *s3client.Client,
 	cmdDispatcher *dispatcher.Dispatcher,
-) error {
+) (*apiv1.AuditInterceptor, error) {
 	cmdDispatcher.StartPingMonitor()
 
 	// Room hub: in-process notifier that wakes long-polling message readers
@@ -71,7 +71,7 @@ func configureV1Routers(
 	// notifications fire-and-forget.
 	webpushCfg, err := stores.GetWebPushSetting(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "failed to load web push setting")
+		return nil, errors.Wrapf(err, "failed to load web push setting")
 	}
 	webpushSender := webpush.NewSender(webpushCfg.GetPublicKey(), webpushCfg.GetPrivateKey(), webpushCfg.GetSubject(), stores)
 	stores.SetWebPushSender(webpushSender)
@@ -81,7 +81,7 @@ func configureV1Routers(
 	rateLimiterCfg.TrustProxy = profile.TrustProxy
 	rateLimiter, err := ratelimit.New(rateLimiterCfg)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create rate limiter")
+		return nil, errors.Wrapf(err, "failed to create rate limiter")
 	}
 
 	onPanic := func(_ context.Context, s connect.Spec, _ http.Header, p any) error {
@@ -91,6 +91,8 @@ func configureV1Routers(
 	}
 
 	ipValidator := auth.NewIPValidator(auth.IPValidationWarn, profile.TrustProxy)
+
+	auditInterceptor := apiv1.NewAuditInterceptor(stores)
 
 	handlerOpts := connect.WithHandlerOptions(
 		// Interceptors execute in the listed order. The rate limiter MUST run
@@ -106,7 +108,7 @@ func configureV1Routers(
 			auth.New(stores, secret, stateCfg, profile),
 			rateLimiter,
 			apiv1.NewIAMInterceptor(iam.NewManager(stores)),
-			apiv1.NewAuditInterceptor(stores),
+			auditInterceptor,
 		),
 		// Cap unary request bodies so the bytes-based file upload RPC can't be
 		// used to exhaust memory; matches apiv1.MaxUploadBytes.
@@ -177,5 +179,5 @@ func configureV1Routers(
 		e.Any(path+"*", echo.WrapHandler(handler))
 	}
 
-	return nil
+	return auditInterceptor, nil
 }

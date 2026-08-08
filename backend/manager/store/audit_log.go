@@ -23,11 +23,32 @@ type AuditLogMessage struct {
 	CreatedAt time.Time
 }
 
-func (s *Store) CreateAuditLog(ctx context.Context, log *AuditLogMessage) error {
-	_, err := s.GetDB().ExecContext(ctx, `
+// CreateAuditLogs inserts audit rows in a single multi-row statement. The
+// audit interceptor batches records in memory and flushes them here, so a
+// steady stream of audited calls costs one round trip per flush window
+// instead of one INSERT per call.
+func (s *Store) CreateAuditLogs(ctx context.Context, logs []*AuditLogMessage) error {
+	if len(logs) == 0 {
+		return nil
+	}
+	const columns = 9
+	var sb strings.Builder
+	// strings.Builder never errors; discard the (int, error) results.
+	write := func(s string) { _, _ = sb.WriteString(s) }
+	write(`
 		INSERT INTO audit_log (method, actor_type, actor_id, source_ip, status, error, resource, payload, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, log.Method, log.ActorType, log.ActorID, log.SourceIP, log.Status, log.Error, log.Resource, normalizeAuditPayload(log.Payload), log.CreatedAt)
+		VALUES `)
+	args := make([]any, 0, len(logs)*columns)
+	for i, l := range logs {
+		if i > 0 {
+			write(",")
+		}
+		base := i * columns
+		write(fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8, base+9))
+		args = append(args, l.Method, l.ActorType, l.ActorID, l.SourceIP, l.Status, l.Error, l.Resource, normalizeAuditPayload(l.Payload), l.CreatedAt)
+	}
+	_, err := s.GetDB().ExecContext(ctx, sb.String(), args...)
 	return err
 }
 
