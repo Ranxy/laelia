@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -23,6 +25,31 @@ const (
 	graceDBTimeout = 10 * time.Second
 	watcherBufSize = 256
 )
+
+// watcher is one subscribed consumer of a command's live stream. dropped
+// counts messages discarded because the consumer was slower than the producer
+// (buffer full); it is only mutated via atomics, so broadcast can update it
+// while holding the dispatcher's read lock.
+type watcher[T any] struct {
+	ch      chan T
+	dropped atomic.Int64
+}
+
+// drop records one dropped message and reports whether this drop should be
+// logged: the first drop and every doubling after it, so a flood of drops
+// costs a logarithmic number of log lines.
+func (w *watcher[T]) drop() (total int64, log bool) {
+	n := w.dropped.Add(1)
+	return n, n&(n-1) == 0
+}
+
+// watcherDroppedTotal counts live-stream messages dropped because a watcher's
+// buffer was full. Exposed at /metrics via the default registry (folded in
+// echo_routes). kind: "output" | "event".
+var watcherDroppedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "laelia_watcher_dropped_total",
+	Help: "Live command stream messages dropped because a watcher's buffer was full.",
+}, []string{"kind"})
 
 type SendFunc func(*v1pb.ManagerStreamMessage) error
 
@@ -166,8 +193,8 @@ type Dispatcher struct {
 	mu            sync.RWMutex
 	sessions      map[int]*AgentSession
 	machines      map[int]*MachineSession
-	watchers      map[string]map[chan *v1pb.CommandOutput]struct{}
-	eventWatchers map[string]map[chan *v1pb.CommandEvent]struct{}
+	watchers      map[string]map[*watcher[*v1pb.CommandOutput]]struct{}
+	eventWatchers map[string]map[*watcher[*v1pb.CommandEvent]]struct{}
 	pingInterval  time.Duration
 	pingTimeout   time.Duration
 
@@ -209,8 +236,8 @@ func New(s *store.Store) *Dispatcher {
 		store:                 s,
 		sessions:              make(map[int]*AgentSession),
 		machines:              make(map[int]*MachineSession),
-		watchers:              make(map[string]map[chan *v1pb.CommandOutput]struct{}),
-		eventWatchers:         make(map[string]map[chan *v1pb.CommandEvent]struct{}),
+		watchers:              make(map[string]map[*watcher[*v1pb.CommandOutput]]struct{}),
+		eventWatchers:         make(map[string]map[*watcher[*v1pb.CommandEvent]]struct{}),
 		pingInterval:          15 * time.Second,
 		pingTimeout:           45 * time.Second,
 		grace:                 make(map[int]map[string]context.CancelFunc),
@@ -1046,9 +1073,9 @@ func (d *Dispatcher) Subscribe(_ context.Context, commandID string) (chan *v1pb.
 
 	d.mu.Lock()
 	if d.watchers[commandID] == nil {
-		d.watchers[commandID] = make(map[chan *v1pb.CommandOutput]struct{})
+		d.watchers[commandID] = make(map[*watcher[*v1pb.CommandOutput]]struct{})
 	}
-	d.watchers[commandID][ch] = struct{}{}
+	d.watchers[commandID][&watcher[*v1pb.CommandOutput]{ch: ch}] = struct{}{}
 	d.mu.Unlock()
 
 	return ch, nil
@@ -1059,8 +1086,13 @@ func (d *Dispatcher) Unsubscribe(commandID string, ch chan *v1pb.CommandOutput) 
 	defer d.mu.Unlock()
 
 	if watchers, ok := d.watchers[commandID]; ok {
-		delete(watchers, ch)
-		close(ch)
+		for w := range watchers {
+			if w.ch == ch {
+				delete(watchers, w)
+				close(ch)
+				break
+			}
+		}
 		if len(watchers) == 0 {
 			delete(d.watchers, commandID)
 		}
@@ -1072,9 +1104,9 @@ func (d *Dispatcher) SubscribeEvents(_ context.Context, commandID string) (chan 
 
 	d.mu.Lock()
 	if d.eventWatchers[commandID] == nil {
-		d.eventWatchers[commandID] = make(map[chan *v1pb.CommandEvent]struct{})
+		d.eventWatchers[commandID] = make(map[*watcher[*v1pb.CommandEvent]]struct{})
 	}
-	d.eventWatchers[commandID][ch] = struct{}{}
+	d.eventWatchers[commandID][&watcher[*v1pb.CommandEvent]{ch: ch}] = struct{}{}
 	d.mu.Unlock()
 
 	return ch, nil
@@ -1085,8 +1117,13 @@ func (d *Dispatcher) UnsubscribeEvents(commandID string, ch chan *v1pb.CommandEv
 	defer d.mu.Unlock()
 
 	if watchers, ok := d.eventWatchers[commandID]; ok {
-		delete(watchers, ch)
-		close(ch)
+		for w := range watchers {
+			if w.ch == ch {
+				delete(watchers, w)
+				close(ch)
+				break
+			}
+		}
 		if len(watchers) == 0 {
 			delete(d.eventWatchers, commandID)
 		}
@@ -1097,10 +1134,15 @@ func (d *Dispatcher) broadcast(commandID string, output *v1pb.CommandOutput) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	for ch := range d.watchers[commandID] {
+	for w := range d.watchers[commandID] {
 		select {
-		case ch <- output:
+		case w.ch <- output:
 		default:
+			total, log := w.drop()
+			watcherDroppedTotal.WithLabelValues("output").Inc()
+			if log {
+				slog.Warn("command watcher too slow; dropping live output (DB replay is the fallback)", "commandID", commandID, "dropped", total)
+			}
 		}
 	}
 }
@@ -1109,10 +1151,15 @@ func (d *Dispatcher) broadcastEvent(commandID string, event *v1pb.CommandEvent) 
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	for ch := range d.eventWatchers[commandID] {
+	for w := range d.eventWatchers[commandID] {
 		select {
-		case ch <- event:
+		case w.ch <- event:
 		default:
+			total, log := w.drop()
+			watcherDroppedTotal.WithLabelValues("event").Inc()
+			if log {
+				slog.Warn("command event watcher too slow; dropping live events (DB replay is the fallback)", "commandID", commandID, "dropped", total)
+			}
 		}
 	}
 }
@@ -1436,8 +1483,8 @@ func (d *Dispatcher) closeWatchers(commandID string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	for ch := range d.watchers[commandID] {
-		close(ch)
+	for w := range d.watchers[commandID] {
+		close(w.ch)
 	}
 	delete(d.watchers, commandID)
 }
@@ -1446,8 +1493,8 @@ func (d *Dispatcher) closeEventWatchers(commandID string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	for ch := range d.eventWatchers[commandID] {
-		close(ch)
+	for w := range d.eventWatchers[commandID] {
+		close(w.ch)
 	}
 	delete(d.eventWatchers, commandID)
 }
