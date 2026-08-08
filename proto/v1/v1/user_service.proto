@@ -62,7 +62,11 @@ service UserService {
       body: "user"
     };
     option (google.api.method_signature) = "user,update_mask";
-    option (laelia.v1.auth_method) = IAM;
+    // CUSTOM: the handler allows the target user themselves and otherwise
+    // requires laelia.users.update (workspace scope). The permission annotation
+    // below documents that requirement; it is enforced in the handler, not by
+    // the IAM interceptor (which must not block self-service updates).
+    option (laelia.v1.auth_method) = CUSTOM;
     option (laelia.v1.permission) = "laelia.users.update";
     option (laelia.v1.audit) = true;
   }

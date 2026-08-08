@@ -20,6 +20,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/common"
 	"github.com/Ranxy/laelia/backend/common/log"
+	"github.com/Ranxy/laelia/backend/common/permission"
 	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
@@ -451,7 +452,7 @@ func (s *UserService) validatePassword(ctx context.Context, password string) err
 
 // UpdateUser updates a user.
 func (s *UserService) UpdateUser(ctx context.Context, request *connect.Request[v1pb.UpdateUserRequest]) (*connect.Response[v1pb.User], error) {
-	_, ok := GetUserFromContext(ctx)
+	caller, ok := GetUserFromContext(ctx)
 	if !ok {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("failed to get caller user"))
 	}
@@ -472,7 +473,13 @@ func (s *UserService) UpdateUser(ctx context.Context, request *connect.Request[v
 	}
 	if user == nil {
 		if request.Msg.AllowMissing {
-			// TODO CHECK PERMISSION
+			allowed, err := canCreateUser(ctx, s.iam, caller)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check permission"))
+			}
+			if !allowed {
+				return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("permission %q denied", permission.UsersCreate))
+			}
 			return s.CreateUser(ctx, connect.NewRequest(&v1pb.CreateUserRequest{
 				User: request.Msg.User,
 			}))
@@ -486,9 +493,13 @@ func (s *UserService) UpdateUser(ctx context.Context, request *connect.Request[v
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("built-in user %d cannot be modified", userID))
 	}
 
-	// if callerUser.ID != userID {
-	// 	// TODO check permission
-	// }
+	allowed, err := canUpdateUser(ctx, s.iam, caller, user)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check permission"))
+	}
+	if !allowed {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.Errorf("permission %q denied", permission.UsersUpdate))
+	}
 
 	var passwordPatch *string
 	patch := &store.UpdateUserMessage{}
