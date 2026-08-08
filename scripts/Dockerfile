@@ -69,6 +69,9 @@ FROM node:24.12.0-slim AS machine
 ARG VERSION=local
 ARG GIT_COMMIT=unknown
 ARG APT_MIRROR
+# Codex CLI version spec for the codex ACP v2 provider (npm package). Pin a
+# version for reproducible rebuilds; override with CODEX_NPM_SPEC.
+ARG CODEX_NPM_SPEC=@openai/codex@0.146.0
 LABEL org.opencontainers.image.version=${VERSION}
 LABEL org.opencontainers.image.revision=${GIT_COMMIT}
 # Agent runtime: pi is a glibc-linked standalone binary (debian base), and the
@@ -88,6 +91,12 @@ RUN if [ -n "${APT_MIRROR}" ]; then \
 		python3 python3-pip python3-venv python-is-python3 build-essential \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& useradd --create-home --uid 1001 laelia
+# Codex ACP v2 provider: the codex CLI ships an app-server speaking the thread
+# protocol. Login/config state is NEVER baked in — operators mount a writable
+# CODEX_HOME volume (config.toml + auth/models) at runtime, see
+# machine-entrypoint.sh's LAELIA_CODEX_HOME.
+RUN npm install -g --no-audit --no-fund "${CODEX_NPM_SPEC}" \
+	&& rm -rf /root/.npm
 COPY --from=machine-build /out/laelia-machine /usr/local/bin/laelia-machine
 COPY scripts/docker/machine-entrypoint.sh /usr/local/bin/machine-entrypoint
 USER laelia

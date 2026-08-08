@@ -13,7 +13,8 @@
 # contain proxy settings and the apt/apk steps of the runtime stages stay
 # proxy-free. PI_PROXY, when set, overrides the proxy for the pi download
 # only. APT_MIRROR swaps the machine image's Debian apt source for a faster
-# local mirror.
+# local mirror. CODEX_NPM_SPEC pins the codex CLI version installed in the
+# machine image (default @openai/codex@0.146.0).
 #
 # Note: do NOT export global HTTP_PROXY/HTTPS_PROXY to proxy docker builds;
 # BuildKit auto-injects those standard args into every build stage, including
@@ -37,6 +38,9 @@ if [[ -n "${PI_PROXY:-}" ]]; then
 fi
 if [[ -n "${APT_MIRROR:-}" ]]; then
 	build_args+=(--build-arg "APT_MIRROR=${APT_MIRROR}")
+fi
+if [[ -n "${CODEX_NPM_SPEC:-}" ]]; then
+	build_args+=(--build-arg "CODEX_NPM_SPEC=${CODEX_NPM_SPEC}")
 fi
 
 docker build -f ./scripts/Dockerfile \

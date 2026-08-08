@@ -13,6 +13,7 @@ This file provides guidance to Copilot (codex/claude.ai/code) when working with 
 3. **Auto-fix**: Use `golangci-lint run --fix --allow-parallel-runners` to fix issues automatically
 4. **Test**: Run relevant tests before committing
   - If you change ACP stdio integration or anything that could break real local ACP execution, also run `LAELIA_RUN_OPENCODE_ACP_TESTS=1 go test ./backend/agent/executor -count=1` on a machine with local `opencode acp` available.
+  - If you change the ACP v2 thread path (acp2, codex provider, thread executor), also run `LAELIA_RUN_CODEX_ACP_TESTS=1 CODEX_HOME=<writable codex home> go test ./backend/agent/executor -run TestThreadExecutorCodex -count=1` on a machine with local `codex` (with `app-server`) available.
 5. **Build**: `go build -ldflags "-w -s" -p=16 -o ./build/laelia ./backend/manager/bin/server/main.go`
 
 ### Frontend Code Changes
@@ -49,6 +50,11 @@ go test -v -count=1 github.com/Ranxy/laelia/backend/manager/path/to/tests -run ^
 
 # Run ACP executor integration tests against local opencode ACP when stdio/runtime integration changes
 LAELIA_RUN_OPENCODE_ACP_TESTS=1 go test ./backend/agent/executor -count=1
+
+# Run ACP v2 thread executor integration tests against local codex (needs a
+# writable CODEX_HOME with config.toml + models.json; the tests copy it into a
+# hermetic temp home, so the real home is never touched)
+LAELIA_RUN_CODEX_ACP_TESTS=1 CODEX_HOME=/path/to/codex-home go test ./backend/agent/executor -run TestThreadExecutorCodex -count=1
 
 # Lint
 golangci-lint run --allow-parallel-runners
@@ -121,8 +127,14 @@ Notes:
   to CLI flags, adding `--allow-http` for `http://` URLs automatically).
 - The machine image is an agent runtime: node/npm (base image) plus
   python3/pip, build-essential (make/gcc), git, curl, wget, jq, unzip, zip,
-  ripgrep. Pass `APT_MIRROR=http://mirrors.aliyun.com/debian` (or your local
-  Debian mirror) to speed up the apt steps in restricted networks.
+  ripgrep, and the codex CLI (`npm install -g @openai/codex`, version pinned
+  via `CODEX_NPM_SPEC`) for the codex ACP v2 provider. Pass
+  `APT_MIRROR=http://mirrors.aliyun.com/debian` (or your local Debian mirror)
+  to speed up the apt steps in restricted networks.
+- Codex login/config is never baked into the image: mount a writable CODEX_HOME
+  volume (config.toml + auth/models.json) and point the machine entrypoint at
+  it with `LAELIA_CODEX_HOME` (it exports CODEX_HOME for the daemon). Without
+  it codex falls back to `~/.codex` under the container home.
 - `LAELIA_BUILD_PROXY` is the single build proxy (pi download + docker Go
   stages). `PI_PROXY` is a legacy alias that overrides just the pi download.
   Do not use a global `HTTPS_PROXY` for docker builds: BuildKit auto-injects
