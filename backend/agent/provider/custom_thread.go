@@ -32,7 +32,7 @@ func (p *CustomThreadProvider) ThreadCommand(_ string) (string, []string) {
 }
 
 // NewThreadMapper returns the generic thread mapper (turn lifecycle only).
-func (p *CustomThreadProvider) NewThreadMapper() acp2.EventMapper { return NewGenericThreadMapper() }
+func (*CustomThreadProvider) NewThreadMapper() acp2.EventMapper { return NewGenericThreadMapper() }
 
 // ThreadMcpArgs returns nil: the provider's MCP CLI shape is unknown, so
 // managed MCP servers are not injected for a custom v2 agent.
@@ -102,6 +102,8 @@ func genericTurnCompleted(params map[string]json.RawMessage, turnID string) []ac
 			msg += ": " + turn.Error.Message
 		}
 		events = append(events, acp2.Event{Type: acp2.EventError, TurnID: turnID, Text: msg})
+	default:
+		// completed and other statuses carry no error event.
 	}
 	events = append(events, acp2.Event{Type: acp2.EventLifecycle, TurnID: turnID, Text: "turn_completed"})
 	return events
