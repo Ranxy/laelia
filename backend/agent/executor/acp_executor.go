@@ -698,14 +698,25 @@ func (e *ACPExecutor) finishACPProcess(err error) {
 	e.sendACPResult(Result{ExitCode: 1, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: errMsg})
 }
 
+// scanACPStderr forwards the ACP subprocess' stderr as command output. It uses
+// bufio.Reader.ReadBytes instead of bufio.Scanner because Scanner caps lines at
+// 64KB (MaxScanTokenSize) and silently truncates a longer line; ReadBytes keeps
+// the full line (the output buffer downstream still caps total bytes).
 func (e *ACPExecutor) scanACPStderr(stderr io.Reader) {
-	scanner := bufio.NewScanner(stderr)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
+	r := bufio.NewReader(stderr)
+	for {
+		chunk, err := r.ReadBytes('\n')
+		if len(chunk) > 0 {
+			if line := strings.TrimSpace(string(chunk)); line != "" {
+				e.sendOutput(v1pb.CommandOutput_STDERR, line)
+			}
 		}
-		e.sendOutput(v1pb.CommandOutput_STDERR, line)
+		if err != nil {
+			if err != io.EOF {
+				slog.Warn("failed reading acp stderr", "error", err)
+			}
+			return
+		}
 	}
 }
 
