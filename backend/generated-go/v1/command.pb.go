@@ -10190,9 +10190,15 @@ func (x *WatchCommandEventsRequest) GetAfterSeqNo() int32 {
 }
 
 type PermissionDecision struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CommandId     string                 `protobuf:"bytes,1,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
-	OptionId      string                 `protobuf:"bytes,2,opt,name=option_id,json=optionId,proto3" json:"option_id,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	CommandId string                 `protobuf:"bytes,1,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	OptionId  string                 `protobuf:"bytes,2,opt,name=option_id,json=optionId,proto3" json:"option_id,omitempty"`
+	// tool_call_id correlates the decision with the PermissionRequested event
+	// that carried it, so the agent routes the decision to the specific pending
+	// tool call instead of a shared channel. Empty when the caller did not
+	// provide it (older clients): the agent falls back to its sole pending
+	// request and drops the decision when ambiguous.
+	ToolCallId    string `protobuf:"bytes,3,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -10241,10 +10247,21 @@ func (x *PermissionDecision) GetOptionId() string {
 	return ""
 }
 
+func (x *PermissionDecision) GetToolCallId() string {
+	if x != nil {
+		return x.ToolCallId
+	}
+	return ""
+}
+
 type RespondPermissionRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	OptionId      string                 `protobuf:"bytes,2,opt,name=option_id,json=optionId,proto3" json:"option_id,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Name     string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	OptionId string                 `protobuf:"bytes,2,opt,name=option_id,json=optionId,proto3" json:"option_id,omitempty"`
+	// Echoes the tool_call_id from the PermissionRequested event the caller is
+	// responding to. Required for correct routing when multiple tool calls are
+	// pending permission concurrently.
+	ToolCallId    string `protobuf:"bytes,3,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -10289,6 +10306,13 @@ func (x *RespondPermissionRequest) GetName() string {
 func (x *RespondPermissionRequest) GetOptionId() string {
 	if x != nil {
 		return x.OptionId
+	}
+	return ""
+}
+
+func (x *RespondPermissionRequest) GetToolCallId() string {
+	if x != nil {
+		return x.ToolCallId
 	}
 	return ""
 }
@@ -11422,15 +11446,19 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tB\x16\xe0A\x02\xfaA\x10\n" +
 	"\x0elaelia/CommandR\x04name\x12 \n" +
 	"\fafter_seq_no\x18\x02 \x01(\x05R\n" +
-	"afterSeqNo\"P\n" +
+	"afterSeqNo\"r\n" +
 	"\x12PermissionDecision\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12\x1b\n" +
-	"\toption_id\x18\x02 \x01(\tR\boptionId\"c\n" +
+	"\toption_id\x18\x02 \x01(\tR\boptionId\x12 \n" +
+	"\ftool_call_id\x18\x03 \x01(\tR\n" +
+	"toolCallId\"\x85\x01\n" +
 	"\x18RespondPermissionRequest\x12*\n" +
 	"\x04name\x18\x01 \x01(\tB\x16\xe0A\x02\xfaA\x10\n" +
 	"\x0elaelia/CommandR\x04name\x12\x1b\n" +
-	"\toption_id\x18\x02 \x01(\tR\boptionId\"\x92\x01\n" +
+	"\toption_id\x18\x02 \x01(\tR\boptionId\x12 \n" +
+	"\ftool_call_id\x18\x03 \x01(\tR\n" +
+	"toolCallId\"\x92\x01\n" +
 	"\x14NewMessagesAvailable\x12)\n" +
 	"\x10conversation_ids\x18\x01 \x03(\tR\x0fconversationIds\x12\x1a\n" +
 	"\bversions\x18\x02 \x03(\x03R\bversions\x123\n" +

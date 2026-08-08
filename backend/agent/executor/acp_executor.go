@@ -223,7 +223,12 @@ type ACPExecutor struct {
 	// command timeline.
 	usageMu       sync.Mutex
 	lastUsageEmit time.Time
-	permissionCh  chan acp.PermissionOptionId
+	// pendingPermMu guards pendingPermChs. pendingPermChs routes permission
+	// decisions to the specific tool call that requested them (keyed by
+	// tool_call_id, "" for legacy callers); concurrent requests no longer share
+	// a single channel, so a decision for call A cannot be consumed by call B.
+	pendingPermMu  sync.Mutex
+	pendingPermChs map[string]chan acp.PermissionOptionId
 	// permMu guards perCommandAllow/perCommandReject. The ACP client methods
 	// may be invoked concurrently; without a lock these maps would race.
 	permMu           sync.Mutex
@@ -279,7 +284,7 @@ func NewACP(req Request, cfg *ACPConfig) (Runtime, error) {
 		eventCh:          make(chan Event, outputBufferSize),
 		resultCh:         make(chan Result, 1),
 		done:             make(chan struct{}),
-		permissionCh:     make(chan acp.PermissionOptionId, 1),
+		pendingPermChs:   map[string]chan acp.PermissionOptionId{},
 		perCommandAllow:  map[string]bool{},
 		perCommandReject: map[string]bool{},
 		toolCallStates:   map[string]*toolCallState{},
@@ -373,11 +378,38 @@ func (e *ACPExecutor) Done() <-chan struct{} {
 	return e.done
 }
 
-func (e *ACPExecutor) ResolvePermission(optionID string) {
-	select {
-	case e.permissionCh <- acp.PermissionOptionId(optionID):
-	default:
+func (e *ACPExecutor) ResolvePermission(toolCallID, optionID string) {
+	e.pendingPermMu.Lock()
+	defer e.pendingPermMu.Unlock()
+	if toolCallID != "" {
+		ch, ok := e.pendingPermChs[toolCallID]
+		if ok {
+			select {
+			case ch <- acp.PermissionOptionId(optionID):
+			default:
+			}
+			return
+		}
+		// Stale/unknown tool_call_id: never guess. The decision may belong to
+		// an already-consumed or timed-out request; delivering it elsewhere
+		// would silently authorize the wrong tool call.
+		slog.Warn("permission decision has no matching pending request",
+			"tool_call_id", toolCallID, "pending", len(e.pendingPermChs))
+		return
 	}
+	// Legacy decision without tool_call_id: deliver to the sole pending
+	// request when unambiguous, otherwise drop with a log rather than guess.
+	if len(e.pendingPermChs) == 1 {
+		for _, ch := range e.pendingPermChs {
+			select {
+			case ch <- acp.PermissionOptionId(optionID):
+			default:
+			}
+		}
+		return
+	}
+	slog.Warn("permission decision has no matching pending request",
+		"tool_call_id", toolCallID, "pending", len(e.pendingPermChs))
 }
 
 func (e *ACPExecutor) run() {
@@ -974,8 +1006,21 @@ func (c *acpRuntimeClient) RequestPermission(_ context.Context, params acp.Reque
 		},
 	})
 
+	// Register a per-tool-call decision channel so concurrent permission
+	// requests (parallel tool use) each consume only their own decision.
+	toolCallID := string(params.ToolCall.ToolCallId)
+	decisionCh := make(chan acp.PermissionOptionId, 1)
+	c.executor.pendingPermMu.Lock()
+	c.executor.pendingPermChs[toolCallID] = decisionCh
+	c.executor.pendingPermMu.Unlock()
+	defer func() {
+		c.executor.pendingPermMu.Lock()
+		delete(c.executor.pendingPermChs, toolCallID)
+		c.executor.pendingPermMu.Unlock()
+	}()
+
 	select {
-	case optionID := <-c.executor.permissionCh:
+	case optionID := <-decisionCh:
 		if optionID == "" {
 			return acp.RequestPermissionResponse{
 				Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{Outcome: "cancelled"}},

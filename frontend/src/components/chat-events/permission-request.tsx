@@ -21,12 +21,12 @@ export function ChatPermissionRequest({
 
   if (event.payload.case !== "permissionRequested") return null;
 
-  const { kind, title, options } = event.payload.value;
+  const { kind, title, options, toolCallId } = event.payload.value;
 
   const handleRespond = async (optionId: string) => {
     setResponded(true);
     try {
-      await respondPermission(commandName, optionId);
+      await respondPermission(commandName, optionId, toolCallId);
     } catch {
       setResponded(false);
     }

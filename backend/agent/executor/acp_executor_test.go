@@ -705,8 +705,8 @@ func TestRequestPermission_ConcurrentCallsNoRace(t *testing.T) {
 		config:           &ACPConfig{MaxEventCount: 0}, // no event limit
 		outputCh:         make(chan OutputChunk, 16),
 		eventCh:          make(chan Event, 256),
-		permissionCh:     make(chan acp.PermissionOptionId, 1),
-		perCommandAllow:  map[string]bool{"hot": true},
+		pendingPermChs:   map[string]chan acp.PermissionOptionId{},
+		perCommandAllow:  map[string]bool{string(acp.ToolKindRead): true},
 		perCommandReject: map[string]bool{},
 	}
 	client := &acpRuntimeClient{executor: exec}
@@ -749,35 +749,32 @@ func TestRequestPermission_ConcurrentCallsNoRace(t *testing.T) {
 		}()
 	}
 
-	// Feeder: pump one AllowAlways option per writer. Each writer consumes one
-	// and records perCommandAllow[uniqueKind]=true (a map write), overlapping
-	// the readers' map reads.
-	feederDone := make(chan struct{})
-	go func() {
-		for i := 0; i < writers; i++ {
-			select {
-			case exec.permissionCh <- allowOpt:
-			case <-ctx.Done():
-				return
-			}
-		}
-		close(feederDone)
-	}()
-
-	wg.Add(writers)
+	// Each writer requests permission with a unique tool_call_id (registering
+	// its own pendingPermChs entry) and records an AllowAlways decision once
+	// its own decision arrives. The feeder then resolves each writer's ID,
+	// overlapping pendingPermChs/permMu writes with the readers' map reads.
+	var writerIDs []string
 	for i := 0; i < writers; i++ {
-		go func(n int) {
+		writerIDs = append(writerIDs, fmt.Sprintf("call-%d", i))
+	}
+	wg.Add(writers)
+	for _, callID := range writerIDs {
+		go func(callID string) {
 			defer wg.Done()
-			kind := acp.ToolKind(fmt.Sprintf("kind-%d", n))
+			kind := acp.ToolKind("kind-" + callID)
 			_, _ = client.RequestPermission(ctx, acp.RequestPermissionRequest{
 				Options:  options,
-				ToolCall: acp.ToolCallUpdate{Kind: &kind},
+				ToolCall: acp.ToolCallUpdate{Kind: &kind, ToolCallId: acp.ToolCallId(callID)},
 			})
-		}(i)
+		}(callID)
+	}
+
+	waitForPending(t, exec, writers)
+	for _, callID := range writerIDs {
+		exec.ResolvePermission(callID, string(allowOpt))
 	}
 
 	wg.Wait()
-	<-feederDone
 
 	// At least one writer should have recorded its kind. Proves the write path
 	// executed under the lock alongside the concurrent readers.
@@ -785,6 +782,198 @@ func TestRequestPermission_ConcurrentCallsNoRace(t *testing.T) {
 	recorded := len(exec.perCommandAllow)
 	exec.permMu.Unlock()
 	assert.Greater(t, recorded, 1, "writers should have recorded AllowAlways decisions")
+
+	cancel()
+	drainWG.Wait()
+}
+
+// waitForPending polls until exactly n permission requests are registered in
+// the executor's pendingPermChs or the deadline expires.
+func waitForPending(t *testing.T, exec *ACPExecutor, n int) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		exec.pendingPermMu.Lock()
+		count := len(exec.pendingPermChs)
+		exec.pendingPermMu.Unlock()
+		if count == n {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected %d pending permission requests, got %d", n, count)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// TestRequestPermission_RoutesDecisionByToolCallID verifies that concurrent
+// pending permission requests consume only their own decision, keyed by
+// tool_call_id.
+func TestRequestPermission_RoutesDecisionByToolCallID(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	exec := &ACPExecutor{
+		ctx:              ctx,
+		cancel:           cancel,
+		config:           &ACPConfig{MaxEventCount: 0},
+		outputCh:         make(chan OutputChunk, 16),
+		eventCh:          make(chan Event, 256),
+		pendingPermChs:   map[string]chan acp.PermissionOptionId{},
+		perCommandAllow:  map[string]bool{},
+		perCommandReject: map[string]bool{},
+	}
+	client := &acpRuntimeClient{executor: exec}
+
+	var drainWG sync.WaitGroup
+	drainWG.Add(1)
+	go func() {
+		defer drainWG.Done()
+		for {
+			select {
+			case <-exec.eventCh:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	kind := acp.ToolKindRead
+	options := []acp.PermissionOption{
+		{OptionId: "allow-a", Kind: acp.PermissionOptionKindAllowOnce, Name: "Allow A"},
+		{OptionId: "allow-b", Kind: acp.PermissionOptionKindAllowOnce, Name: "Allow B"},
+	}
+
+	type result struct {
+		callID   string
+		optionID acp.PermissionOptionId
+		err      error
+	}
+	results := make(chan result, 2)
+
+	for _, callID := range []string{"call-a", "call-b"} {
+		go func(callID string) {
+			resp, err := client.RequestPermission(ctx, acp.RequestPermissionRequest{
+				Options:  options,
+				ToolCall: acp.ToolCallUpdate{Kind: &kind, ToolCallId: acp.ToolCallId(callID)},
+			})
+			var optionID acp.PermissionOptionId
+			if err == nil && resp.Outcome.Selected != nil {
+				optionID = resp.Outcome.Selected.OptionId
+			}
+			results <- result{callID: callID, optionID: optionID, err: err}
+		}(callID)
+	}
+
+	// Wait until both requests are pending, then deliver each call's own
+	// decision. With a shared channel the first decision would be stolen by
+	// whichever call happened to be reading; per-tool-call routing must give
+	// each call exactly its own option.
+	waitForPending(t, exec, 2)
+	exec.ResolvePermission("call-a", "allow-a")
+	exec.ResolvePermission("call-b", "allow-b")
+
+	got := map[string]acp.PermissionOptionId{}
+	for i := 0; i < 2; i++ {
+		r := <-results
+		require.NoError(t, r.err)
+		got[r.callID] = r.optionID
+	}
+	assert.Equal(t, acp.PermissionOptionId("allow-a"), got["call-a"])
+	assert.Equal(t, acp.PermissionOptionId("allow-b"), got["call-b"])
+	exec.pendingPermMu.Lock()
+	assert.Empty(t, exec.pendingPermChs, "decision channels should be cleaned up")
+	exec.pendingPermMu.Unlock()
+
+	cancel()
+	drainWG.Wait()
+}
+
+// TestResolvePermission_FallsBackToSolePending verifies the legacy fallback:
+// an empty tool_call_id decision is delivered when exactly one request is
+// pending, and dropped when ambiguous.
+func TestResolvePermission_FallsBackToSolePending(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	exec := &ACPExecutor{
+		ctx:              ctx,
+		cancel:           cancel,
+		config:           &ACPConfig{MaxEventCount: 0},
+		outputCh:         make(chan OutputChunk, 16),
+		eventCh:          make(chan Event, 256),
+		pendingPermChs:   map[string]chan acp.PermissionOptionId{},
+		perCommandAllow:  map[string]bool{},
+		perCommandReject: map[string]bool{},
+	}
+	client := &acpRuntimeClient{executor: exec}
+
+	var drainWG sync.WaitGroup
+	drainWG.Add(1)
+	go func() {
+		defer drainWG.Done()
+		for {
+			select {
+			case <-exec.eventCh:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	kind := acp.ToolKindRead
+	options := []acp.PermissionOption{
+		{OptionId: "allow", Kind: acp.PermissionOptionKindAllowOnce, Name: "Allow"},
+	}
+
+	// Sole pending request + empty tool_call_id: decision must be delivered.
+	got := make(chan acp.PermissionOptionId, 1)
+	go func() {
+		resp, err := client.RequestPermission(ctx, acp.RequestPermissionRequest{
+			Options:  options,
+			ToolCall: acp.ToolCallUpdate{Kind: &kind, ToolCallId: "solo"},
+		})
+		require.NoError(t, err)
+		got <- resp.Outcome.Selected.OptionId
+	}()
+	waitForPending(t, exec, 1) // deterministic: wait for the request to register
+	exec.ResolvePermission("", string(options[0].OptionId))
+	select {
+	case id := <-got:
+		assert.Equal(t, acp.PermissionOptionId("allow"), id)
+	case <-time.After(time.Second):
+		t.Fatal("sole pending request did not receive the empty-tool-call-id decision")
+	}
+
+	// Two pending requests + unknown tool_call_id: decision is dropped, both
+	// requests keep waiting (and are cleaned up on cancel).
+	first := make(chan struct{})
+	go func() {
+		_, _ = client.RequestPermission(ctx, acp.RequestPermissionRequest{
+			Options:  options,
+			ToolCall: acp.ToolCallUpdate{Kind: &kind, ToolCallId: "one"},
+		})
+		close(first)
+	}()
+	second := make(chan struct{})
+	go func() {
+		_, _ = client.RequestPermission(ctx, acp.RequestPermissionRequest{
+			Options:  options,
+			ToolCall: acp.ToolCallUpdate{Kind: &kind, ToolCallId: "two"},
+		})
+		close(second)
+	}()
+	waitForPending(t, exec, 2) // deterministic: wait for both requests to register
+	exec.ResolvePermission("unknown", "allow")
+	exec.ResolvePermission("", "allow") // ambiguous: must also be dropped
+	select {
+	case <-first:
+		t.Fatal("decision leaked into a pending request despite ambiguous routing")
+	case <-time.After(200 * time.Millisecond):
+	}
+	select {
+	case <-second:
+		t.Fatal("decision leaked into a pending request despite ambiguous routing")
+	case <-time.After(200 * time.Millisecond):
+	}
 
 	cancel()
 	drainWG.Wait()

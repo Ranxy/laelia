@@ -370,7 +370,7 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 				slog.Info("received permission decision", "commandID", d.CommandId, "optionID", d.OptionId)
 				if ex := c.getCurrentExecutor(); ex != nil {
 					if resolver, ok := ex.(executor.PermissionResolver); ok {
-						resolver.ResolvePermission(d.OptionId)
+						resolver.ResolvePermission(d.ToolCallId, d.OptionId)
 					}
 				}
 

@@ -411,10 +411,16 @@ export function CommandDetailPage() {
   const [permissionResponded, setPermissionResponded] = useState(false);
 
   const handleRespondPermission = async (optionId: string) => {
-    if (!cmdName) return;
+    if (!cmdName || !pendingPermission) return;
     setPermissionResponded(true);
     try {
-      await respondPermission(cmdName, optionId);
+      await respondPermission(
+        cmdName,
+        optionId,
+        pendingPermission.payload.case === "permissionRequested"
+          ? pendingPermission.payload.value.toolCallId
+          : undefined
+      );
     } catch {
       setPermissionResponded(false);
     }

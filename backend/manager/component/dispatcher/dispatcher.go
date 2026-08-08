@@ -1013,7 +1013,7 @@ func (d *Dispatcher) CancelCommand(_ context.Context, agentID int, commandID str
 	return nil
 }
 
-func (d *Dispatcher) RespondPermission(_ context.Context, agentID int, commandID, optionID string) error {
+func (d *Dispatcher) RespondPermission(_ context.Context, agentID int, commandID, optionID, toolCallID string) error {
 	d.mu.RLock()
 	sess, ok := d.sessions[agentID]
 	d.mu.RUnlock()
@@ -1025,8 +1025,9 @@ func (d *Dispatcher) RespondPermission(_ context.Context, agentID int, commandID
 	msg := &v1pb.ManagerStreamMessage{
 		Message: &v1pb.ManagerStreamMessage_PermissionDecision{
 			PermissionDecision: &v1pb.PermissionDecision{
-				CommandId: commandID,
-				OptionId:  optionID,
+				CommandId:  commandID,
+				OptionId:   optionID,
+				ToolCallId: toolCallID,
 			},
 		},
 	}

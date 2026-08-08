@@ -111,9 +111,9 @@ export const createCommandSlice: AppSliceCreator<CommandSlice> = (
     }
   },
 
-  async respondPermission(name, optionId) {
+  async respondPermission(name, optionId, toolCallId) {
     await commandServiceClient.respondPermission(
-      create(RespondPermissionRequestSchema, { name, optionId })
+      create(RespondPermissionRequestSchema, { name, optionId, toolCallId })
     );
   },
 });

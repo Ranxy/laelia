@@ -241,7 +241,7 @@ func (s *CommandService) RespondPermission(ctx context.Context, req *connect.Req
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("option_id must not be empty"))
 	}
 
-	if err := s.dispatcher.RespondPermission(ctx, cmd.AgentID, cmd.ID.String(), req.Msg.OptionId); err != nil {
+	if err := s.dispatcher.RespondPermission(ctx, cmd.AgentID, cmd.ID.String(), req.Msg.OptionId, req.Msg.ToolCallId); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to respond to permission"))
 	}
 

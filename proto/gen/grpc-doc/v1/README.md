@@ -4582,6 +4582,7 @@ which excludes the caller.
 | ----- | ---- | ----- | ----------- |
 | command_id | [string](#string) |  |  |
 | option_id | [string](#string) |  |  |
+| tool_call_id | [string](#string) |  | tool_call_id correlates the decision with the PermissionRequested event that carried it, so the agent routes the decision to the specific pending tool call instead of a shared channel. Empty when the caller did not provide it (older clients): the agent falls back to its sole pending request and drops the decision when ambiguous. |
 
 
 
@@ -4839,6 +4840,7 @@ creates one. Powers the &#34;#&lt;title&gt;&#34; address resolver.
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  |  |
 | option_id | [string](#string) |  |  |
+| tool_call_id | [string](#string) |  | Echoes the tool_call_id from the PermissionRequested event the caller is responding to. Required for correct routing when multiple tool calls are pending permission concurrently. |
 
 
 

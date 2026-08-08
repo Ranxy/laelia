@@ -7590,6 +7590,12 @@ components:
                     type: string
                 optionId:
                     type: string
+                toolCallId:
+                    type: string
+                    description: |-
+                        Echoes the tool_call_id from the PermissionRequested event the caller is
+                         responding to. Required for correct routing when multiple tool calls are
+                         pending permission concurrently.
         RevokeAgentTokenRequest:
             required:
                 - name

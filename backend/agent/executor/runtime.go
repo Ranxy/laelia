@@ -96,5 +96,9 @@ type Runtime interface {
 }
 
 type PermissionResolver interface {
-	ResolvePermission(optionID string)
+	// ResolvePermission delivers the user's decision for a pending permission
+	// request. toolCallID correlates with the PermissionRequested event; the
+	// executor routes it to the matching pending request and falls back to the
+	// sole pending request when toolCallID is empty.
+	ResolvePermission(toolCallID, optionID string)
 }
