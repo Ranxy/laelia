@@ -1169,6 +1169,25 @@ func (d *Dispatcher) HandleEvent(ctx context.Context, event *v1pb.CommandEvent) 
 		return errors.Wrapf(err, "failed to store command event")
 	}
 
+	// TOKEN_USAGE is additionally denormalized into command_token_usage so
+	// agent/principal/time aggregates stay cheap. Failure must not break the
+	// event stream: the standalone table is derived data, the event row above
+	// is the source of truth.
+	if event.Type == v1pb.CommandEventType_TOKEN_USAGE {
+		if usage := event.GetTokenUsage(); usage != nil {
+			if err := d.store.RecordCommandTokenUsage(ctx, &store.CommandTokenUsageMessage{
+				CommandID:        cmdID,
+				InputTokens:      usage.InputTokens,
+				OutputTokens:     usage.OutputTokens,
+				CacheReadTokens:  usage.CacheReadTokens,
+				CacheWriteTokens: usage.CacheWriteTokens,
+				TotalTokens:      usage.TotalTokens,
+			}); err != nil {
+				slog.Error("failed to record command token usage", "commandID", event.CommandId, "error", err)
+			}
+		}
+	}
+
 	if err := d.store.UpdateCommandAckSeq(ctx, cmdID, event.SeqNo); err != nil {
 		slog.Error("failed to update command ack seq from event", "commandID", event.CommandId, "error", err)
 	}

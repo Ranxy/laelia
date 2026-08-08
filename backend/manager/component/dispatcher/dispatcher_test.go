@@ -203,6 +203,18 @@ func TestMarshalEventPayload(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "token_usage",
+			event: &v1pb.CommandEvent{
+				Type: v1pb.CommandEventType_TOKEN_USAGE,
+				Payload: &v1pb.CommandEvent_TokenUsage{
+					TokenUsage: &v1pb.TokenUsagePayload{
+						InputTokens: 100, OutputTokens: 50,
+						CacheReadTokens: 20, CacheWriteTokens: 10, TotalTokens: 150,
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

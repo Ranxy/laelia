@@ -438,6 +438,51 @@ func (s *Store) AppendCommandEvent(ctx context.Context, event *CommandEventMessa
 	return nil
 }
 
+// CommandTokenUsageMessage carries the per-command token consumption recorded
+// from a TOKEN_USAGE event. Dimension columns (agent_id/principal_id/
+// machine_id) are resolved from the command row by RecordCommandTokenUsage.
+type CommandTokenUsageMessage struct {
+	CommandID        uuid.UUID
+	InputTokens      int64
+	OutputTokens     int64
+	CacheReadTokens  int64
+	CacheWriteTokens int64
+	TotalTokens      int64
+}
+
+// RecordCommandTokenUsage stores the final token consumption of one command in
+// command_token_usage, denormalizing agent/principal/machine dimensions from
+// the command row so aggregates need no join. One row per command: a replayed
+// TOKEN_USAGE event is a no-op (ON CONFLICT DO NOTHING).
+func (s *Store) RecordCommandTokenUsage(ctx context.Context, usage *CommandTokenUsageMessage) error {
+	var agentID, principalID int
+	var machineID sql.NullInt64
+	if err := s.GetDB().QueryRowContext(ctx, `
+		SELECT agent_id, principal_id, machine_id
+		FROM command
+		WHERE id = $1
+	`, usage.CommandID).Scan(&agentID, &principalID, &machineID); err != nil {
+		return errors.Wrapf(err, "failed to load command dimensions for token usage")
+	}
+
+	var machineArg any
+	if machineID.Valid {
+		machineArg = machineID.Int64
+	}
+	_, err := s.GetDB().ExecContext(ctx, `
+		INSERT INTO command_token_usage
+			(command_id, agent_id, principal_id, machine_id,
+			 input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, total_tokens)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (command_id) DO NOTHING
+	`, usage.CommandID, agentID, principalID, machineArg,
+		usage.InputTokens, usage.OutputTokens, usage.CacheReadTokens, usage.CacheWriteTokens, usage.TotalTokens)
+	if err != nil {
+		return errors.Wrapf(err, "failed to record command token usage")
+	}
+	return nil
+}
+
 func (s *Store) GetCommandOutput(ctx context.Context, cmdID uuid.UUID, afterSeq int32) ([]*CommandOutputMessage, error) {
 	rows, err := s.GetDB().QueryContext(ctx, `
 		SELECT id, command_id, seq_no, stream_type, content, created_at

@@ -170,3 +170,30 @@ func TestChannelTitleUniqueIndexPresent(t *testing.T) {
 		}
 	}
 }
+
+// TestCommandTokenUsageTablePresent locks in the standalone token-usage table
+// that keeps per-command token aggregates cheap. One row per command
+// (command_id UNIQUE) with dimension columns (agent_id/principal_id/
+// machine_id) denormalized from command so agent/principal/machine + time
+// aggregation needs no join. All declarations are idempotent so re-applying
+// the schema is safe.
+func TestCommandTokenUsageTablePresent(t *testing.T) {
+	sql := latestSQL(t)
+
+	for _, want := range []string{
+		"CREATE TABLE IF NOT EXISTS command_token_usage",
+		"command_id UUID NOT NULL UNIQUE REFERENCES command(id) ON DELETE CASCADE",
+		"agent_id INTEGER NOT NULL REFERENCES agent(id) ON DELETE CASCADE",
+		"principal_id INTEGER NOT NULL REFERENCES principal(id)",
+		"machine_id INTEGER REFERENCES machine(id) ON DELETE SET NULL",
+		"total_tokens BIGINT NOT NULL DEFAULT 0",
+		"CREATE INDEX IF NOT EXISTS idx_command_token_usage_agent_time",
+		"CREATE INDEX IF NOT EXISTS idx_command_token_usage_principal_time",
+		"CREATE INDEX IF NOT EXISTS idx_command_token_usage_machine_time",
+		"CREATE INDEX IF NOT EXISTS idx_command_token_usage_time",
+	} {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration missing command_token_usage declaration: %q", want)
+		}
+	}
+}
