@@ -40,11 +40,29 @@ func TestCodexEventMapperReasoningDelta(t *testing.T) {
 	if len(evs) != 1 || evs[0].Type != acp2.EventThinkingDelta || evs[0].Text != "thinking..." {
 		t.Fatalf("reasoning delta: %+v", evs)
 	}
-	// Per-token reasoning stream (item/reasoning/textDelta) is internal
-	// progress, not user-visible thinking — degrade to raw like raft does.
-	evs = m.MapNotification(notif("item/reasoning/textDelta", `{"itemId":"r1","delta":"token by token","contentIndex":0}`))
-	if len(evs) != 1 || evs[0].Type != acp2.EventRaw {
-		t.Fatalf("textDelta should degrade to raw: %+v", evs)
+	// The per-token reasoning stream (item/reasoning/textDelta) is buffered
+	// per item and surfaces as a single thinking delta at item completion.
+	evs = m.MapNotification(notif("item/reasoning/textDelta", `{"itemId":"r2","delta":"token by ","contentIndex":0}`))
+	if len(evs) != 0 {
+		t.Fatalf("textDelta should buffer, not emit: %+v", evs)
+	}
+	evs = m.MapNotification(notif("item/reasoning/textDelta", `{"itemId":"r2","delta":"token","contentIndex":0}`))
+	if len(evs) != 0 {
+		t.Fatalf("textDelta should buffer, not emit: %+v", evs)
+	}
+	evs = m.MapNotification(notif("item/completed", `{"item":{"id":"r2","type":"reasoning","summary":[]}}`))
+	if len(evs) != 1 || evs[0].Type != acp2.EventThinkingDelta || evs[0].Text != "token by token" {
+		t.Fatalf("completed reasoning should emit buffered text: %+v", evs)
+	}
+	// While the full reasoning stream is buffered, the summary is suppressed
+	// to avoid duplicating the thinking output.
+	evs = m.MapNotification(notif("item/reasoning/textDelta", `{"itemId":"r3","delta":"full reasoning","contentIndex":0}`))
+	if len(evs) != 0 {
+		t.Fatalf("textDelta should buffer: %+v", evs)
+	}
+	evs = m.MapNotification(notif("item/reasoning/summaryTextDelta", `{"itemId":"r3","delta":"summary"}`))
+	if len(evs) != 0 {
+		t.Fatalf("summary should be suppressed while full text is buffered: %+v", evs)
 	}
 }
 

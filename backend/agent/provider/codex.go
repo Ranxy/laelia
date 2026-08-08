@@ -326,19 +326,22 @@ func NewCodexEventMapper() *CodexEventMapper {
 		streamedAgentMessageIDs: map[string]struct{}{},
 		agentMessagePhases:      map[string]string{},
 		streamedReasoningIDs:    map[string]struct{}{},
+		reasoningTextBuffers:    map[string]*strings.Builder{},
 		fileChangeCounts:        map[string]int{},
 	}
 }
 
 // CodexEventMapper translates codex app-server notifications into neutral
 // acp2 events. Agent message deltas are user-visible only in the final_answer
-// phase, reasoning summaries surface as thinking deltas, item started/completed
-// frames become tool call boundaries, and everything unrecognized degrades to
-// raw so nothing is silently dropped.
+// phase, the raw per-token reasoning stream is buffered and surfaces as one
+// thinking delta at item completion, reasoning summaries surface as thinking
+// deltas, item started/completed frames become tool call boundaries, and
+// everything unrecognized degrades to raw so nothing is silently dropped.
 type CodexEventMapper struct {
 	streamedAgentMessageIDs map[string]struct{}
 	agentMessagePhases      map[string]string
 	streamedReasoningIDs    map[string]struct{}
+	reasoningTextBuffers    map[string]*strings.Builder
 	fileChangeCounts        map[string]int
 }
 
@@ -348,6 +351,7 @@ func (m *CodexEventMapper) Reset() {
 	m.streamedAgentMessageIDs = map[string]struct{}{}
 	m.agentMessagePhases = map[string]string{}
 	m.streamedReasoningIDs = map[string]struct{}{}
+	m.reasoningTextBuffers = map[string]*strings.Builder{}
 	m.fileChangeCounts = map[string]int{}
 }
 
@@ -365,6 +369,8 @@ func (m *CodexEventMapper) MapNotification(n acp2.Notification) []acp2.Event {
 		return m.agentMessageDelta(params, turnID)
 	case "item/reasoning/summaryTextDelta":
 		return m.reasoningSummaryDelta(params, turnID)
+	case "item/reasoning/textDelta":
+		return m.reasoningTextDelta(params, turnID)
 	case "item/started", "item/completed":
 		return m.itemEvent(n.Method, params, turnID)
 	case "thread/tokenUsage/updated":
@@ -451,7 +457,31 @@ func (m *CodexEventMapper) reasoningSummaryDelta(params map[string]json.RawMessa
 	if delta == "" {
 		return nil
 	}
+	if _, buffered := m.reasoningTextBuffers[itemID]; buffered {
+		// The full reasoning stream is buffered and will be emitted as one
+		// thinking delta at item completion; skip the redundant summary.
+		return nil
+	}
 	return []acp2.Event{{Type: acp2.EventThinkingDelta, TurnID: turnID, Text: delta}}
+}
+
+// reasoningTextDelta buffers the raw per-token reasoning stream per item.
+// The full text is emitted as a single thinking delta when the item
+// completes, so a long reasoning stream does not fragment into hundreds of
+// events.
+func (m *CodexEventMapper) reasoningTextDelta(params map[string]json.RawMessage, _ string) []acp2.Event {
+	itemID := codexString(params, "itemId")
+	delta := codexString(params, "delta")
+	if itemID == "" || delta == "" {
+		return nil
+	}
+	buf := m.reasoningTextBuffers[itemID]
+	if buf == nil {
+		buf = &strings.Builder{}
+		m.reasoningTextBuffers[itemID] = buf
+	}
+	_, _ = buf.WriteString(delta)
+	return nil
 }
 
 // itemEvent maps item/started and item/completed frames by item type.
@@ -485,7 +515,14 @@ func (m *CodexEventMapper) itemEvent(method string, params map[string]json.RawMe
 	switch item.Type {
 	case "reasoning":
 		if completed && item.ID != "" {
-			if _, streamed := m.streamedReasoningIDs[item.ID]; !streamed {
+			if buf, ok := m.reasoningTextBuffers[item.ID]; ok {
+				// The raw reasoning stream was buffered; surface it as one
+				// thinking delta instead of the summary to avoid duplication.
+				if text := strings.TrimSpace(buf.String()); text != "" {
+					events = append(events, acp2.Event{Type: acp2.EventThinkingDelta, TurnID: turnID, Text: text})
+				}
+				delete(m.reasoningTextBuffers, item.ID)
+			} else if _, streamed := m.streamedReasoningIDs[item.ID]; !streamed {
 				if text := strings.TrimSpace(strings.Join(item.Summary, "\n")); text != "" {
 					events = append(events, acp2.Event{Type: acp2.EventThinkingDelta, TurnID: turnID, Text: text})
 				}
