@@ -28,3 +28,15 @@ type ThreadProvider interface {
 	// protocol (model/list with a cache fallback).
 	ProbeModelsV2(ctx context.Context, workspaceDir string) ([]ModelOption, error)
 }
+
+// ThreadCompatChecker is implemented by ThreadProviders that must verify
+// their binary is compatible before spawning (e.g. a minimum codex version).
+// The executor calls it before launching the app-server so an incompatible
+// install fails fast with a clear error instead of a confusing handshake
+// failure.
+type ThreadCompatChecker interface {
+	// CheckThreadCompat verifies the provider's binary is compatible and
+	// returns the executable to spawn, or an error describing the
+	// incompatibility.
+	CheckThreadCompat(ctx context.Context) (executable string, err error)
+}

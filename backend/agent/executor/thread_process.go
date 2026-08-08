@@ -25,6 +25,13 @@ import (
 // passes its long-lived session ctx (the process survives across turns).
 func spawnThreadAppServer(procCtx context.Context, req Request, cfg *ThreadConfig, p provider.ThreadProvider) (*exec.Cmd, *acp2.Client, io.Reader, error) {
 	exe, args := p.ThreadCommand(cfg.WorkingDir)
+	if c, ok := p.(provider.ThreadCompatChecker); ok {
+		resolved, err := c.CheckThreadCompat(procCtx)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		exe = resolved
+	}
 	args = append(args, p.ThreadMcpArgs(cfg.McpServers)...)
 	cmd := exec.CommandContext(procCtx, exe, args...)
 	cmd.Dir = cfg.WorkingDir

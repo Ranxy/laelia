@@ -3,12 +3,15 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -75,7 +78,7 @@ func (*CodexProvider) NewThreadMapper() acp2.EventMapper { return NewCodexEventM
 // The candidate must pass `codex app-server --help`; a codex binary without
 // the v2 app-server is treated as absent.
 func (p *CodexProvider) Detect(ctx context.Context) (*Detected, bool, error) {
-	exe := resolveCodexCandidate(ctx)
+	exe, _ := resolveCodexCandidate(ctx)
 	if exe == "" {
 		return nil, false, nil
 	}
@@ -85,6 +88,23 @@ func (p *CodexProvider) Detect(ctx context.Context) (*Detected, bool, error) {
 		Version:        codexVersion(ctx, exe),
 		ExecutablePath: exe,
 	}, true, nil
+}
+
+// CheckThreadCompat implements ThreadCompatChecker: it resolves the codex
+// candidate (app-server probe + version check) and returns the executable to
+// spawn, or a clear error when no compatible candidate exists so a stale agent
+// config fails fast with an upgrade hint instead of a confusing handshake
+// failure.
+func (*CodexProvider) CheckThreadCompat(ctx context.Context) (string, error) {
+	exe, rejected := resolveCodexCandidate(ctx)
+	if exe != "" {
+		return exe, nil
+	}
+	msg := "Cannot resolve a compatible Codex CLI app-server entry point."
+	if len(rejected) > 0 {
+		msg += " Rejected candidates: " + strings.Join(rejected, "; ") + "."
+	}
+	return "", errors.New(msg)
 }
 
 // ProbeModelsV2 returns the models codex advertises. The app-server model/list
@@ -162,14 +182,22 @@ func windowsCodexCandidates() []string {
 }
 
 // resolveCodexCandidate returns the first candidate whose app-server probe
-// succeeds, or "" when none does.
-func resolveCodexCandidate(ctx context.Context) string {
+// succeeds and whose version is supported, or "" when none does. rejected
+// carries one reason per rejected candidate for diagnostics.
+func resolveCodexCandidate(ctx context.Context) (string, []string) {
+	var rejected []string
 	for _, exe := range codexCandidates() {
-		if codexSupportsAppServer(ctx, exe) {
-			return exe
+		if !codexSupportsAppServer(ctx, exe) {
+			rejected = append(rejected, exe+" rejected: app-server probe failed")
+			continue
 		}
+		if msg := unsupportedCodexVersionMessage(codexVersion(ctx, exe)); msg != "" {
+			rejected = append(rejected, exe+" rejected: "+msg)
+			continue
+		}
+		return exe, rejected
 	}
-	return ""
+	return "", rejected
 }
 
 // codexSupportsAppServer verifies `codex app-server --help` exits cleanly
@@ -199,13 +227,76 @@ func codexVersion(ctx context.Context, exe string) string {
 	return line
 }
 
+// minCodexVersion is the oldest codex CLI the v2 thread integration supports.
+// Codex 0.95.0 added the phase field on item/agentMessage/delta, which the
+// event mapper relies on to surface only final_answer deltas as output; older
+// builds cannot be driven correctly.
+const minCodexVersion = "0.95.0"
+
+// codexVersionRe matches the semver triple inside a codex --version line
+// (e.g. "codex-cli 0.146.0").
+var codexVersionRe = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
+
+// parseCodexVersion extracts the semver triple from a codex --version line.
+func parseCodexVersion(version string) ([3]int, bool) {
+	m := codexVersionRe.FindStringSubmatch(version)
+	if m == nil {
+		return [3]int{}, false
+	}
+	var v [3]int
+	for i := range v {
+		n, err := strconv.Atoi(m[i+1])
+		if err != nil {
+			return [3]int{}, false
+		}
+		v[i] = n
+	}
+	return v, true
+}
+
+// codexVersionSupported reports whether a codex --version line is at least
+// minCodexVersion. An unparseable version is treated as supported so a probe
+// failure never hides an otherwise working install.
+func codexVersionSupported(version string) bool {
+	actual, ok := parseCodexVersion(version)
+	if !ok {
+		return true
+	}
+	minimum, ok := parseCodexVersion(minCodexVersion)
+	if !ok {
+		return true
+	}
+	for i, part := range actual {
+		if part > minimum[i] {
+			return true
+		}
+		if part < minimum[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// unsupportedCodexVersionMessage returns the upgrade hint for a codex
+// --version line below minCodexVersion, or "" when the version is supported.
+func unsupportedCodexVersionMessage(version string) string {
+	if version == "" || codexVersionSupported(version) {
+		return ""
+	}
+	return fmt.Sprintf("Codex CLI %s is unsupported; requires Codex >= %s. Upgrade codex before starting this runtime.", version, minCodexVersion)
+}
+
 // probeCodexModelsFromAppServer spawns the codex app-server, runs the
 // initialize handshake, and walks model/list pages.
 func probeCodexModelsFromAppServer(ctx context.Context, workspaceDir string) ([]ModelOption, error) {
 	if workspaceDir == "" {
 		workspaceDir = "."
 	}
-	cmd := exec.CommandContext(ctx, "codex", "app-server", "--listen", "stdio://")
+	exe, _ := resolveCodexCandidate(ctx)
+	if exe == "" {
+		exe = "codex"
+	}
+	cmd := exec.CommandContext(ctx, exe, "app-server", "--listen", "stdio://")
 	cmd.Dir = workspaceDir
 	cmd.Env = probeEnv()
 
