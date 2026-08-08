@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -37,6 +38,35 @@ func (*fakeThreadProvider) ThreadMcpArgs(_ []acp.McpServer) []string { return ni
 
 func (*fakeThreadProvider) ProbeModelsV2(context.Context, string) ([]provider.ModelOption, error) {
 	return nil, nil
+}
+
+// compatCheckProvider wraps fakeThreadProvider with a ThreadCompatChecker so
+// the spawn path's compatibility gate can be exercised.
+type compatCheckProvider struct {
+	fakeThreadProvider
+	exe string
+	err error
+}
+
+func (p *compatCheckProvider) CheckThreadCompat(context.Context) (string, error) {
+	return p.exe, p.err
+}
+
+func TestSpawnThreadAppServerCompatCheck(t *testing.T) {
+	cfg := newThreadTestConfig(t, "cold")
+
+	// A provider whose compat check fails must fail the spawn with its error.
+	blocked := &compatCheckProvider{err: errors.New("codex too old; requires Codex >= 0.95.0")}
+	_, _, _, err := spawnThreadAppServer(context.Background(), newThreadTestRequest(cfg.WorkingDir), cfg, blocked)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "requires Codex >= 0.95.0")
+
+	// A provider whose compat check resolves an executable must spawn that
+	// executable instead of ThreadCommand's.
+	resolved := &compatCheckProvider{exe: "/nonexistent/codex"}
+	_, _, _, err = spawnThreadAppServer(context.Background(), newThreadTestRequest(cfg.WorkingDir), cfg, resolved)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "/nonexistent/codex")
 }
 
 // threadFakeServerArg re-execs the test binary as the fake ACP v2 app-server.

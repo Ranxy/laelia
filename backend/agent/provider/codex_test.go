@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -302,6 +303,129 @@ exit 1
 	}
 	if present {
 		t.Fatal("expected codex without app-server to be absent")
+	}
+}
+
+func TestCodexDetectRejectsOldVersion(t *testing.T) {
+	dir := t.TempDir()
+	writeFakeCodex(t, dir, `#!/bin/sh
+if [ "$1" = "app-server" ] && [ "$2" = "--help" ]; then
+  exit 0
+fi
+if [ "$1" = "--version" ]; then
+  echo "codex-cli 0.50.0"
+  exit 0
+fi
+exit 1
+`)
+	t.Setenv("PATH", dir)
+	p := &CodexProvider{}
+	_, present, err := p.Detect(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if present {
+		t.Fatal("expected codex below the minimum version to be absent")
+	}
+}
+
+func TestCodexCheckThreadCompat(t *testing.T) {
+	dir := t.TempDir()
+	writeFakeCodex(t, dir, fakeCodexScript)
+	t.Setenv("PATH", dir)
+
+	p := &CodexProvider{}
+	exe, err := p.CheckThreadCompat(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exe != filepath.Join(dir, "codex") {
+		t.Errorf("executable = %q", exe)
+	}
+}
+
+func TestCodexCheckThreadCompatRejectsOldVersion(t *testing.T) {
+	dir := t.TempDir()
+	writeFakeCodex(t, dir, `#!/bin/sh
+if [ "$1" = "app-server" ] && [ "$2" = "--help" ]; then
+  exit 0
+fi
+if [ "$1" = "--version" ]; then
+  echo "codex-cli 0.50.0"
+  exit 0
+fi
+exit 1
+`)
+	t.Setenv("PATH", dir)
+
+	p := &CodexProvider{}
+	_, err := p.CheckThreadCompat(context.Background())
+	if err == nil {
+		t.Fatal("expected old codex to be rejected")
+	}
+	if !strings.Contains(err.Error(), "requires Codex >= 0.95.0") {
+		t.Errorf("error should carry the upgrade hint: %v", err)
+	}
+}
+
+func TestCodexCheckThreadCompatAbsent(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	p := &CodexProvider{}
+	_, err := p.CheckThreadCompat(context.Background())
+	if err == nil {
+		t.Fatal("expected absent codex to be rejected")
+	}
+	if !strings.Contains(err.Error(), "Cannot resolve a compatible Codex CLI app-server entry point") {
+		t.Errorf("error = %v", err)
+	}
+}
+
+func TestParseCodexVersion(t *testing.T) {
+	cases := []struct {
+		in     string
+		want   [3]int
+		wantOK bool
+	}{
+		{"codex-cli 0.146.0", [3]int{0, 146, 0}, true},
+		{"0.95.0", [3]int{0, 95, 0}, true},
+		{"codex 1.2.3 (abc123)", [3]int{1, 2, 3}, true},
+		{"", [3]int{}, false},
+		{"codex-cli", [3]int{}, false},
+	}
+	for _, c := range cases {
+		got, ok := parseCodexVersion(c.in)
+		if ok != c.wantOK || got != c.want {
+			t.Errorf("parseCodexVersion(%q) = %v, %v; want %v, %v", c.in, got, ok, c.want, c.wantOK)
+		}
+	}
+}
+
+func TestCodexVersionSupported(t *testing.T) {
+	cases := []struct {
+		version string
+		want    bool
+	}{
+		{"codex-cli 0.146.0", true},
+		{"codex-cli 0.95.0", true},
+		{"codex-cli 0.94.0", false},
+		{"codex-cli 0.50.0", false},
+		{"", true},
+		{"garbage", true},
+	}
+	for _, c := range cases {
+		if got := codexVersionSupported(c.version); got != c.want {
+			t.Errorf("codexVersionSupported(%q) = %v; want %v", c.version, got, c.want)
+		}
+	}
+}
+
+func TestUnsupportedCodexVersionMessage(t *testing.T) {
+	if msg := unsupportedCodexVersionMessage("codex-cli 0.146.0"); msg != "" {
+		t.Errorf("supported version should have no message: %q", msg)
+	}
+	msg := unsupportedCodexVersionMessage("codex-cli 0.50.0")
+	if !strings.Contains(msg, "requires Codex >= 0.95.0") {
+		t.Errorf("message should carry the minimum version: %q", msg)
 	}
 }
 
