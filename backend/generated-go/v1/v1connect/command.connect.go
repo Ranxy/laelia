@@ -45,6 +45,9 @@ const (
 	// CommandServiceCancelCommandProcedure is the fully-qualified name of the CommandService's
 	// CancelCommand RPC.
 	CommandServiceCancelCommandProcedure = "/laelia.v1.CommandService/CancelCommand"
+	// CommandServiceSteerCommandProcedure is the fully-qualified name of the CommandService's
+	// SteerCommand RPC.
+	CommandServiceSteerCommandProcedure = "/laelia.v1.CommandService/SteerCommand"
 	// CommandServiceWatchCommandProcedure is the fully-qualified name of the CommandService's
 	// WatchCommand RPC.
 	CommandServiceWatchCommandProcedure = "/laelia.v1.CommandService/WatchCommand"
@@ -226,6 +229,10 @@ type CommandServiceClient interface {
 	ListCommands(context.Context, *connect.Request[v1.ListCommandsRequest]) (*connect.Response[v1.ListCommandsResponse], error)
 	GetCommand(context.Context, *connect.Request[v1.GetCommandRequest]) (*connect.Response[v1.Command], error)
 	CancelCommand(context.Context, *connect.Request[v1.CancelCommandRequest]) (*connect.Response[v1.Command], error)
+	// SteerCommand injects a follow-up message into a running command's
+	// in-flight turn. Only executors that support mid-turn steering (the ACP v2
+	// thread protocol's turn/steer) honor it; others ignore it.
+	SteerCommand(context.Context, *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.Command], error)
 	WatchCommand(context.Context, *connect.Request[v1.WatchCommandRequest]) (*connect.ServerStreamForClient[v1.CommandOutput], error)
 	WatchCommandEvents(context.Context, *connect.Request[v1.WatchCommandEventsRequest]) (*connect.ServerStreamForClient[v1.CommandEvent], error)
 	RespondPermission(context.Context, *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error)
@@ -413,6 +420,12 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			httpClient,
 			baseURL+CommandServiceCancelCommandProcedure,
 			connect.WithSchema(commandServiceMethods.ByName("CancelCommand")),
+			connect.WithClientOptions(opts...),
+		),
+		steerCommand: connect.NewClient[v1.SteerCommandRequest, v1.Command](
+			httpClient,
+			baseURL+CommandServiceSteerCommandProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("SteerCommand")),
 			connect.WithClientOptions(opts...),
 		),
 		watchCommand: connect.NewClient[v1.WatchCommandRequest, v1.CommandOutput](
@@ -765,6 +778,7 @@ type commandServiceClient struct {
 	listCommands              *connect.Client[v1.ListCommandsRequest, v1.ListCommandsResponse]
 	getCommand                *connect.Client[v1.GetCommandRequest, v1.Command]
 	cancelCommand             *connect.Client[v1.CancelCommandRequest, v1.Command]
+	steerCommand              *connect.Client[v1.SteerCommandRequest, v1.Command]
 	watchCommand              *connect.Client[v1.WatchCommandRequest, v1.CommandOutput]
 	watchCommandEvents        *connect.Client[v1.WatchCommandEventsRequest, v1.CommandEvent]
 	respondPermission         *connect.Client[v1.RespondPermissionRequest, emptypb.Empty]
@@ -837,6 +851,11 @@ func (c *commandServiceClient) GetCommand(ctx context.Context, req *connect.Requ
 // CancelCommand calls laelia.v1.CommandService.CancelCommand.
 func (c *commandServiceClient) CancelCommand(ctx context.Context, req *connect.Request[v1.CancelCommandRequest]) (*connect.Response[v1.Command], error) {
 	return c.cancelCommand.CallUnary(ctx, req)
+}
+
+// SteerCommand calls laelia.v1.CommandService.SteerCommand.
+func (c *commandServiceClient) SteerCommand(ctx context.Context, req *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.Command], error) {
+	return c.steerCommand.CallUnary(ctx, req)
 }
 
 // WatchCommand calls laelia.v1.CommandService.WatchCommand.
@@ -1129,6 +1148,10 @@ type CommandServiceHandler interface {
 	ListCommands(context.Context, *connect.Request[v1.ListCommandsRequest]) (*connect.Response[v1.ListCommandsResponse], error)
 	GetCommand(context.Context, *connect.Request[v1.GetCommandRequest]) (*connect.Response[v1.Command], error)
 	CancelCommand(context.Context, *connect.Request[v1.CancelCommandRequest]) (*connect.Response[v1.Command], error)
+	// SteerCommand injects a follow-up message into a running command's
+	// in-flight turn. Only executors that support mid-turn steering (the ACP v2
+	// thread protocol's turn/steer) honor it; others ignore it.
+	SteerCommand(context.Context, *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.Command], error)
 	WatchCommand(context.Context, *connect.Request[v1.WatchCommandRequest], *connect.ServerStream[v1.CommandOutput]) error
 	WatchCommandEvents(context.Context, *connect.Request[v1.WatchCommandEventsRequest], *connect.ServerStream[v1.CommandEvent]) error
 	RespondPermission(context.Context, *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error)
@@ -1312,6 +1335,12 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		CommandServiceCancelCommandProcedure,
 		svc.CancelCommand,
 		connect.WithSchema(commandServiceMethods.ByName("CancelCommand")),
+		connect.WithHandlerOptions(opts...),
+	)
+	commandServiceSteerCommandHandler := connect.NewUnaryHandler(
+		CommandServiceSteerCommandProcedure,
+		svc.SteerCommand,
+		connect.WithSchema(commandServiceMethods.ByName("SteerCommand")),
 		connect.WithHandlerOptions(opts...),
 	)
 	commandServiceWatchCommandHandler := connect.NewServerStreamHandler(
@@ -1664,6 +1693,8 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceGetCommandHandler.ServeHTTP(w, r)
 		case CommandServiceCancelCommandProcedure:
 			commandServiceCancelCommandHandler.ServeHTTP(w, r)
+		case CommandServiceSteerCommandProcedure:
+			commandServiceSteerCommandHandler.ServeHTTP(w, r)
 		case CommandServiceWatchCommandProcedure:
 			commandServiceWatchCommandHandler.ServeHTTP(w, r)
 		case CommandServiceWatchCommandEventsProcedure:
@@ -1797,6 +1828,10 @@ func (UnimplementedCommandServiceHandler) GetCommand(context.Context, *connect.R
 
 func (UnimplementedCommandServiceHandler) CancelCommand(context.Context, *connect.Request[v1.CancelCommandRequest]) (*connect.Response[v1.Command], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.CancelCommand is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) SteerCommand(context.Context, *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.Command], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.SteerCommand is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) WatchCommand(context.Context, *connect.Request[v1.WatchCommandRequest], *connect.ServerStream[v1.CommandOutput]) error {

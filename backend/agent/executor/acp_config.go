@@ -11,6 +11,14 @@ import (
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
+// Protocol ids declared on AgentACPConfig.protocol. Empty means "inferred
+// from the provider type": a built-in ThreadProvider runs acp-v2, everything
+// else runs acp-v1. A custom provider declares the protocol explicitly.
+const (
+	ProtocolV1 = "acp-v1"
+	ProtocolV2 = "acp-v2"
+)
+
 const (
 	defaultACPMaxTimeoutSeconds = 1800
 	defaultACPMaxEventCount     = 10000
@@ -66,11 +74,14 @@ type ACPConfig struct {
 	// defaultACPStartupTimeout when zero.
 	StartupTimeout time.Duration `yaml:"startup_timeout"`
 
-	Provider      string   `yaml:"provider"`
-	Model         string   `yaml:"model"`
-	Executable    string   `yaml:"executable"`
-	Args          []string `yaml:"args"`
-	PersonaPrompt string   `yaml:"persona_prompt"`
+	Provider   string   `yaml:"provider"`
+	Model      string   `yaml:"model"`
+	Executable string   `yaml:"executable"`
+	Args       []string `yaml:"args"`
+	// Protocol is the declared ACP protocol generation ("acp-v1"/"acp-v2"),
+	// empty when inferred from the provider type.
+	Protocol      string `yaml:"protocol"`
+	PersonaPrompt string `yaml:"persona_prompt"`
 	// Env is the template env overlay (currently unused; kept for the built-in
 	// template). CustomEnv below is the admin-authored key-value overlay.
 	Env                   map[string]string `yaml:"env"`
@@ -127,6 +138,7 @@ func BuildACPConfig(user *v1pb.AgentACPConfig, machineID, agentID string) *ACPCo
 		Model:                user.Model,
 		Executable:           executable,
 		Args:                 args,
+		Protocol:             user.Protocol,
 		PersonaPrompt:        user.PersonaPrompt,
 		CustomEnv:            user.CustomEnv,
 		AllowEnv:             user.AllowEnv,

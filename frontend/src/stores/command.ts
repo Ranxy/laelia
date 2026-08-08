@@ -3,6 +3,7 @@ import { commandServiceClient } from "@/connect";
 import {
   CancelCommandRequestSchema,
   RespondPermissionRequestSchema,
+  SteerCommandRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import type { AppSliceCreator, CommandSlice } from "./types";
 
@@ -18,6 +19,16 @@ export const createCommandSlice: AppSliceCreator<CommandSlice> = (
   async cancelCommand(name) {
     const res = await commandServiceClient.cancelCommand(
       create(CancelCommandRequestSchema, { name })
+    );
+    set((state) => ({
+      commands: state.commands.map((c) => (c.name === name ? res : c)),
+    }));
+    return res;
+  },
+
+  async steerCommand(name, text) {
+    const res = await commandServiceClient.steerCommand(
+      create(SteerCommandRequestSchema, { name, text })
     );
     set((state) => ({
       commands: state.commands.map((c) => (c.name === name ? res : c)),

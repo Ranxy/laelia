@@ -117,6 +117,7 @@
 | api_key | [string](#string) |  |  |
 | global_provider | [string](#string) |  |  |
 | global_provider_entry | [string](#string) |  |  |
+| protocol | [string](#string) |  |  |
 
 
 

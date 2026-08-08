@@ -1392,6 +1392,19 @@ service CommandService {
     option (laelia.v1.audit) = true;
   }
 
+  // SteerCommand injects a follow-up message into a running command's
+  // in-flight turn. Only executors that support mid-turn steering (the ACP v2
+  // thread protocol's turn/steer) honor it; others ignore it.
+  rpc SteerCommand(SteerCommandRequest) returns (Command) {
+    option (google.api.http) = {
+      post: "/v1/{name=agents/*/commands/*}:steer"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.commands.cancel";
+    option (laelia.v1.audit) = true;
+  }
+
   rpc WatchCommand(WatchCommandRequest) returns (stream CommandOutput) {
     option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}:watch"};
     option (laelia.v1.auth_method) = IAM;
@@ -1926,6 +1939,7 @@ message ManagerStreamMessage {
     DiscoverProviders discover_providers = 9; // ask the agent daemon to re-probe installed LLM agent providers
     WorkspaceListRequest workspace_list_request = 10; // ask the agent daemon to list one level of its workspace
     WorkspaceReadRequest workspace_read_request = 11; // ask the agent daemon to read a workspace file
+    SteerMessage steer = 12; // inject a follow-up message into the in-flight turn
   }
 }
 
@@ -2017,6 +2031,14 @@ message CancelMessage {
   string command_id = 1;
 }
 
+// SteerMessage injects a follow-up message into the in-flight turn of a
+// running command. It is best-effort: an executor that does not support
+// mid-turn steering ignores it.
+message SteerMessage {
+  string command_id = 1;
+  string text = 2;
+}
+
 message Ping {
   int64 seq = 1;
   int64 sent_at = 2;
@@ -2055,6 +2077,14 @@ message CancelCommandRequest {
     (google.api.resource_reference).type = "laelia/Command"
   ];
   string reason = 2;
+}
+
+message SteerCommandRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Command"
+  ];
+  string text = 2;
 }
 
 message WatchCommandRequest {

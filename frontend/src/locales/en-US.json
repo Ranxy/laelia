@@ -645,6 +645,11 @@
     "acp-config-executable": "Executable",
     "acp-config-executable-placeholder": "npx",
     "acp-config-args": "Args",
+    "acp-config-protocol": "ACP Protocol",
+    "acp-config-protocol-auto": "Auto (inferred from provider)",
+    "acp-config-protocol-v1": "acp-v1 (session protocol)",
+    "acp-config-protocol-v2": "acp-v2 (thread protocol)",
+    "acp-config-protocol-hint": "The ACP protocol generation this custom agent speaks: acp-v1 runs the session protocol, acp-v2 runs the thread protocol; leave empty to infer from the provider.",
     "acp-config-args-placeholder": "@agentclientprotocol/claude-agent-acp@latest",
     "acp-config-allow-env": "Allow env",
     "acp-config-allow-env-placeholder": "MY_CUSTOM_VAR",
@@ -866,7 +871,10 @@
     "token-input": "Input",
     "token-output": "Output",
     "token-cache-read": "Cache Read",
-    "token-cache-write": "Cache Write"
+    "token-cache-write": "Cache Write",
+    "steer": "Steer",
+    "steering": "Steering…",
+    "steer-placeholder": "Inject a message into the running turn…"
   },
   "chat": {
     "with-agent": "Chat with {{name}}",

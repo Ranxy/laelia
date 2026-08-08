@@ -3280,8 +3280,13 @@ type AgentACPConfig struct {
 	// provider, in the form "apiProviders/{id}/entries/{entry}". Only meaningful when
 	// provider == "builtin-pi" and global_provider is set.
 	GlobalProviderEntry string `protobuf:"bytes,11,opt,name=global_provider_entry,json=globalProviderEntry,proto3" json:"global_provider_entry,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// protocol declares the ACP protocol generation the provider speaks:
+	// empty (inferred from the provider type), "acp-v1" (session protocol) or
+	// "acp-v2" (thread protocol). Only meaningful for a "custom" provider: a
+	// built-in provider's protocol is determined by its implementation.
+	Protocol      string `protobuf:"bytes,12,opt,name=protocol,proto3" json:"protocol,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AgentACPConfig) Reset() {
@@ -3387,6 +3392,13 @@ func (x *AgentACPConfig) GetGlobalProvider() string {
 func (x *AgentACPConfig) GetGlobalProviderEntry() string {
 	if x != nil {
 		return x.GlobalProviderEntry
+	}
+	return ""
+}
+
+func (x *AgentACPConfig) GetProtocol() string {
+	if x != nil {
+		return x.Protocol
 	}
 	return ""
 }
@@ -3947,7 +3959,7 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\x10AgentModelOption\x12\x14\n" +
 	"\x05value\x18\x01 \x01(\tR\x05value\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\"\xda\x03\n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\"\xf6\x03\n" +
 	"\x0eAgentACPConfig\x12\x1e\n" +
 	"\n" +
 	"executable\x18\x01 \x01(\tR\n" +
@@ -3963,7 +3975,8 @@ const file_v1_agent_proto_rawDesc = "" +
 	"\aapi_key\x18\t \x01(\tR\x06apiKey\x12'\n" +
 	"\x0fglobal_provider\x18\n" +
 	" \x01(\tR\x0eglobalProvider\x122\n" +
-	"\x15global_provider_entry\x18\v \x01(\tR\x13globalProviderEntry\x1a<\n" +
+	"\x15global_provider_entry\x18\v \x01(\tR\x13globalProviderEntry\x12\x1a\n" +
+	"\bprotocol\x18\f \x01(\tR\bprotocol\x1a<\n" +
 	"\x0eCustomEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa0\x03\n" +

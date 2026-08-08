@@ -56,12 +56,18 @@ func init() {
 //   - resume-ok: thread/resume succeeds
 //   - resume-fail: thread/resume errors, forcing the cold-start fallback
 //   - error-turn: turn/completed reports status=failed
+//   - steer-wait: the turn stays open after turn/started until a turn/steer
+//     arrives, then emits a final_answer delta + turn/completed
 //   - wedged: never completes the thread/start handshake
+//   - session: stays resident across turns (the resident ThreadSession mode);
+//     every turn/start gets a completed turn on a stable thread, and the
+//     process keeps serving until it is killed
 func runThreadFakeServer() int {
 	mode := os.Getenv("LAELIA_FAKE_THREAD_MODE")
 	scanner := bufio.NewScanner(os.Stdin)
 	writer := bufio.NewWriter(os.Stdout)
 	threadSeq := 0
+	turnSeq := 0
 	for scanner.Scan() {
 		var msg acp2.Message
 		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
@@ -82,8 +88,15 @@ func runThreadFakeServer() int {
 				continue // never answer: the startup handshake must time out
 			}
 			threadSeq++
+			threadID := fmt.Sprintf("thread-%d", threadSeq)
+			if mode == "session" {
+				// The resident mode test asserts the same thread survives
+				// process restarts (idle eviction + resume), so the id must
+				// be stable across spawns, not process-local.
+				threadID = "thread-resident"
+			}
 			writeResult(writer, msg.ID, map[string]any{
-				"thread": map[string]any{"id": fmt.Sprintf("thread-%d", threadSeq)},
+				"thread": map[string]any{"id": threadID},
 			})
 		case "thread/resume":
 			if mode == "resume-fail" {
@@ -98,11 +111,36 @@ func runThreadFakeServer() int {
 				"thread": map[string]any{"id": params.ThreadID},
 			})
 		case "turn/start":
+			if mode == "session" {
+				turnSeq++
+				turnID := fmt.Sprintf("turn-%d", turnSeq)
+				writeResult(writer, msg.ID, map[string]any{
+					"turn": map[string]any{"id": turnID},
+				})
+				writeFakeSessionTurnNotifications(writer, turnID)
+				continue
+			}
 			writeResult(writer, msg.ID, map[string]any{
 				"turn": map[string]any{"id": "turn-1"},
 			})
 			if mode != "wedged" {
-				writeFakeTurnNotifications(writer, mode)
+				if mode == "steer-wait" {
+					writeNotification(writer, "turn/started", map[string]any{"turn": map[string]any{"id": "turn-1"}})
+				} else {
+					writeFakeTurnNotifications(writer, mode)
+				}
+			}
+		case "turn/steer":
+			writeResult(writer, msg.ID, map[string]any{
+				"turn": map[string]any{"id": "turn-1"},
+			})
+			if mode == "steer-wait" {
+				writeNotification(writer, "item/agentMessage/delta", map[string]any{
+					"itemId": "msg-2", "phase": "final_answer", "delta": "steered reply",
+				})
+				writeNotification(writer, "turn/completed", map[string]any{
+					"turn": map[string]any{"id": "turn-1", "status": "completed"},
+				})
 			}
 		case "model/list":
 			writeResult(writer, msg.ID, map[string]any{"data": []any{}})
@@ -141,6 +179,29 @@ func writeJSON(writer *bufio.Writer, v any) error {
 		return err
 	}
 	return writer.Flush()
+}
+
+// writeFakeSessionTurnNotifications emits one completed turn for the resident
+// "session" fake mode. The server stays up between turns, so each turn/start
+// gets its own sequence number; the thread id is stable ("thread-resident").
+func writeFakeSessionTurnNotifications(writer *bufio.Writer, turnID string) {
+	writeNotification(writer, "turn/started", map[string]any{"turn": map[string]any{"id": turnID}})
+	writeNotification(writer, "item/reasoning/summaryTextDelta", map[string]any{
+		"itemId": "reason-" + turnID, "delta": "thinking about turn " + turnID,
+	})
+	writeNotification(writer, "item/agentMessage/delta", map[string]any{
+		"itemId": "msg-" + turnID, "phase": "final_answer", "delta": "reply for " + turnID,
+	})
+	writeNotification(writer, "thread/tokenUsage/updated", map[string]any{
+		"thread": map[string]any{"id": "thread-resident"},
+		"tokenUsage": map[string]any{
+			"total":              map[string]any{"inputTokens": 100, "cachedInputTokens": 50, "totalTokens": 150, "outputTokens": 50},
+			"modelContextWindow": 200000,
+		},
+	})
+	writeNotification(writer, "turn/completed", map[string]any{
+		"turn": map[string]any{"id": turnID, "status": "completed"},
+	})
 }
 
 // writeFakeTurnNotifications emits the codex-shaped notification sequence for
@@ -219,7 +280,7 @@ func TestThreadExecutor_ColdTurnMapsEvents(t *testing.T) {
 	require.Zero(t, obs.result.ExitCode, "completed turn must exit 0: %s", obs.result.ErrorMessage)
 	assert.False(t, obs.result.Resumed, "cold turn must not resume")
 	assert.Equal(t, "thread-1", obs.result.SessionID)
-	assert.Equal(t, sessionFingerprint(cfg.Provider, cfg.Model, cfg.WorkingDir, "v2"), obs.result.Fingerprint)
+	assert.Equal(t, sessionFingerprint(cfg.Provider, cfg.Model, cfg.WorkingDir, ProtocolV2), obs.result.Fingerprint)
 
 	// The persisted session must carry the thread id so the next turn resumes.
 	state, err := loadACPSession("test-machine-thread", "test-agent-thread")
@@ -274,7 +335,7 @@ func TestThreadExecutor_WarmTurnResumesThread(t *testing.T) {
 	// Persist a thread id with a matching fingerprint so the executor resumes.
 	require.NoError(t, saveACPSession(req.MachineID, req.AgentID, &acpSessionState{
 		ThreadID:    "thread-7",
-		Fingerprint: sessionFingerprint(cfg.Provider, cfg.Model, cfg.WorkingDir, "v2"),
+		Fingerprint: sessionFingerprint(cfg.Provider, cfg.Model, cfg.WorkingDir, ProtocolV2),
 		CreatedAt:   time.Now().Unix(),
 	}))
 
@@ -293,7 +354,7 @@ func TestThreadExecutor_ResumeFailureFallsBackToColdStart(t *testing.T) {
 	req := newThreadTestRequest(cfg.WorkingDir)
 	require.NoError(t, saveACPSession(req.MachineID, req.AgentID, &acpSessionState{
 		ThreadID:    "dead-thread",
-		Fingerprint: sessionFingerprint(cfg.Provider, cfg.Model, cfg.WorkingDir, "v2"),
+		Fingerprint: sessionFingerprint(cfg.Provider, cfg.Model, cfg.WorkingDir, ProtocolV2),
 		CreatedAt:   time.Now().Unix(),
 	}))
 
@@ -403,4 +464,116 @@ func TestThreadExecutor_ThinkingDeltaSurfacesAsSystemOutput(t *testing.T) {
 	}
 	assert.NotEmpty(t, systemChunks, "thinking deltas must surface as system output")
 	assert.True(t, strings.Contains(strings.Join(systemChunks, ""), "thinking about the task"))
+}
+
+func TestThreadExecutor_SteerInjectsIntoRunningTurn(t *testing.T) {
+	cfg := newThreadTestConfig(t, "steer-wait")
+	rt, err := NewThread(newThreadTestRequest(cfg.WorkingDir), cfg, &fakeThreadProvider{})
+	require.NoError(t, err)
+
+	// The fake server keeps the turn open until a turn/steer arrives, so the
+	// steer fires from a separate goroutine while the executor pumps the
+	// turn — the same shape as the command stream's receive pump.
+	steered := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(steered)
+		exec, ok := rt.(*ThreadExecutor)
+		if !ok {
+			return
+		}
+		for {
+			select {
+			case <-done:
+				return
+			default:
+			}
+			if exec.gate.State() == acp2.TurnStarted && exec.gate.CanSteerBusy() {
+				exec.Steer("follow up")
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+
+	obs := runACPTestRuntime(t, rt, 30*time.Second, 0)
+	close(done)
+	<-steered
+
+	require.Zero(t, obs.result.ExitCode, "steered turn must exit 0: %s", obs.result.ErrorMessage)
+	assert.Contains(t, obs.result.FinalSummary, "steered reply", "the steer delta must land in the final summary")
+	assert.Contains(t, joinOutput(obs.outputs), "steered reply", "the steer delta must surface as output")
+}
+
+// newResidentSession builds a resident ThreadSession over the fake app-server
+// in "session" mode (stays alive across turns). idleTimeout controls the
+// session's idle-eviction window; the returned session must be Stop()ped by
+// the caller.
+func newResidentSession(t *testing.T, idleTimeout time.Duration) *ThreadSession {
+	t.Helper()
+	cfg := newThreadTestConfig(t, "session")
+	cfg.IdleTimeout = idleTimeout
+	ctx, cancel := context.WithCancel(context.Background())
+	sess := NewThreadSession(ctx, cancel, newThreadTestRequest(cfg.WorkingDir), cfg, &fakeThreadProvider{})
+	t.Cleanup(sess.Stop)
+	return sess
+}
+
+// runResidentTurn drives one full turn over a resident ThreadSession through
+// the real executor path (NewThreadWithSession), returning the observation.
+func runResidentTurn(t *testing.T, sess *ThreadSession) acpTestObservation {
+	t.Helper()
+	cfg := sess.cfg
+	rt, err := NewThreadWithSession(newThreadTestRequest(cfg.WorkingDir), cfg, &fakeThreadProvider{}, sess)
+	require.NoError(t, err)
+	return runACPTestRuntime(t, rt, 30*time.Second, 0)
+}
+
+// TestThreadSession_ResidentStaysAliveAcrossTurns covers the resident mode
+// (LAELIA_ACP2_SESSION=1) happy path: one long-lived subprocess serves turn
+// after turn on the same thread, so the second turn is warm and starts in
+// seconds instead of a cold app-server boot.
+func TestThreadSession_ResidentStaysAliveAcrossTurns(t *testing.T) {
+	sess := newResidentSession(t, 0) // 0 disables idle eviction
+	require.NoError(t, sess.Start(nil))
+
+	obs1 := runResidentTurn(t, sess)
+	require.Zero(t, obs1.result.ExitCode, "first resident turn must exit 0: %s", obs1.result.ErrorMessage)
+	assert.False(t, obs1.result.Resumed, "the first resident turn cold-starts")
+	assert.Equal(t, "thread-resident", obs1.result.SessionID)
+	assert.Contains(t, obs1.result.FinalSummary, "reply for turn-1")
+	require.True(t, sess.Alive(), "the subprocess must stay up after the first turn")
+	require.True(t, sess.Warm(), "the session must be warm after the first turn")
+
+	obs2 := runResidentTurn(t, sess)
+	require.Zero(t, obs2.result.ExitCode, "second resident turn must exit 0: %s", obs2.result.ErrorMessage)
+	assert.True(t, obs2.result.Resumed, "a later resident turn is warm (same thread, same process)")
+	assert.Equal(t, "thread-resident", obs2.result.SessionID, "both turns share the resident thread")
+	assert.Contains(t, obs2.result.FinalSummary, "reply for turn-2")
+	require.True(t, sess.Alive(), "the subprocess must still be up after the second turn")
+}
+
+// TestThreadSession_IdleEvictionRespawnsAndResumes covers the idle-eviction
+// path: after idleTimeout of turn inactivity the resident subprocess is freed,
+// and the next turn respawns it and resumes the persisted thread id.
+func TestThreadSession_IdleEvictionRespawnsAndResumes(t *testing.T) {
+	sess := newResidentSession(t, 300*time.Millisecond)
+	require.NoError(t, sess.Start(nil))
+
+	obs1 := runResidentTurn(t, sess)
+	require.Zero(t, obs1.result.ExitCode, "first resident turn must exit 0: %s", obs1.result.ErrorMessage)
+
+	// EndTurn (called by the executor) arms the idle timer; wait for the
+	// eviction to reap the subprocess instead of racing it.
+	require.Eventually(t, func() bool { return !sess.Alive() }, 5*time.Second, 50*time.Millisecond,
+		"the idle-eviction timer must free the resident subprocess")
+
+	obs2 := runResidentTurn(t, sess)
+	require.Zero(t, obs2.result.ExitCode, "post-eviction turn must exit 0: %s", obs2.result.ErrorMessage)
+	assert.True(t, obs2.result.Resumed, "after eviction the next turn must resume the persisted thread")
+	assert.Equal(t, "thread-resident", obs2.result.SessionID, "the thread id survives idle eviction")
+	// The respawned process restarts its local turn sequence, so the exact
+	// reply text is process-local; the resumed marker + thread id are the
+	// cross-process invariants.
+	assert.NotEmpty(t, obs2.result.FinalSummary)
 }

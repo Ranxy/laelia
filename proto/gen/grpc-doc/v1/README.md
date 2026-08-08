@@ -277,6 +277,8 @@
     - [SendMessageRequest](#laelia-v1-SendMessageRequest)
     - [SetConversationPinnedRequest](#laelia-v1-SetConversationPinnedRequest)
     - [SetConversationPinnedResponse](#laelia-v1-SetConversationPinnedResponse)
+    - [SteerCommandRequest](#laelia-v1-SteerCommandRequest)
+    - [SteerMessage](#laelia-v1-SteerMessage)
     - [TaskInfo](#laelia-v1-TaskInfo)
     - [TextDeltaPayload](#laelia-v1-TextDeltaPayload)
     - [ThreadUpdate](#laelia-v1-ThreadUpdate)
@@ -684,6 +686,7 @@ permissions) is derived from a built-in template, not set by the admin.
 | api_key | [string](#string) |  | api_key is the plaintext LLM API key for the api_provider. Only meaningful when provider == &#34;builtin-pi&#34;; ignored by ACP runtimes. Stored in the agent info JSONB with the same plaintext-at-rest posture as custom_env. When global_provider is set, api_key is ignored: the key is resolved server-side from the global provider&#39;s entry and never stored in (nor returned with) the agent. |
 | global_provider | [string](#string) |  | global_provider is the resource name of the global API provider this builtin-pi agent uses (&#34;apiProviders/{id}&#34;). Only meaningful when provider == &#34;builtin-pi&#34;. When set, the stored config carries the provider/entry references instead of an inline api_provider/api_key; the server resolves the concrete api_provider/api_key/model at the daemon boundary. |
 | global_provider_entry | [string](#string) |  | global_provider_entry is the resource name of the (key, model) entry within the global provider, in the form &#34;apiProviders/{id}/entries/{entry}&#34;. Only meaningful when provider == &#34;builtin-pi&#34; and global_provider is set. |
+| protocol | [string](#string) |  | protocol declares the ACP protocol generation the provider speaks: empty (inferred from the provider type), &#34;acp-v1&#34; (session protocol) or &#34;acp-v2&#34; (thread protocol). Only meaningful for a &#34;custom&#34; provider: a built-in provider&#39;s protocol is determined by its implementation. |
 
 
 
@@ -4425,6 +4428,7 @@ the drain loop, before acking the conversation cursor.
 | discover_providers | [DiscoverProviders](#laelia-v1-DiscoverProviders) |  | ask the agent daemon to re-probe installed LLM agent providers |
 | workspace_list_request | [WorkspaceListRequest](#laelia-v1-WorkspaceListRequest) |  | ask the agent daemon to list one level of its workspace |
 | workspace_read_request | [WorkspaceReadRequest](#laelia-v1-WorkspaceReadRequest) |  | ask the agent daemon to read a workspace file |
+| steer | [SteerMessage](#laelia-v1-SteerMessage) |  | inject a follow-up message into the in-flight turn |
 
 
 
@@ -4928,6 +4932,40 @@ affected.
 
 ### SetConversationPinnedResponse
 
+
+
+
+
+
+
+<a name="laelia-v1-SteerCommandRequest"></a>
+
+### SteerCommandRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| text | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SteerMessage"></a>
+
+### SteerMessage
+SteerMessage injects a follow-up message into the in-flight turn of a
+running command. It is best-effort: an executor that does not support
+mid-turn steering ignores it.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command_id | [string](#string) |  |  |
+| text | [string](#string) |  |  |
 
 
 
@@ -5508,6 +5546,7 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | ListCommands | [ListCommandsRequest](#laelia-v1-ListCommandsRequest) | [ListCommandsResponse](#laelia-v1-ListCommandsResponse) |  |
 | GetCommand | [GetCommandRequest](#laelia-v1-GetCommandRequest) | [Command](#laelia-v1-Command) |  |
 | CancelCommand | [CancelCommandRequest](#laelia-v1-CancelCommandRequest) | [Command](#laelia-v1-Command) |  |
+| SteerCommand | [SteerCommandRequest](#laelia-v1-SteerCommandRequest) | [Command](#laelia-v1-Command) | SteerCommand injects a follow-up message into a running command&#39;s in-flight turn. Only executors that support mid-turn steering (the ACP v2 thread protocol&#39;s turn/steer) honor it; others ignore it. |
 | WatchCommand | [WatchCommandRequest](#laelia-v1-WatchCommandRequest) | [CommandOutput](#laelia-v1-CommandOutput) stream |  |
 | WatchCommandEvents | [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest) | [CommandEvent](#laelia-v1-CommandEvent) stream |  |
 | RespondPermission | [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |

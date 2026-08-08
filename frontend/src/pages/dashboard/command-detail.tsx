@@ -9,6 +9,7 @@ import { ContextUsageBar } from "@/components/context-usage-bar";
 import { TokenUsageCard } from "@/components/token-usage-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs";
 import {
   commandEventTypeToI18nKey,
@@ -171,6 +172,7 @@ export function CommandDetailPage() {
   }>();
   const getCommand = useAppStore((s) => s.getCommand);
   const cancelCommand = useAppStore((s) => s.cancelCommand);
+  const steerCommand = useAppStore((s) => s.steerCommand);
   const watchCommand = useAppStore((s) => s.watchCommand);
   const watchCommandEvents = useAppStore((s) => s.watchCommandEvents);
   const activeOutputs = useAppStore((s) => s.activeOutputs);
@@ -191,6 +193,8 @@ export function CommandDetailPage() {
     created: string;
   } | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [steerText, setSteerText] = useState("");
+  const [steering, setSteering] = useState(false);
   const [tab, setTab] = useState<"run" | "summary" | null>(null);
   const [showCompletionHint, setShowCompletionHint] = useState(false);
   const [selectedToolSeq, setSelectedToolSeq] = useState<number | null>(null);
@@ -448,6 +452,17 @@ export function CommandDetailPage() {
     }
   };
 
+  const handleSteer = async () => {
+    if (!cmdName || !steerText.trim()) return;
+    setSteering(true);
+    try {
+      await steerCommand(cmdName, steerText.trim());
+      setSteerText("");
+    } finally {
+      setSteering(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex-1 min-h-0 p-4 flex flex-col gap-4 w-full">
@@ -471,13 +486,34 @@ export function CommandDetailPage() {
                 <CommandStatusBadge status={displayCmd.status} />
               </div>
               {isRunning && (
-                <Button
-                  variant="outline"
-                  onClick={handleCancel}
-                  disabled={cancelling}
-                >
-                  {cancelling ? t("command.cancelling") : t("common.cancel")}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      className="w-56"
+                      placeholder={t("command.steer-placeholder")}
+                      value={steerText}
+                      onChange={(e) => setSteerText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSteer();
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSteer}
+                      disabled={steering || !steerText.trim()}
+                    >
+                      {steering ? t("command.steering") : t("command.steer")}
+                    </Button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleCancel}
+                    disabled={cancelling}
+                  >
+                    {cancelling ? t("command.cancelling") : t("common.cancel")}
+                  </Button>
+                </div>
               )}
             </div>
 

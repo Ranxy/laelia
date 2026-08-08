@@ -374,6 +374,15 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 					}
 				}
 
+			case *v1pb.ManagerStreamMessage_Steer:
+				st := m.Steer
+				slog.Info("received steer", "commandID", st.CommandId)
+				if ex := c.getCurrentExecutor(); ex != nil {
+					if resolver, ok := ex.(executor.SteerResolver); ok {
+						resolver.Steer(st.Text)
+					}
+				}
+
 			case *v1pb.ManagerStreamMessage_WorkspaceListRequest:
 				// File reads run on their own goroutine: a slow disk must not
 				// block the receive pump (BeginSession / NewMessages / Cancel).

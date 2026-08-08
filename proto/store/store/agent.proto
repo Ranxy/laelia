@@ -45,6 +45,7 @@ message AgentACPConfig {
   string api_key = 9;
   string global_provider = 10;
   string global_provider_entry = 11;
+  string protocol = 12;
 }
 
 message AgentProviderInfo {
