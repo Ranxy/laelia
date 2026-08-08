@@ -36,16 +36,9 @@ func providerModelsNeedsKey(id string) bool {
 	return id == APIProviderDeepseek
 }
 
-// modelsHTTP is overridable in tests via httptest.NewServer. Nil means use the
-// default http.Client with a bounded timeout.
-var modelsHTTP = (*http.Client)(nil)
-
-func modelsClient() *http.Client {
-	if modelsHTTP != nil {
-		return modelsHTTP
-	}
-	return &http.Client{Timeout: 15 * time.Second}
-}
+// defaultModelsClient is the bounded-timeout client used when ListModels is
+// called without an explicit client. It is never mutated.
+var defaultModelsClient = &http.Client{Timeout: 15 * time.Second}
 
 // providerModelsResponse is the OpenAI-style envelope both providers return:
 // `{"data":[{"id":...,"name":...}]}` (name optional).
@@ -60,7 +53,14 @@ type providerModelsResponse struct {
 // proxies this server-side (CORS + key hygiene — the api_key never reaches the
 // browser's third-party call). Results are cached for a short TTL keyed by
 // provider + api_key hash (the key itself is never stored).
-func ListModels(ctx context.Context, apiProvider, apiKey string) ([]Model, error) {
+//
+// client is the HTTP client used for the upstream call; nil means the package
+// default (bounded timeout). Passing a client is how tests route to an
+// httptest server instead of the live provider.
+func ListModels(ctx context.Context, client *http.Client, apiProvider, apiKey string) ([]Model, error) {
+	if client == nil {
+		client = defaultModelsClient
+	}
 	if _, ok := providerModelsURL[apiProvider]; !ok {
 		return nil, pkgerrors.Errorf("unsupported api_provider %q", apiProvider)
 	}
@@ -72,7 +72,7 @@ func ListModels(ctx context.Context, apiProvider, apiKey string) ([]Model, error
 		return cached, nil
 	}
 
-	models, err := fetchModels(ctx, apiProvider, apiKey)
+	models, err := fetchModels(ctx, client, apiProvider, apiKey)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func ListModels(ctx context.Context, apiProvider, apiKey string) ([]Model, error
 	return models, nil
 }
 
-func fetchModels(ctx context.Context, apiProvider, apiKey string) ([]Model, error) {
+func fetchModels(ctx context.Context, client *http.Client, apiProvider, apiKey string) ([]Model, error) {
 	url := providerModelsURL[apiProvider]
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -92,7 +92,7 @@ func fetchModels(ctx context.Context, apiProvider, apiKey string) ([]Model, erro
 	}
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := modelsClient().Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, pkgerrors.Wrap(err, "failed to call provider models API")
 	}

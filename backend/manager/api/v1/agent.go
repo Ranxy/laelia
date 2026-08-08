@@ -1914,7 +1914,7 @@ func (*AgentService) ListPiModels(ctx context.Context, req *connect.Request[v1pb
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("api_key is required to list models for this provider"))
 	}
 
-	models, err := pi.ListModels(ctx, apiProvider, req.Msg.ApiKey)
+	models, err := pi.ListModels(ctx, nil, apiProvider, req.Msg.ApiKey)
 	if err != nil {
 		// Validation already ruled out client-side errors; anything left is an
 		// upstream provider/network failure (auth, timeout, non-2xx).
