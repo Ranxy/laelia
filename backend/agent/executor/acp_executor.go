@@ -492,7 +492,7 @@ func (e *ACPExecutor) run() {
 	// config fingerprint. The init prompt (identity + persona + communication +
 	// memory + procedure) is sent only on a cold NewSession and lives in the
 	// resumed session's history thereafter — that is the per-turn token saving.
-	fingerprint := sessionFingerprint(e.config.Provider, e.config.Model, e.workingDir)
+	fingerprint := sessionFingerprint(e.config, e.workingDir)
 	e.fingerprint = fingerprint
 	resumed := false
 	var configOpts []acp.SessionConfigOption

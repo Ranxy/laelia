@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
+
+	acp "github.com/coder/acp-go-sdk"
 
 	"github.com/Ranxy/laelia/backend/agent/atomicfile"
 )
@@ -32,15 +35,74 @@ type acpSessionState struct {
 	CreatedAt   int64  `json:"created_at"`
 }
 
-// sessionFingerprint derives a stable identity for the ACP session from the
-// inputs that define it: the provider, the selected model, and the working
-// directory passed to NewSession/ResumeSession. A change in any of these means
+// sessionFingerprint derives a stable identity for the ACP session from every
+// input that defines it: the provider, the selected model, the working
+// directory, the persona prompt, the env overlays (template env + custom env +
+// allow-env whitelist) and the MCP server list. A change in any of these means
 // the persisted SessionId belongs to a different session and must not be
-// resumed.
-func sessionFingerprint(provider, model, workingDir string) string {
+// resumed — otherwise an admin edit to persona/env/MCP would silently resume
+// the old conversation and appear to "not take effect".
+func sessionFingerprint(cfg *ACPConfig, workingDir string) string {
 	h := sha256.New()
-	_, _ = h.Write([]byte(provider + "\x00" + model + "\x00" + workingDir))
+	write := func(s string) { _, _ = h.Write([]byte(s)) }
+	write("provider\x00" + cfg.Provider + "\x00")
+	write("model\x00" + cfg.Model + "\x00")
+	write("workdir\x00" + workingDir + "\x00")
+	write("persona\x00" + cfg.PersonaPrompt + "\x00")
+	writeEnvMap(h, "env\x00", cfg.Env)
+	writeEnvMap(h, "custom_env\x00", cfg.CustomEnv)
+	allow := append([]string(nil), cfg.AllowEnv...)
+	slices.Sort(allow)
+	for _, k := range allow {
+		write("allow_env\x00" + k + "\x00")
+	}
+	write("mcp\x00")
+	for _, m := range cfg.McpServers {
+		write(mcpServerIdentity(m))
+	}
 	return hex.EncodeToString(h.Sum(nil))[:16]
+}
+
+// writeEnvMap hashes a map deterministically: keys sorted, each as key=value.
+func writeEnvMap(h interface{ Write([]byte) (int, error) }, prefix string, m map[string]string) {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	for _, k := range keys {
+		_, _ = h.Write([]byte(prefix + k + "=" + m[k] + "\x00"))
+	}
+}
+
+// mcpServerIdentity is the stable, canonical identity of one MCP server entry.
+// The laelia MCP proxy carries a per-turn LAELIA_SESSION_TOKEN in its env;
+// that value rotates every turn and must NOT invalidate an otherwise-unchanged
+// session, so it is excluded here. Everything else (name, command, args, env)
+// participates so an MCP config change forces a cold start. Non-stdio
+// transports (unused today) fall back to a full marshal so any future
+// transport change still invalidates.
+func mcpServerIdentity(m acp.McpServer) string {
+	if s := m.Stdio; s != nil {
+		env := make(map[string]string, len(s.Env))
+		for _, e := range s.Env {
+			if e.Name == "LAELIA_SESSION_TOKEN" {
+				continue
+			}
+			env[e.Name] = e.Value
+		}
+		data, err := json.Marshal(struct {
+			Name    string
+			Command string
+			Args    []string
+			Env     map[string]string
+		}{s.Name, s.Command, s.Args, env})
+		if err == nil {
+			return string(data)
+		}
+	}
+	data, _ := json.Marshal(m)
+	return string(data)
 }
 
 func acpSessionPath(machineID, agentID string) string {

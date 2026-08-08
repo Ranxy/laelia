@@ -5,25 +5,69 @@ import (
 	"path/filepath"
 	"testing"
 
+	acp "github.com/coder/acp-go-sdk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestSessionFingerprint_StableAndDistinguishing guards the cold/warm gate: the
-// fingerprint must be identical for identical (provider,model,workingDir) and
-// differ when any of the three changes, or a config change would resume a
-// session the provider no longer recognizes.
+// fingerprint must be identical for an identical config and differ when any
+// session-defining input changes (provider, model, working dir, persona, env,
+// MCP), or a config change would resume a session the provider no longer
+// recognizes.
 func TestSessionFingerprint_StableAndDistinguishing(t *testing.T) {
-	a := sessionFingerprint("opencode", "gpt-5", "/work")
-	assert.Equal(t, a, sessionFingerprint("opencode", "gpt-5", "/work"), "same inputs must hash identically")
+	cfg := &ACPConfig{Provider: "opencode", Model: "gpt-5"}
+	a := sessionFingerprint(cfg, "/work")
+	assert.Equal(t, a, sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "gpt-5"}, "/work"), "same inputs must hash identically")
 
-	// Each input change must invalidate the fingerprint.
-	assert.NotEqual(t, a, sessionFingerprint("claude", "gpt-5", "/work"))
-	assert.NotEqual(t, a, sessionFingerprint("opencode", "claude-4", "/work"))
-	assert.NotEqual(t, a, sessionFingerprint("opencode", "gpt-5", "/elsewhere"))
+	// Each session-defining input change must invalidate the fingerprint.
+	assert.NotEqual(t, a, sessionFingerprint(&ACPConfig{Provider: "claude", Model: "gpt-5"}, "/work"))
+	assert.NotEqual(t, a, sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "claude-4"}, "/work"))
+	assert.NotEqual(t, a, sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "gpt-5"}, "/elsewhere"))
 
 	// Empty working dir is a valid distinct input, not a collapse to zero.
-	assert.NotEqual(t, sessionFingerprint("opencode", "gpt-5", ""), a)
+	assert.NotEqual(t, sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "gpt-5"}, ""), a)
+
+	// Persona, env overlays and allow-env must invalidate.
+	assert.NotEqual(t, a, sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "gpt-5", PersonaPrompt: "be terse"}, "/work"))
+	assert.NotEqual(t, a, sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "gpt-5", CustomEnv: map[string]string{"FOO": "1"}}, "/work"))
+	assert.NotEqual(t, a, sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "gpt-5", AllowEnv: []string{"PATH"}}, "/work"))
+	assert.NotEqual(t, a, sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "gpt-5", Env: map[string]string{"TMPDIR": "/x"}}, "/work"))
+
+	// Env maps must hash deterministically regardless of iteration order.
+	envA := sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "gpt-5", CustomEnv: map[string]string{"A": "1", "B": "2", "C": "3"}}, "/work")
+	envB := sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "gpt-5", CustomEnv: map[string]string{"C": "3", "A": "1", "B": "2"}}, "/work")
+	assert.Equal(t, envA, envB, "map iteration order must not change the fingerprint")
+
+	// An MCP server entry participates in the fingerprint...
+	mcp := []acp.McpServer{{Stdio: &acp.McpServerStdio{Name: "laelia-mcp", Command: "laelia-machine", Args: []string{"mcp-proxy"}}}}
+	withMCP := sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "gpt-5", McpServers: mcp}, "/work")
+	assert.NotEqual(t, a, withMCP, "adding an MCP server must invalidate the session")
+	otherMCP := sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "gpt-5", McpServers: []acp.McpServer{{Stdio: &acp.McpServerStdio{Name: "other", Command: "x", Args: []string{"y"}}}}}, "/work")
+	assert.NotEqual(t, withMCP, otherMCP, "changing an MCP server must invalidate the session")
+
+	// ...but the per-turn session token must NOT: it rotates every turn and
+	// would otherwise defeat session reuse entirely.
+	tokA := sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "gpt-5", McpServers: []acp.McpServer{{Stdio: &acp.McpServerStdio{
+		Name: "laelia-mcp", Command: "laelia-machine", Args: []string{"mcp-proxy"},
+		Env: []acp.EnvVariable{
+			{Name: "LAELIA_SESSION_TOKEN", Value: "token-turn-1"},
+			{Name: "LAELIA_DAEMON_SOCKET", Value: "/tmp/daemon.sock"},
+		},
+	}}}}, "/work")
+	tokB := sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "gpt-5", McpServers: []acp.McpServer{{Stdio: &acp.McpServerStdio{
+		Name: "laelia-mcp", Command: "laelia-machine", Args: []string{"mcp-proxy"},
+		Env: []acp.EnvVariable{
+			{Name: "LAELIA_SESSION_TOKEN", Value: "token-turn-2"},
+			{Name: "LAELIA_DAEMON_SOCKET", Value: "/tmp/daemon.sock"},
+		},
+	}}}}, "/work")
+	assert.Equal(t, tokA, tokB, "a rotated session token must not invalidate the session")
+	otherEnv := sessionFingerprint(&ACPConfig{Provider: "opencode", Model: "gpt-5", McpServers: []acp.McpServer{{Stdio: &acp.McpServerStdio{
+		Name: "laelia-mcp", Command: "laelia-machine", Args: []string{"mcp-proxy"},
+		Env: []acp.EnvVariable{{Name: "LAELIA_DAEMON_SOCKET", Value: "/tmp/other.sock"}},
+	}}}}, "/work")
+	assert.NotEqual(t, tokA, otherEnv, "a changed MCP env must invalidate the session")
 }
 
 // TestLoadSaveClearACPSession_RoundTrip exercises the durable session file that
