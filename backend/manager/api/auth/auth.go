@@ -3,12 +3,15 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -209,55 +212,69 @@ func (in *APIAuthInterceptor) getUserOrAgentConnect(ctx context.Context, accessT
 		return nil, errs.Errorf("unexpected access token kid=%v", t.Header["kid"])
 	}
 
-	agentClaims := &agentClaimsMessage{}
-	agentToken, agentErr := jwt.ParseWithClaims(accessTokenStr, agentClaims, keyFunc)
-
-	userClaims := &claimsMessage{}
-	userToken, userErr := jwt.ParseWithClaims(accessTokenStr, userClaims, keyFunc)
-
-	machineClaims := &machineClaimsMessage{}
-	machineToken, machineErr := jwt.ParseWithClaims(accessTokenStr, machineClaims, keyFunc)
-
-	if agentErr == nil && agentToken != nil && agentToken.Valid {
-		if audienceContains(agentClaims.Audience, fmt.Sprintf(AgentAccessTokenAudienceFmt, in.profile.Mode)) {
-			agent, err := in.authenticateAgentByClaims(ctx, agentClaims)
-			if err != nil {
-				return nil, err
-			}
-			return &authResult{agent: agent, accessTokenExpiresAt: agentClaims.ExpiresAt.Unix()}, nil
-		}
-	}
-
-	if machineErr == nil && machineToken != nil && machineToken.Valid {
-		if audienceContains(machineClaims.Audience, fmt.Sprintf(MachineAccessTokenAudienceFmt, in.profile.Mode)) {
-			machine, err := in.authenticateMachineByClaims(ctx, machineClaims)
-			if err != nil {
-				return nil, err
-			}
-			return &authResult{machine: machine, accessTokenExpiresAt: machineClaims.ExpiresAt.Unix()}, nil
-		}
-	}
-
-	if userErr == nil && userToken != nil && userToken.Valid {
-		if audienceContains(userClaims.Audience, fmt.Sprintf(AccessTokenAudienceFmt, in.profile.Mode)) {
-			user, err := in.authenticateUserByClaims(ctx, userClaims)
-			if err != nil {
-				return nil, err
-			}
-			return &authResult{user: user, accessTokenExpiresAt: userClaims.ExpiresAt.Unix()}, nil
-		}
-	}
-
-	if agentErr != nil && userErr != nil && machineErr != nil {
-		if errors.Is(agentErr, jwt.ErrTokenExpired) || errors.Is(userErr, jwt.ErrTokenExpired) || errors.Is(machineErr, jwt.ErrTokenExpired) {
-			return nil, connect.NewError(connect.CodeUnauthenticated, errs.New("access token expired"))
-		}
-	}
-	return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("invalid access token, audience mismatch, expected %q, %q or %q",
-		fmt.Sprintf(AccessTokenAudienceFmt, in.profile.Mode),
+	// Branch on the audience so a request pays for exactly one signature
+	// verification instead of three (user/agent/machine) parses. peekAudience
+	// only decodes the unsigned payload to select the claims struct; the
+	// signature is always verified below, and the audience is re-checked, so a
+	// forged payload can only fall through to the generic invalid-token error.
+	expected := []string{
 		fmt.Sprintf(AgentAccessTokenAudienceFmt, in.profile.Mode),
 		fmt.Sprintf(MachineAccessTokenAudienceFmt, in.profile.Mode),
-	))
+		fmt.Sprintf(AccessTokenAudienceFmt, in.profile.Mode),
+	}
+	kind := audienceKind(peekTokenAudience(accessTokenStr), expected)
+	if kind < 0 {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("invalid access token, audience mismatch, expected %q, %q or %q",
+			expected[2], expected[0], expected[1]))
+	}
+	switch kind {
+	case 0: // agent
+		agentClaims := &agentClaimsMessage{}
+		agentToken, err := jwt.ParseWithClaims(accessTokenStr, agentClaims, keyFunc)
+		if err != nil || agentToken == nil || !agentToken.Valid || !audienceContains(agentClaims.Audience, expected[0]) {
+			if errors.Is(err, jwt.ErrTokenExpired) {
+				return nil, connect.NewError(connect.CodeUnauthenticated, errs.New("access token expired"))
+			}
+			return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("invalid agent access token, error: %v", err))
+		}
+		agent, err := in.authenticateAgentByClaims(ctx, agentClaims)
+		if err != nil {
+			return nil, err
+		}
+		return &authResult{agent: agent, accessTokenExpiresAt: agentClaims.ExpiresAt.Unix()}, nil
+	case 1: // machine
+		machineClaims := &machineClaimsMessage{}
+		machineToken, err := jwt.ParseWithClaims(accessTokenStr, machineClaims, keyFunc)
+		if err != nil || machineToken == nil || !machineToken.Valid || !audienceContains(machineClaims.Audience, expected[1]) {
+			if errors.Is(err, jwt.ErrTokenExpired) {
+				return nil, connect.NewError(connect.CodeUnauthenticated, errs.New("access token expired"))
+			}
+			return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("invalid machine access token, error: %v", err))
+		}
+		machine, err := in.authenticateMachineByClaims(ctx, machineClaims)
+		if err != nil {
+			return nil, err
+		}
+		return &authResult{machine: machine, accessTokenExpiresAt: machineClaims.ExpiresAt.Unix()}, nil
+	case 2: // user
+		userClaims := &claimsMessage{}
+		userToken, err := jwt.ParseWithClaims(accessTokenStr, userClaims, keyFunc)
+		if err != nil || userToken == nil || !userToken.Valid || !audienceContains(userClaims.Audience, expected[2]) {
+			if errors.Is(err, jwt.ErrTokenExpired) {
+				return nil, connect.NewError(connect.CodeUnauthenticated, errs.New("access token expired"))
+			}
+			return nil, connect.NewError(connect.CodeUnauthenticated, errs.Errorf("invalid access token, error: %v", err))
+		}
+		user, err := in.authenticateUserByClaims(ctx, userClaims)
+		if err != nil {
+			return nil, err
+		}
+		return &authResult{user: user, accessTokenExpiresAt: userClaims.ExpiresAt.Unix()}, nil
+	default:
+		// Unreachable: audienceKind returns -1 only when no branch matches,
+		// which is handled before the switch. Kept to satisfy the compiler.
+		return nil, connect.NewError(connect.CodeUnauthenticated, errs.New("invalid access token"))
+	}
 }
 
 func (in *APIAuthInterceptor) authenticateUserByClaims(ctx context.Context, claims *claimsMessage) (*store.UserMessage, error) {
@@ -380,6 +397,42 @@ func GetTokenFromHeaders(headers http.Header) (string, error) {
 		}
 	}
 	return accessToken, nil
+}
+
+// peekTokenAudience extracts the aud claim from a JWT payload WITHOUT
+// verifying the signature. It only selects which claims struct to parse into
+// (see getUserOrAgentConnect); the signature is always verified afterward and
+// the audience re-checked, so a forged payload cannot lead to an unverified
+// acceptance — at worst it falls through to the generic invalid-token error.
+func peekTokenAudience(tokenStr string) jwt.ClaimStrings {
+	parts := strings.Split(tokenStr, ".")
+	if len(parts) != 3 {
+		return nil
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil
+	}
+	var claims struct {
+		Audience jwt.ClaimStrings `json:"aud"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil
+	}
+	return claims.Audience
+}
+
+// audienceKind maps the token's audience to the branch index in
+// getUserOrAgentConnect: 0=agent, 1=machine, 2=user, -1=none matched. The
+// audience is part of the signed payload, so this selection is only as
+// trustworthy as the verification that follows it.
+func audienceKind(audience jwt.ClaimStrings, expected []string) int {
+	for i, aud := range expected {
+		if audienceContains(audience, aud) {
+			return i
+		}
+	}
+	return -1
 }
 
 func audienceContains(audience jwt.ClaimStrings, token string) bool {
@@ -685,7 +738,29 @@ func generateToken(userName string, userID int, aud string, expirationTime time.
 	return tokenString, nil
 }
 
+// authContextCache memoizes getAuthContext per full method name. The
+// descriptors backing it are registered once at startup from generated code
+// and never mutate at runtime, so a successful result is valid for the process
+// lifetime. Errors are not cached: they indicate a programming error (unknown
+// method) that should surface loudly rather than be papered over.
+var authContextCache sync.Map // map[string]*common.AuthContext
+
 func getAuthContext(fullMethod string) (*common.AuthContext, error) {
+	if cached, ok := authContextCache.Load(fullMethod); ok {
+		ctx, ok := cached.(*common.AuthContext)
+		if ok {
+			return ctx, nil
+		}
+	}
+	ctx, err := resolveAuthContext(fullMethod)
+	if err != nil {
+		return nil, err
+	}
+	authContextCache.Store(fullMethod, ctx)
+	return ctx, nil
+}
+
+func resolveAuthContext(fullMethod string) (*common.AuthContext, error) {
 	methodTokens := strings.Split(fullMethod, "/")
 	if len(methodTokens) != 3 {
 		return nil, errs.Errorf("invalid full method name %q", fullMethod)
