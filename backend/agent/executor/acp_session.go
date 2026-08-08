@@ -28,18 +28,19 @@ const maxResumeFailuresBeforeWarning = 3
 // no longer recognizes.
 type acpSessionState struct {
 	SessionID   string `json:"session_id"`
+	ThreadID    string `json:"thread_id,omitempty"`
 	Fingerprint string `json:"fingerprint"`
 	CreatedAt   int64  `json:"created_at"`
 }
 
 // sessionFingerprint derives a stable identity for the ACP session from the
-// inputs that define it: the provider, the selected model, and the working
-// directory passed to NewSession/ResumeSession. A change in any of these means
-// the persisted SessionId belongs to a different session and must not be
-// resumed.
-func sessionFingerprint(provider, model, workingDir string) string {
+// inputs that define it: the provider, the selected model, the working
+// directory, and the protocol generation (v1 session vs v2 thread). A change
+// in any of these means the persisted SessionId/ThreadId belongs to a
+// different session and must not be resumed.
+func sessionFingerprint(provider, model, workingDir, protocol string) string {
 	h := sha256.New()
-	_, _ = h.Write([]byte(provider + "\x00" + model + "\x00" + workingDir))
+	_, _ = h.Write([]byte(provider + "\x00" + model + "\x00" + workingDir + "\x00" + protocol))
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 

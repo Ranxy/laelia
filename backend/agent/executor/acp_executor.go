@@ -67,7 +67,13 @@ func (b *outputBuffer) totalLen() int {
 	return b.stdout.Len() + b.system.Len()
 }
 
-func (b *outputBuffer) flush(e *ACPExecutor) {
+// outputSink is the minimal surface outputBuffer needs to flush buffered text.
+// Both ACPExecutor and ThreadExecutor satisfy it.
+type outputSink interface {
+	sendOutput(streamType v1pb.CommandOutput_StreamType, content string)
+}
+
+func (b *outputBuffer) flush(e outputSink) {
 	b.mu.Lock()
 	stdout := b.stdout.String()
 	b.stdout.Reset()
@@ -460,7 +466,7 @@ func (e *ACPExecutor) run() {
 	// config fingerprint. The init prompt (identity + persona + communication +
 	// memory + procedure) is sent only on a cold NewSession and lives in the
 	// resumed session's history thereafter — that is the per-turn token saving.
-	fingerprint := sessionFingerprint(e.config.Provider, e.config.Model, e.workingDir)
+	fingerprint := sessionFingerprint(e.config.Provider, e.config.Model, e.workingDir, "v1")
 	e.fingerprint = fingerprint
 	resumed := false
 	var configOpts []acp.SessionConfigOption
@@ -619,12 +625,23 @@ func (e *ACPExecutor) run() {
 // is not wasted; a cold turn with no batch just primes the session for future
 // notifications.
 func (e *ACPExecutor) turnPromptText(resumed bool) string {
-	// TurnPrompt is the "New messages received:" batch the drain loop assembled
-	// for this turn; empty means no new work surfaced (cold start with an idle
-	// inbox), in which case the init prompt alone primes the session.
-	batch := strings.TrimSpace(e.request.TurnPrompt)
+	persona := ""
+	if e.config != nil {
+		persona = e.config.PersonaPrompt
+	}
+	return turnPromptText(e.request, persona, resumed)
+}
+
+// turnPromptText assembles the prompt for this turn. TurnPrompt is the "New
+// messages received:" batch the drain loop assembled; empty means no new work
+// surfaced (cold start with an idle inbox), in which case the init prompt
+// alone primes the session. A warm (resumed) turn sends only the batch (plus
+// the re-anchor when the runner decided the session needs re-anchoring); a
+// cold turn prepends the init prompt.
+func turnPromptText(req Request, persona string, resumed bool) string {
+	batch := strings.TrimSpace(req.TurnPrompt)
 	if resumed {
-		anchor := strings.TrimSpace(e.request.ReanchorPrompt)
+		anchor := strings.TrimSpace(req.ReanchorPrompt)
 		if anchor == "" {
 			return batch
 		}
@@ -633,11 +650,11 @@ func (e *ACPExecutor) turnPromptText(resumed bool) string {
 		}
 		return anchor + "\n\n" + batch
 	}
-	identityName := e.request.AgentDisplayName
+	identityName := req.AgentDisplayName
 	if identityName == "" {
-		identityName = e.request.AgentResourceID
+		identityName = req.AgentResourceID
 	}
-	initPrompt := BuildPrompt(identityName, e.request.OwnerDisplayName, e.config.PersonaPrompt)
+	initPrompt := BuildPrompt(identityName, req.OwnerDisplayName, persona)
 	if batch == "" {
 		return initPrompt
 	}
@@ -1358,6 +1375,14 @@ func flattenSelectOptions(opts acp.SessionConfigSelectOptions) []acp.SessionConf
 }
 
 func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []string {
+	return buildRuntimeEnv(cfg.AllowEnv, cfg.CustomEnv, cfg.Env, requestEnv, req)
+}
+
+func buildThreadEnv(cfg *ThreadConfig, requestEnv map[string]string, req Request) []string {
+	return buildRuntimeEnv(cfg.AllowEnv, cfg.CustomEnv, cfg.Env, requestEnv, req)
+}
+
+func buildRuntimeEnv(allowEnv []string, customEnv, env map[string]string, requestEnv map[string]string, req Request) []string {
 	values := map[string]string{}
 	for _, item := range os.Environ() {
 		key, value, ok := strings.Cut(item, "=")
@@ -1365,9 +1390,9 @@ func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []st
 			values[key] = value
 		}
 	}
-	if len(cfg.AllowEnv) > 0 {
+	if len(allowEnv) > 0 {
 		filtered := map[string]string{}
-		for _, key := range cfg.AllowEnv {
+		for _, key := range allowEnv {
 			if value, ok := values[key]; ok {
 				filtered[key] = value
 			}
@@ -1379,13 +1404,13 @@ func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []st
 	for key, value := range requestEnv {
 		values[key] = value
 	}
-	for key, value := range cfg.Env {
+	for key, value := range env {
 		values[key] = value
 	}
 	// Overlay admin-authored custom env (key-value) on top of the inherited
 	// allow_env set; custom env wins over inherited values but is itself
 	// overridden by the LAELIA_* bootstrap vars injected below.
-	for key, value := range cfg.CustomEnv {
+	for key, value := range customEnv {
 		values[key] = value
 	}
 
@@ -1417,11 +1442,11 @@ func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []st
 		}
 	}
 
-	env := make([]string, 0, len(values))
+	result := make([]string, 0, len(values))
 	for key, value := range values {
-		env = append(env, key+"="+value)
+		result = append(result, key+"="+value)
 	}
-	return env
+	return result
 }
 
 func additionalRoots(roots []string, workingDir string) []string {

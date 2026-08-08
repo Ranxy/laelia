@@ -13,6 +13,7 @@ import (
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	"github.com/Ranxy/laelia/backend/agent/executor"
 	"github.com/Ranxy/laelia/backend/agent/pi"
+	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -317,6 +318,13 @@ func (r *agentRunner) buildRuntimeForAgent(req executor.Request) (executor.Runti
 	}
 	copyCfg := *cfg
 	copyCfg.McpServers = r.buildMcpServers(ereq)
+	// Thread-protocol providers (codex and future agents) run on the v2
+	// thread executor; everything else keeps the v1 session executor.
+	if p, ok := provider.Default().Lookup(cfg.Provider); ok {
+		if tp, ok2 := p.(provider.ThreadProvider); ok2 {
+			return executor.NewThread(ereq, executor.BuildThreadConfig(&copyCfg), tp)
+		}
+	}
 	return executor.NewACP(ereq, &copyCfg)
 }
 
