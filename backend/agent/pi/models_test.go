@@ -11,20 +11,15 @@ import (
 	"time"
 )
 
-// withModelsHTTP swaps the package modelsHTTP client for the duration of t (so
-// tests hit an httptest server instead of the live provider), then restores it.
-func withModelsHTTP(t *testing.T, srv *httptest.Server) {
+// redirectModelsURL points the two known providers at the httptest server for
+// the duration of t, so tests never touch the live provider endpoints.
+func redirectModelsURL(t *testing.T, srv *httptest.Server) {
 	t.Helper()
-	prev := modelsHTTP
-	modelsHTTP = srv.Client()
-	// Force the test server's URL onto the provider map for the only two known
-	// providers; restore afterwards.
 	prevDeepseek := providerModelsURL[APIProviderDeepseek]
 	prevOpenRouter := providerModelsURL[APIProviderOpenRouter]
 	providerModelsURL[APIProviderDeepseek] = srv.URL + "/models"
 	providerModelsURL[APIProviderOpenRouter] = srv.URL + "/models"
 	t.Cleanup(func() {
-		modelsHTTP = prev
 		providerModelsURL[APIProviderDeepseek] = prevDeepseek
 		providerModelsURL[APIProviderOpenRouter] = prevOpenRouter
 	})
@@ -53,10 +48,10 @@ func modelsHandler(t *testing.T, requireBearer string, status int, payload strin
 func TestListModelsDeepseekDecodesAndAuths(t *testing.T) {
 	srv := httptest.NewServer(modelsHandler(t, "sk-ds", 200, `{"data":[{"id":"deepseek-chat"},{"id":"deepseek-reasoner"}]}`))
 	defer srv.Close()
-	withModelsHTTP(t, srv)
+	redirectModelsURL(t, srv)
 	modelsCache.entries = make(map[string]modelsCacheEntry) // ensure cold cache
 
-	got, err := ListModels(context.Background(), APIProviderDeepseek, "sk-ds")
+	got, err := ListModels(context.Background(), srv.Client(), APIProviderDeepseek, "sk-ds")
 	if err != nil {
 		t.Fatalf("ListModels: %v", err)
 	}
@@ -72,10 +67,10 @@ func TestListModelsDeepseekDecodesAndAuths(t *testing.T) {
 func TestListModelsDeepseekRequiresKey(t *testing.T) {
 	srv := httptest.NewServer(modelsHandler(t, "sk-ds", 200, `{}`))
 	defer srv.Close()
-	withModelsHTTP(t, srv)
+	redirectModelsURL(t, srv)
 	modelsCache.entries = make(map[string]modelsCacheEntry)
 
-	if _, err := ListModels(context.Background(), APIProviderDeepseek, ""); err == nil {
+	if _, err := ListModels(context.Background(), srv.Client(), APIProviderDeepseek, ""); err == nil {
 		t.Fatal("expected error for empty api_key")
 	}
 }
@@ -83,10 +78,10 @@ func TestListModelsDeepseekRequiresKey(t *testing.T) {
 func TestListModelsDeepseekRejectsBadKey(t *testing.T) {
 	srv := httptest.NewServer(modelsHandler(t, "sk-ds", 200, `{}`))
 	defer srv.Close()
-	withModelsHTTP(t, srv)
+	redirectModelsURL(t, srv)
 	modelsCache.entries = make(map[string]modelsCacheEntry)
 
-	if _, err := ListModels(context.Background(), APIProviderDeepseek, "wrong"); err == nil {
+	if _, err := ListModels(context.Background(), srv.Client(), APIProviderDeepseek, "wrong"); err == nil {
 		t.Fatal("expected error for wrong api_key (server returns 401)")
 	}
 }
@@ -94,10 +89,10 @@ func TestListModelsDeepseekRejectsBadKey(t *testing.T) {
 func TestListModelsOpenRouterPublicNoAuth(t *testing.T) {
 	srv := httptest.NewServer(modelsHandler(t, "", 200, `{"data":[{"id":"anthropic/claude-3.5-sonnet","name":"Claude 3.5 Sonnet"},{"id":"google/gemini-2.5-flash","name":"Gemini 2.5 Flash"}]}`))
 	defer srv.Close()
-	withModelsHTTP(t, srv)
+	redirectModelsURL(t, srv)
 	modelsCache.entries = make(map[string]modelsCacheEntry)
 
-	got, err := ListModels(context.Background(), APIProviderOpenRouter, "")
+	got, err := ListModels(context.Background(), srv.Client(), APIProviderOpenRouter, "")
 	if err != nil {
 		t.Fatalf("ListModels: %v", err)
 	}
@@ -114,7 +109,7 @@ func TestListModelsOpenRouterPublicNoAuth(t *testing.T) {
 }
 
 func TestListModelsUnknownProvider(t *testing.T) {
-	if _, err := ListModels(context.Background(), "bogus", "k"); err == nil {
+	if _, err := ListModels(context.Background(), nil, "bogus", "k"); err == nil {
 		t.Fatal("expected error for unknown provider")
 	}
 }
@@ -122,10 +117,10 @@ func TestListModelsUnknownProvider(t *testing.T) {
 func TestListModelsNon2xx(t *testing.T) {
 	srv := httptest.NewServer(modelsHandler(t, "sk-ds", 500, `{}`))
 	defer srv.Close()
-	withModelsHTTP(t, srv)
+	redirectModelsURL(t, srv)
 	modelsCache.entries = make(map[string]modelsCacheEntry)
 
-	_, err := ListModels(context.Background(), APIProviderDeepseek, "sk-ds")
+	_, err := ListModels(context.Background(), srv.Client(), APIProviderDeepseek, "sk-ds")
 	if err == nil || !strings.Contains(err.Error(), "500") {
 		t.Fatalf("expected 500 in error, got %v", err)
 	}
@@ -134,10 +129,10 @@ func TestListModelsNon2xx(t *testing.T) {
 func TestListModelsDedupAndSort(t *testing.T) {
 	srv := httptest.NewServer(modelsHandler(t, "sk-ds", 200, `{"data":[{"id":"b"},{"id":"a"},{"id":"a"},{"id":""}]}`))
 	defer srv.Close()
-	withModelsHTTP(t, srv)
+	redirectModelsURL(t, srv)
 	modelsCache.entries = make(map[string]modelsCacheEntry)
 
-	got, err := ListModels(context.Background(), APIProviderDeepseek, "sk-ds")
+	got, err := ListModels(context.Background(), srv.Client(), APIProviderDeepseek, "sk-ds")
 	if err != nil {
 		t.Fatalf("ListModels: %v", err)
 	}
@@ -154,11 +149,11 @@ func TestListModelsCacheHitThenExpiry(t *testing.T) {
 		_, _ = io.WriteString(w, `{"data":[{"id":"deepseek-chat"}]}`)
 	}))
 	defer srv.Close()
-	withModelsHTTP(t, srv)
+	redirectModelsURL(t, srv)
 	modelsCache.entries = make(map[string]modelsCacheEntry)
 
 	// First call hits the server.
-	got, err := ListModels(context.Background(), APIProviderDeepseek, "sk-ds")
+	got, err := ListModels(context.Background(), srv.Client(), APIProviderDeepseek, "sk-ds")
 	if err != nil || len(got) != 1 {
 		t.Fatalf("first call: got=%+v err=%v", got, err)
 	}
@@ -166,7 +161,7 @@ func TestListModelsCacheHitThenExpiry(t *testing.T) {
 		t.Fatalf("expected 1 upstream call, got %d", calls)
 	}
 	// Second call is served from cache — no new upstream call.
-	if _, err := ListModels(context.Background(), APIProviderDeepseek, "sk-ds"); err != nil {
+	if _, err := ListModels(context.Background(), srv.Client(), APIProviderDeepseek, "sk-ds"); err != nil {
 		t.Fatalf("cached call: %v", err)
 	}
 	if calls != 1 {
@@ -179,7 +174,7 @@ func TestListModelsCacheHitThenExpiry(t *testing.T) {
 	e.expiresAt = time.Now().Add(-time.Second)
 	modelsCache.entries[key] = e
 	modelsCache.mu.Unlock()
-	if _, err := ListModels(context.Background(), APIProviderDeepseek, "sk-ds"); err != nil {
+	if _, err := ListModels(context.Background(), srv.Client(), APIProviderDeepseek, "sk-ds"); err != nil {
 		t.Fatalf("post-expiry call: %v", err)
 	}
 	if calls != 2 {

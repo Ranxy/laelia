@@ -238,7 +238,7 @@ func (*APIProviderService) ListAPIProviderModels(ctx context.Context, req *conne
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("base_url override is not supported for provider type %q", req.Msg.ProviderType))
 	}
 	apiKey := strings.TrimSpace(req.Msg.ApiKey)
-	models, err := pi.ListModels(ctx, spec.apiProvider, apiKey)
+	models, err := pi.ListModels(ctx, nil, spec.apiProvider, apiKey)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
