@@ -117,12 +117,6 @@ func (s *Store) GetDB() *sql.DB {
 	return s.dbConnManager.GetDB()
 }
 
-// DeleteCache deletes the cache.
-func (s *Store) DeleteCache() {
-	s.userEmailCache.Purge()
-	s.userIDCache.Purge()
-}
-
 func getPolicyCacheKey(resourceType models.Policy_Resource, resource string, policyType models.Policy_Type) string {
 	return fmt.Sprintf("policies/%s/%s/%s", resourceType, resource, policyType)
 }
