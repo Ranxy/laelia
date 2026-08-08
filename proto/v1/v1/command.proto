@@ -151,9 +151,8 @@ message CommandEvent {
     WarningPayload warning = 15;
     RawAcpPayload raw_acp = 16;
     FinalSummaryPayload final_summary = 17;
-    PermissionRequestedPayload permission_requested = 18;
-    PermissionTimedOutPayload permission_timed_out = 19;
-    PermissionDecidedPayload permission_decided = 20;
+    // 18-20 were permission_requested/timed_out/decided; permissions are now
+    // auto-granted by the runtime, so the payloads are gone.
     ContextCompactionPayload context_compaction = 21;
     ContextUsagePayload context_usage = 22;
     TokenUsagePayload token_usage = 23;
@@ -197,32 +196,6 @@ message RawAcpPayload {
 message FinalSummaryPayload {
   string stop_reason = 1;
   string session_id = 2;
-}
-
-message PermissionRequestedPayload {
-  string tool_call_id = 1;
-  string kind = 2;
-  string title = 3;
-  repeated PermissionOptionPayload options = 4;
-  int64 expires_at = 5;
-}
-
-message PermissionOptionPayload {
-  string option_id = 1;
-  string name = 2;
-  string kind = 3;
-}
-
-message PermissionTimedOutPayload {
-  string tool_call_id = 1;
-  string kind = 2;
-}
-
-message PermissionDecidedPayload {
-  string tool_call_id = 1;
-  string kind = 2;
-  string option_id = 3;
-  string option_kind = 4;
 }
 
 // ContextCompactionPayload describes a context-window compaction observed on
@@ -1392,6 +1365,19 @@ service CommandService {
     option (laelia.v1.audit) = true;
   }
 
+  // SteerCommand injects a follow-up message into a running command's
+  // in-flight turn. Only executors that support mid-turn steering (the ACP v2
+  // thread protocol's turn/steer) honor it; others ignore it.
+  rpc SteerCommand(SteerCommandRequest) returns (Command) {
+    option (google.api.http) = {
+      post: "/v1/{name=agents/*/commands/*}:steer"
+      body: "*"
+    };
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.commands.cancel";
+    option (laelia.v1.audit) = true;
+  }
+
   rpc WatchCommand(WatchCommandRequest) returns (stream CommandOutput) {
     option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}:watch"};
     option (laelia.v1.auth_method) = IAM;
@@ -1402,16 +1388,6 @@ service CommandService {
     option (google.api.http) = {get: "/v1/{name=agents/*/commands/*}:watchEvents"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.commands.watch";
-  }
-
-  rpc RespondPermission(RespondPermissionRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      post: "/v1/{name=agents/*/commands/*}:respondPermission"
-      body: "*"
-    };
-    option (laelia.v1.auth_method) = IAM;
-    option (laelia.v1.permission) = "laelia.commands.watch";
-    option (laelia.v1.audit) = true;
   }
 
   rpc SearchChatHistory(SearchChatHistoryRequest) returns (SearchChatHistoryResponse) {
@@ -1922,10 +1898,11 @@ message ManagerStreamMessage {
     BeginSessionResponse begin_session_response = 8;
     CancelMessage cancel = 5;
     Pong pong = 6;
-    PermissionDecision permission_decision = 7;
+    // 7 was permission_decision; permissions are now auto-granted.
     DiscoverProviders discover_providers = 9; // ask the agent daemon to re-probe installed LLM agent providers
     WorkspaceListRequest workspace_list_request = 10; // ask the agent daemon to list one level of its workspace
     WorkspaceReadRequest workspace_read_request = 11; // ask the agent daemon to read a workspace file
+    SteerMessage steer = 12; // inject a follow-up message into the in-flight turn
   }
 }
 
@@ -2017,6 +1994,14 @@ message CancelMessage {
   string command_id = 1;
 }
 
+// SteerMessage injects a follow-up message into the in-flight turn of a
+// running command. It is best-effort: an executor that does not support
+// mid-turn steering ignores it.
+message SteerMessage {
+  string command_id = 1;
+  string text = 2;
+}
+
 message Ping {
   int64 seq = 1;
   int64 sent_at = 2;
@@ -2057,6 +2042,14 @@ message CancelCommandRequest {
   string reason = 2;
 }
 
+message SteerCommandRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Command"
+  ];
+  string text = 2;
+}
+
 message WatchCommandRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
@@ -2071,19 +2064,6 @@ message WatchCommandEventsRequest {
     (google.api.resource_reference).type = "laelia/Command"
   ];
   int32 after_seq_no = 2;
-}
-
-message PermissionDecision {
-  string command_id = 1;
-  string option_id = 2;
-}
-
-message RespondPermissionRequest {
-  string name = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference).type = "laelia/Command"
-  ];
-  string option_id = 2;
 }
 
 // NewMessagesAvailable is a best-effort wake signal pushed from the Manager to

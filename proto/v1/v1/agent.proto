@@ -809,6 +809,11 @@ message AgentACPConfig {
   // provider, in the form "apiProviders/{id}/entries/{entry}". Only meaningful when
   // provider == "builtin-pi" and global_provider is set.
   string global_provider_entry = 11;
+  // protocol declares the ACP protocol generation the provider speaks:
+  // empty (inferred from the provider type), "acp-v1" (session protocol) or
+  // "acp-v2" (thread protocol). Only meaningful for a "custom" provider: a
+  // built-in provider's protocol is determined by its implementation.
+  string protocol = 12;
 }
 
 message AgentCapability {

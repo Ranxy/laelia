@@ -41,7 +41,7 @@ func TestACPValidatePath(t *testing.T) {
 
 func TestACPRequestPermissionSelectsAllowOption(t *testing.T) {
 	kind := acp.ToolKindRead
-	client := &acpRuntimeClient{executor: &ACPExecutor{config: &ACPConfig{AutoApproveToolKinds: []string{"read"}}}}
+	client := &acpRuntimeClient{executor: &ACPExecutor{config: &ACPConfig{}}}
 
 	resp, err := client.RequestPermission(context.Background(), acp.RequestPermissionRequest{
 		Options: []acp.PermissionOption{
@@ -546,11 +546,6 @@ func newOpencodeTestConfig(bin string, workspace string, writable bool) *ACPConf
 		args = append(args, "--agent", agent)
 	}
 
-	toolKinds := []string{"read", "search", "think", "fetch"}
-	if writable {
-		toolKinds = append(toolKinds, "edit", "move")
-	}
-
 	return &ACPConfig{
 		MaxTimeoutSeconds:     120,
 		MaxEventCount:         2000,
@@ -572,12 +567,11 @@ func newOpencodeTestConfig(bin string, workspace string, writable bool) *ACPConf
 			"GOOGLE_API_KEY",
 			"OPENROUTER_API_KEY",
 		},
-		ReadTextFiles:        true,
-		WriteTextFiles:       writable,
-		AutoApproveToolKinds: toolKinds,
-		SupportsDiff:         writable,
-		SupportsRawEvents:    true,
-		SupportsToolTraces:   true,
+		ReadTextFiles:      true,
+		WriteTextFiles:     writable,
+		SupportsDiff:       writable,
+		SupportsRawEvents:  true,
+		SupportsToolTraces: true,
 	}
 }
 
@@ -690,102 +684,4 @@ func TestSendOutput_NonBlockingAfterCancel(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("sendOutput/sendEvent leaked goroutines after cancel (blocked on full channel)")
 	}
-}
-
-// TestRequestPermission_ConcurrentCallsNoRace exercises concurrent reads of
-// perCommandAllow (the "already allowed" fast path) overlapping with writes
-// (an AllowAlways decision recording perCommandAllow[kind]=true). Under -race
-// this fails if the maps are not guarded by permMu.
-func TestRequestPermission_ConcurrentCallsNoRace(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	exec := &ACPExecutor{
-		ctx:              ctx,
-		cancel:           cancel,
-		config:           &ACPConfig{MaxEventCount: 0}, // no event limit
-		outputCh:         make(chan OutputChunk, 16),
-		eventCh:          make(chan Event, 256),
-		permissionCh:     make(chan acp.PermissionOptionId, 1),
-		perCommandAllow:  map[string]bool{"hot": true},
-		perCommandReject: map[string]bool{},
-	}
-	client := &acpRuntimeClient{executor: exec}
-
-	const allowOpt acp.PermissionOptionId = "allow-always"
-	options := []acp.PermissionOption{
-		{OptionId: allowOpt, Kind: acp.PermissionOptionKindAllowAlways, Name: "Allow always"},
-	}
-	hotKind := acp.ToolKindRead
-
-	// Drain events so sendEvent never blocks the writers.
-	var drainWG sync.WaitGroup
-	drainWG.Add(1)
-	go func() {
-		defer drainWG.Done()
-		for {
-			select {
-			case <-exec.eventCh:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	const readers = 32
-	const writers = 24
-
-	var wg sync.WaitGroup
-	wg.Add(readers)
-	for i := 0; i < readers; i++ {
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 50; j++ {
-				// "hot" is preset allowed → pure map read, returns immediately.
-				_, _ = client.RequestPermission(ctx, acp.RequestPermissionRequest{
-					Options:  options,
-					ToolCall: acp.ToolCallUpdate{Kind: &hotKind},
-				})
-			}
-		}()
-	}
-
-	// Feeder: pump one AllowAlways option per writer. Each writer consumes one
-	// and records perCommandAllow[uniqueKind]=true (a map write), overlapping
-	// the readers' map reads.
-	feederDone := make(chan struct{})
-	go func() {
-		for i := 0; i < writers; i++ {
-			select {
-			case exec.permissionCh <- allowOpt:
-			case <-ctx.Done():
-				return
-			}
-		}
-		close(feederDone)
-	}()
-
-	wg.Add(writers)
-	for i := 0; i < writers; i++ {
-		go func(n int) {
-			defer wg.Done()
-			kind := acp.ToolKind(fmt.Sprintf("kind-%d", n))
-			_, _ = client.RequestPermission(ctx, acp.RequestPermissionRequest{
-				Options:  options,
-				ToolCall: acp.ToolCallUpdate{Kind: &kind},
-			})
-		}(i)
-	}
-
-	wg.Wait()
-	<-feederDone
-
-	// At least one writer should have recorded its kind. Proves the write path
-	// executed under the lock alongside the concurrent readers.
-	exec.permMu.Lock()
-	recorded := len(exec.perCommandAllow)
-	exec.permMu.Unlock()
-	assert.Greater(t, recorded, 1, "writers should have recorded AllowAlways decisions")
-
-	cancel()
-	drainWG.Wait()
 }

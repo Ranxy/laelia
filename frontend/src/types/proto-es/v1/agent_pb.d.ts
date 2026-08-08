@@ -1663,6 +1663,16 @@ export declare type AgentACPConfig = Message<"laelia.v1.AgentACPConfig"> & {
    * @generated from field: string global_provider_entry = 11;
    */
   globalProviderEntry: string;
+
+  /**
+   * protocol declares the ACP protocol generation the provider speaks:
+   * empty (inferred from the provider type), "acp-v1" (session protocol) or
+   * "acp-v2" (thread protocol). Only meaningful for a "custom" provider: a
+   * built-in provider's protocol is determined by its implementation.
+   *
+   * @generated from field: string protocol = 12;
+   */
+  protocol: string;
 };
 
 /**

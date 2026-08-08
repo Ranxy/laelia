@@ -677,11 +677,15 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1/agents/{agent}/commands/{command}:respondPermission:
+    /v1/agents/{agent}/commands/{command}:steer:
         post:
             tags:
                 - CommandService
-            operationId: CommandService_RespondPermission
+            description: |-
+                SteerCommand injects a follow-up message into a running command's
+                 in-flight turn. Only executors that support mid-turn steering (the ACP v2
+                 thread protocol's turn/steer) honor it; others ignore it.
+            operationId: CommandService_SteerCommand
             parameters:
                 - name: agent
                   in: path
@@ -699,12 +703,15 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/RespondPermissionRequest'
+                            $ref: '#/components/schemas/SteerCommandRequest'
                 required: true
             responses:
                 "200":
                     description: OK
-                    content: {}
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Command'
                 default:
                     description: Default error response
                     content:
@@ -4973,6 +4980,13 @@ components:
                         global_provider_entry is the resource name of the (key, model) entry within the global
                          provider, in the form "apiProviders/{id}/entries/{entry}". Only meaningful when
                          provider == "builtin-pi" and global_provider is set.
+                protocol:
+                    type: string
+                    description: |-
+                        protocol declares the ACP protocol generation the provider speaks:
+                         empty (inferred from the provider type), "acp-v1" (session protocol) or
+                         "acp-v2" (thread protocol). Only meaningful for a "custom" provider: a
+                         built-in provider's protocol is determined by its implementation.
             description: |-
                 User-configurable ACP settings. Everything else (working dir, capabilities,
                  permissions) is derived from a built-in template, not set by the admin.
@@ -5819,14 +5833,12 @@ components:
                     $ref: '#/components/schemas/RawAcpPayload'
                 finalSummary:
                     $ref: '#/components/schemas/FinalSummaryPayload'
-                permissionRequested:
-                    $ref: '#/components/schemas/PermissionRequestedPayload'
-                permissionTimedOut:
-                    $ref: '#/components/schemas/PermissionTimedOutPayload'
-                permissionDecided:
-                    $ref: '#/components/schemas/PermissionDecidedPayload'
                 contextCompaction:
-                    $ref: '#/components/schemas/ContextCompactionPayload'
+                    allOf:
+                        - $ref: '#/components/schemas/ContextCompactionPayload'
+                    description: |-
+                        18-20 were permission_requested/timed_out/decided; permissions are now
+                         auto-granted by the runtime, so the payloads are gone.
                 contextUsage:
                     $ref: '#/components/schemas/ContextUsagePayload'
                 tokenUsage:
@@ -7312,48 +7324,6 @@ components:
                 timeoutSeconds:
                     type: integer
                     format: int32
-        PermissionDecidedPayload:
-            type: object
-            properties:
-                toolCallId:
-                    type: string
-                kind:
-                    type: string
-                optionId:
-                    type: string
-                optionKind:
-                    type: string
-        PermissionOptionPayload:
-            type: object
-            properties:
-                optionId:
-                    type: string
-                name:
-                    type: string
-                kind:
-                    type: string
-        PermissionRequestedPayload:
-            type: object
-            properties:
-                toolCallId:
-                    type: string
-                kind:
-                    type: string
-                title:
-                    type: string
-                options:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/PermissionOptionPayload'
-                expiresAt:
-                    type: string
-        PermissionTimedOutPayload:
-            type: object
-            properties:
-                toolCallId:
-                    type: string
-                kind:
-                    type: string
         PiModel:
             type: object
             properties:
@@ -7584,15 +7554,6 @@ components:
             properties:
                 conversation:
                     $ref: '#/components/schemas/Conversation'
-        RespondPermissionRequest:
-            required:
-                - name
-            type: object
-            properties:
-                name:
-                    type: string
-                optionId:
-                    type: string
         RevokeAgentTokenRequest:
             required:
                 - name
@@ -7839,6 +7800,15 @@ components:
                         $ref: '#/components/schemas/GoogleProtobufAny'
                     description: A list of messages that carry the error details.  There is a common set of message types for APIs to use.
             description: 'The `Status` type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by [gRPC](https://github.com/grpc). Each `Status` message contains three pieces of data: error code, error message, and error details. You can find out more about this error model and how to work with it in the [API Design Guide](https://cloud.google.com/apis/design/errors).'
+        SteerCommandRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                text:
+                    type: string
         TaskInfo:
             type: object
             properties:

@@ -10,20 +10,21 @@ import (
 )
 
 // TestSessionFingerprint_StableAndDistinguishing guards the cold/warm gate: the
-// fingerprint must be identical for identical (provider,model,workingDir) and
-// differ when any of the three changes, or a config change would resume a
-// session the provider no longer recognizes.
+// fingerprint must be identical for identical (provider,model,workingDir,
+// protocol) and differ when any of the four changes, or a config change would
+// resume a session the provider no longer recognizes.
 func TestSessionFingerprint_StableAndDistinguishing(t *testing.T) {
-	a := sessionFingerprint("opencode", "gpt-5", "/work")
-	assert.Equal(t, a, sessionFingerprint("opencode", "gpt-5", "/work"), "same inputs must hash identically")
+	a := sessionFingerprint("opencode", "gpt-5", "/work", "v1")
+	assert.Equal(t, a, sessionFingerprint("opencode", "gpt-5", "/work", "v1"), "same inputs must hash identically")
 
 	// Each input change must invalidate the fingerprint.
-	assert.NotEqual(t, a, sessionFingerprint("claude", "gpt-5", "/work"))
-	assert.NotEqual(t, a, sessionFingerprint("opencode", "claude-4", "/work"))
-	assert.NotEqual(t, a, sessionFingerprint("opencode", "gpt-5", "/elsewhere"))
+	assert.NotEqual(t, a, sessionFingerprint("claude", "gpt-5", "/work", "v1"))
+	assert.NotEqual(t, a, sessionFingerprint("opencode", "claude-4", "/work", "v1"))
+	assert.NotEqual(t, a, sessionFingerprint("opencode", "gpt-5", "/elsewhere", "v1"))
+	assert.NotEqual(t, a, sessionFingerprint("opencode", "gpt-5", "/work", "v2"), "protocol change must invalidate the fingerprint")
 
 	// Empty working dir is a valid distinct input, not a collapse to zero.
-	assert.NotEqual(t, sessionFingerprint("opencode", "gpt-5", ""), a)
+	assert.NotEqual(t, sessionFingerprint("opencode", "gpt-5", "", "v1"), a)
 }
 
 // TestLoadSaveClearACPSession_RoundTrip exercises the durable session file that

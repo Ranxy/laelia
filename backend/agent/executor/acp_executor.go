@@ -27,7 +27,6 @@ import (
 
 const flushOutputInterval = 500 * time.Millisecond
 const maxRawEventBatchSize = 256
-const permissionTimeout = 120 * time.Second
 const usageUpdateMinInterval = 5 * time.Second
 
 // debugToolCalls gates verbose logging of every ACP ToolCall / ToolCallUpdate
@@ -67,7 +66,13 @@ func (b *outputBuffer) totalLen() int {
 	return b.stdout.Len() + b.system.Len()
 }
 
-func (b *outputBuffer) flush(e *ACPExecutor) {
+// outputSink is the minimal surface outputBuffer needs to flush buffered text.
+// Both ACPExecutor and ThreadExecutor satisfy it.
+type outputSink interface {
+	sendOutput(streamType v1pb.CommandOutput_StreamType, content string)
+}
+
+func (b *outputBuffer) flush(e outputSink) {
 	b.mu.Lock()
 	stdout := b.stdout.String()
 	b.stdout.Reset()
@@ -223,12 +228,6 @@ type ACPExecutor struct {
 	// command timeline.
 	usageMu       sync.Mutex
 	lastUsageEmit time.Time
-	permissionCh  chan acp.PermissionOptionId
-	// permMu guards perCommandAllow/perCommandReject. The ACP client methods
-	// may be invoked concurrently; without a lock these maps would race.
-	permMu           sync.Mutex
-	perCommandAllow  map[string]bool
-	perCommandReject map[string]bool
 }
 
 type acpRuntimeClient struct {
@@ -268,22 +267,19 @@ func NewACP(req Request, cfg *ACPConfig) (Runtime, error) {
 	SetProcessGroup(cmd)
 
 	exec := &ACPExecutor{
-		ctx:              ctx,
-		cancel:           cancel,
-		request:          req,
-		config:           cfg,
-		workingDir:       workingDir,
-		allowedRoots:     roots,
-		cmd:              cmd,
-		outputCh:         make(chan OutputChunk, outputBufferSize),
-		eventCh:          make(chan Event, outputBufferSize),
-		resultCh:         make(chan Result, 1),
-		done:             make(chan struct{}),
-		permissionCh:     make(chan acp.PermissionOptionId, 1),
-		perCommandAllow:  map[string]bool{},
-		perCommandReject: map[string]bool{},
-		toolCallStates:   map[string]*toolCallState{},
-		toolCallAdapter:  resolveToolCallAdapter(cfg),
+		ctx:             ctx,
+		cancel:          cancel,
+		request:         req,
+		config:          cfg,
+		workingDir:      workingDir,
+		allowedRoots:    roots,
+		cmd:             cmd,
+		outputCh:        make(chan OutputChunk, outputBufferSize),
+		eventCh:         make(chan Event, outputBufferSize),
+		resultCh:        make(chan Result, 1),
+		done:            make(chan struct{}),
+		toolCallStates:  map[string]*toolCallState{},
+		toolCallAdapter: resolveToolCallAdapter(cfg),
 	}
 	exec.client = &acpRuntimeClient{executor: exec}
 	return exec, nil
@@ -373,13 +369,6 @@ func (e *ACPExecutor) Done() <-chan struct{} {
 	return e.done
 }
 
-func (e *ACPExecutor) ResolvePermission(optionID string) {
-	select {
-	case e.permissionCh <- acp.PermissionOptionId(optionID):
-	default:
-	}
-}
-
 func (e *ACPExecutor) run() {
 	e.startedAt = time.Now()
 	defer close(e.outputCh)
@@ -460,7 +449,11 @@ func (e *ACPExecutor) run() {
 	// config fingerprint. The init prompt (identity + persona + communication +
 	// memory + procedure) is sent only on a cold NewSession and lives in the
 	// resumed session's history thereafter — that is the per-turn token saving.
-	fingerprint := sessionFingerprint(e.config.Provider, e.config.Model, e.workingDir)
+	protocol := e.config.Protocol
+	if protocol == "" {
+		protocol = ProtocolV1
+	}
+	fingerprint := sessionFingerprint(e.config.Provider, e.config.Model, e.workingDir, protocol)
 	e.fingerprint = fingerprint
 	resumed := false
 	var configOpts []acp.SessionConfigOption
@@ -619,12 +612,23 @@ func (e *ACPExecutor) run() {
 // is not wasted; a cold turn with no batch just primes the session for future
 // notifications.
 func (e *ACPExecutor) turnPromptText(resumed bool) string {
-	// TurnPrompt is the "New messages received:" batch the drain loop assembled
-	// for this turn; empty means no new work surfaced (cold start with an idle
-	// inbox), in which case the init prompt alone primes the session.
-	batch := strings.TrimSpace(e.request.TurnPrompt)
+	persona := ""
+	if e.config != nil {
+		persona = e.config.PersonaPrompt
+	}
+	return turnPromptText(e.request, persona, resumed)
+}
+
+// turnPromptText assembles the prompt for this turn. TurnPrompt is the "New
+// messages received:" batch the drain loop assembled; empty means no new work
+// surfaced (cold start with an idle inbox), in which case the init prompt
+// alone primes the session. A warm (resumed) turn sends only the batch (plus
+// the re-anchor when the runner decided the session needs re-anchoring); a
+// cold turn prepends the init prompt.
+func turnPromptText(req Request, persona string, resumed bool) string {
+	batch := strings.TrimSpace(req.TurnPrompt)
 	if resumed {
-		anchor := strings.TrimSpace(e.request.ReanchorPrompt)
+		anchor := strings.TrimSpace(req.ReanchorPrompt)
 		if anchor == "" {
 			return batch
 		}
@@ -633,11 +637,11 @@ func (e *ACPExecutor) turnPromptText(resumed bool) string {
 		}
 		return anchor + "\n\n" + batch
 	}
-	identityName := e.request.AgentDisplayName
+	identityName := req.AgentDisplayName
 	if identityName == "" {
-		identityName = e.request.AgentResourceID
+		identityName = req.AgentResourceID
 	}
-	initPrompt := BuildPrompt(identityName, e.request.OwnerDisplayName, e.config.PersonaPrompt)
+	initPrompt := BuildPrompt(identityName, req.OwnerDisplayName, persona)
 	if batch == "" {
 		return initPrompt
 	}
@@ -919,118 +923,15 @@ func (c *acpRuntimeClient) WriteTextFile(_ context.Context, params acp.WriteText
 	return acp.WriteTextFileResponse{}, nil
 }
 
-func (c *acpRuntimeClient) RequestPermission(_ context.Context, params acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
-	kind := ""
-	if params.ToolCall.Kind != nil {
-		kind = string(*params.ToolCall.Kind)
-	}
-
-	if allowsToolKind(c.executor.config.AutoApproveToolKinds, params.ToolCall.Kind) {
-		return acp.RequestPermissionResponse{
-			Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{
-				Outcome:  "selected",
-				OptionId: allowPermissionOption(params.Options),
-			}},
-		}, nil
-	}
-
-	c.executor.permMu.Lock()
-	allowed := c.executor.perCommandAllow[kind]
-	rejected := c.executor.perCommandReject[kind]
-	c.executor.permMu.Unlock()
-
-	if allowed {
-		return acp.RequestPermissionResponse{
-			Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{
-				Outcome:  "selected",
-				OptionId: allowPermissionOption(params.Options),
-			}},
-		}, nil
-	}
-
-	if rejected {
-		return acp.RequestPermissionResponse{
-			Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{
-				Outcome:  "selected",
-				OptionId: rejectPermissionOption(params.Options),
-			}},
-		}, nil
-	}
-
-	title := ""
-	if params.ToolCall.Title != nil {
-		title = *params.ToolCall.Title
-	}
-
-	c.executor.sendEvent(Event{
-		Type:    v1pb.CommandEventType_PERMISSION_REQUESTED,
-		Summary: fmt.Sprintf("Permission required for %s: %s", kind, title),
-		PermissionRequested: &v1pb.PermissionRequestedPayload{
-			ToolCallId: string(params.ToolCall.ToolCallId),
-			Kind:       kind,
-			Title:      title,
-			Options:    permissionOptionsToProto(params.Options),
-			ExpiresAt:  time.Now().Add(permissionTimeout).Unix(),
-		},
-	})
-
-	select {
-	case optionID := <-c.executor.permissionCh:
-		if optionID == "" {
-			return acp.RequestPermissionResponse{
-				Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{Outcome: "cancelled"}},
-			}, nil
-		}
-
-		permissionKind := findPermissionOptionKind(params.Options, optionID)
-		switch permissionKind {
-		case acp.PermissionOptionKindAllowAlways:
-			c.executor.permMu.Lock()
-			c.executor.perCommandAllow[kind] = true
-			c.executor.permMu.Unlock()
-		case acp.PermissionOptionKindRejectAlways:
-			c.executor.permMu.Lock()
-			c.executor.perCommandReject[kind] = true
-			c.executor.permMu.Unlock()
-		default:
-		}
-
-		c.executor.sendEvent(Event{
-			Type:    v1pb.CommandEventType_PERMISSION_DECIDED,
-			Summary: fmt.Sprintf("Permission %s for %s: %s", string(permissionKind), kind, title),
-			PermissionDecided: &v1pb.PermissionDecidedPayload{
-				ToolCallId: string(params.ToolCall.ToolCallId),
-				Kind:       kind,
-				OptionId:   string(optionID),
-				OptionKind: string(permissionKind),
-			},
-		})
-
-		return acp.RequestPermissionResponse{
-			Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{
-				Outcome:  "selected",
-				OptionId: optionID,
-			}},
-		}, nil
-
-	case <-time.After(permissionTimeout):
-		c.executor.sendEvent(Event{
-			Type:    v1pb.CommandEventType_PERMISSION_TIMED_OUT,
-			Summary: fmt.Sprintf("Permission timed out for %s", kind),
-			PermissionTimedOut: &v1pb.PermissionTimedOutPayload{
-				ToolCallId: string(params.ToolCall.ToolCallId),
-				Kind:       kind,
-			},
-		})
-		return acp.RequestPermissionResponse{
-			Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{Outcome: "cancelled"}},
-		}, nil
-
-	case <-c.executor.ctx.Done():
-		return acp.RequestPermissionResponse{
-			Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{Outcome: "cancelled"}},
-		}, nil
-	}
+func (*acpRuntimeClient) RequestPermission(_ context.Context, params acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
+	// Permissions are granted automatically: the LLM agent is trusted to
+	// decide, so no human approval round-trip is ever surfaced.
+	return acp.RequestPermissionResponse{
+		Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{
+			Outcome:  "selected",
+			OptionId: allowPermissionOption(params.Options),
+		}},
+	}, nil
 }
 
 func (c *acpRuntimeClient) SessionUpdate(_ context.Context, params acp.SessionNotification) error {
@@ -1358,6 +1259,14 @@ func flattenSelectOptions(opts acp.SessionConfigSelectOptions) []acp.SessionConf
 }
 
 func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []string {
+	return buildRuntimeEnv(cfg.AllowEnv, cfg.CustomEnv, cfg.Env, requestEnv, req)
+}
+
+func buildThreadEnv(cfg *ThreadConfig, requestEnv map[string]string, req Request) []string {
+	return buildRuntimeEnv(cfg.AllowEnv, cfg.CustomEnv, cfg.Env, requestEnv, req)
+}
+
+func buildRuntimeEnv(allowEnv []string, customEnv, env map[string]string, requestEnv map[string]string, req Request) []string {
 	values := map[string]string{}
 	for _, item := range os.Environ() {
 		key, value, ok := strings.Cut(item, "=")
@@ -1365,9 +1274,9 @@ func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []st
 			values[key] = value
 		}
 	}
-	if len(cfg.AllowEnv) > 0 {
+	if len(allowEnv) > 0 {
 		filtered := map[string]string{}
-		for _, key := range cfg.AllowEnv {
+		for _, key := range allowEnv {
 			if value, ok := values[key]; ok {
 				filtered[key] = value
 			}
@@ -1379,13 +1288,13 @@ func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []st
 	for key, value := range requestEnv {
 		values[key] = value
 	}
-	for key, value := range cfg.Env {
+	for key, value := range env {
 		values[key] = value
 	}
 	// Overlay admin-authored custom env (key-value) on top of the inherited
 	// allow_env set; custom env wins over inherited values but is itself
 	// overridden by the LAELIA_* bootstrap vars injected below.
-	for key, value := range cfg.CustomEnv {
+	for key, value := range customEnv {
 		values[key] = value
 	}
 
@@ -1417,11 +1326,11 @@ func buildACPEnv(cfg *ACPConfig, requestEnv map[string]string, req Request) []st
 		}
 	}
 
-	env := make([]string, 0, len(values))
+	result := make([]string, 0, len(values))
 	for key, value := range values {
-		env = append(env, key+"="+value)
+		result = append(result, key+"="+value)
 	}
-	return env
+	return result
 }
 
 func additionalRoots(roots []string, workingDir string) []string {
@@ -1497,55 +1406,18 @@ func toProtobufStruct(value any) *structpb.Struct {
 	return s
 }
 
-func permissionOptionsToProto(options []acp.PermissionOption) []*v1pb.PermissionOptionPayload {
-	result := make([]*v1pb.PermissionOptionPayload, len(options))
-	for i, opt := range options {
-		result[i] = &v1pb.PermissionOptionPayload{
-			OptionId: string(opt.OptionId),
-			Name:     opt.Name,
-			Kind:     string(opt.Kind),
-		}
-	}
-	return result
-}
-
 func allowPermissionOption(options []acp.PermissionOption) acp.PermissionOptionId {
 	for _, option := range options {
 		if option.Kind == acp.PermissionOptionKindAllowOnce || option.Kind == acp.PermissionOptionKindAllowAlways {
 			return option.OptionId
 		}
 	}
-	return ""
-}
-
-func rejectPermissionOption(options []acp.PermissionOption) acp.PermissionOptionId {
-	for _, option := range options {
-		if option.Kind == acp.PermissionOptionKindRejectOnce || option.Kind == acp.PermissionOptionKindRejectAlways {
-			return option.OptionId
-		}
+	// No allow option offered: fall back to the first one so the agent always
+	// gets a valid selection instead of an empty option id.
+	if len(options) > 0 {
+		return options[0].OptionId
 	}
 	return ""
-}
-
-func allowsToolKind(allowed []string, kind *acp.ToolKind) bool {
-	if kind == nil {
-		return false
-	}
-	for _, candidate := range allowed {
-		if candidate == string(*kind) {
-			return true
-		}
-	}
-	return false
-}
-
-func findPermissionOptionKind(options []acp.PermissionOption, optionID acp.PermissionOptionId) acp.PermissionOptionKind {
-	for _, opt := range options {
-		if opt.OptionId == optionID {
-			return opt.Kind
-		}
-	}
-	return acp.PermissionOptionKindAllowOnce
 }
 
 func uniqueStrings(items []string) []string {

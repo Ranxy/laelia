@@ -310,6 +310,7 @@ type AgentACPConfig struct {
 	ApiKey              string                 `protobuf:"bytes,9,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
 	GlobalProvider      string                 `protobuf:"bytes,10,opt,name=global_provider,json=globalProvider,proto3" json:"global_provider,omitempty"`
 	GlobalProviderEntry string                 `protobuf:"bytes,11,opt,name=global_provider_entry,json=globalProviderEntry,proto3" json:"global_provider_entry,omitempty"`
+	Protocol            string                 `protobuf:"bytes,12,opt,name=protocol,proto3" json:"protocol,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -417,6 +418,13 @@ func (x *AgentACPConfig) GetGlobalProvider() string {
 func (x *AgentACPConfig) GetGlobalProviderEntry() string {
 	if x != nil {
 		return x.GlobalProviderEntry
+	}
+	return ""
+}
+
+func (x *AgentACPConfig) GetProtocol() string {
+	if x != nil {
+		return x.Protocol
 	}
 	return ""
 }
@@ -780,7 +788,7 @@ const file_store_agent_proto_rawDesc = "" +
 	" \x01(\v2\x1c.laelia.store.AgentACPConfigR\tacpConfig\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xdd\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xf9\x03\n" +
 	"\x0eAgentACPConfig\x12\x1e\n" +
 	"\n" +
 	"executable\x18\x01 \x01(\tR\n" +
@@ -796,7 +804,8 @@ const file_store_agent_proto_rawDesc = "" +
 	"\aapi_key\x18\t \x01(\tR\x06apiKey\x12'\n" +
 	"\x0fglobal_provider\x18\n" +
 	" \x01(\tR\x0eglobalProvider\x122\n" +
-	"\x15global_provider_entry\x18\v \x01(\tR\x13globalProviderEntry\x1a<\n" +
+	"\x15global_provider_entry\x18\v \x01(\tR\x13globalProviderEntry\x12\x1a\n" +
+	"\bprotocol\x18\f \x01(\tR\bprotocol\x1a<\n" +
 	"\x0eCustomEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd0\x02\n" +

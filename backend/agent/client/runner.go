@@ -13,6 +13,7 @@ import (
 	daemonsrv "github.com/Ranxy/laelia/backend/agent/daemon"
 	"github.com/Ranxy/laelia/backend/agent/executor"
 	"github.com/Ranxy/laelia/backend/agent/pi"
+	"github.com/Ranxy/laelia/backend/agent/provider"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
@@ -39,6 +40,11 @@ type agentRunner struct {
 	acpConfig *executor.ACPConfig
 	piConfig  *pi.PiConfig
 	piSession *pi.Session
+	// threadSession, when non-nil, is the agent's resident ACP v2 app-server
+	// (resident mode, env LAELIA_ACP2_SESSION=1): one long-lived subprocess
+	// shared across turns. It never coexists with piSession; applyAssignment
+	// tears the thread side down when pi takes over and vice versa.
+	threadSession *executor.ThreadSession
 	// cs is this runner's command stream, set in start and read by applyAssignment
 	// to coordinate an in-flight drain turn on a config hot-reload.
 	cs     *commandStream
@@ -104,6 +110,10 @@ func (r *agentRunner) buildPiConfig(assignment *v1pb.AgentAssignment) *pi.PiConf
 func (r *agentRunner) applyAssignment(a *v1pb.AgentAssignment) {
 	acp := a.GetAcpConfig()
 	if acp != nil && acp.GetProvider() == pi.BuiltinPiProvider {
+		// pi owns the runner: tear down any resident thread subprocess first
+		// (coordinated so an in-flight thread turn reports a reload cause).
+		r.coordinateInFlightTurn()
+		r.stopThreadSession()
 		r.setConfig(nil)
 		newPi := r.buildPiConfig(a)
 		if newPi == nil {
@@ -133,7 +143,14 @@ func (r *agentRunner) applyAssignment(a *v1pb.AgentAssignment) {
 	// the pi session and load the ACP config.
 	r.coordinateInFlightTurn()
 	r.stopPiSession()
-	r.setConfig(r.buildAcpConfig(a))
+	cfg := r.buildAcpConfig(a)
+	r.setConfig(cfg)
+	// A resident thread session survives config hot-reloads (the next turn's
+	// buildThreadRuntime restarts it on a launch-shape change), but must go
+	// when the agent is no longer a resident-thread agent.
+	if !threadResidentEligible(cfg) {
+		r.stopThreadSession()
+	}
 }
 
 func (r *agentRunner) setConfig(cfg *executor.ACPConfig) {
@@ -193,6 +210,20 @@ func (r *agentRunner) stopPiSession() {
 	sess := r.piSession
 	r.piSession = nil
 	r.piConfig = nil
+	r.mu.Unlock()
+	if sess != nil {
+		sess.Stop()
+	}
+}
+
+// stopThreadSession tears down the resident thread subprocess and clears the
+// session. The session pointer is cleared under r.mu BEFORE the blocking Stop
+// so a concurrent buildThreadRuntime cannot resurrect a torn-down session. The
+// caller coordinates any in-flight turn first (see coordinateInFlightTurn).
+func (r *agentRunner) stopThreadSession() {
+	r.mu.Lock()
+	sess := r.threadSession
+	r.threadSession = nil
 	r.mu.Unlock()
 	if sess != nil {
 		sess.Stop()
@@ -317,7 +348,85 @@ func (r *agentRunner) buildRuntimeForAgent(req executor.Request) (executor.Runti
 	}
 	copyCfg := *cfg
 	copyCfg.McpServers = r.buildMcpServers(ereq)
+	threadCfg := executor.BuildThreadConfig(&copyCfg)
+	// Thread-protocol providers (codex and future agents) run on the v2
+	// thread executor. A built-in provider's protocol is fixed by its
+	// implementation; a "custom" provider that declares protocol "acp-v2"
+	// runs the thread executor through an adapter over its raw command.
+	// Everything else keeps the v1 session executor.
+	if p, ok := provider.Default().Lookup(cfg.Provider); ok {
+		if tp, ok2 := p.(provider.ThreadProvider); ok2 {
+			return r.buildThreadRuntime(ereq, threadCfg, tp)
+		}
+	} else if cfg.Protocol == executor.ProtocolV2 && cfg.Executable != "" {
+		tp := provider.NewCustomThreadProvider(copyCfg.Executable, copyCfg.Args)
+		return r.buildThreadRuntime(ereq, threadCfg, tp)
+	}
 	return executor.NewACP(ereq, &copyCfg)
+}
+
+// threadSessionEnabled reports whether ACP v2 thread agents run as one
+// long-lived resident subprocess shared across turns (env LAELIA_ACP2_SESSION=1).
+// Default off: each turn spawns a fresh app-server, which is simpler and frees
+// the (memory-heavy) agent runtime while idle.
+func threadSessionEnabled() bool {
+	return os.Getenv("LAELIA_ACP2_SESSION") == "1"
+}
+
+// threadSessionIdleTimeout is how long a resident subprocess stays alive after
+// its last turn before idle eviction (env LAELIA_ACP2_SESSION_IDLE, default
+// 5m). Zero disables eviction.
+func threadSessionIdleTimeout() time.Duration {
+	if v := os.Getenv("LAELIA_ACP2_SESSION_IDLE"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d >= 0 {
+			return d
+		}
+	}
+	return 5 * time.Minute
+}
+
+// threadResidentEligible reports whether the ACP config runs on the v2 thread
+// protocol with resident mode enabled: a built-in ThreadProvider (its protocol
+// is fixed by its implementation) or a custom provider declaring acp-v2.
+func threadResidentEligible(cfg *executor.ACPConfig) bool {
+	if cfg == nil || !threadSessionEnabled() {
+		return false
+	}
+	if p, ok := provider.Default().Lookup(cfg.Provider); ok {
+		_, isThread := p.(provider.ThreadProvider)
+		return isThread
+	}
+	return cfg.Protocol == executor.ProtocolV2 && cfg.Executable != ""
+}
+
+// buildThreadRuntime returns a v2 thread runtime for the given provider: the
+// resident ThreadSession mode (one long-lived app-server shared across turns)
+// or the per-turn ThreadExecutor. In resident mode the session is created
+// lazily on the first turn; a launch-shape change (provider/model/working dir/
+// protocol/command) swaps the session — the old subprocess is stopped outside
+// the lock, a matching fingerprint keeps the warm process.
+func (r *agentRunner) buildThreadRuntime(ereq executor.Request, threadCfg *executor.ThreadConfig, tp provider.ThreadProvider) (executor.Runtime, error) {
+	if !threadSessionEnabled() {
+		return executor.NewThread(ereq, threadCfg, tp)
+	}
+	threadCfg.IdleTimeout = threadSessionIdleTimeout()
+	fp := executor.ThreadLaunchFingerprint(threadCfg, tp)
+	r.mu.Lock()
+	sess := r.threadSession
+	var old *executor.ThreadSession
+	if sess == nil || sess.LaunchFingerprint() != fp {
+		ctx, cancel := context.WithCancel(context.Background())
+		sess = executor.NewThreadSession(ctx, cancel, ereq, threadCfg, tp)
+		old = r.threadSession
+		r.threadSession = sess
+	}
+	r.mu.Unlock()
+	// The old launch shape is torn down outside the lock so a concurrent turn
+	// never sees a half-swapped pair (mirrors restartPiSession).
+	if old != nil {
+		old.Stop()
+	}
+	return executor.NewThreadWithSession(ereq, threadCfg, tp, sess)
 }
 
 // buildMcpServers discovers the agent's managed MCP tools through the daemon
@@ -373,6 +482,7 @@ func (r *agentRunner) stop() {
 	r.cs = nil
 	r.mu.Unlock()
 	r.stopPiSession()
+	r.stopThreadSession()
 	slog.Info("tore down agent runner", "agent", r.agentName)
 }
 

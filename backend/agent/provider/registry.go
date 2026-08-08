@@ -35,7 +35,7 @@ func New(providers ...Provider) *Registry {
 
 // Default is the registry of built-in providers, ordered by preference.
 func Default() *Registry {
-	return New(&OpenCodeProvider{}, &ClaudeCodeProvider{})
+	return New(&OpenCodeProvider{}, &ClaudeCodeProvider{}, &CodexProvider{})
 }
 
 // Lookup returns the provider with the given id, or (nil, false) when unknown.
@@ -90,6 +90,17 @@ func discoverOne(ctx context.Context, p Provider) Discovered {
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, probeTimeout)
 	defer cancel()
+	if tp, ok := p.(ThreadProvider); ok {
+		// v2 providers advertise models through model/list; the model is
+		// passed directly via thread/start's model param instead of a v1
+		// config-option round trip.
+		models, err := tp.ProbeModelsV2(probeCtx, "")
+		if err == nil {
+			d.Models = models
+			d.SupportsModelConfigOption = true
+		}
+		return d
+	}
 	models, supports, err := p.ProbeModels(probeCtx, "")
 	if err != nil {
 		// Detection succeeded but probing failed: report the provider as

@@ -153,6 +153,10 @@ export interface AgentACPConfigInput {
   allowEnv: string[];
   provider: string;
   model: string;
+  // protocol declares the ACP protocol generation for a custom provider:
+  // "" (inferred), "acp-v1" (session) or "acp-v2" (thread). Ignored for
+  // built-in providers.
+  protocol: string;
   customEnv: Record<string, string>;
   personaPrompt: string;
   // builtin-pi runtime fields (only meaningful when provider === "builtin-pi"):
@@ -305,6 +309,10 @@ export interface CommandSlice {
   activeEvents: Record<string, CommandEvent[]>;
 
   cancelCommand: (name: string) => Promise<Command>;
+  // steerCommand injects a follow-up message into the in-flight turn of a
+  // running command. Best-effort: executors without mid-turn steering ignore
+  // it. Throws when the command is not running or the agent is unreachable.
+  steerCommand: (name: string, text: string) => Promise<Command>;
   listCommands: (
     agent: string,
     params?: { pageSize?: number; pageToken?: string; status?: number }
@@ -315,7 +323,6 @@ export interface CommandSlice {
   // aborted by the caller or failed with an error.
   watchCommand: (name: string, signal?: AbortSignal) => Promise<boolean>;
   watchCommandEvents: (name: string, signal?: AbortSignal) => Promise<boolean>;
-  respondPermission: (name: string, optionId: string) => Promise<void>;
 }
 
 export interface ChatSlice {

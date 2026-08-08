@@ -1172,26 +1172,6 @@
                 </li>
               
                 <li>
-                  <a href="#laelia.v1.PermissionDecidedPayload"><span class="badge">M</span>PermissionDecidedPayload</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.PermissionDecision"><span class="badge">M</span>PermissionDecision</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.PermissionOptionPayload"><span class="badge">M</span>PermissionOptionPayload</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.PermissionRequestedPayload"><span class="badge">M</span>PermissionRequestedPayload</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.PermissionTimedOutPayload"><span class="badge">M</span>PermissionTimedOutPayload</a>
-                </li>
-              
-                <li>
                   <a href="#laelia.v1.Ping"><span class="badge">M</span>Ping</a>
                 </li>
               
@@ -1232,10 +1212,6 @@
                 </li>
               
                 <li>
-                  <a href="#laelia.v1.RespondPermissionRequest"><span class="badge">M</span>RespondPermissionRequest</a>
-                </li>
-              
-                <li>
                   <a href="#laelia.v1.SearchChatHistoryRequest"><span class="badge">M</span>SearchChatHistoryRequest</a>
                 </li>
               
@@ -1253,6 +1229,14 @@
               
                 <li>
                   <a href="#laelia.v1.SetConversationPinnedResponse"><span class="badge">M</span>SetConversationPinnedResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SteerCommandRequest"><span class="badge">M</span>SteerCommandRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SteerMessage"><span class="badge">M</span>SteerMessage</a>
                 </li>
               
                 <li>
@@ -2572,6 +2556,16 @@ server resolves the concrete api_provider/api_key/model at the daemon boundary. 
                   <td><p>global_provider_entry is the resource name of the (key, model) entry within the global
 provider, in the form &#34;apiProviders/{id}/entries/{entry}&#34;. Only meaningful when
 provider == &#34;builtin-pi&#34; and global_provider is set. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>protocol</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>protocol declares the ACP protocol generation the provider speaks:
+empty (inferred from the provider type), &#34;acp-v1&#34; (session protocol) or
+&#34;acp-v2&#34; (thread protocol). Only meaningful for a &#34;custom&#34; provider: a
+built-in provider&#39;s protocol is determined by its implementation. </p></td>
                 </tr>
               
             </tbody>
@@ -8693,31 +8687,11 @@ FAILED_PRECONDITION instead and this response is not sent. </p></td>
                 </tr>
               
                 <tr>
-                  <td>permission_requested</td>
-                  <td><a href="#laelia.v1.PermissionRequestedPayload">PermissionRequestedPayload</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>permission_timed_out</td>
-                  <td><a href="#laelia.v1.PermissionTimedOutPayload">PermissionTimedOutPayload</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>permission_decided</td>
-                  <td><a href="#laelia.v1.PermissionDecidedPayload">PermissionDecidedPayload</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
                   <td>context_compaction</td>
                   <td><a href="#laelia.v1.ContextCompactionPayload">ContextCompactionPayload</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>18-20 were permission_requested/timed_out/decided; permissions are now
+auto-granted by the runtime, so the payloads are gone. </p></td>
                 </tr>
               
                 <tr>
@@ -11465,17 +11439,12 @@ thread participation and is left 0. </p></td>
                 </tr>
               
                 <tr>
-                  <td>permission_decision</td>
-                  <td><a href="#laelia.v1.PermissionDecision">PermissionDecision</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
                   <td>discover_providers</td>
                   <td><a href="#laelia.v1.DiscoverProviders">DiscoverProviders</a></td>
                   <td></td>
-                  <td><p>ask the agent daemon to re-probe installed LLM agent providers </p></td>
+                  <td><p>7 was permission_decision; permissions are now auto-granted.
+
+ask the agent daemon to re-probe installed LLM agent providers </p></td>
                 </tr>
               
                 <tr>
@@ -11490,6 +11459,13 @@ thread participation and is left 0. </p></td>
                   <td><a href="#laelia.v1.WorkspaceReadRequest">WorkspaceReadRequest</a></td>
                   <td></td>
                   <td><p>ask the agent daemon to read a workspace file </p></td>
+                </tr>
+              
+                <tr>
+                  <td>steer</td>
+                  <td><a href="#laelia.v1.SteerMessage">SteerMessage</a></td>
+                  <td></td>
+                  <td><p>inject a follow-up message into the in-flight turn </p></td>
                 </tr>
               
             </tbody>
@@ -11709,203 +11685,6 @@ source of truth. Empty means a normal channel-message wake. </p></td>
                 <tr>
                   <td>connection_state</td>
                   <td><a href="#laelia.v1.AgentStatus.ConnectionState">AgentStatus.ConnectionState</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.PermissionDecidedPayload">PermissionDecidedPayload</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>tool_call_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>kind</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>option_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>option_kind</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.PermissionDecision">PermissionDecision</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>command_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>option_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.PermissionOptionPayload">PermissionOptionPayload</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>option_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>name</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>kind</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.PermissionRequestedPayload">PermissionRequestedPayload</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>tool_call_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>kind</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>title</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>options</td>
-                  <td><a href="#laelia.v1.PermissionOptionPayload">PermissionOptionPayload</a></td>
-                  <td>repeated</td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>expires_at</td>
-                  <td><a href="#int64">int64</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.PermissionTimedOutPayload">PermissionTimedOutPayload</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>tool_call_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>kind</td>
-                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -12384,37 +12163,6 @@ offline agent (0 when the agent was reached on the first try). </p></td>
 
         
       
-        <h3 id="laelia.v1.RespondPermissionRequest">RespondPermissionRequest</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>name</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>option_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
         <h3 id="laelia.v1.SearchChatHistoryRequest">SearchChatHistoryRequest</h3>
         <p></p>
 
@@ -12610,6 +12358,68 @@ TODO. Only valid for top-level messages (thread_root must be empty). </p></td>
         <p></p>
 
         
+
+        
+      
+        <h3 id="laelia.v1.SteerCommandRequest">SteerCommandRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>text</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SteerMessage">SteerMessage</h3>
+        <p>SteerMessage injects a follow-up message into the in-flight turn of a</p><p>running command. It is best-effort: an executor that does not support</p><p>mid-turn steering ignores it.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>command_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>text</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
 
         
       
@@ -13869,6 +13679,15 @@ produce no Activity row.</p></td>
               </tr>
             
               <tr>
+                <td>SteerCommand</td>
+                <td><a href="#laelia.v1.SteerCommandRequest">SteerCommandRequest</a></td>
+                <td><a href="#laelia.v1.Command">Command</a></td>
+                <td><p>SteerCommand injects a follow-up message into a running command&#39;s
+in-flight turn. Only executors that support mid-turn steering (the ACP v2
+thread protocol&#39;s turn/steer) honor it; others ignore it.</p></td>
+              </tr>
+            
+              <tr>
                 <td>WatchCommand</td>
                 <td><a href="#laelia.v1.WatchCommandRequest">WatchCommandRequest</a></td>
                 <td><a href="#laelia.v1.CommandOutput">CommandOutput</a> stream</td>
@@ -13879,13 +13698,6 @@ produce no Activity row.</p></td>
                 <td>WatchCommandEvents</td>
                 <td><a href="#laelia.v1.WatchCommandEventsRequest">WatchCommandEventsRequest</a></td>
                 <td><a href="#laelia.v1.CommandEvent">CommandEvent</a> stream</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>RespondPermission</td>
-                <td><a href="#laelia.v1.RespondPermissionRequest">RespondPermissionRequest</a></td>
-                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
                 <td><p></p></td>
               </tr>
             
@@ -14389,6 +14201,16 @@ user, hiding it from All and Unread. The caller&#39;s own id must own the row.</
               
               
               <tr>
+                <td>SteerCommand</td>
+                <td>POST</td>
+                <td>/v1/{name=agents/*/commands/*}:steer</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
                 <td>WatchCommand</td>
                 <td>GET</td>
                 <td>/v1/{name=agents/*/commands/*}:watch</td>
@@ -14403,16 +14225,6 @@ user, hiding it from All and Unread. The caller&#39;s own id must own the row.</
                 <td>GET</td>
                 <td>/v1/{name=agents/*/commands/*}:watchEvents</td>
                 <td></td>
-              </tr>
-              
-            
-              
-              
-              <tr>
-                <td>RespondPermission</td>
-                <td>POST</td>
-                <td>/v1/{name=agents/*/commands/*}:respondPermission</td>
-                <td>*</td>
               </tr>
               
             

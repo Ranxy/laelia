@@ -174,18 +174,6 @@ func TestMarshalEventPayload(t *testing.T) {
 			},
 		},
 		{
-			name: "permission_requested",
-			event: &v1pb.CommandEvent{
-				Type: v1pb.CommandEventType_PERMISSION_REQUESTED,
-				Payload: &v1pb.CommandEvent_PermissionRequested{
-					PermissionRequested: &v1pb.PermissionRequestedPayload{
-						ToolCallId: "tc-1", Kind: "bash", Title: "run command",
-						ExpiresAt: time.Now().Unix() + 120,
-					},
-				},
-			},
-		},
-		{
 			name: "context_compaction_finished",
 			event: &v1pb.CommandEvent{
 				Type: v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED,

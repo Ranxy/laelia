@@ -1342,6 +1342,7 @@ func convertToV1AgentACPConfig(cfg *storepb.AgentACPConfig) *v1pb.AgentACPConfig
 		ApiKey:              cfg.ApiKey,
 		GlobalProvider:      cfg.GlobalProvider,
 		GlobalProviderEntry: cfg.GlobalProviderEntry,
+		Protocol:            cfg.Protocol,
 	}
 }
 
@@ -1361,6 +1362,7 @@ func convertToStoreAgentACPConfig(cfg *v1pb.AgentACPConfig) *storepb.AgentACPCon
 		ApiKey:              cfg.ApiKey,
 		GlobalProvider:      cfg.GlobalProvider,
 		GlobalProviderEntry: cfg.GlobalProviderEntry,
+		Protocol:            cfg.Protocol,
 	}
 }
 
@@ -1371,7 +1373,7 @@ func convertToStoreAgentACPConfig(cfg *v1pb.AgentACPConfig) *storepb.AgentACPCon
 func isEmptyAgentACPConfig(cfg *v1pb.AgentACPConfig) bool {
 	return cfg.Executable == "" && len(cfg.Args) == 0 && len(cfg.AllowEnv) == 0 &&
 		cfg.Provider == "" && cfg.Model == "" && len(cfg.CustomEnv) == 0 && cfg.PersonaPrompt == "" &&
-		cfg.GlobalProvider == "" && cfg.GlobalProviderEntry == ""
+		cfg.GlobalProvider == "" && cfg.GlobalProviderEntry == "" && cfg.Protocol == ""
 }
 
 // buildCapabilityForACPConfig derives the agent capability from the
@@ -1955,6 +1957,9 @@ func validateAgentACPConfig(cfg *v1pb.AgentACPConfig, machineAvailableProviders 
 	if !knownProviderID(cfg.Provider) {
 		return errors.Errorf("invalid acp_config.provider %q: must be a built-in id or \"custom\"", cfg.Provider)
 	}
+	if cfg.Protocol != "" && cfg.Protocol != executor.ProtocolV1 && cfg.Protocol != executor.ProtocolV2 {
+		return errors.Errorf("invalid acp_config.protocol %q: must be \"acp-v1\" or \"acp-v2\"", cfg.Protocol)
+	}
 	// builtin-pi is a non-ACP runtime: it needs an API provider + API key +
 	// model, not a host-detected executable. Validate its fields and skip the
 	// host-availability / model-config-option checks (pi is always available —
@@ -1992,10 +1997,22 @@ func validateAgentACPConfig(cfg *v1pb.AgentACPConfig, machineAvailableProviders 
 		return nil
 	}
 	// A built-in provider derives its command from the registry; anything else
-	// requires a raw executable.
-	_, isBuiltin := provider.Default().Lookup(cfg.Provider)
+	// requires a raw executable. A "acp-v2" declaration is only honored when
+	// the provider actually speaks the thread protocol: a built-in provider's
+	// protocol is fixed by its implementation, and a custom provider needs an
+	// explicit executable to launch.
+	p, isBuiltin := provider.Default().Lookup(cfg.Provider)
 	if !isBuiltin && cfg.Executable == "" {
 		return errors.New("acp_config.executable must be set when provider is not a built-in")
+	}
+	if isBuiltin {
+		if _, ok := p.(provider.ThreadProvider); ok {
+			if cfg.Protocol == executor.ProtocolV1 {
+				return errors.Errorf("acp_config.provider %q only supports the acp-v2 thread protocol", cfg.Provider)
+			}
+		} else if cfg.Protocol == executor.ProtocolV2 {
+			return errors.Errorf("acp_config.provider %q does not support the acp-v2 thread protocol", cfg.Provider)
+		}
 	}
 	// If the owning machine has discovered its available providers, a built-in
 	// provider must be among them — otherwise the agent is configured for a
