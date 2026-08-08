@@ -845,21 +845,12 @@ func (s *AgentService) AgentHeartbeat(ctx context.Context, req *connect.Request[
 
 	nonce := s.stateCfg.NonceManager.GenerateNonce(agent.ResourceID, req.Msg.SessionId)
 
+	// The per-heartbeat agent.status rewrite used to cost a full JSONB marshal
+	// + UPDATE + cache refill per agent per heartbeat. The HeartbeatBuffer now
+	// batches last_heartbeat_at (session touch + status jsonb_set) once per
+	// flush window per agent; the immediate TouchAgentSession above keeps the
+	// session row fresh on the request path.
 	nowSec := time.Now().Unix()
-	activeSessionID := agent.Status.GetActiveSessionId()
-	patch := &store.UpdateAgentMessage{
-		Status: &storepb.AgentStatus{
-			State:           storepb.AgentStatus_ONLINE,
-			LastHeartbeatAt: nowSec,
-			ConnectedAt:     agent.Status.GetConnectedAt(),
-			ActiveSessionId: activeSessionID,
-		},
-	}
-
-	if _, err := s.store.UpdateAgent(ctx, agent, patch); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent heartbeat, error: %v", err))
-	}
-
 	if s.stateCfg.HeartbeatBuffer != nil {
 		s.stateCfg.HeartbeatBuffer.Record(&state.HeartbeatUpdate{
 			AgentID:         agent.ID,
