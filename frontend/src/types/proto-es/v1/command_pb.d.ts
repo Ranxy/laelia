@@ -3990,6 +3990,14 @@ export declare type ManagerStreamMessage = Message<"laelia.v1.ManagerStreamMessa
      */
     value: WorkspaceReadRequest;
     case: "workspaceReadRequest";
+  } | {
+    /**
+     * inject a follow-up message into the in-flight turn
+     *
+     * @generated from field: laelia.v1.SteerMessage steer = 12;
+     */
+    value: SteerMessage;
+    case: "steer";
   } | { case: undefined; value?: undefined };
 };
 
@@ -4338,6 +4346,31 @@ export declare type CancelMessage = Message<"laelia.v1.CancelMessage"> & {
 export declare const CancelMessageSchema: GenMessage<CancelMessage>;
 
 /**
+ * SteerMessage injects a follow-up message into the in-flight turn of a
+ * running command. It is best-effort: an executor that does not support
+ * mid-turn steering ignores it.
+ *
+ * @generated from message laelia.v1.SteerMessage
+ */
+export declare type SteerMessage = Message<"laelia.v1.SteerMessage"> & {
+  /**
+   * @generated from field: string command_id = 1;
+   */
+  commandId: string;
+
+  /**
+   * @generated from field: string text = 2;
+   */
+  text: string;
+};
+
+/**
+ * Describes the message laelia.v1.SteerMessage.
+ * Use `create(SteerMessageSchema)` to create a new message.
+ */
+export declare const SteerMessageSchema: GenMessage<SteerMessage>;
+
+/**
  * @generated from message laelia.v1.Ping
  */
 export declare type Ping = Message<"laelia.v1.Ping"> & {
@@ -4467,6 +4500,27 @@ export declare type CancelCommandRequest = Message<"laelia.v1.CancelCommandReque
  * Use `create(CancelCommandRequestSchema)` to create a new message.
  */
 export declare const CancelCommandRequestSchema: GenMessage<CancelCommandRequest>;
+
+/**
+ * @generated from message laelia.v1.SteerCommandRequest
+ */
+export declare type SteerCommandRequest = Message<"laelia.v1.SteerCommandRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string text = 2;
+   */
+  text: string;
+};
+
+/**
+ * Describes the message laelia.v1.SteerCommandRequest.
+ * Use `create(SteerCommandRequestSchema)` to create a new message.
+ */
+export declare const SteerCommandRequestSchema: GenMessage<SteerCommandRequest>;
 
 /**
  * @generated from message laelia.v1.WatchCommandRequest
@@ -5090,6 +5144,18 @@ export declare const CommandService: GenService<{
   cancelCommand: {
     methodKind: "unary";
     input: typeof CancelCommandRequestSchema;
+    output: typeof CommandSchema;
+  },
+  /**
+   * SteerCommand injects a follow-up message into a running command's
+   * in-flight turn. Only executors that support mid-turn steering (the ACP v2
+   * thread protocol's turn/steer) honor it; others ignore it.
+   *
+   * @generated from rpc laelia.v1.CommandService.SteerCommand
+   */
+  steerCommand: {
+    methodKind: "unary";
+    input: typeof SteerCommandRequestSchema;
     output: typeof CommandSchema;
   },
   /**

@@ -645,6 +645,11 @@
     "acp-config-executable": "可执行程序",
     "acp-config-executable-placeholder": "npx",
     "acp-config-args": "参数",
+    "acp-config-protocol": "ACP 协议",
+    "acp-config-protocol-auto": "自动（按 provider 推断）",
+    "acp-config-protocol-v1": "acp-v1（会话协议）",
+    "acp-config-protocol-v2": "acp-v2（线程协议）",
+    "acp-config-protocol-hint": "自定义 agent 声明的 ACP 协议代际:acp-v1 走会话协议,acp-v2 走线程协议;不选时按 provider 类型推断。",
     "acp-config-args-placeholder": "@agentclientprotocol/claude-agent-acp@latest",
     "acp-config-allow-env": "允许的环境变量",
     "acp-config-allow-env-placeholder": "MY_CUSTOM_VAR",
@@ -859,7 +864,10 @@
     "back": "返回",
     "details": "详情",
     "collapse": "收起",
-    "row-open-detail": "打开命令详情"
+    "row-open-detail": "打开命令详情",
+    "steer": "干预",
+    "steering": "干预中…",
+    "steer-placeholder": "向当前回合注入消息…"
   },
   "chat": {
     "with-agent": "与 {{name}} 对话",

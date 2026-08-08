@@ -711,6 +711,47 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/agents/{agent}/commands/{command}:steer:
+        post:
+            tags:
+                - CommandService
+            description: |-
+                SteerCommand injects a follow-up message into a running command's
+                 in-flight turn. Only executors that support mid-turn steering (the ACP v2
+                 thread protocol's turn/steer) honor it; others ignore it.
+            operationId: CommandService_SteerCommand
+            parameters:
+                - name: agent
+                  in: path
+                  description: The agent id.
+                  required: true
+                  schema:
+                    type: string
+                - name: command
+                  in: path
+                  description: The command id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SteerCommandRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Command'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}/commands/{command}:watch:
         get:
             tags:
@@ -4973,6 +5014,13 @@ components:
                         global_provider_entry is the resource name of the (key, model) entry within the global
                          provider, in the form "apiProviders/{id}/entries/{entry}". Only meaningful when
                          provider == "builtin-pi" and global_provider is set.
+                protocol:
+                    type: string
+                    description: |-
+                        protocol declares the ACP protocol generation the provider speaks:
+                         empty (inferred from the provider type), "acp-v1" (session protocol) or
+                         "acp-v2" (thread protocol). Only meaningful for a "custom" provider: a
+                         built-in provider's protocol is determined by its implementation.
             description: |-
                 User-configurable ACP settings. Everything else (working dir, capabilities,
                  permissions) is derived from a built-in template, not set by the admin.
@@ -7836,6 +7884,15 @@ components:
                         $ref: '#/components/schemas/GoogleProtobufAny'
                     description: A list of messages that carry the error details.  There is a common set of message types for APIs to use.
             description: 'The `Status` type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by [gRPC](https://github.com/grpc). Each `Status` message contains three pieces of data: error code, error message, and error details. You can find out more about this error model and how to work with it in the [API Design Guide](https://cloud.google.com/apis/design/errors).'
+        SteerCommandRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                text:
+                    type: string
         TaskInfo:
             type: object
             properties:

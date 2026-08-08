@@ -34,11 +34,18 @@ type ThreadConfig struct {
 	// StartupTimeout bounds the Initialize + thread/start|resume handshake,
 	// mirroring ACPConfig.StartupTimeout.
 	StartupTimeout time.Duration
+	// IdleTimeout is how long a resident ThreadSession subprocess stays alive
+	// after its last turn before idle eviction. Zero disables eviction. Only
+	// the resident (session) mode reads it; the per-turn executor ignores it.
+	IdleTimeout time.Duration
 
 	Provider      string
 	Model         string
 	WorkingDir    string
 	PersonaPrompt string
+	// Protocol is the declared ACP protocol generation ("acp-v2"); empty
+	// defaults to acp-v2 (the thread executor only runs the v2 protocol).
+	Protocol string
 	// DeveloperInstructions is passed to thread/start as the thread-level
 	// system instructions. Empty in the first version; the plumbing exists for
 	// future agent-specific tuning.
@@ -66,6 +73,7 @@ func BuildThreadConfig(cfg *ACPConfig) *ThreadConfig {
 		Model:             cfg.Model,
 		WorkingDir:        cfg.WorkingDir,
 		PersonaPrompt:     cfg.PersonaPrompt,
+		Protocol:          cfg.Protocol,
 		Env:               cfg.Env,
 		CustomEnv:         cfg.CustomEnv,
 		AllowEnv:          cfg.AllowEnv,
@@ -86,8 +94,14 @@ type ThreadExecutor struct {
 	req    Request
 	cfg    *ThreadConfig
 	p      provider.ThreadProvider
-	cmd    *exec.Cmd
-	client *acp2.Client
+	// sess, when non-nil, makes this executor drive its turn over a shared
+	// resident ThreadSession instead of spawning a fresh app-server.
+	sess *ThreadSession
+	cmd  *exec.Cmd
+	// client is the live protocol client. It is stored atomically because the
+	// command stream's receive pump may Steer() from another goroutine while
+	// run() owns the read loop.
+	client atomic.Pointer[acp2.Client]
 	gate   *acp2.TurnGate
 
 	outputCh chan OutputChunk
@@ -113,11 +127,30 @@ type ThreadExecutor struct {
 }
 
 var _ Runtime = (*ThreadExecutor)(nil)
+var _ SteerResolver = (*ThreadExecutor)(nil)
 
 // NewThread constructs a per-turn thread executor driven by the given
 // ThreadProvider. The provider supplies the launch command and the EventMapper
 // that translates its notification shapes.
+// NewThread constructs a per-turn thread executor driven by the given
+// ThreadProvider. The provider supplies the launch command and the EventMapper
+// that translates its notification shapes.
 func NewThread(req Request, cfg *ThreadConfig, p provider.ThreadProvider) (Runtime, error) {
+	return newThreadExecutor(req, cfg, p, nil)
+}
+
+// NewThreadWithSession returns a per-turn thread executor that drives its turn
+// over a shared resident ThreadSession instead of spawning a fresh app-server.
+// The session owns the subprocess and the thread; the executor owns the turn's
+// event surface, limits, and result. sess must be non-nil.
+func NewThreadWithSession(req Request, cfg *ThreadConfig, p provider.ThreadProvider, sess *ThreadSession) (Runtime, error) {
+	if sess == nil {
+		return nil, errors.New("thread session is not configured on this agent")
+	}
+	return newThreadExecutor(req, cfg, p, sess)
+}
+
+func newThreadExecutor(req Request, cfg *ThreadConfig, p provider.ThreadProvider, sess *ThreadSession) (Runtime, error) {
 	if cfg == nil {
 		return nil, errors.New("thread protocol is not configured on this agent")
 	}
@@ -141,6 +174,7 @@ func NewThread(req Request, cfg *ThreadConfig, p provider.ThreadProvider) (Runti
 		req:      req,
 		cfg:      cfg,
 		p:        p,
+		sess:     sess,
 		gate:     acp2.NewTurnGate(),
 		outputCh: make(chan OutputChunk, outputBufferSize),
 		eventCh:  make(chan Event, outputBufferSize),
@@ -153,9 +187,44 @@ func (e *ThreadExecutor) Start() { go e.run() }
 
 func (e *ThreadExecutor) Cancel() {
 	e.cancel()
+	if e.sess != nil {
+		// Resident mode: kill the shared process so the server cannot keep an
+		// in-flight turn; the session ctx stays alive so the next turn
+		// respawns and resumes the persisted thread.
+		e.sess.Kill()
+		return
+	}
 	if e.cmd != nil && e.cmd.Process != nil {
 		_ = KillGroup(e.cmd, syscall.SIGKILL)
 	}
+}
+
+// Steer implements executor.SteerResolver over the v2 thread protocol's
+// turn/steer. It is a no-op when the client is not up yet or the turn gate
+// reports that steering is unsafe (no active turn, a turn request still
+// pending, or the post-tool window where the server would reject the steer).
+func (e *ThreadExecutor) Steer(text string) {
+	if text == "" {
+		return
+	}
+	client := e.client.Load()
+	if client == nil || !e.gate.CanSteerBusy() {
+		slog.Debug("steer ignored: no steerable turn in flight", "agent", e.req.AgentID)
+		return
+	}
+	turnID := e.gate.ActiveTurnID()
+	if turnID == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	turn, err := client.SteerTurn(ctx, e.threadID, turnID, text)
+	if err != nil {
+		slog.Warn("steer failed", "agent", e.req.AgentID, "turnID", turnID, "error", err)
+		return
+	}
+	e.gate.MarkNonEmptyInput(turn.ResolvedID())
+	slog.Info("steered in-flight turn", "agent", e.req.AgentID, "turnID", turnID)
 }
 
 func (e *ThreadExecutor) OutputChannel() <-chan OutputChunk { return e.outputCh }
@@ -173,39 +242,25 @@ func (e *ThreadExecutor) run() {
 	defer close(e.done)
 	defer e.cancel()
 
-	exe, args := e.p.ThreadCommand(e.cfg.WorkingDir)
-	args = append(args, e.p.ThreadMcpArgs(e.cfg.McpServers)...)
-	cmd := exec.CommandContext(e.ctx, exe, args...)
-	cmd.Dir = e.cfg.WorkingDir
-	cmd.Env = buildThreadEnv(e.cfg, e.req.Env, e.req)
-	// Own process group so KillGroup reaps the whole tree (node, MCP servers);
-	// on Linux also kill on parent death so a SIGKILL'd manager leaves no orphans.
-	SetProcessGroup(cmd)
+	if e.sess != nil {
+		e.runSessionTurn()
+		return
+	}
+	e.runPerTurn()
+}
+
+// runPerTurn drives one turn with a freshly spawned app-server subprocess: a
+// cold turn starts a new thread, a warm turn resumes the persisted thread id
+// (the provider persists thread state server-side, so the thread survives
+// process restarts).
+func (e *ThreadExecutor) runPerTurn() {
+	cmd, client, stderr, err := spawnThreadAppServer(e.ctx, e.req, e.cfg, e.p)
+	if err != nil {
+		e.sendResult(Result{ExitCode: 1, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: err.Error()})
+		return
+	}
 	e.cmd = cmd
-
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		e.sendResult(Result{ExitCode: 1, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: fmt.Sprintf("thread stdin pipe: %v", err)})
-		return
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		e.sendResult(Result{ExitCode: 1, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: fmt.Sprintf("thread stdout pipe: %v", err)})
-		return
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		e.sendResult(Result{ExitCode: 1, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: fmt.Sprintf("thread stderr pipe: %v", err)})
-		return
-	}
-	if err := cmd.Start(); err != nil {
-		e.sendResult(Result{ExitCode: 1, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: fmt.Sprintf("start thread subprocess: %v", err)})
-		return
-	}
-
-	client := acp2.NewClient(acp2.NewTransport(stdin), stdout, e.p.NewThreadMapper())
-	e.client = client
-	client.Start()
+	e.client.Store(client)
 	defer client.Close()
 	go e.scanStderr(stderr)
 	go e.startFlushTimer()
@@ -222,70 +277,17 @@ func (e *ThreadExecutor) run() {
 	startupCtx, cancelStartup := context.WithTimeout(e.ctx, startupTimeout)
 	defer cancelStartup()
 
-	if _, err := client.Initialize(startupCtx, "laelia-machine", "0.2.0"); err != nil {
+	threadID, resumed, resumeFailures, fingerprint, err := establishThread(startupCtx, e.req, e.cfg, client, e.sendEvent)
+	if err != nil {
 		e.finish(err)
 		return
-	}
-	if err := client.Initialized(); err != nil {
-		e.finish(err)
-		return
-	}
-
-	// Thread inheritance: each turn spawns a fresh subprocess but resumes the
-	// SAME thread id when one is persisted for this agent with a matching
-	// config fingerprint. The init prompt is sent only on a cold thread/start
-	// and lives in the resumed thread's history thereafter — that is the
-	// per-turn token saving.
-	e.fingerprint = sessionFingerprint(e.cfg.Provider, e.cfg.Model, e.cfg.WorkingDir, "v2")
-	threadID := ""
-	if existing, loadErr := loadACPSession(e.req.MachineID, e.req.AgentID); loadErr != nil {
-		slog.Warn("failed to load persisted thread session state; cold-starting", "agent", e.req.AgentID, "error", loadErr)
-	} else if existing != nil && existing.ThreadID != "" && existing.Fingerprint == e.fingerprint {
-		thread, resumeErr := client.ResumeThread(startupCtx, existing.ThreadID, e.threadStartParams())
-		if resumeErr != nil {
-			// The provider lost the thread (crash, eviction, config drift the
-			// fingerprint did not catch). Drop the stale id and cold-start so
-			// we do not loop forever on a dead thread — the cursor is the
-			// source of truth, so no message is lost, only the init prompt is
-			// re-sent.
-			slog.Warn("thread resume failed; cold-starting", "agent", e.req.AgentID, "thread_id", existing.ThreadID, "error", resumeErr)
-			clearACPSession(e.req.MachineID, e.req.AgentID)
-			failures, warned := recordResumeFailure(e.req.MachineID, e.req.AgentID)
-			e.resumeFailures = failures
-			if warned {
-				e.sendEvent(Event{
-					Type:    v1pb.CommandEventType_WARNING,
-					Summary: "thread resume failed repeatedly; starting a fresh thread",
-					Warning: &v1pb.WarningPayload{Message: "Thread resume failed 3 times in a row; cold-starting a fresh thread."},
-				})
-			}
-		} else {
-			threadID = thread.ID
-			e.resumed = true
-		}
-	}
-	if threadID == "" {
-		thread, startErr := client.StartThread(startupCtx, e.threadStartParams())
-		if startErr != nil {
-			e.finish(startErr)
-			return
-		}
-		threadID = thread.ID
 	}
 	e.threadID = threadID
+	e.resumed = resumed
+	e.resumeFailures = resumeFailures
+	e.fingerprint = fingerprint
 
-	// Persist the thread id now that thread/start|resume has accepted it, so
-	// the next turn can resume even if the turn below fails — the cursor is
-	// the source of truth, so a re-prompt next turn is safe.
-	if saveErr := saveACPSession(e.req.MachineID, e.req.AgentID, &acpSessionState{
-		ThreadID:    threadID,
-		Fingerprint: e.fingerprint,
-		CreatedAt:   time.Now().Unix(),
-	}); saveErr != nil {
-		slog.Warn("failed to persist thread session state; next turn will cold-start", "agent", e.req.AgentID, "error", saveErr)
-	}
-
-	promptText := e.turnPromptText(e.resumed)
+	promptText := e.turnPromptText(resumed)
 	if promptText == "" {
 		// Defensive: a warm turn should always carry a batch. If it does not,
 		// do not start a turn — finish cleanly and let the drain loop re-gate.
@@ -298,7 +300,7 @@ func (e *ThreadExecutor) run() {
 			DurationMs:   time.Since(e.startedAt).Milliseconds(),
 			FinalSummary: "no turn prompt; thread persisted",
 			SessionID:    threadID,
-			Resumed:      e.resumed,
+			Resumed:      resumed,
 		})
 		return
 	}
@@ -314,6 +316,68 @@ func (e *ThreadExecutor) run() {
 
 	_ = KillGroup(e.cmd, syscall.SIGKILL)
 	_ = e.cmd.Wait()
+	e.completeTurn(threadID, resumed)
+}
+
+// runSessionTurn drives one turn over a shared resident ThreadSession. The
+// session owns the subprocess and the thread; this executor owns the turn's
+// event surface, limits, and result.
+func (e *ThreadExecutor) runSessionTurn() {
+	sess := e.sess
+	// Ensure the shared subprocess is up (spawn + handshake + thread
+	// start/resume on the first turn or after an eviction; no-op when warm).
+	if err := sess.EnsureStarted(e.sendEvent); err != nil {
+		e.finish(err)
+		return
+	}
+	e.client.Store(sess.Client())
+	e.threadID = sess.ThreadID()
+	e.resumed = sess.Warm()
+	e.resumeFailures = sess.ResumeFailures()
+	e.fingerprint = sess.ThreadFingerprint()
+
+	promptText := e.turnPromptText(e.resumed)
+	if promptText == "" {
+		sess.EndTurn()
+		e.buffer.flush(e)
+		e.sendResult(Result{
+			ExitCode:     0,
+			DurationMs:   time.Since(e.startedAt).Milliseconds(),
+			FinalSummary: "no turn prompt; thread persisted",
+			SessionID:    e.threadID,
+			Resumed:      e.resumed,
+		})
+		return
+	}
+
+	go e.startFlushTimer()
+
+	turnID, err := sess.BeginTurn(e.ctx, promptText)
+	if err != nil {
+		// The server may still hold an in-flight turn; kill the process so the
+		// next turn respawns cleanly and resumes the persisted thread.
+		sess.Kill()
+		sess.EndTurn()
+		e.finish(err)
+		return
+	}
+	e.gate.NoteTurnAccepted(turnID)
+
+	e.pumpUntilTurnDone()
+
+	if e.ctx.Err() != nil {
+		// Turn ended by timeout/cancel: the server may still be running the
+		// turn, so kill the process to un-wedge it; the next turn respawns.
+		sess.Kill()
+	}
+	sess.EndTurn()
+	e.completeTurn(e.threadID, e.resumed)
+}
+
+// completeTurn flushes the turn buffer and emits the terminal result. Shared
+// by the per-turn and session-backed paths; the caller has already reaped (or
+// handed back) the subprocess.
+func (e *ThreadExecutor) completeTurn(threadID string, resumed bool) {
 	e.buffer.flush(e)
 
 	if errors.Is(e.ctx.Err(), context.DeadlineExceeded) {
@@ -341,7 +405,7 @@ func (e *ThreadExecutor) run() {
 		"executor_kind":  "THREAD",
 		"provider":       e.cfg.Provider,
 		"thread_id":      threadID,
-		"resumed":        e.resumed,
+		"resumed":        resumed,
 		"output_limited": e.outputLimited.Load(),
 		"event_limited":  e.eventLimitHit.Load(),
 	})
@@ -356,7 +420,7 @@ func (e *ThreadExecutor) run() {
 			FinalSummary: finalSummary,
 			Result:       resultPayload,
 			SessionID:    threadID,
-			Resumed:      e.resumed,
+			Resumed:      resumed,
 		})
 		return
 	}
@@ -366,16 +430,20 @@ func (e *ThreadExecutor) run() {
 		FinalSummary: finalSummary,
 		Result:       resultPayload,
 		SessionID:    threadID,
-		Resumed:      e.resumed,
+		Resumed:      resumed,
 	})
 }
 
 // pumpUntilTurnDone drains mapped events until the current turn completes
 // (turn/completed lifecycle), the process dies, or the turn ctx ends.
 func (e *ThreadExecutor) pumpUntilTurnDone() {
+	client := e.client.Load()
+	if client == nil {
+		return
+	}
 	for {
 		select {
-		case ev, ok := <-e.client.Events():
+		case ev, ok := <-client.Events():
 			if !ok {
 				return
 			}
@@ -505,32 +573,21 @@ func contextUsageRatio(u *acp2.ContextUsageInfo) float64 {
 	return float64(u.TotalTokens) / float64(u.ModelContextWindow)
 }
 
-// threadStartParams builds the thread/start|resume payload. Approval is never
-// requested (the drain loop is autonomous), the sandbox is full access, and
-// raw events are requested so the mapper can track per-phase deltas.
-func (e *ThreadExecutor) threadStartParams() acp2.ThreadStartParams {
-	return acp2.ThreadStartParams{
-		Cwd:                   e.cfg.WorkingDir,
-		ApprovalPolicy:        "never",
-		Sandbox:               "danger-full-access",
-		DeveloperInstructions: e.cfg.DeveloperInstructions,
-		Model:                 e.cfg.Model,
-		ExperimentalRawEvents: true,
-	}
-}
-
 func (e *ThreadExecutor) turnPromptText(resumed bool) string {
 	return turnPromptText(e.req, e.cfg.PersonaPrompt, resumed)
 }
 
 // finish tears down the subprocess and reports a failed turn. It is the
 // failure path for handshake/start errors; the normal completion path in run()
-// tears down inline.
+// tears down inline. In session mode e.cmd is always nil (the resident session
+// owns the subprocess), so only the buffer flush and result are emitted.
 func (e *ThreadExecutor) finish(err error) {
 	if e.cmd != nil && e.cmd.Process != nil {
 		_ = KillGroup(e.cmd, syscall.SIGKILL)
 	}
-	_ = e.cmd.Wait()
+	if e.cmd != nil {
+		_ = e.cmd.Wait()
+	}
 	e.buffer.flush(e)
 	if errors.Is(e.ctx.Err(), context.DeadlineExceeded) {
 		e.sendResult(Result{ExitCode: 124, DurationMs: time.Since(e.startedAt).Milliseconds(), ErrorMessage: e.ctx.Err().Error()})
@@ -682,3 +739,8 @@ func (e *ThreadExecutor) finalSummary() string {
 	defer e.summaryMu.Unlock()
 	return e.summaryText
 }
+
+// Session returns the resident ThreadSession this executor drives, or nil in
+// the per-turn mode. The runner and tests use it to inspect the shared
+// session's lifecycle.
+func (e *ThreadExecutor) Session() *ThreadSession { return e.sess }

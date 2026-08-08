@@ -146,7 +146,7 @@ func TestACPExecutorResumeFallbackToColdOnBadSession(t *testing.T) {
 
 	// Persist a bogus session id with a matching fingerprint so the executor
 	// will attempt ResumeSession (and fail), then fall back to cold.
-	fp := sessionFingerprint(fakeProvider, fakeModel, workspace, "v1")
+	fp := sessionFingerprint(fakeProvider, fakeModel, workspace, ProtocolV1)
 	require.NoError(t, saveACPSession(machineID, agentID, &acpSessionState{SessionID: "dead-session-id", Fingerprint: fp, CreatedAt: 1}))
 
 	// The executor would try to spawn a real subprocess for fakeProvider, which
@@ -167,7 +167,7 @@ func TestACPExecutorResumeFallbackToColdOnBadSession(t *testing.T) {
 	// And a fingerprint mismatch also forces cold: a config change must not
 	// resume a session the provider no longer recognizes.
 	require.NoError(t, saveACPSession(machineID, agentID, &acpSessionState{SessionID: "stale", Fingerprint: "old-fp", CreatedAt: 1}))
-	mismatch := sessionFingerprint(fakeProvider, "different-model", workspace, "v1")
+	mismatch := sessionFingerprint(fakeProvider, "different-model", workspace, ProtocolV1)
 	assert.NotEqual(t, "old-fp", mismatch, "different model must yield a different fingerprint")
 	clearACPSession(machineID, agentID)
 }

@@ -23,6 +23,7 @@ const (
 	CommandService_ListCommands_FullMethodName              = "/laelia.v1.CommandService/ListCommands"
 	CommandService_GetCommand_FullMethodName                = "/laelia.v1.CommandService/GetCommand"
 	CommandService_CancelCommand_FullMethodName             = "/laelia.v1.CommandService/CancelCommand"
+	CommandService_SteerCommand_FullMethodName              = "/laelia.v1.CommandService/SteerCommand"
 	CommandService_WatchCommand_FullMethodName              = "/laelia.v1.CommandService/WatchCommand"
 	CommandService_WatchCommandEvents_FullMethodName        = "/laelia.v1.CommandService/WatchCommandEvents"
 	CommandService_RespondPermission_FullMethodName         = "/laelia.v1.CommandService/RespondPermission"
@@ -89,6 +90,10 @@ type CommandServiceClient interface {
 	ListCommands(ctx context.Context, in *ListCommandsRequest, opts ...grpc.CallOption) (*ListCommandsResponse, error)
 	GetCommand(ctx context.Context, in *GetCommandRequest, opts ...grpc.CallOption) (*Command, error)
 	CancelCommand(ctx context.Context, in *CancelCommandRequest, opts ...grpc.CallOption) (*Command, error)
+	// SteerCommand injects a follow-up message into a running command's
+	// in-flight turn. Only executors that support mid-turn steering (the ACP v2
+	// thread protocol's turn/steer) honor it; others ignore it.
+	SteerCommand(ctx context.Context, in *SteerCommandRequest, opts ...grpc.CallOption) (*Command, error)
 	WatchCommand(ctx context.Context, in *WatchCommandRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CommandOutput], error)
 	WatchCommandEvents(ctx context.Context, in *WatchCommandEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CommandEvent], error)
 	RespondPermission(ctx context.Context, in *RespondPermissionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -281,6 +286,16 @@ func (c *commandServiceClient) CancelCommand(ctx context.Context, in *CancelComm
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Command)
 	err := c.cc.Invoke(ctx, CommandService_CancelCommand_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *commandServiceClient) SteerCommand(ctx context.Context, in *SteerCommandRequest, opts ...grpc.CallOption) (*Command, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Command)
+	err := c.cc.Invoke(ctx, CommandService_SteerCommand_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -882,6 +897,10 @@ type CommandServiceServer interface {
 	ListCommands(context.Context, *ListCommandsRequest) (*ListCommandsResponse, error)
 	GetCommand(context.Context, *GetCommandRequest) (*Command, error)
 	CancelCommand(context.Context, *CancelCommandRequest) (*Command, error)
+	// SteerCommand injects a follow-up message into a running command's
+	// in-flight turn. Only executors that support mid-turn steering (the ACP v2
+	// thread protocol's turn/steer) honor it; others ignore it.
+	SteerCommand(context.Context, *SteerCommandRequest) (*Command, error)
 	WatchCommand(*WatchCommandRequest, grpc.ServerStreamingServer[CommandOutput]) error
 	WatchCommandEvents(*WatchCommandEventsRequest, grpc.ServerStreamingServer[CommandEvent]) error
 	RespondPermission(context.Context, *RespondPermissionRequest) (*emptypb.Empty, error)
@@ -1058,6 +1077,9 @@ func (UnimplementedCommandServiceServer) GetCommand(context.Context, *GetCommand
 }
 func (UnimplementedCommandServiceServer) CancelCommand(context.Context, *CancelCommandRequest) (*Command, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelCommand not implemented")
+}
+func (UnimplementedCommandServiceServer) SteerCommand(context.Context, *SteerCommandRequest) (*Command, error) {
+	return nil, status.Error(codes.Unimplemented, "method SteerCommand not implemented")
 }
 func (UnimplementedCommandServiceServer) WatchCommand(*WatchCommandRequest, grpc.ServerStreamingServer[CommandOutput]) error {
 	return status.Error(codes.Unimplemented, "method WatchCommand not implemented")
@@ -1301,6 +1323,24 @@ func _CommandService_CancelCommand_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CommandServiceServer).CancelCommand(ctx, req.(*CancelCommandRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CommandService_SteerCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SteerCommandRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommandServiceServer).SteerCommand(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommandService_SteerCommand_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommandServiceServer).SteerCommand(ctx, req.(*SteerCommandRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2335,6 +2375,10 @@ var CommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CancelCommand",
 			Handler:    _CommandService_CancelCommand_Handler,
+		},
+		{
+			MethodName: "SteerCommand",
+			Handler:    _CommandService_SteerCommand_Handler,
 		},
 		{
 			MethodName: "RespondPermission",

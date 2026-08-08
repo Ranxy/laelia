@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Ranxy/laelia/backend/agent/executor"
 	"github.com/Ranxy/laelia/backend/agent/pi"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -130,6 +131,92 @@ func TestValidateAgentACPConfigGlobalProvider(t *testing.T) {
 	}
 }
 
+// TestValidateAgentACPConfigProtocol verifies the protocol field: value
+// whitelist, custom providers may declare either generation, and a built-in
+// provider may only declare acp-v2 when it actually speaks the thread protocol.
+func TestValidateAgentACPConfigProtocol(t *testing.T) {
+	cases := []struct {
+		name    string
+		cfg     *v1pb.AgentACPConfig
+		wantErr bool
+	}{
+		{
+			name: "custom v2 ok",
+			cfg: &v1pb.AgentACPConfig{
+				Provider:   "custom",
+				Executable: "my-agent",
+				Protocol:   executor.ProtocolV2,
+			},
+		},
+		{
+			name: "custom v1 ok",
+			cfg: &v1pb.AgentACPConfig{
+				Provider:   "custom",
+				Executable: "my-agent",
+				Protocol:   executor.ProtocolV1,
+			},
+		},
+		{
+			name: "custom empty protocol ok",
+			cfg: &v1pb.AgentACPConfig{
+				Provider:   "custom",
+				Executable: "my-agent",
+			},
+		},
+		{
+			name: "custom v2 missing executable",
+			cfg: &v1pb.AgentACPConfig{
+				Provider: "custom",
+				Protocol: executor.ProtocolV2,
+			},
+			wantErr: true,
+		},
+		{
+			name: "unknown protocol value",
+			cfg: &v1pb.AgentACPConfig{
+				Provider:   "custom",
+				Executable: "my-agent",
+				Protocol:   "acp-v3",
+			},
+			wantErr: true,
+		},
+		{
+			name: "builtin thread provider v2 ok",
+			cfg: &v1pb.AgentACPConfig{
+				Provider: "codex",
+				Protocol: executor.ProtocolV2,
+			},
+		},
+		{
+			name: "builtin non-thread v2 rejected",
+			cfg: &v1pb.AgentACPConfig{
+				Provider: "opencode",
+				Protocol: executor.ProtocolV2,
+			},
+			wantErr: true,
+		},
+		{
+			name: "builtin v1 rejected for thread provider",
+			cfg: &v1pb.AgentACPConfig{
+				Provider: "codex",
+				Protocol: executor.ProtocolV1,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateAgentACPConfig(tc.cfg, nil)
+			if tc.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
 // TestIsEmptyAgentACPConfig verifies that a config carrying only a global
 // provider reference counts as configured (not empty), so CreateAgent stores it.
 func TestIsEmptyAgentACPConfig(t *testing.T) {
@@ -142,6 +229,28 @@ func TestIsEmptyAgentACPConfig(t *testing.T) {
 	}
 	if isEmptyAgentACPConfig(global) {
 		t.Fatal("expected a global-provider config to be non-empty")
+	}
+	protocolOnly := &v1pb.AgentACPConfig{Protocol: executor.ProtocolV2}
+	if isEmptyAgentACPConfig(protocolOnly) {
+		t.Fatal("expected a protocol-only config to count as provided (it fails validation, not silently defaulted)")
+	}
+}
+
+// TestAgentACPConfigProtocolRoundTrip verifies the v1↔store conversion
+// preserves the protocol declaration.
+func TestAgentACPConfigProtocolRoundTrip(t *testing.T) {
+	in := &v1pb.AgentACPConfig{
+		Provider:   "custom",
+		Executable: "my-agent",
+		Protocol:   executor.ProtocolV2,
+	}
+	stored := convertToStoreAgentACPConfig(in)
+	if stored.GetProtocol() != in.Protocol {
+		t.Fatalf("store conversion dropped protocol: %+v", stored)
+	}
+	out := convertToV1AgentACPConfig(stored)
+	if out.GetProtocol() != in.Protocol {
+		t.Fatalf("v1 conversion dropped protocol: %+v", out)
 	}
 }
 

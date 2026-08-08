@@ -127,6 +127,30 @@ func (s *CommandService) CancelCommand(ctx context.Context, req *connect.Request
 	return connect.NewResponse(convertToV1Command(cmd)), nil
 }
 
+// SteerCommand injects a follow-up message into the in-flight turn of a
+// running command. Unlike CancelCommand it does not change the command's DB
+// state — it is a pure best-effort push to the agent; executors that do not
+// support mid-turn steering ignore it. A non-running command or an agent that
+// is not connected surfaces an error so the caller knows the steer did not go
+// through.
+func (s *CommandService) SteerCommand(ctx context.Context, req *connect.Request[v1pb.SteerCommandRequest]) (*connect.Response[v1pb.Command], error) {
+	cmd, err := s.store.GetCommandByName(ctx, req.Msg.Name)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	if cmd.Status != int32(v1pb.CommandStatus_RUNNING) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("command is not in running state"))
+	}
+	text := strings.TrimSpace(req.Msg.Text)
+	if text == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("steer text must not be empty"))
+	}
+	if err := s.dispatcher.SteerCommand(ctx, cmd.AgentID, cmd.ID.String(), text); err != nil {
+		return nil, connect.NewError(connect.CodeUnavailable, err)
+	}
+	return connect.NewResponse(convertToV1Command(cmd)), nil
+}
+
 func (s *CommandService) WatchCommand(ctx context.Context, req *connect.Request[v1pb.WatchCommandRequest], stream *connect.ServerStream[v1pb.CommandOutput]) error {
 	cmd, err := s.store.GetCommandByName(ctx, req.Msg.Name)
 	if err != nil {

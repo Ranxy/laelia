@@ -105,6 +105,7 @@ export function AgentProfilePage() {
   const [allowEnv, setAllowEnv] = useState<string[]>([]);
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
+  const [protocol, setProtocol] = useState("");
   const [apiProvider, setApiProvider] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [globalProvider, setGlobalProvider] = useState("");
@@ -139,6 +140,7 @@ export function AgentProfilePage() {
     allowEnv: [] as string[],
     provider: "",
     model: "",
+    protocol: "",
     apiProvider: "",
     apiKey: "",
     globalProvider: "",
@@ -261,6 +263,7 @@ export function AgentProfilePage() {
       allowEnv: cfg?.allowEnv ? [...cfg.allowEnv] : [],
       provider: cfg?.provider ?? "",
       model: cfg?.model ?? "",
+      protocol: cfg?.protocol ?? "",
       apiProvider: cfg?.apiProvider ?? "",
       // Seed the key from the persisted config so an editor can see/keep it.
       // Non-editors get an empty key server-side (redacted), which is fine —
@@ -278,6 +281,7 @@ export function AgentProfilePage() {
     setAllowEnv(next.allowEnv);
     setProvider(next.provider);
     setModel(next.model);
+    setProtocol(next.protocol);
     setApiProvider(next.apiProvider);
     setApiKey(next.apiKey);
     setGlobalProvider(next.globalProvider);
@@ -352,6 +356,9 @@ export function AgentProfilePage() {
       allowEnv: draft.allowEnv.map((e) => e.trim()).filter((e) => e !== ""),
       provider: draft.provider.trim(),
       model: draft.model.trim(),
+      // protocol is only meaningful for a custom provider; a built-in
+      // provider's protocol is fixed by its implementation.
+      protocol: draft.provider === "custom" ? draft.protocol.trim() : "",
       customEnv: foldCustomEnv(draft.customEnvEntries),
       personaPrompt,
       apiProvider: draft.apiProvider.trim(),
@@ -375,6 +382,7 @@ export function AgentProfilePage() {
       allowEnv: cfg?.allowEnv ? [...cfg.allowEnv] : [],
       provider: cfg?.provider ?? "",
       model: cfg?.model ?? "",
+      protocol: cfg?.protocol ?? "",
       customEnv: { ...(cfg?.customEnv ?? {}) },
       personaPrompt,
       apiProvider: cfg?.apiProvider ?? "",
@@ -937,10 +945,18 @@ export function AgentProfilePage() {
                             ...configRef.current,
                             provider: next,
                             model: "",
+                            // protocol is custom-only; reset when leaving custom
+                            protocol:
+                              next === "custom"
+                                ? configRef.current.protocol
+                                : "",
                             apiProvider: "",
                           };
                           setProvider(next);
                           setModel("");
+                          setProtocol(
+                            next === "custom" ? configRef.current.protocol : ""
+                          );
                           setApiProvider("");
                           saveConfig();
                         }}
@@ -1297,6 +1313,52 @@ export function AgentProfilePage() {
 
                   {isCustomProvider && !isPiProvider && (
                     <>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-medium">
+                          {t("agent.acp-config-protocol")}
+                        </label>
+                        <Select
+                          value={protocol}
+                          onValueChange={(v) => {
+                            const next = String(v ?? "");
+                            configRef.current = {
+                              ...configRef.current,
+                              protocol: next,
+                            };
+                            setProtocol(next);
+                            saveConfig();
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue>
+                              {(v: string | null) =>
+                                t(
+                                  v === "acp-v2"
+                                    ? "agent.acp-config-protocol-v2"
+                                    : v === "acp-v1"
+                                      ? "agent.acp-config-protocol-v1"
+                                      : "agent.acp-config-protocol-auto"
+                                )
+                              }
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">
+                              {t("agent.acp-config-protocol-auto")}
+                            </SelectItem>
+                            <SelectItem value="acp-v1">
+                              {t("agent.acp-config-protocol-v1")}
+                            </SelectItem>
+                            <SelectItem value="acp-v2">
+                              {t("agent.acp-config-protocol-v2")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-control-light">
+                          {t("agent.acp-config-protocol-hint")}
+                        </p>
+                      </div>
+
                       <div className="flex flex-col gap-1">
                         <label className="text-sm font-medium">
                           {t("agent.acp-config-executable")}

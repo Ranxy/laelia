@@ -98,3 +98,11 @@ type Runtime interface {
 type PermissionResolver interface {
 	ResolvePermission(optionID string)
 }
+
+// SteerResolver lets the command stream inject a follow-up message into the
+// in-flight turn of a running executor. Executors that support mid-turn
+// steering (the ACP v2 thread protocol's turn/steer) implement it; a no-op is
+// the correct behavior when no turn is active or steering is not supported.
+type SteerResolver interface {
+	Steer(text string)
+}

@@ -498,6 +498,7 @@ export function MachineProfilePage() {
           allowEnv: allowEnv.map((e) => e.trim()).filter((e) => e !== ""),
           provider: provider.trim(),
           model: model.trim(),
+          protocol: "",
           personaPrompt: personaPrompt.trim(),
           customEnv,
           globalProvider: globalProvider.trim(),

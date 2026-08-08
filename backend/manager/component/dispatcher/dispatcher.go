@@ -1013,6 +1013,36 @@ func (d *Dispatcher) CancelCommand(_ context.Context, agentID int, commandID str
 	return nil
 }
 
+// SteerCommand injects a follow-up message into the in-flight turn of a
+// running command. It is best-effort: executors without mid-turn steering
+// support ignore the message.
+func (d *Dispatcher) SteerCommand(_ context.Context, agentID int, commandID, text string) error {
+	d.mu.RLock()
+	sess, ok := d.sessions[agentID]
+	d.mu.RUnlock()
+
+	if !ok {
+		return errors.New("agent not connected")
+	}
+
+	msg := &v1pb.ManagerStreamMessage{
+		Message: &v1pb.ManagerStreamMessage_Steer{
+			Steer: &v1pb.SteerMessage{
+				CommandId: commandID,
+				Text:      text,
+			},
+		},
+	}
+
+	if err := sess.deliver(msg); err != nil {
+		slog.Error("failed to send steer to agent", "error", err)
+		return errors.Wrapf(err, "failed to send steer to agent")
+	}
+
+	slog.Info("steer sent to agent", "commandID", commandID, "agentID", agentID)
+	return nil
+}
+
 func (d *Dispatcher) RespondPermission(_ context.Context, agentID int, commandID, optionID string) error {
 	d.mu.RLock()
 	sess, ok := d.sessions[agentID]
