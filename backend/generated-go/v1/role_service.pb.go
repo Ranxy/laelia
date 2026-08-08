@@ -404,7 +404,7 @@ var File_v1_role_service_proto protoreflect.FileDescriptor
 
 const file_v1_role_service_proto_rawDesc = "" +
 	"\n" +
-	"\x15v1/role_service.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x13v1/annotation.proto\"\xc1\x01\n" +
+	"\x15v1/role_service.proto\x12\tlaelia.v1\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x13v1/annotation.proto\"\xc1\x01\n" +
 	"\x04Role\x12\x1a\n" +
 	"\x04name\x18\x01 \x01(\tB\x06\xe0A\b\xe0A\x02R\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -432,16 +432,16 @@ const file_v1_role_service_proto_rawDesc = "" +
 	"updateMask\"<\n" +
 	"\x11DeleteRoleRequest\x12'\n" +
 	"\x04name\x18\x01 \x01(\tB\x13\xe0A\x02\xfaA\r\n" +
-	"\vlaelia/RoleR\x04name2\x90\x05\n" +
-	"\vRoleService\x12p\n" +
-	"\aGetRole\x12\x19.laelia.v1.GetRoleRequest\x1a\x0f.laelia.v1.Role\"9\xdaA\x04name\x8a\xea0\x10laelia.roles.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/{name=roles/*}\x12u\n" +
-	"\tListRoles\x12\x1b.laelia.v1.ListRolesRequest\x1a\x1c.laelia.v1.ListRolesResponse\"-\xdaA\x00\x8a\xea0\x11laelia.roles.list\x90\xea0\x01\x82\xd3\xe4\x93\x02\v\x12\t/v1/roles\x12z\n" +
+	"\vlaelia/RoleR\x04name2\x8d\x04\n" +
+	"\vRoleService\x12V\n" +
+	"\aGetRole\x12\x19.laelia.v1.GetRoleRequest\x1a\x0f.laelia.v1.Role\"\x1f\xdaA\x04name\x8a\xea0\x10laelia.roles.get\x90\xea0\x01\x12d\n" +
+	"\tListRoles\x12\x1b.laelia.v1.ListRolesRequest\x1a\x1c.laelia.v1.ListRolesResponse\"\x1c\xdaA\x00\x8a\xea0\x11laelia.roles.list\x90\xea0\x01\x12c\n" +
 	"\n" +
-	"CreateRole\x12\x1c.laelia.v1.CreateRoleRequest\x1a\x0f.laelia.v1.Role\"=\xdaA\x04role\x8a\xea0\x13laelia.roles.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x11:\x04role\"\t/v1/roles\x12\x94\x01\n" +
+	"CreateRole\x12\x1c.laelia.v1.CreateRoleRequest\x1a\x0f.laelia.v1.Role\"&\xdaA\x04role\x8a\xea0\x13laelia.roles.create\x90\xea0\x01\x98\xea0\x01\x12o\n" +
 	"\n" +
-	"UpdateRole\x12\x1c.laelia.v1.UpdateRoleRequest\x1a\x0f.laelia.v1.Role\"W\xdaA\x10role,update_mask\x8a\xea0\x13laelia.roles.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1f:\x04role2\x17/v1/{role.name=roles/*}\x12\x84\x01\n" +
+	"UpdateRole\x12\x1c.laelia.v1.UpdateRoleRequest\x1a\x0f.laelia.v1.Role\"2\xdaA\x10role,update_mask\x8a\xea0\x13laelia.roles.update\x90\xea0\x01\x98\xea0\x01\x12j\n" +
 	"\n" +
-	"DeleteRole\x12\x1c.laelia.v1.DeleteRoleRequest\x1a\x16.google.protobuf.Empty\"@\xdaA\x04name\x8a\xea0\x13laelia.roles.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x14*\x12/v1/{name=roles/*}B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"DeleteRole\x12\x1c.laelia.v1.DeleteRoleRequest\x1a\x16.google.protobuf.Empty\"&\xdaA\x04name\x8a\xea0\x13laelia.roles.delete\x90\xea0\x01\x98\xea0\x01B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_role_service_proto_rawDescOnce sync.Once

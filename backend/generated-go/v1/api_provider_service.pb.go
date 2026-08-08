@@ -714,7 +714,7 @@ var File_v1_api_provider_service_proto protoreflect.FileDescriptor
 
 const file_v1_api_provider_service_proto_rawDesc = "" +
 	"\n" +
-	"\x1dv1/api_provider_service.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0ev1/agent.proto\x1a\x13v1/annotation.proto\"\xbe\x03\n" +
+	"\x1dv1/api_provider_service.proto\x12\tlaelia.v1\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0ev1/agent.proto\x1a\x13v1/annotation.proto\"\xbe\x03\n" +
 	"\vApiProvider\x12\x1a\n" +
 	"\x04name\x18\x01 \x01(\tB\x06\xe0A\b\xe0A\x02R\x04name\x12#\n" +
 	"\rprovider_type\x18\x02 \x01(\tR\fproviderType\x12\x14\n" +
@@ -766,14 +766,14 @@ const file_v1_api_provider_service_proto_rawDesc = "" +
 	"\x11ApiProviderChange\x12\x1a\n" +
 	"\bprovider\x18\x01 \x01(\tR\bprovider\x12#\n" +
 	"\rentries_added\x18\x02 \x03(\tR\fentriesAdded\x12'\n" +
-	"\x0fentries_removed\x18\x03 \x03(\tR\x0eentriesRemoved2\x81\b\n" +
-	"\x12ApiProviderService\x12\x93\x01\n" +
-	"\x0eGetAPIProvider\x12 .laelia.v1.GetApiProviderRequest\x1a\x16.laelia.v1.ApiProvider\"G\xdaA\x04name\x8a\xea0\x17laelia.apiProviders.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1b\x12\x19/v1/{name=apiProviders/*}\x12y\n" +
-	"\x10ListAPIProviders\x12\".laelia.v1.ListApiProvidersRequest\x1a#.laelia.v1.ListApiProvidersResponse\"\x1c\x90\xea0\x01\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/apiProviders\x12\xad\x01\n" +
-	"\x11CreateAPIProvider\x12#.laelia.v1.CreateApiProviderRequest\x1a\x16.laelia.v1.ApiProvider\"[\xdaA\fapi_provider\x8a\xea0\x1alaelia.apiProviders.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02 :\fapi_provider\"\x10/v1/apiProviders\x12\xcf\x01\n" +
-	"\x11UpdateAPIProvider\x12#.laelia.v1.UpdateApiProviderRequest\x1a\x16.laelia.v1.ApiProvider\"}\xdaA\x18api_provider,update_mask\x8a\xea0\x1alaelia.apiProviders.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x026:\fapi_provider2&/v1/{api_provider.name=apiProviders/*}\x12\xa0\x01\n" +
-	"\x11DeleteAPIProvider\x12#.laelia.v1.DeleteApiProviderRequest\x1a\x16.google.protobuf.Empty\"N\xdaA\x04name\x8a\xea0\x1alaelia.apiProviders.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1b*\x19/v1/{name=apiProviders/*}\x12\xb4\x01\n" +
-	"\x15ListAPIProviderModels\x12'.laelia.v1.ListApiProviderModelsRequest\x1a(.laelia.v1.ListApiProviderModelsResponse\"H\x8a\xea0\x1alaelia.apiProviders.update\x90\xea0\x01\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/v1/apiProviders:listModelsB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"\x0fentries_removed\x18\x03 \x03(\tR\x0eentriesRemoved2\x9d\x06\n" +
+	"\x12ApiProviderService\x12r\n" +
+	"\x0eGetAPIProvider\x12 .laelia.v1.GetApiProviderRequest\x1a\x16.laelia.v1.ApiProvider\"&\xdaA\x04name\x8a\xea0\x17laelia.apiProviders.get\x90\xea0\x01\x12a\n" +
+	"\x10ListAPIProviders\x12\".laelia.v1.ListApiProvidersRequest\x1a#.laelia.v1.ListApiProvidersResponse\"\x04\x90\xea0\x01\x12\x87\x01\n" +
+	"\x11CreateAPIProvider\x12#.laelia.v1.CreateApiProviderRequest\x1a\x16.laelia.v1.ApiProvider\"5\xdaA\fapi_provider\x8a\xea0\x1alaelia.apiProviders.create\x90\xea0\x01\x98\xea0\x01\x12\x93\x01\n" +
+	"\x11UpdateAPIProvider\x12#.laelia.v1.UpdateApiProviderRequest\x1a\x16.laelia.v1.ApiProvider\"A\xdaA\x18api_provider,update_mask\x8a\xea0\x1alaelia.apiProviders.update\x90\xea0\x01\x98\xea0\x01\x12\x7f\n" +
+	"\x11DeleteAPIProvider\x12#.laelia.v1.DeleteApiProviderRequest\x1a\x16.google.protobuf.Empty\"-\xdaA\x04name\x8a\xea0\x1alaelia.apiProviders.delete\x90\xea0\x01\x98\xea0\x01\x12\x8e\x01\n" +
+	"\x15ListAPIProviderModels\x12'.laelia.v1.ListApiProviderModelsRequest\x1a(.laelia.v1.ListApiProviderModelsResponse\"\"\x8a\xea0\x1alaelia.apiProviders.update\x90\xea0\x01B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_api_provider_service_proto_rawDescOnce sync.Once

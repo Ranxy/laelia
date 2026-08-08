@@ -7,7 +7,6 @@
 package v1
 
 import (
-	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -314,7 +313,7 @@ var File_v1_auth_service_proto protoreflect.FileDescriptor
 
 const file_v1_auth_service_proto_rawDesc = "" +
 	"\n" +
-	"\x15v1/auth_service.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x13v1/annotation.proto\x1a\x15v1/user_service.proto\"\xb2\x01\n" +
+	"\x15v1/auth_service.proto\x12\tlaelia.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x13v1/annotation.proto\x1a\x15v1/user_service.proto\"\xb2\x01\n" +
 	"\fLoginRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x10\n" +
@@ -331,10 +330,10 @@ const file_v1_auth_service_proto_rawDesc = "" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x124\n" +
 	"\x16require_reset_password\x18\x03 \x01(\bR\x14requireResetPassword\x12#\n" +
 	"\x04user\x18\x04 \x01(\v2\x0f.laelia.v1.UserR\x04user\"\x0f\n" +
-	"\rLogoutRequest2\xcc\x01\n" +
-	"\vAuthService\x12]\n" +
-	"\x05Login\x12\x17.laelia.v1.LoginRequest\x1a\x18.laelia.v1.LoginResponse\"!\x80\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/auth/login\x12^\n" +
-	"\x06Logout\x12\x18.laelia.v1.LogoutRequest\x1a\x16.google.protobuf.Empty\"\"\x80\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/logoutB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"\rLogoutRequest2\x99\x01\n" +
+	"\vAuthService\x12D\n" +
+	"\x05Login\x12\x17.laelia.v1.LoginRequest\x1a\x18.laelia.v1.LoginResponse\"\b\x80\xea0\x01\x98\xea0\x01\x12D\n" +
+	"\x06Logout\x12\x18.laelia.v1.LogoutRequest\x1a\x16.google.protobuf.Empty\"\b\x80\xea0\x01\x98\xea0\x01B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_auth_service_proto_rawDescOnce sync.Once

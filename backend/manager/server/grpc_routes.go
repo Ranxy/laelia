@@ -2,24 +2,16 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"connectrpc.com/connect"
 	"connectrpc.com/grpcreflect"
-	grpcruntime "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/labstack/echo/v5"
 	"github.com/pkg/errors"
 
 	"github.com/Ranxy/laelia/backend/common/log"
 	"github.com/Ranxy/laelia/backend/common/stacktrace"
-	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
 	apiv1 "github.com/Ranxy/laelia/backend/manager/api/v1"
@@ -34,7 +26,7 @@ import (
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
-func configureGrpcRouters(
+func configureV1Routers(
 	ctx context.Context,
 	e *echo.Echo,
 	stores *store.Store,
@@ -44,40 +36,6 @@ func configureGrpcRouters(
 	s3clientmanager *s3client.Client,
 	cmdDispatcher *dispatcher.Dispatcher,
 ) error {
-	gatewayMarshaler := &grpcruntime.HTTPBodyMarshaler{
-		Marshaler: newSuggestingMarshaler(&grpcruntime.JSONPb{
-			MarshalOptions: protojson.MarshalOptions{},
-			//nolint:forbidigo
-			UnmarshalOptions: protojson.UnmarshalOptions{},
-		}),
-	}
-	mux := grpcruntime.NewServeMux(
-		grpcruntime.WithMarshalerOption(grpcruntime.MIMEWildcard, gatewayMarshaler),
-		grpcruntime.WithIncomingHeaderMatcher(func(key string) (string, bool) {
-			switch strings.ToLower(key) {
-			case "authorization", "cookie", "origin":
-				return key, true
-			default:
-				return "", false
-			}
-		}),
-		grpcruntime.WithOutgoingHeaderMatcher(func(key string) (string, bool) {
-			switch strings.ToLower(key) {
-			case "set-cookie":
-				return key, true
-			default:
-				return "", false
-			}
-		}),
-		grpcruntime.WithRoutingErrorHandler(func(ctx context.Context, sm *grpcruntime.ServeMux, m grpcruntime.Marshaler, w http.ResponseWriter, r *http.Request, httpStatus int) {
-			err := &grpcruntime.HTTPStatusError{
-				HTTPStatus: httpStatus,
-				Err:        connect.NewError(connect.CodeNotFound, errors.Errorf("gateway routing error %d: request method %v, URI %v", httpStatus, r.Method, r.RequestURI)),
-			}
-			grpcruntime.DefaultHTTPErrorHandler(ctx, sm, m, w, r, err)
-		}),
-	)
-
 	cmdDispatcher.StartPingMonitor()
 
 	// Room hub: in-process notifier that wakes long-polling message readers
@@ -214,57 +172,6 @@ func configureGrpcRouters(
 
 	reflectAlphaPath, reflectAlphaHandler := grpcreflect.NewHandlerV1Alpha(reflector)
 	connectHandlers[reflectAlphaPath] = reflectAlphaHandler
-
-	grpcEndpoint := fmt.Sprintf(":%d", profile.Port)
-	grpcConn, err := grpc.NewClient(
-		grpcEndpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(100*1024*1024),
-		),
-	)
-	if err != nil {
-		return err
-	}
-
-	if err := v1pb.RegisterAuthServiceHandler(ctx, mux, grpcConn); err != nil {
-		return err
-	}
-	if err := v1pb.RegisterUserServiceHandler(ctx, mux, grpcConn); err != nil {
-		return err
-	}
-	if err := v1pb.RegisterAgentServiceHandler(ctx, mux, grpcConn); err != nil {
-		return err
-	}
-	if err := v1pb.RegisterCommandServiceHandler(ctx, mux, grpcConn); err != nil {
-		return err
-	}
-	if err := v1pb.RegisterMachineServiceHandler(ctx, mux, grpcConn); err != nil {
-		return err
-	}
-	if err := v1pb.RegisterSettingServiceHandler(ctx, mux, grpcConn); err != nil {
-		return err
-	}
-	if err := v1pb.RegisterRoleServiceHandler(ctx, mux, grpcConn); err != nil {
-		return err
-	}
-	if err := v1pb.RegisterIamServiceHandler(ctx, mux, grpcConn); err != nil {
-		return err
-	}
-	if err := v1pb.RegisterGroupServiceHandler(ctx, mux, grpcConn); err != nil {
-		return err
-	}
-	if err := v1pb.RegisterApiProviderServiceHandler(ctx, mux, grpcConn); err != nil {
-		return err
-	}
-	if err := v1pb.RegisterAuditLogServiceHandler(ctx, mux, grpcConn); err != nil {
-		return err
-	}
-	if err := v1pb.RegisterNotificationServiceHandler(ctx, mux, grpcConn); err != nil {
-		return err
-	}
-
-	e.Any("/v1/*", echo.WrapHandler(mux))
 
 	for path, handler := range connectHandlers {
 		e.Any(path+"*", echo.WrapHandler(handler))

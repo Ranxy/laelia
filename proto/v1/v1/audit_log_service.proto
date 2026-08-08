@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package laelia.v1;
 
-import "google/api/annotations.proto";
 import "google/protobuf/timestamp.proto";
 import "v1/annotation.proto";
 
@@ -82,14 +81,12 @@ message ExportAuditLogsResponse {
 service AuditLogService {
   // Search audit logs with filtering and pagination.
   rpc SearchAuditLogs(SearchAuditLogsRequest) returns (SearchAuditLogsResponse) {
-    option (google.api.http) = {get: "/v1/auditLogs:search"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.auditLogs.search";
   }
 
   // Export audit logs as CSV.
   rpc ExportAuditLogs(ExportAuditLogsRequest) returns (ExportAuditLogsResponse) {
-    option (google.api.http) = {get: "/v1/auditLogs:export"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.auditLogs.export";
   }

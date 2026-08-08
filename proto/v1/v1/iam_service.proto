@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package laelia.v1;
 
-import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/type/expr.proto";
@@ -113,17 +112,12 @@ message SetMachineIamPolicyRequest {
 service IamService {
   // Get the workspace IAM policy.
   rpc GetWorkspaceIamPolicy(GetWorkspaceIamPolicyRequest) returns (IamPolicyView) {
-    option (google.api.http) = {get: "/v1/workspace:iamPolicy"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.iam.getPolicy";
   }
 
   // Set the workspace IAM policy (full replace, etag-guarded).
   rpc SetWorkspaceIamPolicy(SetWorkspaceIamPolicyRequest) returns (IamPolicyView) {
-    option (google.api.http) = {
-      post: "/v1/workspace:iamPolicy"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.iam.setPolicy";
     option (laelia.v1.audit) = true;
@@ -131,17 +125,12 @@ service IamService {
 
   // Get the IAM policy attached to an agent.
   rpc GetAgentIamPolicy(GetAgentIamPolicyRequest) returns (IamPolicyView) {
-    option (google.api.http) = {get: "/v1/{name=agents/*}:iamPolicy"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.iam.getPolicy";
   }
 
   // Set the IAM policy attached to an agent (full replace, etag-guarded).
   rpc SetAgentIamPolicy(SetAgentIamPolicyRequest) returns (IamPolicyView) {
-    option (google.api.http) = {
-      post: "/v1/{name=agents/*}:iamPolicy"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.iam.setPolicy";
     option (laelia.v1.audit) = true;
@@ -149,16 +138,11 @@ service IamService {
 
   // Get the IAM policy attached to a machine (who may create agents on it).
   rpc GetMachineIamPolicy(GetMachineIamPolicyRequest) returns (IamPolicyView) {
-    option (google.api.http) = {get: "/v1/{name=machines/*}:iamPolicy"};
     option (laelia.v1.auth_method) = IAM;
   }
 
   // Set the IAM policy attached to a machine (full replace, etag-guarded).
   rpc SetMachineIamPolicy(SetMachineIamPolicyRequest) returns (IamPolicyView) {
-    option (google.api.http) = {
-      post: "/v1/{name=machines/*}:iamPolicy"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.audit) = true;
   }

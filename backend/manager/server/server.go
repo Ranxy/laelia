@@ -117,8 +117,8 @@ func NewServer(ctx context.Context, profile *config.Profile) (*Server, error) {
 	s.dispatcher = dispatcher.New(stores)
 	s.scheduler = scheduler.New(stores, s.dispatcher)
 
-	if err := configureGrpcRouters(ctx, s.echoServer, s.store, secret, s.profile, s.stateCfg, s.s3clientManager, s.dispatcher); err != nil {
-		return nil, errors.Wrapf(err, "failed to configure gRPC routers")
+	if err := configureV1Routers(ctx, s.echoServer, s.store, secret, s.profile, s.stateCfg, s.s3clientManager, s.dispatcher); err != nil {
+		return nil, errors.Wrapf(err, "failed to configure v1 routers")
 	}
 
 	configureEchoRouters(s.echoServer, profile)

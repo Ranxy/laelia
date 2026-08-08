@@ -2523,7 +2523,7 @@ var File_v1_machine_proto protoreflect.FileDescriptor
 
 const file_v1_machine_proto_rawDesc = "" +
 	"\n" +
-	"\x10v1/machine.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0ev1/agent.proto\x1a\x13v1/annotation.proto\x1a\x10v1/command.proto\x1a\x0fv1/common.proto\"I\n" +
+	"\x10v1/machine.proto\x12\tlaelia.v1\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0ev1/agent.proto\x1a\x13v1/annotation.proto\x1a\x10v1/command.proto\x1a\x0fv1/common.proto\"I\n" +
 	"\x14CreateMachineRequest\x121\n" +
 	"\amachine\x18\x01 \x01(\v2\x12.laelia.v1.MachineB\x03\xe0A\x02R\amachine\"t\n" +
 	"\x15CreateMachineResponse\x12,\n" +
@@ -2728,23 +2728,23 @@ const file_v1_machine_proto_rawDesc = "" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12B\n" +
 	"\n" +
 	"workspaces\x18\x02 \x03(\v2\".laelia.v1.MachineWorkspaceSummaryR\n" +
-	"workspaces2\xf4\x0f\n" +
-	"\x0eMachineService\x12\x93\x01\n" +
-	"\rCreateMachine\x12\x1f.laelia.v1.CreateMachineRequest\x1a .laelia.v1.CreateMachineResponse\"?\x8a\xea0\x16laelia.machines.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x17:\amachine\"\f/v1/machines\x12\x80\x01\n" +
-	"\fListMachines\x12\x1e.laelia.v1.ListMachinesRequest\x1a\x1f.laelia.v1.ListMachinesResponse\"/\x8a\xea0\x13laelia.machines.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/machines\x12\x7f\n" +
+	"workspaces2\xed\v\n" +
+	"\x0eMachineService\x12v\n" +
+	"\rCreateMachine\x12\x1f.laelia.v1.CreateMachineRequest\x1a .laelia.v1.CreateMachineResponse\"\"\x8a\xea0\x16laelia.machines.create\x90\xea0\x01\x98\xea0\x01\x12l\n" +
+	"\fListMachines\x12\x1e.laelia.v1.ListMachinesRequest\x1a\x1f.laelia.v1.ListMachinesResponse\"\x1b\x8a\xea0\x13laelia.machines.get\x90\xea0\x01\x12b\n" +
 	"\n" +
-	"GetMachine\x12\x1c.laelia.v1.GetMachineRequest\x1a\x12.laelia.v1.Machine\"?\xdaA\x04name\x8a\xea0\x13laelia.machines.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/{name=machines/*}\x12o\n" +
-	"\rDeleteMachine\x12\x1f.laelia.v1.DeleteMachineRequest\x1a\x16.google.protobuf.Empty\"%\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x17*\x15/v1/{name=machines/*}\x12\x97\x01\n" +
-	"\x12RotateMachineToken\x12$.laelia.v1.RotateMachineTokenRequest\x1a%.laelia.v1.RotateMachineTokenResponse\"4\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02&:\x01*\"!/v1/{name=machines/*}:rotateToken\x12\x97\x01\n" +
-	"\x12RevokeMachineToken\x12$.laelia.v1.RevokeMachineTokenRequest\x1a%.laelia.v1.RevokeMachineTokenResponse\"4\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02&:\x01*\"!/v1/{name=machines/*}:revokeToken\x12\x94\x01\n" +
-	"\x16ForceDisconnectMachine\x12(.laelia.v1.ForceDisconnectMachineRequest\x1a\x16.google.protobuf.Empty\"8\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=machines/*}:forceDisconnect\x12\x9f\x01\n" +
-	"\x11ListMachineAgents\x12#.laelia.v1.ListMachineAgentsRequest\x1a$.laelia.v1.ListMachineAgentsResponse\"?\x8a\xea0\x13laelia.machines.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1e\x12\x1c/v1/{name=machines/*}/agents\x12\xab\x01\n" +
-	"\x17RefreshMachineProviders\x12).laelia.v1.RefreshMachineProvidersRequest\x1a*.laelia.v1.RefreshMachineProvidersResponse\"9\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02+:\x01*\"&/v1/{name=machines/*}:refreshProviders\x12\xa3\x01\n" +
-	"\x15ListMachineWorkspaces\x12'.laelia.v1.ListMachineWorkspacesRequest\x1a(.laelia.v1.ListMachineWorkspacesResponse\"7\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02):\x01*\"$/v1/{name=machines/*}:listWorkspaces\x12~\n" +
-	"\x0eConnectMachine\x12 .laelia.v1.ConnectMachineRequest\x1a!.laelia.v1.ConnectMachineResponse\"'\x90\xea0\x02\x98\xea0\x01\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/v1/machines:connect\x12\x82\x01\n" +
-	"\x10MachineHeartbeat\x12\".laelia.v1.MachineHeartbeatRequest\x1a#.laelia.v1.MachineHeartbeatResponse\"%\x90\xea0\x02\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/v1/machines:heartbeat\x12|\n" +
-	"\x11MachineDisconnect\x12#.laelia.v1.MachineDisconnectRequest\x1a\x16.google.protobuf.Empty\"*\x90\xea0\x02\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/machines:disconnect\x12\x92\x01\n" +
-	"\x13RefreshMachineToken\x12%.laelia.v1.RefreshMachineTokenRequest\x1a&.laelia.v1.RefreshMachineTokenResponse\",\x90\xea0\x02\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1e:\x01*\"\x19/v1/machines:refreshToken2u\n" +
+	"GetMachine\x12\x1c.laelia.v1.GetMachineRequest\x1a\x12.laelia.v1.Machine\"\"\xdaA\x04name\x8a\xea0\x13laelia.machines.get\x90\xea0\x01\x12R\n" +
+	"\rDeleteMachine\x12\x1f.laelia.v1.DeleteMachineRequest\x1a\x16.google.protobuf.Empty\"\b\x90\xea0\x01\x98\xea0\x01\x12k\n" +
+	"\x12RotateMachineToken\x12$.laelia.v1.RotateMachineTokenRequest\x1a%.laelia.v1.RotateMachineTokenResponse\"\b\x90\xea0\x01\x98\xea0\x01\x12k\n" +
+	"\x12RevokeMachineToken\x12$.laelia.v1.RevokeMachineTokenRequest\x1a%.laelia.v1.RevokeMachineTokenResponse\"\b\x90\xea0\x01\x98\xea0\x01\x12d\n" +
+	"\x16ForceDisconnectMachine\x12(.laelia.v1.ForceDisconnectMachineRequest\x1a\x16.google.protobuf.Empty\"\b\x90\xea0\x01\x98\xea0\x01\x12{\n" +
+	"\x11ListMachineAgents\x12#.laelia.v1.ListMachineAgentsRequest\x1a$.laelia.v1.ListMachineAgentsResponse\"\x1b\x8a\xea0\x13laelia.machines.get\x90\xea0\x01\x12z\n" +
+	"\x17RefreshMachineProviders\x12).laelia.v1.RefreshMachineProvidersRequest\x1a*.laelia.v1.RefreshMachineProvidersResponse\"\b\x90\xea0\x01\x98\xea0\x01\x12t\n" +
+	"\x15ListMachineWorkspaces\x12'.laelia.v1.ListMachineWorkspacesRequest\x1a(.laelia.v1.ListMachineWorkspacesResponse\"\b\x90\xea0\x01\x98\xea0\x01\x12_\n" +
+	"\x0eConnectMachine\x12 .laelia.v1.ConnectMachineRequest\x1a!.laelia.v1.ConnectMachineResponse\"\b\x90\xea0\x02\x98\xea0\x01\x12a\n" +
+	"\x10MachineHeartbeat\x12\".laelia.v1.MachineHeartbeatRequest\x1a#.laelia.v1.MachineHeartbeatResponse\"\x04\x90\xea0\x02\x12Z\n" +
+	"\x11MachineDisconnect\x12#.laelia.v1.MachineDisconnectRequest\x1a\x16.google.protobuf.Empty\"\b\x90\xea0\x02\x98\xea0\x01\x12n\n" +
+	"\x13RefreshMachineToken\x12%.laelia.v1.RefreshMachineTokenRequest\x1a&.laelia.v1.RefreshMachineTokenResponse\"\b\x90\xea0\x02\x98\xea0\x012u\n" +
 	"\x14MachineStreamService\x12]\n" +
 	"\x0eMachineChannel\x12\x1f.laelia.v1.MachineStreamMessage\x1a&.laelia.v1.ManagerMachineStreamMessage(\x010\x01B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 

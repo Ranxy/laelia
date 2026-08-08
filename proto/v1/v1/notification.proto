@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package laelia.v1;
 
-import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/protobuf/empty.proto";
 import "v1/annotation.proto";
@@ -25,7 +24,6 @@ service NotificationService {
   // is populated only for callers holding laelia.pushConfig.update (admins);
   // other callers receive it empty.
   rpc GetPushConfig(GetPushConfigRequest) returns (GetPushConfigResponse) {
-    option (google.api.http) = {get: "/v1/pushConfig"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.pushConfig.get";
   }
@@ -35,10 +33,6 @@ service NotificationService {
   // http_proxy disables the proxy (direct connection). The change takes effect
   // immediately on the running manager.
   rpc UpdatePushConfig(UpdatePushConfigRequest) returns (UpdatePushConfigResponse) {
-    option (google.api.http) = {
-      patch: "/v1/pushConfig"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.pushConfig.update";
   }
@@ -48,7 +42,6 @@ service NotificationService {
   // whether the current browser is subscribed and to reconcile a browser-side
   // subscription that is missing server-side.
   rpc ListPushSubscriptions(ListPushSubscriptionsRequest) returns (ListPushSubscriptionsResponse) {
-    option (google.api.http) = {get: "/v1/pushSubscriptions"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.pushSubscriptions.list";
   }
@@ -58,10 +51,6 @@ service NotificationService {
   // same browser refreshes its p256dh/auth keys. Returns FailedPrecondition
   // when Web Push is disabled.
   rpc CreatePushSubscription(CreatePushSubscriptionRequest) returns (PushSubscription) {
-    option (google.api.http) = {
-      post: "/v1/pushSubscriptions"
-      body: "*"
-    };
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.pushSubscriptions.create";
   }
@@ -71,7 +60,6 @@ service NotificationService {
   // endpointKey is the URL-safe base64 of the subscription endpoint; the name's
   // user must be the caller.
   rpc DeletePushSubscription(DeletePushSubscriptionRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {delete: "/v1/{name=users/*/pushSubscriptions/*}"};
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.pushSubscriptions.delete";
   }

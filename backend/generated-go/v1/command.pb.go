@@ -10446,7 +10446,7 @@ var File_v1_command_proto protoreflect.FileDescriptor
 
 const file_v1_command_proto_rawDesc = "" +
 	"\n" +
-	"\x10v1/command.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0ev1/agent.proto\x1a\x13v1/annotation.proto\x1a\x15v1/user_service.proto\"\xb1\x01\n" +
+	"\x10v1/command.proto\x12\tlaelia.v1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0ev1/agent.proto\x1a\x13v1/annotation.proto\x1a\x15v1/user_service.proto\"\xb1\x01\n" +
 	"\bTaskInfo\x12\x1f\n" +
 	"\vtask_number\x18\x01 \x01(\x05R\n" +
 	"taskNumber\x12-\n" +
@@ -11295,72 +11295,72 @@ const file_v1_command_proto_rawDesc = "" +
 	"\x1aACTIVITY_STATE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15ACTIVITY_STATE_UNREAD\x10\x01\x12\x17\n" +
 	"\x13ACTIVITY_STATE_READ\x10\x02\x12\x17\n" +
-	"\x13ACTIVITY_STATE_DONE\x10\x032\xc4L\n" +
-	"\x0eCommandService\x12\x91\x01\n" +
-	"\fListCommands\x12\x1e.laelia.v1.ListCommandsRequest\x1a\x1f.laelia.v1.ListCommandsResponse\"@\x8a\xea0\x13laelia.commands.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1f\x12\x1d/v1/{agent=agents/*}/commands\x12\x81\x01\n" +
+	"\x13ACTIVITY_STATE_DONE\x10\x032\xa27\n" +
+	"\x0eCommandService\x12l\n" +
+	"\fListCommands\x12\x1e.laelia.v1.ListCommandsRequest\x1a\x1f.laelia.v1.ListCommandsResponse\"\x1b\x8a\xea0\x13laelia.commands.get\x90\xea0\x01\x12[\n" +
 	"\n" +
-	"GetCommand\x12\x1c.laelia.v1.GetCommandRequest\x1a\x12.laelia.v1.Command\"A\x8a\xea0\x13laelia.commands.get\x90\xea0\x01\x82\xd3\xe4\x93\x02 \x12\x1e/v1/{name=agents/*/commands/*}\x12\x98\x01\n" +
-	"\rCancelCommand\x12\x1f.laelia.v1.CancelCommandRequest\x1a\x12.laelia.v1.Command\"R\x8a\xea0\x16laelia.commands.cancel\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02*:\x01*\"%/v1/{name=agents/*/commands/*}:cancel\x12\x95\x01\n" +
-	"\fSteerCommand\x12\x1e.laelia.v1.SteerCommandRequest\x1a\x12.laelia.v1.Command\"Q\x8a\xea0\x16laelia.commands.cancel\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02):\x01*\"$/v1/{name=agents/*/commands/*}:steer\x12\x95\x01\n" +
-	"\fWatchCommand\x12\x1e.laelia.v1.WatchCommandRequest\x1a\x18.laelia.v1.CommandOutput\"I\x8a\xea0\x15laelia.commands.watch\x90\xea0\x01\x82\xd3\xe4\x93\x02&\x12$/v1/{name=agents/*/commands/*}:watch0\x01\x12\xa6\x01\n" +
-	"\x12WatchCommandEvents\x12$.laelia.v1.WatchCommandEventsRequest\x1a\x17.laelia.v1.CommandEvent\"O\x8a\xea0\x15laelia.commands.watch\x90\xea0\x01\x82\xd3\xe4\x93\x02,\x12*/v1/{name=agents/*/commands/*}:watchEvents0\x01\x12\xaa\x01\n" +
-	"\x11SearchChatHistory\x12#.laelia.v1.SearchChatHistoryRequest\x1a$.laelia.v1.SearchChatHistoryResponse\"J\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02#\x12!/v1/{agent=agents/*}/chat-history\x12\xab\x01\n" +
-	"\x11GetCommandContext\x12#.laelia.v1.GetCommandContextRequest\x1a$.laelia.v1.GetCommandContextResponse\"K\x8a\xea0\x15laelia.commands.watch\x90\xea0\x01\x82\xd3\xe4\x93\x02(\x12&/v1/{name=agents/*/commands/*}/context\x12\xbf\x01\n" +
-	"\x17GetOrCreateConversation\x12).laelia.v1.GetOrCreateConversationRequest\x1a*.laelia.v1.GetOrCreateConversationResponse\"M\x8a\xea0\x1blaelia.conversations.create\x90\xea0\x01\x82\xd3\xe4\x93\x02$\"\"/v1/{agent=agents/*}/conversations\x12\xbc\x01\n" +
-	"\x15GetOrCreateUserUserDM\x12'.laelia.v1.GetOrCreateUserUserDMRequest\x1a(.laelia.v1.GetOrCreateUserUserDMResponse\"P\x8a\xea0\x1blaelia.conversations.create\x90\xea0\x01\x82\xd3\xe4\x93\x02'\"%/v1/{peer_user=users/*}/conversations\x12\x98\x01\n" +
-	"\x15ResolveChannelByTitle\x12'.laelia.v1.ResolveChannelByTitleRequest\x1a(.laelia.v1.ResolveChannelByTitleResponse\",\x82\xd3\xe4\x93\x02&\x12$/v1/agents/-/channels:resolveByTitle\x12\x8a\x01\n" +
-	"\x11GetOrCreateUserDM\x12#.laelia.v1.GetOrCreateUserDMRequest\x1a$.laelia.v1.GetOrCreateUserDMResponse\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/agents/-/userDm:getOrCreate\x12\x8e\x01\n" +
-	"\x12GetOrCreateAgentDM\x12$.laelia.v1.GetOrCreateAgentDMRequest\x1a%.laelia.v1.GetOrCreateAgentDMResponse\"+\x82\xd3\xe4\x93\x02%:\x01*\" /v1/agents/-/agentDm:getOrCreate\x12v\n" +
-	"\x0eListPeerAgents\x12 .laelia.v1.ListPeerAgentsRequest\x1a!.laelia.v1.ListPeerAgentsResponse\"\x1f\x82\xd3\xe4\x93\x02\x19\x12\x17/v1/agents/-/peerAgents\x12\xc9\x01\n" +
-	"\x18ListConversationMessages\x12*.laelia.v1.ListConversationMessagesRequest\x1a+.laelia.v1.ListConversationMessagesResponse\"T\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02-\x12+/v1/{conversation=conversations/*}/messages\x12\xb6\x01\n" +
-	"\x12ListThreadMessages\x12$.laelia.v1.ListThreadMessagesRequest\x1a%.laelia.v1.ListThreadMessagesResponse\"S\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02,\x12*/v1/{conversation=conversations/*}/threads\x12\xc0\x01\n" +
-	"\x12ListChannelThreads\x12$.laelia.v1.ListChannelThreadsRequest\x1a%.laelia.v1.ListChannelThreadsResponse\"]\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x026\x124/v1/{conversation=conversations/*}/threads:summarize\x12\x89\x01\n" +
-	"\rCreateChannel\x12\x1f.laelia.v1.CreateChannelRequest\x1a\x17.laelia.v1.Conversation\">\x8a\xea0\x1blaelia.conversations.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x11:\x01*\"\f/v1/channels\x12\x86\x01\n" +
-	"\fListChannels\x12\x1e.laelia.v1.ListChannelsRequest\x1a\x1f.laelia.v1.ListChannelsResponse\"5\x8a\xea0\x19laelia.conversations.list\x90\xea0\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/channels\x12\xa6\x01\n" +
-	"\x14ListChannelsForAgent\x12&.laelia.v1.ListChannelsForAgentRequest\x1a'.laelia.v1.ListChannelsForAgentResponse\"=\x8a\xea0\x11laelia.agents.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1e\x12\x1c/v1/{name=agents/*}/channels\x12\x88\x01\n" +
+	"GetCommand\x12\x1c.laelia.v1.GetCommandRequest\x1a\x12.laelia.v1.Command\"\x1b\x8a\xea0\x13laelia.commands.get\x90\xea0\x01\x12h\n" +
+	"\rCancelCommand\x12\x1f.laelia.v1.CancelCommandRequest\x1a\x12.laelia.v1.Command\"\"\x8a\xea0\x16laelia.commands.cancel\x90\xea0\x01\x98\xea0\x01\x12f\n" +
+	"\fSteerCommand\x12\x1e.laelia.v1.SteerCommandRequest\x1a\x12.laelia.v1.Command\"\"\x8a\xea0\x16laelia.commands.cancel\x90\xea0\x01\x98\xea0\x01\x12i\n" +
+	"\fWatchCommand\x12\x1e.laelia.v1.WatchCommandRequest\x1a\x18.laelia.v1.CommandOutput\"\x1d\x8a\xea0\x15laelia.commands.watch\x90\xea0\x010\x01\x12t\n" +
+	"\x12WatchCommandEvents\x12$.laelia.v1.WatchCommandEventsRequest\x1a\x17.laelia.v1.CommandEvent\"\x1d\x8a\xea0\x15laelia.commands.watch\x90\xea0\x010\x01\x12\x81\x01\n" +
+	"\x11SearchChatHistory\x12#.laelia.v1.SearchChatHistoryRequest\x1a$.laelia.v1.SearchChatHistoryResponse\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x12}\n" +
+	"\x11GetCommandContext\x12#.laelia.v1.GetCommandContextRequest\x1a$.laelia.v1.GetCommandContextResponse\"\x1d\x8a\xea0\x15laelia.commands.watch\x90\xea0\x01\x12\x95\x01\n" +
+	"\x17GetOrCreateConversation\x12).laelia.v1.GetOrCreateConversationRequest\x1a*.laelia.v1.GetOrCreateConversationResponse\"#\x8a\xea0\x1blaelia.conversations.create\x90\xea0\x01\x12\x8f\x01\n" +
+	"\x15GetOrCreateUserUserDM\x12'.laelia.v1.GetOrCreateUserUserDMRequest\x1a(.laelia.v1.GetOrCreateUserUserDMResponse\"#\x8a\xea0\x1blaelia.conversations.create\x90\xea0\x01\x12l\n" +
+	"\x15ResolveChannelByTitle\x12'.laelia.v1.ResolveChannelByTitleRequest\x1a(.laelia.v1.ResolveChannelByTitleResponse\"\x00\x12`\n" +
+	"\x11GetOrCreateUserDM\x12#.laelia.v1.GetOrCreateUserDMRequest\x1a$.laelia.v1.GetOrCreateUserDMResponse\"\x00\x12c\n" +
+	"\x12GetOrCreateAgentDM\x12$.laelia.v1.GetOrCreateAgentDMRequest\x1a%.laelia.v1.GetOrCreateAgentDMResponse\"\x00\x12W\n" +
+	"\x0eListPeerAgents\x12 .laelia.v1.ListPeerAgentsRequest\x1a!.laelia.v1.ListPeerAgentsResponse\"\x00\x12\x96\x01\n" +
+	"\x18ListConversationMessages\x12*.laelia.v1.ListConversationMessagesRequest\x1a+.laelia.v1.ListConversationMessagesResponse\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x12\x84\x01\n" +
+	"\x12ListThreadMessages\x12$.laelia.v1.ListThreadMessagesRequest\x1a%.laelia.v1.ListThreadMessagesResponse\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x12\x84\x01\n" +
+	"\x12ListChannelThreads\x12$.laelia.v1.ListChannelThreadsRequest\x1a%.laelia.v1.ListChannelThreadsResponse\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x12r\n" +
+	"\rCreateChannel\x12\x1f.laelia.v1.CreateChannelRequest\x1a\x17.laelia.v1.Conversation\"'\x8a\xea0\x1blaelia.conversations.create\x90\xea0\x01\x98\xea0\x01\x12r\n" +
+	"\fListChannels\x12\x1e.laelia.v1.ListChannelsRequest\x1a\x1f.laelia.v1.ListChannelsResponse\"!\x8a\xea0\x19laelia.conversations.list\x90\xea0\x01\x12\x82\x01\n" +
+	"\x14ListChannelsForAgent\x12&.laelia.v1.ListChannelsForAgentRequest\x1a'.laelia.v1.ListChannelsForAgentResponse\"\x19\x8a\xea0\x11laelia.agents.get\x90\xea0\x01\x12f\n" +
 	"\n" +
-	"GetChannel\x12\x1c.laelia.v1.GetChannelRequest\x1a\x17.laelia.v1.Conversation\"C\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1c\x12\x1a/v1/{name=conversations/*}\x12\xaf\x01\n" +
-	"\rUpdateChannel\x12\x1f.laelia.v1.UpdateChannelRequest\x1a\x17.laelia.v1.Conversation\"d\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x027:\fconversation2'/v1/{conversation.name=conversations/*}\x12\x93\x01\n" +
-	"\rDeleteChannel\x12\x1f.laelia.v1.DeleteChannelRequest\x1a\x16.google.protobuf.Empty\"I\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1c*\x1a/v1/{name=conversations/*}\x12\xc0\x01\n" +
-	"\x10AddChannelMember\x12\".laelia.v1.AddChannelMemberRequest\x1a#.laelia.v1.AddChannelMemberResponse\"c\x8a\xea0\"laelia.conversations.manageMembers\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02/:\x01*\"*/v1/{conversation=conversations/*}/members\x12\xc2\x01\n" +
-	"\x13RemoveChannelMember\x12%.laelia.v1.RemoveChannelMemberRequest\x1a\x16.google.protobuf.Empty\"l\x8a\xea0\"laelia.conversations.manageMembers\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x028*6/v1/{conversation=conversations/*}/members/{member_id}\x12\xdb\x01\n" +
-	"\x18TransferChannelOwnership\x12*.laelia.v1.TransferChannelOwnershipRequest\x1a+.laelia.v1.TransferChannelOwnershipResponse\"f\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{conversation=conversations/*}:transferOwnership\x12\xd3\x01\n" +
-	"\x17UpdateChannelMemberRole\x12).laelia.v1.UpdateChannelMemberRoleRequest\x1a\x18.laelia.v1.ChannelMember\"s\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02F:\x01*\"A/v1/{conversation=conversations/*}/members/{member_id}:updateRole\x12\xa0\x01\n" +
-	"\fLeaveChannel\x12\x1e.laelia.v1.LeaveChannelRequest\x1a\x16.google.protobuf.Empty\"X\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02-:\x01*\"(/v1/{conversation=conversations/*}:leave\x12\xb6\x01\n" +
-	"\x12ListChannelMembers\x12$.laelia.v1.ListChannelMembersRequest\x1a%.laelia.v1.ListChannelMembersResponse\"S\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02,\x12*/v1/{conversation=conversations/*}/members\x12\xd1\x01\n" +
-	"\x16ListThreadParticipants\x12(.laelia.v1.ListThreadParticipantsRequest\x1a).laelia.v1.ListThreadParticipantsResponse\"b\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02;\x129/v1/{conversation=conversations/*}:listThreadParticipants\x12\xa6\x01\n" +
-	"\vSendMessage\x12\x1d.laelia.v1.SendMessageRequest\x1a\x16.laelia.v1.ChatMessage\"`\x8a\xea0\x19laelia.conversations.send\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x025:\x01*\"0/v1/{conversation=conversations/*}/messages:send\x12\xa8\x01\n" +
-	"\vPostMessage\x12\x1d.laelia.v1.PostMessageRequest\x1a\x1e.laelia.v1.PostMessageResponse\"Z\x8a\xea0\x19laelia.conversations.send\x90\xea0\x01\x82\xd3\xe4\x93\x023:\x01*\"./v1/{conversation=conversations/*}:postMessage\x12\xcf\x01\n" +
-	"\x14ConvertMessageToTask\x12&.laelia.v1.ConvertMessageToTaskRequest\x1a'.laelia.v1.ConvertMessageToTaskResponse\"f\x8a\xea0\x19laelia.conversations.send\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/{message=conversations/*/messages/*}:convertToTask\x12\x99\x01\n" +
-	"\tListTasks\x12\x1b.laelia.v1.ListTasksRequest\x1a\x1c.laelia.v1.ListTasksResponse\"Q\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02*\x12(/v1/{conversation=conversations/*}/tasks\x12\xaf\x01\n" +
-	"\x0eListTaskCounts\x12 .laelia.v1.ListTaskCountsRequest\x1a!.laelia.v1.ListTaskCountsResponse\"X\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x021\x12//v1/{conversation=conversations/*}/tasks:counts\x12\x83\x01\n" +
+	"GetChannel\x12\x1c.laelia.v1.GetChannelRequest\x1a\x17.laelia.v1.Conversation\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x12r\n" +
+	"\rUpdateChannel\x12\x1f.laelia.v1.UpdateChannelRequest\x1a\x17.laelia.v1.Conversation\"'\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x12q\n" +
+	"\rDeleteChannel\x12\x1f.laelia.v1.DeleteChannelRequest\x1a\x16.google.protobuf.Empty\"'\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x12\x8b\x01\n" +
+	"\x10AddChannelMember\x12\".laelia.v1.AddChannelMemberRequest\x1a#.laelia.v1.AddChannelMemberResponse\".\x8a\xea0\"laelia.conversations.manageMembers\x90\xea0\x01\x98\xea0\x01\x12\x84\x01\n" +
+	"\x13RemoveChannelMember\x12%.laelia.v1.RemoveChannelMemberRequest\x1a\x16.google.protobuf.Empty\".\x8a\xea0\"laelia.conversations.manageMembers\x90\xea0\x01\x98\xea0\x01\x12\x9c\x01\n" +
+	"\x18TransferChannelOwnership\x12*.laelia.v1.TransferChannelOwnershipRequest\x1a+.laelia.v1.TransferChannelOwnershipResponse\"'\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x12\x87\x01\n" +
+	"\x17UpdateChannelMemberRole\x12).laelia.v1.UpdateChannelMemberRoleRequest\x1a\x18.laelia.v1.ChannelMember\"'\x8a\xea0\x1blaelia.conversations.manage\x90\xea0\x01\x98\xea0\x01\x12m\n" +
+	"\fLeaveChannel\x12\x1e.laelia.v1.LeaveChannelRequest\x1a\x16.google.protobuf.Empty\"%\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x98\xea0\x01\x12\x84\x01\n" +
+	"\x12ListChannelMembers\x12$.laelia.v1.ListChannelMembersRequest\x1a%.laelia.v1.ListChannelMembersResponse\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x12\x90\x01\n" +
+	"\x16ListThreadParticipants\x12(.laelia.v1.ListThreadParticipantsRequest\x1a).laelia.v1.ListThreadParticipantsResponse\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x12k\n" +
+	"\vSendMessage\x12\x1d.laelia.v1.SendMessageRequest\x1a\x16.laelia.v1.ChatMessage\"%\x8a\xea0\x19laelia.conversations.send\x90\xea0\x01\x98\xea0\x01\x12o\n" +
+	"\vPostMessage\x12\x1d.laelia.v1.PostMessageRequest\x1a\x1e.laelia.v1.PostMessageResponse\"!\x8a\xea0\x19laelia.conversations.send\x90\xea0\x01\x12\x8e\x01\n" +
+	"\x14ConvertMessageToTask\x12&.laelia.v1.ConvertMessageToTaskRequest\x1a'.laelia.v1.ConvertMessageToTaskResponse\"%\x8a\xea0\x19laelia.conversations.send\x90\xea0\x01\x98\xea0\x01\x12i\n" +
+	"\tListTasks\x12\x1b.laelia.v1.ListTasksRequest\x1a\x1c.laelia.v1.ListTasksResponse\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x12x\n" +
+	"\x0eListTaskCounts\x12 .laelia.v1.ListTaskCountsRequest\x1a!.laelia.v1.ListTaskCountsResponse\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x12K\n" +
 	"\n" +
-	"CreateTask\x12\x1c.laelia.v1.CreateTaskRequest\x1a\x1d.laelia.v1.CreateTaskResponse\"8\x82\xd3\xe4\x93\x022:\x01*\"-/v1/{conversation=conversations/*}:createTask\x12\x85\x01\n" +
-	"\tClaimTask\x12\x1b.laelia.v1.ClaimTaskRequest\x1a\x1c.laelia.v1.ClaimTaskResponse\"=\x82\xd3\xe4\x93\x027:\x01*\"2/v1/{message=conversations/*/messages/*}:claimTask\x12\x8d\x01\n" +
-	"\vUnclaimTask\x12\x1d.laelia.v1.UnclaimTaskRequest\x1a\x1e.laelia.v1.UnclaimTaskResponse\"?\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{message=conversations/*/messages/*}:unclaimTask\x12\xa1\x01\n" +
-	"\x10UpdateTaskStatus\x12\".laelia.v1.UpdateTaskStatusRequest\x1a#.laelia.v1.UpdateTaskStatusResponse\"D\x82\xd3\xe4\x93\x02>:\x01*\"9/v1/{message=conversations/*/messages/*}:updateTaskStatus\x12\xba\x01\n" +
-	"\x18ConvertMessageToReminder\x12*.laelia.v1.ConvertMessageToReminderRequest\x1a+.laelia.v1.ConvertMessageToReminderResponse\"E\x82\xd3\xe4\x93\x02?:\x01*\":/v1/{message=conversations/*/messages/*}:convertToReminder\x12\x86\x01\n" +
-	"\rListReminders\x12\x1f.laelia.v1.ListRemindersRequest\x1a .laelia.v1.ListRemindersResponse\"2\x8a\xea0\x15laelia.reminders.list\x90\xea0\x01\x82\xd3\xe4\x93\x02\x0f\x12\r/v1/reminders\x12\x88\x01\n" +
-	"\vGetReminder\x12\x1d.laelia.v1.GetReminderRequest\x1a\x1e.laelia.v1.GetReminderResponse\":\x8a\xea0\x14laelia.reminders.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x18\x12\x16/v1/{name=reminders/*}\x12\x9b\x01\n" +
-	"\x0eUpdateReminder\x12 .laelia.v1.UpdateReminderRequest\x1a!.laelia.v1.UpdateReminderResponse\"D\x8a\xea0\x17laelia.reminders.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1b:\x01*2\x16/v1/{name=reminders/*}\x12\xa2\x01\n" +
-	"\x0eCancelReminder\x12 .laelia.v1.CancelReminderRequest\x1a!.laelia.v1.CancelReminderResponse\"K\x8a\xea0\x17laelia.reminders.cancel\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/v1/{name=reminders/*}:cancel\x12\xa6\x01\n" +
-	"\x10CompleteReminder\x12\".laelia.v1.CompleteReminderRequest\x1a#.laelia.v1.CompleteReminderResponse\"I\x8a\xea0\x17laelia.reminders.update\x90\xea0\x01\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/{name=reminders/*}:complete\x12\x96\x01\n" +
-	"\fFailReminder\x12\x1e.laelia.v1.FailReminderRequest\x1a\x1f.laelia.v1.FailReminderResponse\"E\x8a\xea0\x17laelia.reminders.update\x90\xea0\x01\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/v1/{name=reminders/*}:fail\x12~\n" +
-	"\x10ListDueReminders\x12\".laelia.v1.ListDueRemindersRequest\x1a#.laelia.v1.ListDueRemindersResponse\"!\x82\xd3\xe4\x93\x02\x1b\x12\x19/v1/agents/-/dueReminders\x12\x86\x01\n" +
-	"\x12ListChannelUpdates\x12$.laelia.v1.ListChannelUpdatesRequest\x1a%.laelia.v1.ListChannelUpdatesResponse\"#\x82\xd3\xe4\x93\x02\x1d\x12\x1b/v1/agents/-/channelUpdates\x12\x9a\x01\n" +
-	"\x16ListAccessibleChannels\x12(.laelia.v1.ListAccessibleChannelsRequest\x1a).laelia.v1.ListAccessibleChannelsResponse\"+\x82\xd3\xe4\x93\x02%\x12#/v1/agents/-:listAccessibleChannels\x12\xa5\x01\n" +
-	"\vJoinChannel\x12\x1d.laelia.v1.JoinChannelRequest\x1a\x1e.laelia.v1.JoinChannelResponse\"W\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02,:\x01*\"'/v1/{conversation=conversations/*}:join\x12\x82\x01\n" +
-	"\x11ListThreadUpdates\x12#.laelia.v1.ListThreadUpdatesRequest\x1a$.laelia.v1.ListThreadUpdatesResponse\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/v1/agents/-/threadUpdates\x12\xa7\x01\n" +
-	"\x13AckProcessedVersion\x12%.laelia.v1.AckProcessedVersionRequest\x1a&.laelia.v1.AckProcessedVersionResponse\"A\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/{conversation=conversations/*}:ackProcessedVersion\x12\xcc\x01\n" +
-	"\x19FetchConversationActivity\x12+.laelia.v1.FetchConversationActivityRequest\x1a,.laelia.v1.FetchConversationActivityResponse\"T\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x02-\x12+/v1/{conversation=conversations/*}/activity\x12\xc0\x01\n" +
-	"\x14MarkConversationRead\x12&.laelia.v1.MarkConversationReadRequest\x1a'.laelia.v1.MarkConversationReadResponse\"W\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x020:\x01*\"+/v1/{conversation=conversations/*}:markRead\x12\xc4\x01\n" +
-	"\x15SetConversationPinned\x12'.laelia.v1.SetConversationPinnedRequest\x1a(.laelia.v1.SetConversationPinnedResponse\"X\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x82\xd3\xe4\x93\x021:\x01*\",/v1/{conversation=conversations/*}:setPinned\x12X\n" +
+	"CreateTask\x12\x1c.laelia.v1.CreateTaskRequest\x1a\x1d.laelia.v1.CreateTaskResponse\"\x00\x12H\n" +
+	"\tClaimTask\x12\x1b.laelia.v1.ClaimTaskRequest\x1a\x1c.laelia.v1.ClaimTaskResponse\"\x00\x12N\n" +
+	"\vUnclaimTask\x12\x1d.laelia.v1.UnclaimTaskRequest\x1a\x1e.laelia.v1.UnclaimTaskResponse\"\x00\x12]\n" +
+	"\x10UpdateTaskStatus\x12\".laelia.v1.UpdateTaskStatusRequest\x1a#.laelia.v1.UpdateTaskStatusResponse\"\x00\x12u\n" +
+	"\x18ConvertMessageToReminder\x12*.laelia.v1.ConvertMessageToReminderRequest\x1a+.laelia.v1.ConvertMessageToReminderResponse\"\x00\x12q\n" +
+	"\rListReminders\x12\x1f.laelia.v1.ListRemindersRequest\x1a .laelia.v1.ListRemindersResponse\"\x1d\x8a\xea0\x15laelia.reminders.list\x90\xea0\x01\x12j\n" +
+	"\vGetReminder\x12\x1d.laelia.v1.GetReminderRequest\x1a\x1e.laelia.v1.GetReminderResponse\"\x1c\x8a\xea0\x14laelia.reminders.get\x90\xea0\x01\x12z\n" +
+	"\x0eUpdateReminder\x12 .laelia.v1.UpdateReminderRequest\x1a!.laelia.v1.UpdateReminderResponse\"#\x8a\xea0\x17laelia.reminders.update\x90\xea0\x01\x98\xea0\x01\x12z\n" +
+	"\x0eCancelReminder\x12 .laelia.v1.CancelReminderRequest\x1a!.laelia.v1.CancelReminderResponse\"#\x8a\xea0\x17laelia.reminders.cancel\x90\xea0\x01\x98\xea0\x01\x12|\n" +
+	"\x10CompleteReminder\x12\".laelia.v1.CompleteReminderRequest\x1a#.laelia.v1.CompleteReminderResponse\"\x1f\x8a\xea0\x17laelia.reminders.update\x90\xea0\x01\x12p\n" +
+	"\fFailReminder\x12\x1e.laelia.v1.FailReminderRequest\x1a\x1f.laelia.v1.FailReminderResponse\"\x1f\x8a\xea0\x17laelia.reminders.update\x90\xea0\x01\x12]\n" +
+	"\x10ListDueReminders\x12\".laelia.v1.ListDueRemindersRequest\x1a#.laelia.v1.ListDueRemindersResponse\"\x00\x12c\n" +
+	"\x12ListChannelUpdates\x12$.laelia.v1.ListChannelUpdatesRequest\x1a%.laelia.v1.ListChannelUpdatesResponse\"\x00\x12o\n" +
+	"\x16ListAccessibleChannels\x12(.laelia.v1.ListAccessibleChannelsRequest\x1a).laelia.v1.ListAccessibleChannelsResponse\"\x00\x12s\n" +
+	"\vJoinChannel\x12\x1d.laelia.v1.JoinChannelRequest\x1a\x1e.laelia.v1.JoinChannelResponse\"%\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x98\xea0\x01\x12`\n" +
+	"\x11ListThreadUpdates\x12#.laelia.v1.ListThreadUpdatesRequest\x1a$.laelia.v1.ListThreadUpdatesResponse\"\x00\x12f\n" +
+	"\x13AckProcessedVersion\x12%.laelia.v1.AckProcessedVersionRequest\x1a&.laelia.v1.AckProcessedVersionResponse\"\x00\x12\x99\x01\n" +
+	"\x19FetchConversationActivity\x12+.laelia.v1.FetchConversationActivityRequest\x1a,.laelia.v1.FetchConversationActivityResponse\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x12\x8a\x01\n" +
+	"\x14MarkConversationRead\x12&.laelia.v1.MarkConversationReadRequest\x1a'.laelia.v1.MarkConversationReadResponse\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x12\x8d\x01\n" +
+	"\x15SetConversationPinned\x12'.laelia.v1.SetConversationPinnedRequest\x1a(.laelia.v1.SetConversationPinnedResponse\"!\x8a\xea0\x19laelia.conversations.read\x90\xea0\x01\x12X\n" +
 	"\n" +
 	"UploadFile\x12\x1c.laelia.v1.UploadFileRequest\x1a\x0f.laelia.v1.File\"\x1b\x8a\xea0\x13laelia.files.upload\x90\xea0\x01\x12n\n" +
 	"\fDownloadFile\x12\x1e.laelia.v1.DownloadFileRequest\x1a\x1f.laelia.v1.DownloadFileResponse\"\x1d\x8a\xea0\x15laelia.files.download\x90\xea0\x01\x12a\n" +
-	"\tListFiles\x12\x1b.laelia.v1.ListFilesRequest\x1a\x1c.laelia.v1.ListFilesResponse\"\x19\x8a\xea0\x11laelia.files.list\x90\xea0\x01\x12\x8b\x01\n" +
-	"\x0eListActivities\x12 .laelia.v1.ListActivitiesRequest\x1a!.laelia.v1.ListActivitiesResponse\"4\x8a\xea0\x16laelia.activities.list\x90\xea0\x01\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/activities\x12\xb6\x01\n" +
-	"\x10MarkActivityDone\x12\".laelia.v1.MarkActivityDoneRequest\x1a#.laelia.v1.MarkActivityDoneResponse\"Y\x8a\xea0\x1alaelia.activities.markDone\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02-:\x01*\"(/v1/{name=users/*/activities/*}:markDone2h\n" +
+	"\tListFiles\x12\x1b.laelia.v1.ListFilesRequest\x1a\x1c.laelia.v1.ListFilesResponse\"\x19\x8a\xea0\x11laelia.files.list\x90\xea0\x01\x12u\n" +
+	"\x0eListActivities\x12 .laelia.v1.ListActivitiesRequest\x1a!.laelia.v1.ListActivitiesResponse\"\x1e\x8a\xea0\x16laelia.activities.list\x90\xea0\x01\x12\x83\x01\n" +
+	"\x10MarkActivityDone\x12\".laelia.v1.MarkActivityDoneRequest\x1a#.laelia.v1.MarkActivityDoneResponse\"&\x8a\xea0\x1alaelia.activities.markDone\x90\xea0\x01\x98\xea0\x012h\n" +
 	"\x12AgentStreamService\x12R\n" +
 	"\fAgentChannel\x12\x1d.laelia.v1.AgentStreamMessage\x1a\x1f.laelia.v1.ManagerStreamMessage(\x010\x01B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 

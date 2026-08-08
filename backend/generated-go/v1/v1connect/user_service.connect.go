@@ -90,8 +90,7 @@ type UserServiceClient interface {
 	// UploadAvatar replaces the current user's avatar image. Self only: the
 	// caller must be the user named by the resource. The image bytes are
 	// re-encoded/stored server-side; clients should resize before uploading.
-	// No google.api.http annotation: bytes travel over Connect-JSON like
-	// CommandService.UploadFile.
+	// Bytes travel over Connect-JSON like CommandService.UploadFile.
 	UploadAvatar(context.Context, *connect.Request[v1.UploadAvatarRequest]) (*connect.Response[v1.User], error)
 	// DownloadAvatar fetches a user's avatar image bytes. Any authenticated
 	// user can download any user's avatar (workspace-internal profile image).
@@ -277,8 +276,7 @@ type UserServiceHandler interface {
 	// UploadAvatar replaces the current user's avatar image. Self only: the
 	// caller must be the user named by the resource. The image bytes are
 	// re-encoded/stored server-side; clients should resize before uploading.
-	// No google.api.http annotation: bytes travel over Connect-JSON like
-	// CommandService.UploadFile.
+	// Bytes travel over Connect-JSON like CommandService.UploadFile.
 	UploadAvatar(context.Context, *connect.Request[v1.UploadAvatarRequest]) (*connect.Response[v1.User], error)
 	// DownloadAvatar fetches a user's avatar image bytes. Any authenticated
 	// user can download any user's avatar (workspace-internal profile image).
