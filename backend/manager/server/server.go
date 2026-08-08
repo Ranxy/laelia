@@ -14,6 +14,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/common/log"
 	"github.com/Ranxy/laelia/backend/manager/api/auth"
+	apiv1 "github.com/Ranxy/laelia/backend/manager/api/v1"
 	"github.com/Ranxy/laelia/backend/manager/component/dispatcher"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/component/scheduler"
@@ -43,6 +44,10 @@ type Server struct {
 
 	// stateCfg is the shared in-momory state within the server.
 	stateCfg *state.State
+
+	// auditInterceptor owns the batched audit-log writer; started with the
+	// server and stopped on shutdown.
+	auditInterceptor *apiv1.AuditInterceptor
 
 	// s3clientManager is the shared S3 client used by the CommandService file RPCs and
 	// the SettingService.
@@ -117,9 +122,11 @@ func NewServer(ctx context.Context, profile *config.Profile) (*Server, error) {
 	s.dispatcher = dispatcher.New(stores)
 	s.scheduler = scheduler.New(stores, s.dispatcher)
 
-	if err := configureV1Routers(ctx, s.echoServer, s.store, secret, s.profile, s.stateCfg, s.s3clientManager, s.dispatcher); err != nil {
+	auditInterceptor, err := configureV1Routers(ctx, s.echoServer, s.store, secret, s.profile, s.stateCfg, s.s3clientManager, s.dispatcher)
+	if err != nil {
 		return nil, errors.Wrapf(err, "failed to configure v1 routers")
 	}
+	s.auditInterceptor = auditInterceptor
 
 	configureEchoRouters(s.echoServer, profile)
 
@@ -179,6 +186,11 @@ func (s *Server) Run(ctx context.Context, port int) error {
 		s.stateCfg.HeartbeatBuffer.Start(s.runnerCtx)
 	}
 
+	// Audit log buffer: flush loop with a final flush on shutdown.
+	if s.auditInterceptor != nil {
+		s.auditInterceptor.Start(s.runnerCtx)
+	}
+
 	// Start the reminder scheduler once the dispatcher is ready (it wakes agents
 	// via the dispatcher). Start spawns its own goroutines.
 	if s.scheduler != nil {
@@ -220,6 +232,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// Stop heartbeat buffer
 	if s.stateCfg.HeartbeatBuffer != nil {
 		s.stateCfg.HeartbeatBuffer.Stop()
+	}
+
+	// Stop audit buffer; Stop blocks until the final flush has been written.
+	if s.auditInterceptor != nil {
+		s.auditInterceptor.Stop()
 	}
 
 	// Shutdown echo
