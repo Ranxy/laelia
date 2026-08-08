@@ -453,7 +453,7 @@ func (e *ACPExecutor) run() {
 	if protocol == "" {
 		protocol = ProtocolV1
 	}
-	fingerprint := sessionFingerprint(e.config.Provider, e.config.Model, e.workingDir, protocol)
+	fingerprint := sessionFingerprint(e.config, e.workingDir, protocol)
 	e.fingerprint = fingerprint
 	resumed := false
 	var configOpts []acp.SessionConfigOption

@@ -123,11 +123,7 @@ func establishThread(startupCtx context.Context, req Request, cfg *ThreadConfig,
 	// config fingerprint. The init prompt is sent only on a cold thread/start
 	// and lives in the resumed thread's history thereafter — that is the
 	// per-turn token saving.
-	protocol := cfg.Protocol
-	if protocol == "" {
-		protocol = ProtocolV2
-	}
-	fingerprint = sessionFingerprint(cfg.Provider, cfg.Model, cfg.WorkingDir, protocol)
+	fingerprint = threadSessionFingerprint(cfg)
 	if existing, loadErr := loadACPSession(req.MachineID, req.AgentID); loadErr != nil {
 		slog.Warn("failed to load persisted thread session state; cold-starting", "agent", req.AgentID, "error", loadErr)
 	} else if existing != nil && existing.ThreadID != "" && existing.Fingerprint == fingerprint {
