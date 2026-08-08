@@ -54,9 +54,6 @@ const (
 	// CommandServiceWatchCommandEventsProcedure is the fully-qualified name of the CommandService's
 	// WatchCommandEvents RPC.
 	CommandServiceWatchCommandEventsProcedure = "/laelia.v1.CommandService/WatchCommandEvents"
-	// CommandServiceRespondPermissionProcedure is the fully-qualified name of the CommandService's
-	// RespondPermission RPC.
-	CommandServiceRespondPermissionProcedure = "/laelia.v1.CommandService/RespondPermission"
 	// CommandServiceSearchChatHistoryProcedure is the fully-qualified name of the CommandService's
 	// SearchChatHistory RPC.
 	CommandServiceSearchChatHistoryProcedure = "/laelia.v1.CommandService/SearchChatHistory"
@@ -235,7 +232,6 @@ type CommandServiceClient interface {
 	SteerCommand(context.Context, *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.Command], error)
 	WatchCommand(context.Context, *connect.Request[v1.WatchCommandRequest]) (*connect.ServerStreamForClient[v1.CommandOutput], error)
 	WatchCommandEvents(context.Context, *connect.Request[v1.WatchCommandEventsRequest]) (*connect.ServerStreamForClient[v1.CommandEvent], error)
-	RespondPermission(context.Context, *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error)
 	SearchChatHistory(context.Context, *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error)
 	GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error)
 	GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error)
@@ -438,12 +434,6 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			httpClient,
 			baseURL+CommandServiceWatchCommandEventsProcedure,
 			connect.WithSchema(commandServiceMethods.ByName("WatchCommandEvents")),
-			connect.WithClientOptions(opts...),
-		),
-		respondPermission: connect.NewClient[v1.RespondPermissionRequest, emptypb.Empty](
-			httpClient,
-			baseURL+CommandServiceRespondPermissionProcedure,
-			connect.WithSchema(commandServiceMethods.ByName("RespondPermission")),
 			connect.WithClientOptions(opts...),
 		),
 		searchChatHistory: connect.NewClient[v1.SearchChatHistoryRequest, v1.SearchChatHistoryResponse](
@@ -781,7 +771,6 @@ type commandServiceClient struct {
 	steerCommand              *connect.Client[v1.SteerCommandRequest, v1.Command]
 	watchCommand              *connect.Client[v1.WatchCommandRequest, v1.CommandOutput]
 	watchCommandEvents        *connect.Client[v1.WatchCommandEventsRequest, v1.CommandEvent]
-	respondPermission         *connect.Client[v1.RespondPermissionRequest, emptypb.Empty]
 	searchChatHistory         *connect.Client[v1.SearchChatHistoryRequest, v1.SearchChatHistoryResponse]
 	getCommandContext         *connect.Client[v1.GetCommandContextRequest, v1.GetCommandContextResponse]
 	getOrCreateConversation   *connect.Client[v1.GetOrCreateConversationRequest, v1.GetOrCreateConversationResponse]
@@ -866,11 +855,6 @@ func (c *commandServiceClient) WatchCommand(ctx context.Context, req *connect.Re
 // WatchCommandEvents calls laelia.v1.CommandService.WatchCommandEvents.
 func (c *commandServiceClient) WatchCommandEvents(ctx context.Context, req *connect.Request[v1.WatchCommandEventsRequest]) (*connect.ServerStreamForClient[v1.CommandEvent], error) {
 	return c.watchCommandEvents.CallServerStream(ctx, req)
-}
-
-// RespondPermission calls laelia.v1.CommandService.RespondPermission.
-func (c *commandServiceClient) RespondPermission(ctx context.Context, req *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error) {
-	return c.respondPermission.CallUnary(ctx, req)
 }
 
 // SearchChatHistory calls laelia.v1.CommandService.SearchChatHistory.
@@ -1154,7 +1138,6 @@ type CommandServiceHandler interface {
 	SteerCommand(context.Context, *connect.Request[v1.SteerCommandRequest]) (*connect.Response[v1.Command], error)
 	WatchCommand(context.Context, *connect.Request[v1.WatchCommandRequest], *connect.ServerStream[v1.CommandOutput]) error
 	WatchCommandEvents(context.Context, *connect.Request[v1.WatchCommandEventsRequest], *connect.ServerStream[v1.CommandEvent]) error
-	RespondPermission(context.Context, *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error)
 	SearchChatHistory(context.Context, *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error)
 	GetCommandContext(context.Context, *connect.Request[v1.GetCommandContextRequest]) (*connect.Response[v1.GetCommandContextResponse], error)
 	GetOrCreateConversation(context.Context, *connect.Request[v1.GetOrCreateConversationRequest]) (*connect.Response[v1.GetOrCreateConversationResponse], error)
@@ -1353,12 +1336,6 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		CommandServiceWatchCommandEventsProcedure,
 		svc.WatchCommandEvents,
 		connect.WithSchema(commandServiceMethods.ByName("WatchCommandEvents")),
-		connect.WithHandlerOptions(opts...),
-	)
-	commandServiceRespondPermissionHandler := connect.NewUnaryHandler(
-		CommandServiceRespondPermissionProcedure,
-		svc.RespondPermission,
-		connect.WithSchema(commandServiceMethods.ByName("RespondPermission")),
 		connect.WithHandlerOptions(opts...),
 	)
 	commandServiceSearchChatHistoryHandler := connect.NewUnaryHandler(
@@ -1699,8 +1676,6 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceWatchCommandHandler.ServeHTTP(w, r)
 		case CommandServiceWatchCommandEventsProcedure:
 			commandServiceWatchCommandEventsHandler.ServeHTTP(w, r)
-		case CommandServiceRespondPermissionProcedure:
-			commandServiceRespondPermissionHandler.ServeHTTP(w, r)
 		case CommandServiceSearchChatHistoryProcedure:
 			commandServiceSearchChatHistoryHandler.ServeHTTP(w, r)
 		case CommandServiceGetCommandContextProcedure:
@@ -1840,10 +1815,6 @@ func (UnimplementedCommandServiceHandler) WatchCommand(context.Context, *connect
 
 func (UnimplementedCommandServiceHandler) WatchCommandEvents(context.Context, *connect.Request[v1.WatchCommandEventsRequest], *connect.ServerStream[v1.CommandEvent]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.WatchCommandEvents is not implemented"))
-}
-
-func (UnimplementedCommandServiceHandler) RespondPermission(context.Context, *connect.Request[v1.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.RespondPermission is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) SearchChatHistory(context.Context, *connect.Request[v1.SearchChatHistoryRequest]) (*connect.Response[v1.SearchChatHistoryResponse], error) {

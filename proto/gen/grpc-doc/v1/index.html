@@ -1172,26 +1172,6 @@
                 </li>
               
                 <li>
-                  <a href="#laelia.v1.PermissionDecidedPayload"><span class="badge">M</span>PermissionDecidedPayload</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.PermissionDecision"><span class="badge">M</span>PermissionDecision</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.PermissionOptionPayload"><span class="badge">M</span>PermissionOptionPayload</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.PermissionRequestedPayload"><span class="badge">M</span>PermissionRequestedPayload</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.PermissionTimedOutPayload"><span class="badge">M</span>PermissionTimedOutPayload</a>
-                </li>
-              
-                <li>
                   <a href="#laelia.v1.Ping"><span class="badge">M</span>Ping</a>
                 </li>
               
@@ -1229,10 +1209,6 @@
               
                 <li>
                   <a href="#laelia.v1.ResolveChannelByTitleResponse"><span class="badge">M</span>ResolveChannelByTitleResponse</a>
-                </li>
-              
-                <li>
-                  <a href="#laelia.v1.RespondPermissionRequest"><span class="badge">M</span>RespondPermissionRequest</a>
                 </li>
               
                 <li>
@@ -8707,31 +8683,11 @@ FAILED_PRECONDITION instead and this response is not sent. </p></td>
                 </tr>
               
                 <tr>
-                  <td>permission_requested</td>
-                  <td><a href="#laelia.v1.PermissionRequestedPayload">PermissionRequestedPayload</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>permission_timed_out</td>
-                  <td><a href="#laelia.v1.PermissionTimedOutPayload">PermissionTimedOutPayload</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>permission_decided</td>
-                  <td><a href="#laelia.v1.PermissionDecidedPayload">PermissionDecidedPayload</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
                   <td>context_compaction</td>
                   <td><a href="#laelia.v1.ContextCompactionPayload">ContextCompactionPayload</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>18-20 were permission_requested/timed_out/decided; permissions are now
+auto-granted by the runtime, so the payloads are gone. </p></td>
                 </tr>
               
                 <tr>
@@ -11472,17 +11428,12 @@ thread participation and is left 0. </p></td>
                 </tr>
               
                 <tr>
-                  <td>permission_decision</td>
-                  <td><a href="#laelia.v1.PermissionDecision">PermissionDecision</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
                   <td>discover_providers</td>
                   <td><a href="#laelia.v1.DiscoverProviders">DiscoverProviders</a></td>
                   <td></td>
-                  <td><p>ask the agent daemon to re-probe installed LLM agent providers </p></td>
+                  <td><p>7 was permission_decision; permissions are now auto-granted.
+
+ask the agent daemon to re-probe installed LLM agent providers </p></td>
                 </tr>
               
                 <tr>
@@ -11723,203 +11674,6 @@ source of truth. Empty means a normal channel-message wake. </p></td>
                 <tr>
                   <td>connection_state</td>
                   <td><a href="#laelia.v1.AgentStatus.ConnectionState">AgentStatus.ConnectionState</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.PermissionDecidedPayload">PermissionDecidedPayload</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>tool_call_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>kind</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>option_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>option_kind</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.PermissionDecision">PermissionDecision</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>command_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>option_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.PermissionOptionPayload">PermissionOptionPayload</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>option_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>name</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>kind</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.PermissionRequestedPayload">PermissionRequestedPayload</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>tool_call_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>kind</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>title</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>options</td>
-                  <td><a href="#laelia.v1.PermissionOptionPayload">PermissionOptionPayload</a></td>
-                  <td>repeated</td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>expires_at</td>
-                  <td><a href="#int64">int64</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.PermissionTimedOutPayload">PermissionTimedOutPayload</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>tool_call_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>kind</td>
-                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -12387,37 +12141,6 @@ offline agent (0 when the agent was reached on the first try). </p></td>
                 <tr>
                   <td>conversation</td>
                   <td><a href="#laelia.v1.Conversation">Conversation</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="laelia.v1.RespondPermissionRequest">RespondPermissionRequest</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>name</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>option_id</td>
-                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -13910,13 +13633,6 @@ thread protocol&#39;s turn/steer) honor it; others ignore it.</p></td>
               </tr>
             
               <tr>
-                <td>RespondPermission</td>
-                <td><a href="#laelia.v1.RespondPermissionRequest">RespondPermissionRequest</a></td>
-                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
                 <td>SearchChatHistory</td>
                 <td><a href="#laelia.v1.SearchChatHistoryRequest">SearchChatHistoryRequest</a></td>
                 <td><a href="#laelia.v1.SearchChatHistoryResponse">SearchChatHistoryResponse</a></td>
@@ -14440,16 +14156,6 @@ user, hiding it from All and Unread. The caller&#39;s own id must own the row.</
                 <td>GET</td>
                 <td>/v1/{name=agents/*/commands/*}:watchEvents</td>
                 <td></td>
-              </tr>
-              
-            
-              
-              
-              <tr>
-                <td>RespondPermission</td>
-                <td>POST</td>
-                <td>/v1/{name=agents/*/commands/*}:respondPermission</td>
-                <td>*</td>
               </tr>
               
             

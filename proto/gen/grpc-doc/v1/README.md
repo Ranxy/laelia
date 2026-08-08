@@ -256,11 +256,6 @@
     - [Mention](#laelia-v1-Mention)
     - [NewMessagesAvailable](#laelia-v1-NewMessagesAvailable)
     - [PeerAgent](#laelia-v1-PeerAgent)
-    - [PermissionDecidedPayload](#laelia-v1-PermissionDecidedPayload)
-    - [PermissionDecision](#laelia-v1-PermissionDecision)
-    - [PermissionOptionPayload](#laelia-v1-PermissionOptionPayload)
-    - [PermissionRequestedPayload](#laelia-v1-PermissionRequestedPayload)
-    - [PermissionTimedOutPayload](#laelia-v1-PermissionTimedOutPayload)
     - [Ping](#laelia-v1-Ping)
     - [Pong](#laelia-v1-Pong)
     - [PostMessageRequest](#laelia-v1-PostMessageRequest)
@@ -271,7 +266,6 @@
     - [RemoveChannelMemberRequest](#laelia-v1-RemoveChannelMemberRequest)
     - [ResolveChannelByTitleRequest](#laelia-v1-ResolveChannelByTitleRequest)
     - [ResolveChannelByTitleResponse](#laelia-v1-ResolveChannelByTitleResponse)
-    - [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest)
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
     - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
     - [SendMessageRequest](#laelia-v1-SendMessageRequest)
@@ -3023,10 +3017,7 @@ room_version greater than the agent&#39;s processed_version for that channel.
 | warning | [WarningPayload](#laelia-v1-WarningPayload) |  |  |
 | raw_acp | [RawAcpPayload](#laelia-v1-RawAcpPayload) |  |  |
 | final_summary | [FinalSummaryPayload](#laelia-v1-FinalSummaryPayload) |  |  |
-| permission_requested | [PermissionRequestedPayload](#laelia-v1-PermissionRequestedPayload) |  |  |
-| permission_timed_out | [PermissionTimedOutPayload](#laelia-v1-PermissionTimedOutPayload) |  |  |
-| permission_decided | [PermissionDecidedPayload](#laelia-v1-PermissionDecidedPayload) |  |  |
-| context_compaction | [ContextCompactionPayload](#laelia-v1-ContextCompactionPayload) |  |  |
+| context_compaction | [ContextCompactionPayload](#laelia-v1-ContextCompactionPayload) |  | 18-20 were permission_requested/timed_out/decided; permissions are now auto-granted by the runtime, so the payloads are gone. |
 | context_usage | [ContextUsagePayload](#laelia-v1-ContextUsagePayload) |  |  |
 
 
@@ -4422,8 +4413,9 @@ the drain loop, before acking the conversation cursor.
 | begin_session_response | [BeginSessionResponse](#laelia-v1-BeginSessionResponse) |  |  |
 | cancel | [CancelMessage](#laelia-v1-CancelMessage) |  |  |
 | pong | [Pong](#laelia-v1-Pong) |  |  |
-| permission_decision | [PermissionDecision](#laelia-v1-PermissionDecision) |  |  |
-| discover_providers | [DiscoverProviders](#laelia-v1-DiscoverProviders) |  | ask the agent daemon to re-probe installed LLM agent providers |
+| discover_providers | [DiscoverProviders](#laelia-v1-DiscoverProviders) |  | 7 was permission_decision; permissions are now auto-granted.
+
+ask the agent daemon to re-probe installed LLM agent providers |
 | workspace_list_request | [WorkspaceListRequest](#laelia-v1-WorkspaceListRequest) |  | ask the agent daemon to list one level of its workspace |
 | workspace_read_request | [WorkspaceReadRequest](#laelia-v1-WorkspaceReadRequest) |  | ask the agent daemon to read a workspace file |
 | steer | [SteerMessage](#laelia-v1-SteerMessage) |  | inject a follow-up message into the in-flight turn |
@@ -4552,92 +4544,6 @@ which excludes the caller.
 | display_name | [string](#string) |  |  |
 | persona_prompt | [string](#string) |  |  |
 | connection_state | [AgentStatus.ConnectionState](#laelia-v1-AgentStatus-ConnectionState) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-PermissionDecidedPayload"></a>
-
-### PermissionDecidedPayload
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| tool_call_id | [string](#string) |  |  |
-| kind | [string](#string) |  |  |
-| option_id | [string](#string) |  |  |
-| option_kind | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-PermissionDecision"></a>
-
-### PermissionDecision
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| command_id | [string](#string) |  |  |
-| option_id | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-PermissionOptionPayload"></a>
-
-### PermissionOptionPayload
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| option_id | [string](#string) |  |  |
-| name | [string](#string) |  |  |
-| kind | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-PermissionRequestedPayload"></a>
-
-### PermissionRequestedPayload
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| tool_call_id | [string](#string) |  |  |
-| kind | [string](#string) |  |  |
-| title | [string](#string) |  |  |
-| options | [PermissionOptionPayload](#laelia-v1-PermissionOptionPayload) | repeated |  |
-| expires_at | [int64](#int64) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-PermissionTimedOutPayload"></a>
-
-### PermissionTimedOutPayload
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| tool_call_id | [string](#string) |  |  |
-| kind | [string](#string) |  |  |
 
 
 
@@ -4827,22 +4733,6 @@ creates one. Powers the &#34;#&lt;title&gt;&#34; address resolver.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | conversation | [Conversation](#laelia-v1-Conversation) |  |  |
-
-
-
-
-
-
-<a name="laelia-v1-RespondPermissionRequest"></a>
-
-### RespondPermissionRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  |  |
-| option_id | [string](#string) |  |  |
 
 
 
@@ -5525,7 +5415,6 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | SteerCommand | [SteerCommandRequest](#laelia-v1-SteerCommandRequest) | [Command](#laelia-v1-Command) | SteerCommand injects a follow-up message into a running command&#39;s in-flight turn. Only executors that support mid-turn steering (the ACP v2 thread protocol&#39;s turn/steer) honor it; others ignore it. |
 | WatchCommand | [WatchCommandRequest](#laelia-v1-WatchCommandRequest) | [CommandOutput](#laelia-v1-CommandOutput) stream |  |
 | WatchCommandEvents | [WatchCommandEventsRequest](#laelia-v1-WatchCommandEventsRequest) | [CommandEvent](#laelia-v1-CommandEvent) stream |  |
-| RespondPermission | [RespondPermissionRequest](#laelia-v1-RespondPermissionRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 | SearchChatHistory | [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest) | [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse) |  |
 | GetCommandContext | [GetCommandContextRequest](#laelia-v1-GetCommandContextRequest) | [GetCommandContextResponse](#laelia-v1-GetCommandContextResponse) |  |
 | GetOrCreateConversation | [GetOrCreateConversationRequest](#laelia-v1-GetOrCreateConversationRequest) | [GetOrCreateConversationResponse](#laelia-v1-GetOrCreateConversationResponse) |  |

@@ -12,7 +12,6 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -248,30 +247,6 @@ func (s *CommandService) WatchCommandEvents(ctx context.Context, req *connect.Re
 	}
 }
 
-func (s *CommandService) RespondPermission(ctx context.Context, req *connect.Request[v1pb.RespondPermissionRequest]) (*connect.Response[emptypb.Empty], error) {
-	cmd, err := s.store.GetCommandByName(ctx, req.Msg.Name)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeNotFound, err)
-	}
-	if cmd == nil {
-		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("command %s not found", req.Msg.Name))
-	}
-
-	if cmd.Status != 2 {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("command is not running"))
-	}
-
-	if req.Msg.OptionId == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("option_id must not be empty"))
-	}
-
-	if err := s.dispatcher.RespondPermission(ctx, cmd.AgentID, cmd.ID.String(), req.Msg.OptionId); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to respond to permission"))
-	}
-
-	return connect.NewResponse(&emptypb.Empty{}), nil
-}
-
 func parseConversationID(conversation string) (uuid.UUID, error) {
 	parts := strings.Split(conversation, "/")
 	if len(parts) == 2 && parts[0] == "conversations" {
@@ -391,21 +366,6 @@ func convertToV1CommandEvent(event *store.CommandEventMessage) *v1pb.CommandEven
 			p := &v1pb.FinalSummaryPayload{}
 			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
 				v1Event.Payload = &v1pb.CommandEvent_FinalSummary{FinalSummary: p}
-			}
-		case v1pb.CommandEventType_PERMISSION_REQUESTED:
-			p := &v1pb.PermissionRequestedPayload{}
-			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
-				v1Event.Payload = &v1pb.CommandEvent_PermissionRequested{PermissionRequested: p}
-			}
-		case v1pb.CommandEventType_PERMISSION_TIMED_OUT:
-			p := &v1pb.PermissionTimedOutPayload{}
-			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
-				v1Event.Payload = &v1pb.CommandEvent_PermissionTimedOut{PermissionTimedOut: p}
-			}
-		case v1pb.CommandEventType_PERMISSION_DECIDED:
-			p := &v1pb.PermissionDecidedPayload{}
-			if err := common.ProtojsonUnmarshaler.Unmarshal(data, p); err == nil {
-				v1Event.Payload = &v1pb.CommandEvent_PermissionDecided{PermissionDecided: p}
 			}
 		case v1pb.CommandEventType_CONTEXT_COMPACTION_STARTED, v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED:
 			p := &v1pb.ContextCompactionPayload{}

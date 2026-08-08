@@ -677,40 +677,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1/agents/{agent}/commands/{command}:respondPermission:
-        post:
-            tags:
-                - CommandService
-            operationId: CommandService_RespondPermission
-            parameters:
-                - name: agent
-                  in: path
-                  description: The agent id.
-                  required: true
-                  schema:
-                    type: string
-                - name: command
-                  in: path
-                  description: The command id.
-                  required: true
-                  schema:
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/RespondPermissionRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content: {}
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
     /v1/agents/{agent}/commands/{command}:steer:
         post:
             tags:
@@ -5866,14 +5832,12 @@ components:
                     $ref: '#/components/schemas/RawAcpPayload'
                 finalSummary:
                     $ref: '#/components/schemas/FinalSummaryPayload'
-                permissionRequested:
-                    $ref: '#/components/schemas/PermissionRequestedPayload'
-                permissionTimedOut:
-                    $ref: '#/components/schemas/PermissionTimedOutPayload'
-                permissionDecided:
-                    $ref: '#/components/schemas/PermissionDecidedPayload'
                 contextCompaction:
-                    $ref: '#/components/schemas/ContextCompactionPayload'
+                    allOf:
+                        - $ref: '#/components/schemas/ContextCompactionPayload'
+                    description: |-
+                        18-20 were permission_requested/timed_out/decided; permissions are now
+                         auto-granted by the runtime, so the payloads are gone.
                 contextUsage:
                     $ref: '#/components/schemas/ContextUsagePayload'
         CommandOutput:
@@ -7357,48 +7321,6 @@ components:
                 timeoutSeconds:
                     type: integer
                     format: int32
-        PermissionDecidedPayload:
-            type: object
-            properties:
-                toolCallId:
-                    type: string
-                kind:
-                    type: string
-                optionId:
-                    type: string
-                optionKind:
-                    type: string
-        PermissionOptionPayload:
-            type: object
-            properties:
-                optionId:
-                    type: string
-                name:
-                    type: string
-                kind:
-                    type: string
-        PermissionRequestedPayload:
-            type: object
-            properties:
-                toolCallId:
-                    type: string
-                kind:
-                    type: string
-                title:
-                    type: string
-                options:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/PermissionOptionPayload'
-                expiresAt:
-                    type: string
-        PermissionTimedOutPayload:
-            type: object
-            properties:
-                toolCallId:
-                    type: string
-                kind:
-                    type: string
         PiModel:
             type: object
             properties:
@@ -7629,15 +7551,6 @@ components:
             properties:
                 conversation:
                     $ref: '#/components/schemas/Conversation'
-        RespondPermissionRequest:
-            required:
-                - name
-            type: object
-            properties:
-                name:
-                    type: string
-                optionId:
-                    type: string
         RevokeAgentTokenRequest:
             required:
                 - name

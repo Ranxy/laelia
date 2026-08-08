@@ -20,7 +20,6 @@ import {
 import { RemoteImage } from "@/components/chat/remote-image";
 import { TaskStatusBadge } from "@/components/chat/task-status-badge";
 import { ChatDiff } from "@/components/chat-events/diff-view";
-import { ChatPermissionRequest } from "@/components/chat-events/permission-request";
 import { ChatToolCall } from "@/components/chat-events/tool-call";
 import { ChatWarning } from "@/components/chat-events/warning";
 import { CommandStatusBadge } from "@/components/command-status-badge";
@@ -242,20 +241,6 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     () => events.filter((e) => e.type === CommandEventType.WARNING),
     [events]
   );
-  const permissionEvent = useMemo(
-    () => events.find((e) => e.type === CommandEventType.PERMISSION_REQUESTED),
-    [events]
-  );
-  const isPermissionDecided = useMemo(
-    () =>
-      events.some(
-        (e) =>
-          e.type === CommandEventType.PERMISSION_DECIDED ||
-          e.type === CommandEventType.PERMISSION_TIMED_OUT
-      ),
-    [events]
-  );
-
   const hasEvents =
     !isUser &&
     (toolCallPairs.length > 0 ||
@@ -458,12 +443,6 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
             {warningEvents.map((e) => (
               <ChatWarning key={`warn-${e.seqNo}`} event={e} />
             ))}
-            {permissionEvent && !isPermissionDecided && msg.commandName && (
-              <ChatPermissionRequest
-                event={permissionEvent}
-                commandName={msg.commandName}
-              />
-            )}
             {!isStreaming && (
               <button
                 type="button"

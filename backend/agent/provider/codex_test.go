@@ -207,9 +207,14 @@ func TestCodexEventMapperThreadStatus(t *testing.T) {
 	if len(evs) != 1 || evs[0].Type != acp2.EventError || evs[0].Text != "disk error" {
 		t.Fatalf("systemError: %+v", evs)
 	}
+	// Permissions are auto-granted, so waitingOnApproval is not surfaced.
 	evs = m.MapNotification(notif("thread/status/changed", `{"status":{"type":"active","activeFlags":["waitingOnApproval"]}}`))
+	if len(evs) != 0 {
+		t.Fatalf("waitingOnApproval should produce no events: %+v", evs)
+	}
+	evs = m.MapNotification(notif("thread/status/changed", `{"status":{"type":"active","activeFlags":["waitingOnUserInput"]}}`))
 	if len(evs) != 1 || evs[0].Type != acp2.EventWarning {
-		t.Fatalf("waitingOnApproval: %+v", evs)
+		t.Fatalf("waitingOnUserInput: %+v", evs)
 	}
 	evs = m.MapNotification(notif("thread/status/changed", `{"status":{"type":"active","activeFlags":["running"]}}`))
 	if len(evs) != 0 {

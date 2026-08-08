@@ -49,13 +49,6 @@ var DefaultAllowEnv = []string{
 	"NO_PROXY",
 }
 
-// defaultAutoApproveToolKinds is the template default for tool kinds the agent
-// may run without asking for permission. "execute" is required so the LLM can
-// shell out to the `laelia-machine` CLI to drive the chat loop during an
-// autonomous drain session — without it, every CLI call would block on a
-// permission prompt that no human is around to answer.
-var defaultAutoApproveToolKinds = []string{"read", "search", "think", "fetch", "edit", "move", "execute"}
-
 // ACPConfig is the internal, fully-resolved executor configuration. It is
 // never user-authored: the admin only sets the AgentACPConfig proto fields
 // (provider, model, custom_env, executable, args, allow_env), and BuildACPConfig
@@ -91,7 +84,6 @@ type ACPConfig struct {
 	AdditionalDirectories []string          `yaml:"additional_directories"`
 	ReadTextFiles         bool              `yaml:"read_text_files"`
 	WriteTextFiles        bool              `yaml:"write_text_files"`
-	AutoApproveToolKinds  []string          `yaml:"auto_approve_tool_kinds"`
 	SupportsDiff          bool              `yaml:"supports_diff"`
 	SupportsRawEvents     bool              `yaml:"supports_raw_events"`
 	SupportsToolTraces    bool              `yaml:"supports_tool_traces"`
@@ -134,21 +126,20 @@ func BuildACPConfig(user *v1pb.AgentACPConfig, machineID, agentID string) *ACPCo
 		OutputFlushBytes:  defaultOutputFlushBytes,
 		StartupTimeout:    defaultACPStartupTimeout,
 
-		Provider:             user.Provider,
-		Model:                user.Model,
-		Executable:           executable,
-		Args:                 args,
-		Protocol:             user.Protocol,
-		PersonaPrompt:        user.PersonaPrompt,
-		CustomEnv:            user.CustomEnv,
-		AllowEnv:             user.AllowEnv,
-		WorkingDir:           AgentWorkingDir(machineID, agentID),
-		ReadTextFiles:        true,
-		WriteTextFiles:       true,
-		AutoApproveToolKinds: defaultAutoApproveToolKinds,
-		SupportsDiff:         true,
-		SupportsRawEvents:    true,
-		SupportsToolTraces:   true,
+		Provider:           user.Provider,
+		Model:              user.Model,
+		Executable:         executable,
+		Args:               args,
+		Protocol:           user.Protocol,
+		PersonaPrompt:      user.PersonaPrompt,
+		CustomEnv:          user.CustomEnv,
+		AllowEnv:           user.AllowEnv,
+		WorkingDir:         AgentWorkingDir(machineID, agentID),
+		ReadTextFiles:      true,
+		WriteTextFiles:     true,
+		SupportsDiff:       true,
+		SupportsRawEvents:  true,
+		SupportsToolTraces: true,
 	}
 	return cfg
 }

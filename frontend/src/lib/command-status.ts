@@ -30,7 +30,7 @@ const commandStatusToVariant: Record<CommandStatus, BadgeVariant> = {
   [CommandStatus.TIMEOUT]: "destructive",
 };
 
-const commandEventTypeToI18nKey: Record<CommandEventType, string> = {
+const commandEventTypeToI18nKey: Partial<Record<CommandEventType, string>> = {
   [CommandEventType.COMMAND_EVENT_TYPE_UNSPECIFIED]: "command.event-unknown",
   [CommandEventType.LIFECYCLE]: "command.event-lifecycle",
   [CommandEventType.TEXT_DELTA]: "command.event-text",
@@ -40,9 +40,6 @@ const commandEventTypeToI18nKey: Record<CommandEventType, string> = {
   [CommandEventType.WARNING]: "command.event-warning",
   [CommandEventType.RAW_ACP]: "command.event-raw-acp",
   [CommandEventType.FINAL_SUMMARY]: "command.event-final-summary",
-  [CommandEventType.PERMISSION_REQUESTED]: "command.event-permission-requested",
-  [CommandEventType.PERMISSION_TIMED_OUT]: "command.event-permission-timed-out",
-  [CommandEventType.PERMISSION_DECIDED]: "command.event-permission-decided",
   [CommandEventType.CONTEXT_COMPACTION_STARTED]:
     "command.event-context-compaction-started",
   [CommandEventType.CONTEXT_COMPACTION_FINISHED]:

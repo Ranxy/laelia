@@ -156,7 +156,7 @@ type commandStream struct {
 	// drain loop coordination. wakeCh is buffered(1): a wake while one is
 	// already pending is coalesced. beginRespCh carries the manager's reply
 	// to a BeginSession. currentExecutor is the in-flight session runtime, set
-	// by the drain loop and read by the receive goroutine for Cancel/permission.
+	// by the drain loop and read by the receive goroutine for Cancel.
 	wakeCh            chan struct{}
 	beginRespCh       chan *v1pb.BeginSessionResponse
 	currentExecutor   executor.Runtime
@@ -292,8 +292,8 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 	defer close(doneCh)
 
 	// Receive pump: dispatches manager messages. BeginSessionResponse goes to
-	// the drain loop; NewMessages kicks the drain loop; Cancel/permission act
-	// on the in-flight session.
+	// the drain loop; NewMessages kicks the drain loop; Cancel acts on the
+	// in-flight session.
 	go func() {
 		for {
 			msg, err := stream.Receive()
@@ -327,15 +327,6 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 
 			case *v1pb.ManagerStreamMessage_Pong:
 				// pong received, link acknowledged
-
-			case *v1pb.ManagerStreamMessage_PermissionDecision:
-				d := m.PermissionDecision
-				slog.Info("received permission decision", "commandID", d.CommandId, "optionID", d.OptionId)
-				if ex := c.getCurrentExecutor(); ex != nil {
-					if resolver, ok := ex.(executor.PermissionResolver); ok {
-						resolver.ResolvePermission(d.OptionId)
-					}
-				}
 
 			case *v1pb.ManagerStreamMessage_Steer:
 				st := m.Steer
@@ -1111,12 +1102,6 @@ func sendCommandEvent(stream streamSender, commandID string, event *executor.Eve
 		ce.Payload = &v1pb.CommandEvent_RawAcp{RawAcp: event.RawAcp}
 	case v1pb.CommandEventType_FINAL_SUMMARY:
 		ce.Payload = &v1pb.CommandEvent_FinalSummary{FinalSummary: event.FinalSummary}
-	case v1pb.CommandEventType_PERMISSION_REQUESTED:
-		ce.Payload = &v1pb.CommandEvent_PermissionRequested{PermissionRequested: event.PermissionRequested}
-	case v1pb.CommandEventType_PERMISSION_TIMED_OUT:
-		ce.Payload = &v1pb.CommandEvent_PermissionTimedOut{PermissionTimedOut: event.PermissionTimedOut}
-	case v1pb.CommandEventType_PERMISSION_DECIDED:
-		ce.Payload = &v1pb.CommandEvent_PermissionDecided{PermissionDecided: event.PermissionDecided}
 	case v1pb.CommandEventType_CONTEXT_COMPACTION_STARTED, v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED:
 		ce.Payload = &v1pb.CommandEvent_ContextCompaction{ContextCompaction: event.ContextCompaction}
 	case v1pb.CommandEventType_CONTEXT_USAGE_UPDATE:
