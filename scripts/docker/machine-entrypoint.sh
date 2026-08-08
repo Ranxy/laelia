@@ -19,5 +19,12 @@ fi
 if [[ "${LAELIA_DEBUG:-false}" == "true" ]]; then
 	args+=(--debug)
 fi
+# Codex provider login/config: point CODEX_HOME at a mounted writable volume
+# carrying config.toml + auth/models.json. Without it codex falls back to
+# ~/.codex under the container home (writable, but loses login state on
+# container recreation).
+if [[ -n "${LAELIA_CODEX_HOME:-}" ]]; then
+	export CODEX_HOME="${LAELIA_CODEX_HOME}"
+fi
 
 exec laelia-machine "${args[@]}" "$@"

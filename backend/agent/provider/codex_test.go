@@ -40,6 +40,12 @@ func TestCodexEventMapperReasoningDelta(t *testing.T) {
 	if len(evs) != 1 || evs[0].Type != acp2.EventThinkingDelta || evs[0].Text != "thinking..." {
 		t.Fatalf("reasoning delta: %+v", evs)
 	}
+	// Per-token reasoning stream (item/reasoning/textDelta) is internal
+	// progress, not user-visible thinking — degrade to raw like raft does.
+	evs = m.MapNotification(notif("item/reasoning/textDelta", `{"itemId":"r1","delta":"token by token","contentIndex":0}`))
+	if len(evs) != 1 || evs[0].Type != acp2.EventRaw {
+		t.Fatalf("textDelta should degrade to raw: %+v", evs)
+	}
 }
 
 func TestCodexEventMapperToolCalls(t *testing.T) {
