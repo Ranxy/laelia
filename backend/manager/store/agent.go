@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/proto"
 
 	models "github.com/Ranxy/laelia/backend/generated-go/store"
 )
@@ -351,6 +352,58 @@ func (s *Store) CreateAgent(ctx context.Context, create *AgentMessage) (*AgentMe
 	s.agentIDCache.Add(agent.ID, agent)
 	s.agentResourceIDCache.Add(agent.ResourceID, agent)
 	return agent, nil
+}
+
+// TouchAgentHeartbeat records an agent heartbeat in one round trip: it touches
+// the ACTIVE session row and patches the agent status' last_heartbeat_at via
+// jsonb_set (instead of marshaling and rewriting the whole status JSONB from
+// Go), then refreshes the in-memory cache so reads see the new heartbeat
+// without a DB re-read. The HeartbeatBuffer calls it once per agent per flush
+// window, so a steady heartbeat stream costs one UPDATE per flush instead of a
+// full-row status rewrite per heartbeat.
+func (s *Store) TouchAgentHeartbeat(ctx context.Context, agentID int, lastHeartbeatAt int64) error {
+	// Single data-modifying CTE keeps both writes atomic in one round trip.
+	if _, err := s.GetDB().ExecContext(ctx, `
+		WITH touched AS (
+			UPDATE agent_session SET last_heartbeat_at = to_timestamp($2)
+			WHERE agent_id = $1 AND state = 'ACTIVE'
+		)
+		UPDATE agent SET status = jsonb_set(status, '{last_heartbeat_at}', to_jsonb($2))
+		WHERE id = $1
+	`, agentID, lastHeartbeatAt); err != nil {
+		return err
+	}
+	s.refreshAgentHeartbeatCache(agentID, lastHeartbeatAt)
+	return nil
+}
+
+// refreshAgentHeartbeatCache patches the cached status in memory (clone then
+// re-Add, so readers never observe a concurrently-mutated pointer) keeping
+// GetAgent/ListAgents fresh without a DB round trip per flush. The DB write
+// above is the source of truth; a cache miss (disabled cache, eviction) simply
+// skips the refresh and the next read falls back to the DB.
+func (s *Store) refreshAgentHeartbeatCache(agentID int, lastHeartbeatAt int64) {
+	cached, ok := s.agentIDCache.Peek(agentID)
+	if !ok || cached == nil {
+		return
+	}
+	clone := *cached
+	if clone.Status == nil {
+		clone.Status = &models.AgentStatus{LastHeartbeatAt: lastHeartbeatAt}
+	} else {
+		// proto.Clone: the generated type embeds a sync.Mutex, so a plain copy
+		// would alias the message state. The type is fixed by construction.
+		cloned, ok := proto.Clone(cached.Status).(*models.AgentStatus)
+		if !ok {
+			return
+		}
+		cloned.LastHeartbeatAt = lastHeartbeatAt
+		clone.Status = cloned
+	}
+	s.agentIDCache.Remove(agentID)
+	s.agentResourceIDCache.Remove(clone.ResourceID)
+	s.agentIDCache.Add(agentID, &clone)
+	s.agentResourceIDCache.Add(clone.ResourceID, &clone)
 }
 
 func (s *Store) UpdateAgent(ctx context.Context, current *AgentMessage, patch *UpdateAgentMessage) (*AgentMessage, error) {

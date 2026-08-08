@@ -7,13 +7,13 @@ import (
 	"time"
 )
 
-// fakeHeartbeatWriter counts TouchAgentSessionForHeartbeat calls so the buffer
-// can be exercised without a Postgres connection.
+// fakeHeartbeatWriter counts TouchAgentHeartbeat calls so the buffer can be
+// exercised without a Postgres connection.
 type fakeHeartbeatWriter struct {
 	count atomic.Int64
 }
 
-func (f *fakeHeartbeatWriter) TouchAgentSessionForHeartbeat(_ context.Context, _ int, _ int64) error {
+func (f *fakeHeartbeatWriter) TouchAgentHeartbeat(_ context.Context, _ int, _ int64) error {
 	f.count.Add(1)
 	return nil
 }
