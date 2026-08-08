@@ -547,17 +547,17 @@ func (m *CodexEventMapper) itemEvent(method string, params map[string]json.RawMe
 	case "commandExecution":
 		if started && item.Command != "" {
 			input, _ := json.Marshal(map[string]any{"command": item.Command})
-			events = append(events, toolCallEvent(turnID, "shell", item.ID, "started", input))
+			events = append(events, toolCallEvent(turnID, "shell", item.ID, "started", item.Command, input))
 		}
 		if completed {
-			events = append(events, toolCallEvent(turnID, "shell", item.ID, "completed", raw))
+			events = append(events, toolCallEvent(turnID, "shell", item.ID, "completed", item.Command, raw))
 		}
 	case "fileChange":
 		if started {
 			count := 0
 			for _, c := range item.Changes {
 				input, _ := json.Marshal(map[string]any{"path": c.Path, "kind": c.Kind})
-				events = append(events, toolCallEvent(turnID, "file_change", item.ID, "started", input))
+				events = append(events, toolCallEvent(turnID, "file_change", item.ID, "started", "", input))
 				count++
 			}
 			if count > 0 && item.ID != "" {
@@ -571,24 +571,24 @@ func (m *CodexEventMapper) itemEvent(method string, params map[string]json.RawMe
 				count = len(item.Changes)
 			}
 			for i := 0; i < count; i++ {
-				events = append(events, toolCallEvent(turnID, "file_change", item.ID, "completed", raw))
+				events = append(events, toolCallEvent(turnID, "file_change", item.ID, "completed", "", raw))
 			}
 		}
 	case "mcpToolCall":
 		name := codexMcpToolName(item.Tool, item.Server)
 		if started {
-			events = append(events, toolCallEvent(turnID, name, item.ID, "started", item.Arguments))
+			events = append(events, toolCallEvent(turnID, name, item.ID, "started", "", item.Arguments))
 		}
 		if completed {
-			events = append(events, toolCallEvent(turnID, name, item.ID, "completed", raw))
+			events = append(events, toolCallEvent(turnID, name, item.ID, "completed", "", raw))
 		}
 	case "webSearch":
 		if started {
 			input, _ := json.Marshal(map[string]any{"query": item.Query})
-			events = append(events, toolCallEvent(turnID, "web_search", item.ID, "started", input))
+			events = append(events, toolCallEvent(turnID, "web_search", item.ID, "started", "", input))
 		}
 		if completed {
-			events = append(events, toolCallEvent(turnID, "web_search", item.ID, "completed", raw))
+			events = append(events, toolCallEvent(turnID, "web_search", item.ID, "completed", "", raw))
 		}
 	case "contextCompaction":
 		if started {
@@ -747,14 +747,17 @@ func (*CodexEventMapper) errorEvent(params map[string]json.RawMessage, turnID st
 	return []acp2.Event{{Type: acp2.EventError, TurnID: turnID, Text: msg}}
 }
 
-// toolCallEvent builds a tool call started/completed event.
-func toolCallEvent(turnID, kind, id, status string, payload json.RawMessage) acp2.Event {
+// toolCallEvent builds a tool call started/completed event. title is the
+// display title (e.g. the executed command for shell calls); when empty the
+// executor falls back to the kind.
+func toolCallEvent(turnID, kind, id, status, title string, payload json.RawMessage) acp2.Event {
 	ev := acp2.Event{
 		Type:   acp2.EventToolCallStarted,
 		TurnID: turnID,
 		ToolCall: &acp2.ToolCallInfo{
 			ID:     id,
 			Kind:   kind,
+			Title:  title,
 			Status: status,
 		},
 	}

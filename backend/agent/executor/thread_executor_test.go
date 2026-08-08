@@ -310,9 +310,9 @@ func TestThreadExecutor_ColdTurnMapsEvents(t *testing.T) {
 		}
 	}
 	require.NotNil(t, toolStarted)
-	assert.Equal(t, "shell", toolStarted.Summary, "the tool kind is the fallback title")
+	assert.Equal(t, "ls -la", toolStarted.Summary, "the executed command is the tool title")
 	require.NotNil(t, toolStarted.ToolCallStarted)
-	assert.Equal(t, "shell", toolStarted.ToolCallStarted.Title)
+	assert.Equal(t, "ls -la", toolStarted.ToolCallStarted.Title)
 	require.NotNil(t, toolStarted.ToolCallStarted.RawInput)
 	assert.Equal(t, "ls -la", toolStarted.ToolCallStarted.RawInput.Fields["command"].GetStringValue())
 

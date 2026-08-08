@@ -72,6 +72,9 @@ func TestCodexEventMapperToolCalls(t *testing.T) {
 	if len(evs) != 1 || evs[0].Type != acp2.EventToolCallStarted || evs[0].ToolCall.Kind != "shell" {
 		t.Fatalf("commandExecution started: %+v", evs)
 	}
+	if evs[0].ToolCall.Title != "ls -la" {
+		t.Fatalf("commandExecution title: %q", evs[0].ToolCall.Title)
+	}
 	if string(evs[0].ToolCall.Input) != `{"command":"ls -la"}` {
 		t.Fatalf("commandExecution input: %s", evs[0].ToolCall.Input)
 	}
