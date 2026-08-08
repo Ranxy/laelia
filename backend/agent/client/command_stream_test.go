@@ -620,3 +620,26 @@ func TestCommandStreamStart_SurfacesTerminalError(t *testing.T) {
 	assert.Contains(t, err.Error(), "stream dead", "Start must return the stream error, not a backoff/ctx error")
 	assert.Less(t, elapsed, 1*time.Second, "Start must return promptly, not retry-then-backoff")
 }
+
+// TestBuildSteerNotice covers the content-free inbox notice steered into a
+// running turn: it names no payload, hints thread replies, and counts
+// conversations only when there are several.
+func TestBuildSteerNotice(t *testing.T) {
+	plain := buildSteerNotice(&v1pb.NewMessagesAvailable{ConversationIds: []string{"conv-1"}})
+	assert.Contains(t, plain, "new messages arrived")
+	assert.Contains(t, plain, "laelia-machine message check")
+	assert.NotContains(t, plain, "conv-1", "notice must not carry conversation ids")
+
+	thread := buildSteerNotice(&v1pb.NewMessagesAvailable{
+		ConversationIds:     []string{"conv-1"},
+		ThreadRootMessageId: "conv-1/messages/root",
+	})
+	assert.Contains(t, thread, "thread you follow")
+	assert.Contains(t, thread, "laelia-machine thread check")
+
+	multi := buildSteerNotice(&v1pb.NewMessagesAvailable{ConversationIds: []string{"a", "b", "c"}})
+	assert.Contains(t, multi, "3 conversations")
+
+	empty := buildSteerNotice(nil)
+	assert.Contains(t, empty, "new messages arrived")
+}

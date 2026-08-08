@@ -640,6 +640,22 @@ func (s *Session) prompt(ctx context.Context, message string) error {
 	return nil
 }
 
+// steer queues a steering message into the running turn. pi delivers it after
+// the current assistant turn finishes executing its tool calls, before the next
+// LLM call, so the turn naturally extends instead of settling early. Best-effort
+// by contract: callers treat a rejection as a hint to fall back to the next
+// turn's BeginSession wake.
+func (s *Session) steer(ctx context.Context, message string) error {
+	r, err := s.send(ctx, steerCommand{Type: "steer", Message: message})
+	if err != nil {
+		return err
+	}
+	if !r.Success {
+		return pkgerrors.Errorf("pi: steer rejected: %s", r.Error)
+	}
+	return nil
+}
+
 // sessionStats fetches the session's token usage and current context-window
 // estimate via get_session_stats. Unlike ACP's pushed UsageUpdate, pi exposes
 // usage only as a pull command, so callers poll it.

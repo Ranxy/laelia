@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"strings"
+	"time"
 )
 
 // fakePiModeFile is read by the fake-pi subprocess (CWD = the session working
@@ -17,6 +18,14 @@ import (
 // "stuck" reads stdin but never answers get_state, simulating a pi that spawned
 // but is wedged at startup (no response to the first RPC) — exercises the
 // Phase 5 startup-timeout fast-failure + wedged-process kill path.
+// "steer" accepts the prompt, emits a text delta, then blocks until a `steer`
+// command arrives: it responds success, emits another text delta, and settles —
+// proving a same-turn steer is delivered while the turn is in flight and the
+// turn extends until the steered work is processed. "steer-fail" is the same
+// but responds success:false to the steer (the turn must still settle).
+// "compact" accepts the prompt, emits compaction_start, waits briefly for a
+// steer (which the executor must suppress while compacting), then emits
+// compaction_end + agent_settled.
 const fakePiModeFile = "fake-pi-mode"
 
 // fakePiPromptsFile receives one JSON line per prompt command the fake pi
@@ -24,6 +33,11 @@ const fakePiModeFile = "fake-pi-mode"
 // assert which prompt text a turn sent — e.g. the cold init prompt vs. a
 // warm-turn-only batch (the Phase 6 amnesia regression).
 const fakePiPromptsFile = "fake-pi-prompts.log"
+
+// fakePiSteersFile receives one JSON line per steer command the fake pi
+// accepts, recording the steer message. Lifecycle tests read it back to assert
+// whether (and what) a same-turn steer reached the subprocess.
+const fakePiSteersFile = "fake-pi-steers.log"
 
 // This file's init() turns the test binary into a fake pi subprocess when it is
 // re-exec'd by a lifecycle test. The runner spawns pi as `testbin --mode rpc
@@ -120,6 +134,75 @@ func fakePiMain() {
 				if _, err := r.ReadString('\n'); err != nil {
 					return
 				}
+			case "steer", "steer-fail":
+				// Block until a steer command arrives (the turn stays in
+				// flight), respond per mode, then settle. Any other line
+				// (e.g. an abort) is ignored.
+				for {
+					line, err := r.ReadString('\n')
+					if err != nil {
+						return
+					}
+					var sc struct {
+						Type    string `json:"type"`
+						ID      string `json:"id,omitempty"`
+						Message string `json:"message"`
+					}
+					if json.Unmarshal([]byte(line), &sc) != nil || sc.Type != "steer" {
+						continue
+					}
+					appendFakePiSteer(sc.Message)
+					success := readFakePiMode() != "steer-fail"
+					writeJSONL(w, response{Type: "response", ID: sc.ID, Command: "steer", Success: success, Error: map[bool]string{false: "steer rejected"}[success]})
+					writeJSONL(w, event{Type: eventMessageUpdate, AssistantMessageEvent: &assistantMessageEvent{
+						Type:         assistantEventTextDelta,
+						ContentIndex: 0,
+						Delta:        "steered",
+					}})
+					writeJSONL(w, event{Type: eventAgentSettled})
+					return
+				}
+			case "compact":
+				// Emit compaction_start, then wait briefly for a steer (the
+				// executor must suppress it while compacting), then finish the
+				// compaction and settle either way. The wait uses a goroutine
+				// reader (pipes do not support read deadlines); the main loop
+				// does not read again before returning, so the bufio.Reader is
+				// never accessed concurrently.
+				writeJSONL(w, event{Type: eventCompactionStart})
+				steerLine := make(chan string, 1)
+				go func() {
+					line, err := r.ReadString('\n')
+					if err != nil {
+						return
+					}
+					steerLine <- line
+				}()
+				select {
+				case line := <-steerLine:
+					// A steer arrived while compacting (bug: should have been
+					// suppressed). Log it so the test can fail loudly.
+					appendFakePiSteer(line)
+				case <-time.After(time.Second):
+				}
+				writeJSONL(w, event{Type: eventCompactionEnd})
+				writeJSONL(w, event{Type: eventAgentSettled})
+				return
+			default:
+				// "settle": fall through to the agent_settled write below.
+			}
+			writeJSONL(w, event{Type: eventAgentSettled})
+			switch readFakePiMode() {
+			case "die":
+				// Exit immediately so the subprocess dies mid-turn; waitPump
+				// closes the active turn channel and the drain loop fails fast.
+				return
+			case "wait":
+				// Block for the next line (an abort from Cancel) so the turn
+				// stays in flight, then settle.
+				if _, err := r.ReadString('\n'); err != nil {
+					return
+				}
 			default:
 				// "settle": fall through to the agent_settled write below.
 			}
@@ -140,7 +223,7 @@ func readFakePiMode() string {
 		return "settle"
 	}
 	switch strings.TrimSpace(string(b)) {
-	case "wait", "die", "stuck":
+	case "wait", "die", "stuck", "steer", "steer-fail", "compact":
 		return strings.TrimSpace(string(b))
 	default:
 		return "settle"
@@ -162,6 +245,20 @@ func writeJSONL(w *bufio.Writer, v any) {
 // test can inspect which prompt each turn sent.
 func appendFakePiPrompt(msg string) {
 	f, err := os.OpenFile(fakePiPromptsFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_ = json.NewEncoder(f).Encode(struct {
+		Message string `json:"message"`
+	}{Message: msg})
+}
+
+// appendFakePiSteer appends one steer message to the steers log in the fake
+// pi's CWD, so a lifecycle test can assert whether a same-turn steer reached
+// the subprocess (and with what text).
+func appendFakePiSteer(msg string) {
+	f, err := os.OpenFile(fakePiSteersFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return
 	}

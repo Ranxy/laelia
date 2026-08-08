@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Ranxy/laelia/backend/agent/executor"
+	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 )
 
 // These tests drive the real Session/PiExecutor against a fake pi subprocess
@@ -588,4 +589,265 @@ func TestPiSession_TerminalUnblocksOnTurnCancel(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("endTurn blocked on turnMu — the terminal send never released it (wedge)")
 	}
+}
+
+// --- same-turn steering ---
+
+// waitForFakePiPrompts polls the fake pi's prompts log until n prompts have
+// been accepted (the fake pi is then blocked waiting for a steer in the
+// steer/steer-fail modes), or fails the test.
+func waitForFakePiPrompts(t *testing.T, work string, n int) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if len(readFakePiPrompts(t, work)) >= n {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("fake pi did not log %d prompt(s)", n)
+}
+
+// readFakePiSteers returns the steer messages the fake pi logged (one per
+// accepted steer command), in send order.
+func readFakePiSteers(t *testing.T, work string) []string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(work, fakePiSteersFile))
+	if err != nil {
+		return nil
+	}
+	var steers []string
+	for line := range strings.SplitSeq(strings.TrimRight(string(data), "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		var rec struct {
+			Message string `json:"message"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(line), &rec))
+		steers = append(steers, rec.Message)
+	}
+	return steers
+}
+
+// TestPiExecutor_SteerDeliveredMidTurn proves a same-turn steer reaches the
+// running turn: the fake pi accepts the prompt, blocks until a steer command
+// arrives, then settles only after responding to it — so a successful turn
+// with exactly one logged steer shows the notice was delivered mid-turn and
+// the turn extended until the steered work was processed.
+func TestPiExecutor_SteerDeliveredMidTurn(t *testing.T) {
+	sess, cfg := newFakePiSession(t, "steer")
+
+	rt, err := NewPi(executor.Request{
+		CommandID:        "cmd-steer",
+		TurnPrompt:       "do the thing",
+		AgentDisplayName: "TestPi",
+		TimeoutSeconds:   10,
+	}, sess, cfg)
+	require.NoError(t, err)
+	rt.Start()
+
+	// Wait until the prompt is accepted (the fake pi is now blocked waiting for
+	// a steer), then steer a notice into the running turn.
+	waitForFakePiPrompts(t, cfg.WorkingDir, 1)
+	steerer, ok := rt.(interface{ Steer(string) error })
+	require.True(t, ok, "PiExecutor must implement Steer")
+	require.NoError(t, steerer.Steer("[Laelia inbox notice: new messages arrived]"))
+
+	result := drainTurn(t, rt)
+	require.Equal(t, int32(0), result.ExitCode, "steered turn should succeed")
+
+	steers := readFakePiSteers(t, cfg.WorkingDir)
+	require.Len(t, steers, 1, "exactly one steer must reach the subprocess")
+	require.Equal(t, "[Laelia inbox notice: new messages arrived]", steers[0])
+}
+
+// TestPiExecutor_SteerFailureDoesNotBlockTurn proves a rejected steer is
+// best-effort: the fake pi answers success:false, and the turn still settles
+// cleanly (the post-turn BeginSession wake is the fallback).
+func TestPiExecutor_SteerFailureDoesNotBlockTurn(t *testing.T) {
+	sess, cfg := newFakePiSession(t, "steer-fail")
+
+	rt, err := NewPi(executor.Request{
+		CommandID:        "cmd-steer-fail",
+		TurnPrompt:       "do the thing",
+		AgentDisplayName: "TestPi",
+		TimeoutSeconds:   10,
+	}, sess, cfg)
+	require.NoError(t, err)
+	rt.Start()
+
+	waitForFakePiPrompts(t, cfg.WorkingDir, 1)
+	steerer, ok := rt.(interface{ Steer(string) error })
+	require.True(t, ok)
+	require.NoError(t, steerer.Steer("notice"))
+
+	result := drainTurn(t, rt)
+	require.Equal(t, int32(0), result.ExitCode, "a rejected steer must not fail the turn")
+
+	steers := readFakePiSteers(t, cfg.WorkingDir)
+	require.Len(t, steers, 1, "the steer must still reach the subprocess")
+}
+
+// TestPiExecutor_SteerSuppressedDuringCompaction proves steering is suppressed
+// while a context compaction is in flight: the fake pi emits compaction_start
+// and waits for a steer that must never arrive; the turn completes and the
+// steer log stays empty (the post-turn wake recovers the notice).
+func TestPiExecutor_SteerSuppressedDuringCompaction(t *testing.T) {
+	sess, cfg := newFakePiSession(t, "compact")
+
+	rt, err := NewPi(executor.Request{
+		CommandID:        "cmd-compact",
+		TurnPrompt:       "do the thing",
+		AgentDisplayName: "TestPi",
+		TimeoutSeconds:   10,
+	}, sess, cfg)
+	require.NoError(t, err)
+	rt.Start()
+
+	// Wait until compaction_start is observed: the executor sets compacting
+	// BEFORE emitting the event, so once this event is seen the drain loop is
+	// guaranteed to suppress any steer queued afterwards.
+	deadline := time.After(10 * time.Second)
+	seen := false
+	for !seen {
+		select {
+		case ev, ok := <-rt.EventChannel():
+			require.True(t, ok, "event channel closed before compaction_start")
+			if ev.Type == v1pb.CommandEventType_CONTEXT_COMPACTION_STARTED {
+				seen = true
+			}
+		case <-deadline:
+			t.Fatal("compaction_start event not observed")
+		}
+	}
+	steerer, ok := rt.(interface{ Steer(string) error })
+	require.True(t, ok)
+	require.NoError(t, steerer.Steer("notice"))
+
+	result := drainTurn(t, rt)
+	require.Equal(t, int32(0), result.ExitCode, "compacted turn should succeed")
+
+	steers := readFakePiSteers(t, cfg.WorkingDir)
+	require.Empty(t, steers, "steer must be suppressed during compaction")
+}
+
+// TestPiExecutor_SteerAfterSettledNoBlock covers the steer/agent_settled race
+// the other way: a notice steered AFTER the turn already settled (the drain
+// loop exited). Steer is best-effort by contract, so it must return
+// immediately without panicking, the notice must not reach the (gone)
+// subprocess, and the post-turn BeginSession wake — the durable fallback —
+// recovers the messages next turn. A follow-up turn on the same session must
+// be unaffected.
+func TestPiExecutor_SteerAfterSettledNoBlock(t *testing.T) {
+	sess, cfg := newFakePiSession(t, "settle")
+
+	rt, err := NewPi(executor.Request{
+		CommandID:        "cmd-settle",
+		TurnPrompt:       "do the thing",
+		AgentDisplayName: "TestPi",
+		TimeoutSeconds:   10,
+	}, sess, cfg)
+	require.NoError(t, err)
+	rt.Start()
+	require.Equal(t, int32(0), drainTurn(t, rt).ExitCode, "turn must settle cleanly")
+
+	// drainTurn returned ⇒ agent_settled was processed and the drain loop
+	// exited. steerCh is never closed (a close would race the drain loop), so
+	// Steer must be safe here: no panic, no block.
+	steerer, ok := rt.(interface{ Steer(string) error })
+	require.True(t, ok, "PiExecutor must implement Steer")
+	done := make(chan error, 1)
+	go func() { done <- steerer.Steer("[Laelia inbox notice: new messages arrived]") }()
+	select {
+	case err := <-done:
+		require.NoError(t, err, "a post-settle Steer must not fail (queue has room; best-effort)")
+	case <-time.After(2 * time.Second):
+		t.Fatal("Steer blocked after the turn settled — must be non-blocking")
+	}
+	require.Empty(t, readFakePiSteers(t, cfg.WorkingDir),
+		"a post-settle steer must not reach the subprocess (the drain loop is gone)")
+
+	// The stale notice must not poison the next turn.
+	require.Equal(t, int32(0), runTurn(t, sess, cfg, "cmd-2").ExitCode, "next turn must be unaffected")
+}
+
+// TestPiExecutor_SteerQueueFullRejectsNonBlocking proves Steer never blocks
+// the receive pump: with the 8-slot queue full (no drain loop running), the
+// ninth steer is rejected immediately with "queue full" instead of blocking,
+// and draining one slot restores acceptance.
+func TestPiExecutor_SteerQueueFullRejectsNonBlocking(t *testing.T) {
+	sess, cfg := newFakePiSession(t, "settle")
+
+	rt, err := NewPi(executor.Request{
+		CommandID:        "cmd-queue",
+		TurnPrompt:       "do the thing",
+		AgentDisplayName: "TestPi",
+		TimeoutSeconds:   10,
+	}, sess, cfg)
+	require.NoError(t, err)
+	e, ok := rt.(*PiExecutor)
+	require.True(t, ok)
+
+	// No drain loop is running (the turn is not started), so the queue only
+	// fills. Steer must accept exactly cap entries...
+	for i := 0; i < cap(e.steerCh); i++ {
+		require.NoError(t, e.Steer("notice"), "queue must accept up to capacity")
+	}
+
+	// ...and reject the (cap+1)-th immediately, without blocking.
+	done := make(chan error, 1)
+	go func() { done <- e.Steer("overflow") }()
+	select {
+	case err := <-done:
+		require.ErrorContains(t, err, "queue full", "overflow steer must be rejected")
+	case <-time.After(2 * time.Second):
+		t.Fatal("Steer blocked on a full queue — must be non-blocking")
+	}
+
+	// Room is restored once the queue drains (e.g. the drain loop consumes a
+	// notice).
+	<-e.steerCh
+	require.NoError(t, e.Steer("after-drain"), "a drained slot must accept a steer again")
+}
+
+// TestPiExecutor_SteerAfterCancelNoBlock covers the cancelled-turn variant of
+// the post-turn race: the drain loop exited via Cancel (not settle), and a
+// late Steer must still be safe — no panic, no block, nothing delivered to the
+// subprocess. The messages are recovered by the next turn's wake.
+func TestPiExecutor_SteerAfterCancelNoBlock(t *testing.T) {
+	sess, cfg := newFakePiSession(t, "wait")
+
+	rt, err := NewPi(executor.Request{
+		CommandID:        "cmd-cancel",
+		TurnPrompt:       "do the thing",
+		AgentDisplayName: "TestPi",
+		TimeoutSeconds:   10,
+	}, sess, cfg)
+	require.NoError(t, err)
+	rt.Start()
+
+	// Wait for turn activity, then cancel mid-turn and drain to completion.
+	select {
+	case <-rt.EventChannel():
+	case <-rt.OutputChannel():
+	case <-rt.Done():
+		t.Fatal("turn ended before cancel could fire")
+	case <-time.After(10 * time.Second):
+		t.Fatal("no turn activity before cancel")
+	}
+	rt.Cancel()
+	_ = drainTurn(t, rt)
+
+	steerer, ok := rt.(interface{ Steer(string) error })
+	require.True(t, ok)
+	done := make(chan error, 1)
+	go func() { done <- steerer.Steer("notice") }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Steer blocked after Cancel — must be non-blocking")
+	}
+	require.Empty(t, readFakePiSteers(t, cfg.WorkingDir),
+		"a post-cancel steer must not reach the subprocess")
 }

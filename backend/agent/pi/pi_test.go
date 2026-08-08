@@ -420,6 +420,7 @@ func TestPiTurnPromptText_ReanchorOnWarmTurn(t *testing.T) {
 	got := e.turnPromptText(true)
 	assert.Contains(t, got, "Re-anchor (context compaction recovery)")
 	assert.Contains(t, got, "New messages received:")
+	assert.Contains(t, got, "Laelia inbox notice", "re-anchor must carry the same-turn steering instruction")
 	assert.True(t, strings.Index(got, "Re-anchor") < strings.Index(got, "New messages received:"),
 		"anchor must be prepended to the warm batch")
 }
@@ -434,6 +435,7 @@ func TestPiTurnPromptText_ColdTurnIgnoresReanchor(t *testing.T) {
 	got := e.turnPromptText(false)
 	assert.NotContains(t, got, "Re-anchor")
 	assert.Contains(t, got, `You are "alice"`, "cold turn sends the full init prompt")
+	assert.Contains(t, got, "Laelia inbox notice", "cold init prompt must carry the same-turn steering instruction")
 	assert.Contains(t, got, "batch")
 }
 

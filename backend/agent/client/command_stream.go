@@ -214,6 +214,31 @@ func (c *commandStream) wake() {
 	}
 }
 
+// steerer is the optional in-turn message injection capability a runtime may
+// implement (pi does; ACP does not). Steer delivers a notice into the running
+// turn; it must be non-blocking and best-effort.
+type steerer interface {
+	Steer(text string) error
+}
+
+// buildSteerNotice renders the content-free inbox notice steered into a running
+// turn. The agent pulls the real messages itself via `laelia-machine message
+// check` / `thread check`; the notice only says that something arrived (and
+// whether it is a thread reply), never the payload.
+func buildSteerNotice(nm *v1pb.NewMessagesAvailable) string {
+	if nm != nil && nm.ThreadRootMessageId != "" {
+		return "[Laelia inbox notice: new reply in a thread you follow. Run `laelia-machine thread check` at a natural breakpoint.]"
+	}
+	count := 0
+	if nm != nil {
+		count = len(nm.ConversationIds)
+	}
+	if count <= 1 {
+		return "[Laelia inbox notice: new messages arrived. Run `laelia-machine message check` at a natural breakpoint.]"
+	}
+	return fmt.Sprintf("[Laelia inbox notice: new messages arrived in %d conversations. Run `laelia-machine message check` at a natural breakpoint.]", count)
+}
+
 // resetCrossConnectionState clears stale in-flight session bookkeeping left
 // over from a previous connection so a BeginSessionResponse that arrived but
 // was never consumed (the drain loop's ctx cancelled mid-begin) cannot persist
@@ -318,6 +343,18 @@ func (c *commandStream) mainLoop(ctx context.Context) error {
 			case *v1pb.ManagerStreamMessage_NewMessages:
 				// Best-effort wake; the durable cursor recovers anything missed.
 				c.wake()
+				// Same-turn steering: when the in-flight runtime supports it
+				// (pi), push a content-free notice into the running turn so the
+				// agent reacts now instead of waiting for the turn to end. Any
+				// failure (non-pi runtime, turn about to end, queue full) falls
+				// back to the wake above.
+				if ex := c.getCurrentExecutor(); ex != nil {
+					if s, ok := ex.(steerer); ok {
+						if err := s.Steer(buildSteerNotice(m.NewMessages)); err != nil {
+							slog.Debug("same-turn steer failed; post-turn wake is the fallback", "error", err)
+						}
+					}
+				}
 
 			case *v1pb.ManagerStreamMessage_Cancel:
 				if ex := c.getCurrentExecutor(); ex != nil {

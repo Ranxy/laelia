@@ -24,6 +24,12 @@ type promptCommand struct {
 	Message string `json:"message"`
 }
 
+type steerCommand struct {
+	Type    string `json:"type"`
+	ID      string `json:"id,omitempty"`
+	Message string `json:"message"`
+}
+
 type abortCommand struct {
 	Type string `json:"type"`
 }

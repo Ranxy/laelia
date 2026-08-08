@@ -47,6 +47,18 @@ type PiExecutor struct {
 	eventLimited  atomic.Bool
 	outputBytes   atomic.Int64
 
+	// steerCh carries same-turn steering notices from the receive pump (via
+	// Steer) to the drain loop, which forwards them to pi as `steer` commands.
+	// Buffered and non-blocking: a full queue drops the notice and the
+	// post-turn BeginSession wake is the durable fallback.
+	steerCh chan string
+	// compacting suppresses steering while a context compaction is in flight:
+	// pi is rewriting the session history, so an injected message could be
+	// lost or land in the wrong place. Set/cleared by the drain loop from
+	// compaction_start/compaction_end events (same goroutine as the steerCh
+	// case, so the atomic is only for Steer's external readers).
+	compacting atomic.Bool
+
 	// stdoutBuf accumulates text_delta content for the final summary when the
 	// agent does not post its own reply (it normally does, via laelia-machine).
 	stdoutBuf strings.Builder
@@ -122,6 +134,7 @@ func NewPi(req executor.Request, sess *Session, cfg *PiConfig) (executor.Runtime
 		eventCh:     make(chan executor.Event, outputBufferSize),
 		resultCh:    make(chan executor.Result, 1),
 		done:        make(chan struct{}),
+		steerCh:     make(chan string, 8),
 		toolStarted: map[string]bool{},
 	}, nil
 }
@@ -137,6 +150,20 @@ func (e *PiExecutor) Cancel() {
 	// (s.ctx, derived from Background by the runner), so abort is fire-and-forget
 	// and the session process stays alive for the next turn.
 	e.session.abort()
+}
+
+// Steer delivers a notice into the running turn. It is non-blocking and
+// best-effort: the notice is queued to the drain loop, which forwards it to pi
+// as a `steer` command (suppressed during compaction). A full queue or a
+// rejected steer is dropped — the caller's post-turn wake (BeginSession) is the
+// durable fallback, so Steer never blocks the receive pump.
+func (e *PiExecutor) Steer(text string) error {
+	select {
+	case e.steerCh <- text:
+		return nil
+	default:
+		return errors.New("pi: steer queue full")
+	}
 }
 
 func (e *PiExecutor) OutputChannel() <-chan executor.OutputChunk { return e.outputCh }
@@ -213,6 +240,21 @@ func (e *PiExecutor) run() {
 				return
 			}
 			settled = e.handleEvent(ev)
+		case text := <-e.steerCh:
+			// Same-turn steering: forward the notice to pi, which queues it and
+			// delivers it after the current assistant turn's tool calls, before
+			// the next LLM call — the turn naturally extends until the steered
+			// work is processed (agent_settled only fires when fully settled).
+			// Suppressed during compaction (pi is rewriting the session
+			// history); the post-turn wake fallback recovers the notice.
+			if e.compacting.Load() {
+				continue
+			}
+			if err := e.session.steer(e.ctx, text); err != nil {
+				// Best-effort: a steer racing agent_settled (or a wedged pi)
+				// fails here; the wake fallback picks the messages up next turn.
+				slog.Debug("pi: steer failed; post-turn wake is the fallback", "error", err)
+			}
 		case <-e.ctx.Done():
 			err := e.ctx.Err()
 			if errors.Is(err, context.DeadlineExceeded) {
@@ -316,6 +358,7 @@ func (e *PiExecutor) handleEvent(ev *event) bool {
 			e.sendWarning(fmt.Sprintf("pi agent will retry: %s", strings.TrimSpace(ev.Reason)))
 		}
 	case eventCompactionStart:
+		e.compacting.Store(true)
 		e.sendEvent(executor.Event{
 			Type:    v1pb.CommandEventType_CONTEXT_COMPACTION_STARTED,
 			Summary: "Context compaction started",
@@ -324,6 +367,7 @@ func (e *PiExecutor) handleEvent(ev *event) bool {
 			},
 		})
 	case eventCompactionEnd:
+		e.compacting.Store(false)
 		e.sendEvent(executor.Event{
 			Type:    v1pb.CommandEventType_CONTEXT_COMPACTION_FINISHED,
 			Summary: "Context compaction finished",
@@ -588,6 +632,11 @@ func (e *PiExecutor) limitOutput(content string) (string, bool) {
 
 func (e *PiExecutor) nextSeq() int32 { return e.seqNo.Add(1) }
 
+// piSteeringPrompt tells the agent that new messages can arrive mid-turn as a
+// short notice and how to react. It is appended to the cold init prompt and the
+// re-anchor prompt (both pi-only paths; ACP never sees it).
+const piSteeringPrompt = `While you are working, new messages may be delivered into your current turn as a short notice (e.g. "[Laelia inbox notice: ...]"). When you see one, run ` + "`laelia-machine message check`" + ` (or ` + "`laelia-machine thread check`" + ` if the notice mentions a thread reply) at a natural breakpoint and process the new messages before ending your turn.`
+
 // turnPromptText mirrors acp_executor.turnPromptText: cold turn sends the full
 // init prompt (identity + persona + communication + procedure + memory) plus
 // the batch; warm turn sends only the batch.
@@ -599,15 +648,15 @@ func (e *PiExecutor) turnPromptText(resumed bool) string {
 			return batch
 		}
 		if batch == "" {
-			return anchor
+			return anchor + "\n\n" + piSteeringPrompt
 		}
-		return anchor + "\n\n" + batch
+		return anchor + "\n\n" + piSteeringPrompt + "\n\n" + batch
 	}
 	initPrompt := executor.BuildPrompt(e.identity, e.req.OwnerDisplayName, e.cfg.PersonaPrompt)
 	if batch == "" {
-		return initPrompt
+		return initPrompt + "\n\n" + piSteeringPrompt
 	}
-	return initPrompt + "\n\n" + batch
+	return initPrompt + "\n\n" + piSteeringPrompt + "\n\n" + batch
 }
 
 // finish flushes and emits the terminal FinalSummary event and Result, then
