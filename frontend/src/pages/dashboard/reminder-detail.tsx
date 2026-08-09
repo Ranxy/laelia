@@ -207,6 +207,7 @@ export function ReminderDetailPage() {
         <Button
           variant="ghost"
           size="sm"
+          className="hidden lg:inline-flex"
           onClick={() => navigate(`/members/agents/${agentId}/reminders`)}
         >
           &larr; {t("reminders.back")}
@@ -225,7 +226,7 @@ export function ReminderDetailPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="shrink-0 px-4 py-3 border-b border-control-border">
+      <div className="hidden shrink-0 px-4 py-3 border-b border-control-border lg:block">
         <Button
           variant="ghost"
           size="sm"
@@ -239,7 +240,7 @@ export function ReminderDetailPage() {
         <div className="mx-auto max-w-5xl px-4 py-4 flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <h1 className="text-base font-semibold text-main truncate max-w-xl">
+              <h1 className="hidden text-base font-semibold text-main truncate max-w-xl lg:block">
                 {t("reminders.title")}
               </h1>
               <ReminderStatusBadge status={reminder.status} />

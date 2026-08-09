@@ -137,13 +137,15 @@ export function DashboardLayout() {
           <UserMenu />
         </header>
         {/* Mobile header. */}
-        <div className="shrink-0 lg:hidden">
+        <div className="fixed left-0 right-0 top-0 z-20 lg:hidden">
           <MobileHeader />
         </div>
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-hidden pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:pt-0 lg:pb-0">
           <Outlet />
         </main>
-        <MobileTabBar />
+        <div className="fixed bottom-0 left-0 right-0 z-20 lg:hidden">
+          <MobileTabBar />
+        </div>
       </div>
       {/* Store-driven preview overlays (lazy — load only when opened). */}
       <Suspense fallback={null}>

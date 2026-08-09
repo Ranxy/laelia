@@ -84,7 +84,7 @@ export function MachineWorkspacePage() {
     <div className="h-full overflow-y-auto p-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-base font-semibold text-main">
+          <h2 className="hidden items-center gap-2 text-base font-semibold text-main lg:flex">
             <FolderTree className="size-4" />
             {t("machine.tab-workspace")}
           </h2>

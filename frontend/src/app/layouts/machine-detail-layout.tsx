@@ -65,7 +65,7 @@ export function MachineDetailLayout() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-3 border-b border-control-border px-4 py-2 lg:px-6">
+      <div className="hidden shrink-0 items-center gap-3 border-b border-control-border px-4 py-2 lg:flex lg:px-6">
         <h1 className="truncate text-base font-semibold text-main">{title}</h1>
         {displayMachine?.status?.state ===
           MachineStatus_ConnectionState.ONLINE && (

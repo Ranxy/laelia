@@ -424,7 +424,7 @@ export function CommandDetailPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex-1 min-h-0 p-4 flex flex-col gap-4 w-full">
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="hidden items-center gap-2 shrink-0 lg:flex">
           <Button
             variant="ghost"
             size="sm"
@@ -438,7 +438,7 @@ export function CommandDetailPage() {
           <>
             <div className="flex items-center justify-between gap-3 shrink-0">
               <div className="flex items-center gap-3 min-w-0">
-                <h1 className="text-lg font-mono font-semibold text-main truncate max-w-xl">
+                <h1 className="hidden text-lg font-mono font-semibold text-main truncate max-w-xl lg:block">
                   {displayCmd.instruction || displayCmd.command}
                 </h1>
                 <CommandStatusBadge status={displayCmd.status} />
