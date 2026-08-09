@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { FieldRow } from "@/components/ui/field-row";
 import { Input } from "@/components/ui/input";
 import { SearchInput } from "@/components/ui/search-input";
+import { SecretInput } from "@/components/ui/secret-input";
 import {
   Sheet,
   SheetBody,
@@ -562,13 +563,11 @@ export function UserListPage() {
                 label={t("user.field-password")}
                 htmlFor="create-password"
               >
-                <Input
+                <SecretInput
                   id="create-password"
-                  type="password"
                   value={password}
                   placeholder={t("user.field-password-placeholder")}
                   onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
                 />
               </FieldRow>
             </div>
@@ -698,25 +697,21 @@ export function UserListPage() {
           </AlertDialogDescription>
           <div className="mt-4 flex flex-col gap-3">
             {resetError && <Alert variant="error" description={resetError} />}
-            <Input
-              type="password"
+            <SecretInput
               placeholder={t("user.field-password-new")}
               value={newPassword}
               onChange={(e) => {
                 setNewPassword(e.target.value);
                 setResetError("");
               }}
-              autoComplete="new-password"
             />
-            <Input
-              type="password"
+            <SecretInput
               placeholder={t("user.field-password-confirm")}
               value={confirmPassword}
               onChange={(e) => {
                 setConfirmPassword(e.target.value);
                 setResetError("");
               }}
-              autoComplete="new-password"
             />
           </div>
           <AlertDialogFooter>
