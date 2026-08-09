@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FieldRow } from "@/components/ui/field-row";
 import { Input } from "@/components/ui/input";
+import { SecretInput } from "@/components/ui/secret-input";
 import {
   Select,
   SelectContent,
@@ -617,10 +618,7 @@ function ProviderSheet({
               <div className="flex flex-col gap-2">
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
-                    <Input
-                      type="password"
-                      autoComplete="off"
-                      data-1p-ignore
+                    <SecretInput
                       value={fetchKey}
                       onChange={(e) => setFetchKey(e.target.value)}
                       placeholder={t(
@@ -703,10 +701,7 @@ function ProviderSheet({
                               {e.maskedApiKey ||
                                 t("settings.api-providers.entry-key-kept")}
                             </span>
-                            <Input
-                              type="password"
-                              autoComplete="off"
-                              data-1p-ignore
+                            <SecretInput
                               value={e.apiKey}
                               onChange={(ev) =>
                                 updateEntry(i, { apiKey: ev.target.value })

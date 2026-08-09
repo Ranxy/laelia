@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FieldRow } from "@/components/ui/field-row";
 import { Input } from "@/components/ui/input";
+import { SecretInput } from "@/components/ui/secret-input";
 import {
   Select,
   SelectContent,
@@ -770,10 +771,7 @@ function McpServerSheet({
                       <span className="text-xs text-control-placeholder">
                         {h.maskedValue}
                       </span>
-                      <Input
-                        type="password"
-                        autoComplete="off"
-                        data-1p-ignore
+                      <SecretInput
                         value={h.value}
                         onChange={(e) =>
                           updateHeader(i, { value: e.target.value })
@@ -785,10 +783,7 @@ function McpServerSheet({
                       />
                     </div>
                   ) : (
-                    <Input
-                      type="password"
-                      autoComplete="off"
-                      data-1p-ignore
+                    <SecretInput
                       value={h.value}
                       onChange={(e) =>
                         updateHeader(i, { value: e.target.value })

@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { FieldRow } from "@/components/ui/field-row";
 import { Input } from "@/components/ui/input";
+import { SecretInput } from "@/components/ui/secret-input";
 import {
   Select,
   SelectContent,
@@ -1217,14 +1218,7 @@ export function AgentProfilePage() {
                             <label className="text-sm font-medium">
                               {t("agent.acp-config-pi-api-key")}
                             </label>
-                            <Input
-                              type="password"
-                              // An LLM API key is not a login password: stop password
-                              // managers from autofilling a generated password here
-                              // (which would silently overwrite the real key on save).
-                              autoComplete="off"
-                              data-1p-ignore
-                              data-lpignore="true"
+                            <SecretInput
                               placeholder={t(
                                 "agent.acp-config-pi-api-key-placeholder"
                               )}

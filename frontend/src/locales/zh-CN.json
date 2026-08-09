@@ -29,7 +29,8 @@
     "toggle-password-visibility": "切换密码可见性",
     "dismiss": "关闭",
     "discard": "放弃",
-    "profile": "个人资料"
+    "profile": "个人资料",
+    "toggle-secret-visibility": "切换可见性"
   },
   "auth": {
     "sign-in": {

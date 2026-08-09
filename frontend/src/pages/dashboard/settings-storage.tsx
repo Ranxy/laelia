@@ -5,6 +5,7 @@ import { PageLoading } from "@/components/settings-page";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { SecretInput } from "@/components/ui/secret-input";
 import { settingServiceClient } from "@/connect";
 import { toastManager } from "@/lib/toast";
 
@@ -167,16 +168,10 @@ export function SettingsStoragePage() {
                     : undefined
                 }
               >
-                <Input
-                  type="password"
+                <SecretInput
                   value={form.secretKey}
                   placeholder={t("settings.s3.secret-placeholder")}
                   onChange={(e) => set("secretKey", e.target.value)}
-                  // "new-password" tells the browser this is a credential
-                  // creation form, not a login form, so it won't autofill saved
-                  // passwords — and won't treat the Access Key field above as a
-                  // username. Chrome ignores autoComplete="off".
-                  autoComplete="new-password"
                 />
               </Field>
             </div>

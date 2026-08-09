@@ -29,7 +29,8 @@
     "toggle-password-visibility": "Toggle password visibility",
     "dismiss": "Dismiss",
     "discard": "Discard",
-    "profile": "Profile"
+    "profile": "Profile",
+    "toggle-secret-visibility": "Toggle visibility"
   },
   "auth": {
     "sign-in": {
