@@ -205,7 +205,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     scrollRoot,
     eager = false,
   } = props;
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isUser = msg.role === "user";
   // In a shared channel, user messages from other users must render with their
   // own name rather than the current user's "You" label. isOwnUser falls back
@@ -403,7 +403,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
                 : agentTitle || msg.senderName || t("chat.agent")}
             </span>
             <span className="text-xs text-control-placeholder">
-              {formatTime(msg.timestamp)}
+              {formatTime(msg.timestamp, i18n.language)}
             </span>
             {!isUser && msg.status !== undefined && !isStreaming && (
               <CommandStatusBadge

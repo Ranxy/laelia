@@ -5,7 +5,7 @@ let translationHookCalls = 0;
 vi.mock("react-i18next", () => ({
   useTranslation: () => {
     translationHookCalls += 1;
-    return { t: (k: string) => k };
+    return { t: (k: string) => k, i18n: { language: "en-US" } };
   },
 }));
 
@@ -63,9 +63,19 @@ describe("Avatar", () => {
 });
 
 describe("formatTime", () => {
-  it("formats HH:MM with zero padding", () => {
-    const d = new Date(2026, 0, 1, 9, 5);
-    expect(formatTime(d)).toBe("09:05");
+  it("shows time only for today's messages", () => {
+    const d = new Date();
+    expect(formatTime(d, "en-US")).toMatch(/^\d{2}:\d{2} (AM|PM)$/);
+  });
+
+  it("includes the date for messages from another day", () => {
+    const d = new Date(new Date().getFullYear() - 1, 0, 1, 9, 5);
+    expect(formatTime(d, "en-US")).toBe(`1/1/${d.getFullYear()} 09:05 AM`);
+  });
+
+  it("switches the time format with the locale", () => {
+    const d = new Date(new Date().getFullYear() - 1, 0, 1, 9, 5);
+    expect(formatTime(d, "zh-CN")).toBe(`${d.getFullYear()}/1/1 09:05`);
   });
 });
 

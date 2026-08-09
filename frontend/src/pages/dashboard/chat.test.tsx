@@ -12,7 +12,7 @@ let translationHookCalls = 0;
 vi.mock("react-i18next", () => ({
   useTranslation: () => {
     translationHookCalls += 1;
-    return { t: (k: string) => k };
+    return { t: (k: string) => k, i18n: { language: "en-US" } };
   },
 }));
 

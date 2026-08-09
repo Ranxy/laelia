@@ -57,9 +57,27 @@ export function Avatar({
   );
 }
 
-// Shared HH:MM time formatter for message row headers.
-export function formatTime(date: Date): string {
-  const hours = date.getHours().toString().padStart(2, "0");
-  const minutes = date.getMinutes().toString().padStart(2, "0");
-  return `${hours}:${minutes}`;
+// Shared time formatter for message row headers. Today's messages show the
+// time only; older messages include the date (plus the year when it differs
+// from the current year) so history rows are distinguishable by day. Both
+// parts follow the active locale (12/24-hour clock, date order).
+export function formatTime(date: Date, locale: string): string {
+  const now = new Date();
+  const time = new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+  if (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  ) {
+    return time;
+  }
+  const datePart = new Intl.DateTimeFormat(locale, {
+    month: "numeric",
+    day: "numeric",
+    ...(date.getFullYear() !== now.getFullYear() && { year: "numeric" }),
+  }).format(date);
+  return `${datePart} ${time}`;
 }

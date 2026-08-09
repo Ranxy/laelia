@@ -234,7 +234,7 @@ function CommentRow({
   currentPrincipalId?: string;
   onJumpToComment: (sectionId: string, quote: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const att = msg.attachments?.find(
     (a) => a.sectionAnchor !== "" && a.id === attachmentId
   );
@@ -269,7 +269,7 @@ function CommentRow({
             : (msg.senderName ?? t("chat.agent"))}
         </span>
         <span className="shrink-0 text-[10px] text-control-placeholder">
-          {formatTime(msg.timestamp)}
+          {formatTime(msg.timestamp, i18n.language)}
         </span>
       </div>
       <AttachmentCommentCard
