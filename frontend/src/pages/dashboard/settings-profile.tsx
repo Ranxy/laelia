@@ -342,7 +342,7 @@ export function SettingsProfilePage() {
 
   return (
     <div className="flex h-full overflow-y-auto flex-col">
-      <div className="mx-auto w-full max-w-2xl px-6 py-8">
+      <div className="mx-auto w-full max-w-2xl px-4 pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom)+1rem)] pt-4 lg:px-6 lg:py-8">
         <h1 className="hidden text-lg font-semibold text-main lg:block">
           {t("settings.profile.title")}
         </h1>

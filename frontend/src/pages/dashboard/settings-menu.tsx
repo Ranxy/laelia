@@ -125,7 +125,7 @@ export function SettingsMenuPage() {
   const items = useSettingsMenuItems();
 
   return (
-    <div className="h-full overflow-y-auto p-4 lg:p-6">
+    <div className="h-full overflow-y-auto px-4 pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom)+1rem)] pt-4 lg:p-6">
       <h1 className="mb-4 hidden text-xl font-semibold text-main lg:block">
         {t("settings.title")}
       </h1>
