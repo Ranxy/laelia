@@ -902,11 +902,18 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   // reply or channel message) opens the file's preview already scrolled to the
   // section the comment is anchored to. The anchored attachment references the
   // file (same id/name/mime/size), so openFilePreview downloads and renders it,
-  // then the overlay scrolls to scrollToSectionId once the DOM is ready.
+  // then the overlay scrolls to the anchor (heading id for markdown, quote +
+  // locate spec for html) once the DOM is ready.
   const handleJumpToSection = useCallback(
     (att: Attachment, sectionId: string, rootMessageId: string) => {
       if (!channelId) return;
-      openFilePreview(conversationName, rootMessageId, att, sectionId);
+      openFilePreview(
+        conversationName,
+        rootMessageId,
+        att,
+        sectionId,
+        att.quotedText
+      );
     },
     [channelId, conversationName, openFilePreview]
   );

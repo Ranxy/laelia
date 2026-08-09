@@ -930,6 +930,7 @@
     "comments-ready": "已锚定段落，按 Enter 发送。",
     "comments-ready-inverted": "已锚定段落，按 Shift+Enter 发送。",
     "comments-send": "发送评论",
+    "html-add-comment": "添加评论",
     "image-load-failed": "无法加载该图片。"
   },
   "tasks": {

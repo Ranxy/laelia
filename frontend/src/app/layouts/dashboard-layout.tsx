@@ -17,6 +17,11 @@ const MarkdownPreviewOverlay = lazy(() =>
     default: m.MarkdownPreviewOverlay,
   }))
 );
+const HtmlPreviewOverlay = lazy(() =>
+  import("@/components/preview/html-preview-overlay").then((m) => ({
+    default: m.HtmlPreviewOverlay,
+  }))
+);
 const ImagePreviewOverlay = lazy(() =>
   import("@/components/preview/image-preview-overlay").then((m) => ({
     default: m.ImagePreviewOverlay,
@@ -31,8 +36,13 @@ const SetupChecklistDialog = lazy(() =>
 // Each gate renders the lazy overlay only while its store state is active, so
 // the underlying chunk loads on first use instead of on boot.
 function MarkdownPreviewGate() {
-  const open = useAppStore((s) => s.activePreview != null);
+  const open = useAppStore((s) => s.activePreview?.kind === "markdown");
   return open ? <MarkdownPreviewOverlay /> : null;
+}
+
+function HtmlPreviewGate() {
+  const open = useAppStore((s) => s.activePreview?.kind === "html");
+  return open ? <HtmlPreviewOverlay /> : null;
 }
 
 function ImagePreviewGate() {
@@ -145,6 +155,7 @@ export function DashboardLayout() {
       {/* Store-driven preview overlays (lazy — load only when opened). */}
       <Suspense fallback={null}>
         <MarkdownPreviewGate />
+        <HtmlPreviewGate />
         <ImagePreviewGate />
         {/* Admin onboarding: prompts admins to finish required config. */}
         <SetupChecklistGate />

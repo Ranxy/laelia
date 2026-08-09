@@ -930,6 +930,7 @@
     "comments-ready": "Anchored — press Enter to send.",
     "comments-ready-inverted": "Anchored — press Shift+Enter to send.",
     "comments-send": "Send comment",
+    "html-add-comment": "Add comment",
     "image-load-failed": "Couldn't load this image."
   },
   "tasks": {

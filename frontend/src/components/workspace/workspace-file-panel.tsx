@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { formatBytes } from "@/components/chat/file-card";
 import { Button } from "@/components/ui/button";
+import { HtmlFileView } from "@/components/workspace/html-file-view";
 import { useAppStore } from "@/stores";
 import {
   type WorkspaceEntry,
@@ -20,6 +21,7 @@ interface WorkspaceFilePanelProps {
 }
 
 const MARKDOWN_EXTENSIONS = new Set([".md", ".markdown"]);
+const HTML_EXTENSIONS = new Set([".html", ".htm", ".xhtml"]);
 
 function isMarkdownFile(name: string): boolean {
   const dot = name.lastIndexOf(".");
@@ -27,12 +29,18 @@ function isMarkdownFile(name: string): boolean {
   return MARKDOWN_EXTENSIONS.has(name.slice(dot).toLowerCase());
 }
 
+function isHtmlFile(name: string): boolean {
+  const dot = name.lastIndexOf(".");
+  if (dot < 0) return false;
+  return HTML_EXTENSIONS.has(name.slice(dot).toLowerCase());
+}
+
 // WorkspaceFilePanel is the right pane of the agent workspace browser: it
 // shows one file's content next to the tree. Text files render in a monospace
-// pane, markdown files through markstream-react, images inline, and other
-// binary files as metadata only. The machine returns a non-empty `error` for
-// files it refuses to read (sensitive, too large, missing), rendered instead
-// of content.
+// pane, markdown files through markstream-react, html files in a sandboxed
+// iframe, images inline, and other binary files as metadata only. The machine
+// returns a non-empty `error` for files it refuses to read (sensitive, too
+// large, missing), rendered instead of content.
 export function WorkspaceFilePanel({
   agentName,
   entry,
@@ -82,6 +90,7 @@ export function WorkspaceFilePanel({
   }
 
   const markdown = !file?.binary && isMarkdownFile(entry.name);
+  const html = !file?.binary && isHtmlFile(entry.name);
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -134,6 +143,8 @@ export function WorkspaceFilePanel({
               deferNodesUntilVisible={false}
             />
           </div>
+        ) : html ? (
+          <HtmlFileView name={entry.name} content={file.content} />
         ) : (
           <pre className="whitespace-pre-wrap break-words px-4 py-2 font-mono text-sm">
             {file.content}
