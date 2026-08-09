@@ -1,5 +1,5 @@
 import { Hash, Loader2, Pin, PinOff, Plus } from "lucide-react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { Avatar } from "@/components/chat/avatar";
@@ -193,6 +193,8 @@ export function ConversationList() {
 // id-threaded handlers), so a re-render of the parent — an unread-badge change
 // on one conversation, or a fetchChannels poll — does not re-render every row:
 // rows whose title/unread/active/pinned are unchanged bail out.
+const SWIPE_ACTION_WIDTH = 72;
+
 const ConversationRow = memo(function ConversationRow({
   id,
   title,
@@ -223,13 +225,91 @@ const ConversationRow = memo(function ConversationRow({
   const avatarName = peer ? `${peer}/avatar` : undefined;
   const avatarSrc = useAvatar(avatarName);
   const peerId = peer ? (peer.split("/").pop() ?? "") : "";
+
+  const [offset, setOffset] = useState(0);
+  const startXRef = useRef(0);
+  const startOffsetRef = useRef(0);
+
+  // Close the swipe action when the row becomes active (user navigated into it)
+  // or when pinned state changes so the UI doesn't feel stuck.
+  useEffect(() => {
+    setOffset(0);
+  }, [active, pinned]);
+
+  const clampOffset = useCallback((value: number) => {
+    return Math.max(0, Math.min(SWIPE_ACTION_WIDTH, value));
+  }, []);
+
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      startXRef.current = e.touches[0].clientX;
+      startOffsetRef.current = offset;
+    },
+    [offset]
+  );
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      const clientX = e.touches[0]?.clientX ?? startXRef.current;
+      const delta = startXRef.current - clientX;
+      // Only allow left-swipe (positive delta) from an already-open or closed
+      // state; right-swipe closes the action.
+      const next = clampOffset(startOffsetRef.current + delta);
+      setOffset(next);
+    },
+    [clampOffset]
+  );
+
+  const handleTouchEnd = useCallback(() => {
+    setOffset((current) => {
+      // Snap open if dragged past half the action width, otherwise close.
+      return current > SWIPE_ACTION_WIDTH / 2 ? SWIPE_ACTION_WIDTH : 0;
+    });
+  }, []);
+
+  const handleOpen = useCallback(() => {
+    if (offset > 8) {
+      setOffset(0);
+      return;
+    }
+    onOpen(id);
+  }, [offset, onOpen, id]);
+
+  const handlePinClick = useCallback(() => {
+    onTogglePin(id, !pinned);
+    setOffset(0);
+  }, [onTogglePin, id, pinned]);
+
   return (
-    <div className="group relative flex w-full items-center">
+    <div className="group relative flex w-full items-center overflow-hidden">
+      {/* Mobile swipe action: revealed by left-swiping the row. */}
       <button
         type="button"
-        onClick={() => onOpen(id)}
+        onClick={handlePinClick}
+        aria-label={pinned ? t("channel.unpin") : t("channel.pin")}
         className={cn(
-          "flex w-full items-center gap-3 px-2 py-2.5 pr-10 text-left transition-colors lg:px-3",
+          "absolute inset-y-0 right-0 z-0 flex w-[72px] shrink-0 items-center justify-center",
+          "transition-colors lg:hidden",
+          pinned
+            ? "bg-accent/15 text-accent"
+            : "bg-control-bg text-control-light"
+        )}
+      >
+        {pinned ? <PinOff className="size-5" /> : <Pin className="size-5" />}
+      </button>
+
+      <button
+        type="button"
+        onClick={handleOpen}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          transform: `translateX(${-offset}px)`,
+          transition: offset === 0 ? "transform 200ms ease-out" : "none",
+        }}
+        className={cn(
+          "relative z-10 flex w-full items-center gap-3 bg-background px-2 py-2.5 pr-10 text-left transition-colors lg:px-3",
           active ? "bg-accent/10" : "hover:bg-control-bg/40"
         )}
       >
@@ -285,7 +365,7 @@ const ConversationRow = memo(function ConversationRow({
         }}
         aria-label={pinned ? t("channel.unpin") : t("channel.pin")}
         className={cn(
-          "absolute right-1 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded transition-colors",
+          "absolute right-1 top-1/2 hidden size-6 -translate-y-1/2 items-center justify-center rounded transition-colors lg:inline-flex",
           pinned
             ? "text-accent opacity-100"
             : "text-control-light opacity-0 hover:bg-control-bg group-hover:opacity-100"
