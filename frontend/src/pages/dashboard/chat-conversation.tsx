@@ -56,6 +56,7 @@ import {
 import { getCaretCoordinates } from "@/lib/caret-position";
 import { isImageAttachment } from "@/lib/image-file";
 import "@/lib/markdown";
+import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { senderKeyForMessage } from "@/stores/chat-helpers";
@@ -263,6 +264,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
   const stickToBottomRef = useRef(true);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isDesktop = useIsDesktop();
   // Per-conversation input draft cache so switching channels does not leak the
   // half-typed message, pending attachments, or @mention map across channels.
   // Keyed by channelId; lives for the lifetime of this page instance.
@@ -1077,7 +1079,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                 </div>
               </div>
             ) : (
-              <div className="px-4 pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom)+0.5rem)] pt-2 lg:px-6 lg:pb-5">
+              <div className="px-4 pb-2 pt-2 lg:px-6 lg:pb-5">
                 <div
                   className="rounded-2xl border border-control-border bg-control-bg/40 focus-within:border-accent focus-within:bg-background transition-colors"
                   onDragOver={(e) => {
@@ -1276,13 +1278,15 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                           {t("channelTask.as-task")}
                         </span>
                       </button>
-                      <span className="text-xs text-control-placeholder">
-                        {t(
-                          enterToSend
-                            ? "chat.send-hint"
-                            : "chat.send-hint-inverted"
-                        )}
-                      </span>
+                      {isDesktop && (
+                        <span className="text-xs text-control-placeholder">
+                          {t(
+                            enterToSend
+                              ? "chat.send-hint"
+                              : "chat.send-hint-inverted"
+                          )}
+                        </span>
+                      )}
                     </div>
                     <Button
                       type="button"
