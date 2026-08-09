@@ -1,9 +1,8 @@
-import { ArrowLeft, FolderTree, UserCircle } from "lucide-react";
+import { FolderTree, UserCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   MACHINE_ROUTE_PROFILE,
@@ -67,15 +66,6 @@ export function MachineDetailLayout() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-3 border-b border-control-border px-4 py-2 lg:px-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate("/machines")}
-          aria-label={t("machine.back")}
-          className="size-8 p-0 lg:hidden"
-        >
-          <ArrowLeft className="size-4" />
-        </Button>
         <h1 className="truncate text-base font-semibold text-main">{title}</h1>
         {displayMachine?.status?.state ===
           MachineStatus_ConnectionState.ONLINE && (

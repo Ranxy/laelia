@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   Bell,
   FolderTree,
   ListChecks,
@@ -38,9 +37,7 @@ type TabKey =
 // workspace / mcp) and an Outlet for the active child route. The Members left rail
 // already conveys the agent's identity and connection state, so — unlike the old
 // standalone /agents page — this layout omits the back + title + status
-// header bar. A slim mobile-only back button returns to the rail on small
-// screens (the rail is hidden there when a detail is open, mirroring
-// machines.tsx).
+// header bar. The global MobileHeader handles back navigation on small screens.
 export function AgentDetailLayout() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -102,15 +99,6 @@ export function AgentDetailLayout() {
       <Tabs value={activeTab} className="flex h-full flex-col overflow-hidden">
         <div className="border-b border-control-border shrink-0">
           <div className="flex items-end gap-2 px-4 pt-2 lg:px-6">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/members")}
-              aria-label={t("agent.back")}
-              className="size-8 p-0 lg:hidden"
-            >
-              <ArrowLeft className="size-4" />
-            </Button>
             <TabsList className="gap-x-6 border-b-0!">
               <TabsTrigger
                 value="profile"

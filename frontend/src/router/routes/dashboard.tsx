@@ -12,6 +12,7 @@ import {
   CHAT_ROUTE_DETAIL,
   COMMAND_ROUTE_DETAIL,
   COMMAND_ROUTE_LIST,
+  HUMAN_ROUTE_DETAIL,
   MACHINE_ROUTE_LIST,
   MACHINE_ROUTE_PROFILE,
   MACHINE_ROUTE_WORKSPACE,
@@ -106,6 +107,7 @@ export const dashboardRoutes: RouteObject[] = [
         children: [
           {
             index: true,
+            handle: { name: MEMBERS_ROUTE },
             lazy: () =>
               import("@/components/selection-empty-state").then((m) => ({
                 element: (
@@ -188,6 +190,7 @@ export const dashboardRoutes: RouteObject[] = [
           },
           {
             path: "users/:userId",
+            handle: { name: HUMAN_ROUTE_DETAIL },
             lazy: () =>
               import("@/pages/dashboard/human-detail").then((m) => ({
                 Component: m.HumanDetailPage,

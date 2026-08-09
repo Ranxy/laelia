@@ -27,6 +27,13 @@ function isTabActive(tab: TabItem, pathname: string): boolean {
         !pathname.startsWith("/machines"))
     );
   }
+  if (tab.path === "/settings") {
+    return (
+      pathname === tab.path ||
+      pathname.startsWith(`${tab.path}/`) ||
+      pathname.startsWith("/machines")
+    );
+  }
   return pathname === tab.path || pathname.startsWith(`${tab.path}/`);
 }
 

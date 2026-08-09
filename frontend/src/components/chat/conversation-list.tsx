@@ -84,7 +84,9 @@ export function ConversationList() {
     <div className="flex h-full w-full flex-col overflow-hidden">
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-control-border px-4 py-3">
-        <h2 className="text-sm font-semibold text-main">{t("chat.title")}</h2>
+        <h2 className="hidden text-sm font-semibold text-main lg:block">
+          {t("chat.title")}
+        </h2>
         <Button
           onClick={() => setCreateOpen(true)}
           size="sm"

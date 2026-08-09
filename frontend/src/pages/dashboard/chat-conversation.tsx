@@ -1,7 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import {
   ArrowDown,
-  ArrowLeft,
   Bot,
   ExternalLink,
   Hash,
@@ -951,21 +950,6 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
     <div className="relative flex h-full flex-col overflow-hidden">
       {/* Header */}
       <div className="flex shrink-0 items-center gap-3 border-b border-control-border px-4 py-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            if (props?.onClose) {
-              props.onClose();
-            } else {
-              navigate("/");
-            }
-          }}
-          aria-label={t("channel.back")}
-          className="size-8 p-0 lg:hidden"
-        >
-          <ArrowLeft className="size-4" />
-        </Button>
         <div
           className={cn(
             "flex size-8 items-center justify-center rounded-lg",
