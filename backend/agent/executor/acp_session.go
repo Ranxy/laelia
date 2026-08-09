@@ -34,14 +34,41 @@ type acpSessionState struct {
 }
 
 // sessionFingerprint derives a stable identity for the ACP session from the
-// inputs that define it: the provider, the selected model, the working
-// directory, and the protocol generation (v1 session vs v2 thread). A change
-// in any of these means the persisted SessionId/ThreadId belongs to a
-// different session and must not be resumed.
-func sessionFingerprint(provider, model, workingDir, protocol string) string {
+// inputs that are baked into the conversation itself: the provider, the
+// selected model, the working directory, the protocol generation (v1 session
+// vs v2 thread) and the persona prompt (rendered into the init prompt, which
+// is sent only on a cold start and lives in the resumed conversation). A
+// change in any of these means the persisted SessionId/ThreadId belongs to a
+// different session and must not be resumed — otherwise an admin edit to the
+// persona would silently resume the old conversation and appear to "not take
+// effect". Env overlays (env/custom_env/allow_env) and MCP servers are
+// deliberately excluded: they only feed the per-turn subprocess environment
+// and session request, both rebuilt from the current config every turn, so a
+// change takes effect on the next resume without invalidating the session.
+func sessionFingerprint(cfg *ACPConfig, workingDir, protocol string) string {
 	h := sha256.New()
-	_, _ = h.Write([]byte(provider + "\x00" + model + "\x00" + workingDir + "\x00" + protocol))
+	write := func(s string) { _, _ = h.Write([]byte(s)) }
+	write("provider\x00" + cfg.Provider + "\x00")
+	write("model\x00" + cfg.Model + "\x00")
+	write("workdir\x00" + workingDir + "\x00")
+	write("protocol\x00" + protocol + "\x00")
+	write("persona\x00" + cfg.PersonaPrompt + "\x00")
 	return hex.EncodeToString(h.Sum(nil))[:16]
+}
+
+// threadSessionFingerprint derives the session fingerprint for the v2 thread
+// executor from the shared session-defining inputs (ThreadConfig mirrors the
+// ACPConfig fields the fingerprint depends on).
+func threadSessionFingerprint(cfg *ThreadConfig) string {
+	protocol := cfg.Protocol
+	if protocol == "" {
+		protocol = ProtocolV2
+	}
+	return sessionFingerprint(&ACPConfig{
+		Provider:      cfg.Provider,
+		Model:         cfg.Model,
+		PersonaPrompt: cfg.PersonaPrompt,
+	}, cfg.WorkingDir, protocol)
 }
 
 func acpSessionPath(machineID, agentID string) string {

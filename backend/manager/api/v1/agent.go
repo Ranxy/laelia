@@ -845,21 +845,12 @@ func (s *AgentService) AgentHeartbeat(ctx context.Context, req *connect.Request[
 
 	nonce := s.stateCfg.NonceManager.GenerateNonce(agent.ResourceID, req.Msg.SessionId)
 
+	// The per-heartbeat agent.status rewrite used to cost a full JSONB marshal
+	// + UPDATE + cache refill per agent per heartbeat. The HeartbeatBuffer now
+	// batches last_heartbeat_at (session touch + status jsonb_set) once per
+	// flush window per agent; the immediate TouchAgentSession above keeps the
+	// session row fresh on the request path.
 	nowSec := time.Now().Unix()
-	activeSessionID := agent.Status.GetActiveSessionId()
-	patch := &store.UpdateAgentMessage{
-		Status: &storepb.AgentStatus{
-			State:           storepb.AgentStatus_ONLINE,
-			LastHeartbeatAt: nowSec,
-			ConnectedAt:     agent.Status.GetConnectedAt(),
-			ActiveSessionId: activeSessionID,
-		},
-	}
-
-	if _, err := s.store.UpdateAgent(ctx, agent, patch); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update agent heartbeat, error: %v", err))
-	}
-
 	if s.stateCfg.HeartbeatBuffer != nil {
 		s.stateCfg.HeartbeatBuffer.Record(&state.HeartbeatUpdate{
 			AgentID:         agent.ID,
@@ -1925,7 +1916,7 @@ func (*AgentService) ListPiModels(ctx context.Context, req *connect.Request[v1pb
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("api_key is required to list models for this provider"))
 	}
 
-	models, err := pi.ListModels(ctx, apiProvider, req.Msg.ApiKey)
+	models, err := pi.ListModels(ctx, nil, apiProvider, req.Msg.ApiKey)
 	if err != nil {
 		// Validation already ruled out client-side errors; anything left is an
 		// upstream provider/network failure (auth, timeout, non-2xx).

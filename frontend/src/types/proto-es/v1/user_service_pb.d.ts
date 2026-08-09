@@ -701,8 +701,7 @@ export declare const UserService: GenService<{
    * UploadAvatar replaces the current user's avatar image. Self only: the
    * caller must be the user named by the resource. The image bytes are
    * re-encoded/stored server-side; clients should resize before uploading.
-   * No google.api.http annotation: bytes travel over Connect-JSON like
-   * CommandService.UploadFile.
+   * Bytes travel over Connect-JSON like CommandService.UploadFile.
    *
    * @generated from rpc laelia.v1.UserService.UploadAvatar
    */

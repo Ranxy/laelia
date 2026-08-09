@@ -16,7 +16,6 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/cel-go v0.28.1
 	github.com/google/uuid v1.6.0
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgx/v5 v5.10.0
@@ -35,7 +34,6 @@ require (
 	golang.org/x/time v0.14.0
 	google.golang.org/genproto v0.0.0-20260610212136-7ab31c22f7ad
 	google.golang.org/genproto/googleapis/api v0.0.0-20260610212136-7ab31c22f7ad
-	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
 )
 

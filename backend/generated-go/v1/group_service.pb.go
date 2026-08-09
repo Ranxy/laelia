@@ -757,7 +757,7 @@ var File_v1_group_service_proto protoreflect.FileDescriptor
 
 const file_v1_group_service_proto_rawDesc = "" +
 	"\n" +
-	"\x16v1/group_service.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x13v1/annotation.proto\"\x8c\x02\n" +
+	"\x16v1/group_service.proto\x12\tlaelia.v1\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x13v1/annotation.proto\"\x8c\x02\n" +
 	"\x05Group\x12\x1a\n" +
 	"\x04name\x18\x01 \x01(\tB\x06\xe0A\b\xe0A\x02R\x04name\x12\x19\n" +
 	"\x05email\x18\x02 \x01(\tB\x03\xe0A\x05R\x05email\x12\x14\n" +
@@ -811,18 +811,16 @@ const file_v1_group_service_proto_rawDesc = "" +
 	"\x1dGROUP_MEMBER_ROLE_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05OWNER\x10\x01\x12\n" +
 	"\n" +
-	"\x06MEMBER\x10\x022\xd2\a\n" +
-	"\fGroupService\x12u\n" +
-	"\bGetGroup\x12\x1a.laelia.v1.GetGroupRequest\x1a\x10.laelia.v1.Group\";\xdaA\x04name\x8a\xea0\x11laelia.groups.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/{name=groups/*}\x12\x8b\x01\n" +
-	"\x0eBatchGetGroups\x12 .laelia.v1.BatchGetGroupsRequest\x1a!.laelia.v1.BatchGetGroupsResponse\"4\x8a\xea0\x11laelia.groups.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/groups:batchGet\x12w\n" +
+	"\x06MEMBER\x10\x022\x87\x06\n" +
+	"\fGroupService\x12Z\n" +
+	"\bGetGroup\x12\x1a.laelia.v1.GetGroupRequest\x1a\x10.laelia.v1.Group\" \xdaA\x04name\x8a\xea0\x11laelia.groups.get\x90\xea0\x01\x12p\n" +
+	"\x0eBatchGetGroups\x12 .laelia.v1.BatchGetGroupsRequest\x1a!.laelia.v1.BatchGetGroupsResponse\"\x19\x8a\xea0\x11laelia.groups.get\x90\xea0\x01\x12e\n" +
 	"\n" +
-	"ListGroups\x12\x1c.laelia.v1.ListGroupsRequest\x1a\x1d.laelia.v1.ListGroupsResponse\",\x8a\xea0\x12laelia.groups.list\x90\xea0\x01\x82\xd3\xe4\x93\x02\f\x12\n" +
-	"/v1/groups\x12\x89\x01\n" +
-	"\vCreateGroup\x12\x1d.laelia.v1.CreateGroupRequest\x1a\x10.laelia.v1.Group\"I\xdaA\x11group_email,group\x8a\xea0\x14laelia.groups.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x0f:\x01*\"\n" +
-	"/v1/groups\x12\x9c\x01\n" +
-	"\vUpdateGroup\x12\x1d.laelia.v1.UpdateGroupRequest\x1a\x10.laelia.v1.Group\"\\\xdaA\x11group,update_mask\x8a\xea0\x14laelia.groups.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\":\x05group2\x19/v1/{group.name=groups/*}\x12\x88\x01\n" +
-	"\vDeleteGroup\x12\x1d.laelia.v1.DeleteGroupRequest\x1a\x16.google.protobuf.Empty\"B\xdaA\x04name\x8a\xea0\x14laelia.groups.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x15*\x13/v1/{name=groups/*}\x12\x8d\x01\n" +
-	"\x12GetGroupReferences\x12\x1a.laelia.v1.GetGroupRequest\x1a\x1a.laelia.v1.GroupReferences\"?\x8a\xea0\x11laelia.groups.get\x90\xea0\x01\x82\xd3\xe4\x93\x02 \x12\x1e/v1/{name=groups/*}:referencesB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"ListGroups\x12\x1c.laelia.v1.ListGroupsRequest\x1a\x1d.laelia.v1.ListGroupsResponse\"\x1a\x8a\xea0\x12laelia.groups.list\x90\xea0\x01\x12t\n" +
+	"\vCreateGroup\x12\x1d.laelia.v1.CreateGroupRequest\x1a\x10.laelia.v1.Group\"4\xdaA\x11group_email,group\x8a\xea0\x14laelia.groups.create\x90\xea0\x01\x98\xea0\x01\x12t\n" +
+	"\vUpdateGroup\x12\x1d.laelia.v1.UpdateGroupRequest\x1a\x10.laelia.v1.Group\"4\xdaA\x11group,update_mask\x8a\xea0\x14laelia.groups.update\x90\xea0\x01\x98\xea0\x01\x12m\n" +
+	"\vDeleteGroup\x12\x1d.laelia.v1.DeleteGroupRequest\x1a\x16.google.protobuf.Empty\"'\xdaA\x04name\x8a\xea0\x14laelia.groups.delete\x90\xea0\x01\x98\xea0\x01\x12g\n" +
+	"\x12GetGroupReferences\x12\x1a.laelia.v1.GetGroupRequest\x1a\x1a.laelia.v1.GroupReferences\"\x19\x8a\xea0\x11laelia.groups.get\x90\xea0\x01B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_group_service_proto_rawDescOnce sync.Once

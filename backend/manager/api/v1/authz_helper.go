@@ -7,6 +7,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/pkg/errors"
 
+	"github.com/Ranxy/laelia/backend/common/permission"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
@@ -38,4 +39,30 @@ func requireChannelOwner(ctx context.Context, conv *store.ConversationMessage) e
 		return connect.NewError(connect.CodePermissionDenied, errors.New("only the channel owner can perform this action"))
 	}
 	return nil
+}
+
+// canUpdateUser authorizes an UpdateUser call: the target user themselves may
+// always update their own profile (self-service), any other caller must hold
+// the workspace-scope laelia.users.update permission. UpdateUser is annotated
+// CUSTOM so the IAM interceptor does not gate it; this check runs in the
+// handler.
+func canUpdateUser(ctx context.Context, checker PermissionChecker, caller, target *store.UserMessage) (bool, error) {
+	if caller == nil || target == nil {
+		return false, nil
+	}
+	if caller.ID == target.ID {
+		return true, nil
+	}
+	return checker.CheckPermission(ctx, permission.UsersUpdate, caller, nil, nil)
+}
+
+// canCreateUser authorizes the UpdateUser allow_missing fallback, which
+// creates the target user via CreateUser. It requires the workspace-scope
+// laelia.users.create permission (self-service signup goes through the
+// dedicated CreateUser RPC instead).
+func canCreateUser(ctx context.Context, checker PermissionChecker, caller *store.UserMessage) (bool, error) {
+	if caller == nil {
+		return false, nil
+	}
+	return checker.CheckPermission(ctx, permission.UsersCreate, caller, nil, nil)
 }

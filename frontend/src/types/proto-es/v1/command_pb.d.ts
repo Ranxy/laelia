@@ -5554,9 +5554,8 @@ export declare const CommandService: GenService<{
   },
   /**
    * UploadFile stores data in S3 and persists a file row. Intended for the
-   * agent daemon (browser uploads go through the Echo multipart route). No
-   * google.api.http annotation: the agent reaches it via Connect-JSON over the
-   * CommandServiceClient, and avoiding a /v1/files/{id} gateway entry keeps it
+   * agent daemon (browser uploads go through the Echo multipart route); bytes
+   * travel over Connect-JSON, and avoiding a /v1/files/{id} REST entry keeps it
    * from colliding with the browser download route.
    *
    * @generated from rpc laelia.v1.CommandService.UploadFile

@@ -310,7 +310,7 @@ func TestThreadExecutor_ColdTurnMapsEvents(t *testing.T) {
 	require.Zero(t, obs.result.ExitCode, "completed turn must exit 0: %s", obs.result.ErrorMessage)
 	assert.False(t, obs.result.Resumed, "cold turn must not resume")
 	assert.Equal(t, "thread-1", obs.result.SessionID)
-	assert.Equal(t, sessionFingerprint(cfg.Provider, cfg.Model, cfg.WorkingDir, ProtocolV2), obs.result.Fingerprint)
+	assert.Equal(t, threadSessionFingerprint(cfg), obs.result.Fingerprint)
 
 	// The persisted session must carry the thread id so the next turn resumes.
 	state, err := loadACPSession("test-machine-thread", "test-agent-thread")
@@ -365,7 +365,7 @@ func TestThreadExecutor_WarmTurnResumesThread(t *testing.T) {
 	// Persist a thread id with a matching fingerprint so the executor resumes.
 	require.NoError(t, saveACPSession(req.MachineID, req.AgentID, &acpSessionState{
 		ThreadID:    "thread-7",
-		Fingerprint: sessionFingerprint(cfg.Provider, cfg.Model, cfg.WorkingDir, ProtocolV2),
+		Fingerprint: threadSessionFingerprint(cfg),
 		CreatedAt:   time.Now().Unix(),
 	}))
 
@@ -384,7 +384,7 @@ func TestThreadExecutor_ResumeFailureFallsBackToColdStart(t *testing.T) {
 	req := newThreadTestRequest(cfg.WorkingDir)
 	require.NoError(t, saveACPSession(req.MachineID, req.AgentID, &acpSessionState{
 		ThreadID:    "dead-thread",
-		Fingerprint: sessionFingerprint(cfg.Provider, cfg.Model, cfg.WorkingDir, ProtocolV2),
+		Fingerprint: threadSessionFingerprint(cfg),
 		CreatedAt:   time.Now().Unix(),
 	}))
 

@@ -834,7 +834,7 @@ var File_v1_setting_proto protoreflect.FileDescriptor
 
 const file_v1_setting_proto_rawDesc = "" +
 	"\n" +
-	"\x10v1/setting.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x13store/setting.proto\x1a\x13v1/annotation.proto\"\x14\n" +
+	"\x10v1/setting.proto\x12\tlaelia.v1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x13store/setting.proto\x1a\x13v1/annotation.proto\"\x14\n" +
 	"\x12GetS3ConfigRequest\"L\n" +
 	"\x13GetS3ConfigResponse\x125\n" +
 	"\x06config\x18\x01 \x01(\v2\x1d.laelia.store.S3ConfigSettingR\x06config\"S\n" +
@@ -870,18 +870,17 @@ const file_v1_setting_proto_rawDesc = "" +
 	"\x18UpdateDebugConfigRequest\x12\x1d\n" +
 	"\aenabled\x18\x01 \x01(\bB\x03\xe0A\x02R\aenabled\"5\n" +
 	"\x19UpdateDebugConfigResponse\x12\x18\n" +
-	"\aenabled\x18\x01 \x01(\bR\aenabled2\xb6\n" +
-	"\n" +
-	"\x0eSettingService\x12}\n" +
-	"\vGetS3Config\x12\x1d.laelia.v1.GetS3ConfigRequest\x1a\x1e.laelia.v1.GetS3ConfigResponse\"/\x8a\xea0\x13laelia.settings.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/s3Config\x12\x95\x01\n" +
-	"\x0eUpdateS3Config\x12 .laelia.v1.UpdateS3ConfigRequest\x1a!.laelia.v1.UpdateS3ConfigResponse\">\x8a\xea0\x16laelia.settings.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x16:\x06config2\f/v1/s3Config\x12~\n" +
-	"\x11GetLlmAgentConfig\x12#.laelia.v1.GetLlmAgentConfigRequest\x1a$.laelia.v1.GetLlmAgentConfigResponse\"\x1e\x90\xea0\x01\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/llmAgentConfig\x12\xad\x01\n" +
-	"\x14UpdateLlmAgentConfig\x12&.laelia.v1.UpdateLlmAgentConfigRequest\x1a'.laelia.v1.UpdateLlmAgentConfigResponse\"D\x8a\xea0\x16laelia.settings.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1c:\x06config2\x12/v1/llmAgentConfig\x12z\n" +
-	"\x10GetUserMcpConfig\x12\".laelia.v1.GetUserMcpConfigRequest\x1a#.laelia.v1.GetUserMcpConfigResponse\"\x1d\x90\xea0\x01\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/userMcpConfig\x12\xa9\x01\n" +
-	"\x13UpdateUserMcpConfig\x12%.laelia.v1.UpdateUserMcpConfigRequest\x1a&.laelia.v1.UpdateUserMcpConfigResponse\"C\x8a\xea0\x16laelia.settings.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1b:\x06config2\x11/v1/userMcpConfig\x12\x89\x01\n" +
-	"\x0eGetSetupStatus\x12 .laelia.v1.GetSetupStatusRequest\x1a!.laelia.v1.GetSetupStatusResponse\"2\x8a\xea0\x13laelia.settings.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/setupStatus\x12\x89\x01\n" +
-	"\x0eGetDebugConfig\x12 .laelia.v1.GetDebugConfigRequest\x1a!.laelia.v1.GetDebugConfigResponse\"2\x8a\xea0\x13laelia.settings.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/debugConfig\x12\x9c\x01\n" +
-	"\x11UpdateDebugConfig\x12#.laelia.v1.UpdateDebugConfigRequest\x1a$.laelia.v1.UpdateDebugConfigResponse\"<\x8a\xea0\x16laelia.settings.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x14:\x01*2\x0f/v1/debugConfigB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"\aenabled\x18\x01 \x01(\bR\aenabled2\xc5\b\n" +
+	"\x0eSettingService\x12i\n" +
+	"\vGetS3Config\x12\x1d.laelia.v1.GetS3ConfigRequest\x1a\x1e.laelia.v1.GetS3ConfigResponse\"\x1b\x8a\xea0\x13laelia.settings.get\x90\xea0\x01\x12y\n" +
+	"\x0eUpdateS3Config\x12 .laelia.v1.UpdateS3ConfigRequest\x1a!.laelia.v1.UpdateS3ConfigResponse\"\"\x8a\xea0\x16laelia.settings.update\x90\xea0\x01\x98\xea0\x01\x12d\n" +
+	"\x11GetLlmAgentConfig\x12#.laelia.v1.GetLlmAgentConfigRequest\x1a$.laelia.v1.GetLlmAgentConfigResponse\"\x04\x90\xea0\x01\x12\x8b\x01\n" +
+	"\x14UpdateLlmAgentConfig\x12&.laelia.v1.UpdateLlmAgentConfigRequest\x1a'.laelia.v1.UpdateLlmAgentConfigResponse\"\"\x8a\xea0\x16laelia.settings.update\x90\xea0\x01\x98\xea0\x01\x12a\n" +
+	"\x10GetUserMcpConfig\x12\".laelia.v1.GetUserMcpConfigRequest\x1a#.laelia.v1.GetUserMcpConfigResponse\"\x04\x90\xea0\x01\x12\x88\x01\n" +
+	"\x13UpdateUserMcpConfig\x12%.laelia.v1.UpdateUserMcpConfigRequest\x1a&.laelia.v1.UpdateUserMcpConfigResponse\"\"\x8a\xea0\x16laelia.settings.update\x90\xea0\x01\x98\xea0\x01\x12r\n" +
+	"\x0eGetSetupStatus\x12 .laelia.v1.GetSetupStatusRequest\x1a!.laelia.v1.GetSetupStatusResponse\"\x1b\x8a\xea0\x13laelia.settings.get\x90\xea0\x01\x12r\n" +
+	"\x0eGetDebugConfig\x12 .laelia.v1.GetDebugConfigRequest\x1a!.laelia.v1.GetDebugConfigResponse\"\x1b\x8a\xea0\x13laelia.settings.get\x90\xea0\x01\x12\x82\x01\n" +
+	"\x11UpdateDebugConfig\x12#.laelia.v1.UpdateDebugConfigRequest\x1a$.laelia.v1.UpdateDebugConfigResponse\"\"\x8a\xea0\x16laelia.settings.update\x90\xea0\x01\x98\xea0\x01B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_setting_proto_rawDescOnce sync.Once

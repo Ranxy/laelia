@@ -465,7 +465,7 @@ var File_v1_notification_proto protoreflect.FileDescriptor
 
 const file_v1_notification_proto_rawDesc = "" +
 	"\n" +
-	"\x15v1/notification.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x13v1/annotation.proto\"\x16\n" +
+	"\x15v1/notification.proto\x12\tlaelia.v1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x13v1/annotation.proto\"\x16\n" +
 	"\x14GetPushConfigRequest\"z\n" +
 	"\x15GetPushConfigResponse\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12(\n" +
@@ -489,13 +489,13 @@ const file_v1_notification_proto_rawDesc = "" +
 	"\x06p256dh\x18\x02 \x01(\tB\x03\xe0A\x02R\x06p256dh\x12\x17\n" +
 	"\x04auth\x18\x03 \x01(\tB\x03\xe0A\x02R\x04auth\"8\n" +
 	"\x1dDeletePushSubscriptionRequest\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x02R\x04name2\xc8\x06\n" +
-	"\x13NotificationService\x12\x87\x01\n" +
-	"\rGetPushConfig\x12\x1f.laelia.v1.GetPushConfigRequest\x1a .laelia.v1.GetPushConfigResponse\"3\x8a\xea0\x15laelia.pushConfig.get\x90\xea0\x01\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/pushConfig\x12\x96\x01\n" +
-	"\x10UpdatePushConfig\x12\".laelia.v1.UpdatePushConfigRequest\x1a#.laelia.v1.UpdatePushConfigResponse\"9\x8a\xea0\x18laelia.pushConfig.update\x90\xea0\x01\x82\xd3\xe4\x93\x02\x13:\x01*2\x0e/v1/pushConfig\x12\xae\x01\n" +
-	"\x15ListPushSubscriptions\x12'.laelia.v1.ListPushSubscriptionsRequest\x1a(.laelia.v1.ListPushSubscriptionsResponse\"B\x8a\xea0\x1dlaelia.pushSubscriptions.list\x90\xea0\x01\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/pushSubscriptions\x12\xa8\x01\n" +
-	"\x16CreatePushSubscription\x12(.laelia.v1.CreatePushSubscriptionRequest\x1a\x1b.laelia.v1.PushSubscription\"G\x8a\xea0\x1flaelia.pushSubscriptions.create\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/v1/pushSubscriptions\x12\xb1\x01\n" +
-	"\x16DeletePushSubscription\x12(.laelia.v1.DeletePushSubscriptionRequest\x1a\x16.google.protobuf.Empty\"U\x8a\xea0\x1flaelia.pushSubscriptions.delete\x90\xea0\x01\x82\xd3\xe4\x93\x02(*&/v1/{name=users/*/pushSubscriptions/*}B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x02R\x04name2\xac\x05\n" +
+	"\x13NotificationService\x12q\n" +
+	"\rGetPushConfig\x12\x1f.laelia.v1.GetPushConfigRequest\x1a .laelia.v1.GetPushConfigResponse\"\x1d\x8a\xea0\x15laelia.pushConfig.get\x90\xea0\x01\x12}\n" +
+	"\x10UpdatePushConfig\x12\".laelia.v1.UpdatePushConfigRequest\x1a#.laelia.v1.UpdatePushConfigResponse\" \x8a\xea0\x18laelia.pushConfig.update\x90\xea0\x01\x12\x91\x01\n" +
+	"\x15ListPushSubscriptions\x12'.laelia.v1.ListPushSubscriptionsRequest\x1a(.laelia.v1.ListPushSubscriptionsResponse\"%\x8a\xea0\x1dlaelia.pushSubscriptions.list\x90\xea0\x01\x12\x88\x01\n" +
+	"\x16CreatePushSubscription\x12(.laelia.v1.CreatePushSubscriptionRequest\x1a\x1b.laelia.v1.PushSubscription\"'\x8a\xea0\x1flaelia.pushSubscriptions.create\x90\xea0\x01\x12\x83\x01\n" +
+	"\x16DeletePushSubscription\x12(.laelia.v1.DeletePushSubscriptionRequest\x1a\x16.google.protobuf.Empty\"'\x8a\xea0\x1flaelia.pushSubscriptions.delete\x90\xea0\x01B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_notification_proto_rawDescOnce sync.Once

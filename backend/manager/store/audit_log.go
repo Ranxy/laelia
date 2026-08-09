@@ -23,12 +23,42 @@ type AuditLogMessage struct {
 	CreatedAt time.Time
 }
 
-func (s *Store) CreateAuditLog(ctx context.Context, log *AuditLogMessage) error {
-	_, err := s.GetDB().ExecContext(ctx, `
-		INSERT INTO audit_log (method, actor_type, actor_id, source_ip, status, error, resource, payload, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, log.Method, log.ActorType, log.ActorID, log.SourceIP, log.Status, log.Error, log.Resource, normalizeAuditPayload(log.Payload), log.CreatedAt)
-	return err
+// CreateAuditLogs inserts audit rows in multi-row statements, chunked so a
+// batch never exceeds Postgres' 65,535 parameter limit (9 columns per row).
+// The audit interceptor batches records in memory and flushes them here, so a
+// steady stream of audited calls costs one round trip per chunk per flush
+// window instead of one INSERT per call.
+func (s *Store) CreateAuditLogs(ctx context.Context, logs []*AuditLogMessage) error {
+	if len(logs) == 0 {
+		return nil
+	}
+	const (
+		columns   = 9
+		chunkSize = 2000 // 18,000 parameters per statement, safely under the limit
+	)
+	for start := 0; start < len(logs); start += chunkSize {
+		chunk := logs[start:min(start+chunkSize, len(logs))]
+		var sb strings.Builder
+		// strings.Builder never errors; discard the (int, error) results.
+		write := func(s string) { _, _ = sb.WriteString(s) }
+		write(`
+			INSERT INTO audit_log (method, actor_type, actor_id, source_ip, status, error, resource, payload, created_at)
+			VALUES `)
+		args := make([]any, 0, len(chunk)*columns)
+		for i, l := range chunk {
+			if i > 0 {
+				write(",")
+			}
+			base := i * columns
+			write(fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+				base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8, base+9))
+			args = append(args, l.Method, l.ActorType, l.ActorID, l.SourceIP, l.Status, l.Error, l.Resource, normalizeAuditPayload(l.Payload), l.CreatedAt)
+		}
+		if _, err := s.GetDB().ExecContext(ctx, sb.String(), args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // normalizeAuditPayload guarantees a value the jsonb payload column accepts.

@@ -108,13 +108,6 @@ func (s *Store) TouchMachineSession(ctx context.Context, sessionID string) error
 	return err
 }
 
-func (s *Store) TouchMachineSessionForHeartbeat(ctx context.Context, machineID int, lastHeartbeatAt int64) error {
-	_, err := s.GetDB().ExecContext(ctx, `
-		UPDATE machine_session SET last_heartbeat_at = to_timestamp($2) WHERE machine_id = $1 AND state = 'ACTIVE'
-	`, machineID, lastHeartbeatAt)
-	return err
-}
-
 func (s *Store) TerminateMachineSession(ctx context.Context, sessionID string, reason string) error {
 	_, err := s.GetDB().ExecContext(ctx, `
 		UPDATE machine_session SET

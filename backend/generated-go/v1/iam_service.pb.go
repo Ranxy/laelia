@@ -616,7 +616,7 @@ var File_v1_iam_service_proto protoreflect.FileDescriptor
 
 const file_v1_iam_service_proto_rawDesc = "" +
 	"\n" +
-	"\x14v1/iam_service.proto\x12\tlaelia.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x16google/type/expr.proto\x1a\x12store/policy.proto\x1a\x13v1/annotation.proto\"T\n" +
+	"\x14v1/iam_service.proto\x12\tlaelia.v1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x16google/type/expr.proto\x1a\x12store/policy.proto\x1a\x13v1/annotation.proto\"T\n" +
 	"\rIamPolicyView\x12/\n" +
 	"\x06policy\x18\x01 \x01(\v2\x17.laelia.store.IamPolicyR\x06policy\x12\x12\n" +
 	"\x04etag\x18\x02 \x01(\tR\x04etag\"\xda\x01\n" +
@@ -654,15 +654,15 @@ const file_v1_iam_service_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tB\x16\xe0A\x02\xfaA\x10\n" +
 	"\x0elaelia/MachineR\x04name\x124\n" +
 	"\x06policy\x18\x02 \x01(\v2\x17.laelia.store.IamPolicyB\x03\xe0A\x02R\x06policy\x12\x12\n" +
-	"\x04etag\x18\x03 \x01(\tR\x04etag2\x91\a\n" +
+	"\x04etag\x18\x03 \x01(\tR\x04etag2\xac\x05\n" +
 	"\n" +
-	"IamService\x12\x97\x01\n" +
-	"\x15GetWorkspaceIamPolicy\x12'.laelia.v1.GetWorkspaceIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\";\x8a\xea0\x14laelia.iam.getPolicy\x90\xea0\x01\x82\xd3\xe4\x93\x02\x19\x12\x17/v1/workspace:iamPolicy\x12\x9e\x01\n" +
-	"\x15SetWorkspaceIamPolicy\x12'.laelia.v1.SetWorkspaceIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"B\x8a\xea0\x14laelia.iam.setPolicy\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/workspace:iamPolicy\x12\x95\x01\n" +
-	"\x11GetAgentIamPolicy\x12#.laelia.v1.GetAgentIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"A\x8a\xea0\x14laelia.iam.getPolicy\x90\xea0\x01\x82\xd3\xe4\x93\x02\x1f\x12\x1d/v1/{name=agents/*}:iamPolicy\x12\x9c\x01\n" +
-	"\x11SetAgentIamPolicy\x12#.laelia.v1.SetAgentIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"H\x8a\xea0\x14laelia.iam.setPolicy\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/v1/{name=agents/*}:iamPolicy\x12\x83\x01\n" +
-	"\x13GetMachineIamPolicy\x12%.laelia.v1.GetMachineIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"+\x90\xea0\x01\x82\xd3\xe4\x93\x02!\x12\x1f/v1/{name=machines/*}:iamPolicy\x12\x8a\x01\n" +
-	"\x13SetMachineIamPolicy\x12%.laelia.v1.SetMachineIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"2\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/{name=machines/*}:iamPolicyB1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
+	"IamService\x12x\n" +
+	"\x15GetWorkspaceIamPolicy\x12'.laelia.v1.GetWorkspaceIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"\x1c\x8a\xea0\x14laelia.iam.getPolicy\x90\xea0\x01\x12|\n" +
+	"\x15SetWorkspaceIamPolicy\x12'.laelia.v1.SetWorkspaceIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\" \x8a\xea0\x14laelia.iam.setPolicy\x90\xea0\x01\x98\xea0\x01\x12p\n" +
+	"\x11GetAgentIamPolicy\x12#.laelia.v1.GetAgentIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"\x1c\x8a\xea0\x14laelia.iam.getPolicy\x90\xea0\x01\x12t\n" +
+	"\x11SetAgentIamPolicy\x12#.laelia.v1.SetAgentIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\" \x8a\xea0\x14laelia.iam.setPolicy\x90\xea0\x01\x98\xea0\x01\x12\\\n" +
+	"\x13GetMachineIamPolicy\x12%.laelia.v1.GetMachineIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"\x04\x90\xea0\x01\x12`\n" +
+	"\x13SetMachineIamPolicy\x12%.laelia.v1.SetMachineIamPolicyRequest\x1a\x18.laelia.v1.IamPolicyView\"\b\x90\xea0\x01\x98\xea0\x01B1Z/github.com/Ranxy/laelia/backend/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_iam_service_proto_rawDescOnce sync.Once

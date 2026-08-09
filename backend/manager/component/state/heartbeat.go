@@ -19,7 +19,7 @@ type HeartbeatUpdate struct {
 // satisfies it; tests may pass a fake. Keeping it an interface (rather than
 // *store.Store) lets the buffer be unit-tested without a Postgres connection.
 type heartbeatWriter interface {
-	TouchAgentSessionForHeartbeat(ctx context.Context, agentID int, lastHeartbeatAt int64) error
+	TouchAgentHeartbeat(ctx context.Context, agentID int, lastHeartbeatAt int64) error
 }
 
 type HeartbeatBuffer struct {
@@ -113,7 +113,7 @@ func (b *HeartbeatBuffer) flush() {
 	defer cancel()
 
 	for _, update := range snapshot {
-		if err := b.store.TouchAgentSessionForHeartbeat(ctx, update.AgentID, update.LastHeartbeatAt); err != nil {
+		if err := b.store.TouchAgentHeartbeat(ctx, update.AgentID, update.LastHeartbeatAt); err != nil {
 			slog.Error("failed to batch update agent heartbeat", "agent_id", update.AgentID, "error", err)
 		}
 	}

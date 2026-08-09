@@ -16,15 +16,25 @@ import (
 )
 
 type AuditInterceptor struct {
-	stores                *store.Store
+	buffer                *AuditBuffer
 	heartbeatSamplingRate int
 }
 
 func NewAuditInterceptor(stores *store.Store) *AuditInterceptor {
 	return &AuditInterceptor{
-		stores:                stores,
+		buffer:                NewAuditBuffer(stores, 2*time.Second),
 		heartbeatSamplingRate: 100,
 	}
+}
+
+// Start/Stop delegate to the underlying buffer so the server wires the audit
+// flush loop into its own lifecycle (see server.Run/Shutdown).
+func (a *AuditInterceptor) Start(ctx context.Context) {
+	a.buffer.Start(ctx)
+}
+
+func (a *AuditInterceptor) Stop() {
+	a.buffer.Stop()
 }
 
 func (a *AuditInterceptor) recordAudit(ctx context.Context, procedure string, err error, resource, payload string) {
@@ -40,13 +50,7 @@ func (a *AuditInterceptor) recordAudit(ctx context.Context, procedure string, er
 		CreatedAt: time.Now(),
 	}
 
-	if a.stores != nil {
-		go func() {
-			if dbErr := a.stores.CreateAuditLog(context.Background(), auditLog); dbErr != nil {
-				slog.Warn("failed to persist audit log", "error", dbErr)
-			}
-		}()
-	}
+	a.buffer.Record(auditLog)
 
 	slog.Info("audit",
 		"method", auditLog.Method,
