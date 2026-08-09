@@ -1265,7 +1265,8 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                         aria-pressed={asTask}
                         disabled={sending}
                         className={cn(
-                          "flex h-7 items-center gap-1 rounded-md px-2 text-xs transition-colors disabled:opacity-50",
+                          "flex h-7 items-center gap-1 rounded-md px-2 text-xs transition-colors disabled:opacity-50 lg:ml-0",
+                          "ml-2",
                           asTask
                             ? "bg-accent/15 text-accent"
                             : "text-control-placeholder hover:text-main hover:bg-control-bg"
@@ -1274,7 +1275,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                         title={t("channelTask.as-task-hint")}
                       >
                         <ListTodo className="size-3.5" />
-                        <span className="hidden sm:inline">
+                        <span className="sm:hidden lg:inline">
                           {t("channelTask.as-task")}
                         </span>
                       </button>
