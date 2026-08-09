@@ -83,7 +83,7 @@ export function ConversationList() {
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-control-border px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-control-border px-3 py-2 lg:px-4 lg:py-3">
         <h2 className="hidden text-sm font-semibold text-main lg:block">
           {t("chat.title")}
         </h2>
@@ -98,7 +98,7 @@ export function ConversationList() {
       </div>
 
       {/* Search */}
-      <div className="shrink-0 px-3 py-2">
+      <div className="shrink-0 px-2 py-2 lg:px-3">
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -229,7 +229,7 @@ const ConversationRow = memo(function ConversationRow({
         type="button"
         onClick={() => onOpen(id)}
         className={cn(
-          "flex w-full items-center gap-3 px-3 py-2.5 pr-10 text-left transition-colors",
+          "flex w-full items-center gap-3 px-2 py-2.5 pr-10 text-left transition-colors lg:px-3",
           active ? "bg-accent/10" : "hover:bg-control-bg/40"
         )}
       >

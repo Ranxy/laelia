@@ -32,6 +32,7 @@ import {
 import { commandServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
 import { isImageAttachment } from "@/lib/image-file";
+import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { senderKeyForMessage } from "@/stores/chat-helpers";
@@ -177,7 +178,7 @@ export function ThreadPanel({
   const conversationName = `conversations/${channelId}`;
   const asideClass = fluid
     ? "flex h-full w-full flex-col"
-    : "flex w-[420px] shrink-0 flex-col border-l border-control-border";
+    : "fixed inset-0 z-10 flex w-full flex-col bg-background pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:static lg:inset-auto lg:z-auto lg:w-[420px] lg:shrink-0 lg:border-l lg:border-control-border lg:pt-0 lg:pb-0";
 
   const thread = useAppStore((s) => s.threadByRoot[rootMessageId]);
   const sendThreadMessage = useAppStore((s) => s.sendThreadMessage);
@@ -714,6 +715,7 @@ function ThreadHeader({
   onToggleExpand?: () => void;
 }) {
   const { t } = useTranslation();
+  const isDesktop = useIsDesktop();
   const closeThread = useAppStore((s) => s.closeThread);
   const toggleTasksPanel = useAppStore((s) => s.toggleTasksPanel);
   const isTask = !!rootMsg?.task;
@@ -777,7 +779,11 @@ function ThreadHeader({
         className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors"
         aria-label={t("chat.thread-close")}
       >
-        <X className="size-4" />
+        {isDesktop ? (
+          <X className="size-4" />
+        ) : (
+          <ArrowLeft className="size-4" />
+        )}
       </button>
     </div>
   );

@@ -1077,7 +1077,7 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
                 </div>
               </div>
             ) : (
-              <div className="px-6 pb-5 pt-2">
+              <div className="px-4 pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom)+0.5rem)] pt-2 lg:px-6 lg:pb-5">
                 <div
                   className="rounded-2xl border border-control-border bg-control-bg/40 focus-within:border-accent focus-within:bg-background transition-colors"
                   onDragOver={(e) => {
