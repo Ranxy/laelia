@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { AtSign, Bell, Check, ListChecks, MessageSquare } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { formatTimestamp } from "@/lib/command-status";
+import { formatActivityListTime, formatTimestamp } from "@/lib/command-status";
 import { cn } from "@/lib/utils";
 import type { Activity } from "@/types/proto-es/v1/command_pb";
 import { ActivityCategory } from "@/types/proto-es/v1/command_pb";
@@ -45,13 +45,17 @@ export function ActivityRow({
   const { t } = useTranslation();
   const Icon = primaryCategoryIcon(activity.categories);
   const isDone = activity.state === 3; // ActivityState.DONE
+  const { date: mobileDate, time: mobileTime } = formatActivityListTime(
+    activity.createdAt
+  );
 
   return (
     <button
       type="button"
       onClick={onSelect}
       className={cn(
-        "group flex w-full gap-2.5 px-3 py-2.5 text-left transition-colors",
+        "group flex w-full gap-2.5 text-left transition-colors",
+        "px-2.5 py-2 lg:px-3 lg:py-2.5",
         active
           ? "bg-accent/10 border-l-2 border-accent"
           : "border-l-2 border-transparent hover:bg-control-bg",
@@ -67,10 +71,15 @@ export function ActivityRow({
             {activity.senderName || t("activity.thread")}
           </span>
           <span className="shrink-0 font-mono text-[11px] text-control-light">
-            {formatTimestamp(activity.createdAt)}
+            <span className="hidden lg:inline">
+              {formatTimestamp(activity.createdAt)}
+            </span>
+            <span className="lg:hidden">
+              {mobileDate ? `${mobileDate} ${mobileTime}` : mobileTime}
+            </span>
           </span>
         </div>
-        <p className="mt-0.5 line-clamp-2 text-xs text-control-light">
+        <p className="mt-0.5 line-clamp-1 lg:line-clamp-2 text-xs text-control-light">
           {activity.summary}
         </p>
         <div className="mt-1.5 flex items-center justify-between gap-2">
@@ -89,7 +98,10 @@ export function ActivityRow({
                   onMarkDone();
                 }
               }}
-              className="inline-flex size-6 shrink-0 items-center justify-center rounded-xs text-control-light opacity-0 transition-opacity hover:bg-control-bg hover:text-control focus-visible:opacity-100 group-hover:opacity-100"
+              className={cn(
+                "inline-flex size-6 shrink-0 items-center justify-center rounded-xs text-control-light transition-opacity hover:bg-control-bg hover:text-control focus-visible:opacity-100",
+                "opacity-100 lg:opacity-0 group-hover:lg:opacity-100"
+              )}
               title={t("activity.mark-done")}
               aria-label={t("activity.mark-done")}
             >

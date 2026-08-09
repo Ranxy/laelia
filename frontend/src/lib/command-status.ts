@@ -66,6 +66,27 @@ function formatTimeOfDay(ts: { seconds?: bigint } | undefined): string {
   return new Date(Number(ts.seconds) * 1000).toLocaleTimeString();
 }
 
+// formatActivityListTime returns a compact representation for the activity feed
+// on small screens: time-of-day for today, otherwise "M/D time".
+function formatActivityListTime(ts: { seconds?: bigint } | undefined): {
+  time: string;
+  date: string;
+} {
+  if (!ts?.seconds) return { time: "", date: "" };
+  const date = new Date(Number(ts.seconds) * 1000);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const time = date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  if (isToday) return { time, date: "" };
+  return {
+    time,
+    date: date.toLocaleDateString([], { month: "numeric", day: "numeric" }),
+  };
+}
+
 function agentResourceName(agentId: string | undefined): string {
   return `agents/${agentId ?? ""}`;
 }
@@ -96,6 +117,7 @@ export {
   commandResourceName,
   commandStatusToI18nKey,
   commandStatusToVariant,
+  formatActivityListTime,
   formatDuration,
   formatTimeOfDay,
   formatTimestamp,

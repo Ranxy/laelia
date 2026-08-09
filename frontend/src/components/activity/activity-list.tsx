@@ -161,7 +161,7 @@ export function ActivityList() {
   return (
     <div className="flex h-full flex-col">
       {/* Header: title + active count. */}
-      <div className="shrink-0 border-b border-control-border px-4 py-3">
+      <div className="shrink-0 border-b border-control-border px-3 py-2 lg:px-4 lg:py-3">
         <div className="flex items-center gap-2">
           <Inbox className="size-4 text-control-light" />
           <h1 className="text-sm font-semibold text-control">
@@ -171,15 +171,17 @@ export function ActivityList() {
             {t("activity.active-count", { n: unreadCount })}
           </span>
         </div>
-        {/* Filter pills. Active = accent; inactive = muted + hover. */}
-        <div className="mt-3 flex flex-wrap gap-1">
+        {/* Filter pills. Active = accent; inactive = muted + hover.
+            On mobile they scroll horizontally so the header never grows
+            tall enough to steal list space. */}
+        <div className="mt-2 flex gap-1 overflow-x-auto pb-1 lg:mt-3 lg:flex-wrap lg:overflow-visible lg:pb-0">
           {filters.map((f) => (
             <button
               key={f}
               type="button"
               onClick={() => handleFilterChange(f)}
               className={cn(
-                "rounded-xs px-2.5 py-1 text-xs font-medium transition-colors",
+                "shrink-0 rounded-xs px-2.5 py-1 text-xs font-medium transition-colors",
                 filter === f
                   ? "bg-accent text-accent-foreground"
                   : "text-control-light hover:bg-control-bg"
@@ -222,8 +224,10 @@ export function ActivityList() {
 
       {/* Pagination footer. */}
       <div className="flex shrink-0 items-center justify-between gap-2 border-t border-control-border px-3 py-2 text-xs text-control-light">
-        <span>{t("activity.page", { n: pageIndex + 1 })}</span>
-        <div className="flex gap-1">
+        <span className="hidden lg:inline">
+          {t("activity.page", { n: pageIndex + 1 })}
+        </span>
+        <div className="flex w-full justify-end gap-1 lg:w-auto">
           <Button
             variant="outline"
             size="sm"
@@ -231,7 +235,7 @@ export function ActivityList() {
             disabled={!canPrev || loading}
           >
             <ChevronLeft className="size-3.5" />
-            {t("activity.prev")}
+            <span className="hidden lg:inline">{t("activity.prev")}</span>
           </Button>
           <Button
             variant="outline"
@@ -239,7 +243,7 @@ export function ActivityList() {
             onClick={() => gotoPage(1)}
             disabled={!canNext || loading}
           >
-            {t("activity.next")}
+            <span className="hidden lg:inline">{t("activity.next")}</span>
             <ChevronRight className="size-3.5" />
           </Button>
         </div>

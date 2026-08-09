@@ -118,6 +118,7 @@ export interface ChannelConversationViewProps {
   scrollToMessageId?: string;
   scrollToReadVersion?: bigint;
   onViewInChannel?: () => void;
+  onClose?: () => void;
 }
 
 interface MessageListProps {
@@ -953,7 +954,13 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate("/")}
+          onClick={() => {
+            if (props?.onClose) {
+              props.onClose();
+            } else {
+              navigate("/");
+            }
+          }}
           aria-label={t("channel.back")}
           className="size-8 p-0 lg:hidden"
         >
