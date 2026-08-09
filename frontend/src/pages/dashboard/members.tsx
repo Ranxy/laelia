@@ -75,7 +75,7 @@ export function MembersPage() {
           hasSelection ? "hidden lg:flex lg:w-60" : "flex w-full lg:w-60"
         )}
       >
-        <div className="flex items-center justify-between gap-2 border-b border-control-border px-3 py-3 shrink-0">
+        <div className="hidden lg:flex items-center justify-between gap-2 border-b border-control-border px-3 py-3 shrink-0">
           <h1 className="text-sm font-semibold text-main truncate">
             {t("members.title")}
           </h1>

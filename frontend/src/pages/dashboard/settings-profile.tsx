@@ -343,10 +343,10 @@ export function SettingsProfilePage() {
   return (
     <div className="flex h-full overflow-y-auto flex-col">
       <div className="mx-auto w-full max-w-2xl px-6 py-8">
-        <h1 className="text-lg font-semibold text-main">
+        <h1 className="hidden text-lg font-semibold text-main lg:block">
           {t("settings.profile.title")}
         </h1>
-        <p className="mt-1 text-sm text-control-light">
+        <p className="hidden mt-1 text-sm text-control-light lg:block">
           {t("settings.profile.description")}
         </p>
 

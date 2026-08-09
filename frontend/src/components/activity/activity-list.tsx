@@ -163,8 +163,8 @@ export function ActivityList() {
       {/* Header: title + active count. */}
       <div className="shrink-0 border-b border-control-border px-3 py-2 lg:px-4 lg:py-3">
         <div className="flex items-center gap-2">
-          <Inbox className="size-4 text-control-light" />
-          <h1 className="text-sm font-semibold text-control">
+          <Inbox className="hidden lg:block size-4 text-control-light" />
+          <h1 className="hidden lg:block text-sm font-semibold text-control">
             {t("activity.title")}
           </h1>
           <span className="ml-auto text-xs text-control-light">

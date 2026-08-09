@@ -137,7 +137,7 @@ export function MachinesPage() {
         )}
       >
         <div className="flex items-center justify-between gap-2 border-b border-control-border px-3 py-3 shrink-0">
-          <h1 className="text-sm font-semibold text-main truncate">
+          <h1 className="hidden lg:block text-sm font-semibold text-main truncate">
             {t("machine.title")}
           </h1>
           {canCreate && (

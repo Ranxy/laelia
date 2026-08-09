@@ -411,7 +411,7 @@ export function UserListPage() {
   return (
     <div className="h-full overflow-y-auto p-6 flex flex-col gap-5 w-full">
       <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
+        <div className="hidden lg:flex flex-col gap-1">
           <h1 className="text-xl font-semibold text-main flex items-center gap-2">
             <Users className="size-5 text-accent" />
             {t("user.title")}

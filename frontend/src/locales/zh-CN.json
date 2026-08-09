@@ -57,6 +57,9 @@
       "name-placeholder": "张三"
     }
   },
+  "mobile": {
+    "tab-bar": "标签栏"
+  },
   "sidebar": {
     "home": "对话",
     "activity": "动态",

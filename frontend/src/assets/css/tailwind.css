@@ -180,6 +180,12 @@
     /* The matrix green lighter */
     --color-matrix-green-hover: 136 255 136; /* #88ff88 */
   }
+  :root {
+    /* Mobile native-app shell dimensions. */
+    --mobile-header-height: 3.5rem;
+    --mobile-tab-height: 4rem;
+    --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 @layer utilities {

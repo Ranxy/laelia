@@ -18,6 +18,7 @@ import {
   MEMBERS_ROUTE,
   REMINDER_ROUTE_DETAIL,
   REMINDER_ROUTE_LIST,
+  SETTINGS_ROUTE,
   SETTINGS_ROUTE_AGENTS,
   SETTINGS_ROUTE_API_PROVIDERS,
   SETTINGS_ROUTE_AUDIT,
@@ -258,7 +259,14 @@ export const dashboardRoutes: RouteObject[] = [
       {
         path: "settings",
         children: [
-          { index: true, element: <Navigate to="profile" replace /> },
+          {
+            index: true,
+            handle: { name: SETTINGS_ROUTE },
+            lazy: () =>
+              import("@/pages/dashboard/settings-menu").then((m) => ({
+                Component: m.SettingsIndex,
+              })),
+          },
           {
             path: "agents",
             handle: { name: SETTINGS_ROUTE_AGENTS },

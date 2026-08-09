@@ -57,6 +57,9 @@
       "name-placeholder": "foo bar"
     }
   },
+  "mobile": {
+    "tab-bar": "Tab bar"
+  },
   "sidebar": {
     "home": "Chat",
     "activity": "Activity",

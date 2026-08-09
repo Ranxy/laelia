@@ -1,7 +1,8 @@
-import { Menu } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { DesktopSidebar, MobileSidebar } from "@/components/sidebar";
+import { MobileHeader } from "@/components/mobile-header";
+import { MobileTabBar } from "@/components/mobile-tab-bar";
+import { DesktopSidebar } from "@/components/sidebar";
 import { UserMenu } from "@/components/user-menu";
 import { toastManager } from "@/lib/toast";
 import { reconcilePushSubscription, suppressRoute } from "@/lib/web-push";
@@ -69,7 +70,6 @@ function loadCollapsed(): boolean {
 
 export function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -84,11 +84,6 @@ export function DashboardLayout() {
       return next;
     });
   }, []);
-
-  // Close mobile sidebar on route change
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
 
   // Web Push: on boot, refresh the server-side keys for this browser's push
   // subscription when it is already registered (browsers rotate keys across
@@ -135,22 +130,20 @@ export function DashboardLayout() {
         collapsed={collapsed}
         onToggleCollapse={toggleCollapsed}
       />
-      <MobileSidebar open={mobileOpen} onClose={() => setMobileOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-12 shrink-0 items-center gap-4 border-b border-control-border px-4">
-          <button
-            type="button"
-            className="rounded-md p-1 text-control hover:bg-link-hover lg:hidden"
-            onClick={() => setMobileOpen(true)}
-          >
-            <Menu className="size-4" />
-          </button>
+        {/* Desktop header. */}
+        <header className="hidden lg:flex h-12 shrink-0 items-center gap-4 border-b border-control-border px-4">
           <div className="flex-1" />
           <UserMenu />
         </header>
+        {/* Mobile header. */}
+        <div className="shrink-0 lg:hidden">
+          <MobileHeader />
+        </div>
         <main className="flex-1 overflow-hidden">
           <Outlet />
         </main>
+        <MobileTabBar />
       </div>
       {/* Store-driven preview overlays (lazy — load only when opened). */}
       <Suspense fallback={null}>
