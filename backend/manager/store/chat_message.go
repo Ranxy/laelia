@@ -517,6 +517,27 @@ func (s *Store) IsThreadRoot(ctx context.Context, conversationID, rootID uuid.UU
 	return exists, nil
 }
 
+// threadRootSenderSQL is the thread-root sender lookup used by
+// GetThreadRootSender. It must return sender_type and sender_agent_id of the
+// root message by id so subscribeAndNotifyThread can subscribe the agent that
+// authored a thread root (replies to its own messages then wake it).
+const threadRootSenderSQL = `
+	SELECT sender_type, sender_agent_id
+	FROM chat_message
+	WHERE id = $1`
+
+// GetThreadRootSender returns the sender type and sender agent id of a thread
+// root message. Used by subscribeAndNotifyThread to subscribe the agent that
+// authored the root (e.g. the agent that uploaded a file being commented on)
+// so it is woken on every reply in the thread, even without a fresh @mention.
+func (s *Store) GetThreadRootSender(ctx context.Context, rootID uuid.UUID) (senderType int32, senderAgentID sql.NullInt32, err error) {
+	err = s.GetDB().QueryRowContext(ctx, threadRootSenderSQL, rootID).Scan(&senderType, &senderAgentID)
+	if err != nil {
+		return 0, sql.NullInt32{}, errors.Wrapf(err, "failed to get thread root sender")
+	}
+	return senderType, senderAgentID, nil
+}
+
 func (s *Store) GetRecentChatMessages(ctx context.Context, conversationID uuid.UUID, limit int) ([]*ChatMessage, error) {
 	rows, err := s.GetDB().QueryContext(ctx, `
 		SELECT `+chatMessageColumns+`

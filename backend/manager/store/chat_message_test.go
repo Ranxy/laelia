@@ -30,3 +30,14 @@ func TestCreateChatMessageBumpVersionSQL(t *testing.T) {
 		"bump statement must advance updated_at so activity-ordered listings reflect new messages")
 	assert.Contains(t, conversationVersionBumpSQL, "version = version + 1")
 }
+
+// TestGetThreadRootSenderSQL locks in that the thread-root sender lookup
+// returns the sender_type and sender_agent_id of the root message by id — the
+// columns subscribeAndNotifyThread needs to subscribe the agent that authored
+// a thread root (so replies to its own messages wake it). Run without a live
+// database.
+func TestGetThreadRootSenderSQL(t *testing.T) {
+	assert.Contains(t, threadRootSenderSQL, "sender_type")
+	assert.Contains(t, threadRootSenderSQL, "sender_agent_id")
+	assert.Contains(t, threadRootSenderSQL, "WHERE id = $1")
+}

@@ -1050,12 +1050,14 @@ func (s *CommandService) notifyConversationAgents(ctx context.Context, convID uu
 
 // subscribeAndNotifyThread handles a thread reply: it subscribes any agent
 // @mentioned in the reply (plus the posting agent, when posterAgentID is
-// non-nil) to the thread, and any user @mentioned (plus the posting user, when
-// posterUserID is non-nil) via user_thread_participant, then wakes every current
-// agent subscriber except posterAgentID that a new reply landed. Subscription is
-// persistent — once an agent is subscribed (via @mention or its own reply) it is
-// woken on every subsequent reply in the thread, even without a fresh @mention;
-// a user subscriber gets a THREAD activity on every subsequent reply. Used by
+// non-nil, plus the agent that authored the thread root, so an agent is woken
+// by replies to its own messages) to the thread, and any user @mentioned (plus
+// the posting user, when posterUserID is non-nil) via user_thread_participant,
+// then wakes every current agent subscriber except posterAgentID that a new
+// reply landed. Subscription is persistent — once an agent is subscribed (via
+// @mention, its own reply, or its own root message) it is woken on every
+// subsequent reply in the thread, even without a fresh @mention; a user
+// subscriber gets a THREAD activity on every subsequent reply. Used by
 // SendMessage (user, posterAgentID=nil, posterUserID=&user.ID) and PostMessage
 // (agent, posterUserID=nil) for thread replies.
 func (s *CommandService) subscribeAndNotifyThread(ctx context.Context, convID, rootID uuid.UUID, version int64, mentions []*v1pb.Mention, posterAgentID *int, posterUserID *int) {
@@ -1095,6 +1097,18 @@ func (s *CommandService) subscribeAndNotifyThread(ctx context.Context, convID, r
 	}
 	if posterUserID != nil {
 		addUser(*posterUserID)
+	}
+	// The thread root's author is an implicit participant: when an agent
+	// authored the root (e.g. it uploaded the markdown/html file being
+	// commented on), subscribe it so every reply in the thread wakes it even
+	// without a fresh @mention. This is what lets a user's anchored comment on
+	// an agent's attachment reach the agent. Best-effort: a failed lookup only
+	// skips the implicit subscription, never the explicit ones above.
+	senderType, senderAgentID, err := s.store.GetThreadRootSender(ctx, rootID)
+	if err != nil {
+		slog.Warn("failed to resolve thread root sender for subscription", "rootID", rootID, "error", err)
+	} else if senderType == store.SenderTypeAgent && senderAgentID.Valid {
+		addAgent(int(senderAgentID.Int32))
 	}
 	if err := s.store.AddThreadParticipants(ctx, rootID, agentIDs); err != nil {
 		slog.Warn("failed to subscribe thread participants", "rootID", rootID, "error", err)
