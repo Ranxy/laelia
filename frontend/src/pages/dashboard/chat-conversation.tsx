@@ -1050,8 +1050,9 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             />
           </div>
 
-          {/* Scroll to bottom button */}
-          {showScrollDown && (
+          {/* Scroll to bottom button — hidden while the tasks panel is open so
+              it doesn't float over the task board or its close affordance. */}
+          {showScrollDown && !tasksPanelOpen && (
             <button
               type="button"
               onClick={scrollToBottom}
@@ -1067,259 +1068,264 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
             </button>
           )}
 
-          {/* Input area — hidden only for agent-to-agent DMs (type 3: an admin
-              can view but cannot intervene). Every other embedded view (the
-              Activity detail pane for a DM or a top-level channel mention) is
-              writable, mirroring task/reminder: the user replies inline. */}
-          <div className="shrink-0 bg-background">
-            {isAgentDm ? (
-              <div className="px-6 py-4">
-                <div className="rounded-2xl border border-control-border bg-control-bg/40 px-4 py-3 text-center text-xs text-control-placeholder">
-                  {t("chat.agent-dm-view-only")}
-                </div>
-              </div>
-            ) : (
-              <div className="px-4 pb-2 pt-2 lg:px-6 lg:pb-5">
-                <div
-                  className="rounded-2xl border border-control-border bg-control-bg/40 focus-within:border-accent focus-within:bg-background transition-colors"
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    if (e.dataTransfer.files.length > 0)
-                      handleFiles(e.dataTransfer.files);
-                  }}
-                >
-                  {pendingAttachments.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 px-3 pt-2">
-                      {pendingAttachments.map((att) =>
-                        isImageAttachment(att) ? (
-                          <div key={att.id} className="group relative shrink-0">
-                            <RemoteImage
-                              attachment={att}
-                              variant="thumb"
-                              onClick={() => openImagePreview(att)}
-                            />
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setPendingAttachments((prev) =>
-                                  prev.filter((p) => p.id !== att.id)
-                                )
-                              }
-                              className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-control-border bg-background text-control-placeholder opacity-0 transition-opacity hover:text-error group-hover:opacity-100"
-                              aria-label={t("common.delete")}
-                            >
-                              <X className="size-3" />
-                            </button>
-                          </div>
-                        ) : (
-                          <span
-                            key={att.id}
-                            className="group flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
-                          >
-                            <span className="max-w-[160px] truncate">
-                              {att.name}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setPendingAttachments((prev) =>
-                                  prev.filter((p) => p.id !== att.id)
-                                )
-                              }
-                              className="text-control-placeholder hover:text-error transition-colors"
-                              aria-label={t("common.delete")}
-                            >
-                              <X className="size-3" />
-                            </button>
-                          </span>
-                        )
-                      )}
-                    </div>
-                  )}
-                  <Textarea
-                    ref={textareaRef}
-                    className={cn(
-                      "block w-full resize-none border-0 bg-transparent px-4 py-3 text-sm text-main",
-                      "placeholder:text-control-placeholder focus:ring-0 focus:border-transparent",
-                      "max-h-[200px] min-h-[24px]"
-                    )}
-                    rows={1}
-                    placeholder={t("channel.placeholder")}
-                    aria-controls={
-                      mentionState?.active ? MENTION_POPUP_ID : undefined
-                    }
-                    aria-activedescendant={
-                      mentionState?.active && mentionState.matched.length > 0
-                        ? `${MENTION_POPUP_ID}-opt-${mentionSelectedIndex}`
-                        : undefined
-                    }
-                    value={input}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setInput(value);
-                      const pos = e.target.selectionStart ?? 0;
-                      setCursorPos(pos);
-                      const state = detectMention(value, pos, mentionTargets);
-                      setMentionState(state);
-                      setMentionSelectedIndex(0);
-                      if (state?.active) {
-                        const newMap: MentionTarget[] = [];
-                        const re = /(?:^|\s)@(\S+)/g;
-                        let m: RegExpExecArray | null;
-                        while ((m = re.exec(value)) !== null) {
-                          const name = m[1];
-                          const found = mentionTargets.find(
-                            (t) => t.name === name
-                          );
-                          if (found) newMap.push(found);
-                        }
-                        setMentionMap(newMap);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (mentionState?.active) {
-                        const total = mentionState.matched.length;
-                        if (e.key === "ArrowDown") {
-                          e.preventDefault();
-                          setMentionSelectedIndex((idx) =>
-                            idx + 1 < total ? idx + 1 : 0
-                          );
-                          return;
-                        }
-                        if (e.key === "ArrowUp") {
-                          e.preventDefault();
-                          setMentionSelectedIndex((idx) =>
-                            idx - 1 >= 0 ? idx - 1 : total - 1
-                          );
-                          return;
-                        }
-                        if (e.key === "Enter" || e.key === "Tab") {
-                          if (total === 0) return;
-                          e.preventDefault();
-                          if (mentionState.matched[mentionSelectedIndex]) {
-                            handleMentionSelect(
-                              mentionState.matched[mentionSelectedIndex]
-                            );
-                          }
-                          return;
-                        }
-                        if (e.key === "Escape") {
-                          e.preventDefault();
-                          setMentionState(null);
-                          return;
-                        }
-                      }
-                      if (e.nativeEvent.isComposing) return;
-                      if (e.key !== "Enter") return;
-                      const wantSend = enterToSend ? !e.shiftKey : e.shiftKey;
-                      if (wantSend) {
-                        e.preventDefault();
-                        handleSend();
-                      }
-                    }}
-                    onSelect={(e) => {
-                      const target = e.target as HTMLTextAreaElement;
-                      const pos = target.selectionStart ?? 0;
-                      setCursorPos(pos);
-                      const state = detectMention(
-                        target.value,
-                        pos,
-                        mentionTargets
-                      );
-                      setMentionState(state);
-                      setMentionSelectedIndex(0);
-                    }}
-                    disabled={sending}
-                  />
-                  <div className="flex items-center justify-between px-3 pb-2">
-                    <div className="flex items-center gap-2">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files) handleFiles(e.target.files);
-                          e.target.value = "";
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploading || sending}
-                        className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors disabled:opacity-50"
-                        aria-label={t("channel.attach-file")}
-                      >
-                        {uploading ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <Paperclip className="size-4" />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAsTask((v) => !v)}
-                        aria-pressed={asTask}
-                        disabled={sending}
-                        className={cn(
-                          "flex h-7 items-center gap-1 rounded-md px-2 text-xs transition-colors disabled:opacity-50 lg:ml-0",
-                          "ml-2",
-                          asTask
-                            ? "bg-accent/15 text-accent"
-                            : "text-control-placeholder hover:text-main hover:bg-control-bg"
-                        )}
-                        aria-label={t("channelTask.as-task")}
-                        title={t("channelTask.as-task-hint")}
-                      >
-                        <ListTodo className="size-3.5" />
-                        <span className="sm:hidden lg:inline">
-                          {t("channelTask.as-task")}
-                        </span>
-                      </button>
-                      {isDesktop && (
-                        <span className="text-xs text-control-placeholder">
-                          {t(
-                            enterToSend
-                              ? "chat.send-hint"
-                              : "chat.send-hint-inverted"
-                          )}
-                        </span>
-                      )}
-                    </div>
-                    <Button
-                      type="button"
-                      size="xs"
-                      onClick={handleSend}
-                      disabled={
-                        (!input.trim() && pendingAttachments.length === 0) ||
-                        sending
-                      }
-                    >
-                      <Send className="size-3" />
-                      {t("common.send")}
-                    </Button>
+          {/* Input area — hidden for agent-to-agent DMs (type 3: an admin can
+              view but cannot intervene) and when the tasks panel is open on
+              mobile (the panel itself is the focus, not composing). Desktop
+              keeps the composer visible. Every other embedded view is writable. */}
+          {(!tasksPanelOpen || isDesktop) && (
+            <div className="shrink-0 bg-background">
+              {isAgentDm ? (
+                <div className="px-6 py-4">
+                  <div className="rounded-2xl border border-control-border bg-control-bg/40 px-4 py-3 text-center text-xs text-control-placeholder">
+                    {t("chat.agent-dm-view-only")}
                   </div>
                 </div>
-                {mentionState?.active && textareaRef.current && (
-                  <MentionPopup
-                    id={MENTION_POPUP_ID}
-                    targets={mentionState.matched}
-                    query={mentionState.query}
-                    position={getCaretCoordinates(
-                      textareaRef.current,
-                      cursorPos
+              ) : (
+                <div className="px-4 pb-2 pt-2 lg:px-6 lg:pb-5">
+                  <div
+                    className="rounded-2xl border border-control-border bg-control-bg/40 focus-within:border-accent focus-within:bg-background transition-colors"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (e.dataTransfer.files.length > 0)
+                        handleFiles(e.dataTransfer.files);
+                    }}
+                  >
+                    {pendingAttachments.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 px-3 pt-2">
+                        {pendingAttachments.map((att) =>
+                          isImageAttachment(att) ? (
+                            <div
+                              key={att.id}
+                              className="group relative shrink-0"
+                            >
+                              <RemoteImage
+                                attachment={att}
+                                variant="thumb"
+                                onClick={() => openImagePreview(att)}
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPendingAttachments((prev) =>
+                                    prev.filter((p) => p.id !== att.id)
+                                  )
+                                }
+                                className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-control-border bg-background text-control-placeholder opacity-0 transition-opacity hover:text-error group-hover:opacity-100"
+                                aria-label={t("common.delete")}
+                              >
+                                <X className="size-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span
+                              key={att.id}
+                              className="group flex items-center gap-1.5 rounded-md border border-control-border bg-background px-2 py-1 text-xs text-main"
+                            >
+                              <span className="max-w-[160px] truncate">
+                                {att.name}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPendingAttachments((prev) =>
+                                    prev.filter((p) => p.id !== att.id)
+                                  )
+                                }
+                                className="text-control-placeholder hover:text-error transition-colors"
+                                aria-label={t("common.delete")}
+                              >
+                                <X className="size-3" />
+                              </button>
+                            </span>
+                          )
+                        )}
+                      </div>
                     )}
-                    selectedIndex={mentionSelectedIndex}
-                    onSelect={handleMentionSelect}
-                    onClose={() => setMentionState(null)}
-                  />
-                )}
-              </div>
-            )}
-          </div>
+                    <Textarea
+                      ref={textareaRef}
+                      className={cn(
+                        "block w-full resize-none border-0 bg-transparent px-4 py-3 text-sm text-main",
+                        "placeholder:text-control-placeholder focus:ring-0 focus:border-transparent",
+                        "max-h-[200px] min-h-[24px]"
+                      )}
+                      rows={1}
+                      placeholder={t("channel.placeholder")}
+                      aria-controls={
+                        mentionState?.active ? MENTION_POPUP_ID : undefined
+                      }
+                      aria-activedescendant={
+                        mentionState?.active && mentionState.matched.length > 0
+                          ? `${MENTION_POPUP_ID}-opt-${mentionSelectedIndex}`
+                          : undefined
+                      }
+                      value={input}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setInput(value);
+                        const pos = e.target.selectionStart ?? 0;
+                        setCursorPos(pos);
+                        const state = detectMention(value, pos, mentionTargets);
+                        setMentionState(state);
+                        setMentionSelectedIndex(0);
+                        if (state?.active) {
+                          const newMap: MentionTarget[] = [];
+                          const re = /(?:^|\s)@(\S+)/g;
+                          let m: RegExpExecArray | null;
+                          while ((m = re.exec(value)) !== null) {
+                            const name = m[1];
+                            const found = mentionTargets.find(
+                              (t) => t.name === name
+                            );
+                            if (found) newMap.push(found);
+                          }
+                          setMentionMap(newMap);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (mentionState?.active) {
+                          const total = mentionState.matched.length;
+                          if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            setMentionSelectedIndex((idx) =>
+                              idx + 1 < total ? idx + 1 : 0
+                            );
+                            return;
+                          }
+                          if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            setMentionSelectedIndex((idx) =>
+                              idx - 1 >= 0 ? idx - 1 : total - 1
+                            );
+                            return;
+                          }
+                          if (e.key === "Enter" || e.key === "Tab") {
+                            if (total === 0) return;
+                            e.preventDefault();
+                            if (mentionState.matched[mentionSelectedIndex]) {
+                              handleMentionSelect(
+                                mentionState.matched[mentionSelectedIndex]
+                              );
+                            }
+                            return;
+                          }
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            setMentionState(null);
+                            return;
+                          }
+                        }
+                        if (e.nativeEvent.isComposing) return;
+                        if (e.key !== "Enter") return;
+                        const wantSend = enterToSend ? !e.shiftKey : e.shiftKey;
+                        if (wantSend) {
+                          e.preventDefault();
+                          handleSend();
+                        }
+                      }}
+                      onSelect={(e) => {
+                        const target = e.target as HTMLTextAreaElement;
+                        const pos = target.selectionStart ?? 0;
+                        setCursorPos(pos);
+                        const state = detectMention(
+                          target.value,
+                          pos,
+                          mentionTargets
+                        );
+                        setMentionState(state);
+                        setMentionSelectedIndex(0);
+                      }}
+                      disabled={sending}
+                    />
+                    <div className="flex items-center justify-between px-3 pb-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files) handleFiles(e.target.files);
+                            e.target.value = "";
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploading || sending}
+                          className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors disabled:opacity-50"
+                          aria-label={t("channel.attach-file")}
+                        >
+                          {uploading ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Paperclip className="size-4" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAsTask((v) => !v)}
+                          aria-pressed={asTask}
+                          disabled={sending}
+                          className={cn(
+                            "flex h-7 items-center gap-1 rounded-md px-2 text-xs transition-colors disabled:opacity-50 lg:ml-0",
+                            "ml-2",
+                            asTask
+                              ? "bg-accent/15 text-accent"
+                              : "text-control-placeholder hover:text-main hover:bg-control-bg"
+                          )}
+                          aria-label={t("channelTask.as-task")}
+                          title={t("channelTask.as-task-hint")}
+                        >
+                          <ListTodo className="size-3.5" />
+                          <span className="sm:hidden lg:inline">
+                            {t("channelTask.as-task")}
+                          </span>
+                        </button>
+                        {isDesktop && (
+                          <span className="text-xs text-control-placeholder">
+                            {t(
+                              enterToSend
+                                ? "chat.send-hint"
+                                : "chat.send-hint-inverted"
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        size="xs"
+                        onClick={handleSend}
+                        disabled={
+                          (!input.trim() && pendingAttachments.length === 0) ||
+                          sending
+                        }
+                      >
+                        <Send className="size-3" />
+                        {t("common.send")}
+                      </Button>
+                    </div>
+                  </div>
+                  {mentionState?.active && textareaRef.current && (
+                    <MentionPopup
+                      id={MENTION_POPUP_ID}
+                      targets={mentionState.matched}
+                      query={mentionState.query}
+                      position={getCaretCoordinates(
+                        textareaRef.current,
+                        cursorPos
+                      )}
+                      selectedIndex={mentionSelectedIndex}
+                      onSelect={handleMentionSelect}
+                      onClose={() => setMentionState(null)}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         {threadRootOpen && (
           <ThreadPanel

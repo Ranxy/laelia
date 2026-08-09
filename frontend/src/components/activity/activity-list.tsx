@@ -1,10 +1,11 @@
-import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
+import { ChevronLeft, ChevronRight, Inbox, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { ActivityRow } from "@/components/activity/activity-row";
 import { EmptyState, LoadingState } from "@/components/chat/states";
 import { Button } from "@/components/ui/button";
+import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { Activity } from "@/types/proto-es/v1/command_pb";
@@ -55,19 +56,21 @@ export function ActivityList() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { messageId: selectedId } = useParams<{ messageId: string }>();
+  const isDesktop = useIsDesktop();
 
   const activities = useAppStore((s) => s.activities);
   const loading = useAppStore((s) => s.activitiesLoading);
+  const activitiesNextPageToken = useAppStore((s) => s.activitiesNextPageToken);
   const listActivities = useAppStore((s) => s.listActivities);
+  const loadMoreActivities = useAppStore((s) => s.loadMoreActivities);
   const markActivityDone = useAppStore((s) => s.markActivityDone);
 
   const [filter, setFilter] = useState<Filter>("unread");
   // pageTokens[i] is the page_token to ENTER page i; page 0 is "" (offset 0).
-  // Seeded with [""] so the off-by-one that broke Next is impossible: appending
-  // nextPageToken lands at index pageIndex+1, which is the page we navigate to.
+  // Kept for desktop Prev/Next pagination. Mobile uses infinite scroll and
+  // appends via the store's loadMoreActivities.
   const [pageTokens, setPageTokens] = useState<string[]>([""]);
   const [pageIndex, setPageIndex] = useState(0);
-  const [nextPageToken, setNextPageToken] = useState("");
   const [markingDone, setMarkingDone] = useState<string>("");
   const initialLoadDone = useRef(false);
   // requestSeq is a monotonic epoch for in-flight listActivities calls. Every
@@ -79,7 +82,8 @@ export function ActivityList() {
 
   const pageToken = pageTokens[pageIndex] ?? "";
   const canPrev = pageIndex > 0;
-  const canNext = nextPageToken !== "";
+  const canNext =
+    pageIndex < pageTokens.length - 1 || activitiesNextPageToken !== "";
 
   const load = useCallback(
     async (silent?: boolean) => {
@@ -95,7 +99,17 @@ export function ActivityList() {
       // A newer load (filter/page change, or a later poll) has started since
       // this one was issued — drop the stale result.
       if (seq !== requestSeq.current) return;
-      setNextPageToken(res?.nextPageToken ?? "");
+      // The store now owns activitiesNextPageToken; desktop pagination just
+      // tracks the token stack locally.
+      const next = res?.nextPageToken ?? "";
+      if (!silent) {
+        setPageTokens((tok) => {
+          // If the first page returned a next token we haven't captured yet,
+          // append it so the Next button works immediately.
+          if (next && !tok.includes(next)) return [...tok, next];
+          return tok;
+        });
+      }
     },
     [filter, pageToken, listActivities]
   );
@@ -118,13 +132,16 @@ export function ActivityList() {
     setFilter(next);
     setPageTokens([""]);
     setPageIndex(0);
-    setNextPageToken("");
   };
 
   const gotoPage = (delta: number) => {
     if (delta > 0) {
-      if (!nextPageToken) return;
-      setPageTokens((tok) => [...tok, nextPageToken]);
+      if (pageIndex < pageTokens.length - 1) {
+        setPageIndex((i) => i + 1);
+        return;
+      }
+      if (!activitiesNextPageToken) return;
+      setPageTokens((tok) => [...tok, activitiesNextPageToken]);
       setPageIndex((i) => i + 1);
     } else {
       if (pageIndex <= 0) return;
@@ -158,11 +175,38 @@ export function ActivityList() {
 
   const filters: Filter[] = ["all", "unread", "mention", "task", "reminder"];
 
+  // Mobile infinite scroll: when the bottom sentinel enters the viewport and
+  // there is another page available, load and append it. Hidden on desktop,
+  // which keeps the Prev/Next pagination footer.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const hasMore = activitiesNextPageToken !== "";
+  useEffect(() => {
+    if (isDesktop) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting) && hasMore && !loading) {
+        const { readStateFilter, categoryFilter } = filterToParams(filter);
+        void loadMoreActivities({
+          filter: categoryFilter,
+          readStateFilter,
+          pageSize: PAGE_SIZE,
+        });
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [filter, hasMore, loading, loadMoreActivities, isDesktop]);
+
   return (
     <div className="flex h-full flex-col">
-      {/* Header: title + active count. */}
-      <div className="shrink-0 border-b border-control-border px-3 py-2 lg:px-4 lg:py-3">
-        <div className="flex items-center gap-2">
+      {/* Header: title + active count (desktop only). On mobile we keep just
+          the filter tabs; the active count is redundant with the empty-state
+          text and the title already lives in the top app bar.
+          The bottom border spans the full viewport width on mobile so empty
+          tabs look identical to tabs whose rows extend edge-to-edge. */}
+      <div className="shrink-0 border-b border-control-border py-2 lg:px-4 lg:py-3">
+        <div className="hidden items-center gap-2 px-4 lg:flex">
           <Inbox className="hidden lg:block size-4 text-control-light" />
           <h1 className="hidden lg:block text-sm font-semibold text-control">
             {t("activity.title")}
@@ -171,20 +215,41 @@ export function ActivityList() {
             {t("activity.active-count", { n: unreadCount })}
           </span>
         </div>
-        {/* Filter pills. Active = accent; inactive = muted + hover.
-            On mobile they scroll horizontally so the header never grows
-            tall enough to steal list space. */}
-        <div className="mt-2 flex gap-1 overflow-x-auto pb-1 lg:mt-3 lg:flex-wrap lg:overflow-visible lg:pb-0">
+        {/* Filter tabs.
+            Mobile: horizontal scrollable bar. Each tab has a generous min-width
+            so short labels like "All" remain tappable, and a bottom indicator
+            marks the active tab.
+            Desktop: wrapped pill buttons. */}
+        <div
+          className={cn(
+            "flex",
+            isDesktop
+              ? "flex-wrap gap-1 px-4 lg:mt-3"
+              : "overflow-x-auto px-3 pb-1 [&::-webkit-scrollbar]:hidden"
+          )}
+          style={isDesktop ? undefined : { scrollbarWidth: "none" }}
+          role="tablist"
+          aria-label={t("activity.title")}
+        >
           {filters.map((f) => (
             <button
               key={f}
               type="button"
+              role="tab"
+              aria-selected={filter === f}
               onClick={() => handleFilterChange(f)}
               className={cn(
-                "shrink-0 rounded-xs px-2.5 py-1 text-xs font-medium transition-colors",
+                "text-xs font-medium transition-colors",
+                isDesktop
+                  ? "shrink-0 rounded-xs px-2.5 py-1"
+                  : "flex-none min-w-[60px] px-4 py-2",
                 filter === f
-                  ? "bg-accent text-accent-foreground"
-                  : "text-control-light hover:bg-control-bg"
+                  ? isDesktop
+                    ? "bg-accent text-accent-foreground"
+                    : "border-b-2 border-accent text-main font-semibold"
+                  : isDesktop
+                    ? "text-control-light hover:bg-control-bg"
+                    : "text-control-light"
               )}
             >
               {t(`activity.filter-${f}`)}
@@ -218,36 +283,51 @@ export function ActivityList() {
                 markingDone={markingDone === a.name}
               />
             ))}
+            {/* Mobile infinite-scroll sentinel. */}
+            {!isDesktop && (
+              <div
+                ref={sentinelRef}
+                className="flex items-center justify-center py-3"
+              >
+                {loading && (
+                  <Loader2 className="size-4 animate-spin text-control-light" />
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Pagination footer. */}
-      <div className="flex shrink-0 items-center justify-between gap-2 border-t border-control-border px-3 py-2 text-xs text-control-light">
-        <span className="hidden lg:inline">
-          {t("activity.page", { n: pageIndex + 1 })}
-        </span>
-        <div className="flex w-full justify-end gap-1 lg:w-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => gotoPage(-1)}
-            disabled={!canPrev || loading}
-          >
-            <ChevronLeft className="size-3.5" />
-            <span className="hidden lg:inline">{t("activity.prev")}</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => gotoPage(1)}
-            disabled={!canNext || loading}
-          >
-            <span className="hidden lg:inline">{t("activity.next")}</span>
-            <ChevronRight className="size-3.5" />
-          </Button>
+      {/* Pagination footer — desktop only. On mobile infinite scroll replaces it;
+          also hide entirely when there are no activities so empty tabs don't show
+          two disabled icon-only buttons floating at the bottom. */}
+      {isDesktop && activities.length > 0 && (
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-control-border px-3 py-2 text-xs text-control-light">
+          <span className="hidden lg:inline">
+            {t("activity.page", { n: pageIndex + 1 })}
+          </span>
+          <div className="flex w-full justify-end gap-1 lg:w-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => gotoPage(-1)}
+              disabled={!canPrev || loading}
+            >
+              <ChevronLeft className="size-3.5" />
+              <span className="hidden lg:inline">{t("activity.prev")}</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => gotoPage(1)}
+              disabled={!canNext || loading}
+            >
+              <span className="hidden lg:inline">{t("activity.next")}</span>
+              <ChevronRight className="size-3.5" />
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

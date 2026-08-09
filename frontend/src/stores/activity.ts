@@ -58,9 +58,13 @@ function activitiesEqual(a: Activity[], b: Activity[]): boolean {
 // mutation. The feed is inherently per-user — the caller's own id is the
 // implicit filter on the server — so the slice holds a single list for the
 // authenticated user.
-export const createActivitySlice: AppSliceCreator<ActivitySlice> = (set) => ({
+export const createActivitySlice: AppSliceCreator<ActivitySlice> = (
+  set,
+  get
+) => ({
   activities: [],
   activitiesLoading: false,
+  activitiesNextPageToken: "",
 
   async listActivities(params) {
     if (!params?.silent) {
@@ -76,22 +80,63 @@ export const createActivitySlice: AppSliceCreator<ActivitySlice> = (set) => ({
           pageToken: params?.pageToken ?? "",
         })
       );
-      set((state) => ({
-        activities: activitiesEqual(state.activities, res.activities)
-          ? state.activities
-          : res.activities,
-        activitiesLoading: false,
-      }));
-      return { activities: res.activities, nextPageToken: res.nextPageToken };
+      const nextPageToken = res.nextPageToken ?? "";
+      const pageToken = params?.pageToken ?? "";
+      const silent = params?.silent ?? false;
+      set((state) => {
+        let nextActivities: Activity[];
+        if (silent && pageToken === "") {
+          // Background poll on the first page: merge any brand-new rows on top
+          // without dropping pages the user has already loaded via infinite
+          // scroll. Existing rows that also appear in the poll response are
+          // refreshed in place with the latest server state.
+          const incomingNames = new Set(res.activities.map((a) => a.name));
+          const kept = state.activities.filter(
+            (a) => !incomingNames.has(a.name)
+          );
+          nextActivities = [...res.activities, ...kept];
+        } else {
+          nextActivities = activitiesEqual(state.activities, res.activities)
+            ? state.activities
+            : res.activities;
+        }
+        return {
+          activities: activitiesEqual(state.activities, nextActivities)
+            ? state.activities
+            : nextActivities,
+          activitiesNextPageToken: nextPageToken,
+          activitiesLoading: false,
+        };
+      });
+      return { activities: res.activities, nextPageToken };
     } catch {
       // A silent background poll (the activity feed polls every 5s) must keep
       // the existing list on a transient error — only an explicit load reports
       // failure and clears. Mirrors agent.ts's fetchAgents.
       if (!params?.silent) {
-        set({ activities: [], activitiesLoading: false });
+        set({
+          activities: [],
+          activitiesNextPageToken: "",
+          activitiesLoading: false,
+        });
       }
       return undefined;
     }
+  },
+
+  async loadMoreActivities(params) {
+    const pageToken = get().activitiesNextPageToken;
+    if (pageToken === "" || get().activitiesLoading) return;
+    const res = await get().listActivities({
+      ...params,
+      pageToken,
+      silent: true,
+    });
+    if (!res) return;
+    set((state) => ({
+      activities: [...state.activities, ...res.activities],
+      activitiesNextPageToken: res.nextPageToken,
+    }));
   },
 
   async markActivityDone(name) {

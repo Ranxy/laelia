@@ -5,6 +5,7 @@ import { EmptyState, LoadingState } from "@/components/chat/states";
 import { TaskStatusBadge } from "@/components/chat/task-status-badge";
 import { Button } from "@/components/ui/button";
 import { taskStatusShort } from "@/lib/task-status";
+import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { ChatMessageUI } from "@/stores/types";
@@ -156,15 +157,20 @@ function TaskCard({
   onOpenTask: (taskMessageId: string) => void;
 }) {
   const { t } = useTranslation();
+  const isDesktop = useIsDesktop();
   const status = task.task?.status ?? 0;
   const title =
     task.content.split("\n")[0]?.trim() || t("channelTask.untitled");
   const replies = task.threadReplyCount ?? 0;
   return (
     <div
+      onClick={!isDesktop ? () => onOpenTask(task.id) : undefined}
       className={cn(
-        "group/card rounded-lg border border-control-border bg-control-bg/30 px-3 py-2 text-sm"
+        "group/card rounded-lg border border-control-border bg-control-bg/30 px-3 py-2 text-sm",
+        !isDesktop && "cursor-pointer active:bg-control-bg/60"
       )}
+      role={!isDesktop ? "button" : undefined}
+      aria-label={!isDesktop ? t("channelTask.open") : undefined}
     >
       <div className="flex flex-wrap items-center gap-1.5">
         {task.task && (
@@ -189,7 +195,10 @@ function TaskCard({
         </p>
         <button
           type="button"
-          onClick={() => onOpenTask(task.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenTask(task.id);
+          }}
           className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-control-placeholder transition-colors hover:bg-control-bg hover:text-main cursor-pointer"
           aria-label={t("channelTask.open")}
         >

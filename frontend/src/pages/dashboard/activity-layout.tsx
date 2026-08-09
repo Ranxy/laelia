@@ -22,7 +22,7 @@ export function ActivityLayout() {
         className={
           messageId
             ? "hidden w-80 shrink-0 border-r border-control-border bg-background lg:flex lg:flex-col"
-            : "flex w-full shrink-0 border-r border-control-border bg-background lg:w-80 lg:flex-col"
+            : "flex w-full flex-col shrink-0 border-r border-control-border bg-background lg:w-80"
         }
       >
         <ActivityList />
