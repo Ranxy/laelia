@@ -449,32 +449,40 @@ export interface ThreadSlice {
   ) => Promise<ChatMessage>;
 }
 
-// PreviewSlice owns the markdown file preview overlay: the active preview
-// (file + decoded text + status) and the actions to open/close it. The overlay
-// is mounted once at the dashboard layout and reads `activePreview`.
+// PreviewSlice owns the markdown/html file preview overlay: the active
+// preview (file + decoded text + status) and the actions to open/close it.
+// The overlay is mounted once at the dashboard layout and reads
+// `activePreview`; `kind` selects the renderer (markdown DOM vs sandboxed
+// iframe).
 export interface PreviewSlice {
   activePreview: {
+    kind: "markdown" | "html";
     conversation: string; // "conversations/{id}"
     conversationId: string; // bare id
     // Thread root the previewed attachment belongs to (the attachment owner's
-    // threadRoot, or the owner's own id when it is a root). Used in Phase 2 to
-    // route section-anchored comments as replies on this thread.
+    // threadRoot, or the owner's own id when it is a root). Used to route
+    // section-anchored comments as replies on this thread.
     rootMessageId: string;
     attachment: Attachment;
     content: string;
     status: "loading" | "ready" | "error" | "too-large";
-    // When set, the overlay scrolls to this heading id once the markdown DOM
-    // is ready (cross-scenario anchor jump: a comment's anchor chip clicked
-    // outside the overlay opens the preview already scrolled to its section).
-    // Consumed and cleared by the overlay after the first ready render.
-    scrollToSectionId?: string;
+    // When set, the overlay scrolls to this anchor once the preview DOM is
+    // ready (cross-scenario anchor jump: a comment's anchor chip clicked
+    // outside the overlay opens the preview already positioned at its
+    // section). For markdown it is a heading DOM id; for html it is a locate
+    // spec ("html:y:{y}") paired with `scrollToQuote`. Consumed and cleared
+    // by the overlay after the first ready render.
+    scrollToAnchorId?: string;
+    // For html previews, the quoted text to locate when jumping to an anchor.
+    scrollToQuote?: string;
   } | null;
 
   openFilePreview: (
     conversation: string,
     rootMessageId: string,
     attachment: Attachment,
-    scrollToSectionId?: string
+    scrollToAnchorId?: string,
+    scrollToQuote?: string
   ) => Promise<void>;
   closeFilePreview: () => void;
 }

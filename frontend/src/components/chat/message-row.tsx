@@ -29,6 +29,7 @@ import {
   avatarNameForUserId,
   useAvatar,
 } from "@/lib/avatar-cache";
+import { isHtmlAttachment, MAX_HTML_PREVIEW_BYTES } from "@/lib/html-file";
 import { isImageAttachment } from "@/lib/image-file";
 import {
   isMarkdownAttachment,
@@ -591,10 +592,14 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
                     />
                   );
                 }
-                const previewable = isMarkdownAttachment(att);
+                const previewable =
+                  isMarkdownAttachment(att) || isHtmlAttachment(att);
                 const tooLarge =
                   previewable &&
-                  (att.sizeBytes ?? 0n) > MAX_MARKDOWN_PREVIEW_BYTES;
+                  (att.sizeBytes ?? 0n) >
+                    (isHtmlAttachment(att)
+                      ? MAX_HTML_PREVIEW_BYTES
+                      : MAX_MARKDOWN_PREVIEW_BYTES);
                 const rootMessageId = msg.threadRoot ?? msg.id;
                 return (
                   <FileCard

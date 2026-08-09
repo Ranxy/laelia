@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   getLayerRoot,
+  LAYER_SURFACE_CLASS,
   usePreserveHigherLayerAccess,
 } from "@/components/ui/layer";
 import { downloadAttachment } from "@/lib/file-download";
@@ -37,7 +38,7 @@ export function ImagePreviewOverlay() {
   const { attachment, blobUrl, status } = active;
 
   return createPortal(
-    <div className="fixed inset-0 z-10 flex flex-col">
+    <div className={`fixed inset-0 ${LAYER_SURFACE_CLASS} flex flex-col`}>
       {/* Top bar — normal page surface. */}
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-control-border bg-background px-4">
         <span className="truncate text-sm font-medium text-main">

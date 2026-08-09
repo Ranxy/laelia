@@ -142,7 +142,13 @@ export function ActivityDetail() {
           openFilePreview(convName, rootMessageId, attachment)
         }
         onJumpToSection={(attachment, sectionId, rootMessageId) =>
-          openFilePreview(convName, rootMessageId, attachment, sectionId)
+          openFilePreview(
+            convName,
+            rootMessageId,
+            attachment,
+            sectionId,
+            attachment.quotedText
+          )
         }
         onPreviewImage={openImagePreview}
       />

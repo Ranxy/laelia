@@ -14,6 +14,7 @@ import { formatBytes } from "@/components/chat/file-card";
 import { Button } from "@/components/ui/button";
 import {
   getLayerRoot,
+  LAYER_SURFACE_CLASS,
   usePreserveHigherLayerAccess,
 } from "@/components/ui/layer";
 import { downloadAttachment } from "@/lib/file-download";
@@ -51,7 +52,7 @@ export function MarkdownPreviewOverlay() {
 
   // Build the outline once the markdown DOM is painted. The content is static
   // (`final`), so a single rAF after `status === "ready"` suffices. When the
-  // preview was opened with a scrollToSectionId (cross-scenario anchor jump
+  // preview was opened with a scrollToAnchorId (cross-scenario anchor jump
   // from a comment card), scroll to that heading right after ids are assigned.
   useEffect(() => {
     if (!active || active.status !== "ready") {
@@ -61,14 +62,14 @@ export function MarkdownPreviewOverlay() {
     const id = requestAnimationFrame(() => {
       if (!contentRef.current) return;
       setOutline(buildOutline(contentRef.current));
-      if (active.scrollToSectionId) {
+      if (active.scrollToAnchorId) {
         document
-          .getElementById(active.scrollToSectionId)
+          .getElementById(active.scrollToAnchorId)
           ?.scrollIntoView({ block: "start", behavior: "smooth" });
       }
     });
     return () => cancelAnimationFrame(id);
-  }, [active?.status, active?.content, active?.scrollToSectionId]);
+  }, [active?.status, active?.content, active?.scrollToAnchorId]);
 
   if (!active) return null;
   const { attachment } = active;
@@ -79,7 +80,9 @@ export function MarkdownPreviewOverlay() {
       ?.scrollIntoView({ block: "start", behavior: "smooth" });
 
   return createPortal(
-    <div className="fixed inset-0 z-10 flex flex-col bg-background">
+    <div
+      className={`fixed inset-0 ${LAYER_SURFACE_CLASS} flex flex-col bg-background`}
+    >
       {/* Top bar */}
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-control-border px-4">
         <FileText className="size-4 shrink-0 text-control-light" />
