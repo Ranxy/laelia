@@ -340,8 +340,14 @@ const ConversationRow = memo(function ConversationRow({
             </p>
           )}
         </div>
+        {/* The pinned indicator is mobile-only: on desktop the always-visible
+            pin/unpin button in the row's corner already conveys the state, so
+            showing both would render a pin and an unpin icon side by side. */}
         {pinned && (
-          <Pin className="size-3.5 shrink-0 text-accent" aria-hidden />
+          <Pin
+            className="size-3.5 shrink-0 text-accent lg:hidden"
+            aria-hidden
+          />
         )}
         {unread > 0 && (
           <span
@@ -365,7 +371,10 @@ const ConversationRow = memo(function ConversationRow({
         }}
         aria-label={pinned ? t("channel.unpin") : t("channel.pin")}
         className={cn(
-          "absolute right-1 top-1/2 hidden size-6 -translate-y-1/2 items-center justify-center rounded transition-colors lg:inline-flex",
+          // z-20 keeps the desktop pin button clickable above the row's z-10
+          // surface (the row covers the full width and would otherwise swallow
+          // the click and open the channel instead of toggling the pin).
+          "absolute right-1 top-1/2 z-20 hidden size-6 -translate-y-1/2 items-center justify-center rounded transition-colors lg:inline-flex",
           pinned
             ? "text-accent opacity-100"
             : "text-control-light opacity-0 hover:bg-control-bg group-hover:opacity-100"
