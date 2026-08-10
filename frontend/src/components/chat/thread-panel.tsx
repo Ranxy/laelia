@@ -188,7 +188,7 @@ export function ThreadPanel({
   const conversationName = `conversations/${channelId}`;
   const asideClass = fluid
     ? "flex h-full w-full flex-col"
-    : "fixed inset-0 z-10 flex w-full flex-col bg-background pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:static lg:inset-auto lg:z-auto lg:w-[420px] lg:shrink-0 lg:border-l lg:border-control-border lg:pt-0 lg:pb-0";
+    : "fixed inset-0 z-panel flex w-full flex-col bg-background pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:static lg:inset-auto lg:w-[420px] lg:shrink-0 lg:border-l lg:border-control-border lg:pt-0 lg:pb-0";
 
   const thread = useAppStore((s) => s.threadByRoot[rootMessageId]);
   const sendThreadMessage = useAppStore((s) => s.sendThreadMessage);

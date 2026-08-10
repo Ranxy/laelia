@@ -87,6 +87,19 @@
   transform: translate3d(0, 0, 0);
 }
 
+/* Shared z-index tokens for fixed app chrome. Feature code must not use raw
+   z-* utilities on fixed/global overlays (see scripts/check-react-layering.mjs);
+   these keep the mobile stacking order in one place:
+   content < z-panel (mobile full-screen panels) < z-chrome (header/tab bar)
+   < semantic layer roots (overlay 2500+). */
+@utility z-panel {
+  z-index: 10;
+}
+
+@utility z-chrome {
+  z-index: 20;
+}
+
 @utility writing-vertical-rl {
   writing-mode: vertical-rl;
 }
