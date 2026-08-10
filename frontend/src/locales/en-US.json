@@ -889,6 +889,8 @@
     "you": "You",
     "agent": "Agent",
     "view-details": "View details",
+    "send-message": "Send message",
+    "open-conversation-failed": "Failed to open conversation",
     "scroll-to-bottom": "Scroll to bottom",
     "tool-call": "Tool Call",
     "tool-started": "Started",

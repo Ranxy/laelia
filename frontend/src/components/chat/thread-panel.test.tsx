@@ -55,10 +55,10 @@ vi.mock("@/lib/use-is-desktop", () => ({
   useIsDesktop: () => true,
 }));
 
-import { ThreadPanel } from "./thread-panel";
 import { useAppStore } from "@/stores";
 import type { ChatMessageUI } from "@/stores/types";
 import { TaskStatus } from "@/types/proto-es/v1/command_pb";
+import { ThreadPanel } from "./thread-panel";
 
 const ROOT_NAME = "conversations/c1/messages/m1";
 

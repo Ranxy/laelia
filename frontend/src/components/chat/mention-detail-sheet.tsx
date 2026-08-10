@@ -1,6 +1,15 @@
-import { Bot, Loader2, User as UserIcon } from "lucide-react";
+import {
+  Bot,
+  ExternalLink,
+  Loader2,
+  MessageSquare,
+  User as UserIcon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { ConnectionBadge } from "@/components/connection-badge";
+import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetBody,
@@ -11,6 +20,8 @@ import {
 } from "@/components/ui/sheet";
 import { agentServiceClient, userServiceClient } from "@/connect";
 import { agentResourceName } from "@/lib/command-status";
+import { toastManager } from "@/lib/toast";
+import { useAppStore } from "@/stores";
 import type { Agent } from "@/types/proto-es/v1/agent_pb";
 import type { User } from "@/types/proto-es/v1/user_service_pb";
 
@@ -46,9 +57,14 @@ export function MentionDetailSheet({
   name,
   onClose,
 }: MentionDetailSheetProps) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const getOrCreateConversation = useAppStore((s) => s.getOrCreateConversation);
+  const fetchChannels = useAppStore((s) => s.fetchChannels);
   const [agent, setAgent] = useState<Agent | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
+  const [startingChat, setStartingChat] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -71,6 +87,35 @@ export function MentionDetailSheet({
 
   const entityLabel = type === "agent" ? "Agent" : "User";
 
+  // Opens (or reuses) the user↔agent DM and jumps to the chat surface, the
+  // same flow as the agent detail page's "Chat" action.
+  async function handleSendMessage() {
+    if (startingChat) return;
+    setStartingChat(true);
+    try {
+      const conversation = await getOrCreateConversation(`agents/${id}`);
+      await fetchChannels();
+      onClose();
+      navigate(`/${conversation.split("/").pop()}`);
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("chat.open-conversation-failed"),
+        description:
+          err instanceof Error
+            ? err.message
+            : t("chat.open-conversation-failed"),
+      });
+    } finally {
+      setStartingChat(false);
+    }
+  }
+
+  function handleViewDetails() {
+    onClose();
+    navigate(`/members/agents/${id}`);
+  }
+
   return (
     <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
       <SheetContent width="medium">
@@ -81,7 +126,7 @@ export function MentionDetailSheet({
           <SheetDescription className="sr-only">{name}</SheetDescription>
         </SheetHeader>
         <SheetBody>
-          <div className="flex flex-col gap-5">
+          <div className="flex h-full flex-col gap-5">
             {/* Header card */}
             <div className="flex items-center gap-3 rounded-xs border border-control-border bg-control-bg/50 p-3">
               <div className="flex size-9 items-center justify-center rounded-full bg-accent/10 text-accent">
@@ -166,6 +211,31 @@ export function MentionDetailSheet({
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {type === "agent" && (
+              <div className="mt-auto flex gap-2">
+                <Button
+                  className="flex-1"
+                  onClick={handleSendMessage}
+                  disabled={startingChat}
+                >
+                  {startingChat ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <MessageSquare className="size-4" />
+                  )}
+                  {t("chat.send-message")}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleViewDetails}
+                >
+                  <ExternalLink className="size-4" />
+                  {t("chat.view-details")}
+                </Button>
               </div>
             )}
           </div>

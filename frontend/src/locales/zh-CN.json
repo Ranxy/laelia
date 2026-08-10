@@ -889,6 +889,8 @@
     "you": "你",
     "agent": "Agent",
     "view-details": "查看详情",
+    "send-message": "发送消息",
+    "open-conversation-failed": "打开会话失败",
     "scroll-to-bottom": "滚动到底部",
     "tool-call": "工具调用",
     "tool-started": "已开始",
