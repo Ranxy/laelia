@@ -791,6 +791,8 @@
     "no-data": "No members yet.",
     "no-selection": "Select a member to view their details.",
     "load-failed": "Failed to load the member directory. Please retry.",
+    "search-placeholder": "Search agents and humans…",
+    "no-search-results": "No agents or humans match “{{query}}”.",
     "section-agents": "Agents",
     "section-humans": "Humans",
     "add-agent": "Add agent",

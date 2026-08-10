@@ -6,6 +6,7 @@ import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { SearchInput } from "@/components/ui/search-input";
 import {
   avatarNameForAgentId,
   avatarNameForUserId,
@@ -60,11 +61,28 @@ export function MembersPage() {
     return m;
   }, [machines]);
 
-  const agents = members.filter((m) => m.kind === "agent");
-  const humans = members.filter((m) => m.kind === "user");
-
   const [agentsOpen, setAgentsOpen] = useState(true);
   const [humansOpen, setHumansOpen] = useState(true);
+  const [query, setQuery] = useState("");
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const searching = normalizedQuery.length > 0;
+  // Client-side directory search: match the display title or the member id
+  // (the segment after "agents/" / "users/"), case-insensitively.
+  const matchesQuery = (m: MemberSummary) =>
+    !searching ||
+    m.title.toLowerCase().includes(normalizedQuery) ||
+    m.name
+      .replace(/^(agents|users)\//, "")
+      .toLowerCase()
+      .includes(normalizedQuery);
+
+  const agents = members.filter((m) => m.kind === "agent" && matchesQuery(m));
+  const humans = members.filter((m) => m.kind === "user" && matchesQuery(m));
+  // While searching, hide sections that have no matches instead of showing an
+  // empty group; when nothing matches at all, a dedicated message appears.
+  const showAgents = !searching || agents.length > 0;
+  const showHumans = !searching || humans.length > 0;
 
   return (
     <div className="flex h-full w-full overflow-hidden">
@@ -79,6 +97,16 @@ export function MembersPage() {
           <h1 className="text-sm font-semibold text-main truncate">
             {t("members.title")}
           </h1>
+        </div>
+
+        <div className="shrink-0 px-3 py-2">
+          <SearchInput
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("members.search-placeholder")}
+            aria-label={t("members.search-placeholder")}
+            className="h-8 text-sm"
+          />
         </div>
 
         <div className="flex-1 overflow-y-auto py-1">
@@ -101,51 +129,63 @@ export function MembersPage() {
             <p className="px-3 py-2 text-sm text-control-light">
               {t("members.no-data")}
             </p>
+          ) : searching && agents.length === 0 && humans.length === 0 ? (
+            <p className="px-3 py-2 text-sm text-control-light">
+              {t("members.no-search-results", { query: query.trim() })}
+            </p>
           ) : (
             <div className="flex flex-col">
-              <SectionHeader
-                label={t("members.section-agents")}
-                count={agents.length}
-                open={agentsOpen}
-                onToggle={() => setAgentsOpen((v) => !v)}
-                onAdd={() => navigate("/machines")}
-                addLabel={t("members.add-agent")}
-              />
-              {agentsOpen &&
-                agents.map((member) => (
-                  <MemberRow
-                    key={member.name}
-                    member={member}
-                    machineLabel={
-                      member.subtitle
-                        ? (machineTitleByName.get(member.subtitle) ??
-                          member.subtitle.replace(/^machines\//, ""))
-                        : ""
-                    }
-                    selected={
-                      selectedAgentId === member.name.replace(/^agents\//, "")
-                    }
+              {showAgents && (
+                <>
+                  <SectionHeader
+                    label={t("members.section-agents")}
+                    count={agents.length}
+                    open={agentsOpen}
+                    onToggle={() => setAgentsOpen((v) => !v)}
+                    onAdd={() => navigate("/machines")}
+                    addLabel={t("members.add-agent")}
                   />
-                ))}
-
-              <SectionHeader
-                label={t("members.section-humans")}
-                count={humans.length}
-                open={humansOpen}
-                onToggle={() => setHumansOpen((v) => !v)}
-                onAdd={() => navigate("/settings/users")}
-                addLabel={t("members.add-human")}
-              />
-              {humansOpen &&
-                humans.map((member) => (
-                  <MemberRow
-                    key={member.name}
-                    member={member}
-                    selected={
-                      selectedUserId === member.name.replace(/^users\//, "")
-                    }
+                  {agentsOpen &&
+                    agents.map((member) => (
+                      <MemberRow
+                        key={member.name}
+                        member={member}
+                        machineLabel={
+                          member.subtitle
+                            ? (machineTitleByName.get(member.subtitle) ??
+                              member.subtitle.replace(/^machines\//, ""))
+                            : ""
+                        }
+                        selected={
+                          selectedAgentId ===
+                          member.name.replace(/^agents\//, "")
+                        }
+                      />
+                    ))}
+                </>
+              )}
+              {showHumans && (
+                <>
+                  <SectionHeader
+                    label={t("members.section-humans")}
+                    count={humans.length}
+                    open={humansOpen}
+                    onToggle={() => setHumansOpen((v) => !v)}
+                    onAdd={() => navigate("/settings/users")}
+                    addLabel={t("members.add-human")}
                   />
-                ))}
+                  {humansOpen &&
+                    humans.map((member) => (
+                      <MemberRow
+                        key={member.name}
+                        member={member}
+                        selected={
+                          selectedUserId === member.name.replace(/^users\//, "")
+                        }
+                      />
+                    ))}
+                </>
+              )}
             </div>
           )}
         </div>

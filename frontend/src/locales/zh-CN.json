@@ -791,6 +791,8 @@
     "no-data": "暂无成员。",
     "no-selection": "选择一个成员以查看详情。",
     "load-failed": "加载成员目录失败,请重试。",
+    "search-placeholder": "搜索 Agent 和用户…",
+    "no-search-results": "没有匹配“{{query}}”的 Agent 或用户。",
     "section-agents": "Agents",
     "section-humans": "Humans",
     "add-agent": "添加 Agent",
