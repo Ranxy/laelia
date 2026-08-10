@@ -128,6 +128,15 @@ export declare type ListUsersRequest = Message<"laelia.v1.ListUsersRequest"> & {
    * @generated from field: string filter = 4;
    */
   filter: string;
+
+  /**
+   * Include the internal SYSTEM_BOT account in the results. Defaults to false:
+   * the system bot is hidden from every caller except the settings user
+   * directory, which opts in explicitly.
+   *
+   * @generated from field: bool include_system_bot = 5;
+   */
+  includeSystemBot: boolean;
 };
 
 /**

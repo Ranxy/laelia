@@ -77,6 +77,12 @@ func (s *UserService) GetUser(ctx context.Context, request *connect.Request[v1pb
 	if user == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %d not found", userID))
 	}
+	// The internal SYSTEM_BOT account is only reachable through ListUsers with
+	// include_system_bot set (the settings user directory); direct lookups are
+	// hidden so no other surface can resolve or display it.
+	if user.Type == storepb.PrincipalType_SYSTEM_BOT {
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %d not found", userID))
+	}
 	return connect.NewResponse(convertToUser(user)), nil
 }
 
@@ -133,9 +139,10 @@ func (s *UserService) ListUsers(ctx context.Context, request *connect.Request[v1
 	limitPlusOne := offset.limit + 1
 
 	find := &store.FindUserMessage{
-		Limit:       &limitPlusOne,
-		Offset:      &offset.offset,
-		ShowDeleted: request.Msg.ShowDeleted,
+		Limit:            &limitPlusOne,
+		Offset:           &offset.offset,
+		ShowDeleted:      request.Msg.ShowDeleted,
+		ExcludeSystemBot: !request.Msg.IncludeSystemBot,
 	}
 	if err := parseListUserFilter(find, request.Msg.Filter); err != nil {
 		return nil, err

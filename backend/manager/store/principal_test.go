@@ -3,6 +3,8 @@ package store
 import (
 	"strings"
 	"testing"
+
+	models "github.com/Ranxy/laelia/backend/generated-go/store"
 )
 
 // TestBuildListUsersQuery_ProjectFilter_Parameterized verifies that a
@@ -73,4 +75,48 @@ func TestBuildListUsersQuery_GroupsNullFilter(t *testing.T) {
 	if !strings.Contains(query, "FILTER (WHERE user_group.id IS NOT NULL)") {
 		t.Fatalf("user_groups CTE must filter out NULL LEFT JOIN rows:\n%s", query)
 	}
+}
+
+// TestBuildListUsersQuery_ExcludeSystemBot verifies the system-bot exclusion:
+// the default query keeps every principal (store-internal lookups such as
+// agent-DM owner resolution must still read id=1), while ExcludeSystemBot adds
+// a parameterized `principal.type != 'SYSTEM_BOT'` predicate so the value is
+// carried as an argument, never interpolated into the query text.
+func TestBuildListUsersQuery_ExcludeSystemBot(t *testing.T) {
+	t.Run("default keeps system bot", func(t *testing.T) {
+		query, _ := buildListUsersQuery(&FindUserMessage{})
+		if strings.Contains(query, "SYSTEM_BOT") {
+			t.Fatalf("default query must not exclude the system bot:\n%s", query)
+		}
+	})
+
+	t.Run("explicit exclusion adds parameterized predicate", func(t *testing.T) {
+		query, args := buildListUsersQuery(&FindUserMessage{ExcludeSystemBot: true})
+		if !strings.Contains(query, "principal.type != $") {
+			t.Fatalf("expected parameterized type exclusion, got:\n%s", query)
+		}
+		var found bool
+		for _, a := range args {
+			if s, ok := a.(string); ok && s == "SYSTEM_BOT" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("SYSTEM_BOT arg not present in args %v", args)
+		}
+	})
+
+	t.Run("exclusion wins over type filter", func(t *testing.T) {
+		// Even a caller that explicitly filters for SYSTEM_BOT must not see it
+		// without opting in: the exclusion is unconditional.
+		botType := models.PrincipalType_SYSTEM_BOT
+		query, args := buildListUsersQuery(&FindUserMessage{
+			ExcludeSystemBot: true,
+			Type:             &botType,
+		})
+		if !strings.Contains(query, "principal.type != $") {
+			t.Fatalf("expected exclusion to win over the type filter, got:\n%s", query)
+		}
+		_ = args
+	})
 }

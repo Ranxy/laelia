@@ -30,11 +30,16 @@ type FindUserMessage struct {
 	ID          *int
 	Email       *string
 	ShowDeleted bool
-	Type        *models.PrincipalType
-	Limit       *int
-	Offset      *int
-	Filter      *ListResourceFilter
-	ProjectID   *string
+	// ExcludeSystemBot hides the internal SYSTEM_BOT account (id=1). Only the
+	// user-service API sets it (unless the caller opts in); store-internal
+	// lookups (agent-DM owner resolution, resolveUserName) keep the default
+	// false so they can still read the system bot.
+	ExcludeSystemBot bool
+	Type             *models.PrincipalType
+	Limit            *int
+	Offset           *int
+	Filter           *ListResourceFilter
+	ProjectID        *string
 }
 
 // UpdateUserMessage is the message to update a user.
@@ -306,6 +311,12 @@ func buildListUsersQuery(find *FindUserMessage) (string, []any) {
 	}
 	if v := find.Type; v != nil {
 		where, args = append(where, fmt.Sprintf("principal.type = $%d", len(args)+1)), append(args, v.String())
+	}
+	// The internal SYSTEM_BOT account is hidden unless the caller explicitly
+	// opts in; even a user_type filter naming SYSTEM_BOT is overridden so the
+	// exclusion is unconditional.
+	if find.ExcludeSystemBot {
+		where, args = append(where, fmt.Sprintf("principal.type != $%d", len(args)+1)), append(args, models.PrincipalType_SYSTEM_BOT.String())
 	}
 	if !find.ShowDeleted {
 		where, args = append(where, fmt.Sprintf("principal.deleted = $%d", len(args)+1)), append(args, false)

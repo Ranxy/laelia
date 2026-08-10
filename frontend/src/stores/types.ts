@@ -118,6 +118,9 @@ export interface UserSlice {
       pageToken?: string;
       showDeleted?: boolean;
       filter?: string;
+      /** Include the internal SYSTEM_BOT account; only the settings user
+       *  directory opts in. Defaults to false everywhere else. */
+      includeSystemBot?: boolean;
     },
     opts?: { silent?: boolean }
   ) => Promise<{ nextPageToken: string } | undefined>;

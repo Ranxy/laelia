@@ -5,11 +5,15 @@ import { useAppStore } from "./index";
 const mock = vi.hoisted(() => ({
   listUsersError: false as boolean,
   listAgentsError: false as boolean,
+  // Captured call args so tests can assert the roster never asks for the
+  // internal SYSTEM_BOT account (includeSystemBot stays false by default).
+  listUsersCalls: [] as Array<{ includeSystemBot?: boolean }>,
 }));
 
 vi.mock("@/connect", () => ({
   userServiceClient: {
-    async listUsers() {
+    async listUsers(args: { includeSystemBot?: boolean } = {}) {
+      mock.listUsersCalls.push(args);
       if (mock.listUsersError) throw new Error("boom");
       return {
         users: [{ name: "users/1", title: "Human One", email: "h1@x" }],
@@ -46,6 +50,7 @@ beforeEach(() => {
   });
   mock.listUsersError = false;
   mock.listAgentsError = false;
+  mock.listUsersCalls = [];
 });
 
 describe("fetchMembers", () => {
@@ -90,6 +95,15 @@ describe("fetchMembers", () => {
     const state = useAppStore.getState();
     expect(state.membersLoading).toBe(false);
     expect(state.members.length).toBe(2);
+  });
+
+  it("never requests the system bot from the user roster", async () => {
+    await useAppStore.getState().fetchMembers();
+
+    expect(mock.listUsersCalls.length).toBeGreaterThan(0);
+    for (const call of mock.listUsersCalls) {
+      expect(call.includeSystemBot).toBe(false);
+    }
   });
 
   it("keeps cached members on a silent refresh failure", async () => {

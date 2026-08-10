@@ -152,6 +152,11 @@ message ListUsersRequest {
   // name.matches("ed") && project == "projects/sample-project"
   // (name == "ed" || email == "ed@example.com") && project == "projects/sample-project"
   string filter = 4;
+
+  // Include the internal SYSTEM_BOT account in the results. Defaults to false:
+  // the system bot is hidden from every caller except the settings user
+  // directory, which opts in explicitly.
+  bool include_system_bot = 5;
 }
 
 message ListUsersResponse {

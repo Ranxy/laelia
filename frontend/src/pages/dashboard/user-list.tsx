@@ -208,10 +208,15 @@ export function UserListPage() {
 
   // silent skips the loading flag so a refetch swaps the rows in place without
   // unmounting the table (headers/frame) to show the spinner.
+  // The active roster is the only surface that may see the internal SYSTEM_BOT
+  // account; every other caller keeps the default (excluded).
   const loadActive = useCallback((filter: string, silent = false) => {
     useAppStore
       .getState()
-      .fetchUsers({ showDeleted: false, pageSize: 100, filter }, { silent });
+      .fetchUsers(
+        { showDeleted: false, pageSize: 100, filter, includeSystemBot: true },
+        { silent }
+      );
   }, []);
   const loadTrash = useCallback((filter: string, silent = false) => {
     useAppStore

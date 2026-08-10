@@ -307,9 +307,13 @@ type ListUsersRequest struct {
 	// You can combine filter conditions like:
 	// name.matches("ed") && project == "projects/sample-project"
 	// (name == "ed" || email == "ed@example.com") && project == "projects/sample-project"
-	Filter        string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
+	// Include the internal SYSTEM_BOT account in the results. Defaults to false:
+	// the system bot is hidden from every caller except the settings user
+	// directory, which opts in explicitly.
+	IncludeSystemBot bool `protobuf:"varint,5,opt,name=include_system_bot,json=includeSystemBot,proto3" json:"include_system_bot,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ListUsersRequest) Reset() {
@@ -368,6 +372,13 @@ func (x *ListUsersRequest) GetFilter() string {
 		return x.Filter
 	}
 	return ""
+}
+
+func (x *ListUsersRequest) GetIncludeSystemBot() bool {
+	if x != nil {
+		return x.IncludeSystemBot
+	}
+	return false
 }
 
 type ListUsersResponse struct {
@@ -1174,13 +1185,14 @@ const file_v1_user_service_proto_rawDesc = "" +
 	"\x05names\x18\x01 \x03(\tB\x13\xe0A\x02\xfaA\r\n" +
 	"\vlaelia/UserR\x05names\">\n" +
 	"\x15BatchGetUsersResponse\x12%\n" +
-	"\x05users\x18\x01 \x03(\v2\x0f.laelia.v1.UserR\x05users\"\x89\x01\n" +
+	"\x05users\x18\x01 \x03(\v2\x0f.laelia.v1.UserR\x05users\"\xb7\x01\n" +
 	"\x10ListUsersRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\x12!\n" +
 	"\fshow_deleted\x18\x03 \x01(\bR\vshowDeleted\x12\x16\n" +
-	"\x06filter\x18\x04 \x01(\tR\x06filter\"b\n" +
+	"\x06filter\x18\x04 \x01(\tR\x06filter\x12,\n" +
+	"\x12include_system_bot\x18\x05 \x01(\bR\x10includeSystemBot\"b\n" +
 	"\x11ListUsersResponse\x12%\n" +
 	"\x05users\x18\x01 \x03(\v2\x0f.laelia.v1.UserR\x05users\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"=\n" +

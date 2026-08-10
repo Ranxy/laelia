@@ -15,6 +15,7 @@ import (
 
 	"github.com/Ranxy/laelia/backend/common"
 	"github.com/Ranxy/laelia/backend/common/permission"
+	storepb "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
@@ -441,6 +442,19 @@ func (s *CommandService) DeleteChannel(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
+// validateChannelUserMember rejects a user member that cannot join a channel:
+// missing/deleted accounts and the internal SYSTEM_BOT (which only serves as
+// owner-of-record for system-created conversations, never as a real member).
+func validateChannelUserMember(memberID string, user *store.UserMessage) error {
+	if user == nil || user.MemberDeleted {
+		return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("user %s not found or deleted", memberID))
+	}
+	if user.Type == storepb.PrincipalType_SYSTEM_BOT {
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("cannot add the system bot to a channel"))
+	}
+	return nil
+}
+
 func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Request[v1pb.AddChannelMemberRequest]) (*connect.Response[v1pb.AddChannelMemberResponse], error) {
 	convID, err := parseConversationID(req.Msg.Conversation)
 	if err != nil {
@@ -508,7 +522,7 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 				if userErr != nil {
 					return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(userErr, "failed to look up user %d", userID))
 				}
-				if user == nil || user.MemberDeleted {
+				if user == nil || user.MemberDeleted || user.Type == storepb.PrincipalType_SYSTEM_BOT {
 					continue
 				}
 				seen[key] = true
@@ -559,8 +573,16 @@ func (s *CommandService) AddChannelMember(ctx context.Context, req *connect.Requ
 			}
 		}
 		if memberType == store.MemberTypeUser {
-			if _, uidErr := strconv.Atoi(memberID); uidErr != nil {
+			userID, uidErr := strconv.Atoi(memberID)
+			if uidErr != nil {
 				return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user member_id, must be principal id"))
+			}
+			user, userErr := s.store.GetUserByID(ctx, userID)
+			if userErr != nil {
+				return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(userErr, "failed to look up user %d", userID))
+			}
+			if err := validateChannelUserMember(memberID, user); err != nil {
+				return nil, err
 			}
 		}
 		inputs = append(inputs, store.ConversationMemberInput{MemberType: memberType, MemberID: memberID, ExpireAt: expireAt})

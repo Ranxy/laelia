@@ -32,6 +32,7 @@ export const createUserSlice: AppSliceCreator<UserSlice> = (set) => ({
           pageToken: params?.pageToken ?? "",
           showDeleted,
           filter: params?.filter ?? "",
+          includeSystemBot: params?.includeSystemBot ?? false,
         })
       );
       if (showDeleted) {
