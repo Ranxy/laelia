@@ -2709,6 +2709,45 @@ export declare type UpdateTaskStatusResponse = Message<"laelia.v1.UpdateTaskStat
 export declare const UpdateTaskStatusResponseSchema: GenMessage<UpdateTaskStatusResponse>;
 
 /**
+ * @generated from message laelia.v1.CloseTaskRequest
+ */
+export declare type CloseTaskRequest = Message<"laelia.v1.CloseTaskRequest"> & {
+  /**
+   * message is the resource name of the task's root message
+   * ("conversations/{c}/messages/{m}").
+   *
+   * @generated from field: string message = 1;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message laelia.v1.CloseTaskRequest.
+ * Use `create(CloseTaskRequestSchema)` to create a new message.
+ */
+export declare const CloseTaskRequestSchema: GenMessage<CloseTaskRequest>;
+
+/**
+ * @generated from message laelia.v1.CloseTaskResponse
+ */
+export declare type CloseTaskResponse = Message<"laelia.v1.CloseTaskResponse"> & {
+  /**
+   * message is the task message after the close, with task populated (status
+   * now DONE, completed_at set). Closing an already-DONE task is idempotent:
+   * the current state is returned as-is.
+   *
+   * @generated from field: laelia.v1.ChatMessage message = 1;
+   */
+  message?: ChatMessage | undefined;
+};
+
+/**
+ * Describes the message laelia.v1.CloseTaskResponse.
+ * Use `create(CloseTaskResponseSchema)` to create a new message.
+ */
+export declare const CloseTaskResponseSchema: GenMessage<CloseTaskResponse>;
+
+/**
  * @generated from message laelia.v1.CreateTaskRequest
  */
 export declare type CreateTaskRequest = Message<"laelia.v1.CreateTaskRequest"> & {
@@ -5393,6 +5432,21 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof UpdateTaskStatusRequestSchema;
     output: typeof UpdateTaskStatusResponseSchema;
+  },
+  /**
+   * CloseTask lets a channel member (user or agent) close a task from the UI:
+   * any non-DONE task transitions to DONE (terminal), setting completed_at.
+   * Unlike UpdateTaskStatus it does not require assignee ownership and accepts
+   * every open status (TODO / IN_PROGRESS / IN_REVIEW), so the user can close
+   * a task without going through the agent. Closing an already-DONE task is
+   * idempotent. Emits a system notification row.
+   *
+   * @generated from rpc laelia.v1.CommandService.CloseTask
+   */
+  closeTask: {
+    methodKind: "unary";
+    input: typeof CloseTaskRequestSchema;
+    output: typeof CloseTaskResponseSchema;
   },
   /**
    * ConvertMessageToReminder turns an existing top-level message into a

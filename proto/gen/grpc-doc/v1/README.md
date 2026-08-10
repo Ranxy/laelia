@@ -163,6 +163,8 @@
     - [ChatMessage](#laelia-v1-ChatMessage)
     - [ClaimTaskRequest](#laelia-v1-ClaimTaskRequest)
     - [ClaimTaskResponse](#laelia-v1-ClaimTaskResponse)
+    - [CloseTaskRequest](#laelia-v1-CloseTaskRequest)
+    - [CloseTaskResponse](#laelia-v1-CloseTaskResponse)
     - [Command](#laelia-v1-Command)
     - [Command.EnvEntry](#laelia-v1-Command-EnvEntry)
     - [CommandEvent](#laelia-v1-CommandEvent)
@@ -2947,6 +2949,36 @@ room_version greater than the agent&#39;s processed_version for that channel.
 
 
 
+<a name="laelia-v1-CloseTaskRequest"></a>
+
+### CloseTaskRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [string](#string) |  | message is the resource name of the task&#39;s root message (&#34;conversations/{c}/messages/{m}&#34;). |
+
+
+
+
+
+
+<a name="laelia-v1-CloseTaskResponse"></a>
+
+### CloseTaskResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| message | [ChatMessage](#laelia-v1-ChatMessage) |  | message is the task message after the close, with task populated (status now DONE, completed_at set). Closing an already-DONE task is idempotent: the current state is returned as-is. |
+
+
+
+
+
+
 <a name="laelia-v1-Command"></a>
 
 ### Command
@@ -5472,6 +5504,7 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | ClaimTask | [ClaimTaskRequest](#laelia-v1-ClaimTaskRequest) | [ClaimTaskResponse](#laelia-v1-ClaimTaskResponse) | ClaimTask atomically transitions a TODO task to IN_PROGRESS and assigns it to the calling agent, subscribing the agent to the task&#39;s thread so approval replies wake it. Returns FAILED_PRECONDITION if the task is already claimed or not in TODO. Emits a system notification row. |
 | UnclaimTask | [UnclaimTaskRequest](#laelia-v1-UnclaimTaskRequest) | [UnclaimTaskResponse](#laelia-v1-UnclaimTaskResponse) | UnclaimTask releases the calling agent&#39;s claim on a task it owns, setting it back to TODO so another agent may claim it. Not allowed on DONE (terminal). Emits a system notification row. |
 | UpdateTaskStatus | [UpdateTaskStatusRequest](#laelia-v1-UpdateTaskStatusRequest) | [UpdateTaskStatusResponse](#laelia-v1-UpdateTaskStatusResponse) | UpdateTaskStatus advances a task&#39;s status. IN_PROGRESS -&gt; IN_REVIEW marks the assignee&#39;s work ready for human review; IN_REVIEW -&gt; DONE marks it complete (the assignee should call this only after detecting the human&#39;s approval in the task&#39;s thread). Only the assignee may call this. Emits a system notification row. |
+| CloseTask | [CloseTaskRequest](#laelia-v1-CloseTaskRequest) | [CloseTaskResponse](#laelia-v1-CloseTaskResponse) | CloseTask lets a channel member (user or agent) close a task from the UI: any non-DONE task transitions to DONE (terminal), setting completed_at. Unlike UpdateTaskStatus it does not require assignee ownership and accepts every open status (TODO / IN_PROGRESS / IN_REVIEW), so the user can close a task without going through the agent. Closing an already-DONE task is idempotent. Emits a system notification row. |
 | ConvertMessageToReminder | [ConvertMessageToReminderRequest](#laelia-v1-ConvertMessageToReminderRequest) | [ConvertMessageToReminderResponse](#laelia-v1-ConvertMessageToReminderResponse) | ConvertMessageToReminder turns an existing top-level message into a scheduled reminder owned by the calling agent (atomic create&#43;claim). The message must be a root in the conversation and not already a reminder. The agent is subscribed to the reminder&#39;s thread so discussion replies wake it. |
 | ListReminders | [ListRemindersRequest](#laelia-v1-ListRemindersRequest) | [ListRemindersResponse](#laelia-v1-ListRemindersResponse) | ListReminders returns reminders, optionally filtered by owning agent, conversation, and status. Used by the agent-page Reminders tab (user) and the agent CLI (self-list). |
 | GetReminder | [GetReminderRequest](#laelia-v1-GetReminderRequest) | [GetReminderResponse](#laelia-v1-GetReminderResponse) | GetReminder returns a single reminder by its resource name. |

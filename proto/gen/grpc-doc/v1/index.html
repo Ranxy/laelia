@@ -800,6 +800,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.CloseTaskRequest"><span class="badge">M</span>CloseTaskRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.CloseTaskResponse"><span class="badge">M</span>CloseTaskResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.Command"><span class="badge">M</span>Command</a>
                 </li>
               
@@ -7916,6 +7924,57 @@ FAILED_PRECONDITION instead and this response is not sent. </p></td>
 
         
       
+        <h3 id="laelia.v1.CloseTaskRequest">CloseTaskRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>message is the resource name of the task&#39;s root message
+(&#34;conversations/{c}/messages/{m}&#34;). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.CloseTaskResponse">CloseTaskResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>message</td>
+                  <td><a href="#laelia.v1.ChatMessage">ChatMessage</a></td>
+                  <td></td>
+                  <td><p>message is the task message after the close, with task populated (status
+now DONE, completed_at set). Closing an already-DONE task is idempotent:
+the current state is returned as-is. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.v1.Command">Command</h3>
         <p></p>
 
@@ -13495,6 +13554,18 @@ the assignee&#39;s work ready for human review; IN_REVIEW -&gt; DONE marks it
 complete (the assignee should call this only after detecting the human&#39;s
 approval in the task&#39;s thread). Only the assignee may call this. Emits a
 system notification row.</p></td>
+              </tr>
+            
+              <tr>
+                <td>CloseTask</td>
+                <td><a href="#laelia.v1.CloseTaskRequest">CloseTaskRequest</a></td>
+                <td><a href="#laelia.v1.CloseTaskResponse">CloseTaskResponse</a></td>
+                <td><p>CloseTask lets a channel member (user or agent) close a task from the UI:
+any non-DONE task transitions to DONE (terminal), setting completed_at.
+Unlike UpdateTaskStatus it does not require assignee ownership and accepts
+every open status (TODO / IN_PROGRESS / IN_REVIEW), so the user can close
+a task without going through the agent. Closing an already-DONE task is
+idempotent. Emits a system notification row.</p></td>
               </tr>
             
               <tr>

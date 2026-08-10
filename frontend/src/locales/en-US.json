@@ -1061,7 +1061,14 @@
     "refresh": "Refresh",
     "open": "Open",
     "back-to-tasks": "Tasks",
-    "replies": "{{count}} replies"
+    "replies": "{{count}} replies",
+    "close": "Close task",
+    "close-confirm-title": "Close this task?",
+    "close-confirm-description": "The task will be marked as done. Any agent working on it will keep running until it finishes on its own.",
+    "close-confirm-action": "Close task",
+    "close-success": "Task closed",
+    "close-error": "Failed to close task",
+    "close-error-description": "Please try again."
   },
   "channel": {
     "title": "Channels",

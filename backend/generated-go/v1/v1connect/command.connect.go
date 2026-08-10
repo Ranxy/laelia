@@ -153,6 +153,9 @@ const (
 	// CommandServiceUpdateTaskStatusProcedure is the fully-qualified name of the CommandService's
 	// UpdateTaskStatus RPC.
 	CommandServiceUpdateTaskStatusProcedure = "/laelia.v1.CommandService/UpdateTaskStatus"
+	// CommandServiceCloseTaskProcedure is the fully-qualified name of the CommandService's CloseTask
+	// RPC.
+	CommandServiceCloseTaskProcedure = "/laelia.v1.CommandService/CloseTask"
 	// CommandServiceConvertMessageToReminderProcedure is the fully-qualified name of the
 	// CommandService's ConvertMessageToReminder RPC.
 	CommandServiceConvertMessageToReminderProcedure = "/laelia.v1.CommandService/ConvertMessageToReminder"
@@ -328,6 +331,13 @@ type CommandServiceClient interface {
 	// approval in the task's thread). Only the assignee may call this. Emits a
 	// system notification row.
 	UpdateTaskStatus(context.Context, *connect.Request[v1.UpdateTaskStatusRequest]) (*connect.Response[v1.UpdateTaskStatusResponse], error)
+	// CloseTask lets a channel member (user or agent) close a task from the UI:
+	// any non-DONE task transitions to DONE (terminal), setting completed_at.
+	// Unlike UpdateTaskStatus it does not require assignee ownership and accepts
+	// every open status (TODO / IN_PROGRESS / IN_REVIEW), so the user can close
+	// a task without going through the agent. Closing an already-DONE task is
+	// idempotent. Emits a system notification row.
+	CloseTask(context.Context, *connect.Request[v1.CloseTaskRequest]) (*connect.Response[v1.CloseTaskResponse], error)
 	// ConvertMessageToReminder turns an existing top-level message into a
 	// scheduled reminder owned by the calling agent (atomic create+claim). The
 	// message must be a root in the conversation and not already a reminder. The
@@ -633,6 +643,12 @@ func NewCommandServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(commandServiceMethods.ByName("UpdateTaskStatus")),
 			connect.WithClientOptions(opts...),
 		),
+		closeTask: connect.NewClient[v1.CloseTaskRequest, v1.CloseTaskResponse](
+			httpClient,
+			baseURL+CommandServiceCloseTaskProcedure,
+			connect.WithSchema(commandServiceMethods.ByName("CloseTask")),
+			connect.WithClientOptions(opts...),
+		),
 		convertMessageToReminder: connect.NewClient[v1.ConvertMessageToReminderRequest, v1.ConvertMessageToReminderResponse](
 			httpClient,
 			baseURL+CommandServiceConvertMessageToReminderProcedure,
@@ -803,6 +819,7 @@ type commandServiceClient struct {
 	claimTask                 *connect.Client[v1.ClaimTaskRequest, v1.ClaimTaskResponse]
 	unclaimTask               *connect.Client[v1.UnclaimTaskRequest, v1.UnclaimTaskResponse]
 	updateTaskStatus          *connect.Client[v1.UpdateTaskStatusRequest, v1.UpdateTaskStatusResponse]
+	closeTask                 *connect.Client[v1.CloseTaskRequest, v1.CloseTaskResponse]
 	convertMessageToReminder  *connect.Client[v1.ConvertMessageToReminderRequest, v1.ConvertMessageToReminderResponse]
 	listReminders             *connect.Client[v1.ListRemindersRequest, v1.ListRemindersResponse]
 	getReminder               *connect.Client[v1.GetReminderRequest, v1.GetReminderResponse]
@@ -1021,6 +1038,11 @@ func (c *commandServiceClient) UpdateTaskStatus(ctx context.Context, req *connec
 	return c.updateTaskStatus.CallUnary(ctx, req)
 }
 
+// CloseTask calls laelia.v1.CommandService.CloseTask.
+func (c *commandServiceClient) CloseTask(ctx context.Context, req *connect.Request[v1.CloseTaskRequest]) (*connect.Response[v1.CloseTaskResponse], error) {
+	return c.closeTask.CallUnary(ctx, req)
+}
+
 // ConvertMessageToReminder calls laelia.v1.CommandService.ConvertMessageToReminder.
 func (c *commandServiceClient) ConvertMessageToReminder(ctx context.Context, req *connect.Request[v1.ConvertMessageToReminderRequest]) (*connect.Response[v1.ConvertMessageToReminderResponse], error) {
 	return c.convertMessageToReminder.CallUnary(ctx, req)
@@ -1233,6 +1255,13 @@ type CommandServiceHandler interface {
 	// approval in the task's thread). Only the assignee may call this. Emits a
 	// system notification row.
 	UpdateTaskStatus(context.Context, *connect.Request[v1.UpdateTaskStatusRequest]) (*connect.Response[v1.UpdateTaskStatusResponse], error)
+	// CloseTask lets a channel member (user or agent) close a task from the UI:
+	// any non-DONE task transitions to DONE (terminal), setting completed_at.
+	// Unlike UpdateTaskStatus it does not require assignee ownership and accepts
+	// every open status (TODO / IN_PROGRESS / IN_REVIEW), so the user can close
+	// a task without going through the agent. Closing an already-DONE task is
+	// idempotent. Emits a system notification row.
+	CloseTask(context.Context, *connect.Request[v1.CloseTaskRequest]) (*connect.Response[v1.CloseTaskResponse], error)
 	// ConvertMessageToReminder turns an existing top-level message into a
 	// scheduled reminder owned by the calling agent (atomic create+claim). The
 	// message must be a root in the conversation and not already a reminder. The
@@ -1534,6 +1563,12 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 		connect.WithSchema(commandServiceMethods.ByName("UpdateTaskStatus")),
 		connect.WithHandlerOptions(opts...),
 	)
+	commandServiceCloseTaskHandler := connect.NewUnaryHandler(
+		CommandServiceCloseTaskProcedure,
+		svc.CloseTask,
+		connect.WithSchema(commandServiceMethods.ByName("CloseTask")),
+		connect.WithHandlerOptions(opts...),
+	)
 	commandServiceConvertMessageToReminderHandler := connect.NewUnaryHandler(
 		CommandServiceConvertMessageToReminderProcedure,
 		svc.ConvertMessageToReminder,
@@ -1740,6 +1775,8 @@ func NewCommandServiceHandler(svc CommandServiceHandler, opts ...connect.Handler
 			commandServiceUnclaimTaskHandler.ServeHTTP(w, r)
 		case CommandServiceUpdateTaskStatusProcedure:
 			commandServiceUpdateTaskStatusHandler.ServeHTTP(w, r)
+		case CommandServiceCloseTaskProcedure:
+			commandServiceCloseTaskHandler.ServeHTTP(w, r)
 		case CommandServiceConvertMessageToReminderProcedure:
 			commandServiceConvertMessageToReminderHandler.ServeHTTP(w, r)
 		case CommandServiceListRemindersProcedure:
@@ -1945,6 +1982,10 @@ func (UnimplementedCommandServiceHandler) UnclaimTask(context.Context, *connect.
 
 func (UnimplementedCommandServiceHandler) UpdateTaskStatus(context.Context, *connect.Request[v1.UpdateTaskStatusRequest]) (*connect.Response[v1.UpdateTaskStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.UpdateTaskStatus is not implemented"))
+}
+
+func (UnimplementedCommandServiceHandler) CloseTask(context.Context, *connect.Request[v1.CloseTaskRequest]) (*connect.Response[v1.CloseTaskResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("laelia.v1.CommandService.CloseTask is not implemented"))
 }
 
 func (UnimplementedCommandServiceHandler) ConvertMessageToReminder(context.Context, *connect.Request[v1.ConvertMessageToReminderRequest]) (*connect.Response[v1.ConvertMessageToReminderResponse], error) {

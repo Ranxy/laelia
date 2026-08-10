@@ -303,6 +303,33 @@ func (s *CommandService) UpdateTaskStatus(ctx context.Context, req *connect.Requ
 	return connect.NewResponse(&v1pb.UpdateTaskStatusResponse{Message: storeToV1ChatMessage(msg)}), nil
 }
 
+// CloseTask lets a channel member close a task directly from the UI: any
+// non-DONE task transitions to DONE (terminal), setting completed_at. Unlike
+// UpdateTaskStatus it does not require assignee ownership and accepts every
+// open status (TODO / IN_PROGRESS / IN_REVIEW), so the user can close a task
+// without going through the assignee. Closing an already-DONE task is
+// idempotent (no duplicate system notification). Authorization is the IAM
+// interceptor's conversations.send check against the task's conversation.
+func (s *CommandService) CloseTask(ctx context.Context, req *connect.Request[v1pb.CloseTaskRequest]) (*connect.Response[v1pb.CloseTaskResponse], error) {
+	convID, msgID, err := parseMessageName(req.Msg.Message)
+	if err != nil {
+		return nil, err
+	}
+	msg, changed, err := s.store.CloseTask(ctx, msgID, convID)
+	if err != nil {
+		switch {
+		case errors.Is(err, store.ErrTaskNotFound):
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		default:
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to close task"))
+		}
+	}
+	if changed {
+		s.postTaskSystemNotification(ctx, convID, fmt.Sprintf("✅ %s closed task #%d %q", resolveActorName(ctx), msg.TaskInfo.TaskNumber, truncateContent(msg.Content)))
+	}
+	return connect.NewResponse(&v1pb.CloseTaskResponse{Message: storeToV1ChatMessage(msg)}), nil
+}
+
 // postTaskSystemNotification inserts a sender_type=SYSTEM chat_message into the
 // conversation flow so task lifecycle events (created/converted/claimed/
 // released/reviewed/done) appear as a system line in the message list. It bumps

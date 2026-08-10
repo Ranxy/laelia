@@ -536,6 +536,10 @@ export interface TaskSlice {
     conversationId: string,
     messageId: string
   ) => Promise<void>;
+  // closeTask marks a task DONE (terminal) from the UI. The caller's thread
+  // root is patched with the authoritative response and the board + counts
+  // reload; throws on failure so the UI can surface the error.
+  closeTask: (conversationId: string, rootMessageId: string) => Promise<void>;
 }
 
 export interface ReminderSlice {

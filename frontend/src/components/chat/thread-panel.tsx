@@ -1,6 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import {
   ArrowLeft,
+  CheckCircle2,
   ExternalLink,
   Loader2,
   Maximize2,
@@ -21,6 +22,14 @@ import {
 } from "@/components/chat/message-row";
 import { RemoteImage } from "@/components/chat/remote-image";
 import { EmptyState, LoadingState } from "@/components/chat/states";
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { detectMention } from "@/composables/useMentionDetect";
@@ -32,13 +41,14 @@ import {
 import { commandServiceClient } from "@/connect";
 import { getCaretCoordinates } from "@/lib/caret-position";
 import { isImageAttachment } from "@/lib/image-file";
+import { toastManager } from "@/lib/toast";
 import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { senderKeyForMessage } from "@/stores/chat-helpers";
 import type { ChatMessageUI } from "@/stores/types";
 import type { Attachment } from "@/types/proto-es/v1/command_pb";
-import { AttachmentSchema } from "@/types/proto-es/v1/command_pb";
+import { AttachmentSchema, TaskStatus } from "@/types/proto-es/v1/command_pb";
 
 const MENTION_POPUP_ID = "thread-mention-popup";
 
@@ -402,6 +412,7 @@ export function ThreadPanel({
           rootMsg={null}
           onClose={onClose}
           onViewInChannel={onViewInChannel}
+          readOnly={readOnly}
           expanded={expanded}
           onToggleExpand={onToggleExpand}
         />
@@ -419,6 +430,7 @@ export function ThreadPanel({
         rootMsg={rootMsg}
         onClose={onClose}
         onViewInChannel={onViewInChannel}
+        readOnly={readOnly}
         expanded={expanded}
         onToggleExpand={onToggleExpand}
       />
@@ -696,6 +708,7 @@ function ThreadHeader({
   rootMsg,
   onClose,
   onViewInChannel,
+  readOnly,
   expanded,
   onToggleExpand,
 }: {
@@ -709,6 +722,9 @@ function ThreadHeader({
   // jump is only meaningful from a standalone/embedded context (activity detail,
   // reminder detail) that is not the channel itself.
   onViewInChannel?: () => void;
+  // readOnly hides the close-task action (agent-to-agent DMs are admin
+  // view-only, same as the composer).
+  readOnly?: boolean;
   // onToggleExpand renders the expand/collapse toggle; expanded selects the
   // icon shown. Both omitted outside the channel page.
   expanded?: boolean;
@@ -718,7 +734,37 @@ function ThreadHeader({
   const isDesktop = useIsDesktop();
   const closeThread = useAppStore((s) => s.closeThread);
   const toggleTasksPanel = useAppStore((s) => s.toggleTasksPanel);
+  const closeTask = useAppStore((s) => s.closeTask);
+  const [closeTaskOpen, setCloseTaskOpen] = useState(false);
+  const [closingTask, setClosingTask] = useState(false);
   const isTask = !!rootMsg?.task;
+  // Users close a task straight from its thread header — but only while it is
+  // not already DONE, and never in readOnly (admin agent-to-agent DMs).
+  const canCloseTask =
+    isTask && !readOnly && rootMsg?.task?.status !== TaskStatus.DONE;
+  const handleCloseTask = async () => {
+    if (!rootMsg) return;
+    setClosingTask(true);
+    try {
+      await closeTask(channelId, rootMsg.id);
+      setCloseTaskOpen(false);
+      toastManager.add({
+        type: "success",
+        title: t("channelTask.close-success"),
+      });
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: t("channelTask.close-error"),
+        description:
+          err instanceof Error
+            ? err.message
+            : t("channelTask.close-error-description"),
+      });
+    } finally {
+      setClosingTask(false);
+    }
+  };
   const handleBackToTasks = () => {
     // Drill back from a task's thread to the channel's task board.
     closeThread();
@@ -755,6 +801,45 @@ function ThreadHeader({
             {t("chat.thread-view-in-channel")}
           </span>
         </button>
+      )}
+      {canCloseTask && (
+        <>
+          <button
+            type="button"
+            onClick={() => setCloseTaskOpen(true)}
+            className="flex size-7 items-center justify-center rounded-md text-control-placeholder hover:text-main hover:bg-control-bg transition-colors"
+            aria-label={t("channelTask.close")}
+            title={t("channelTask.close")}
+          >
+            <CheckCircle2 className="size-4" />
+          </button>
+          <AlertDialog open={closeTaskOpen} onOpenChange={setCloseTaskOpen}>
+            <AlertDialogContent>
+              <AlertDialogTitle>
+                {t("channelTask.close-confirm-title")}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("channelTask.close-confirm-description")}
+              </AlertDialogDescription>
+              <AlertDialogFooter>
+                <AlertDialogClose>
+                  <Button variant="outline" disabled={closingTask}>
+                    {t("common.cancel")}
+                  </Button>
+                </AlertDialogClose>
+                <Button
+                  variant="destructive"
+                  disabled={closingTask}
+                  onClick={handleCloseTask}
+                >
+                  {closingTask
+                    ? t("common.saving")
+                    : t("channelTask.close-confirm-action")}
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
       )}
       {onToggleExpand && (
         <button

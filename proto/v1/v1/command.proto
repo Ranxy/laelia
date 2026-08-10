@@ -936,6 +936,21 @@ message UpdateTaskStatusResponse {
   ChatMessage message = 1;
 }
 
+message CloseTaskRequest {
+  // message is the resource name of the task's root message
+  // ("conversations/{c}/messages/{m}").
+  string message = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference).type = "laelia/Conversation"
+  ];
+}
+message CloseTaskResponse {
+  // message is the task message after the close, with task populated (status
+  // now DONE, completed_at set). Closing an already-DONE task is idempotent:
+  // the current state is returned as-is.
+  ChatMessage message = 1;
+}
+
 message CreateTaskRequest {
   string conversation = 1 [
     (google.api.field_behavior) = REQUIRED,
@@ -1590,6 +1605,18 @@ service CommandService {
   // approval in the task's thread). Only the assignee may call this. Emits a
   // system notification row.
   rpc UpdateTaskStatus(UpdateTaskStatusRequest) returns (UpdateTaskStatusResponse) {}
+
+  // CloseTask lets a channel member (user or agent) close a task from the UI:
+  // any non-DONE task transitions to DONE (terminal), setting completed_at.
+  // Unlike UpdateTaskStatus it does not require assignee ownership and accepts
+  // every open status (TODO / IN_PROGRESS / IN_REVIEW), so the user can close
+  // a task without going through the agent. Closing an already-DONE task is
+  // idempotent. Emits a system notification row.
+  rpc CloseTask(CloseTaskRequest) returns (CloseTaskResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.send";
+    option (laelia.v1.audit) = true;
+  }
 
   // ConvertMessageToReminder turns an existing top-level message into a
   // scheduled reminder owned by the calling agent (atomic create+claim). The

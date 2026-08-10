@@ -19,6 +19,7 @@
 7. **转换权限**:任何频道成员(用户或 agent)可转换已有 top-level 消息为任务。
 8. **claim 不主动通知其他 agent**:认领只产生系统通知行(系统消息不唤醒 agent,见下)。其他 agent 在下次自然 drain 时通过 `task list` / `message read` 看到任务已被认领,避免认领风暴。
 9. **agent 任务发现**:drain 流程显式增加一步 `task list --status TODO`,因为 `message read` 只返回 cursor 之后的增量,已 ack 过的旧任务需要 `task list` 主动发现。
+10. **用户可直接关闭任务**:task 的 thread 标题栏("Expand thread"左侧)新增关闭按钮,任何频道成员可把任意非 DONE 任务置为 DONE(幂等,复用 `CloseTask` RPC);不要求 assignee 身份、不主动中断正在执行的 agent。审核流(review→done)仍由 agent 自行 `task done`,两者并存。
 
 ## 数据模型
 
@@ -139,6 +140,7 @@ message TaskInfo {
   - 任务徽标:在 `CommandStatusBadge`(205-210)旁加 `<TaskStatusBadge task={msg.task} />`(新组件,仿 `command-status-badge.tsx` + 新 `frontend/src/lib/task-status.ts` 做 `taskStatusToVariant`/i18n 映射),显示 `#N · IN_PROGRESS`。
   - 系统通知行:`msg.senderType === 3` 时渲染为居中、低对比的文本行(无气泡/头像)。
 - **Tasks 面板**:新 `frontend/src/components/chat/tasks-panel.tsx`(仿 `thread-panel.tsx` 的开合与 store 接线),调 `commandServiceClient.listTasks`,列出任务(徽标 + 负责人),提供对选中消息的 "Convert to Task" 动作(`convertMessageToTask`)。新增 `frontend/src/stores/task.ts` + `TaskSlice`。
+- **Thread 标题栏关闭按钮**(`thread-panel.tsx` 的 `ThreadHeader`,"View in channel" 与 "Expand thread" 之间):仅 `rootMsg.task` 存在、状态非 DONE 且非 `readOnly` 时显示,`AlertDialog` 二次确认后调 store `closeTask`(`CloseTaskRequestSchema`),成功即以响应消息 patch 打开的 thread root 并刷新任务面板/计数,失败 toast 提示。
 
 ## 状态迁移与权限
 
@@ -149,8 +151,9 @@ message TaskInfo {
 | unclaim: IN_PROGRESS→TODO | 当前 assignee | `status=2 AND assignee=caller` | FailedPrecondition |
 | review: IN_PROGRESS→IN_REVIEW | 当前 assignee | `status=2 AND assignee=caller` | FailedPrecondition |
 | done: IN_REVIEW→DONE | 当前 assignee | `status=3 AND assignee=caller` | FailedPrecondition |
+| close: 任意非 DONE→DONE | 任何频道成员(user/agent) | `status <> DONE`(幂等) | NotFound(无 task 行) |
 
-`UpdateTaskStatus`/`ClaimTask`/`UnclaimTask`/`CreateTask` 仅 agent;handler 用 `GetAgentFromContext` 取 caller,`assignee_agent_id` 不匹配返回 `CodePermissionDenied`。无面向用户的 done 按钮。
+`UpdateTaskStatus`/`ClaimTask`/`UnclaimTask`/`CreateTask` 仅 agent;handler 用 `GetAgentFromContext` 取 caller,`assignee_agent_id` 不匹配返回 `CodePermissionDenied`。用户关闭走独立的 `CloseTask` RPC(`conversations.send` 权限,resource_reference 解析为会话):不要求 assignee 身份,任意非 DONE → DONE 并写 `completed_at`,重复关闭幂等(不重复发系统通知)。
 
 ## 实现顺序
 
@@ -159,7 +162,7 @@ message TaskInfo {
 3. Store:`store/task.go` 新文件 + `store/conversation.go` 补列 + `store/agent_channel_cursor.go` 排除系统消息 + `store/chat_message.go` 接 `fillTaskInfo`。
 4. Service:`api/v1/task.go` 新文件 + `channel.go`(`SendMessage.as_task`)与 `command.go`(`storeToV1ChatMessage` 透出 `task`、`ListTasks` 的 `is_own`)微调 + `postTaskSystemNotification` 辅助。
 5. Agent:`cmd/task.go` + `daemon/server.go` 路由 + `chattools/chattools.go` 函数 + `prompt/communication.md` 与 `prompt.go`。
-6. 前端:composer 开关 + store 签名 + 类型/映射 + MessageRow 徽标与系统行 + tasks-panel + lib/task-status。
+6. 前端:composer 开关 + store 签名 + 类型/映射 + MessageRow 徽标与系统行 + tasks-panel + lib/task-status + thread 标题栏关闭任务按钮(`CloseTask` RPC + 确认弹窗)。
 7. 全流程格式化/lint:`gofmt`、`golangci-lint run --allow-parallel-runners`(反复至无 issue)、`pnpm --dir frontend biome:check && lint --fix && type-check`。
 
 ## 验证

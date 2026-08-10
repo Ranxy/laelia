@@ -289,6 +289,40 @@ func (s *Store) UpdateTaskStatus(ctx context.Context, msgID uuid.UUID, agentID i
 	return s.GetTaskMessage(ctx, msgID)
 }
 
+// CloseTask transitions any non-DONE task to DONE (terminal), setting
+// completed_at. It is the user-facing close path (CloseTask RPC): unlike
+// UpdateTaskStatus it does not require assignee ownership and accepts every
+// open status (TODO / IN_PROGRESS / IN_REVIEW), so a channel member can close
+// a task directly from the UI without going through the assignee. Closing an
+// already-DONE task is idempotent: changed=false and the current message is
+// returned unchanged. Returns ErrTaskNotFound when the message has no task
+// row.
+func (s *Store) CloseTask(ctx context.Context, msgID, convID uuid.UUID) (msg *ChatMessage, changed bool, err error) {
+	res, err := s.GetDB().ExecContext(ctx, `
+		UPDATE task SET status = $1, completed_at = now(), updated_at = now()
+		WHERE message_id = $2 AND conversation_id = $3 AND status <> $1
+	`, TaskStatusDone, msgID, convID)
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "failed to close task")
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "failed to read close task result")
+	}
+	// rows == 0 means the task was already DONE; either way the re-read returns
+	// the current state. GetTaskMessage reports ErrTaskNotFound when no task
+	// row exists; a task whose message lives in another conversation is treated
+	// the same (the caller only has authorization for the requested one).
+	msg, err = s.GetTaskMessage(ctx, msgID)
+	if err != nil {
+		return nil, false, err
+	}
+	if msg.ConversationID != convID {
+		return nil, false, ErrTaskNotFound
+	}
+	return msg, rows > 0, nil
+}
+
 // taskStatusPredecessor returns the status a task must be in to advance to
 // target via UpdateTaskStatus, and whether target is a valid UpdateTaskStatus
 // target at all.

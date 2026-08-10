@@ -1061,7 +1061,14 @@
     "refresh": "刷新",
     "open": "打开",
     "back-to-tasks": "任务",
-    "replies": "{{count}} 条回复"
+    "replies": "{{count}} 条回复",
+    "close": "关闭任务",
+    "close-confirm-title": "关闭该任务？",
+    "close-confirm-description": "任务将标记为已完成。正在处理它的 agent 会继续运行,直到自然结束。",
+    "close-confirm-action": "关闭任务",
+    "close-success": "任务已关闭",
+    "close-error": "关闭任务失败",
+    "close-error-description": "请稍后重试。"
   },
   "channel": {
     "title": "频道",
