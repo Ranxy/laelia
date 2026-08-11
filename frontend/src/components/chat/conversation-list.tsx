@@ -42,6 +42,9 @@ export function ConversationList() {
   const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
+  // True once the list has been scrolled down; the mobile create-channel
+  // FAB collapses to a bare icon while the list is not at the top.
+  const [listScrolled, setListScrolled] = useState(false);
 
   // No mount fetch here: ChatLayout (the only host of this list) owns the
   // listChannels fetch + 5s poll, so fetching again here duplicated the request
@@ -90,7 +93,7 @@ export function ConversationList() {
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-control-border px-3 py-2 lg:px-4 lg:py-3">
+      <div className="hidden shrink-0 items-center justify-between gap-2 border-b border-control-border px-3 py-2 lg:flex lg:px-4 lg:py-3">
         <h2 className="hidden text-sm font-semibold text-main lg:block">
           {t("chat.title")}
         </h2>
@@ -117,7 +120,11 @@ export function ConversationList() {
       {/* List */}
       {/* divide-y gives each row a hairline top border so the rail scans
           quickly; /50 keeps the divider light against the row whitespace. */}
-      <div className="flex-1 divide-y divide-control-border/50 overflow-y-auto">
+      <div
+        data-testid="conversation-list-scroll"
+        className="flex-1 divide-y divide-control-border/50 overflow-y-auto"
+        onScroll={(e) => setListScrolled(e.currentTarget.scrollTop > 8)}
+      >
         {channelsLoading && channels.length === 0 && (
           <div className="flex items-center justify-center gap-2 py-12 text-control-light text-sm">
             <Loader2 className="size-4 animate-spin" />
@@ -205,6 +212,31 @@ export function ConversationList() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Mobile create-channel FAB: replaces the header + button on touch
+          layouts. Pills up with an icon + label until the list is scrolled
+          down, then collapses to a bare icon pinned above the tab bar in the
+          bottom-right corner. */}
+      <button
+        type="button"
+        onClick={() => setCreateOpen(true)}
+        aria-label={t("channel.create")}
+        data-testid="create-channel-fab"
+        className={cn(
+          "fixed right-4 z-chrome flex h-14 items-center justify-center gap-1.5 overflow-hidden",
+          "bottom-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom)+0.75rem)]",
+          "rounded-full bg-accent text-accent-text shadow-lg transition-all duration-200",
+          "focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
+          "lg:hidden",
+          listScrolled ? "w-14" : "w-32"
+        )}
+      >
+        <Plus className="size-6 shrink-0" strokeWidth={2.25} />
+        {!listScrolled && (
+          <span className="text-sm font-semibold whitespace-nowrap">
+            {t("channel.fab-label")}
+          </span>
+        )}
+      </button>
     </div>
   );
 }

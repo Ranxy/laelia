@@ -1113,6 +1113,7 @@
     "no-results": "无结果",
     "attach-file": "添加文件",
     "pin": "置顶",
-    "unpin": "取消置顶"
+    "unpin": "取消置顶",
+    "fab-label": "频道"
   }
 }

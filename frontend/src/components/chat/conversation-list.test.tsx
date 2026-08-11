@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // ConversationList uses react-i18next (no provider in tests) and the app
@@ -123,5 +123,40 @@ describe("ConversationList last-message preview", () => {
     // The row still renders its title and no preview text or time appears.
     expect(screen.getByText("Design")).toBeInTheDocument();
     expect(screen.queryByText(/chat.you:|Alice:|Bob:/)).not.toBeInTheDocument();
+  });
+});
+
+describe("ConversationList mobile create-channel FAB", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+    mock.channels = [];
+  });
+
+  it("renders the expanded pill (icon + label) by default", () => {
+    render(<ConversationList />);
+    const fab = screen.getByTestId("create-channel-fab");
+    expect(fab).toBeInTheDocument();
+    expect(screen.getByText("channel.fab-label")).toBeInTheDocument();
+  });
+
+  it("collapses to the bare icon while the list is scrolled down", () => {
+    render(<ConversationList />);
+    const list = screen.getByTestId("conversation-list-scroll");
+    expect(screen.getByText("channel.fab-label")).toBeInTheDocument();
+
+    list.scrollTop = 50;
+    fireEvent.scroll(list);
+    expect(screen.queryByText("channel.fab-label")).not.toBeInTheDocument();
+
+    // Scrolling back to the top restores the label.
+    list.scrollTop = 0;
+    fireEvent.scroll(list);
+    expect(screen.getByText("channel.fab-label")).toBeInTheDocument();
+  });
+
+  it("opens the create dialog from the FAB", () => {
+    render(<ConversationList />);
+    fireEvent.click(screen.getByTestId("create-channel-fab"));
+    expect(screen.getByText("channel.create-title")).toBeInTheDocument();
   });
 });
