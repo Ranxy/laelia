@@ -71,6 +71,7 @@ export function AgentProfilePage() {
   const { agentId } = useParams<{ agentId: string }>();
   const getAgent = useAppStore((s) => s.getAgent);
   const getMachine = useAppStore((s) => s.getMachine);
+  const machines = useAppStore((s) => s.machines);
   const fetchAgents = useAppStore((s) => s.fetchAgents);
   const users = useAppStore((s) => s.users);
   const fetchUsers = useAppStore((s) => s.fetchUsers);
@@ -168,6 +169,11 @@ export function AgentProfilePage() {
   // machineTitle is the owning machine's display title (resolved from
   // agent.machine so the identity grid shows a name, not the raw id).
   const [machineTitle, setMachineTitle] = useState("");
+  // machineResolved is true once the fresh GetMachine round-trip has settled,
+  // so the grid can show a placeholder (not the raw resource name) while the
+  // title is still resolving and fall back to the raw name for a deleted
+  // machine only after resolution.
+  const [machineResolved, setMachineResolved] = useState(false);
 
   const agentAvatarName = agent?.avatar || undefined;
   const avatarSrc = useAvatar(agentAvatarName);
@@ -236,11 +242,14 @@ export function AgentProfilePage() {
     if (!machineName) {
       setMachineProviders([]);
       setMachineTitle("");
+      setMachineResolved(false);
       return;
     }
+    setMachineResolved(false);
     getMachine(machineName).then((m) => {
       setMachineProviders(m?.info?.availableProviders ?? []);
       setMachineTitle(m?.title ?? "");
+      setMachineResolved(true);
     });
   }, [agent?.machine, getMachine]);
 
@@ -654,6 +663,18 @@ export function AgentProfilePage() {
     ? agent.machine.replace(/^machines\//, "")
     : "";
 
+  // The Members page preloads the machine roster into the store, so the cached
+  // title is available on the very first paint and the identity grid never
+  // flashes the raw machines/{id}. The fresh GetMachine title supersedes it
+  // once the round-trip settles; the raw name appears only after resolution
+  // (e.g. for a deleted machine), never while loading.
+  const cachedMachineTitle = machines.find(
+    (m) => m.name === agent.machine
+  )?.title;
+  const machineDisplay = machineResolved
+    ? machineTitle || cachedMachineTitle || agent.machine
+    : cachedMachineTitle || "…";
+
   return (
     <div className="h-full overflow-y-auto p-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -695,7 +716,7 @@ export function AgentProfilePage() {
                         navigate(`/machines/${machineResourceID}`)
                       }
                     >
-                      {machineTitle || agent.machine}
+                      {machineDisplay}
                     </button>
                   </Field>
                 )}

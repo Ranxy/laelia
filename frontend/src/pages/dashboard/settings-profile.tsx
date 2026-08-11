@@ -474,7 +474,7 @@ export function SettingsProfilePage() {
               />
             </div>
 
-            <div className="flex items-center justify-between rounded-md border border-control-border p-4">
+            <div className="flex flex-col gap-3 rounded-md border border-control-border p-4 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
               <div className="flex min-w-0 flex-1 items-start gap-3">
                 <Languages className="mt-0.5 size-4 shrink-0 text-control-light" />
                 <div className="min-w-0">
@@ -492,7 +492,7 @@ export function SettingsProfilePage() {
                   void handleLanguageChange(Number(v) as PreferredLanguage)
                 }
               >
-                <SelectTrigger className="shrink-0">
+                <SelectTrigger className="w-full shrink-0 lg:w-auto">
                   <SelectValue>
                     {(value) =>
                       preferredLanguageLabel(Number(value) as PreferredLanguage)
