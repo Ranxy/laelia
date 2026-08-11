@@ -20,7 +20,10 @@ import { useSwipeBack } from "@/lib/use-swipe-back";
 import { reconcilePushSubscription, suppressRoute } from "@/lib/web-push";
 import { ROUTE_INFO } from "@/router/route-info";
 import { dashboardChildrenRoutes } from "@/router/routes/dashboard";
-import { usePreviewRoutes } from "@/router/use-preview-routes";
+import {
+  preloadPreviewRoute,
+  usePreviewRoutes,
+} from "@/router/use-preview-routes";
 import { useAppStore } from "@/stores";
 
 // The overlays/dialog are code-split so markstream-react (and the
@@ -89,9 +92,7 @@ export function DashboardLayout() {
   const navigate = useNavigate();
   // Mobile swipe-back: drag from the left edge to go back one level (thread
   // panel first, then the route's backTo target). Inert on desktop.
-  const { rootRef, currentPageRef, previewPath } = useSwipeBack(
-    dashboardChildrenRoutes
-  );
+  const { rootRef, currentPageRef, previewPath } = useSwipeBack();
   // The back-target route rendered underneath the current page while the
   // gesture is active, so the destination is visible during the drag.
   const previewElement = usePreviewRoutes(dashboardChildrenRoutes, previewPath);
@@ -116,6 +117,21 @@ export function DashboardLayout() {
       }
       return next;
     });
+  }, []);
+
+  // Preload the lazy modules for every swipe-back target route at mount so
+  // the preview renders on the very first frame when a gesture starts — the
+  // module cache is already populated, cloneRouteTree sets Component
+  // synchronously, and useRoutes renders the component without waiting for a
+  // microtask/useSyncExternalStore re-render cycle.
+  useEffect(() => {
+    const backTargets = new Set<string>();
+    for (const info of Object.values(ROUTE_INFO)) {
+      if (info.backTo) backTargets.add(info.backTo);
+    }
+    for (const target of backTargets) {
+      preloadPreviewRoute(dashboardChildrenRoutes, target);
+    }
   }, []);
 
   // Web Push: on boot, refresh the server-side keys for this browser's push
@@ -176,7 +192,7 @@ export function DashboardLayout() {
             <Outlet />
           </div>
           {previewPath && (
-            <div className="absolute inset-0 z-0 pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:pt-0 lg:pb-0">
+            <div className="absolute inset-0 z-0 bg-background will-change-transform pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:pt-0 lg:pb-0">
               <Suspense fallback={null}>{previewElement}</Suspense>
             </div>
           )}

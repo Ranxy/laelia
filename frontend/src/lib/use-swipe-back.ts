@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { type RouteObject, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ROUTE_INFO } from "@/router/route-info";
 import { useCurrentRoute } from "@/router/use-current-route";
-import { preloadPreviewRoute } from "@/router/use-preview-routes";
 import { setSuppressLoadingFlags, useAppStore } from "@/stores";
 import { useIsDesktop } from "./use-is-desktop";
 
@@ -22,6 +21,9 @@ const TRIGGER_RATIO = 0.25; // release past 25% of the viewport commits
 const MIN_TRIGGER_PX = 80;
 const SNAP_MS = 200; // spring-back animation
 const COMMIT_MS = 250; // slide-out animation before the navigation commits
+// Safety timeout: if the data router's navigation doesn't complete within this
+// window, force a reset so the gesture state doesn't get stuck.
+const RESET_TIMEOUT_MS = 1000;
 
 export interface SwipeBackState {
   // Bind to the layout root (CSS variables for the thread panel live here).
@@ -33,9 +35,10 @@ export interface SwipeBackState {
   previewPath: string | null;
 }
 
-export function useSwipeBack(routes?: RouteObject[]): SwipeBackState {
+export function useSwipeBack(): SwipeBackState {
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
+  const location = useLocation();
   const closeThread = useAppStore((s) => s.closeThread);
   const activeThreadRoot = useAppStore((s) => s.activeThreadRoot);
   const currentRoute = useCurrentRoute();
@@ -43,10 +46,12 @@ export function useSwipeBack(routes?: RouteObject[]): SwipeBackState {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const pageRef = useRef<HTMLDivElement | null>(null);
   const [previewPath, setPreviewPath] = useState<string | null>(null);
+  // Set when a route-level commit's navigate() has been called; the
+  // location-change effect clears the transform + preview once the data
+  // router finishes the navigation (preventing a one-frame flash of the old
+  // route before the new one renders).
+  const pendingResetRef = useRef(false);
 
-  // Latest back target / thread state, read by the window listeners without
-  // re-binding them on every render (route/store changes would otherwise
-  // churn listeners).
   const backTargetRef = useRef<string | null>(null);
   backTargetRef.current = currentRoute.name
     ? (ROUTE_INFO[currentRoute.name]?.backTo ?? null)
@@ -92,13 +97,11 @@ export function useSwipeBack(routes?: RouteObject[]): SwipeBackState {
       }
       root.style.removeProperty("--swipe-offset");
       root.style.removeProperty("--swipe-transition");
-      setSuppressLoadingFlags(false);
+      window.setTimeout(() => setSuppressLoadingFlags(false), 500);
       setPreviewPath(null);
     };
 
     const onTouchStart = (e: TouchEvent) => {
-      // Touches over layer overlays (sheets, dialogs, previews) keep their own
-      // dismissal; the gesture must not navigate behind them.
       const target = e.target as HTMLElement | null;
       if (target?.closest?.("[data-bb-layer-family]")) {
         cancelled = true;
@@ -116,19 +119,11 @@ export function useSwipeBack(routes?: RouteObject[]): SwipeBackState {
       cancelled = false;
       maxDrag = window.innerWidth * MAX_DRAG_RATIO;
       clearTimers();
-      // Decide the level: the thread panel (full-screen overlay) closes
-      // first; otherwise the current route's backTo target is previewed.
       if (threadActiveRef.current) {
         mode = "thread";
         root.style.setProperty("--swipe-transition", "none");
       } else if (backTargetRef.current) {
         mode = "route";
-        // Kick off the dynamic import for the back-target route before
-        // setPreviewPath triggers a re-render, so the module is cached by the
-        // time the preview clones the route tree (no blank-frame delay).
-        if (routes) preloadPreviewRoute(routes, backTargetRef.current);
-        // Suppress loading-flag updates so the preview instance's mount-time
-        // fetch does not flash the real page (still mounted as the parent route).
         setSuppressLoadingFlags(true);
         setPreviewPath(backTargetRef.current);
         if (pageRef.current) pageRef.current.style.transition = "none";
@@ -148,7 +143,6 @@ export function useSwipeBack(routes?: RouteObject[]): SwipeBackState {
         if (Math.abs(dx) < DIRECTION_LOCK && Math.abs(dy) < DIRECTION_LOCK)
           return;
         decided = true;
-        // Vertical scrolls and leftward swipes (row actions) are not back.
         if (dy > dx || dx < 0) {
           cancelled = true;
           reset();
@@ -179,7 +173,22 @@ export function useSwipeBack(routes?: RouteObject[]): SwipeBackState {
           window.setTimeout(() => {
             if (commit) {
               const target = backTargetRef.current;
-              if (target) navigate(target, { replace: true });
+              if (target) {
+                // Start the navigation but DON'T reset yet — the
+                // location-change effect will reset once the data router
+                // finishes the navigation. This prevents a one-frame flash
+                // where the old route is visible at translateX(0) before the
+                // new route renders.
+                pendingResetRef.current = true;
+                navigate(target, { replace: true });
+                // Safety: force a reset if the navigation doesn't complete.
+                timers.push(
+                  window.setTimeout(() => {
+                    if (pendingResetRef.current) reset();
+                  }, RESET_TIMEOUT_MS)
+                );
+                return;
+              }
             }
             reset();
           }, ms + 50)
@@ -201,7 +210,6 @@ export function useSwipeBack(routes?: RouteObject[]): SwipeBackState {
 
     const onTouchEnd = (e: TouchEvent) => {
       if (!dragging) {
-        // Started but never moved (or cancelled): drop any preview state.
         if (mode) reset();
         return;
       }
@@ -231,7 +239,27 @@ export function useSwipeBack(routes?: RouteObject[]): SwipeBackState {
       window.removeEventListener("touchcancel", onTouchCancel);
       clearTimers();
     };
-  }, [isDesktop, navigate, closeThread, routes]);
+  }, [isDesktop, navigate, closeThread]);
+
+  // When a route-level commit is pending, wait for the data router to finish
+  // the navigation (location changes) before clearing the transform and
+  // unmounting the preview. This prevents a one-frame flash where the old
+  // route would be visible at translateX(0) before the new route renders.
+  useEffect(() => {
+    if (!pendingResetRef.current) return;
+    pendingResetRef.current = false;
+    if (pageRef.current) {
+      pageRef.current.style.transition = "";
+      pageRef.current.style.transform = "";
+    }
+    const root = rootRef.current;
+    if (root) {
+      root.style.removeProperty("--swipe-offset");
+      root.style.removeProperty("--swipe-transition");
+    }
+    window.setTimeout(() => setSuppressLoadingFlags(false), 500);
+    setPreviewPath(null);
+  }, [location.pathname]);
 
   return { rootRef: setRoot, currentPageRef: setPage, previewPath };
 }

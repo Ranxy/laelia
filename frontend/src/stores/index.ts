@@ -19,80 +19,38 @@ import { createImagePreviewSlice } from "./image-preview";
 import { createPreviewSlice } from "./preview";
 
 // ---------------------------------------------------------------------------
-// Swipe-back preview: loading-flag suppression
+// Swipe-back preview: store freeze
 //
 // The mobile swipe-back gesture renders the back-target page underneath the
 // current one (via useRoutes).  That preview instance mounts fresh and its
-// useEffect calls fetch functions (fetchMachines, fetchChannels, …) which set
-// loading flags (machinesLoading, channelsLoading, …) to true.  The REAL page
-// (still mounted as the parent route) subscribes to those flags and briefly
-// swaps its content to a "Loading…" state — the user sees a flash right after
-// the gesture commits.
+// useEffect calls fetch functions (fetchChannels, fetchMachines, …) which
+// update the store.  The REAL page (still mounted as the parent route)
+// subscribes to the same store and re-renders on every update — the user
+// sees a "flash" right after the gesture commits.
 //
-// While the preview is active we strip loading-flag keys from every store
-// `set` call so the preview's fetch silently refreshes data without flipping
-// the real page into a loading state.  Data keys (machines, channels, …) pass
-// through unchanged.
+// While the preview is active we freeze the store (all `set` calls become
+// no-ops) so the preview instance's fetches cannot trigger a re-render of
+// the real page.  The store is un-frozen shortly after the gesture ends.
 // ---------------------------------------------------------------------------
-const LOADING_FLAGS = new Set([
-  "activitiesLoading",
-  "agentChannelsLoading",
-  "agentsLoading",
-  "apiProvidersLoading",
-  "channelMembersLoading",
-  "channelsLoading",
-  "chatLoading",
-  "commandsLoading",
-  "deletedUsersLoading",
-  "machinesLoading",
-  "mcpServersLoading",
-  "membersLoading",
-  "myChannelsLoading",
-  "remindersLoading",
-  "tasksLoading",
-  "usersLoading",
-]);
-
 let suppressLoadingFlags = false;
 
 export function setSuppressLoadingFlags(value: boolean): void {
   suppressLoadingFlags = value;
 }
 
-function stripLoadingFlags<T extends Record<string, unknown>>(
-  partial: T
-): T | null {
-  if (!suppressLoadingFlags) return partial;
-  const filtered: Record<string, unknown> = {};
-  let hasData = false;
-  for (const key in partial) {
-    if (LOADING_FLAGS.has(key)) continue;
-    filtered[key] = partial[key];
-    hasData = true;
-  }
-  return hasData ? (filtered as T) : null;
-}
-
 export const useAppStore = create<AppStoreState>()((...args) => {
   const [originalSet, get] = args;
-  // Wrap set so loading-flag updates are stripped while the swipe-back preview
-  // is active.  Function-form updates are resolved first so the filtering
-  // always sees a plain object.
+  // Wrap set so ALL store updates are suppressed while the swipe-back preview
+  // is active.  The preview renders a separate component instance whose
+  // useEffect calls fetch functions (fetchChannels, fetchMachines, …).  Those
+  // fetches update the store (channels, machines, unreadByConv, …) which makes
+  // the REAL page (still mounted as the parent route) re-render — the user sees
+  // a "flash" right after the gesture commits.  By freezing the store during
+  // the gesture (and briefly after, until the preview's in-flight fetch
+  // completes), we prevent that re-render entirely.
   const set = ((partial: unknown, replace?: boolean) => {
-    if (!suppressLoadingFlags) {
-      originalSet(partial as never, replace as never);
-      return;
-    }
-    if (typeof partial === "function") {
-      originalSet((state: unknown) => {
-        const resolved = (partial as (s: unknown) => unknown)(state);
-        const filtered = stripLoadingFlags(resolved as Record<string, unknown>);
-        return (filtered ?? {}) as never;
-      }, replace as never);
-      return;
-    }
-    const filtered = stripLoadingFlags(partial as Record<string, unknown>);
-    if (filtered) originalSet(filtered as never, replace as never);
+    if (suppressLoadingFlags) return; // no-op: store is frozen
+    originalSet(partial as never, replace as never);
   }) as typeof originalSet;
 
   const wrappedArgs = [set, ...args.slice(1)] as typeof args;

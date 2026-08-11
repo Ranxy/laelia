@@ -7,16 +7,15 @@ const mock = vi.hoisted(() => ({
   routeName: null as string | null,
   activeThreadRoot: null as string | null,
   closeThread: vi.fn(),
+  location: { pathname: "/test" },
 }));
 
-vi.mock("@/router/use-preview-routes", () => ({
-  preloadPreviewRoute: vi.fn(),
-}));
 vi.mock("@/lib/use-is-desktop", () => ({
   useIsDesktop: mock.useIsDesktop,
 }));
 vi.mock("react-router-dom", () => ({
   useNavigate: () => mock.navigate,
+  useLocation: () => mock.location,
 }));
 vi.mock("@/router/use-current-route", () => ({
   useCurrentRoute: () => ({ name: mock.routeName }),
@@ -157,7 +156,7 @@ describe("useSwipeBack", () => {
   });
 
   it("slides the page out and navigates back past the threshold", () => {
-    render(<Harness />);
+    const { rerender } = render(<Harness />);
     const page = screen.getByTestId("page");
     act(() => swipeFromEdge(200));
     // Commit animation: the page slides out to the full viewport width.
@@ -167,6 +166,12 @@ describe("useSwipeBack", () => {
       vi.advanceTimersByTime(300);
     });
     expect(mock.navigate).toHaveBeenCalledWith("/", { replace: true });
+    // The preview stays mounted until the data router finishes the
+    // navigation (location changes). Simulate the location change:
+    mock.location = { pathname: "/" };
+    act(() => {
+      rerender(<Harness />);
+    });
     expect(screen.queryByTestId("preview")).toBeNull();
     expect(page.style.transform).toBe("");
   });
