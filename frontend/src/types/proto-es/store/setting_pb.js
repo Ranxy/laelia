@@ -2,13 +2,13 @@
 // @generated from file store/setting.proto (package laelia.store, syntax proto3)
 /* eslint-disable */
 
-import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, tsEnum } from "@bufbuild/protobuf/codegenv2";
 
 /**
  * Describes the file store/setting.proto.
  */
 export const file_store_setting = /*@__PURE__*/
-  fileDesc("ChNzdG9yZS9zZXR0aW5nLnByb3RvEgxsYWVsaWEuc3RvcmUilgEKD1MzQ29uZmlnU2V0dGluZxIQCghlbmRwb2ludBgBIAEoCRIOCgZyZWdpb24YAiABKAkSDgoGYnVja2V0GAMgASgJEhIKCmFjY2Vzc19rZXkYBCABKAkSEgoKc2VjcmV0X2tleRgFIAEoCRIYChBmb3JjZV9wYXRoX3N0eWxlGAYgASgIEg8KB3VzZV9zc2wYByABKAgiPgoVTGxtQWdlbnRDb25maWdTZXR0aW5nEiUKHWFsbG93X3VzZXJfc2VsZl9wcm92aWRlZF9rZXlzGAEgASgIIjYKFFVzZXJNY3BDb25maWdTZXR0aW5nEh4KFmFsbG93X3VzZXJfbWNwX3NlcnZlcnMYASABKAhCNFoyZ2l0aHViLmNvbS9SYW54eS9sYWVsaWEvYmFja2VuZC9nZW5lcmF0ZWQtZ28vc3RvcmViBnByb3RvMw");
+  fileDesc("ChNzdG9yZS9zZXR0aW5nLnByb3RvEgxsYWVsaWEuc3RvcmUilgEKD1MzQ29uZmlnU2V0dGluZxIQCghlbmRwb2ludBgBIAEoCRIOCgZyZWdpb24YAiABKAkSDgoGYnVja2V0GAMgASgJEhIKCmFjY2Vzc19rZXkYBCABKAkSEgoKc2VjcmV0X2tleRgFIAEoCRIYChBmb3JjZV9wYXRoX3N0eWxlGAYgASgIEg8KB3VzZV9zc2wYByABKAgiPgoVTGxtQWdlbnRDb25maWdTZXR0aW5nEiUKHWFsbG93X3VzZXJfc2VsZl9wcm92aWRlZF9rZXlzGAEgASgIImgKFFVzZXJNY3BDb25maWdTZXR0aW5nEh4KFmFsbG93X3VzZXJfbWNwX3NlcnZlcnMYASABKAgSMAoNbWNwX2lwX3BvbGljeRgCIAEoCzIZLmxhZWxpYS5zdG9yZS5NY3BJcFBvbGljeSK+AQoLTWNwSXBQb2xpY3kSDwoHZW5hYmxlZBgBIAEoCBIuCgVzY29wZRgCIAEoDjIfLmxhZWxpYS5zdG9yZS5NY3BJcFBvbGljeS5TY29wZRITCgthbGxvd19jaWRycxgDIAMoCRISCgpkZW55X2NpZHJzGAQgAygJIkUKBVNjb3BlEhUKEVNDT1BFX1VOU1BFQ0lGSUVEEAASDQoJU0NPUEVfQUxMEAESFgoSU0NPUEVfVVNFUl9DUkVBVEVEEAJCNFoyZ2l0aHViLmNvbS9SYW54eS9sYWVsaWEvYmFja2VuZC9nZW5lcmF0ZWQtZ28vc3RvcmViBnByb3RvMw");
 
 /**
  * Describes the message laelia.store.S3ConfigSetting.
@@ -30,4 +30,25 @@ export const LlmAgentConfigSettingSchema = /*@__PURE__*/
  */
 export const UserMcpConfigSettingSchema = /*@__PURE__*/
   messageDesc(file_store_setting, 2);
+
+/**
+ * Describes the message laelia.store.McpIpPolicy.
+ * Use `create(McpIpPolicySchema)` to create a new message.
+ */
+export const McpIpPolicySchema = /*@__PURE__*/
+  messageDesc(file_store_setting, 3);
+
+/**
+ * Describes the enum laelia.store.McpIpPolicy.Scope.
+ */
+export const McpIpPolicy_ScopeSchema = /*@__PURE__*/
+  enumDesc(file_store_setting, 3, 0);
+
+/**
+ * Scope selects which MCP servers the policy applies to.
+ *
+ * @generated from enum laelia.store.McpIpPolicy.Scope
+ */
+export const McpIpPolicy_Scope = /*@__PURE__*/
+  tsEnum(McpIpPolicy_ScopeSchema);
 

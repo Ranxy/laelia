@@ -12,6 +12,7 @@ import (
 	models "github.com/Ranxy/laelia/backend/generated-go/store"
 	v1pb "github.com/Ranxy/laelia/backend/generated-go/v1"
 	"github.com/Ranxy/laelia/backend/generated-go/v1/v1connect"
+	"github.com/Ranxy/laelia/backend/manager/component/mcp"
 	"github.com/Ranxy/laelia/backend/manager/component/s3client"
 	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
@@ -112,6 +113,9 @@ func (s *SettingService) UpdateUserMcpConfig(ctx context.Context, req *connect.R
 	in := req.Msg.GetConfig()
 	if in == nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("config is required"))
+	}
+	if _, err := mcp.ParsePolicy(in.GetMcpIpPolicy()); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	if _, err := s.store.UpsertUserMcpConfigSetting(ctx, in); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to update user mcp config"))

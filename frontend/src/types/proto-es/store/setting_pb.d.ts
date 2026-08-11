@@ -2,7 +2,7 @@
 // @generated from file store/setting.proto (package laelia.store, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
@@ -106,9 +106,10 @@ export declare type LlmAgentConfigSetting = Message<"laelia.store.LlmAgentConfig
 export declare const LlmAgentConfigSettingSchema: GenMessage<LlmAgentConfigSetting>;
 
 /**
- * UserMcpConfigSetting is the workspace-level personal MCP configuration. The
- * only knob today is whether users may configure their own personal MCP
- * servers and enable them on their own agents. Defaults to enabled when unset.
+ * UserMcpConfigSetting is the workspace-level personal MCP configuration:
+ * whether users may configure their own personal MCP servers and enable them
+ * on their own agents, plus the optional target IP allow/deny policy that
+ * bounds where those servers (or all MCP servers) may connect.
  *
  * @generated from message laelia.store.UserMcpConfigSetting
  */
@@ -122,6 +123,15 @@ export declare type UserMcpConfigSetting = Message<"laelia.store.UserMcpConfigSe
    * @generated from field: bool allow_user_mcp_servers = 1;
    */
   allowUserMcpServers: boolean;
+
+  /**
+   * mcp_ip_policy controls the MCP target IP allow/deny policy. Zero value
+   * (enabled=false) means no restriction, preserving existing behavior for
+   * stored rows that predate this field.
+   *
+   * @generated from field: laelia.store.McpIpPolicy mcp_ip_policy = 2;
+   */
+  mcpIpPolicy?: McpIpPolicy | undefined;
 };
 
 /**
@@ -129,4 +139,83 @@ export declare type UserMcpConfigSetting = Message<"laelia.store.UserMcpConfigSe
  * Use `create(UserMcpConfigSettingSchema)` to create a new message.
  */
 export declare const UserMcpConfigSettingSchema: GenMessage<UserMcpConfigSetting>;
+
+/**
+ * McpIpPolicy is the workspace MCP target IP allow/deny policy, guarding
+ * against SSRF (internal network / cloud metadata) via user-configured MCP
+ * server URLs.
+ *
+ * @generated from message laelia.store.McpIpPolicy
+ */
+export declare type McpIpPolicy = Message<"laelia.store.McpIpPolicy"> & {
+  /**
+   * enabled turns the policy on. When false, no restriction is enforced and
+   * existing behavior is unchanged. Defaults to disabled.
+   *
+   * @generated from field: bool enabled = 1;
+   */
+  enabled: boolean;
+
+  /**
+   * scope selects the servers the policy applies to.
+   *
+   * @generated from field: laelia.store.McpIpPolicy.Scope scope = 2;
+   */
+  scope: McpIpPolicy_Scope;
+
+  /**
+   * allow_cidrs is the allow list: when non-empty the target IP must match one
+   * of these CIDR prefixes; when empty, the allow side does not restrict.
+   *
+   * @generated from field: repeated string allow_cidrs = 3;
+   */
+  allowCidrs: string[];
+
+  /**
+   * deny_cidrs is the deny list: a target IP matching any of these CIDR
+   * prefixes is rejected, taking precedence over the allow list.
+   *
+   * @generated from field: repeated string deny_cidrs = 4;
+   */
+  denyCidrs: string[];
+};
+
+/**
+ * Describes the message laelia.store.McpIpPolicy.
+ * Use `create(McpIpPolicySchema)` to create a new message.
+ */
+export declare const McpIpPolicySchema: GenMessage<McpIpPolicy>;
+
+/**
+ * Scope selects which MCP servers the policy applies to.
+ *
+ * @generated from enum laelia.store.McpIpPolicy.Scope
+ */
+export enum McpIpPolicy_Scope {
+  /**
+   * Unspecified is treated as SCOPE_USER_CREATED (conservative default).
+   *
+   * @generated from enum value: SCOPE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * Applies to every MCP server, including admin-maintained workspace ones.
+   *
+   * @generated from enum value: SCOPE_ALL = 1;
+   */
+  ALL = 1,
+
+  /**
+   * Applies only to personal-scope servers (owner_id != 0).
+   *
+   * @generated from enum value: SCOPE_USER_CREATED = 2;
+   */
+  USER_CREATED = 2,
+}
+
+/**
+ * Describes the enum laelia.store.McpIpPolicy.Scope.
+ */
+export declare const McpIpPolicy_ScopeSchema: GenEnum<McpIpPolicy_Scope>;
 

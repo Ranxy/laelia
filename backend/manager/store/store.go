@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sync"
+	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 
@@ -38,6 +40,12 @@ type Store struct {
 	machineIDCache         *lru.Cache[int, *MachineMessage]
 	machineResourceIDCache *lru.Cache[string, *MachineMessage]
 	rolesCache             *lru.Cache[string, *RoleMessage]
+
+	// userMcpConfigSetting caches the USER_MCP_CONFIG row for a short TTL so
+	// per-call MCP gateway checks do not hit the database. Cleared on upsert.
+	userMcpConfigMu       sync.Mutex
+	userMcpConfigSetting  *SettingMessage
+	userMcpConfigCachedAt time.Time
 }
 
 func New(ctx context.Context, pgURL string, enableCache bool) (*Store, error) {

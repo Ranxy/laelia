@@ -161,6 +161,7 @@ export function SettingsMcpServersPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [creatorQuery, setCreatorQuery] = useState("");
   const [allowUserMcp, setAllowUserMcp] = useState(true);
+  const [mcpIpPolicyEnabled, setMcpIpPolicyEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<McpTab>(
     isAdmin ? "workspace" : "my"
@@ -191,6 +192,7 @@ export function SettingsMcpServersPage() {
         mcpServerServiceClient.listMyMcpServers({ pageSize: 1000 }),
       ]);
       setAllowUserMcp(cfgRes.config?.allowUserMcpServers ?? true);
+      setMcpIpPolicyEnabled(cfgRes.config?.mcpIpPolicy?.enabled ?? false);
       setMyServers(myRes.mcpServers ?? []);
       if (isAdmin) {
         const [wsRes, allUserRes, userRes, groupRes] = await Promise.all([
@@ -474,6 +476,7 @@ export function SettingsMcpServersPage() {
             : t("settings.mcp-servers.create-description")
         }
         personal={createForm.scope === "user"}
+        ipPolicyActive={mcpIpPolicyEnabled}
         form={createForm}
         users={users}
         groups={groups}
@@ -493,6 +496,7 @@ export function SettingsMcpServersPage() {
             : t("settings.mcp-servers.edit-description")
         }
         personal={editForm.scope === "user"}
+        ipPolicyActive={mcpIpPolicyEnabled}
         form={editForm}
         users={users}
         groups={groups}
@@ -643,6 +647,7 @@ interface McpServerSheetProps {
   title: string;
   description: string;
   personal?: boolean;
+  ipPolicyActive?: boolean;
   form: McpServerForm;
   users: User[];
   groups: Group[];
@@ -657,6 +662,7 @@ function McpServerSheet({
   title,
   description,
   personal = false,
+  ipPolicyActive = false,
   form,
   users,
   groups,
@@ -722,6 +728,11 @@ function McpServerSheet({
               placeholder={t("settings.mcp-servers.field-url-placeholder")}
               spellCheck={false}
             />
+            {personal && ipPolicyActive && (
+              <p className="mt-1 text-xs text-control-light">
+                {t("settings.mcp-servers.ip-policy-active-hint")}
+              </p>
+            )}
           </FieldRow>
           <FieldRow label={t("settings.mcp-servers.field-description")}>
             <Input

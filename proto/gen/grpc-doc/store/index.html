@@ -448,6 +448,10 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.store.McpIpPolicy"><span class="badge">M</span>McpIpPolicy</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.store.PasswordRestrictionSetting"><span class="badge">M</span>PasswordRestrictionSetting</a>
                 </li>
               
@@ -470,6 +474,10 @@
               
                 <li>
                   <a href="#laelia.store.IPValidationPolicy"><span class="badge">E</span>IPValidationPolicy</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.store.McpIpPolicy.Scope"><span class="badge">E</span>McpIpPolicy.Scope</a>
                 </li>
               
                 <li>
@@ -2758,6 +2766,54 @@ provider. Default true. </p></td>
 
         
       
+        <h3 id="laelia.store.McpIpPolicy">McpIpPolicy</h3>
+        <p>McpIpPolicy is the workspace MCP target IP allow/deny policy, guarding</p><p>against SSRF (internal network / cloud metadata) via user-configured MCP</p><p>server URLs.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>enabled</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>enabled turns the policy on. When false, no restriction is enforced and
+existing behavior is unchanged. Defaults to disabled. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>scope</td>
+                  <td><a href="#laelia.store.McpIpPolicy.Scope">McpIpPolicy.Scope</a></td>
+                  <td></td>
+                  <td><p>scope selects the servers the policy applies to. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>allow_cidrs</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>allow_cidrs is the allow list: when non-empty the target IP must match one
+of these CIDR prefixes; when empty, the allow side does not restrict. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>deny_cidrs</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>deny_cidrs is the deny list: a target IP matching any of these CIDR
+prefixes is rejected, taking precedence over the allow list. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="laelia.store.PasswordRestrictionSetting">PasswordRestrictionSetting</h3>
         <p></p>
 
@@ -2894,7 +2950,7 @@ stores; false for AWS virtual-host style). </p></td>
         
       
         <h3 id="laelia.store.UserMcpConfigSetting">UserMcpConfigSetting</h3>
-        <p>UserMcpConfigSetting is the workspace-level personal MCP configuration. The</p><p>only knob today is whether users may configure their own personal MCP</p><p>servers and enable them on their own agents. Defaults to enabled when unset.</p>
+        <p>UserMcpConfigSetting is the workspace-level personal MCP configuration:</p><p>whether users may configure their own personal MCP servers and enable them</p><p>on their own agents, plus the optional target IP allow/deny policy that</p><p>bounds where those servers (or all MCP servers) may connect.</p>
 
         
           <table class="field-table">
@@ -2911,6 +2967,15 @@ stores; false for AWS virtual-host style). </p></td>
 create/edit/delete their own servers and enable them on their agents;
 when false, personal servers are hidden from agent catalogs and creation
 is rejected (existing rows are retained and restored on re-enable). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mcp_ip_policy</td>
+                  <td><a href="#laelia.store.McpIpPolicy">McpIpPolicy</a></td>
+                  <td></td>
+                  <td><p>mcp_ip_policy controls the MCP target IP allow/deny policy. Zero value
+(enabled=false) means no restriction, preserving existing behavior for
+stored rows that predate this field. </p></td>
                 </tr>
               
             </tbody>
@@ -3081,6 +3146,35 @@ endpoints directly. Only http:// and https:// schemes are supported. </p></td>
                 <td>IP_VALIDATION_STRICT</td>
                 <td>3</td>
                 <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+        <h3 id="laelia.store.McpIpPolicy.Scope">McpIpPolicy.Scope</h3>
+        <p>Scope selects which MCP servers the policy applies to.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>SCOPE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p>Unspecified is treated as SCOPE_USER_CREATED (conservative default).</p></td>
+              </tr>
+            
+              <tr>
+                <td>SCOPE_ALL</td>
+                <td>1</td>
+                <td><p>Applies to every MCP server, including admin-maintained workspace ones.</p></td>
+              </tr>
+            
+              <tr>
+                <td>SCOPE_USER_CREATED</td>
+                <td>2</td>
+                <td><p>Applies only to personal-scope servers (owner_id != 0).</p></td>
               </tr>
             
           </tbody>

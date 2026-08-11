@@ -418,7 +418,8 @@
       "update-failed": "更新 MCP 服务失败",
       "delete-failed": "删除 MCP 服务失败",
       "delete-confirm-title": "删除 MCP 服务",
-      "delete-confirm-description": "删除 MCP 服务 \"{{title}}\"? 已启用该服务的 Agent 无法删除。"
+      "delete-confirm-description": "删除 MCP 服务 \"{{title}}\"? 已启用该服务的 Agent 无法删除。",
+      "ip-policy-active-hint": "工作区已启用 MCP 目标 IP 策略，域名将做解析校验，指向内网/云元数据地址的服务可能无法保存或连接。"
     },
     "agents": {
       "title": "Agents / LLM",
@@ -428,7 +429,22 @@
       "allow-user-mcp": "允许用户配置自己的 MCP 服务",
       "allow-user-mcp-hint": "开启后,用户可以在设置中创建自己的 MCP 服务,并在自己的 Agent 上启用(管理员也可以创建个人服务);关闭后个人 MCP 服务立即对所有 Agent 不可用,数据保留,重新开启后恢复。",
       "saved": "配置已保存",
-      "save-failed": "保存配置失败"
+      "save-failed": "保存配置失败",
+      "allow-user-mcp-confirm-title": "确认允许用户配置个人 MCP 服务？",
+      "allow-user-mcp-confirm-description": "开启后，用户填写的 MCP 服务地址将由服务器代为连接，存在 SSRF 风险：可被用于访问内网服务或云元数据（如 169.254.169.254）。建议同时配置下方的 MCP 目标 IP 策略。",
+      "allow-user-mcp-confirm-action": "确认开启",
+      "ip-policy-title": "MCP 目标 IP 策略",
+      "ip-policy-hint": "对 MCP 服务目标地址执行 IP 黑白名单校验，防止通过个人 MCP 配置访问内网/云元数据（SSRF）。默认关闭；黑名单优先，白名单非空时目标 IP 必须命中其一。",
+      "ip-policy-scope": "生效范围",
+      "ip-policy-scope-all": "全局生效（所有 MCP 服务器）",
+      "ip-policy-scope-user": "仅对用户创建的个人 MCP 生效",
+      "ip-policy-allow-label": "白名单（每行一个 CIDR，留空=不限制允许段）",
+      "ip-policy-allow-placeholder": "例如 10.0.0.0/8",
+      "ip-policy-deny-label": "黑名单（每行一个 CIDR，命中即拒绝）",
+      "ip-policy-deny-placeholder": "例如 169.254.0.0/16",
+      "ip-policy-preset": "添加内网/云元数据预设",
+      "ip-policy-empty-warning": "策略已启用但未配置任何网段，当前不会限制任何地址。",
+      "ip-policy-save": "保存策略"
     }
   },
   "setup": {

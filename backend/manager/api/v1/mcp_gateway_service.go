@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"log/slog"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,16 +45,71 @@ type McpGatewayService struct {
 	client    *mcp.Client
 	cacheMu   sync.Mutex
 	toolCache map[string]mcpToolCacheEntry
+
+	// ipPolicyMu guards the compiled MCP IP policy cache; the policy is
+	// refreshed at most every ipPolicyCacheTTL so per-call gateway checks do
+	// not recompile (or re-read) it constantly.
+	ipPolicyMu        sync.Mutex
+	ipPolicyCompiled  *mcp.CompiledPolicy
+	ipPolicyFetchedAt time.Time
 }
 
 // NewMcpGatewayService returns a new McpGatewayService.
 func NewMcpGatewayService(s *store.Store, iamManager *iam.Manager) *McpGatewayService {
-	return &McpGatewayService{
+	svc := &McpGatewayService{
 		store:     s,
 		iam:       iamManager,
 		client:    mcp.New(),
 		toolCache: make(map[string]mcpToolCacheEntry),
 	}
+	svc.client.SetIPPolicy(svc.checkTargetIP)
+	return svc
+}
+
+// ipPolicyCacheTTL bounds how long the compiled MCP IP policy is reused.
+const ipPolicyCacheTTL = 30 * time.Second
+
+// checkTargetIP is the client's IP policy hook: it applies the compiled
+// workspace policy to the server's target address, honoring the policy scope.
+func (s *McpGatewayService) checkTargetIP(ctx context.Context, server *store.McpServerMessage, ip netip.Addr) (bool, error) {
+	policy, err := s.compiledIPPolicy(ctx)
+	if err != nil {
+		return false, err
+	}
+	if !policy.AppliesTo(server.OwnerID) {
+		return true, nil
+	}
+	reason, err := policy.Allowed(ip)
+	if err != nil {
+		return false, err
+	}
+	return reason == nil, nil
+}
+
+// compiledIPPolicy returns the workspace MCP IP policy, cached for
+// ipPolicyCacheTTL.
+func (s *McpGatewayService) compiledIPPolicy(ctx context.Context) (*mcp.CompiledPolicy, error) {
+	s.ipPolicyMu.Lock()
+	if s.ipPolicyCompiled != nil && time.Since(s.ipPolicyFetchedAt) < ipPolicyCacheTTL {
+		policy := s.ipPolicyCompiled
+		s.ipPolicyMu.Unlock()
+		return policy, nil
+	}
+	s.ipPolicyMu.Unlock()
+
+	cfg, err := s.store.GetUserMcpConfigSetting(ctx)
+	if err != nil {
+		return nil, err
+	}
+	policy, err := mcp.ParsePolicy(cfg.GetMcpIpPolicy())
+	if err != nil {
+		return nil, err
+	}
+	s.ipPolicyMu.Lock()
+	s.ipPolicyCompiled = policy
+	s.ipPolicyFetchedAt = time.Now()
+	s.ipPolicyMu.Unlock()
+	return policy, nil
 }
 
 // Compile-time assertion that the service implements every RPC of the generated

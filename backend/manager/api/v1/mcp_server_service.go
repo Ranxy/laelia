@@ -157,6 +157,9 @@ func (s *McpServerService) CreateMcpServer(ctx context.Context, req *connect.Req
 		if err != nil {
 			return nil, err
 		}
+		if err := validateMcpServerTarget(ctx, s.store, serverURL, false); err != nil {
+			return nil, err
+		}
 		created, err := s.store.CreateMcpServer(ctx, &store.McpServerMessage{
 			Title:         strings.TrimSpace(in.Title),
 			Description:   strings.TrimSpace(in.Description),
@@ -185,6 +188,9 @@ func (s *McpServerService) CreateMcpServer(ctx context.Context, req *connect.Req
 
 	transportType, serverURL, headers, err := buildMcpTransportForCreate(in)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateMcpServerTarget(ctx, s.store, serverURL, true); err != nil {
 		return nil, err
 	}
 
@@ -252,6 +258,9 @@ func (s *McpServerService) UpdateMcpServer(ctx context.Context, req *connect.Req
 
 	transportType, serverURL, headers, err := buildMcpTransportForUpdate(current, in)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateMcpServerTarget(ctx, s.store, serverURL, current.OwnerID != 0); err != nil {
 		return nil, err
 	}
 	members := []string(nil)

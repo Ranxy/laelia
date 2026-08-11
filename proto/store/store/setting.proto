@@ -167,13 +167,49 @@ message LlmAgentConfigSetting {
   bool allow_user_self_provided_keys = 1;
 }
 
-// UserMcpConfigSetting is the workspace-level personal MCP configuration. The
-// only knob today is whether users may configure their own personal MCP
-// servers and enable them on their own agents. Defaults to enabled when unset.
+// UserMcpConfigSetting is the workspace-level personal MCP configuration:
+// whether users may configure their own personal MCP servers and enable them
+// on their own agents, plus the optional target IP allow/deny policy that
+// bounds where those servers (or all MCP servers) may connect.
 message UserMcpConfigSetting {
   // allow_user_mcp_servers gates personal MCP servers: when true, any user may
   // create/edit/delete their own servers and enable them on their agents;
   // when false, personal servers are hidden from agent catalogs and creation
   // is rejected (existing rows are retained and restored on re-enable).
   bool allow_user_mcp_servers = 1;
+
+  // mcp_ip_policy controls the MCP target IP allow/deny policy. Zero value
+  // (enabled=false) means no restriction, preserving existing behavior for
+  // stored rows that predate this field.
+  McpIpPolicy mcp_ip_policy = 2;
+}
+
+// McpIpPolicy is the workspace MCP target IP allow/deny policy, guarding
+// against SSRF (internal network / cloud metadata) via user-configured MCP
+// server URLs.
+message McpIpPolicy {
+  // Scope selects which MCP servers the policy applies to.
+  enum Scope {
+    // Unspecified is treated as SCOPE_USER_CREATED (conservative default).
+    SCOPE_UNSPECIFIED = 0;
+    // Applies to every MCP server, including admin-maintained workspace ones.
+    SCOPE_ALL = 1;
+    // Applies only to personal-scope servers (owner_id != 0).
+    SCOPE_USER_CREATED = 2;
+  }
+
+  // enabled turns the policy on. When false, no restriction is enforced and
+  // existing behavior is unchanged. Defaults to disabled.
+  bool enabled = 1;
+
+  // scope selects the servers the policy applies to.
+  Scope scope = 2;
+
+  // allow_cidrs is the allow list: when non-empty the target IP must match one
+  // of these CIDR prefixes; when empty, the allow side does not restrict.
+  repeated string allow_cidrs = 3;
+
+  // deny_cidrs is the deny list: a target IP matching any of these CIDR
+  // prefixes is rejected, taking precedence over the allow list.
+  repeated string deny_cidrs = 4;
 }

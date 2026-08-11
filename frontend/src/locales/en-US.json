@@ -418,7 +418,8 @@
       "update-failed": "Failed to update MCP server",
       "delete-failed": "Failed to delete MCP server",
       "delete-confirm-title": "Delete MCP server",
-      "delete-confirm-description": "Delete the MCP server \"{{title}}\"? Servers enabled on agents cannot be deleted."
+      "delete-confirm-description": "Delete the MCP server \"{{title}}\"? Servers enabled on agents cannot be deleted.",
+      "ip-policy-active-hint": "The workspace MCP target IP policy is enabled: domains are resolved and validated, and servers pointing at internal or cloud-metadata addresses may be rejected."
     },
     "agents": {
       "title": "Agents / LLM",
@@ -428,7 +429,22 @@
       "allow-user-mcp": "Allow users to configure their own MCP servers",
       "allow-user-mcp-hint": "When enabled, users can create their own MCP servers in settings and enable them on their own agents (admins can create personal servers too). When disabled, personal MCP servers become immediately unavailable to all agents; data is retained and restored when re-enabled.",
       "saved": "Configuration saved",
-      "save-failed": "Failed to save configuration"
+      "save-failed": "Failed to save configuration",
+      "allow-user-mcp-confirm-title": "Allow users to configure personal MCP servers?",
+      "allow-user-mcp-confirm-description": "Enabling this lets the server connect to MCP server URLs entered by users, which expands the SSRF surface: addresses may target internal networks or cloud metadata (e.g. 169.254.169.254). Consider configuring the MCP target IP policy below.",
+      "allow-user-mcp-confirm-action": "Enable",
+      "ip-policy-title": "MCP target IP policy",
+      "ip-policy-hint": "Restricts where MCP servers may connect with an IP allow/deny list, preventing SSRF via personal MCP configurations (internal networks / cloud metadata). Disabled by default; deny wins, and a non-empty allow list restricts targets to matching ranges.",
+      "ip-policy-scope": "Scope",
+      "ip-policy-scope-all": "All MCP servers",
+      "ip-policy-scope-user": "User-created personal MCP servers only",
+      "ip-policy-allow-label": "Allow list (one CIDR per line; empty = no allow restriction)",
+      "ip-policy-allow-placeholder": "e.g. 10.0.0.0/8",
+      "ip-policy-deny-label": "Deny list (one CIDR per line; matching targets are rejected)",
+      "ip-policy-deny-placeholder": "e.g. 169.254.0.0/16",
+      "ip-policy-preset": "Add internal / cloud-metadata presets",
+      "ip-policy-empty-warning": "Policy is enabled but no CIDRs are configured, so nothing is restricted.",
+      "ip-policy-save": "Save policy"
     }
   },
   "setup": {

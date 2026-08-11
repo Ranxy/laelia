@@ -10,7 +10,10 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
+	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 	"time"
@@ -52,6 +55,11 @@ type CallResult struct {
 	StructuredContent map[string]any
 }
 
+// IPPolicyFunc reports whether the given target address is allowed for the
+// server. A nil error with false denies the address; an error fails the
+// connection closed.
+type IPPolicyFunc func(ctx context.Context, server *store.McpServerMessage, ip netip.Addr) (bool, error)
+
 // Client speaks the minimal MCP JSON-RPC subset (initialize, tools/list,
 // tools/call) over streamable HTTP and SSE transports.
 type Client struct {
@@ -59,6 +67,11 @@ type Client struct {
 	// sseClient has no total timeout: the SSE event stream is long-lived and
 	// bounded by the caller's context instead.
 	sseClient *http.Client
+	// ipPolicy, when non-nil, guards every outbound connection: the target
+	// host is resolved and each address checked before dialing, preventing
+	// SSRF via user-configured server URLs (and DNS rebinding, because the
+	// dial uses the verified IP directly).
+	ipPolicy IPPolicyFunc
 }
 
 // New returns a Client with a bounded HTTP client.
@@ -67,6 +80,102 @@ func New() *Client {
 		httpClient: &http.Client{Timeout: 25 * time.Second},
 		sseClient:  &http.Client{},
 	}
+}
+
+// SetIPPolicy installs the target IP guard used for every connection. Nil
+// disables the guard.
+func (c *Client) SetIPPolicy(fn IPPolicyFunc) {
+	c.ipPolicy = fn
+}
+
+// httpClientFor returns a client for one HTTP request. Without an IP policy
+// the shared client is used; with a policy, a per-call client whose transport
+// dials only policy-approved IPs is built (preserving Timeout and Proxy).
+func (c *Client) httpClientFor(server *store.McpServerMessage) *http.Client {
+	if c.ipPolicy == nil {
+		return c.httpClient
+	}
+	return guardedClient(c.httpClient, func(ctx context.Context, addr string) (string, error) {
+		return c.resolveAllowedTarget(ctx, server, addr)
+	})
+}
+
+// sseClientFor is the SSE counterpart of httpClientFor.
+func (c *Client) sseClientFor(server *store.McpServerMessage) *http.Client {
+	if c.ipPolicy == nil {
+		return c.sseClient
+	}
+	return guardedClient(c.sseClient, func(ctx context.Context, addr string) (string, error) {
+		return c.resolveAllowedTarget(ctx, server, addr)
+	})
+}
+
+// resolveAllowedTarget verifies every address of the target host against the
+// IP policy and returns the dial address: the host itself when it is already
+// an IP literal, or the first policy-approved resolved IP. Any offending or
+// unresolvable address fails the connection closed, and the dial later uses
+// the returned IP directly (no second DNS window, so DNS rebinding cannot
+// bypass the policy).
+func (c *Client) resolveAllowedTarget(ctx context.Context, server *store.McpServerMessage, host string) (string, error) {
+	if ip, err := netip.ParseAddr(host); err == nil {
+		ok, err := c.ipPolicy(ctx, server, ip)
+		if err != nil {
+			return "", err
+		}
+		if !ok {
+			slog.Warn("mcp target blocked by IP policy", "server", server.ResourceID, "host", host, "ip", ip)
+			return "", pkgerrors.Errorf("mcp target %s is blocked by the MCP IP policy", host)
+		}
+		return ip.String(), nil
+	}
+	addrs, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+	if err != nil {
+		return "", pkgerrors.Wrapf(err, "resolve mcp target %q", host)
+	}
+	if len(addrs) == 0 {
+		return "", pkgerrors.Errorf("resolve mcp target %q: no addresses", host)
+	}
+	for _, addr := range addrs {
+		ok, err := c.ipPolicy(ctx, server, addr)
+		if err != nil {
+			return "", err
+		}
+		if !ok {
+			slog.Warn("mcp target blocked by IP policy", "server", server.ResourceID, "host", host, "ip", addr)
+			return "", pkgerrors.Errorf("mcp target %q resolves to %s which is blocked by the MCP IP policy", host, addr)
+		}
+	}
+	return addrs[0].String(), nil
+}
+
+// guardedClient clones the base client's transport and replaces DialContext
+// with a guard that maps the target host to a policy-approved IP before
+// dialing. The clone keeps Proxy configuration, so when an HTTP proxy is
+// configured the guard covers only direct connections (the proxy is the dial
+// target and the final host is not observable locally).
+func guardedClient(base *http.Client, resolve func(ctx context.Context, addr string) (string, error)) *http.Client {
+	transport, ok := base.Transport.(*http.Transport)
+	if !ok || transport == nil {
+		transport = http.DefaultTransport.(*http.Transport).Clone()
+	} else {
+		transport = transport.Clone()
+	}
+	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			host, port = addr, ""
+		}
+		dialAddr, err := resolve(ctx, host)
+		if err != nil {
+			return nil, err
+		}
+		if port != "" {
+			dialAddr = net.JoinHostPort(dialAddr, port)
+		}
+		return dialer.DialContext(ctx, network, dialAddr)
+	}
+	return &http.Client{Timeout: base.Timeout, Transport: transport}
 }
 
 // ListTools returns the tool list of an MCP server.
@@ -117,11 +226,11 @@ func (c *Client) httpListTools(ctx context.Context, server *store.McpServerMessa
 	if err != nil {
 		return nil, err
 	}
-	sessionID, err := c.httpInitialize(ctx, endpoint, server.Headers)
+	sessionID, err := c.httpInitialize(ctx, server, endpoint, server.Headers)
 	if err != nil {
 		return nil, err
 	}
-	result, err := c.httpRPC(ctx, endpoint, server.Headers, sessionID, "tools/list", map[string]any{})
+	result, err := c.httpRPC(ctx, server, endpoint, server.Headers, sessionID, "tools/list", map[string]any{})
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +242,7 @@ func (c *Client) httpListTools(ctx context.Context, server *store.McpServerMessa
 		return nil, pkgerrors.Wrap(err, "decode tools/list result")
 	}
 	for cursor := list.NextCursor; cursor != ""; {
-		page, err := c.httpRPC(ctx, endpoint, server.Headers, sessionID, "tools/list", map[string]any{"cursor": cursor})
+		page, err := c.httpRPC(ctx, server, endpoint, server.Headers, sessionID, "tools/list", map[string]any{"cursor": cursor})
 		if err != nil {
 			return nil, err
 		}
@@ -155,11 +264,11 @@ func (c *Client) httpCallTool(ctx context.Context, server *store.McpServerMessag
 	if err != nil {
 		return nil, err
 	}
-	sessionID, err := c.httpInitialize(ctx, endpoint, server.Headers)
+	sessionID, err := c.httpInitialize(ctx, server, endpoint, server.Headers)
 	if err != nil {
 		return nil, err
 	}
-	result, err := c.httpRPC(ctx, endpoint, server.Headers, sessionID, "tools/call", map[string]any{
+	result, err := c.httpRPC(ctx, server, endpoint, server.Headers, sessionID, "tools/call", map[string]any{
 		"name":      toolName,
 		"arguments": args,
 	})
@@ -183,7 +292,7 @@ func (c *Client) httpCallTool(ctx context.Context, server *store.McpServerMessag
 
 // httpInitialize performs the initialize handshake and returns the optional
 // Mcp-Session-Id header value.
-func (c *Client) httpInitialize(ctx context.Context, endpoint *url.URL, headers map[string]string) (string, error) {
+func (c *Client) httpInitialize(ctx context.Context, server *store.McpServerMessage, endpoint *url.URL, headers map[string]string) (string, error) {
 	initParams := map[string]any{
 		"protocolVersion": ProtocolVersion,
 		"capabilities":    map[string]any{},
@@ -192,7 +301,7 @@ func (c *Client) httpInitialize(ctx context.Context, endpoint *url.URL, headers 
 			"version": "1.0.0",
 		},
 	}
-	resp, err := c.doHTTP(ctx, endpoint, headers, "", "initialize", initParams)
+	resp, err := c.doHTTP(ctx, server, endpoint, headers, "", "initialize", initParams)
 	if err != nil {
 		return "", err
 	}
@@ -204,13 +313,13 @@ func (c *Client) httpInitialize(ctx context.Context, endpoint *url.URL, headers 
 	_ = resp.Body.Close()
 	// The initialized notification is fire-and-forget; a server that rejects it
 	// still accepts the subsequent request.
-	_, _ = c.httpRPC(ctx, endpoint, headers, sessionID, "notifications/initialized", map[string]any{})
+	_, _ = c.httpRPC(ctx, server, endpoint, headers, sessionID, "notifications/initialized", map[string]any{})
 	return sessionID, nil
 }
 
 // httpRPC sends one JSON-RPC request and decodes the result.
-func (c *Client) httpRPC(ctx context.Context, endpoint *url.URL, headers map[string]string, sessionID, method string, params any) (json.RawMessage, error) {
-	resp, err := c.doHTTP(ctx, endpoint, headers, sessionID, method, params)
+func (c *Client) httpRPC(ctx context.Context, server *store.McpServerMessage, endpoint *url.URL, headers map[string]string, sessionID, method string, params any) (json.RawMessage, error) {
+	resp, err := c.doHTTP(ctx, server, endpoint, headers, sessionID, method, params)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +327,7 @@ func (c *Client) httpRPC(ctx context.Context, endpoint *url.URL, headers map[str
 	return decodeRPCResponse(resp.Body, method)
 }
 
-func (c *Client) doHTTP(ctx context.Context, endpoint *url.URL, headers map[string]string, sessionID, method string, params any) (*http.Response, error) {
+func (c *Client) doHTTP(ctx context.Context, server *store.McpServerMessage, endpoint *url.URL, headers map[string]string, sessionID, method string, params any) (*http.Response, error) {
 	body, err := json.Marshal(rpcRequest{JSONRPC: "2.0", ID: 1, Method: method, Params: params})
 	if err != nil {
 		return nil, err
@@ -235,7 +344,7 @@ func (c *Client) doHTTP(ctx context.Context, endpoint *url.URL, headers map[stri
 	for name, value := range headers {
 		req.Header.Set(name, value)
 	}
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClientFor(server).Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -265,13 +374,15 @@ func decodeRPCResponse(body io.Reader, method string) (json.RawMessage, error) {
 // --- SSE ---
 
 // sseSession is one SSE transport session: the event stream plus the resolved
-// messages endpoint.
+// messages endpoint. client carries the guarded HTTP client (same policy as
+// the initial GET) used for messages POSTs.
 type sseSession struct {
 	body        io.ReadCloser
 	reader      *bufio.Reader
 	messagesURL *url.URL
 	sessionID   string
 	close       func()
+	client      *http.Client
 }
 
 func (c *Client) sseListTools(ctx context.Context, server *store.McpServerMessage) ([]Tool, error) {
@@ -280,7 +391,7 @@ func (c *Client) sseListTools(ctx context.Context, server *store.McpServerMessag
 		return nil, err
 	}
 	defer sess.close()
-	result, err := c.sseRPC(ctx, sess, "tools/list", map[string]any{})
+	result, err := sseRPC(ctx, sess, "tools/list", map[string]any{})
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +410,7 @@ func (c *Client) sseCallTool(ctx context.Context, server *store.McpServerMessage
 		return nil, err
 	}
 	defer sess.close()
-	result, err := c.sseRPC(ctx, sess, "tools/call", map[string]any{
+	result, err := sseRPC(ctx, sess, "tools/call", map[string]any{
 		"name":      toolName,
 		"arguments": args,
 	})
@@ -336,8 +447,9 @@ func (c *Client) sseOpen(ctx context.Context, server *store.McpServerMessage) (*
 	for name, value := range server.Headers {
 		req.Header.Set(name, value)
 	}
+	sseClient := c.sseClientFor(server)
 	//nolint:bodyclose // SSE response body is the long-lived event stream, closed by sseSession.close
-	resp, err := c.sseClient.Do(req)
+	resp, err := sseClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -348,6 +460,7 @@ func (c *Client) sseOpen(ctx context.Context, server *store.McpServerMessage) (*
 	sess := &sseSession{
 		body:   resp.Body,
 		reader: bufio.NewReaderSize(resp.Body, 64*1024),
+		client: sseClient,
 	}
 	sess.close = func() { _ = resp.Body.Close() }
 
@@ -367,16 +480,16 @@ func (c *Client) sseOpen(ctx context.Context, server *store.McpServerMessage) (*
 			"version": "1.0.0",
 		},
 	}
-	if _, err := c.sseRPC(ctx, sess, "initialize", initParams); err != nil {
+	if _, err := sseRPC(ctx, sess, "initialize", initParams); err != nil {
 		sess.close()
 		return nil, err
 	}
-	c.sseNotify(ctx, sess, "notifications/initialized", map[string]any{})
+	sseNotify(ctx, sess, "notifications/initialized", map[string]any{})
 	return sess, nil
 }
 
 // sseNotify posts a JSON-RPC notification and does not wait for a response.
-func (c *Client) sseNotify(ctx context.Context, sess *sseSession, method string, params any) {
+func sseNotify(ctx context.Context, sess *sseSession, method string, params any) {
 	body, err := json.Marshal(rpcRequest{JSONRPC: "2.0", Method: method, Params: params})
 	if err != nil {
 		return
@@ -393,7 +506,7 @@ func (c *Client) sseNotify(ctx context.Context, sess *sseSession, method string,
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/event-stream")
-	resp, err := c.sseClient.Do(req)
+	resp, err := sess.client.Do(req)
 	if err != nil {
 		return
 	}
@@ -428,7 +541,7 @@ func (*Client) sseWaitEndpoint(ctx context.Context, sess *sseSession) (*url.URL,
 
 // sseRPC posts one JSON-RPC request to the messages endpoint and waits for the
 // matching response, either in the HTTP response body or over the event stream.
-func (c *Client) sseRPC(ctx context.Context, sess *sseSession, method string, params any) (json.RawMessage, error) {
+func sseRPC(ctx context.Context, sess *sseSession, method string, params any) (json.RawMessage, error) {
 	body, err := json.Marshal(rpcRequest{JSONRPC: "2.0", ID: 1, Method: method, Params: params})
 	if err != nil {
 		return nil, err
@@ -446,7 +559,7 @@ func (c *Client) sseRPC(ctx context.Context, sess *sseSession, method string, pa
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/event-stream")
-	postResp, err := c.sseClient.Do(req)
+	postResp, err := sess.client.Do(req)
 	if err != nil {
 		return nil, err
 	}

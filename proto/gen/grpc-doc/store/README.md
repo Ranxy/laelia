@@ -71,6 +71,7 @@
     - [EnvironmentSetting.Environment](#laelia-store-EnvironmentSetting-Environment)
     - [EnvironmentSetting.Environment.TagsEntry](#laelia-store-EnvironmentSetting-Environment-TagsEntry)
     - [LlmAgentConfigSetting](#laelia-store-LlmAgentConfigSetting)
+    - [McpIpPolicy](#laelia-store-McpIpPolicy)
     - [PasswordRestrictionSetting](#laelia-store-PasswordRestrictionSetting)
     - [S3ConfigSetting](#laelia-store-S3ConfigSetting)
     - [UserMcpConfigSetting](#laelia-store-UserMcpConfigSetting)
@@ -78,6 +79,7 @@
     - [WorkspaceProfileSetting](#laelia-store-WorkspaceProfileSetting)
   
     - [IPValidationPolicy](#laelia-store-IPValidationPolicy)
+    - [McpIpPolicy.Scope](#laelia-store-McpIpPolicy-Scope)
     - [SettingName](#laelia-store-SettingName)
   
 - [store/user.proto](#store_user-proto)
@@ -1042,6 +1044,26 @@ using the managed global API providers. Defaults to enabled when unset.
 
 
 
+<a name="laelia-store-McpIpPolicy"></a>
+
+### McpIpPolicy
+McpIpPolicy is the workspace MCP target IP allow/deny policy, guarding
+against SSRF (internal network / cloud metadata) via user-configured MCP
+server URLs.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| enabled | [bool](#bool) |  | enabled turns the policy on. When false, no restriction is enforced and existing behavior is unchanged. Defaults to disabled. |
+| scope | [McpIpPolicy.Scope](#laelia-store-McpIpPolicy-Scope) |  | scope selects the servers the policy applies to. |
+| allow_cidrs | [string](#string) | repeated | allow_cidrs is the allow list: when non-empty the target IP must match one of these CIDR prefixes; when empty, the allow side does not restrict. |
+| deny_cidrs | [string](#string) | repeated | deny_cidrs is the deny list: a target IP matching any of these CIDR prefixes is rejected, taking precedence over the allow list. |
+
+
+
+
+
+
 <a name="laelia-store-PasswordRestrictionSetting"></a>
 
 ### PasswordRestrictionSetting
@@ -1090,14 +1112,16 @@ considered unconfigured and upload/download endpoints reject with
 <a name="laelia-store-UserMcpConfigSetting"></a>
 
 ### UserMcpConfigSetting
-UserMcpConfigSetting is the workspace-level personal MCP configuration. The
-only knob today is whether users may configure their own personal MCP
-servers and enable them on their own agents. Defaults to enabled when unset.
+UserMcpConfigSetting is the workspace-level personal MCP configuration:
+whether users may configure their own personal MCP servers and enable them
+on their own agents, plus the optional target IP allow/deny policy that
+bounds where those servers (or all MCP servers) may connect.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | allow_user_mcp_servers | [bool](#bool) |  | allow_user_mcp_servers gates personal MCP servers: when true, any user may create/edit/delete their own servers and enable them on their agents; when false, personal servers are hidden from agent catalogs and creation is rejected (existing rows are retained and restored on re-enable). |
+| mcp_ip_policy | [McpIpPolicy](#laelia-store-McpIpPolicy) |  | mcp_ip_policy controls the MCP target IP allow/deny policy. Zero value (enabled=false) means no restriction, preserving existing behavior for stored rows that predate this field. |
 
 
 
@@ -1163,6 +1187,19 @@ IP validation policy for agent connections.
 | IP_VALIDATION_OFF | 1 |  |
 | IP_VALIDATION_WARN | 2 |  |
 | IP_VALIDATION_STRICT | 3 |  |
+
+
+
+<a name="laelia-store-McpIpPolicy-Scope"></a>
+
+### McpIpPolicy.Scope
+Scope selects which MCP servers the policy applies to.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| SCOPE_UNSPECIFIED | 0 | Unspecified is treated as SCOPE_USER_CREATED (conservative default). |
+| SCOPE_ALL | 1 | Applies to every MCP server, including admin-maintained workspace ones. |
+| SCOPE_USER_CREATED | 2 | Applies only to personal-scope servers (owner_id != 0). |
 
 
 
