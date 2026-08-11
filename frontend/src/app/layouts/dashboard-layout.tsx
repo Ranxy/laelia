@@ -89,7 +89,9 @@ export function DashboardLayout() {
   const navigate = useNavigate();
   // Mobile swipe-back: drag from the left edge to go back one level (thread
   // panel first, then the route's backTo target). Inert on desktop.
-  const { rootRef, currentPageRef, previewPath } = useSwipeBack();
+  const { rootRef, currentPageRef, previewPath } = useSwipeBack(
+    dashboardChildrenRoutes
+  );
   // The back-target route rendered underneath the current page while the
   // gesture is active, so the destination is visible during the drag.
   const previewElement = usePreviewRoutes(dashboardChildrenRoutes, previewPath);
@@ -169,7 +171,7 @@ export function DashboardLayout() {
         <main className="relative flex-1 overflow-hidden pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:pt-0 lg:pb-0">
           <div
             ref={currentPageRef}
-            className="relative z-10 h-full will-change-transform"
+            className="relative z-10 h-full bg-background will-change-transform"
           >
             <Outlet />
           </div>

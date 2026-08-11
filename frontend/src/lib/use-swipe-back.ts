@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { type RouteObject, useNavigate } from "react-router-dom";
 import { ROUTE_INFO } from "@/router/route-info";
 import { useCurrentRoute } from "@/router/use-current-route";
+import { preloadPreviewRoute } from "@/router/use-preview-routes";
 import { useAppStore } from "@/stores";
 import { useIsDesktop } from "./use-is-desktop";
 
@@ -32,7 +33,7 @@ export interface SwipeBackState {
   previewPath: string | null;
 }
 
-export function useSwipeBack(): SwipeBackState {
+export function useSwipeBack(routes?: RouteObject[]): SwipeBackState {
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
   const closeThread = useAppStore((s) => s.closeThread);
@@ -121,6 +122,10 @@ export function useSwipeBack(): SwipeBackState {
         root.style.setProperty("--swipe-transition", "none");
       } else if (backTargetRef.current) {
         mode = "route";
+        // Kick off the dynamic import for the back-target route before
+        // setPreviewPath triggers a re-render, so the module is cached by the
+        // time the preview clones the route tree (no blank-frame delay).
+        if (routes) preloadPreviewRoute(routes, backTargetRef.current);
         setPreviewPath(backTargetRef.current);
         if (pageRef.current) pageRef.current.style.transition = "none";
       } else {
@@ -222,7 +227,7 @@ export function useSwipeBack(): SwipeBackState {
       window.removeEventListener("touchcancel", onTouchCancel);
       clearTimers();
     };
-  }, [isDesktop, navigate, closeThread]);
+  }, [isDesktop, navigate, closeThread, routes]);
 
   return { rootRef: setRoot, currentPageRef: setPage, previewPath };
 }
