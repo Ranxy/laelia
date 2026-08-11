@@ -1,5 +1,5 @@
 import { ChevronDown, Hash, Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useMatch, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/chat/avatar";
@@ -78,11 +78,22 @@ export function MembersPage() {
     return m;
   }, [machines]);
 
-  const [agentsOpen, setAgentsOpen] = useState(true);
-  const [humansOpen, setHumansOpen] = useState(true);
-  // The Channels section starts collapsed: it is a recovery entry point for
-  // closed chats, not a primary browsing surface.
-  const [channelsOpen, setChannelsOpen] = useState(false);
+  // Section collapse state is persisted to localStorage so folding choices
+  // survive navigation and reloads. Defaults match the original first-visit
+  // behavior: agents/humans open, channels collapsed (it is a recovery entry
+  // point for closed chats, not a primary browsing surface).
+  const [sections, setSections] = useState(loadSections);
+  const toggleSection = useCallback((key: keyof MembersSections) => {
+    setSections((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem(MEMBERS_SECTIONS_KEY, JSON.stringify(next));
+      } catch {
+        // ignore quota/security errors; the toggle still applies in-memory
+      }
+      return next;
+    });
+  }, []);
   const [query, setQuery] = useState("");
 
   const normalizedQuery = query.trim().toLowerCase();
@@ -160,12 +171,12 @@ export function MembersPage() {
                   <SectionHeader
                     label={t("members.section-agents")}
                     count={agents.length}
-                    open={agentsOpen}
-                    onToggle={() => setAgentsOpen((v) => !v)}
+                    open={sections.agents}
+                    onToggle={() => toggleSection("agents")}
                     onAdd={() => navigate("/machines")}
                     addLabel={t("members.add-agent")}
                   />
-                  {agentsOpen && (
+                  {sections.agents && (
                     <div className="divide-y divide-control-border/50">
                       {agents.map((member) => (
                         <MemberRow
@@ -192,12 +203,12 @@ export function MembersPage() {
                   <SectionHeader
                     label={t("members.section-humans")}
                     count={humans.length}
-                    open={humansOpen}
-                    onToggle={() => setHumansOpen((v) => !v)}
+                    open={sections.humans}
+                    onToggle={() => toggleSection("humans")}
                     onAdd={() => navigate("/settings/users")}
                     addLabel={t("members.add-human")}
                   />
-                  {humansOpen && (
+                  {sections.humans && (
                     <div className="divide-y divide-control-border/50">
                       {humans.map((member) => (
                         <MemberRow
@@ -224,16 +235,16 @@ export function MembersPage() {
             <SectionHeader
               label={t("members.section-channels")}
               count={myChannels.length}
-              open={channelsOpen}
-              onToggle={() => setChannelsOpen((v) => !v)}
+              open={sections.channels}
+              onToggle={() => toggleSection("channels")}
             />
-            {myChannelsLoading && channelsOpen && (
+            {myChannelsLoading && sections.channels && (
               <p className="px-3 py-2 text-sm text-control-light">
                 {t("common.loading")}
               </p>
             )}
             {!myChannelsLoading &&
-              channelsOpen &&
+              sections.channels &&
               (myChannels.length === 0 ? (
                 <p className="px-3 py-2 text-sm text-control-light">
                   {t("members.channels-empty")}
@@ -425,4 +436,34 @@ function ChannelRow({
       </span>
     </button>
   );
+}
+
+// ---- Section collapse persistence ----
+const MEMBERS_SECTIONS_KEY = "laelia-members-sections-open";
+
+interface MembersSections {
+  agents: boolean;
+  humans: boolean;
+  channels: boolean;
+}
+
+const DEFAULT_SECTIONS: MembersSections = {
+  agents: true,
+  humans: true,
+  channels: false,
+};
+
+function loadSections(): MembersSections {
+  try {
+    const raw = localStorage.getItem(MEMBERS_SECTIONS_KEY);
+    if (!raw) return DEFAULT_SECTIONS;
+    const parsed = JSON.parse(raw) as Partial<MembersSections>;
+    return {
+      agents: parsed.agents ?? DEFAULT_SECTIONS.agents,
+      humans: parsed.humans ?? DEFAULT_SECTIONS.humans,
+      channels: parsed.channels ?? DEFAULT_SECTIONS.channels,
+    };
+  } catch {
+    return DEFAULT_SECTIONS;
+  }
 }

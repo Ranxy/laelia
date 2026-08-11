@@ -84,6 +84,7 @@ function searchInput() {
 
 beforeEach(() => {
   seedStore();
+  localStorage.clear();
 });
 
 afterEach(() => {
