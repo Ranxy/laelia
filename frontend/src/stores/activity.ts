@@ -3,9 +3,9 @@ import { commandServiceClient } from "@/connect";
 import type {
   Activity,
   ActivityCategory,
-  ActivityState,
 } from "@/types/proto-es/v1/command_pb";
 import {
+  ActivityState,
   ListActivitiesRequestSchema,
   MarkActivityDoneRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
@@ -89,10 +89,13 @@ export const createActivitySlice: AppSliceCreator<ActivitySlice> = (
           // Background poll on the first page: merge any brand-new rows on top
           // without dropping pages the user has already loaded via infinite
           // scroll. Existing rows that also appear in the poll response are
-          // refreshed in place with the latest server state.
+          // refreshed in place with the latest server state. Locally DONE rows
+          // are dropped too: every non-Done view excludes them server-side, so
+          // a row marked done (or done elsewhere) must leave the list instead
+          // of lingering as a stale "kept" page row.
           const incomingNames = new Set(res.activities.map((a) => a.name));
           const kept = state.activities.filter(
-            (a) => !incomingNames.has(a.name)
+            (a) => !incomingNames.has(a.name) && a.state !== ActivityState.DONE
           );
           nextActivities = [...res.activities, ...kept];
         } else {
