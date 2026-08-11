@@ -47,7 +47,7 @@ const SWIPE_ACTION_WIDTH = 72;
 // with the sender's name, the timestamp, and a "Mark as Done" button. The
 // active row is highlighted; a DONE row is dimmed.
 // Mobile marks done by left-swiping the row (mirroring the chat list's swipe
-// actions); desktop keeps the hover check button and adds a right-click menu.
+// actions); desktop marks done via the right-click context menu.
 export function ActivityRow({
   activity,
   active,
@@ -178,29 +178,8 @@ export function ActivityRow({
           <p className="mt-0.5 line-clamp-1 lg:line-clamp-2 text-xs text-control-light">
             {activity.summary}
           </p>
-          <div className="mt-1.5 flex items-center justify-between gap-2">
+          <div className="mt-1.5">
             <CategoryBadges categories={activity.categories} />
-            {!isDone && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMarkDone();
-                }}
-                title={t("activity.mark-done")}
-                aria-label={t("activity.mark-done")}
-                className={cn(
-                  "hidden size-6 shrink-0 items-center justify-center rounded-xs text-control-light transition-opacity lg:inline-flex",
-                  "opacity-0 hover:bg-control-bg hover:text-control group-hover:opacity-100 focus-visible:opacity-100"
-                )}
-              >
-                {markingDone ? (
-                  <span className="size-3 animate-spin rounded-full border border-control-light border-t-transparent" />
-                ) : (
-                  <Check className="size-3.5" />
-                )}
-              </button>
-            )}
           </div>
         </div>
       </button>
