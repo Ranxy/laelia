@@ -11,7 +11,6 @@ import {
   Outlet,
   useLocation,
   useNavigate,
-  useRoutes,
 } from "react-router-dom";
 import { MobileHeader } from "@/components/mobile-header";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
@@ -21,6 +20,7 @@ import { useSwipeBack } from "@/lib/use-swipe-back";
 import { reconcilePushSubscription, suppressRoute } from "@/lib/web-push";
 import { ROUTE_INFO } from "@/router/route-info";
 import { dashboardChildrenRoutes } from "@/router/routes/dashboard";
+import { usePreviewRoutes } from "@/router/use-preview-routes";
 import { useAppStore } from "@/stores";
 
 // The overlays/dialog are code-split so markstream-react (and the
@@ -83,10 +83,6 @@ function loadCollapsed(): boolean {
   }
 }
 
-// Path that matches no dashboard route; useRoutes returns null for it so the
-// swipe-back preview stays unmounted while no gesture is active.
-const NO_PREVIEW_PATH = "/__swipe-preview-no-match__";
-
 export function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const location = useLocation();
@@ -96,10 +92,7 @@ export function DashboardLayout() {
   const { rootRef, currentPageRef, previewPath } = useSwipeBack();
   // The back-target route rendered underneath the current page while the
   // gesture is active, so the destination is visible during the drag.
-  const previewElement = useRoutes(
-    dashboardChildrenRoutes,
-    previewPath ?? NO_PREVIEW_PATH
-  );
+  const previewElement = usePreviewRoutes(dashboardChildrenRoutes, previewPath);
 
   // While previewing, the mobile header shows the destination page's title
   // (the header visually belongs to the page underneath the drag).
