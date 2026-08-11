@@ -99,6 +99,7 @@ export function MachineProfilePage() {
   const { machineId } = useParams<{ machineId: string }>();
   const getMachine = useAppStore((s) => s.getMachine);
   const fetchMachines = useAppStore((s) => s.fetchMachines);
+  const isDesktop = useIsDesktop();
 
   const machineName = `machines/${machineId ?? ""}`;
 
@@ -310,7 +311,6 @@ export function MachineProfilePage() {
   }
 
   const canEdit = machine.canEdit;
-  const isDesktop = useIsDesktop();
   const canCreateAgent = machine.canCreateAgent;
   const canManage = machine.canManage;
   // hasAnyAction suppresses the "not allowed" notice for users who hold at least
