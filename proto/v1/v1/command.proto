@@ -434,6 +434,13 @@ message Conversation {
   // last_message_at is the send time of last_message. Unset when the
   // conversation has no main-channel messages yet.
   google.protobuf.Timestamp last_message_at = 18;
+  // closed is the requesting user's per-conversation close state
+  // (conversation_member_meta.closed). A closed conversation is hidden from the
+  // user's left-rail list; the first new main-channel message (thread replies
+  // excluded) clears the flag, so it reappears automatically. Per-user: each
+  // viewer has their own close state. Populated by GetChannel for a user
+  // viewer; ListChannels never returns closed conversations.
+  bool closed = 19;
 }
 
 message ChannelMember {
@@ -1279,6 +1286,23 @@ message SetConversationPinnedRequest {
 
 message SetConversationPinnedResponse {}
 
+// SetConversationClosed sets or clears the requesting user's per-conversation
+// close state. Closing hides a channel or DM from the user's left-rail list
+// without deleting the conversation or its messages; the conversation
+// reappears automatically when a new main-channel message arrives (thread
+// replies excluded), at which point the flag is cleared server-side. Per-user
+// state (conversation_member_meta.closed/closed_at); only the caller's own
+// close state is affected.
+message SetConversationClosedRequest {
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "laelia/Conversation"}
+  ];
+  bool closed = 2;
+}
+
+message SetConversationClosedResponse {}
+
 // ActivityCategory flags which kind of conversation event an Activity item
 // represents. A single Activity row may carry several categories OR-ed together
 // (a task-thread reply that @mentions a user is both TASK and MENTION). The
@@ -1719,6 +1743,11 @@ service CommandService {
   }
 
   rpc SetConversationPinned(SetConversationPinnedRequest) returns (SetConversationPinnedResponse) {
+    option (laelia.v1.auth_method) = IAM;
+    option (laelia.v1.permission) = "laelia.conversations.read";
+  }
+
+  rpc SetConversationClosed(SetConversationClosedRequest) returns (SetConversationClosedResponse) {
     option (laelia.v1.auth_method) = IAM;
     option (laelia.v1.permission) = "laelia.conversations.read";
   }

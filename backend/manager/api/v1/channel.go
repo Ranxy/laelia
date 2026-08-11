@@ -409,6 +409,13 @@ func (s *CommandService) GetChannel(ctx context.Context, req *connect.Request[v1
 
 	resp := convertToV1Conversation(conv, ownerName, peer.name, peer.resource, memberCount, 0, title, readVersion)
 	resp.Pinned = pinned
+	if viewerUserID != 0 {
+		if c, err := s.store.GetConversationClosed(ctx, conv.ID, viewerUserID); err != nil {
+			slog.Warn("failed to read conversation closed", "conversationID", conv.ID, "error", err)
+		} else {
+			resp.Closed = c
+		}
+	}
 	return connect.NewResponse(resp), nil
 }
 
@@ -1415,6 +1422,27 @@ func (s *CommandService) SetConversationPinned(ctx context.Context, req *connect
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to set conversation pinned"))
 	}
 	return connect.NewResponse(&v1pb.SetConversationPinnedResponse{}), nil
+}
+
+func (s *CommandService) SetConversationClosed(ctx context.Context, req *connect.Request[v1pb.SetConversationClosedRequest]) (*connect.Response[v1pb.SetConversationClosedResponse], error) {
+	convID, err := parseConversationID(req.Msg.Conversation)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "invalid conversation name"))
+	}
+	user, ok := GetUserFromContext(ctx)
+	if !ok || user == nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("SetConversationClosed is for authenticated users"))
+	}
+	// SetConversationClosed updates the caller's own membership row; a missing
+	// row (non-member) returns ErrConversationMemberNotFound, which doubles as
+	// the membership gate so only members can close.
+	if err := s.store.SetConversationClosed(ctx, convID, user.ID, req.Msg.Closed); err != nil {
+		if errors.Is(err, store.ErrConversationMemberNotFound) {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("must be a member to close a conversation"))
+		}
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to set conversation closed"))
+	}
+	return connect.NewResponse(&v1pb.SetConversationClosedResponse{}), nil
 }
 
 func resolveMemberDisplayName(ctx context.Context, s *store.Store, memberType int32, memberID string) string {

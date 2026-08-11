@@ -18,6 +18,7 @@ import {
   MarkConversationReadRequestSchema,
   RemoveChannelMemberRequestSchema,
   SendMessageRequestSchema,
+  SetConversationClosedRequestSchema,
   SetConversationPinnedRequestSchema,
 } from "@/types/proto-es/v1/command_pb";
 import { appendNewMessages, fetchConversationDelta, toUiMessage } from "./chat";
@@ -189,6 +190,37 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
       );
     } catch {
       // reconcile from the server on failure
+      void get().fetchChannels();
+    }
+  },
+
+  async setConversationClosed(conversationId, closed) {
+    const conversation = `conversations/${conversationId}`;
+    if (closed) {
+      // Optimistically drop the row (and its unread badge) so the left rail
+      // updates instantly. The conversation itself is untouched; it reappears
+      // automatically when the next main-channel message clears the flag.
+      set((s) => {
+        const unreadByConv = { ...s.unreadByConv };
+        delete unreadByConv[conversation];
+        return {
+          channels: s.channels.filter((c) => c.name !== conversation),
+          unreadByConv,
+        };
+      });
+    }
+    try {
+      await commandServiceClient.setConversationClosed(
+        create(SetConversationClosedRequestSchema, { conversation, closed })
+      );
+      if (!closed) {
+        // Reopen (undo): refetch so the row lands at its server position
+        // (pinned-first / updatedAt DESC) instead of guessing locally.
+        void get().fetchChannels();
+      }
+    } catch {
+      // reconcile from the server on failure: a failed close restores the row,
+      // a failed reopen leaves it hidden.
       void get().fetchChannels();
     }
   },

@@ -49,4 +49,7 @@ func TestListUserConversationsWithUnreadSQL(t *testing.T) {
 	if !strings.Contains(listUserConversationsWithUnreadSQL, "CASE WHEN m.sender_type = 1 THEN m.principal_id::text ELSE '' END") {
 		t.Fatal("preview must expose the decimal principal id only for USER senders")
 	}
+	if !strings.Contains(listUserConversationsWithUnreadSQL, "NOT cm.closed") {
+		t.Fatal("list must exclude conversations the viewer closed; a closed chat only reappears when a new main-channel message clears the flag")
+	}
 }

@@ -1217,6 +1217,18 @@ export declare type Conversation = Message<"laelia.v1.Conversation"> & {
    * @generated from field: google.protobuf.Timestamp last_message_at = 18;
    */
   lastMessageAt?: Timestamp | undefined;
+
+  /**
+   * closed is the requesting user's per-conversation close state
+   * (conversation_member_meta.closed). A closed conversation is hidden from the
+   * user's left-rail list; the first new main-channel message (thread replies
+   * excluded) clears the flag, so it reappears automatically. Per-user: each
+   * viewer has their own close state. Populated by GetChannel for a user
+   * viewer; ListChannels never returns closed conversations.
+   *
+   * @generated from field: bool closed = 19;
+   */
+  closed: boolean;
 };
 
 /**
@@ -3649,6 +3661,47 @@ export declare type SetConversationPinnedResponse = Message<"laelia.v1.SetConver
 export declare const SetConversationPinnedResponseSchema: GenMessage<SetConversationPinnedResponse>;
 
 /**
+ * SetConversationClosed sets or clears the requesting user's per-conversation
+ * close state. Closing hides a channel or DM from the user's left-rail list
+ * without deleting the conversation or its messages; the conversation
+ * reappears automatically when a new main-channel message arrives (thread
+ * replies excluded), at which point the flag is cleared server-side. Per-user
+ * state (conversation_member_meta.closed/closed_at); only the caller's own
+ * close state is affected.
+ *
+ * @generated from message laelia.v1.SetConversationClosedRequest
+ */
+export declare type SetConversationClosedRequest = Message<"laelia.v1.SetConversationClosedRequest"> & {
+  /**
+   * @generated from field: string conversation = 1;
+   */
+  conversation: string;
+
+  /**
+   * @generated from field: bool closed = 2;
+   */
+  closed: boolean;
+};
+
+/**
+ * Describes the message laelia.v1.SetConversationClosedRequest.
+ * Use `create(SetConversationClosedRequestSchema)` to create a new message.
+ */
+export declare const SetConversationClosedRequestSchema: GenMessage<SetConversationClosedRequest>;
+
+/**
+ * @generated from message laelia.v1.SetConversationClosedResponse
+ */
+export declare type SetConversationClosedResponse = Message<"laelia.v1.SetConversationClosedResponse"> & {
+};
+
+/**
+ * Describes the message laelia.v1.SetConversationClosedResponse.
+ * Use `create(SetConversationClosedResponseSchema)` to create a new message.
+ */
+export declare const SetConversationClosedResponseSchema: GenMessage<SetConversationClosedResponse>;
+
+/**
  * Activity is one item in a user's per-user activity feed. Each item corresponds
  * to a single chat_message relevant to the user, tagged with the category(ies)
  * that made it relevant. The message itself is the source of truth for
@@ -5643,6 +5696,14 @@ export declare const CommandService: GenService<{
     methodKind: "unary";
     input: typeof SetConversationPinnedRequestSchema;
     output: typeof SetConversationPinnedResponseSchema;
+  },
+  /**
+   * @generated from rpc laelia.v1.CommandService.SetConversationClosed
+   */
+  setConversationClosed: {
+    methodKind: "unary";
+    input: typeof SetConversationClosedRequestSchema;
+    output: typeof SetConversationClosedResponseSchema;
   },
   /**
    * UploadFile stores data in S3 and persists a file row. Intended for the

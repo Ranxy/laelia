@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // ConversationList uses react-i18next (no provider in tests) and the app
@@ -15,6 +15,9 @@ const mock = vi.hoisted(() => ({
   channels: [] as Array<Record<string, unknown>>,
   currentUser: { name: "users/42" },
   setConversationPinned: vi.fn(),
+  setConversationClosed: vi.fn(),
+  toastAdd: vi.fn(),
+  useIsDesktop: vi.fn(() => true),
 }));
 
 vi.mock("@/stores", () => ({
@@ -25,6 +28,7 @@ vi.mock("@/stores", () => ({
       unreadByConv: {},
       createChannel: async () => {},
       setConversationPinned: mock.setConversationPinned,
+      setConversationClosed: mock.setConversationClosed,
       currentUser: mock.currentUser,
     }),
 }));
@@ -38,6 +42,18 @@ vi.mock("react-router-dom", () => ({
 vi.mock("@/connect", () => ({
   agentServiceClient: {},
   userServiceClient: {},
+}));
+
+// The undo toast is app chrome; capture the add call and drive the action
+// callback directly instead of rendering the real toaster.
+vi.mock("@/lib/toast", () => ({
+  toastManager: { add: mock.toastAdd },
+}));
+
+// Default to desktop (context menu) so the mobile-swipe tests can opt out
+// with mock.useIsDesktop.mockReturnValue(false).
+vi.mock("@/lib/use-is-desktop", () => ({
+  useIsDesktop: mock.useIsDesktop,
 }));
 
 import type { Conversation } from "@/types/proto-es/v1/command_pb";
@@ -158,5 +174,75 @@ describe("ConversationList mobile create-channel FAB", () => {
     render(<ConversationList />);
     fireEvent.click(screen.getByTestId("create-channel-fab"));
     expect(screen.getByText("channel.create-title")).toBeInTheDocument();
+  });
+});
+
+describe("ConversationList close and context menu", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+    vi.useRealTimers();
+    mock.channels = [];
+    mock.setConversationClosed.mockClear();
+    mock.setConversationPinned.mockClear();
+    mock.toastAdd.mockClear();
+    mock.useIsDesktop.mockReturnValue(true);
+  });
+
+  it("closes a conversation from the desktop context menu", () => {
+    mock.channels = [channel()];
+    render(<ConversationList />);
+    fireEvent.contextMenu(screen.getByText("Design"));
+    expect(screen.getByText("channel.pin")).toBeInTheDocument();
+    expect(screen.getByText("chat.close")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("chat.close"));
+    expect(mock.setConversationClosed).toHaveBeenCalledWith("ch1", true);
+  });
+
+  it("offers an undo toast whose action reopens the conversation", () => {
+    mock.channels = [channel()];
+    render(<ConversationList />);
+    fireEvent.contextMenu(screen.getByText("Design"));
+    fireEvent.click(screen.getByText("chat.close"));
+
+    expect(mock.toastAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "info",
+        title: "chat.closed-title",
+        timeout: 5000,
+        actionProps: expect.objectContaining({ children: "chat.undo" }),
+      })
+    );
+    const { actionProps } = mock.toastAdd.mock.calls[0][0];
+    act(() => actionProps.onClick());
+    expect(mock.setConversationClosed).toHaveBeenCalledWith("ch1", false);
+  });
+
+  it("pins and unpins from the desktop context menu", () => {
+    mock.channels = [channel()];
+    render(<ConversationList />);
+    fireEvent.contextMenu(screen.getByText("Design"));
+    fireEvent.click(screen.getByText("channel.pin"));
+    expect(mock.setConversationPinned).toHaveBeenCalledWith("ch1", true);
+  });
+
+  it("shows both swipe actions on mobile and closes on the close tap", () => {
+    mock.useIsDesktop.mockReturnValue(false);
+    mock.channels = [channel()];
+    render(<ConversationList />);
+    // The two swipe buttons sit side by side behind the row.
+    expect(screen.getByTestId("swipe-close")).toBeInTheDocument();
+    expect(screen.getByTestId("swipe-pin")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("swipe-close"));
+    expect(mock.setConversationClosed).toHaveBeenCalledWith("ch1", true);
+  });
+
+  it("does not mount the context menu trigger on mobile", () => {
+    mock.useIsDesktop.mockReturnValue(false);
+    mock.channels = [channel()];
+    render(<ConversationList />);
+    fireEvent.contextMenu(screen.getByText("Design"));
+    expect(screen.queryByText("chat.close")).not.toBeInTheDocument();
   });
 });

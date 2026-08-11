@@ -528,6 +528,7 @@ const listUserConversationsWithUnreadSQL = `
 		  LIMIT 1
 		) lm ON true
 		WHERE cm.member_type = $1 AND cm.member_id = $2
+		  AND NOT cm.closed
 		ORDER BY cm.pinned DESC, cm.pinned_at DESC NULLS LAST, c.updated_at DESC
 		LIMIT $4 OFFSET $5`
 

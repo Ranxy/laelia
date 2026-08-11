@@ -271,6 +271,8 @@
     - [SearchChatHistoryRequest](#laelia-v1-SearchChatHistoryRequest)
     - [SearchChatHistoryResponse](#laelia-v1-SearchChatHistoryResponse)
     - [SendMessageRequest](#laelia-v1-SendMessageRequest)
+    - [SetConversationClosedRequest](#laelia-v1-SetConversationClosedRequest)
+    - [SetConversationClosedResponse](#laelia-v1-SetConversationClosedResponse)
     - [SetConversationPinnedRequest](#laelia-v1-SetConversationPinnedRequest)
     - [SetConversationPinnedResponse](#laelia-v1-SetConversationPinnedResponse)
     - [SteerCommandRequest](#laelia-v1-SteerCommandRequest)
@@ -3251,6 +3253,7 @@ window. usage_ratio is used/size.
 | last_message_sender | [string](#string) |  | last_message_sender is the display name of the last_message author: the principal name for USER/SYSTEM senders, the agent name for AGENT senders. Empty when last_message is empty. |
 | last_message_principal_id | [string](#string) |  | last_message_principal_id is the decimal principal id of the last_message author when the sender is a USER (so the frontend can render &#34;You&#34; without mistaking an agent message, whose chat_message.principal_id is the conversation owner, for the viewer). Empty for AGENT/SYSTEM senders and when last_message is empty. |
 | last_message_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | last_message_at is the send time of last_message. Unset when the conversation has no main-channel messages yet. |
+| closed | [bool](#bool) |  | closed is the requesting user&#39;s per-conversation close state (conversation_member_meta.closed). A closed conversation is hidden from the user&#39;s left-rail list; the first new main-channel message (thread replies excluded) clears the flag, so it reappears automatically. Per-user: each viewer has their own close state. Populated by GetChannel for a user viewer; ListChannels never returns closed conversations. |
 
 
 
@@ -4835,6 +4838,38 @@ creates one. Powers the &#34;#&lt;title&gt;&#34; address resolver.
 
 
 
+<a name="laelia-v1-SetConversationClosedRequest"></a>
+
+### SetConversationClosedRequest
+SetConversationClosed sets or clears the requesting user&#39;s per-conversation
+close state. Closing hides a channel or DM from the user&#39;s left-rail list
+without deleting the conversation or its messages; the conversation
+reappears automatically when a new main-channel message arrives (thread
+replies excluded), at which point the flag is cleared server-side. Per-user
+state (conversation_member_meta.closed/closed_at); only the caller&#39;s own
+close state is affected.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| conversation | [string](#string) |  |  |
+| closed | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="laelia-v1-SetConversationClosedResponse"></a>
+
+### SetConversationClosedResponse
+
+
+
+
+
+
+
 <a name="laelia-v1-SetConversationPinnedRequest"></a>
 
 ### SetConversationPinnedRequest
@@ -5526,6 +5561,7 @@ enums cannot share value names), matching SenderType/CommandStatus.
 | FetchConversationActivity | [FetchConversationActivityRequest](#laelia-v1-FetchConversationActivityRequest) | [FetchConversationActivityResponse](#laelia-v1-FetchConversationActivityResponse) |  |
 | MarkConversationRead | [MarkConversationReadRequest](#laelia-v1-MarkConversationReadRequest) | [MarkConversationReadResponse](#laelia-v1-MarkConversationReadResponse) |  |
 | SetConversationPinned | [SetConversationPinnedRequest](#laelia-v1-SetConversationPinnedRequest) | [SetConversationPinnedResponse](#laelia-v1-SetConversationPinnedResponse) |  |
+| SetConversationClosed | [SetConversationClosedRequest](#laelia-v1-SetConversationClosedRequest) | [SetConversationClosedResponse](#laelia-v1-SetConversationClosedResponse) |  |
 | UploadFile | [UploadFileRequest](#laelia-v1-UploadFileRequest) | [File](#laelia-v1-File) | UploadFile stores data in S3 and persists a file row. Intended for the agent daemon (browser uploads go through the Echo multipart route); bytes travel over Connect-JSON, and avoiding a /v1/files/{id} REST entry keeps it from colliding with the browser download route. |
 | DownloadFile | [DownloadFileRequest](#laelia-v1-DownloadFileRequest) | [DownloadFileResponse](#laelia-v1-DownloadFileResponse) | DownloadFile fetches a file&#39;s bytes from S3. The caller must be a member of the file&#39;s conversation. Used by the agent daemon; browser downloads go through the Echo route. |
 | ListFiles | [ListFilesRequest](#laelia-v1-ListFilesRequest) | [ListFilesResponse](#laelia-v1-ListFilesResponse) | ListFiles returns the files attached to a conversation. The caller must be a member. |

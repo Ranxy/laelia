@@ -41,3 +41,21 @@ func TestGetThreadRootSenderSQL(t *testing.T) {
 	assert.Contains(t, threadRootSenderSQL, "sender_agent_id")
 	assert.Contains(t, threadRootSenderSQL, "WHERE id = $1")
 }
+
+// TestClearConversationClosedSQL locks in the "closed chat reappears" behavior:
+// a new main-channel message clears the per-member close flag for the whole
+// conversation (closed_at reset too), and only rows actually closed are
+// touched. The thread-scoping guard lives in createChatMessageInTx (the
+// single choke point for both message insert paths), which skips the clear for
+// thread replies — mirroring the unread-badge scoping. Run without a live
+// database.
+func TestClearConversationClosedSQL(t *testing.T) {
+	assert.Contains(t, clearConversationClosedSQL, "closed = false",
+		"a new message must un-close the conversation so it reappears in the left rail")
+	assert.Contains(t, clearConversationClosedSQL, "closed_at = NULL",
+		"closed_at must reset on un-close so it does not linger from the last close")
+	assert.Contains(t, clearConversationClosedSQL, "closed = true",
+		"the clear must be scoped to members who actually closed the conversation")
+	assert.Contains(t, clearConversationClosedSQL, "WHERE conversation_id = $1",
+		"the clear must target exactly the conversation receiving the message")
+}

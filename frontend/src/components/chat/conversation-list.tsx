@@ -1,10 +1,17 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
-import { Hash, Loader2, Pin, PinOff, Plus } from "lucide-react";
+import { Hash, Loader2, Pin, PinOff, Plus, X } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { Avatar } from "@/components/chat/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +21,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAvatar } from "@/lib/avatar-cache";
 import { formatConversationListTime } from "@/lib/command-status";
+import { toastManager } from "@/lib/toast";
+import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 
@@ -32,6 +41,7 @@ export function ConversationList() {
   const unreadByConv = useAppStore((s) => s.unreadByConv);
   const createChannel = useAppStore((s) => s.createChannel);
   const setConversationPinned = useAppStore((s) => s.setConversationPinned);
+  const setConversationClosed = useAppStore((s) => s.setConversationClosed);
   // currentUser's {user} segment is the decimal principal id used to tag the
   // viewer's own messages in the last-message preview ("You: ...").
   const myPrincipalId = useAppStore((s) =>
@@ -88,6 +98,28 @@ export function ConversationList() {
       setConversationPinned(id, pinned);
     },
     [setConversationPinned]
+  );
+
+  // Close hides the row from the rail without touching the conversation or
+  // its messages; the server clears the flag again on the next main-channel
+  // message, so the chat reappears on its own. The toast leaves a short undo
+  // window for accidental closes.
+  const handleClose = useCallback(
+    (id: string) => {
+      void setConversationClosed(id, true);
+      toastManager.add({
+        type: "info",
+        title: t("chat.closed-title"),
+        timeout: 5000,
+        actionProps: {
+          children: t("chat.undo"),
+          onClick: () => {
+            void setConversationClosed(id, false);
+          },
+        },
+      });
+    },
+    [setConversationClosed, t]
   );
 
   return (
@@ -173,6 +205,7 @@ export function ConversationList() {
               }
               onOpen={handleOpen}
               onTogglePin={handleTogglePin}
+              onClose={handleClose}
             />
           );
         })}
@@ -245,7 +278,8 @@ export function ConversationList() {
 // id-threaded handlers), so a re-render of the parent — an unread-badge change
 // on one conversation, or a fetchChannels poll — does not re-render every row:
 // rows whose title/unread/active/pinned are unchanged bail out.
-const SWIPE_ACTION_WIDTH = 72;
+// Two 72px swipe actions (pin + close) side by side.
+const SWIPE_ACTION_WIDTH = 144;
 
 const ConversationRow = memo(function ConversationRow({
   id,
@@ -262,6 +296,7 @@ const ConversationRow = memo(function ConversationRow({
   lastMessageAtMs,
   onOpen,
   onTogglePin,
+  onClose,
 }: {
   id: string;
   title: string;
@@ -284,6 +319,7 @@ const ConversationRow = memo(function ConversationRow({
   lastMessageAtMs?: number;
   onOpen: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
+  onClose: (id: string) => void;
 }) {
   const { t } = useTranslation();
   const avatarName = peer ? `${peer}/avatar` : undefined;
@@ -344,15 +380,37 @@ const ConversationRow = memo(function ConversationRow({
     setOffset(0);
   }, [onTogglePin, id, pinned]);
 
-  return (
-    <div className="group relative flex w-full items-center overflow-hidden">
-      {/* Mobile swipe action: revealed by left-swiping the row. */}
+  const handleCloseClick = useCallback(() => {
+    onClose(id);
+    setOffset(0);
+  }, [onClose, id]);
+
+  const isDesktop = useIsDesktop();
+
+  const row = (
+    <>
+      {/* Mobile swipe actions: revealed by left-swiping the row. The
+          destructive close action hugs the screen edge (iOS convention) with
+          the pin toggle to its left. */}
+      <button
+        type="button"
+        onClick={handleCloseClick}
+        aria-label={t("chat.close")}
+        data-testid="swipe-close"
+        className={cn(
+          "absolute inset-y-0 right-0 z-0 flex w-[72px] shrink-0 items-center justify-center",
+          "bg-error text-white transition-colors lg:hidden"
+        )}
+      >
+        <X className="size-5" />
+      </button>
       <button
         type="button"
         onClick={handlePinClick}
         aria-label={pinned ? t("channel.unpin") : t("channel.pin")}
+        data-testid="swipe-pin"
         className={cn(
-          "absolute inset-y-0 right-0 z-0 flex w-[72px] shrink-0 items-center justify-center",
+          "absolute inset-y-0 right-[72px] z-0 flex w-[72px] shrink-0 items-center justify-center",
           "transition-colors lg:hidden",
           pinned
             ? "bg-accent/15 text-accent"
@@ -469,6 +527,40 @@ const ConversationRow = memo(function ConversationRow({
           <Pin className="size-3.5" />
         )}
       </button>
+    </>
+  );
+
+  // Desktop right-click menu (Pin/Unpin + Close). Mobile gets the swipe
+  // actions only: the trigger div would otherwise also answer long-presses,
+  // which fights the swipe gesture.
+  if (isDesktop) {
+    return (
+      <ContextMenu>
+        <ContextMenuTrigger className="group relative flex w-full items-center overflow-hidden">
+          {row}
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onClick={handlePinClick}>
+            {pinned ? (
+              <PinOff className="size-4" />
+            ) : (
+              <Pin className="size-4" />
+            )}
+            {t(pinned ? "channel.unpin" : "channel.pin")}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={handleCloseClick}>
+            <X className="size-4" />
+            {t("chat.close")}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    );
+  }
+
+  return (
+    <div className="group relative flex w-full items-center overflow-hidden">
+      {row}
     </div>
   );
 });

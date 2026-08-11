@@ -149,6 +149,17 @@ const conversationVersionBumpSQL = `
 	RETURNING version
 `
 
+// clearConversationClosedSQL is the "closed chat reappears" statement: the
+// first new main-channel message (thread replies excluded) clears the
+// per-member close flag for the whole conversation, so a chat the user closed
+// shows up in the left rail again as soon as it gets new activity. Extracted
+// as a named constant so the regression guard can lock the closed_at clear and
+// the closed = true predicate in place without a live database.
+const clearConversationClosedSQL = `
+	UPDATE conversation_member_meta SET closed = false, closed_at = NULL
+	WHERE conversation_id = $1 AND closed = true
+`
+
 // CreateChatMessageBumpVersion atomically increments the conversation's room
 // version and inserts a chat_message carrying that new version. It is the
 // single entry point for both user (SendMessage) and assistant (HandleResult)
@@ -222,6 +233,14 @@ func createChatMessageInTx(ctx context.Context, tx *sql.Tx, msg *ChatMessage, ro
 		RETURNING id, created_at
 	`, msg.ConversationID, msg.PrincipalID, msg.Role, msg.Content, msg.CommandID, msg.SenderAgentID, roomVersion, msg.SenderType, mentionsBytes, attachmentsBytes, msg.ThreadRootMessageID).Scan(&id, &createdAt); err != nil {
 		return uuid.Nil, time.Time{}, errors.Wrapf(err, "failed to create chat message")
+	}
+	// A main-channel message un-closes the conversation for every member (a
+	// closed chat reappears in the left rail on new activity); thread replies
+	// must not, mirroring the unread-badge scoping.
+	if !msg.ThreadRootMessageID.Valid {
+		if _, err := tx.ExecContext(ctx, clearConversationClosedSQL, msg.ConversationID); err != nil {
+			return uuid.Nil, time.Time{}, errors.Wrapf(err, "failed to clear conversation closed")
+		}
 	}
 	return id, createdAt, nil
 }

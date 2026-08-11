@@ -392,6 +392,16 @@ export interface ChannelSlice {
     conversationId: string,
     pinned: boolean
   ) => Promise<void>;
+  // Close or reopen a conversation for the current user. Closing hides the
+  // channel/DM from the left-rail list (the conversation and its messages are
+  // untouched); the backend clears the flag on the next main-channel message,
+  // so a closed chat reappears automatically on new activity. Optimistically
+  // removes the row locally; reopening refetches so the row lands at its
+  // server position.
+  setConversationClosed: (
+    conversationId: string,
+    closed: boolean
+  ) => Promise<void>;
   sendChannelMessage: (
     conversationId: string,
     content: string,

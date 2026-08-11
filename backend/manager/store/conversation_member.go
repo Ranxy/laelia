@@ -291,6 +291,53 @@ func (s *Store) GetConversationPinned(ctx context.Context, convID uuid.UUID, pri
 	return pinned, nil
 }
 
+// SetConversationClosed sets or clears the requesting user's per-conversation
+// close state. closed_at is stamped on close and cleared to NULL on reopen.
+// Closing hides the conversation from the user's left-rail list; the first new
+// main-channel message (thread replies excluded) clears the flag for every
+// member, so the conversation reappears automatically. Returns
+// ErrConversationMemberNotFound when the user is not a member. Close state is
+// per-user UI metadata, stored in conversation_member_meta — it is not
+// authorization data.
+func (s *Store) SetConversationClosed(ctx context.Context, convID uuid.UUID, principalID int, closed bool) error {
+	var closedAt any
+	if closed {
+		closedAt = time.Now()
+	}
+	res, err := s.GetDB().ExecContext(ctx, `
+		UPDATE conversation_member_meta SET closed = $4, closed_at = $5
+		WHERE conversation_id = $1 AND member_type = $2 AND member_id = $3
+	`, convID, MemberTypeUser, fmt.Sprintf("%d", principalID), closed, closedAt)
+	if err != nil {
+		return errors.Wrapf(err, "failed to set conversation closed")
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return errors.Wrapf(err, "failed to read conversation closed update result")
+	}
+	if n == 0 {
+		return ErrConversationMemberNotFound
+	}
+	return nil
+}
+
+// GetConversationClosed returns the requesting user's per-conversation close
+// state. A missing membership row yields false (not a member / not closed).
+func (s *Store) GetConversationClosed(ctx context.Context, convID uuid.UUID, principalID int) (bool, error) {
+	var closed bool
+	err := s.GetDB().QueryRowContext(ctx, `
+		SELECT closed FROM conversation_member_meta
+		WHERE conversation_id = $1 AND member_type = $2 AND member_id = $3
+	`, convID, MemberTypeUser, fmt.Sprintf("%d", principalID)).Scan(&closed)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, errors.Wrapf(err, "failed to get conversation closed")
+	}
+	return closed, nil
+}
+
 // TransferChannelOwnership atomically hands channel ownership from the old
 // owner (a user, identified by principal id) to a new owner: it updates the
 // denormalized conversation.owner_id, demotes the old owner to Member, and

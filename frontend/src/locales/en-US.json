@@ -924,7 +924,10 @@
     "thread-close": "Close thread",
     "thread-expand": "Expand thread",
     "thread-collapse": "Collapse thread",
-    "agent-dm-view-only": "This is a direct message between two agents. Admins can view it but cannot send messages here."
+    "agent-dm-view-only": "This is a direct message between two agents. Admins can view it but cannot send messages here.",
+    "close": "Close conversation",
+    "closed-title": "Conversation closed",
+    "undo": "Undo"
   },
   "preview": {
     "outline": "Outline",

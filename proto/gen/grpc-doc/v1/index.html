@@ -1232,6 +1232,14 @@
                 </li>
               
                 <li>
+                  <a href="#laelia.v1.SetConversationClosedRequest"><span class="badge">M</span>SetConversationClosedRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#laelia.v1.SetConversationClosedResponse"><span class="badge">M</span>SetConversationClosedResponse</a>
+                </li>
+              
+                <li>
                   <a href="#laelia.v1.SetConversationPinnedRequest"><span class="badge">M</span>SetConversationPinnedRequest</a>
                 </li>
               
@@ -8874,6 +8882,18 @@ last_message is empty. </p></td>
 conversation has no main-channel messages yet. </p></td>
                 </tr>
               
+                <tr>
+                  <td>closed</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>closed is the requesting user&#39;s per-conversation close state
+(conversation_member_meta.closed). A closed conversation is hidden from the
+user&#39;s left-rail list; the first new main-channel message (thread replies
+excluded) clears the flag, so it reappears automatically. Per-user: each
+viewer has their own close state. Populated by GetChannel for a user
+viewer; ListChannels never returns closed conversations. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -11948,6 +11968,44 @@ TODO. Only valid for top-level messages (thread_root must be empty). </p></td>
 
         
       
+        <h3 id="laelia.v1.SetConversationClosedRequest">SetConversationClosedRequest</h3>
+        <p>SetConversationClosed sets or clears the requesting user's per-conversation</p><p>close state. Closing hides a channel or DM from the user's left-rail list</p><p>without deleting the conversation or its messages; the conversation</p><p>reappears automatically when a new main-channel message arrives (thread</p><p>replies excluded), at which point the flag is cleared server-side. Per-user</p><p>state (conversation_member_meta.closed/closed_at); only the caller's own</p><p>close state is affected.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>conversation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>closed</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="laelia.v1.SetConversationClosedResponse">SetConversationClosedResponse</h3>
+        <p></p>
+
+        
+
+        
+      
         <h3 id="laelia.v1.SetConversationPinnedRequest">SetConversationPinnedRequest</h3>
         <p>SetConversationPinned sets or clears the requesting user's per-conversation</p><p>pin. Pinning a channel or DM keeps it at the top of the user's left-rail</p><p>list independent of last message time. Per-user state</p><p>(conversation_member.pinned/pinned_at); only the caller's own pin is</p><p>affected.</p>
 
@@ -13738,6 +13796,13 @@ from the auth context.</p></td>
                 <td>SetConversationPinned</td>
                 <td><a href="#laelia.v1.SetConversationPinnedRequest">SetConversationPinnedRequest</a></td>
                 <td><a href="#laelia.v1.SetConversationPinnedResponse">SetConversationPinnedResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>SetConversationClosed</td>
+                <td><a href="#laelia.v1.SetConversationClosedRequest">SetConversationClosedRequest</a></td>
+                <td><a href="#laelia.v1.SetConversationClosedResponse">SetConversationClosedResponse</a></td>
                 <td><p></p></td>
               </tr>
             
