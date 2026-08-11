@@ -1,11 +1,26 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  matchRoutes,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useRoutes,
+} from "react-router-dom";
 import { MobileHeader } from "@/components/mobile-header";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { DesktopSidebar } from "@/components/sidebar";
 import { toastManager } from "@/lib/toast";
 import { useSwipeBack } from "@/lib/use-swipe-back";
 import { reconcilePushSubscription, suppressRoute } from "@/lib/web-push";
+import { ROUTE_INFO } from "@/router/route-info";
+import { dashboardChildrenRoutes } from "@/router/routes/dashboard";
 import { useAppStore } from "@/stores";
 
 // The overlays/dialog are code-split so markstream-react (and the
@@ -68,13 +83,33 @@ function loadCollapsed(): boolean {
   }
 }
 
+// Path that matches no dashboard route; useRoutes returns null for it so the
+// swipe-back preview stays unmounted while no gesture is active.
+const NO_PREVIEW_PATH = "/__swipe-preview-no-match__";
+
 export function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const location = useLocation();
   const navigate = useNavigate();
   // Mobile swipe-back: drag from the left edge to go back one level (thread
   // panel first, then the route's backTo target). Inert on desktop.
-  const swipeBackRef = useSwipeBack();
+  const { rootRef, currentPageRef, previewPath } = useSwipeBack();
+  // The back-target route rendered underneath the current page while the
+  // gesture is active, so the destination is visible during the drag.
+  const previewElement = useRoutes(
+    dashboardChildrenRoutes,
+    previewPath ?? NO_PREVIEW_PATH
+  );
+
+  // While previewing, the mobile header shows the destination page's title
+  // (the header visually belongs to the page underneath the drag).
+  const previewTitleKey = useMemo(() => {
+    if (!previewPath) return undefined;
+    const matches = matchRoutes(dashboardChildrenRoutes, previewPath);
+    const leaf = matches?.at(-1);
+    const name = (leaf?.route.handle as { name?: string } | undefined)?.name;
+    return name ? ROUTE_INFO[name]?.titleKey : undefined;
+  }, [previewPath]);
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => {
@@ -128,10 +163,7 @@ export function DashboardLayout() {
   }, [navigate]);
 
   return (
-    <div
-      ref={swipeBackRef}
-      className="flex h-screen overflow-hidden bg-background"
-    >
+    <div ref={rootRef} className="flex h-screen overflow-hidden bg-background">
       <DesktopSidebar
         collapsed={collapsed}
         onToggleCollapse={toggleCollapsed}
@@ -139,10 +171,20 @@ export function DashboardLayout() {
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Mobile header. */}
         <div className="fixed left-0 right-0 top-0 z-chrome lg:hidden">
-          <MobileHeader />
+          <MobileHeader previewTitleKey={previewTitleKey} />
         </div>
-        <main className="flex-1 overflow-hidden pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:pt-0 lg:pb-0">
-          <Outlet />
+        <main className="relative flex-1 overflow-hidden pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:pt-0 lg:pb-0">
+          <div
+            ref={currentPageRef}
+            className="relative z-10 h-full will-change-transform"
+          >
+            <Outlet />
+          </div>
+          {previewPath && (
+            <div className="absolute inset-0 z-0 pt-[var(--mobile-header-height)] pb-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom))] lg:pt-0 lg:pb-0">
+              <Suspense fallback={null}>{previewElement}</Suspense>
+            </div>
+          )}
         </main>
         <div className="fixed bottom-0 left-0 right-0 z-chrome lg:hidden">
           <MobileTabBar />

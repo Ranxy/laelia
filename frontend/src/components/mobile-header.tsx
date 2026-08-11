@@ -7,18 +7,27 @@ import { cn } from "@/lib/utils";
 import { ROUTE_INFO } from "@/router/route-info";
 import { useCurrentRoute } from "@/router/use-current-route";
 
-export function MobileHeader() {
+interface MobileHeaderProps {
+  // While the swipe-back gesture previews the destination page underneath,
+  // the header shows that page's title (and hides its own back button).
+  previewTitleKey?: string;
+}
+
+export function MobileHeader({ previewTitleKey }: MobileHeaderProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const currentRoute = useCurrentRoute();
 
   const { title, backPath } = useMemo(() => {
+    if (previewTitleKey) {
+      return { title: t(previewTitleKey), backPath: undefined };
+    }
     const info = currentRoute.name ? ROUTE_INFO[currentRoute.name] : undefined;
     if (info) {
       return { title: t(info.titleKey), backPath: info.backTo };
     }
     return { title: t("sidebar.home"), backPath: undefined };
-  }, [currentRoute.name, t]);
+  }, [previewTitleKey, currentRoute.name, t]);
 
   return (
     <header className="flex h-[var(--mobile-header-height)] shrink-0 items-center gap-2 border-b border-control-border bg-background px-4 lg:hidden">

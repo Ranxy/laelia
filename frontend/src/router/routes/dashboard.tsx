@@ -45,330 +45,334 @@ function AgentRouteRedirect() {
   return <Navigate to={`/members/agents/${agentId ?? ""}${rest}`} replace />;
 }
 
-export const dashboardRoutes: RouteObject[] = [
+// Exported separately so the mobile swipe-back gesture can render the
+// back-target route (useRoutes) underneath the current page while dragging.
+export const dashboardChildrenRoutes: RouteObject[] = [
   {
-    element: <DashboardLayout />,
+    lazy: () =>
+      import("@/pages/dashboard/chat-layout").then((m) => ({
+        Component: m.ChatLayout,
+      })),
     children: [
       {
+        index: true,
+        handle: { name: CHAT_ROUTE },
         lazy: () =>
-          import("@/pages/dashboard/chat-layout").then((m) => ({
-            Component: m.ChatLayout,
+          import("@/pages/dashboard/chat-conversation").then((m) => ({
+            Component: m.ChatEmptyState,
           })),
-        children: [
-          {
-            index: true,
-            handle: { name: CHAT_ROUTE },
-            lazy: () =>
-              import("@/pages/dashboard/chat-conversation").then((m) => ({
-                Component: m.ChatEmptyState,
-              })),
-          },
-          {
-            path: ":conversationId",
-            handle: { name: CHAT_ROUTE_DETAIL },
-            lazy: () =>
-              import("@/pages/dashboard/chat-conversation").then((m) => ({
-                Component: m.ChatConversationPage,
-              })),
-          },
-        ],
       },
       {
-        path: "activity",
-        handle: { name: ACTIVITY_ROUTE },
+        path: ":conversationId",
+        handle: { name: CHAT_ROUTE_DETAIL },
         lazy: () =>
-          import("@/pages/dashboard/activity-layout").then((m) => ({
-            Component: m.ActivityLayout,
+          import("@/pages/dashboard/chat-conversation").then((m) => ({
+            Component: m.ChatConversationPage,
           })),
-        children: [
-          {
-            path: ":messageId",
-            handle: { name: ACTIVITY_ROUTE_DETAIL },
-            lazy: () =>
-              import("@/pages/dashboard/activity-detail").then((m) => ({
-                Component: m.ActivityDetail,
-              })),
-          },
-        ],
       },
+    ],
+  },
+  {
+    path: "activity",
+    handle: { name: ACTIVITY_ROUTE },
+    lazy: () =>
+      import("@/pages/dashboard/activity-layout").then((m) => ({
+        Component: m.ActivityLayout,
+      })),
+    children: [
       {
-        // Members owns the workspace directory (left rail) and the member
-        // detail panes. The agent detail tree (AgentDetailLayout + its four
-        // tab pages) is nested here so the route-name index resolves
-        // AGENT_ROUTE_* / COMMAND_ROUTE_* / REMINDER_ROUTE_* under
-        // /members/agents/:agentId — the left rail's tab navigation then
-        // stays within Members. Defined before the legacy /agents redirect
-        // so the index (first-registration-wins) picks these paths.
-        path: "members",
+        path: ":messageId",
+        handle: { name: ACTIVITY_ROUTE_DETAIL },
+        lazy: () =>
+          import("@/pages/dashboard/activity-detail").then((m) => ({
+            Component: m.ActivityDetail,
+          })),
+      },
+    ],
+  },
+  {
+    // Members owns the workspace directory (left rail) and the member
+    // detail panes. The agent detail tree (AgentDetailLayout + its four
+    // tab pages) is nested here so the route-name index resolves
+    // AGENT_ROUTE_* / COMMAND_ROUTE_* / REMINDER_ROUTE_* under
+    // /members/agents/:agentId — the left rail's tab navigation then
+    // stays within Members. Defined before the legacy /agents redirect
+    // so the index (first-registration-wins) picks these paths.
+    path: "members",
+    handle: { name: MEMBERS_ROUTE },
+    lazy: () =>
+      import("@/pages/dashboard/members").then((m) => ({
+        Component: m.MembersPage,
+      })),
+    children: [
+      {
+        index: true,
         handle: { name: MEMBERS_ROUTE },
         lazy: () =>
-          import("@/pages/dashboard/members").then((m) => ({
-            Component: m.MembersPage,
+          import("@/components/selection-empty-state").then((m) => ({
+            element: (
+              <m.SelectionEmptyState messageKey="members.no-selection" />
+            ),
           })),
-        children: [
-          {
-            index: true,
-            handle: { name: MEMBERS_ROUTE },
-            lazy: () =>
-              import("@/components/selection-empty-state").then((m) => ({
-                element: (
-                  <m.SelectionEmptyState messageKey="members.no-selection" />
-                ),
-              })),
-          },
-          {
-            path: "agents/:agentId",
-            lazy: () =>
-              import("@/app/layouts/agent-detail-layout").then((m) => ({
-                Component: m.AgentDetailLayout,
-              })),
-            children: [
-              {
-                index: true,
-                handle: { name: AGENT_ROUTE_PROFILE },
-                lazy: () =>
-                  import("@/pages/dashboard/agent-profile").then((m) => ({
-                    Component: m.AgentProfilePage,
-                  })),
-              },
-              {
-                path: "commands",
-                handle: { name: COMMAND_ROUTE_LIST },
-                lazy: () =>
-                  import("@/pages/dashboard/command-list").then((m) => ({
-                    Component: m.CommandListPage,
-                  })),
-              },
-              {
-                path: "commands/:commandId",
-                handle: { name: COMMAND_ROUTE_DETAIL },
-                lazy: () =>
-                  import("@/pages/dashboard/command-detail").then((m) => ({
-                    Component: m.CommandDetailPage,
-                  })),
-              },
-              {
-                path: "reminders",
-                handle: { name: REMINDER_ROUTE_LIST },
-                lazy: () =>
-                  import("@/pages/dashboard/reminder-list").then((m) => ({
-                    Component: m.ReminderListPage,
-                  })),
-              },
-              {
-                path: "reminders/:reminderId",
-                handle: { name: REMINDER_ROUTE_DETAIL },
-                lazy: () =>
-                  import("@/pages/dashboard/reminder-detail").then((m) => ({
-                    Component: m.ReminderDetailPage,
-                  })),
-              },
-              {
-                path: "chat",
-                handle: { name: AGENT_ROUTE_CHAT },
-                lazy: () =>
-                  import("@/pages/dashboard/agent-chat").then((m) => ({
-                    Component: m.AgentChatPage,
-                  })),
-              },
-              {
-                path: "mcp",
-                handle: { name: AGENT_ROUTE_MCP },
-                lazy: () =>
-                  import("@/pages/dashboard/agent-mcp").then((m) => ({
-                    Component: m.AgentMcpPage,
-                  })),
-              },
-              {
-                path: "workspace",
-                handle: { name: AGENT_ROUTE_WORKSPACE },
-                lazy: () =>
-                  import("@/pages/dashboard/agent-workspace").then((m) => ({
-                    Component: m.AgentWorkspacePage,
-                  })),
-              },
-            ],
-          },
-          {
-            path: "users/:userId",
-            handle: { name: HUMAN_ROUTE_DETAIL },
-            lazy: () =>
-              import("@/pages/dashboard/human-detail").then((m) => ({
-                Component: m.HumanDetailPage,
-              })),
-          },
-          {
-            path: "channels/:channelId",
-            handle: { name: CHANNEL_ROUTE_DETAIL },
-            lazy: () =>
-              import("@/pages/dashboard/channel-detail").then((m) => ({
-                Component: m.ChannelDetailPage,
-              })),
-          },
-        ],
       },
       {
-        path: "machines",
+        path: "agents/:agentId",
         lazy: () =>
-          import("@/pages/dashboard/machines").then((m) => ({
-            Component: m.MachinesPage,
+          import("@/app/layouts/agent-detail-layout").then((m) => ({
+            Component: m.AgentDetailLayout,
           })),
         children: [
           {
             index: true,
-            handle: { name: MACHINE_ROUTE_LIST },
+            handle: { name: AGENT_ROUTE_PROFILE },
             lazy: () =>
-              import("@/components/selection-empty-state").then((m) => ({
-                element: (
-                  <m.SelectionEmptyState messageKey="machine.no-selection" />
-                ),
+              import("@/pages/dashboard/agent-profile").then((m) => ({
+                Component: m.AgentProfilePage,
               })),
           },
           {
-            path: ":machineId",
+            path: "commands",
+            handle: { name: COMMAND_ROUTE_LIST },
             lazy: () =>
-              import("@/app/layouts/machine-detail-layout").then((m) => ({
-                Component: m.MachineDetailLayout,
+              import("@/pages/dashboard/command-list").then((m) => ({
+                Component: m.CommandListPage,
               })),
-            children: [
-              {
-                index: true,
-                handle: { name: MACHINE_ROUTE_PROFILE },
-                lazy: () =>
-                  import("@/pages/dashboard/machine-profile").then((m) => ({
-                    Component: m.MachineProfilePage,
-                  })),
-              },
-              {
-                path: "workspace",
-                handle: { name: MACHINE_ROUTE_WORKSPACE },
-                lazy: () =>
-                  import("@/pages/dashboard/machine-workspace").then((m) => ({
-                    Component: m.MachineWorkspacePage,
-                  })),
-              },
-            ],
+          },
+          {
+            path: "commands/:commandId",
+            handle: { name: COMMAND_ROUTE_DETAIL },
+            lazy: () =>
+              import("@/pages/dashboard/command-detail").then((m) => ({
+                Component: m.CommandDetailPage,
+              })),
+          },
+          {
+            path: "reminders",
+            handle: { name: REMINDER_ROUTE_LIST },
+            lazy: () =>
+              import("@/pages/dashboard/reminder-list").then((m) => ({
+                Component: m.ReminderListPage,
+              })),
+          },
+          {
+            path: "reminders/:reminderId",
+            handle: { name: REMINDER_ROUTE_DETAIL },
+            lazy: () =>
+              import("@/pages/dashboard/reminder-detail").then((m) => ({
+                Component: m.ReminderDetailPage,
+              })),
+          },
+          {
+            path: "chat",
+            handle: { name: AGENT_ROUTE_CHAT },
+            lazy: () =>
+              import("@/pages/dashboard/agent-chat").then((m) => ({
+                Component: m.AgentChatPage,
+              })),
+          },
+          {
+            path: "mcp",
+            handle: { name: AGENT_ROUTE_MCP },
+            lazy: () =>
+              import("@/pages/dashboard/agent-mcp").then((m) => ({
+                Component: m.AgentMcpPage,
+              })),
+          },
+          {
+            path: "workspace",
+            handle: { name: AGENT_ROUTE_WORKSPACE },
+            lazy: () =>
+              import("@/pages/dashboard/agent-workspace").then((m) => ({
+                Component: m.AgentWorkspacePage,
+              })),
           },
         ],
       },
       {
-        // Legacy /agents deep links redirect into the Members-embedded agent
-        // detail tree. The index redirects to the Members directory; any
-        // /agents/:agentId[/**] forwards to /members/agents/:agentId[/**].
-        path: "agents",
-        element: <Outlet />,
-        children: [
-          {
-            index: true,
-            element: <Navigate to="/members" replace />,
-          },
-          {
-            path: ":agentId/*",
-            element: <AgentRouteRedirect />,
-          },
-        ],
+        path: "users/:userId",
+        handle: { name: HUMAN_ROUTE_DETAIL },
+        lazy: () =>
+          import("@/pages/dashboard/human-detail").then((m) => ({
+            Component: m.HumanDetailPage,
+          })),
       },
       {
-        path: "settings",
+        path: "channels/:channelId",
+        handle: { name: CHANNEL_ROUTE_DETAIL },
+        lazy: () =>
+          import("@/pages/dashboard/channel-detail").then((m) => ({
+            Component: m.ChannelDetailPage,
+          })),
+      },
+    ],
+  },
+  {
+    path: "machines",
+    lazy: () =>
+      import("@/pages/dashboard/machines").then((m) => ({
+        Component: m.MachinesPage,
+      })),
+    children: [
+      {
+        index: true,
+        handle: { name: MACHINE_ROUTE_LIST },
+        lazy: () =>
+          import("@/components/selection-empty-state").then((m) => ({
+            element: (
+              <m.SelectionEmptyState messageKey="machine.no-selection" />
+            ),
+          })),
+      },
+      {
+        path: ":machineId",
+        lazy: () =>
+          import("@/app/layouts/machine-detail-layout").then((m) => ({
+            Component: m.MachineDetailLayout,
+          })),
         children: [
           {
             index: true,
-            handle: { name: SETTINGS_ROUTE },
+            handle: { name: MACHINE_ROUTE_PROFILE },
             lazy: () =>
-              import("@/pages/dashboard/settings-menu").then((m) => ({
-                Component: m.SettingsIndex,
+              import("@/pages/dashboard/machine-profile").then((m) => ({
+                Component: m.MachineProfilePage,
               })),
           },
           {
-            path: "agents",
-            handle: { name: SETTINGS_ROUTE_AGENTS },
+            path: "workspace",
+            handle: { name: MACHINE_ROUTE_WORKSPACE },
             lazy: () =>
-              import("@/pages/dashboard/settings-agents").then((m) => ({
-                Component: m.SettingsAgentsPage,
-              })),
-          },
-          {
-            path: "profile",
-            handle: { name: SETTINGS_ROUTE_PROFILE },
-            lazy: () =>
-              import("@/pages/dashboard/settings-profile").then((m) => ({
-                Component: m.SettingsProfilePage,
-              })),
-          },
-          {
-            path: "storage",
-            handle: { name: SETTINGS_ROUTE_STORAGE },
-            lazy: () =>
-              import("@/pages/dashboard/settings-storage").then((m) => ({
-                Component: m.SettingsStoragePage,
-              })),
-          },
-          {
-            path: "notifications",
-            handle: { name: SETTINGS_ROUTE_NOTIFICATIONS },
-            lazy: () =>
-              import("@/pages/dashboard/settings-notifications").then((m) => ({
-                Component: m.SettingsNotificationsPage,
-              })),
-          },
-          {
-            path: "users",
-            handle: { name: SETTINGS_ROUTE_USERS },
-            lazy: () =>
-              import("@/pages/dashboard/user-list").then((m) => ({
-                Component: m.UserListPage,
-              })),
-          },
-          {
-            path: "roles",
-            handle: { name: SETTINGS_ROUTE_ROLES },
-            lazy: () =>
-              import("@/pages/dashboard/settings-roles").then((m) => ({
-                Component: m.SettingsRolesPage,
-              })),
-          },
-          {
-            path: "iam",
-            handle: { name: SETTINGS_ROUTE_IAM },
-            lazy: () =>
-              import("@/pages/dashboard/settings-iam").then((m) => ({
-                Component: m.SettingsIamPage,
-              })),
-          },
-          {
-            path: "groups",
-            handle: { name: SETTINGS_ROUTE_GROUPS },
-            lazy: () =>
-              import("@/pages/dashboard/settings-groups").then((m) => ({
-                Component: m.SettingsGroupsPage,
-              })),
-          },
-          {
-            path: "api-providers",
-            handle: { name: SETTINGS_ROUTE_API_PROVIDERS },
-            lazy: () =>
-              import("@/pages/dashboard/settings-api-providers").then((m) => ({
-                Component: m.SettingsApiProvidersPage,
-              })),
-          },
-          {
-            path: "mcp-servers",
-            handle: { name: SETTINGS_ROUTE_MCP_SERVERS },
-            lazy: () =>
-              import("@/pages/dashboard/settings-mcp-servers").then((m) => ({
-                Component: m.SettingsMcpServersPage,
-              })),
-          },
-          {
-            path: "audit",
-            handle: { name: SETTINGS_ROUTE_AUDIT },
-            lazy: () =>
-              import("@/pages/dashboard/settings-audit").then((m) => ({
-                Component: m.SettingsAuditPage,
+              import("@/pages/dashboard/machine-workspace").then((m) => ({
+                Component: m.MachineWorkspacePage,
               })),
           },
         ],
       },
     ],
+  },
+  {
+    // Legacy /agents deep links redirect into the Members-embedded agent
+    // detail tree. The index redirects to the Members directory; any
+    // /agents/:agentId[/**] forwards to /members/agents/:agentId[/**].
+    path: "agents",
+    element: <Outlet />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/members" replace />,
+      },
+      {
+        path: ":agentId/*",
+        element: <AgentRouteRedirect />,
+      },
+    ],
+  },
+  {
+    path: "settings",
+    children: [
+      {
+        index: true,
+        handle: { name: SETTINGS_ROUTE },
+        lazy: () =>
+          import("@/pages/dashboard/settings-menu").then((m) => ({
+            Component: m.SettingsIndex,
+          })),
+      },
+      {
+        path: "agents",
+        handle: { name: SETTINGS_ROUTE_AGENTS },
+        lazy: () =>
+          import("@/pages/dashboard/settings-agents").then((m) => ({
+            Component: m.SettingsAgentsPage,
+          })),
+      },
+      {
+        path: "profile",
+        handle: { name: SETTINGS_ROUTE_PROFILE },
+        lazy: () =>
+          import("@/pages/dashboard/settings-profile").then((m) => ({
+            Component: m.SettingsProfilePage,
+          })),
+      },
+      {
+        path: "storage",
+        handle: { name: SETTINGS_ROUTE_STORAGE },
+        lazy: () =>
+          import("@/pages/dashboard/settings-storage").then((m) => ({
+            Component: m.SettingsStoragePage,
+          })),
+      },
+      {
+        path: "notifications",
+        handle: { name: SETTINGS_ROUTE_NOTIFICATIONS },
+        lazy: () =>
+          import("@/pages/dashboard/settings-notifications").then((m) => ({
+            Component: m.SettingsNotificationsPage,
+          })),
+      },
+      {
+        path: "users",
+        handle: { name: SETTINGS_ROUTE_USERS },
+        lazy: () =>
+          import("@/pages/dashboard/user-list").then((m) => ({
+            Component: m.UserListPage,
+          })),
+      },
+      {
+        path: "roles",
+        handle: { name: SETTINGS_ROUTE_ROLES },
+        lazy: () =>
+          import("@/pages/dashboard/settings-roles").then((m) => ({
+            Component: m.SettingsRolesPage,
+          })),
+      },
+      {
+        path: "iam",
+        handle: { name: SETTINGS_ROUTE_IAM },
+        lazy: () =>
+          import("@/pages/dashboard/settings-iam").then((m) => ({
+            Component: m.SettingsIamPage,
+          })),
+      },
+      {
+        path: "groups",
+        handle: { name: SETTINGS_ROUTE_GROUPS },
+        lazy: () =>
+          import("@/pages/dashboard/settings-groups").then((m) => ({
+            Component: m.SettingsGroupsPage,
+          })),
+      },
+      {
+        path: "api-providers",
+        handle: { name: SETTINGS_ROUTE_API_PROVIDERS },
+        lazy: () =>
+          import("@/pages/dashboard/settings-api-providers").then((m) => ({
+            Component: m.SettingsApiProvidersPage,
+          })),
+      },
+      {
+        path: "mcp-servers",
+        handle: { name: SETTINGS_ROUTE_MCP_SERVERS },
+        lazy: () =>
+          import("@/pages/dashboard/settings-mcp-servers").then((m) => ({
+            Component: m.SettingsMcpServersPage,
+          })),
+      },
+      {
+        path: "audit",
+        handle: { name: SETTINGS_ROUTE_AUDIT },
+        lazy: () =>
+          import("@/pages/dashboard/settings-audit").then((m) => ({
+            Component: m.SettingsAuditPage,
+          })),
+      },
+    ],
+  },
+];
+
+export const dashboardRoutes: RouteObject[] = [
+  {
+    element: <DashboardLayout />,
+    children: dashboardChildrenRoutes,
   },
 ];

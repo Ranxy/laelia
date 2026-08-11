@@ -185,6 +185,7 @@ export function ThreadPanel({
   onToggleExpand,
 }: ThreadPanelProps) {
   const { t } = useTranslation();
+  const isDesktop = useIsDesktop();
   const conversationName = `conversations/${channelId}`;
   const asideClass = fluid
     ? "flex h-full w-full flex-col"
@@ -407,7 +408,19 @@ export function ThreadPanel({
 
   if (loading && !rootMsg) {
     return (
-      <aside className={asideClass}>
+      <aside
+        className={asideClass}
+        style={
+          isDesktop
+            ? undefined
+            : {
+                // The swipe-back gesture drives the mobile full-screen panel
+                // via CSS variables set on the layout root (see use-swipe-back).
+                transform: "translateX(var(--swipe-offset, 0px))",
+                transition: "var(--swipe-transition, none)",
+              }
+        }
+      >
         <ThreadHeader
           title={t("chat.thread-title")}
           channelName={channelTitle}
@@ -425,7 +438,19 @@ export function ThreadPanel({
   }
 
   return (
-    <aside className={asideClass}>
+    <aside
+      className={asideClass}
+      style={
+        isDesktop
+          ? undefined
+          : {
+              // The swipe-back gesture drives the mobile full-screen panel
+              // via CSS variables set on the layout root (see use-swipe-back).
+              transform: "translateX(var(--swipe-offset, 0px))",
+              transition: "var(--swipe-transition, none)",
+            }
+      }
+    >
       <ThreadHeader
         title={t("chat.thread-title")}
         channelName={channelTitle}

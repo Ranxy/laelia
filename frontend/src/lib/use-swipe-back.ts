@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ROUTE_INFO } from "@/router/route-info";
 import { useCurrentRoute } from "@/router/use-current-route";
@@ -6,20 +6,33 @@ import { useAppStore } from "@/stores";
 import { useIsDesktop } from "./use-is-desktop";
 
 // iOS-style interactive back gesture for mobile: drag from the left edge of
-// the screen to the right; the shell follows the finger and releasing past
-// the threshold goes back exactly one level. The level stack is:
+// the screen to the right. The current page follows the finger and the
+// back-target route is rendered underneath (previewPath) so the destination is
+// visible while dragging; releasing past the threshold slides the current page
+// out and commits the navigation. The level stack is:
 //   thread panel (full-screen overlay) -> current route -> its backTo target.
 // The gesture is inert on desktop, on top-level tab routes (nothing to go
 // back to), and over layer overlays (sheets/dialogs/previews dismiss on
 // their own).
 const EDGE_SIZE = 24; // px from the left edge where the gesture may start
 const DIRECTION_LOCK = 10; // px of movement before the gesture is decided
-const MAX_DRAG_RATIO = 0.5; // the shell may slide up to half the viewport
+const MAX_DRAG_RATIO = 0.5; // the page may slide up to half the viewport
 const TRIGGER_RATIO = 0.25; // release past 25% of the viewport commits
 const MIN_TRIGGER_PX = 80;
-const SNAP_MS = 200; // spring-back / commit animation
+const SNAP_MS = 200; // spring-back animation
+const COMMIT_MS = 250; // slide-out animation before the navigation commits
 
-export function useSwipeBack() {
+export interface SwipeBackState {
+  // Bind to the layout root (CSS variables for the thread panel live here).
+  rootRef: (el: HTMLDivElement | null) => void;
+  // Bind to the current page container; it is translated while dragging.
+  currentPageRef: (el: HTMLDivElement | null) => void;
+  // Back-target path rendered underneath while a route-level gesture is
+  // active; null when idle (or when the gesture targets the thread panel).
+  previewPath: string | null;
+}
+
+export function useSwipeBack(): SwipeBackState {
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
   const closeThread = useAppStore((s) => s.closeThread);
@@ -27,36 +40,58 @@ export function useSwipeBack() {
   const currentRoute = useCurrentRoute();
 
   const rootRef = useRef<HTMLDivElement | null>(null);
-  // Latest back action, read by the window listeners without re-binding them
-  // on every render (route/store changes would otherwise churn listeners).
-  const backActionRef = useRef<() => void>(() => {});
-  backActionRef.current = () => {
-    if (activeThreadRoot) {
-      closeThread();
-      return;
-    }
-    const info = currentRoute.name ? ROUTE_INFO[currentRoute.name] : undefined;
-    if (info?.backTo) navigate(info.backTo);
-  };
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
+
+  // Latest back target / thread state, read by the window listeners without
+  // re-binding them on every render (route/store changes would otherwise
+  // churn listeners).
+  const backTargetRef = useRef<string | null>(null);
+  backTargetRef.current = currentRoute.name
+    ? (ROUTE_INFO[currentRoute.name]?.backTo ?? null)
+    : null;
+  const threadActiveRef = useRef(false);
+  threadActiveRef.current = activeThreadRoot != null;
+
+  const setRoot = useCallback((el: HTMLDivElement | null) => {
+    rootRef.current = el;
+  }, []);
+  const setPage = useCallback((el: HTMLDivElement | null) => {
+    pageRef.current = el;
+  }, []);
 
   useEffect(() => {
     if (isDesktop) return;
-    const el = rootRef.current;
-    if (!el) return;
+    const root = rootRef.current;
+    if (!root) return;
 
     let startX = 0;
     let startY = 0;
     let dragging = false;
     let decided = false;
     let cancelled = false;
+    let mode: "thread" | "route" | null = null;
     let maxDrag = 0;
-    let snapTimer: number | undefined;
+    let timers: number[] = [];
 
-    const clearSnap = () => {
-      if (snapTimer !== undefined) {
-        window.clearTimeout(snapTimer);
-        snapTimer = undefined;
+    const clearTimers = () => {
+      for (const t of timers) window.clearTimeout(t);
+      timers = [];
+    };
+
+    const reset = () => {
+      dragging = false;
+      decided = false;
+      cancelled = false;
+      mode = null;
+      clearTimers();
+      if (pageRef.current) {
+        pageRef.current.style.transition = "";
+        pageRef.current.style.transform = "";
       }
+      root.style.removeProperty("--swipe-offset");
+      root.style.removeProperty("--swipe-transition");
+      setPreviewPath(null);
     };
 
     const onTouchStart = (e: TouchEvent) => {
@@ -78,12 +113,24 @@ export function useSwipeBack() {
       decided = false;
       cancelled = false;
       maxDrag = window.innerWidth * MAX_DRAG_RATIO;
-      clearSnap();
-      el.style.transition = "none";
+      clearTimers();
+      // Decide the level: the thread panel (full-screen overlay) closes
+      // first; otherwise the current route's backTo target is previewed.
+      if (threadActiveRef.current) {
+        mode = "thread";
+        root.style.setProperty("--swipe-transition", "none");
+      } else if (backTargetRef.current) {
+        mode = "route";
+        setPreviewPath(backTargetRef.current);
+        if (pageRef.current) pageRef.current.style.transition = "none";
+      } else {
+        cancelled = true;
+        return;
+      }
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (cancelled) return;
+      if (cancelled || !mode) return;
       const touch = e.touches[0];
       if (!touch) return;
       const dx = touch.clientX - startX;
@@ -95,6 +142,7 @@ export function useSwipeBack() {
         // Vertical scrolls and leftward swipes (row actions) are not back.
         if (dy > dx || dx < 0) {
           cancelled = true;
+          reset();
           return;
         }
         dragging = true;
@@ -102,24 +150,52 @@ export function useSwipeBack() {
       if (!dragging) return;
       e.preventDefault();
       const offset = Math.min(Math.max(0, dx), maxDrag);
-      el.style.transform = `translateX(${offset}px)`;
+      if (mode === "route" && pageRef.current) {
+        pageRef.current.style.transform = `translateX(${offset}px)`;
+      } else if (mode === "thread") {
+        root.style.setProperty("--swipe-offset", `${offset}px`);
+      }
     };
 
     const finish = (commit: boolean) => {
       if (!dragging) return;
       dragging = false;
-      el.style.transition = `transform ${SNAP_MS}ms ease-out`;
-      el.style.transform = "translateX(0px)";
-      clearSnap();
-      snapTimer = window.setTimeout(() => {
-        el.style.transition = "";
-        snapTimer = undefined;
-      }, SNAP_MS + 50);
-      if (commit) backActionRef.current();
+      const width = window.innerWidth;
+      const ms = commit ? COMMIT_MS : SNAP_MS;
+      if (mode === "route" && pageRef.current) {
+        const page = pageRef.current;
+        page.style.transition = `transform ${ms}ms ease-out`;
+        page.style.transform = `translateX(${commit ? width : 0}px)`;
+        timers.push(
+          window.setTimeout(() => {
+            if (commit) {
+              const target = backTargetRef.current;
+              if (target) navigate(target, { replace: true });
+            }
+            reset();
+          }, ms + 50)
+        );
+      } else if (mode === "thread") {
+        root.style.setProperty(
+          "--swipe-transition",
+          `transform ${ms}ms ease-out`
+        );
+        root.style.setProperty("--swipe-offset", `${commit ? width : 0}px`);
+        timers.push(
+          window.setTimeout(() => {
+            if (commit) closeThread();
+            reset();
+          }, ms + 50)
+        );
+      }
     };
 
     const onTouchEnd = (e: TouchEvent) => {
-      if (!dragging) return;
+      if (!dragging) {
+        // Started but never moved (or cancelled): drop any preview state.
+        if (mode) reset();
+        return;
+      }
       const touch = e.changedTouches[0];
       const dx = touch ? touch.clientX - startX : 0;
       const width = window.innerWidth;
@@ -127,7 +203,13 @@ export function useSwipeBack() {
       finish(commit);
     };
 
-    const onTouchCancel = () => finish(false);
+    const onTouchCancel = () => {
+      if (!dragging) {
+        if (mode) reset();
+        return;
+      }
+      finish(false);
+    };
 
     window.addEventListener("touchstart", onTouchStart, { passive: true });
     window.addEventListener("touchmove", onTouchMove, { passive: false });
@@ -138,9 +220,9 @@ export function useSwipeBack() {
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("touchcancel", onTouchCancel);
-      clearSnap();
+      clearTimers();
     };
-  }, [isDesktop]);
+  }, [isDesktop, navigate, closeThread]);
 
-  return rootRef;
+  return { rootRef: setRoot, currentPageRef: setPage, previewPath };
 }
