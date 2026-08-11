@@ -15,7 +15,9 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	pkgerrors "github.com/pkg/errors"
@@ -72,13 +74,52 @@ type Client struct {
 	// SSRF via user-configured server URLs (and DNS rebinding, because the
 	// dial uses the verified IP directly).
 	ipPolicy IPPolicyFunc
+	// lookupIP resolves a host to addresses; overridable in tests.
+	lookupIP func(ctx context.Context, host string) ([]netip.Addr, error)
+
+	// guardMu guards the per-server guarded client cache and the resolved
+	// target cache below.
+	guardMu    sync.Mutex
+	guarded    map[string]*http.Client
+	guardedSSE map[string]*http.Client
+	// targets maps a (server, host) pair to its policy-approved addresses.
+	// It distinguishes direct dials (pair present) from proxy dials (pair
+	// absent, dialed as-is) and keeps the dial pinned to approved IPs.
+	targets map[string]targetEntry
 }
+
+// targetEntry is one resolved-and-approved target host.
+type targetEntry struct {
+	ips       []string
+	checkedAt time.Time
+}
+
+// targetKey scopes the resolved-target cache to one server, so two servers
+// sharing a hostname cannot reuse each other's verification result (their
+// policy scopes may differ).
+func targetKey(server *store.McpServerMessage, host string) string {
+	return server.ResourceID + "\x00" + strconv.FormatInt(server.OwnerID, 10) + "\x00" + host
+}
+
+const (
+	// targetCacheTTL bounds how long a resolved target's approved address
+	// list is reused before being re-verified.
+	targetCacheTTL = 30 * time.Second
+	// guardCacheMax bounds the per-server guarded client and target caches.
+	guardCacheMax = 128
+)
 
 // New returns a Client with a bounded HTTP client.
 func New() *Client {
 	return &Client{
 		httpClient: &http.Client{Timeout: 25 * time.Second},
 		sseClient:  &http.Client{},
+		lookupIP: func(ctx context.Context, host string) ([]netip.Addr, error) {
+			return net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+		},
+		guarded:    make(map[string]*http.Client),
+		guardedSSE: make(map[string]*http.Client),
+		targets:    make(map[string]targetEntry),
 	}
 }
 
@@ -88,16 +129,14 @@ func (c *Client) SetIPPolicy(fn IPPolicyFunc) {
 	c.ipPolicy = fn
 }
 
-// httpClientFor returns a client for one HTTP request. Without an IP policy
-// the shared client is used; with a policy, a per-call client whose transport
-// dials only policy-approved IPs is built (preserving Timeout and Proxy).
+// httpClientFor returns the guarded HTTP client for one server, caching it so
+// connections and TLS sessions are reused across RPCs. Without an IP policy
+// the shared client is used.
 func (c *Client) httpClientFor(server *store.McpServerMessage) *http.Client {
 	if c.ipPolicy == nil {
 		return c.httpClient
 	}
-	return guardedClient(c.httpClient, func(ctx context.Context, addr string) (string, error) {
-		return c.resolveAllowedTarget(ctx, server, addr)
-	})
+	return c.guardedFor(server, c.httpClient, false)
 }
 
 // sseClientFor is the SSE counterpart of httpClientFor.
@@ -105,55 +144,41 @@ func (c *Client) sseClientFor(server *store.McpServerMessage) *http.Client {
 	if c.ipPolicy == nil {
 		return c.sseClient
 	}
-	return guardedClient(c.sseClient, func(ctx context.Context, addr string) (string, error) {
-		return c.resolveAllowedTarget(ctx, server, addr)
-	})
+	return c.guardedFor(server, c.sseClient, true)
 }
 
-// resolveAllowedTarget verifies every address of the target host against the
-// IP policy and returns the dial address: the host itself when it is already
-// an IP literal, or the first policy-approved resolved IP. Any offending or
-// unresolvable address fails the connection closed, and the dial later uses
-// the returned IP directly (no second DNS window, so DNS rebinding cannot
-// bypass the policy).
-func (c *Client) resolveAllowedTarget(ctx context.Context, server *store.McpServerMessage, host string) (string, error) {
-	if ip, err := netip.ParseAddr(host); err == nil {
-		ok, err := c.ipPolicy(ctx, server, ip)
-		if err != nil {
-			return "", err
-		}
-		if !ok {
-			slog.Warn("mcp target blocked by IP policy", "server", server.ResourceID, "host", host, "ip", ip)
-			return "", pkgerrors.Errorf("mcp target %s is blocked by the MCP IP policy", host)
-		}
-		return ip.String(), nil
+// guardedFor returns a cached guarded client for the server. The transport is
+// cloned once per server (keeping Timeout and Proxy) and reused, and its
+// DialContext dials only policy-approved target IPs; redirects are re-checked
+// against the policy as well.
+func (c *Client) guardedFor(server *store.McpServerMessage, base *http.Client, sse bool) *http.Client {
+	key := serverKey(server)
+	c.guardMu.Lock()
+	cache := c.guarded
+	if sse {
+		cache = c.guardedSSE
 	}
-	addrs, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
-	if err != nil {
-		return "", pkgerrors.Wrapf(err, "resolve mcp target %q", host)
+	if cl, ok := cache[key]; ok {
+		c.guardMu.Unlock()
+		return cl
 	}
-	if len(addrs) == 0 {
-		return "", pkgerrors.Errorf("resolve mcp target %q: no addresses", host)
+	if len(cache) >= guardCacheMax {
+		clear(cache)
 	}
-	for _, addr := range addrs {
-		ok, err := c.ipPolicy(ctx, server, addr)
-		if err != nil {
-			return "", err
-		}
-		if !ok {
-			slog.Warn("mcp target blocked by IP policy", "server", server.ResourceID, "host", host, "ip", addr)
-			return "", pkgerrors.Errorf("mcp target %q resolves to %s which is blocked by the MCP IP policy", host, addr)
-		}
-	}
-	return addrs[0].String(), nil
+	cl := c.buildGuarded(server, base)
+	cache[key] = cl
+	c.guardMu.Unlock()
+	return cl
 }
 
-// guardedClient clones the base client's transport and replaces DialContext
-// with a guard that maps the target host to a policy-approved IP before
-// dialing. The clone keeps Proxy configuration, so when an HTTP proxy is
-// configured the guard covers only direct connections (the proxy is the dial
-// target and the final host is not observable locally).
-func guardedClient(base *http.Client, resolve func(ctx context.Context, addr string) (string, error)) *http.Client {
+// serverKey identifies one MCP server for the guarded client cache.
+func serverKey(server *store.McpServerMessage) string {
+	return server.ResourceID + "\x00" + server.URL + "\x00" + strconv.FormatInt(server.OwnerID, 10)
+}
+
+// buildGuarded clones the base transport, installs the policy-guarded
+// DialContext and a redirect checker, and returns the client.
+func (c *Client) buildGuarded(server *store.McpServerMessage, base *http.Client) *http.Client {
 	transport, ok := base.Transport.(*http.Transport)
 	if !ok || transport == nil {
 		transport = http.DefaultTransport.(*http.Transport).Clone()
@@ -162,20 +187,156 @@ func guardedClient(base *http.Client, resolve func(ctx context.Context, addr str
 	}
 	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		host, port, err := net.SplitHostPort(addr)
-		if err != nil {
-			host, port = addr, ""
+		return c.guardedDial(ctx, server, dialer, network, addr)
+	}
+	cl := &http.Client{Timeout: base.Timeout, Transport: transport}
+	cl.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return pkgerrors.New("stopped after 10 redirects")
 		}
-		dialAddr, err := resolve(ctx, host)
+		// Redirect targets are new MCP endpoints: verify them too, or an
+		// attacker could bounce an approved URL to an internal address.
+		_, err := c.resolveTargetHosts(req.Context(), server, req.URL.Hostname())
+		return err
+	}
+	return cl
+}
+
+// resolveTargetHosts verifies every address of the target host against the IP
+// policy and returns the approved addresses in resolver order; the dial then
+// tries them in order, so a host with several addresses keeps the native
+// multi-address fallback while blocked addresses are skipped. It is called
+// before every request is sent, so the target is always checked even when the
+// connection goes through an HTTP proxy (where DialContext only sees the
+// proxy). When no address is approved the connection fails closed, and the
+// dial uses the returned IPs directly (no second DNS window, so DNS rebinding
+// cannot bypass the policy). Results are cached for targetCacheTTL.
+func (c *Client) resolveTargetHosts(ctx context.Context, server *store.McpServerMessage, host string) ([]string, error) {
+	if host == "" {
+		return nil, pkgerrors.New("mcp target has no host")
+	}
+	key := targetKey(server, host)
+	if entry, ok := c.lookupTarget(key); ok && time.Since(entry.checkedAt) < targetCacheTTL {
+		return entry.ips, nil
+	}
+	if ip, err := netip.ParseAddr(host); err == nil {
+		ok, err := c.ipPolicy(ctx, server, ip)
 		if err != nil {
 			return nil, err
 		}
-		if port != "" {
-			dialAddr = net.JoinHostPort(dialAddr, port)
+		if !ok {
+			slog.Warn("mcp target blocked by IP policy", "server", server.ResourceID, "host", host, "ip", ip)
+			return nil, pkgerrors.Errorf("mcp target %s is blocked by the MCP IP policy", host)
 		}
-		return dialer.DialContext(ctx, network, dialAddr)
+		ips := []string{ip.String()}
+		c.storeTarget(key, ips)
+		return ips, nil
 	}
-	return &http.Client{Timeout: base.Timeout, Transport: transport}
+	addrs, err := c.lookupIP(ctx, host)
+	if err != nil {
+		return nil, pkgerrors.Wrapf(err, "resolve mcp target %q", host)
+	}
+	if len(addrs) == 0 {
+		return nil, pkgerrors.Errorf("resolve mcp target %q: no addresses", host)
+	}
+	approved := make([]string, 0, len(addrs))
+	for _, addr := range addrs {
+		ok, err := c.ipPolicy(ctx, server, addr)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			slog.Warn("mcp target blocked by IP policy", "server", server.ResourceID, "host", host, "ip", addr)
+			continue
+		}
+		approved = append(approved, addr.String())
+	}
+	if len(approved) == 0 {
+		return nil, pkgerrors.Errorf("mcp target %q resolves only to addresses blocked by the MCP IP policy", host)
+	}
+	c.storeTarget(key, approved)
+	return approved, nil
+}
+
+// checkTarget verifies the target host against the IP policy before a request
+// is sent. It is a no-op when no policy is installed (the unguarded shared
+// client is used then).
+func (c *Client) checkTarget(ctx context.Context, server *store.McpServerMessage, host string) error {
+	if c.ipPolicy == nil {
+		return nil
+	}
+	_, err := c.resolveTargetHosts(ctx, server, host)
+	return err
+}
+
+// guardedDial is the DialContext installed by buildGuarded. When the dial
+// address is a verified MCP target (present in the target cache) it dials the
+// approved addresses in order, re-verifying when the cache is stale. Anything
+// else - notably a configured HTTP proxy, whose address DialContext sees
+// instead of the target - is dialed as-is; the target itself has already been
+// policy-checked at request time.
+func (c *Client) guardedDial(ctx context.Context, server *store.McpServerMessage, dialer *net.Dialer, network, addr string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		host, port = addr, ""
+	}
+	entry, ok := c.lookupTarget(targetKey(server, host))
+	if !ok {
+		return dialer.DialContext(ctx, network, addr)
+	}
+	ips := entry.ips
+	if time.Since(entry.checkedAt) >= targetCacheTTL {
+		ips, err = c.resolveTargetHosts(ctx, server, host)
+		if err != nil {
+			return nil, err
+		}
+	}
+	targets := make([]string, len(ips))
+	for i, ip := range ips {
+		if port != "" {
+			targets[i] = net.JoinHostPort(ip, port)
+		} else {
+			targets[i] = ip
+		}
+	}
+	return dialAny(ctx, dialer, network, targets)
+}
+
+// dialAny dials each target in order until one succeeds, mirroring the
+// multi-address fallback of a plain net.Dialer.
+func dialAny(ctx context.Context, dialer *net.Dialer, network string, targets []string) (net.Conn, error) {
+	var lastErr error
+	for _, target := range targets {
+		conn, err := dialer.DialContext(ctx, network, target)
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+		if ctx.Err() != nil {
+			break
+		}
+	}
+	return nil, lastErr
+}
+
+func (c *Client) lookupTarget(key string) (targetEntry, bool) {
+	c.guardMu.Lock()
+	defer c.guardMu.Unlock()
+	entry, ok := c.targets[key]
+	return entry, ok
+}
+
+func (c *Client) storeTarget(key string, ips []string) {
+	c.guardMu.Lock()
+	defer c.guardMu.Unlock()
+	if len(c.targets) >= guardCacheMax {
+		for k, e := range c.targets {
+			if time.Since(e.checkedAt) >= targetCacheTTL {
+				delete(c.targets, k)
+			}
+		}
+	}
+	c.targets[key] = targetEntry{ips: ips, checkedAt: time.Now()}
 }
 
 // ListTools returns the tool list of an MCP server.
@@ -344,6 +505,12 @@ func (c *Client) doHTTP(ctx context.Context, server *store.McpServerMessage, end
 	for name, value := range headers {
 		req.Header.Set(name, value)
 	}
+	// Request-layer policy check: the target is verified even when the
+	// connection later goes through an HTTP proxy, whose address is what
+	// DialContext sees instead of the target's.
+	if err := c.checkTarget(ctx, server, endpoint.Hostname()); err != nil {
+		return nil, err
+	}
 	resp, err := c.httpClientFor(server).Do(req)
 	if err != nil {
 		return nil, err
@@ -447,6 +614,9 @@ func (c *Client) sseOpen(ctx context.Context, server *store.McpServerMessage) (*
 	for name, value := range server.Headers {
 		req.Header.Set(name, value)
 	}
+	if err := c.checkTarget(ctx, server, base.Hostname()); err != nil {
+		return nil, err
+	}
 	sseClient := c.sseClientFor(server)
 	//nolint:bodyclose // SSE response body is the long-lived event stream, closed by sseSession.close
 	resp, err := sseClient.Do(req)
@@ -471,6 +641,10 @@ func (c *Client) sseOpen(ctx context.Context, server *store.McpServerMessage) (*
 	}
 	sess.messagesURL = base.ResolveReference(endpoint)
 	sess.sessionID = sessionID
+	if err := c.checkTarget(ctx, server, sess.messagesURL.Hostname()); err != nil {
+		sess.close()
+		return nil, err
+	}
 
 	initParams := map[string]any{
 		"protocolVersion": ProtocolVersion,
