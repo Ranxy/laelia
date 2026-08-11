@@ -23,6 +23,13 @@ vi.mock("markstream-react", () => ({
   default: ({ content }: { content: string }) => <>{content}</>,
 }));
 
+// Desktop by default so the mobile-only "tap bubble to open thread" path stays
+// inert; mobile tests opt out with mockUseIsDesktop.mockReturnValue(false).
+const mockUseIsDesktop = vi.hoisted(() => vi.fn(() => true));
+vi.mock("@/lib/use-is-desktop", () => ({
+  useIsDesktop: mockUseIsDesktop,
+}));
+
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;

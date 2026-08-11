@@ -15,6 +15,13 @@ vi.mock("markstream-react", () => ({
   default: ({ content }: { content: string }) => <>{content}</>,
 }));
 
+// Desktop by default so the mobile-only "tap bubble to open thread" path stays
+// inert; mobile tests opt out with mockUseIsDesktop.mockReturnValue(false).
+const mockUseIsDesktop = vi.hoisted(() => vi.fn(() => true));
+vi.mock("@/lib/use-is-desktop", () => ({
+  useIsDesktop: mockUseIsDesktop,
+}));
+
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { Avatar, formatTime } from "@/components/chat/avatar";
@@ -26,6 +33,7 @@ let root: ReturnType<typeof createRoot> | null = null;
 
 beforeEach(() => {
   translationHookCalls = 0;
+  mockUseIsDesktop.mockReturnValue(true);
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -98,5 +106,65 @@ describe("MessageRow shared render", () => {
     });
     expect(translationHookCalls).toBeGreaterThan(0);
     expect(container?.textContent).toContain("hi there");
+  });
+});
+
+describe("MessageRow thread entry", () => {
+  function renderRow(onOpenThread: () => void) {
+    act(() => {
+      root!.render(
+        <MessageRow
+          msg={baseMsg({ role: "user", content: "hi there" })}
+          showAvatar
+          agentTitle="Agent"
+          streamingContent=""
+          streamingEvents={[]}
+          onViewDetails={() => {}}
+          onOpenThread={onOpenThread}
+          markdownCustomId="chat"
+          debugMode={false}
+        />
+      );
+    });
+  }
+
+  it("hides the Reply in thread button on mobile", () => {
+    mockUseIsDesktop.mockReturnValue(false);
+    renderRow(() => {});
+    expect(
+      container?.querySelector('[aria-label="chat.reply-in-thread"]')
+    ).toBeNull();
+  });
+
+  it("keeps the Reply in thread button on desktop", () => {
+    renderRow(() => {});
+    expect(
+      container?.querySelector('[aria-label="chat.reply-in-thread"]')
+    ).not.toBeNull();
+  });
+
+  it("opens the thread when the bubble is tapped on mobile", () => {
+    mockUseIsDesktop.mockReturnValue(false);
+    const onOpenThread = vi.fn();
+    renderRow(onOpenThread);
+    const bubble = container?.querySelector(".rounded-2xl") as HTMLElement;
+    act(() => {
+      bubble.click();
+    });
+    expect(onOpenThread).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not open the thread when a link inside the bubble is tapped", () => {
+    mockUseIsDesktop.mockReturnValue(false);
+    const onOpenThread = vi.fn();
+    renderRow(onOpenThread);
+    const bubble = container?.querySelector(".rounded-2xl") as HTMLElement;
+    const link = document.createElement("a");
+    link.href = "https://example.com";
+    bubble.appendChild(link);
+    act(() => {
+      link.click();
+    });
+    expect(onOpenThread).not.toHaveBeenCalled();
   });
 });

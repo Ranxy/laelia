@@ -35,6 +35,7 @@ import {
   isMarkdownAttachment,
   MAX_MARKDOWN_PREVIEW_BYTES,
 } from "@/lib/markdown-file";
+import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { isOwnUserMessage } from "@/stores/chat-helpers";
 import type { ChatMessageUI } from "@/stores/types";
@@ -206,6 +207,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
     eager = false,
   } = props;
   const { t, i18n } = useTranslation();
+  const isDesktop = useIsDesktop();
   const isUser = msg.role === "user";
   // In a shared channel, user messages from other users must render with their
   // own name rather than the current user's "You" label. isOwnUser falls back
@@ -312,17 +314,31 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
   // re-attached on every render.
   const handleBubbleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!onMentionClick) return;
       const target = e.target as HTMLElement | null;
-      const chip = target?.closest?.("[data-mtype]");
-      if (!chip) return;
-      const type = chip.getAttribute("data-mtype");
-      const id = chip.getAttribute("data-mid");
-      const name = chip.getAttribute("data-mname");
-      if (!type || !id || !name) return;
-      onMentionClick(type, id, name);
+      // Mention chips (agent markdown <mention> nodes) keep their own action.
+      if (onMentionClick) {
+        const chip = target?.closest?.("[data-mtype]");
+        if (chip) {
+          const type = chip.getAttribute("data-mtype");
+          const id = chip.getAttribute("data-mid");
+          const name = chip.getAttribute("data-mname");
+          if (type && id && name) {
+            onMentionClick(type, id, name);
+            return;
+          }
+        }
+      }
+      // On mobile the "Reply in thread" entry is hidden (too small to tap), so
+      // tapping the message bubble itself opens the thread. Interactive
+      // elements (links, buttons, mention chips, image zoom) keep their own
+      // behavior.
+      if (!isDesktop && onOpenThread && !msg.threadRoot && !isStreaming) {
+        if (target?.closest?.("a, button, [role='button'], [data-mtype]"))
+          return;
+        onOpenThread(msg);
+      }
     },
-    [onMentionClick]
+    [onMentionClick, isDesktop, onOpenThread, msg, isStreaming]
   );
 
   // "Reply in thread" entry. Rendered in the header when the header is shown
@@ -331,7 +347,7 @@ export const MessageRow = memo(function MessageRow(props: MessageRowProps) {
   // (Consecutive messages from the same sender skip the header to group the
   // bubble, which previously swallowed this button along with it.)
   const renderReplyInThread = () =>
-    onOpenThread && !msg.threadRoot && !isStreaming ? (
+    isDesktop && onOpenThread && !msg.threadRoot && !isStreaming ? (
       <button
         type="button"
         onClick={() => onOpenThread(msg)}
