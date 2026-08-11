@@ -115,7 +115,9 @@ export function ConversationList() {
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto">
+      {/* divide-y gives each row a hairline top border so the rail scans
+          quickly; /50 keeps the divider light against the row whitespace. */}
+      <div className="flex-1 divide-y divide-control-border/50 overflow-y-auto">
         {channelsLoading && channels.length === 0 && (
           <div className="flex items-center justify-center gap-2 py-12 text-control-light text-sm">
             <Loader2 className="size-4 animate-spin" />
