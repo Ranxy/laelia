@@ -348,7 +348,7 @@ const ConversationRow = memo(function ConversationRow({
         ) : (
           <div
             className={cn(
-              "flex size-9 shrink-0 items-center justify-center rounded-lg",
+              "flex size-8 shrink-0 items-center justify-center rounded-lg",
               active ? "bg-accent/15 text-accent" : "bg-control-bg text-control"
             )}
           >
