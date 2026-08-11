@@ -828,7 +828,11 @@
       "cancel": "取消",
       "description-saved": "描述已保存",
       "description-save-failed": "保存描述失败"
-    }
+    },
+    "section-channels": "频道",
+    "channels-empty": "还没有频道。",
+    "channel-not-found": "频道不存在。",
+    "row-open-channel": "打开频道 {{title}}"
   },
   "command": {
     "status-unknown": "未知",
@@ -1117,6 +1121,14 @@
     "attach-file": "添加文件",
     "pin": "置顶",
     "unpin": "取消置顶",
-    "fab-label": "频道"
+    "fab-label": "频道",
+    "closed": "已关闭",
+    "open": "打开",
+    "role-owner": "所有者",
+    "role-admin": "管理员",
+    "role-member": "成员",
+    "joined-at": "加入于 {{date}}",
+    "owner": "所有者:{{name}}",
+    "members-heading": "成员 ({{count}})"
   }
 }

@@ -359,6 +359,13 @@ export interface ChatSlice {
 export interface ChannelSlice {
   channels: Conversation[];
   channelsLoading: boolean;
+  // Every real channel (type 2) the user joined or created, including closed
+  // ones, for the members page roster. Kept separate from `channels` (the
+  // left-rail list, which hides closed conversations and includes DMs) so the
+  // two views never overwrite each other; fetched on demand instead of
+  // polled.
+  myChannels: Conversation[];
+  myChannelsLoading: boolean;
   channelMembersByConv: Record<string, ChannelMember[]>;
   channelMembersLoading: Record<string, boolean>;
   agentActivities: Record<string, AgentActivity[]>;
@@ -382,6 +389,10 @@ export interface ChannelSlice {
   agentChannelsLoading: boolean;
 
   fetchChannels: () => Promise<void>;
+  // Fetches the user's channel roster (type 2 only, closed included) for the
+  // members page. silent suppresses the loading flag so a cached refresh does
+  // not flash the spinner.
+  fetchMyChannels: (opts?: { silent?: boolean }) => Promise<void>;
   fetchChannelsForAgent: (agentName: string) => Promise<void>;
   createChannel: (title: string) => Promise<Conversation>;
   markConversationRead: (conversationId: string) => Promise<void>;

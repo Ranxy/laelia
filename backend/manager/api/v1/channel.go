@@ -54,7 +54,7 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 	}
 	limitPlusOne := offset.limit + 1
 
-	convs, err := s.store.ListUserConversationsWithUnread(ctx, user.ID, limitPlusOne, offset.offset)
+	convs, err := s.store.ListUserConversationsWithUnread(ctx, user.ID, req.Msg.IncludeClosed, limitPlusOne, offset.offset)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to list channels"))
 	}
@@ -102,6 +102,10 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 		// query already returns pinned-first, this just surfaces the flag so the
 		// frontend can render a pin indicator.
 		convV1.Pinned = uc.Pinned
+		// closed is the requesting user's per-conversation close state, so the
+		// members-page roster can badge channels hidden from the left rail
+		// (only populated when include_closed was requested).
+		convV1.Closed = uc.Closed
 		// last_message preview: the newest main-channel message joined by the
 		// list query. The sender principal id is only meaningful for USER
 		// senders (the store already empties it otherwise) so the frontend can
@@ -410,6 +414,13 @@ func (s *CommandService) GetChannel(ctx context.Context, req *connect.Request[v1
 	resp := convertToV1Conversation(conv, ownerName, peer.name, peer.resource, memberCount, 0, title, readVersion)
 	resp.Pinned = pinned
 	if viewerUserID != 0 {
+		if joinedAt, err := s.store.GetConversationJoinedAt(ctx, conv.ID, viewerUserID); err != nil {
+			if !errors.Is(err, store.ErrConversationMemberNotFound) {
+				slog.Warn("failed to read conversation joined_at", "conversationID", conv.ID, "error", err)
+			}
+		} else {
+			resp.JoinedAt = timestamppb.New(joinedAt)
+		}
 		if c, err := s.store.GetConversationClosed(ctx, conv.ID, viewerUserID); err != nil {
 			slog.Warn("failed to read conversation closed", "conversationID", conv.ID, "error", err)
 		} else {

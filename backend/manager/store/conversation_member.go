@@ -321,6 +321,25 @@ func (s *Store) SetConversationClosed(ctx context.Context, convID uuid.UUID, pri
 	return nil
 }
 
+// GetConversationJoinedAt returns the time the user joined the conversation
+// (conversation_member_meta.joined_at). A missing membership row yields
+// ErrConversationMemberNotFound so callers can tell "joined but unknown" from
+// "not a member".
+func (s *Store) GetConversationJoinedAt(ctx context.Context, convID uuid.UUID, principalID int) (time.Time, error) {
+	var joinedAt time.Time
+	err := s.GetDB().QueryRowContext(ctx, `
+		SELECT joined_at FROM conversation_member_meta
+		WHERE conversation_id = $1 AND member_type = $2 AND member_id = $3
+	`, convID, MemberTypeUser, fmt.Sprintf("%d", principalID)).Scan(&joinedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return time.Time{}, ErrConversationMemberNotFound
+		}
+		return time.Time{}, errors.Wrapf(err, "failed to get conversation joined_at")
+	}
+	return joinedAt, nil
+}
+
 // GetConversationClosed returns the requesting user's per-conversation close
 // state. A missing membership row yields false (not a member / not closed).
 func (s *Store) GetConversationClosed(ctx context.Context, convID uuid.UUID, principalID int) (bool, error) {

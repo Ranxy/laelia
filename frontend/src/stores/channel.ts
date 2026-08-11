@@ -94,6 +94,8 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
 ) => ({
   channels: [],
   channelsLoading: false,
+  myChannels: [],
+  myChannelsLoading: false,
   channelMembersByConv: {},
   channelMembersLoading: {},
   agentActivities: {},
@@ -114,6 +116,25 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
       set({ channels: list, unreadByConv, channelsLoading: false });
     } catch {
       set({ channelsLoading: false });
+    }
+  },
+
+  async fetchMyChannels({ silent = false } = {}) {
+    if (!silent) set({ myChannelsLoading: true });
+    try {
+      const res = await commandServiceClient.listChannels(
+        create(ListChannelsRequestSchema, {
+          pageSize: 100,
+          pageToken: "",
+          includeClosed: true,
+        })
+      );
+      // Only real channels (type 2) belong in the members-page roster; DMs are
+      // re-opened by starting a chat with the peer instead.
+      const list = (res.channels ?? []).filter((c) => c.type === 2);
+      set({ myChannels: list, myChannelsLoading: false });
+    } catch {
+      set({ myChannelsLoading: false });
     }
   },
 
@@ -213,6 +234,14 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
       await commandServiceClient.setConversationClosed(
         create(SetConversationClosedRequestSchema, { conversation, closed })
       );
+      // Keep the members-page roster in sync: its rows carry the per-user
+      // closed flag, so a reopen must clear the badge (and a close, when it
+      // comes from the detail page, must set it) without a full refetch.
+      set((s) => ({
+        myChannels: s.myChannels.map((c) =>
+          c.name === conversation ? { ...c, closed } : c
+        ),
+      }));
       if (!closed) {
         // Reopen (undo): refetch so the row lands at its server position
         // (pinned-first / updatedAt DESC) instead of guessing locally.

@@ -3253,7 +3253,8 @@ window. usage_ratio is used/size.
 | last_message_sender | [string](#string) |  | last_message_sender is the display name of the last_message author: the principal name for USER/SYSTEM senders, the agent name for AGENT senders. Empty when last_message is empty. |
 | last_message_principal_id | [string](#string) |  | last_message_principal_id is the decimal principal id of the last_message author when the sender is a USER (so the frontend can render &#34;You&#34; without mistaking an agent message, whose chat_message.principal_id is the conversation owner, for the viewer). Empty for AGENT/SYSTEM senders and when last_message is empty. |
 | last_message_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | last_message_at is the send time of last_message. Unset when the conversation has no main-channel messages yet. |
-| closed | [bool](#bool) |  | closed is the requesting user&#39;s per-conversation close state (conversation_member_meta.closed). A closed conversation is hidden from the user&#39;s left-rail list; the first new main-channel message (thread replies excluded) clears the flag, so it reappears automatically. Per-user: each viewer has their own close state. Populated by GetChannel for a user viewer; ListChannels never returns closed conversations. |
+| closed | [bool](#bool) |  | closed is the requesting user&#39;s per-conversation close state (conversation_member_meta.closed). A closed conversation is hidden from the user&#39;s left-rail list; the first new main-channel message (thread replies excluded) clears the flag, so it reappears automatically. Per-user: each viewer has their own close state. Populated by GetChannel for a user viewer; ListChannels only returns closed conversations when the caller asks with include_closed. |
+| joined_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | joined_at is the time the requesting user joined this conversation (conversation_member_meta.joined_at). Populated by GetChannel for a user viewer; unset for non-user callers. Lets the channel detail page show &#34;joined at&#34; without an extra member lookup. |
 
 
 
@@ -4058,6 +4059,7 @@ drain loop. The agent identity is resolved from the auth context.
 | ----- | ---- | ----- | ----------- |
 | page_size | [int32](#int32) |  |  |
 | page_token | [string](#string) |  |  |
+| include_closed | [bool](#bool) |  | include_closed also returns the user&#39;s closed channels (conversations hidden from the left rail) so the members page can surface an entry point back into them. Closed state stays per-user; other viewers&#39; channels are never included. |
 
 
 

@@ -828,7 +828,11 @@
       "cancel": "Cancel",
       "description-saved": "Description saved",
       "description-save-failed": "Failed to save description"
-    }
+    },
+    "section-channels": "Channels",
+    "channels-empty": "No channels yet.",
+    "channel-not-found": "Channel not found.",
+    "row-open-channel": "Open channel {{title}}"
   },
   "command": {
     "status-unknown": "Unknown",
@@ -1117,6 +1121,14 @@
     "attach-file": "Attach file",
     "pin": "Pin to top",
     "unpin": "Unpin",
-    "fab-label": "Channel"
+    "fab-label": "Channel",
+    "closed": "Closed",
+    "open": "Open",
+    "role-owner": "Owner",
+    "role-admin": "Admin",
+    "role-member": "Member",
+    "joined-at": "Joined {{date}}",
+    "owner": "Owner: {{name}}",
+    "members-heading": "Members ({{count}})"
   }
 }

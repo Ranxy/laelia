@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/stores";
 import type { MemberSummary } from "@/stores/types";
+import type { Conversation } from "@/types/proto-es/v1/command_pb";
 import { MembersPage } from "./members";
 
 vi.mock("react-i18next", () => ({
@@ -47,6 +48,12 @@ function seedStore() {
     machines: [],
     machinesLoading: false,
     fetchMachines: vi.fn(async () => undefined),
+    myChannels: [
+      { name: "conversations/c1", title: "Design", type: 2, closed: false },
+      { name: "conversations/c2", title: "Retired", type: 2, closed: true },
+    ] as Conversation[],
+    myChannelsLoading: false,
+    fetchMyChannels: vi.fn(async () => undefined),
   });
 }
 
@@ -59,6 +66,10 @@ function renderPage() {
         children: [
           { path: "agents/:agentId/*", element: <div /> },
           { path: "users/:userId/*", element: <div /> },
+          {
+            path: "channels/:channelId",
+            element: <div>channel-detail-route</div>,
+          },
         ],
       },
     ],
@@ -141,5 +152,37 @@ describe("MembersPage search", () => {
     expect(screen.getByText("Beta Agent")).toBeTruthy();
     expect(screen.getByText("Alice")).toBeTruthy();
     expect(screen.getByText("Bob")).toBeTruthy();
+  });
+});
+
+describe("MembersPage channels roster", () => {
+  it("starts collapsed: rows are hidden until the section is toggled", () => {
+    renderPage();
+
+    expect(screen.getByText("members.section-channels")).toBeTruthy();
+    expect(screen.queryByText("Design")).toBeNull();
+    expect(screen.queryByText("Retired")).toBeNull();
+
+    fireEvent.click(screen.getByText("members.section-channels"));
+
+    expect(screen.getByText("Design")).toBeTruthy();
+    expect(screen.getByText("Retired")).toBeTruthy();
+  });
+
+  it("badges closed channels in the roster", () => {
+    renderPage();
+    fireEvent.click(screen.getByText("members.section-channels"));
+
+    expect(screen.getByText("channel.closed")).toBeTruthy();
+    // only one of the two channels is closed
+    expect(screen.getAllByText("channel.closed")).toHaveLength(1);
+  });
+
+  it("navigates to the channel detail on row click", () => {
+    renderPage();
+    fireEvent.click(screen.getByText("members.section-channels"));
+    fireEvent.click(screen.getByText("Design"));
+
+    expect(screen.getByText("channel-detail-route")).toBeTruthy();
   });
 });

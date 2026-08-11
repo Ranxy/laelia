@@ -1224,11 +1224,22 @@ export declare type Conversation = Message<"laelia.v1.Conversation"> & {
    * user's left-rail list; the first new main-channel message (thread replies
    * excluded) clears the flag, so it reappears automatically. Per-user: each
    * viewer has their own close state. Populated by GetChannel for a user
-   * viewer; ListChannels never returns closed conversations.
+   * viewer; ListChannels only returns closed conversations when the caller
+   * asks with include_closed.
    *
    * @generated from field: bool closed = 19;
    */
   closed: boolean;
+
+  /**
+   * joined_at is the time the requesting user joined this conversation
+   * (conversation_member_meta.joined_at). Populated by GetChannel for a user
+   * viewer; unset for non-user callers. Lets the channel detail page show
+   * "joined at" without an extra member lookup.
+   *
+   * @generated from field: google.protobuf.Timestamp joined_at = 20;
+   */
+  joinedAt?: Timestamp | undefined;
 };
 
 /**
@@ -1903,6 +1914,16 @@ export declare type ListChannelsRequest = Message<"laelia.v1.ListChannelsRequest
    * @generated from field: string page_token = 2;
    */
   pageToken: string;
+
+  /**
+   * include_closed also returns the user's closed channels (conversations
+   * hidden from the left rail) so the members page can surface an entry point
+   * back into them. Closed state stays per-user; other viewers' channels are
+   * never included.
+   *
+   * @generated from field: bool include_closed = 3;
+   */
+  includeClosed: boolean;
 };
 
 /**

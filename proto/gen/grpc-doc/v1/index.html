@@ -8891,7 +8891,18 @@ conversation has no main-channel messages yet. </p></td>
 user&#39;s left-rail list; the first new main-channel message (thread replies
 excluded) clears the flag, so it reappears automatically. Per-user: each
 viewer has their own close state. Populated by GetChannel for a user
-viewer; ListChannels never returns closed conversations. </p></td>
+viewer; ListChannels only returns closed conversations when the caller
+asks with include_closed. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>joined_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p>joined_at is the time the requesting user joined this conversation
+(conversation_member_meta.joined_at). Populated by GetChannel for a user
+viewer; unset for non-user callers. Lets the channel detail page show
+&#34;joined at&#34; without an extra member lookup. </p></td>
                 </tr>
               
             </tbody>
@@ -10284,6 +10295,16 @@ created unassigned (status TODO); the posting agent does NOT auto-claim it
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>include_closed</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>include_closed also returns the user&#39;s closed channels (conversations
+hidden from the left rail) so the members page can surface an entry point
+back into them. Closed state stays per-user; other viewers&#39; channels are
+never included. </p></td>
                 </tr>
               
             </tbody>

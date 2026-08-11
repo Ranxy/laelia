@@ -1,10 +1,11 @@
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Hash, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useMatch, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { Alert } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import {
@@ -15,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { MemberSummary } from "@/stores/types";
+import type { Conversation } from "@/types/proto-es/v1/command_pb";
 
 // MembersPage is the two-column workspace directory. The left rail lists
 // agents and humans as separate collapsible sections (each with a count and a
@@ -32,15 +34,24 @@ export function MembersPage() {
   const fetchMembers = useAppStore((s) => s.fetchMembers);
   const machines = useAppStore((s) => s.machines);
   const fetchMachines = useAppStore((s) => s.fetchMachines);
+  const myChannels = useAppStore((s) => s.myChannels);
+  const myChannelsLoading = useAppStore((s) => s.myChannelsLoading);
+  const fetchMyChannels = useAppStore((s) => s.fetchMyChannels);
 
   // useMatch reads the child-route params so the parent layout can highlight
   // the selected row (parent route elements don't receive child params via
   // useParams).
   const agentMatch = useMatch("/members/agents/:agentId/*");
   const userMatch = useMatch("/members/users/:userId/*");
+  const channelMatch = useMatch("/members/channels/:channelId/*");
   const selectedAgentId = agentMatch?.params.agentId;
   const selectedUserId = userMatch?.params.userId;
-  const hasSelection = !!(selectedAgentId || selectedUserId);
+  const selectedChannelId = channelMatch?.params.channelId;
+  const hasSelection = !!(
+    selectedAgentId ||
+    selectedUserId ||
+    selectedChannelId
+  );
 
   useEffect(() => {
     // Keep the already-rendered roster visible when returning to this page:
@@ -48,6 +59,13 @@ export function MembersPage() {
     const hasCached = useAppStore.getState().members.length > 0;
     void fetchMembers({ silent: hasCached });
   }, [fetchMembers]);
+
+  // Load the channel roster (all joined/created channels, closed included) so
+  // the Channels section has an entry point back into closed conversations.
+  useEffect(() => {
+    const hasCached = useAppStore.getState().myChannels.length > 0;
+    void fetchMyChannels({ silent: hasCached });
+  }, [fetchMyChannels]);
 
   // Load the machine roster so agent rows can show the owning machine's title
   // (member.subtitle is the machine resource name machines/{id}).
@@ -63,6 +81,9 @@ export function MembersPage() {
 
   const [agentsOpen, setAgentsOpen] = useState(true);
   const [humansOpen, setHumansOpen] = useState(true);
+  // The Channels section starts collapsed: it is a recovery entry point for
+  // closed chats, not a primary browsing surface.
+  const [channelsOpen, setChannelsOpen] = useState(false);
   const [query, setQuery] = useState("");
 
   const normalizedQuery = query.trim().toLowerCase();
@@ -188,6 +209,42 @@ export function MembersPage() {
               )}
             </div>
           )}
+
+          {/* Channels roster — all joined/created channels including closed
+              ones, so a closed conversation always has an entry point back.
+              Independent of the member directory: it has its own fetch/loading
+              state and is unaffected by the member search. */}
+          <div className="flex flex-col">
+            <SectionHeader
+              label={t("members.section-channels")}
+              count={myChannels.length}
+              open={channelsOpen}
+              onToggle={() => setChannelsOpen((v) => !v)}
+            />
+            {myChannelsLoading && channelsOpen && (
+              <p className="px-3 py-2 text-sm text-control-light">
+                {t("common.loading")}
+              </p>
+            )}
+            {!myChannelsLoading &&
+              channelsOpen &&
+              (myChannels.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-control-light">
+                  {t("members.channels-empty")}
+                </p>
+              ) : (
+                myChannels.map((channel) => (
+                  <ChannelRow
+                    key={channel.name}
+                    channel={channel}
+                    selected={
+                      selectedChannelId ===
+                      channel.name.replace(/^conversations\//, "")
+                    }
+                  />
+                ))
+              ))}
+          </div>
         </div>
       </aside>
 
@@ -220,8 +277,8 @@ function SectionHeader({
   count: number;
   open: boolean;
   onToggle: () => void;
-  onAdd: () => void;
-  addLabel: string;
+  onAdd?: () => void;
+  addLabel?: string;
 }) {
   return (
     <div className="mb-1 mt-3 flex h-6 items-center justify-between gap-1 px-2">
@@ -241,16 +298,18 @@ function SectionHeader({
           {count}
         </span>
       </button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onAdd}
-        aria-label={addLabel}
-        title={addLabel}
-        className="size-6 shrink-0 p-0"
-      >
-        <Plus className="size-3.5" />
-      </Button>
+      {onAdd && addLabel && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onAdd}
+          aria-label={addLabel}
+          title={addLabel}
+          className="size-6 shrink-0 p-0"
+        >
+          <Plus className="size-3.5" />
+        </Button>
+      )}
     </div>
   );
 }
@@ -316,6 +375,52 @@ function MemberRow({
           {t("members.kind-user")}
         </span>
       )}
+    </button>
+  );
+}
+
+// ChannelRow is a single channels-roster row: a channel opens its detail page
+// (where a closed channel can be reopened). Closed channels show a badge so
+// they stay distinguishable from the live ones.
+function ChannelRow({
+  channel,
+  selected,
+}: {
+  channel: Conversation;
+  selected: boolean;
+}) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const resourceId = channel.name.replace(/^conversations\//, "");
+
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(`/members/channels/${resourceId}`)}
+      aria-label={t("members.row-open-channel", { title: channel.title })}
+      className={cn(
+        "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors border-l-2",
+        selected
+          ? "border-accent bg-control-bg"
+          : "border-transparent hover:bg-control-bg/60"
+      )}
+    >
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-control-bg text-control">
+        <Hash className="size-3.5" />
+      </span>
+      <div className="min-w-0 flex-1 flex items-center gap-2">
+        <span className="truncate text-sm font-medium text-main">
+          {channel.title}
+        </span>
+        {channel.closed && (
+          <Badge variant="secondary" className="text-xs shrink-0">
+            {t("channel.closed")}
+          </Badge>
+        )}
+      </div>
+      <span className="text-xs text-control-light">
+        {t("channel.members", { count: channel.memberCount ?? 0 })}
+      </span>
     </button>
   );
 }

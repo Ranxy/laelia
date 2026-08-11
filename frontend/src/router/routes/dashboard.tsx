@@ -8,6 +8,7 @@ import {
   AGENT_ROUTE_MCP,
   AGENT_ROUTE_PROFILE,
   AGENT_ROUTE_WORKSPACE,
+  CHANNEL_ROUTE_DETAIL,
   CHAT_ROUTE,
   CHAT_ROUTE_DETAIL,
   COMMAND_ROUTE_DETAIL,
@@ -194,6 +195,14 @@ export const dashboardRoutes: RouteObject[] = [
             lazy: () =>
               import("@/pages/dashboard/human-detail").then((m) => ({
                 Component: m.HumanDetailPage,
+              })),
+          },
+          {
+            path: "channels/:channelId",
+            handle: { name: CHANNEL_ROUTE_DETAIL },
+            lazy: () =>
+              import("@/pages/dashboard/channel-detail").then((m) => ({
+                Component: m.ChannelDetailPage,
               })),
           },
         ],

@@ -479,6 +479,11 @@ type UserConversation struct {
 	// Conversation.UpdatedAt so pinned items don't drift as new messages arrive.
 	Pinned   bool
 	PinnedAt sql.NullTime
+	// Closed is the requesting user's per-conversation close state
+	// (conversation_member_meta.closed), surfaced so the members-page channel
+	// roster can badge channels the user closed and the list API can include
+	// them on request.
+	Closed bool
 	// IsMember reports whether the requesting agent is a direct member of the
 	// conversation (vs only readable via owner-follow). Populated by
 	// ListAccessibleChannels.
@@ -509,7 +514,7 @@ const listUserConversationsWithUnreadSQL = `
 		           AND m.thread_root_message_id IS NULL
 		           AND m.room_version > COALESCE(ucc.read_version, c.version)
 		       ), 0),
-		       cm.pinned, cm.pinned_at,
+		       cm.pinned, cm.pinned_at, cm.closed,
 		       lm.content, lm.created_at, lm.sender_name, lm.sender_principal_id
 		FROM conversation c
 		JOIN conversation_member_meta cm ON cm.conversation_id = c.id
@@ -528,7 +533,7 @@ const listUserConversationsWithUnreadSQL = `
 		  LIMIT 1
 		) lm ON true
 		WHERE cm.member_type = $1 AND cm.member_id = $2
-		  AND NOT cm.closed
+		  AND ($6 OR NOT cm.closed)
 		ORDER BY cm.pinned DESC, cm.pinned_at DESC NULLS LAST, c.updated_at DESC
 		LIMIT $4 OFFSET $5`
 
@@ -537,7 +542,9 @@ const listUserConversationsWithUnreadSQL = `
 // chat_message rows whose room_version is beyond the user's read cursor. A
 // missing cursor row is treated as caught-up (COALESCE to conversation.version),
 // mirroring agent_channel_cursor semantics, so a newly joined user does not see
-// existing history as unread.
+// existing history as unread. When includeClosed is true, the user's closed
+// conversations (hidden from the left rail) are included too; the Closed flag
+// on each result tells the caller which ones they are.
 //
 // Only main-channel messages (thread_root_message_id IS NULL) count toward the
 // channel unread badge: thread replies are a side conversation whose
@@ -545,8 +552,8 @@ const listUserConversationsWithUnreadSQL = `
 // badge (see fillThreadReplyCounts). This mirrors the agent inbox's
 // thread-aware relevance filter, so a thread reply never pings the left-rail
 // badge for a user who has the channel open.
-func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID int, limit, offset int) ([]*UserConversation, error) {
-	rows, err := s.GetDB().QueryContext(ctx, listUserConversationsWithUnreadSQL, MemberTypeUser, fmt.Sprintf("%d", principalID), principalID, limit, offset)
+func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID int, includeClosed bool, limit, offset int) ([]*UserConversation, error) {
+	rows, err := s.GetDB().QueryContext(ctx, listUserConversationsWithUnreadSQL, MemberTypeUser, fmt.Sprintf("%d", principalID), principalID, limit, offset, includeClosed)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to list user conversations with unread")
 	}
@@ -561,7 +568,7 @@ func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID
 		if err := rows.Scan(
 			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
 			&uc.UnreadCount,
-			&uc.Pinned, &uc.PinnedAt,
+			&uc.Pinned, &uc.PinnedAt, &uc.Closed,
 			&lmContent, &lmCreatedAt, &lmSender, &lmPrincipalID,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan user conversation")
