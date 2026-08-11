@@ -398,7 +398,7 @@ const ConversationRow = memo(function ConversationRow({
         aria-label={t("chat.close")}
         data-testid="swipe-close"
         className={cn(
-          "absolute inset-y-0 right-0 z-0 flex w-[72px] shrink-0 items-center justify-center",
+          "absolute right-0 top-1 bottom-1 z-0 flex w-[72px] shrink-0 items-center justify-center rounded-lg",
           "bg-error text-white transition-colors lg:hidden"
         )}
       >
@@ -410,7 +410,7 @@ const ConversationRow = memo(function ConversationRow({
         aria-label={pinned ? t("channel.unpin") : t("channel.pin")}
         data-testid="swipe-pin"
         className={cn(
-          "absolute inset-y-0 right-[72px] z-0 flex w-[72px] shrink-0 items-center justify-center",
+          "absolute right-[72px] top-1 bottom-1 z-0 flex w-[72px] shrink-0 items-center justify-center rounded-lg",
           "transition-colors lg:hidden",
           pinned
             ? "bg-accent/15 text-accent"
