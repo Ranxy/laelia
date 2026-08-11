@@ -87,6 +87,27 @@ function formatActivityListTime(ts: { seconds?: bigint } | undefined): {
   };
 }
 
+// formatConversationListTime returns the compact timestamp for the
+// conversation-list preview: "HH:MM" for today, "M/D" for earlier in the
+// current year, and "YYYY/M/D" for messages from a previous year. Manual
+// formatting keeps the label locale-stable next to the mixed-language list,
+// and the same year/day split the user sees in the message timeline.
+function formatConversationListTime(ms: number | undefined): string {
+  if (ms === undefined || Number.isNaN(ms)) return "";
+  const date = new Date(ms);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    const hh = String(date.getHours()).padStart(2, "0");
+    const mm = String(date.getMinutes()).padStart(2, "0");
+    return `${hh}:${mm}`;
+  }
+  const month = String(date.getMonth() + 1);
+  const day = String(date.getDate());
+  if (date.getFullYear() === now.getFullYear()) return `${month}/${day}`;
+  return `${date.getFullYear()}/${month}/${day}`;
+}
+
 function agentResourceName(agentId: string | undefined): string {
   return `agents/${agentId ?? ""}`;
 }
@@ -118,6 +139,7 @@ export {
   commandStatusToI18nKey,
   commandStatusToVariant,
   formatActivityListTime,
+  formatConversationListTime,
   formatDuration,
   formatTimeOfDay,
   formatTimestamp,

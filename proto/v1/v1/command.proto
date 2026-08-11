@@ -416,6 +416,24 @@ message Conversation {
   // left-rail list regardless of last message time. Per-user: each viewer has
   // their own pins. Populated by ListChannels and GetChannel for a user viewer.
   bool pinned = 14;
+  // last_message is a single-line, truncated preview of the newest main-channel
+  // message (thread replies excluded, mirroring the main message list and the
+  // unread count). Populated by ListChannels; empty when the conversation has no
+  // main-channel messages yet.
+  string last_message = 15;
+  // last_message_sender is the display name of the last_message author: the
+  // principal name for USER/SYSTEM senders, the agent name for AGENT senders.
+  // Empty when last_message is empty.
+  string last_message_sender = 16;
+  // last_message_principal_id is the decimal principal id of the last_message
+  // author when the sender is a USER (so the frontend can render "You" without
+  // mistaking an agent message, whose chat_message.principal_id is the
+  // conversation owner, for the viewer). Empty for AGENT/SYSTEM senders and when
+  // last_message is empty.
+  string last_message_principal_id = 17;
+  // last_message_at is the send time of last_message. Unset when the
+  // conversation has no main-channel messages yet.
+  google.protobuf.Timestamp last_message_at = 18;
 }
 
 message ChannelMember {

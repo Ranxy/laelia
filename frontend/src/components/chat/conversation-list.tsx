@@ -1,3 +1,4 @@
+import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { Hash, Loader2, Pin, PinOff, Plus } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAvatar } from "@/lib/avatar-cache";
+import { formatConversationListTime } from "@/lib/command-status";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 
@@ -30,6 +32,11 @@ export function ConversationList() {
   const unreadByConv = useAppStore((s) => s.unreadByConv);
   const createChannel = useAppStore((s) => s.createChannel);
   const setConversationPinned = useAppStore((s) => s.setConversationPinned);
+  // currentUser's {user} segment is the decimal principal id used to tag the
+  // viewer's own messages in the last-message preview ("You: ...").
+  const myPrincipalId = useAppStore((s) =>
+    s.currentUser?.name.split("/").pop()
+  );
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -144,6 +151,17 @@ export function ConversationList() {
               isDirect={isDm || isUserDm}
               active={active}
               unread={unread}
+              lastMessage={conv.lastMessage}
+              lastMessageSender={conv.lastMessageSender}
+              lastMessageIsMine={
+                conv.lastMessagePrincipalId !== "" &&
+                conv.lastMessagePrincipalId === myPrincipalId
+              }
+              lastMessageAtMs={
+                conv.lastMessageAt
+                  ? timestampDate(conv.lastMessageAt).getTime()
+                  : undefined
+              }
               onOpen={handleOpen}
               onTogglePin={handleTogglePin}
             />
@@ -204,6 +222,10 @@ const ConversationRow = memo(function ConversationRow({
   isDirect,
   active,
   unread,
+  lastMessage,
+  lastMessageSender,
+  lastMessageIsMine,
+  lastMessageAtMs,
   onOpen,
   onTogglePin,
 }: {
@@ -218,6 +240,14 @@ const ConversationRow = memo(function ConversationRow({
   isDirect: boolean;
   active: boolean;
   unread: number;
+  // last-message preview from ListChannels: single-line truncated content,
+  // the author's display name, whether the author is the viewer (from the
+  // decimal principal id), and the send time in ms. The row stays memoizable
+  // because every value here is a primitive.
+  lastMessage: string;
+  lastMessageSender: string;
+  lastMessageIsMine: boolean;
+  lastMessageAtMs?: number;
   onOpen: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
 }) {
@@ -326,19 +356,38 @@ const ConversationRow = memo(function ConversationRow({
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <p
-            className={cn(
-              "text-sm truncate",
-              unread > 0 ? "font-semibold text-main" : "font-medium text-main"
-            )}
-          >
-            {title}
-          </p>
-          {!isDirect && (
-            <p className="text-xs text-control-placeholder mt-0.5">
-              {memberCount} {memberCount === 1 ? "member" : "members"}
+          <div className="flex min-w-0 items-baseline gap-1.5">
+            <p
+              className={cn(
+                "text-sm truncate",
+                unread > 0 ? "font-semibold text-main" : "font-medium text-main"
+              )}
+            >
+              {title}
             </p>
-          )}
+            {!isDirect && (
+              <span className="shrink-0 text-xs text-control-placeholder">
+                {t("channel.members", { count: memberCount })}
+              </span>
+            )}
+            {lastMessageAtMs !== undefined && (
+              <span className="ml-auto shrink-0 pl-1 text-xs text-control-placeholder">
+                {formatConversationListTime(lastMessageAtMs)}
+              </span>
+            )}
+          </div>
+          {/* Preview of the newest main-channel message. A non-breaking space
+              keeps the line height uniform for conversations with no messages
+              yet. */}
+          <p className="mt-0.5 truncate text-xs text-control-light">
+            {lastMessage
+              ? lastMessageIsMine
+                ? `${t("chat.you")}: ${lastMessage}`
+                : lastMessageSender
+                  ? `${lastMessageSender}: ${lastMessage}`
+                  : lastMessage
+              : "\u00A0"}
+          </p>
         </div>
         {/* The pinned indicator is mobile-only: on desktop the always-visible
             pin/unpin button in the row's corner already conveys the state, so

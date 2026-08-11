@@ -366,16 +366,24 @@ func resolveActorName(ctx context.Context) string {
 	return "Someone"
 }
 
-// truncateContent collapses a message body to a single-line summary of at most
-// maxTaskTitleLen runes, for embedding in system-notification text.
-func truncateContent(s string) string {
+// singleLinePreview collapses a message body to a single-line excerpt of at
+// most maxRunes runes. Newlines fold to spaces and an overlong body is cut
+// with a trailing ellipsis; visual truncation is left to the client's CSS, so
+// this only bounds the payload. Rune-safe for multi-byte text.
+func singleLinePreview(s string, maxRunes int) string {
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.TrimSpace(s)
 	r := []rune(s)
-	if len(r) <= maxTaskTitleLen {
+	if len(r) <= maxRunes {
 		return s
 	}
-	return string(r[:maxTaskTitleLen]) + "…"
+	return string(r[:maxRunes]) + "…"
+}
+
+// truncateContent collapses a message body to a single-line summary of at most
+// maxTaskTitleLen runes, for embedding in system-notification text.
+func truncateContent(s string) string {
+	return singleLinePreview(s, maxTaskTitleLen)
 }
 
 // maxTaskTitleLen is the rune cap on a task title excerpt embedded in system

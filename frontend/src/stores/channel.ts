@@ -1,4 +1,5 @@
 import { create } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { commandServiceClient } from "@/connect";
 import type {
   AgentActivity,
@@ -52,6 +53,23 @@ function agentActivitiesEqual(a: AgentActivity[], b: AgentActivity[]): boolean {
     }
   }
   return true;
+}
+
+// MAX_LIST_PREVIEW_LEN mirrors the backend's maxListPreviewLen cap
+// (api/v1/channel.go): the left-rail preview stays single-line in the payload,
+// visual truncation is left to the client's CSS.
+const MAX_LIST_PREVIEW_LEN = 120;
+
+// listPreview mirrors the backend's singleLinePreview for the optimistic
+// left-rail last-message patch: fold newlines, trim, and cut at a code-point
+// boundary with an ellipsis. The next fetchChannels poll replaces it with the
+// server-truncated text; this only keeps the list from looking stale in the
+// seconds between send and poll.
+function listPreview(content: string): string {
+  const oneLine = content.replace(/\n/g, " ").trim();
+  const chars = Array.from(oneLine);
+  if (chars.length <= MAX_LIST_PREVIEW_LEN) return oneLine;
+  return chars.slice(0, MAX_LIST_PREVIEW_LEN).join("") + "…";
 }
 
 // reorderChannels sorts the list the way the backend does: pinned items first
@@ -206,6 +224,20 @@ export const createChannelSlice: AppSliceCreator<ChannelSlice> = (
           [chatMsg]
         ),
       },
+      // Refresh the left-rail last-message preview optimistically so the
+      // just-sent message shows up immediately; the 5s fetchChannels poll
+      // reconciles the server-side truncation.
+      channels: state.channels.map((c) =>
+        c.name === conversationName
+          ? {
+              ...c,
+              lastMessage: listPreview(content),
+              lastMessageSender: chatMsg.senderName ?? "",
+              lastMessagePrincipalId: chatMsg.principalId ?? "",
+              lastMessageAt: timestampFromDate(chatMsg.timestamp),
+            }
+          : c
+      ),
     }));
 
     // Agent replies arrive asynchronously on the agent's bidi stream; the

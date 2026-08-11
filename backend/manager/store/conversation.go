@@ -483,7 +483,53 @@ type UserConversation struct {
 	// conversation (vs only readable via owner-follow). Populated by
 	// ListAccessibleChannels.
 	IsMember bool
+	// LastMessage/LastMessageSender/LastMessagePrincipalID/LastMessageAt are
+	// the newest main-channel message (thread_root_message_id IS NULL) joined
+	// by ListUserConversationsWithUnread for the left-rail preview:
+	// content, sender display name, the sender's decimal principal id (empty
+	// unless the sender is a USER), and the send time. All empty/unset when
+	// the conversation has no main-channel messages yet.
+	LastMessage            string
+	LastMessageSender      string
+	LastMessagePrincipalID string
+	LastMessageAt          sql.NullTime
 }
+
+// listUserConversationsWithUnreadSQL is the left-rail roster query: the user's
+// conversations with unread counts and the newest main-channel message joined
+// via LATERAL for the list preview. Named as a constant so the guard test can
+// lock in the thread-scoping (thread_root_message_id IS NULL) and the preview
+// join without a live database.
+const listUserConversationsWithUnreadSQL = `
+		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version,
+		       COALESCE((
+		         SELECT count(*)::int
+		         FROM chat_message m
+		         WHERE m.conversation_id = c.id
+		           AND m.thread_root_message_id IS NULL
+		           AND m.room_version > COALESCE(ucc.read_version, c.version)
+		       ), 0),
+		       cm.pinned, cm.pinned_at,
+		       lm.content, lm.created_at, lm.sender_name, lm.sender_principal_id
+		FROM conversation c
+		JOIN conversation_member_meta cm ON cm.conversation_id = c.id
+		LEFT JOIN user_channel_cursor ucc ON ucc.principal_id = $3 AND ucc.conversation_id = c.id
+		LEFT JOIN LATERAL (
+		  SELECT m.content, m.created_at,
+		         CASE WHEN m.sender_type = 2 THEN COALESCE(ag.name, '')
+		              ELSE COALESCE(p.name, '') END AS sender_name,
+		         CASE WHEN m.sender_type = 1 THEN m.principal_id::text ELSE '' END AS sender_principal_id
+		  FROM chat_message m
+		  LEFT JOIN principal p ON p.id = m.principal_id
+		  LEFT JOIN agent ag ON ag.id = m.sender_agent_id
+		  WHERE m.conversation_id = c.id
+		    AND m.thread_root_message_id IS NULL
+		  ORDER BY m.room_version DESC
+		  LIMIT 1
+		) lm ON true
+		WHERE cm.member_type = $1 AND cm.member_id = $2
+		ORDER BY cm.pinned DESC, cm.pinned_at DESC NULLS LAST, c.updated_at DESC
+		LIMIT $4 OFFSET $5`
 
 // ListUserConversationsWithUnread returns every conversation the user is a
 // member of, ordered by updated_at DESC, together with the number of
@@ -499,23 +545,7 @@ type UserConversation struct {
 // thread-aware relevance filter, so a thread reply never pings the left-rail
 // badge for a user who has the channel open.
 func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID int, limit, offset int) ([]*UserConversation, error) {
-	rows, err := s.GetDB().QueryContext(ctx, `
-		SELECT c.id, c.agent_id, c.title, c.type, c.created_by, c.owner_id, c.created_at, c.updated_at, c.version,
-		       COALESCE((
-		         SELECT count(*)::int
-		         FROM chat_message m
-		         WHERE m.conversation_id = c.id
-		           AND m.thread_root_message_id IS NULL
-		           AND m.room_version > COALESCE(ucc.read_version, c.version)
-		       ), 0),
-		       cm.pinned, cm.pinned_at
-		FROM conversation c
-		JOIN conversation_member_meta cm ON cm.conversation_id = c.id
-		LEFT JOIN user_channel_cursor ucc ON ucc.principal_id = $3 AND ucc.conversation_id = c.id
-		WHERE cm.member_type = $1 AND cm.member_id = $2
-		ORDER BY cm.pinned DESC, cm.pinned_at DESC NULLS LAST, c.updated_at DESC
-		LIMIT $4 OFFSET $5
-	`, MemberTypeUser, fmt.Sprintf("%d", principalID), principalID, limit, offset)
+	rows, err := s.GetDB().QueryContext(ctx, listUserConversationsWithUnreadSQL, MemberTypeUser, fmt.Sprintf("%d", principalID), principalID, limit, offset)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to list user conversations with unread")
 	}
@@ -525,12 +555,21 @@ func (s *Store) ListUserConversationsWithUnread(ctx context.Context, principalID
 	for rows.Next() {
 		var uc UserConversation
 		conv := &uc.Conversation
+		var lmContent, lmSender, lmPrincipalID sql.NullString
+		var lmCreatedAt sql.NullTime
 		if err := rows.Scan(
 			&conv.ID, &conv.AgentID, &conv.Title, &conv.Type, &conv.CreatedBy, &conv.OwnerID, &conv.CreatedAt, &conv.UpdatedAt, &conv.Version,
 			&uc.UnreadCount,
 			&uc.Pinned, &uc.PinnedAt,
+			&lmContent, &lmCreatedAt, &lmSender, &lmPrincipalID,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan user conversation")
+		}
+		if lmContent.Valid {
+			uc.LastMessage = lmContent.String
+			uc.LastMessageAt = lmCreatedAt
+			uc.LastMessageSender = lmSender.String
+			uc.LastMessagePrincipalID = lmPrincipalID.String
 		}
 		convs = append(convs, &uc)
 	}

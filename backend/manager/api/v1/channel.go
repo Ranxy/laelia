@@ -97,11 +97,24 @@ func (s *CommandService) ListChannels(ctx context.Context, req *connect.Request[
 				peerResource = common.FormatUserUID(peer.ID)
 			}
 		}
-		v1Convs = append(v1Convs, convertToV1Conversation(&conv, ownerName, peerName, peerResource, memberCount, uc.UnreadCount, title, 0))
+		convV1 := convertToV1Conversation(&conv, ownerName, peerName, peerResource, memberCount, uc.UnreadCount, title, 0)
 		// pinned is the requesting user's per-conversation pin state; the list
 		// query already returns pinned-first, this just surfaces the flag so the
 		// frontend can render a pin indicator.
-		v1Convs[len(v1Convs)-1].Pinned = uc.Pinned
+		convV1.Pinned = uc.Pinned
+		// last_message preview: the newest main-channel message joined by the
+		// list query. The sender principal id is only meaningful for USER
+		// senders (the store already empties it otherwise) so the frontend can
+		// render "You" without mistaking an agent message for the viewer.
+		if uc.LastMessage != "" {
+			convV1.LastMessage = singleLinePreview(uc.LastMessage, maxListPreviewLen)
+			convV1.LastMessageSender = uc.LastMessageSender
+			convV1.LastMessagePrincipalId = uc.LastMessagePrincipalID
+			if uc.LastMessageAt.Valid {
+				convV1.LastMessageAt = timestamppb.New(uc.LastMessageAt.Time)
+			}
+		}
+		v1Convs = append(v1Convs, convV1)
 	}
 
 	return connect.NewResponse(&v1pb.ListChannelsResponse{
@@ -1168,6 +1181,11 @@ type conversationPeer struct {
 	name     string // display name, used for the "dm:@<name>" address
 	resource string // resource name e.g. "users/<id>" or "agents/<id>", used for Conversation.Peer
 }
+
+// maxListPreviewLen caps the single-line last-message preview embedded in the
+// left-rail conversation list. The client truncates visually via CSS; this
+// only bounds the payload while keeping the preview one line.
+const maxListPreviewLen = 120
 
 // convertToV1Conversation is the single builder for v1 Conversation. It
 // populates Address — the name-based form agents write and read — from the

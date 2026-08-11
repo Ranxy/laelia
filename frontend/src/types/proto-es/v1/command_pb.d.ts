@@ -1179,6 +1179,44 @@ export declare type Conversation = Message<"laelia.v1.Conversation"> & {
    * @generated from field: bool pinned = 14;
    */
   pinned: boolean;
+
+  /**
+   * last_message is a single-line, truncated preview of the newest main-channel
+   * message (thread replies excluded, mirroring the main message list and the
+   * unread count). Populated by ListChannels; empty when the conversation has no
+   * main-channel messages yet.
+   *
+   * @generated from field: string last_message = 15;
+   */
+  lastMessage: string;
+
+  /**
+   * last_message_sender is the display name of the last_message author: the
+   * principal name for USER/SYSTEM senders, the agent name for AGENT senders.
+   * Empty when last_message is empty.
+   *
+   * @generated from field: string last_message_sender = 16;
+   */
+  lastMessageSender: string;
+
+  /**
+   * last_message_principal_id is the decimal principal id of the last_message
+   * author when the sender is a USER (so the frontend can render "You" without
+   * mistaking an agent message, whose chat_message.principal_id is the
+   * conversation owner, for the viewer). Empty for AGENT/SYSTEM senders and when
+   * last_message is empty.
+   *
+   * @generated from field: string last_message_principal_id = 17;
+   */
+  lastMessagePrincipalId: string;
+
+  /**
+   * last_message_at is the send time of last_message. Unset when the
+   * conversation has no main-channel messages yet.
+   *
+   * @generated from field: google.protobuf.Timestamp last_message_at = 18;
+   */
+  lastMessageAt?: Timestamp | undefined;
 };
 
 /**

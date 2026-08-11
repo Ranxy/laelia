@@ -8836,6 +8836,44 @@ left-rail list regardless of last message time. Per-user: each viewer has
 their own pins. Populated by ListChannels and GetChannel for a user viewer. </p></td>
                 </tr>
               
+                <tr>
+                  <td>last_message</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>last_message is a single-line, truncated preview of the newest main-channel
+message (thread replies excluded, mirroring the main message list and the
+unread count). Populated by ListChannels; empty when the conversation has no
+main-channel messages yet. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_message_sender</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>last_message_sender is the display name of the last_message author: the
+principal name for USER/SYSTEM senders, the agent name for AGENT senders.
+Empty when last_message is empty. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_message_principal_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>last_message_principal_id is the decimal principal id of the last_message
+author when the sender is a USER (so the frontend can render &#34;You&#34; without
+mistaking an agent message, whose chat_message.principal_id is the
+conversation owner, for the viewer). Empty for AGENT/SYSTEM senders and when
+last_message is empty. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>last_message_at</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p>last_message_at is the send time of last_message. Unset when the
+conversation has no main-channel messages yet. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
