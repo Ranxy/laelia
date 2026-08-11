@@ -844,7 +844,9 @@ function ThreadHeader({
           </AlertDialog>
         </>
       )}
-      {onToggleExpand && (
+      {/* The expand/collapse toggle is a desktop affordance: on mobile the
+          thread panel already fills the screen, so the toggle is meaningless. */}
+      {isDesktop && onToggleExpand && (
         <button
           type="button"
           onClick={onToggleExpand}

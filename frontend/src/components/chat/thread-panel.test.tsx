@@ -51,8 +51,10 @@ vi.mock("@/composables/useMentionTargets", () => ({
   targetToMention: (t: unknown) => t,
 }));
 
+// Desktop by default; mobile tests opt out with mockUseIsDesktop.mockReturnValue(false).
+const mockUseIsDesktop = vi.hoisted(() => vi.fn(() => true));
 vi.mock("@/lib/use-is-desktop", () => ({
-  useIsDesktop: () => true,
+  useIsDesktop: mockUseIsDesktop,
 }));
 
 import { useAppStore } from "@/stores";
@@ -101,6 +103,7 @@ function renderPanel(rootMsg: ChatMessageUI, readOnly?: boolean) {
 describe("ThreadPanel close-task button", () => {
   beforeEach(() => {
     useAppStore.getState().reset();
+    mockUseIsDesktop.mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -115,6 +118,30 @@ describe("ThreadPanel close-task button", () => {
     const close = screen.getByLabelText("channelTask.close");
     expect(close).not.toBeNull();
     expect(close.getAttribute("title")).toBe("channelTask.close");
+  });
+
+  it("hides the expand/collapse toggle on mobile", () => {
+    mockUseIsDesktop.mockReturnValue(false);
+    useAppStore.setState({
+      threadByRoot: {
+        [ROOT_NAME]: {
+          messages: [taskRoot(TaskStatus.TODO)],
+          currentVersion: 1n,
+          loading: false,
+        },
+      },
+    });
+    render(
+      <ThreadPanel
+        channelId="c1"
+        channelTitle="C1"
+        rootMessageId={ROOT_NAME}
+        onClose={() => {}}
+        onToggleExpand={() => {}}
+      />
+    );
+    expect(screen.queryByLabelText("chat.thread-expand")).toBeNull();
+    expect(screen.queryByLabelText("chat.thread-collapse")).toBeNull();
   });
 
   it("places the close button before the expand toggle in the header", () => {
