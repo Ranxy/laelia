@@ -341,6 +341,17 @@ func (s *UserService) CreateUser(ctx context.Context, request *connect.Request[v
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("support user and service account only"))
 	}
 
+	// Service accounts are privileged programmatic identities: the response
+	// hands out their generated access key, which authenticates directly via
+	// Login. Anonymous self-service signup must therefore stay limited to USER;
+	// only a caller holding the workspace-scope laelia.users.create permission
+	// (workspace admins) may create a service account.
+	if principalType == storepb.PrincipalType_SERVICE_ACCOUNT {
+		if err := authorizeServiceAccountCreation(ctx, s.iam); err != nil {
+			return nil, err
+		}
+	}
+
 	count, err := s.store.CountUsers(ctx, storepb.PrincipalType_END_USER)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to count users, error: %v", err))

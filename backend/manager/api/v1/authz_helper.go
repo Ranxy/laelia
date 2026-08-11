@@ -66,3 +66,23 @@ func canCreateUser(ctx context.Context, checker PermissionChecker, caller *store
 	}
 	return checker.CheckPermission(ctx, permission.UsersCreate, caller, nil, nil)
 }
+
+// authorizeServiceAccountCreation gates service-account creation to callers
+// holding the workspace-scope laelia.users.create permission (workspace
+// admins). Service accounts receive a generated access key that authenticates
+// directly via Login, so anonymous self-service signup must never be able to
+// mint one (self-service signup stays limited to USER).
+func authorizeServiceAccountCreation(ctx context.Context, checker PermissionChecker) error {
+	caller, ok := GetUserFromContext(ctx)
+	if !ok || caller == nil {
+		return connect.NewError(connect.CodePermissionDenied, errors.Errorf("service account creation requires an authenticated workspace admin"))
+	}
+	allowed, err := canCreateUser(ctx, checker, caller)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, errors.Wrap(err, "failed to check permission"))
+	}
+	if !allowed {
+		return connect.NewError(connect.CodePermissionDenied, errors.Errorf("permission %q denied", permission.UsersCreate))
+	}
+	return nil
+}
