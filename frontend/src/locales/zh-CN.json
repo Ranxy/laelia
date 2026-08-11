@@ -832,7 +832,8 @@
     "section-channels": "频道",
     "channels-empty": "还没有频道。",
     "channel-not-found": "频道不存在。",
-    "row-open-channel": "打开频道 {{title}}"
+    "row-open-channel": "打开频道 {{title}}",
+    "message-channel": "发消息"
   },
   "command": {
     "status-unknown": "未知",
@@ -1122,8 +1123,6 @@
     "pin": "置顶",
     "unpin": "取消置顶",
     "fab-label": "频道",
-    "closed": "已关闭",
-    "open": "打开",
     "role-owner": "所有者",
     "role-admin": "管理员",
     "role-member": "成员",

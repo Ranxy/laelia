@@ -5,7 +5,6 @@ import { Outlet, useMatch, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/chat/avatar";
 import { ConnectionBadge } from "@/components/connection-badge";
 import { Alert } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import {
@@ -380,8 +379,7 @@ function MemberRow({
 }
 
 // ChannelRow is a single channels-roster row: a channel opens its detail page
-// (where a closed channel can be reopened). Closed channels show a badge so
-// they stay distinguishable from the live ones.
+// (where a closed channel can be reopened from the Message action).
 function ChannelRow({
   channel,
   selected,
@@ -408,15 +406,10 @@ function ChannelRow({
       <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-control-bg text-control">
         <Hash className="size-3.5" />
       </span>
-      <div className="min-w-0 flex-1 flex items-center gap-2">
+      <div className="min-w-0 flex-1">
         <span className="truncate text-sm font-medium text-main">
           {channel.title}
         </span>
-        {channel.closed && (
-          <Badge variant="secondary" className="text-xs shrink-0">
-            {t("channel.closed")}
-          </Badge>
-        )}
       </div>
       <span className="text-xs text-control-light">
         {t("channel.members", { count: channel.memberCount ?? 0 })}

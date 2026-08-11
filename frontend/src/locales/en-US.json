@@ -832,7 +832,8 @@
     "section-channels": "Channels",
     "channels-empty": "No channels yet.",
     "channel-not-found": "Channel not found.",
-    "row-open-channel": "Open channel {{title}}"
+    "row-open-channel": "Open channel {{title}}",
+    "message-channel": "Message"
   },
   "command": {
     "status-unknown": "Unknown",
@@ -1122,8 +1123,6 @@
     "pin": "Pin to top",
     "unpin": "Unpin",
     "fab-label": "Channel",
-    "closed": "Closed",
-    "open": "Open",
     "role-owner": "Owner",
     "role-admin": "Admin",
     "role-member": "Member",

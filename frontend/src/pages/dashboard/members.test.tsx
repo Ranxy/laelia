@@ -169,13 +169,13 @@ describe("MembersPage channels roster", () => {
     expect(screen.getByText("Retired")).toBeTruthy();
   });
 
-  it("badges closed channels in the roster", () => {
+  it("lists closed channels without a closed badge", () => {
     renderPage();
     fireEvent.click(screen.getByText("members.section-channels"));
 
-    expect(screen.getByText("channel.closed")).toBeTruthy();
-    // only one of the two channels is closed
-    expect(screen.getAllByText("channel.closed")).toHaveLength(1);
+    expect(screen.getByText("Design")).toBeTruthy();
+    expect(screen.getByText("Retired")).toBeTruthy();
+    expect(screen.queryByText("channel.closed")).toBeNull();
   });
 
   it("navigates to the channel detail on row click", () => {

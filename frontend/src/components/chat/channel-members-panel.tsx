@@ -1,12 +1,18 @@
 import { Plus, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Avatar } from "@/components/chat/avatar";
 import { MemberPicker } from "@/components/chat/member-picker";
 import { LoadingState } from "@/components/chat/states";
 import { MemberPicker as IamMemberPicker } from "@/components/member-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { groupServiceClient, userServiceClient } from "@/connect";
+import {
+  avatarNameForAgentId,
+  avatarNameForUserId,
+  useAvatar,
+} from "@/lib/avatar-cache";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import type { ChannelMember } from "@/types/proto-es/v1/command_pb";
@@ -262,54 +268,12 @@ export function ChannelMembersPanel({
       {!membersLoading && (
         <div className="flex flex-col gap-2">
           {members.map((m) => (
-            <div
+            <ChannelMemberRow
               key={`${m.memberType}-${m.memberId}`}
-              className="flex items-center gap-3 rounded-xs border border-control-border bg-background p-3 transition-colors hover:bg-control-bg/60"
-            >
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent text-sm font-medium">
-                {(m.displayName || m.memberId).charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-main truncate">
-                  {m.displayName || m.memberId}
-                </p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-xs text-control-light">
-                    {memberTypeLabel(t, m.memberType)}
-                  </span>
-                  <Badge
-                    variant={roleBadgeVariant(m.memberRole)}
-                    className="text-xs"
-                  >
-                    {roleLabel(t, m.memberRole)}
-                  </Badge>
-                  {m.joinedAt && (
-                    <span className="text-xs text-control-placeholder">
-                      {t("channel.joined-at", {
-                        date: new Date(
-                          Number(m.joinedAt.seconds) * 1000
-                        ).toLocaleDateString(),
-                      })}
-                    </span>
-                  )}
-                </div>
-              </div>
-              {/* DMs have fixed membership (user + agent); only channel
-                  owners can remove members. */}
-              {!membershipFixed && canManage && m.memberRole !== 1 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRemoveMember(m.memberType, m.memberId)}
-                  aria-label={t("common.delete")}
-                  className={cn(
-                    "size-7 p-0 text-control-placeholder hover:text-error hover:bg-error/10"
-                  )}
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
-              )}
-            </div>
+              member={m}
+              removable={!membershipFixed && canManage && m.memberRole !== 1}
+              onRemove={() => handleRemoveMember(m.memberType, m.memberId)}
+            />
           ))}
         </div>
       )}
@@ -509,6 +473,72 @@ export function ChannelMembersPanel({
             </Button>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ChannelMemberRow is one roster row: real avatar (uploaded image or pixel
+// identicon, same as the members directory), name, and a fixed-width type
+// label so the role badge and join time line up across user/agent rows.
+function ChannelMemberRow({
+  member,
+  removable,
+  onRemove,
+}: {
+  member: ChannelMember;
+  removable: boolean;
+  onRemove: () => void;
+}) {
+  const { t } = useTranslation();
+  const isAgent = member.memberType === 2;
+  const avatarName = isAgent
+    ? avatarNameForAgentId(member.memberId)
+    : avatarNameForUserId(member.memberId);
+  const avatarSrc = useAvatar(avatarName);
+
+  return (
+    <div className="flex items-center gap-3 rounded-xs border border-control-border bg-background p-3 transition-colors hover:bg-control-bg/60">
+      <Avatar seed={member.memberId || member.displayName} src={avatarSrc} />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-main truncate">
+          {member.displayName || member.memberId}
+        </p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className="w-10 shrink-0 text-xs text-control-light">
+            {memberTypeLabel(t, member.memberType)}
+          </span>
+          <Badge
+            variant={roleBadgeVariant(member.memberRole)}
+            className="text-xs"
+          >
+            {roleLabel(t, member.memberRole)}
+          </Badge>
+          {member.joinedAt && (
+            <span className="text-xs text-control-placeholder">
+              {t("channel.joined-at", {
+                date: new Date(
+                  Number(member.joinedAt.seconds) * 1000
+                ).toLocaleDateString(),
+              })}
+            </span>
+          )}
+        </div>
+      </div>
+      {/* DMs have fixed membership (user + agent); only channel owners can
+          remove members. */}
+      {removable && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onRemove}
+          aria-label={t("common.delete")}
+          className={cn(
+            "size-7 p-0 text-control-placeholder hover:text-error hover:bg-error/10"
+          )}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
       )}
     </div>
   );

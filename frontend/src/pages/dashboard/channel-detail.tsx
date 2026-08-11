@@ -1,10 +1,9 @@
-import { ArrowLeft, Hash, Users } from "lucide-react";
+import { ArrowLeft, Hash, Loader2, MessageSquare, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChannelMembersPanel } from "@/components/chat/channel-members-panel";
 import { EmptyState, LoadingState } from "@/components/chat/states";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { commandServiceClient } from "@/connect";
 import { useAppStore } from "@/stores";
@@ -12,9 +11,9 @@ import type { Conversation } from "@/types/proto-es/v1/command_pb";
 
 // ChannelDetailPage is the right-pane detail view for a channel opened from
 // the Members directory's Channels roster. It shows the channel's metadata
-// (member count, owner, the viewer's join time), flags closed channels with a
-// badge, and offers an "Open" action that reopens a closed channel and jumps
-// into the chat. Membership management (add/remove) reuses the same
+// (member count, owner, the viewer's join time) and a Message action that
+// jumps into the chat (reopening a closed channel first), matching the
+// user/agent detail pages. Membership management (add/remove) reuses the same
 // ChannelMembersPanel as the chat page's members sheet.
 export function ChannelDetailPage() {
   const { t } = useTranslation();
@@ -59,14 +58,21 @@ export function ChannelDetailPage() {
     !!currentUser?.name &&
     conv.ownerId === currentUser.name.split("/").pop();
 
-  const handleOpen = async () => {
+  const [startingChat, setStartingChat] = useState(false);
+
+  const handleMessage = async () => {
     if (!channelId) return;
-    // Reopen restores the row to the left rail (setConversationClosed clears
-    // the closed flag and refetches the list), then jump straight into chat.
+    setStartingChat(true);
     try {
-      await setConversationClosed(channelId, false);
-    } finally {
+      // A closed channel is reopened first: setConversationClosed clears the
+      // closed flag and refetches the list, restoring the row to the left
+      // rail, then we jump straight into chat.
+      if (conv?.closed) {
+        await setConversationClosed(channelId, false);
+      }
       navigate(`/chat/${channelId}`);
+    } finally {
+      setStartingChat(false);
     }
   };
 
@@ -85,16 +91,20 @@ export function ChannelDetailPage() {
         <h1 className="min-w-0 flex-1 truncate text-sm font-semibold text-main">
           {conv?.title ?? channelId ?? ""}
         </h1>
-        {conv?.closed && (
-          <Badge variant="secondary" className="text-xs shrink-0">
-            {t("channel.closed")}
-          </Badge>
-        )}
-        {conv?.closed && (
-          <Button variant="default" size="sm" onClick={() => void handleOpen()}>
-            {t("channel.open")}
-          </Button>
-        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void handleMessage()}
+          disabled={startingChat}
+          className="shrink-0"
+        >
+          {startingChat ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <MessageSquare className="size-4" />
+          )}
+          {t("members.message-channel")}
+        </Button>
       </div>
 
       <div className="flex-1 overflow-y-auto">

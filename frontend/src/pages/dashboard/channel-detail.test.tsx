@@ -13,6 +13,14 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+// useAvatar would hit the avatar RPCs; stub it so rows render the pixel
+// fallback without network noise.
+vi.mock("@/lib/avatar-cache", () => ({
+  avatarNameForAgentId: (id: string) => `agents/${id}/avatar`,
+  avatarNameForUserId: (id: string) => `users/${id}/avatar`,
+  useAvatar: () => null,
+}));
+
 const mock = vi.hoisted(() => ({
   getChannel: vi.fn(),
 }));
@@ -96,12 +104,12 @@ afterEach(() => {
 });
 
 describe("ChannelDetailPage", () => {
-  it("shows channel metadata, the closed badge and the Open action", async () => {
+  it("shows channel metadata and the Message action", async () => {
     renderPage();
 
     expect(await screen.findByText("Design")).toBeTruthy();
-    expect(screen.getByText("channel.closed")).toBeTruthy();
-    expect(screen.getByText("channel.open")).toBeTruthy();
+    expect(screen.getByText("members.message-channel")).toBeTruthy();
+    expect(screen.queryByText("channel.closed")).toBeNull();
     expect(screen.getByText("channel.owner")).toBeTruthy();
     expect(screen.getAllByText("channel.joined-at").length).toBeGreaterThan(0);
   });
@@ -116,24 +124,35 @@ describe("ChannelDetailPage", () => {
     expect(screen.getAllByText("channel.joined-at")).toHaveLength(4);
   });
 
-  it("hides the Open action for a live channel", async () => {
+  it("shows the Message action for a live channel too", async () => {
     mock.getChannel.mockResolvedValue({ ...CONV, closed: false });
     renderPage();
 
     expect(await screen.findByText("Design")).toBeTruthy();
-    expect(screen.queryByText("channel.open")).toBeNull();
+    expect(screen.getByText("members.message-channel")).toBeTruthy();
   });
 
-  it("reopens the channel and navigates to chat on Open", async () => {
+  it("reopens a closed channel and navigates to chat on Message", async () => {
     renderPage();
     await screen.findByText("Design");
 
-    fireEvent.click(screen.getByText("channel.open"));
+    fireEvent.click(screen.getByText("members.message-channel"));
 
     expect(useAppStore.getState().setConversationClosed).toHaveBeenCalledWith(
       "c1",
       false
     );
+    expect(await screen.findByText("chat-route")).toBeTruthy();
+  });
+
+  it("navigates straight to chat for a live channel on Message", async () => {
+    mock.getChannel.mockResolvedValue({ ...CONV, closed: false });
+    renderPage();
+    await screen.findByText("Design");
+
+    fireEvent.click(screen.getByText("members.message-channel"));
+
+    expect(useAppStore.getState().setConversationClosed).not.toHaveBeenCalled();
     expect(await screen.findByText("chat-route")).toBeTruthy();
   });
 });
