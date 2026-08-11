@@ -510,7 +510,7 @@ function ChannelMemberRow({
           </span>
           <Badge
             variant={roleBadgeVariant(member.memberRole)}
-            className="text-xs"
+            className="w-16 shrink-0 justify-center text-xs"
           >
             {roleLabel(t, member.memberRole)}
           </Badge>
