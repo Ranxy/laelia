@@ -3,7 +3,7 @@ import { type RouteObject, useNavigate } from "react-router-dom";
 import { ROUTE_INFO } from "@/router/route-info";
 import { useCurrentRoute } from "@/router/use-current-route";
 import { preloadPreviewRoute } from "@/router/use-preview-routes";
-import { useAppStore } from "@/stores";
+import { setSuppressLoadingFlags, useAppStore } from "@/stores";
 import { useIsDesktop } from "./use-is-desktop";
 
 // iOS-style interactive back gesture for mobile: drag from the left edge of
@@ -92,6 +92,7 @@ export function useSwipeBack(routes?: RouteObject[]): SwipeBackState {
       }
       root.style.removeProperty("--swipe-offset");
       root.style.removeProperty("--swipe-transition");
+      setSuppressLoadingFlags(false);
       setPreviewPath(null);
     };
 
@@ -126,6 +127,9 @@ export function useSwipeBack(routes?: RouteObject[]): SwipeBackState {
         // setPreviewPath triggers a re-render, so the module is cached by the
         // time the preview clones the route tree (no blank-frame delay).
         if (routes) preloadPreviewRoute(routes, backTargetRef.current);
+        // Suppress loading-flag updates so the preview instance's mount-time
+        // fetch does not flash the real page (still mounted as the parent route).
+        setSuppressLoadingFlags(true);
         setPreviewPath(backTargetRef.current);
         if (pageRef.current) pageRef.current.style.transition = "none";
       } else {

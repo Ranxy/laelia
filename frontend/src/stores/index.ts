@@ -18,26 +18,103 @@ import { createUserSlice } from "./user";
 import { createImagePreviewSlice } from "./image-preview";
 import { createPreviewSlice } from "./preview";
 
+// ---------------------------------------------------------------------------
+// Swipe-back preview: loading-flag suppression
+//
+// The mobile swipe-back gesture renders the back-target page underneath the
+// current one (via useRoutes).  That preview instance mounts fresh and its
+// useEffect calls fetch functions (fetchMachines, fetchChannels, …) which set
+// loading flags (machinesLoading, channelsLoading, …) to true.  The REAL page
+// (still mounted as the parent route) subscribes to those flags and briefly
+// swaps its content to a "Loading…" state — the user sees a flash right after
+// the gesture commits.
+//
+// While the preview is active we strip loading-flag keys from every store
+// `set` call so the preview's fetch silently refreshes data without flipping
+// the real page into a loading state.  Data keys (machines, channels, …) pass
+// through unchanged.
+// ---------------------------------------------------------------------------
+const LOADING_FLAGS = new Set([
+  "activitiesLoading",
+  "agentChannelsLoading",
+  "agentsLoading",
+  "apiProvidersLoading",
+  "channelMembersLoading",
+  "channelsLoading",
+  "chatLoading",
+  "commandsLoading",
+  "deletedUsersLoading",
+  "machinesLoading",
+  "mcpServersLoading",
+  "membersLoading",
+  "myChannelsLoading",
+  "remindersLoading",
+  "tasksLoading",
+  "usersLoading",
+]);
+
+let suppressLoadingFlags = false;
+
+export function setSuppressLoadingFlags(value: boolean): void {
+  suppressLoadingFlags = value;
+}
+
+function stripLoadingFlags<T extends Record<string, unknown>>(
+  partial: T
+): T | null {
+  if (!suppressLoadingFlags) return partial;
+  const filtered: Record<string, unknown> = {};
+  let hasData = false;
+  for (const key in partial) {
+    if (LOADING_FLAGS.has(key)) continue;
+    filtered[key] = partial[key];
+    hasData = true;
+  }
+  return hasData ? (filtered as T) : null;
+}
+
 export const useAppStore = create<AppStoreState>()((...args) => {
-  const [set, get] = args;
+  const [originalSet, get] = args;
+  // Wrap set so loading-flag updates are stripped while the swipe-back preview
+  // is active.  Function-form updates are resolved first so the filtering
+  // always sees a plain object.
+  const set = ((partial: unknown, replace?: boolean) => {
+    if (!suppressLoadingFlags) {
+      originalSet(partial as never, replace as never);
+      return;
+    }
+    if (typeof partial === "function") {
+      originalSet((state: unknown) => {
+        const resolved = (partial as (s: unknown) => unknown)(state);
+        const filtered = stripLoadingFlags(resolved as Record<string, unknown>);
+        return (filtered ?? {}) as never;
+      }, replace as never);
+      return;
+    }
+    const filtered = stripLoadingFlags(partial as Record<string, unknown>);
+    if (filtered) originalSet(filtered as never, replace as never);
+  }) as typeof originalSet;
+
+  const wrappedArgs = [set, ...args.slice(1)] as typeof args;
+
   return {
-    ...createAuthSlice(...args),
-    ...createAPIProviderSlice(...args),
-    ...createMcpServerSlice(...args),
-    ...createAgentSlice(...args),
-    ...createMachineSlice(...args),
-    ...createWorkspaceSlice(...args),
-    ...createMembersSlice(...args),
-    ...createCommandSlice(...args),
-    ...createChatSlice(...args),
-    ...createChannelSlice(...args),
-    ...createThreadSlice(...args),
-    ...createTaskSlice(...args),
-    ...createReminderSlice(...args),
-    ...createActivitySlice(...args),
-    ...createUserSlice(...args),
-    ...createPreviewSlice(...args),
-    ...createImagePreviewSlice(...args),
+    ...createAuthSlice(...wrappedArgs),
+    ...createAPIProviderSlice(...wrappedArgs),
+    ...createMcpServerSlice(...wrappedArgs),
+    ...createAgentSlice(...wrappedArgs),
+    ...createMachineSlice(...wrappedArgs),
+    ...createWorkspaceSlice(...wrappedArgs),
+    ...createMembersSlice(...wrappedArgs),
+    ...createCommandSlice(...wrappedArgs),
+    ...createChatSlice(...wrappedArgs),
+    ...createChannelSlice(...wrappedArgs),
+    ...createThreadSlice(...wrappedArgs),
+    ...createTaskSlice(...wrappedArgs),
+    ...createReminderSlice(...wrappedArgs),
+    ...createActivitySlice(...wrappedArgs),
+    ...createUserSlice(...wrappedArgs),
+    ...createPreviewSlice(...wrappedArgs),
+    ...createImagePreviewSlice(...wrappedArgs),
     reset: () => {
       // Stop every watcher interval before wiping state so orphaned timers can't
       // keep polling (and re-writing) the freshly reset store. getInitialState()

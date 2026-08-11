@@ -9,6 +9,9 @@ const mock = vi.hoisted(() => ({
   closeThread: vi.fn(),
 }));
 
+vi.mock("@/router/use-preview-routes", () => ({
+  preloadPreviewRoute: vi.fn(),
+}));
 vi.mock("@/lib/use-is-desktop", () => ({
   useIsDesktop: mock.useIsDesktop,
 }));
@@ -24,6 +27,7 @@ vi.mock("@/stores", () => ({
       closeThread: mock.closeThread,
       activeThreadRoot: mock.activeThreadRoot,
     }),
+  setSuppressLoadingFlags: vi.fn(),
 }));
 
 import { useSwipeBack } from "./use-swipe-back";
