@@ -157,7 +157,7 @@ export function MachinesPage() {
               {t("common.no-data")}
             </p>
           ) : (
-            <ul className="flex flex-col">
+            <ul className="flex flex-col divide-y divide-control-border/50">
               {machines.map((machine) => {
                 const resourceId = machine.name.replace(/^machines\//, "");
                 const selected = resourceId === selectedMachineId;
@@ -173,8 +173,8 @@ export function MachinesPage() {
                         "group flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors",
                         "border-l-2",
                         selected
-                          ? "border-accent bg-control-bg"
-                          : "border-transparent hover:bg-control-bg/60"
+                          ? "border-l-accent bg-control-bg"
+                          : "border-l-transparent hover:bg-control-bg/60"
                       )}
                       onClick={() => navigate(`/machines/${resourceId}`)}
                       onKeyDown={(e) => {

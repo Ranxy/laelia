@@ -165,23 +165,26 @@ export function MembersPage() {
                     onAdd={() => navigate("/machines")}
                     addLabel={t("members.add-agent")}
                   />
-                  {agentsOpen &&
-                    agents.map((member) => (
-                      <MemberRow
-                        key={member.name}
-                        member={member}
-                        machineLabel={
-                          member.subtitle
-                            ? (machineTitleByName.get(member.subtitle) ??
-                              member.subtitle.replace(/^machines\//, ""))
-                            : ""
-                        }
-                        selected={
-                          selectedAgentId ===
-                          member.name.replace(/^agents\//, "")
-                        }
-                      />
-                    ))}
+                  {agentsOpen && (
+                    <div className="divide-y divide-control-border/50">
+                      {agents.map((member) => (
+                        <MemberRow
+                          key={member.name}
+                          member={member}
+                          machineLabel={
+                            member.subtitle
+                              ? (machineTitleByName.get(member.subtitle) ??
+                                member.subtitle.replace(/^machines\//, ""))
+                              : ""
+                          }
+                          selected={
+                            selectedAgentId ===
+                            member.name.replace(/^agents\//, "")
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
               {showHumans && (
@@ -194,16 +197,20 @@ export function MembersPage() {
                     onAdd={() => navigate("/settings/users")}
                     addLabel={t("members.add-human")}
                   />
-                  {humansOpen &&
-                    humans.map((member) => (
-                      <MemberRow
-                        key={member.name}
-                        member={member}
-                        selected={
-                          selectedUserId === member.name.replace(/^users\//, "")
-                        }
-                      />
-                    ))}
+                  {humansOpen && (
+                    <div className="divide-y divide-control-border/50">
+                      {humans.map((member) => (
+                        <MemberRow
+                          key={member.name}
+                          member={member}
+                          selected={
+                            selectedUserId ===
+                            member.name.replace(/^users\//, "")
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -232,16 +239,18 @@ export function MembersPage() {
                   {t("members.channels-empty")}
                 </p>
               ) : (
-                myChannels.map((channel) => (
-                  <ChannelRow
-                    key={channel.name}
-                    channel={channel}
-                    selected={
-                      selectedChannelId ===
-                      channel.name.replace(/^conversations\//, "")
-                    }
-                  />
-                ))
+                <div className="divide-y divide-control-border/50">
+                  {myChannels.map((channel) => (
+                    <ChannelRow
+                      key={channel.name}
+                      channel={channel}
+                      selected={
+                        selectedChannelId ===
+                        channel.name.replace(/^conversations\//, "")
+                      }
+                    />
+                  ))}
+                </div>
               ))}
           </div>
         </div>
@@ -352,8 +361,8 @@ function MemberRow({
       className={cn(
         "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors border-l-2",
         selected
-          ? "border-accent bg-control-bg"
-          : "border-transparent hover:bg-control-bg/60"
+          ? "border-l-accent bg-control-bg"
+          : "border-l-transparent hover:bg-control-bg/60"
       )}
     >
       <Avatar seed={resourceId || member.title} src={avatarSrc} />
@@ -399,8 +408,8 @@ function ChannelRow({
       className={cn(
         "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors border-l-2",
         selected
-          ? "border-accent bg-control-bg"
-          : "border-transparent hover:bg-control-bg/60"
+          ? "border-l-accent bg-control-bg"
+          : "border-l-transparent hover:bg-control-bg/60"
       )}
     >
       <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-control-bg text-control">

@@ -272,7 +272,7 @@ export function ActivityList() {
             }
           />
         ) : (
-          <div className="divide-y divide-control-border">
+          <div className="divide-y divide-control-border/50">
             {activities.map((a) => (
               <ActivityRow
                 key={a.name}

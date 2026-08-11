@@ -57,8 +57,8 @@ export function ActivityRow({
         "group flex w-full gap-2.5 text-left transition-colors",
         "px-2.5 py-2 lg:px-3 lg:py-2.5",
         active
-          ? "bg-accent/10 border-l-2 border-accent"
-          : "border-l-2 border-transparent hover:bg-control-bg",
+          ? "bg-accent/10 border-l-2 border-l-accent"
+          : "border-l-2 border-l-transparent hover:bg-control-bg",
         isDone && "opacity-60"
       )}
     >
