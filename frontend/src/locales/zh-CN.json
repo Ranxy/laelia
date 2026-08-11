@@ -704,7 +704,7 @@
   "machine": {
     "title": "机器",
     "create": "创建机器",
-    "fab-label": "创建机器",
+    "fab-label": "机器",
     "create-title": "创建机器",
     "create-description": "为新的机器宿主输入名称。",
     "create-name-placeholder": "机器名称",
@@ -752,7 +752,7 @@
     "agent-roster": "Agent",
     "no-agents": "该机器上尚未托管任何 Agent。",
     "add-agent": "添加 Agent",
-    "add-agent-fab-label": "添加 Agent",
+    "add-agent-fab-label": "Agent",
     "add-agent-title": "添加 Agent",
     "add-agent-description": "在机器 {{title}} 上创建新 Agent。机器连接后将被自动接管,无需令牌。",
     "field-agent-name": "Agent 名称",
