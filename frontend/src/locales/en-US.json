@@ -704,6 +704,7 @@
   "machine": {
     "title": "Machines",
     "create": "Create Machine",
+    "fab-label": "New Machine",
     "create-title": "Create Machine",
     "create-description": "Enter a name for the new machine host.",
     "create-name-placeholder": "Machine name",
@@ -751,6 +752,7 @@
     "agent-roster": "Agents",
     "no-agents": "No agents hosted on this machine yet.",
     "add-agent": "Add Agent",
+    "add-agent-fab-label": "Add Agent",
     "add-agent-title": "Add Agent",
     "add-agent-description": "Create a new agent hosted on machine {{title}}. It will be picked up automatically once the machine is connected.",
     "field-agent-name": "Agent name",

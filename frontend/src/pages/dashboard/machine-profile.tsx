@@ -71,6 +71,7 @@ import {
 } from "@/connect";
 import { formatTimestamp } from "@/lib/command-status";
 import { buildMachineRunCommand } from "@/lib/machine-token";
+import { useIsDesktop } from "@/lib/use-is-desktop";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import {
@@ -127,6 +128,7 @@ export function MachineProfilePage() {
   // model, persona, env, custom command) so an agent can be fully configured at
   // creation time instead of requiring a second visit to the agent profile.
   const [addOpen, setAddOpen] = useState(false);
+  const [listScrolled, setListScrolled] = useState(false);
   const [agentName, setAgentName] = useState("");
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
@@ -308,6 +310,7 @@ export function MachineProfilePage() {
   }
 
   const canEdit = machine.canEdit;
+  const isDesktop = useIsDesktop();
   const canCreateAgent = machine.canCreateAgent;
   const canManage = machine.canManage;
   // hasAnyAction suppresses the "not allowed" notice for users who hold at least
@@ -637,7 +640,10 @@ export function MachineProfilePage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6">
+    <div
+      className="h-full overflow-y-auto p-6"
+      onScroll={(e) => setListScrolled(e.currentTarget.scrollTop > 8)}
+    >
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         {!hasAnyAction && (
           <Alert
@@ -813,19 +819,21 @@ export function MachineProfilePage() {
             <Card
               title={t("machine.agent-roster")}
               footer={
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    size="sm"
-                    disabled={!canCreateAgent}
-                    onClick={() => {
-                      resetAddForm();
-                      setAddOpen(true);
-                    }}
-                  >
-                    <Plus className="size-3.5" />
-                    {t("machine.add-agent")}
-                  </Button>
-                </div>
+                isDesktop ? (
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      size="sm"
+                      disabled={!canCreateAgent}
+                      onClick={() => {
+                        resetAddForm();
+                        setAddOpen(true);
+                      }}
+                    >
+                      <Plus className="size-3.5" />
+                      {t("machine.add-agent")}
+                    </Button>
+                  </div>
+                ) : undefined
               }
             >
               {agentsLoading ? (
@@ -1658,6 +1666,35 @@ export function MachineProfilePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Mobile add-agent FAB: mirrors the chat create-channel FAB on touch
+          layouts; the roster footer button stays for desktop. */}
+      {canCreateAgent && (
+        <button
+          type="button"
+          onClick={() => {
+            resetAddForm();
+            setAddOpen(true);
+          }}
+          aria-label={t("machine.add-agent")}
+          data-testid="add-agent-fab"
+          className={cn(
+            "fixed right-4 z-chrome flex h-14 items-center justify-center gap-1.5 overflow-hidden",
+            "bottom-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom)+0.75rem)]",
+            "rounded-full bg-accent text-accent-text shadow-lg transition-all duration-200",
+            "focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
+            "lg:hidden",
+            listScrolled ? "w-14" : "w-32"
+          )}
+        >
+          <Plus className="size-6 shrink-0" strokeWidth={2.25} />
+          {!listScrolled && (
+            <span className="text-sm font-semibold whitespace-nowrap">
+              {t("machine.add-agent-fab-label")}
+            </span>
+          )}
+        </button>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Trash } from "lucide-react";
+import { Plus, Trash } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useNavigate, useParams } from "react-router-dom";
@@ -54,6 +54,7 @@ export function MachinesPage() {
   const [token, setToken] = useState<string | null>(null);
   const [tokenOpen, setTokenOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [listScrolled, setListScrolled] = useState(false);
   const [createError, setCreateError] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -136,7 +137,7 @@ export function MachinesPage() {
           selectedMachineId ? "hidden lg:flex lg:w-56" : "flex w-full lg:w-56"
         )}
       >
-        <div className="flex items-center justify-between gap-2 border-b border-control-border px-3 py-3 shrink-0">
+        <div className="hidden lg:flex items-center justify-between gap-2 border-b border-control-border px-3 py-3 shrink-0">
           <h1 className="hidden lg:block text-sm font-semibold text-main truncate">
             {t("machine.title")}
           </h1>
@@ -147,7 +148,10 @@ export function MachinesPage() {
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto py-1">
+        <div
+          className="flex-1 overflow-y-auto py-1"
+          onScroll={(e) => setListScrolled(e.currentTarget.scrollTop > 8)}
+        >
           {loading ? (
             <p className="px-3 py-2 text-sm text-control-light">
               {t("common.loading")}
@@ -224,6 +228,32 @@ export function MachinesPage() {
             </ul>
           )}
         </div>
+
+        {/* Mobile create-machine FAB: mirrors the chat create-channel FAB on
+            touch layouts; the header button stays for desktop. */}
+        {canCreate && (
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            aria-label={t("machine.create")}
+            data-testid="create-machine-fab"
+            className={cn(
+              "fixed right-4 z-chrome flex h-14 items-center justify-center gap-1.5 overflow-hidden",
+              "bottom-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom)+0.75rem)]",
+              "rounded-full bg-accent text-accent-text shadow-lg transition-all duration-200",
+              "focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
+              "lg:hidden",
+              listScrolled ? "w-14" : "w-32"
+            )}
+          >
+            <Plus className="size-6 shrink-0" strokeWidth={2.25} />
+            {!listScrolled && (
+              <span className="text-sm font-semibold whitespace-nowrap">
+                {t("machine.fab-label")}
+              </span>
+            )}
+          </button>
+        )}
       </aside>
 
       {/* Right pane: machine detail (or empty state). */}
