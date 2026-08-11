@@ -339,7 +339,7 @@ const ConversationRow = memo(function ConversationRow({
           transition: offset === 0 ? "transform 200ms ease-out" : "none",
         }}
         className={cn(
-          "relative z-10 flex w-full items-center gap-3 bg-background px-2 py-2.5 pr-10 text-left transition-colors lg:px-3",
+          "relative z-10 flex w-full items-center gap-3 bg-background px-2 py-2.5 pr-10 text-left transition-colors lg:pl-3 lg:pr-10",
           active ? "bg-accent/10" : "hover:bg-control-bg/40"
         )}
       >
