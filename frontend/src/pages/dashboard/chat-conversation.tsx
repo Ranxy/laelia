@@ -632,6 +632,9 @@ export function ChatConversationPage(props?: ChannelConversationViewProps) {
       setAsTask(sendAsTask);
     } finally {
       setSending(false);
+      // The textarea is disabled while sending, which drops focus; restore it
+      // after the send settles so the user can keep typing.
+      setTimeout(() => textareaRef.current?.focus(), 0);
     }
   }, [
     input,
