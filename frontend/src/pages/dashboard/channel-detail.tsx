@@ -70,7 +70,7 @@ export function ChannelDetailPage() {
       if (conv?.closed) {
         await setConversationClosed(channelId, false);
       }
-      navigate(`/chat/${channelId}`);
+      navigate(`/${channelId}`);
     } finally {
       setStartingChat(false);
     }

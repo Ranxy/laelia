@@ -87,7 +87,9 @@ function renderPage() {
         path: "/members/channels/:channelId",
         element: <ChannelDetailPage />,
       },
-      { path: "/chat/:conversationId", element: <div>chat-route</div> },
+      // Chat routes live at the root: "/" is the list, "/:conversationId" is
+      // the conversation itself (see router/routes/dashboard.tsx).
+      { path: "/:conversationId", element: <div>chat-route</div> },
     ],
     { initialEntries: ["/members/channels/c1"] }
   );
