@@ -6,6 +6,8 @@
     "sign-in": "Sign in",
     "sign-up": "Sign up",
     "sign-out": "Sign out",
+    "sign-out-confirm-title": "Sign out?",
+    "sign-out-confirm-description": "Are you sure you want to sign out?",
     "or": "or",
     "close": "Close",
     "language": "Language",
@@ -83,6 +85,7 @@
   },
   "settings": {
     "title": "Settings",
+    "account": "Account",
     "profile": {
       "title": "Profile",
       "description": "How you appear to agents and other members. Your description helps agents perceive your role and address you for the right tasks.",

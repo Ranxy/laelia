@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { settingServiceClient } from "@/connect";
-import { setLocale } from "@/lib/i18n";
+import { LOCALES, setLocale } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores";
 import { useHasPermission } from "@/stores/permissions";
 import {
@@ -23,65 +24,93 @@ import {
   UpdateDebugConfigRequestSchema,
 } from "@/types/proto-es/v1/setting_pb";
 
-type LocaleOption = {
-  value: string;
-  label: string;
-};
-
-const LOCALES: LocaleOption[] = [
-  { value: "en-US", label: "English" },
-  { value: "zh-CN", label: "中文" },
-];
-
-export function UserMenu() {
-  const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
-  const currentUser = useAppStore((s) => s.currentUser);
-  const logout = useAppStore((s) => s.logout);
-  const [open, setOpen] = useState(false);
-
+// Debug-config state + toggle, shared by the sidebar user menu (desktop) and
+// the settings account section (mobile).
+export function useDebugConfig() {
   const isAdmin = useHasPermission("laelia.settings.get");
-  const [debugEnabled, setDebugEnabled] = useState(false);
-  const [debugLoaded, setDebugLoaded] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) return;
     settingServiceClient
       .getDebugConfig(create(GetDebugConfigRequestSchema))
       .then((res) => {
-        setDebugEnabled(res.enabled);
-        setDebugLoaded(true);
+        setEnabled(res.enabled);
+        setLoaded(true);
       })
       .catch(() => {
-        setDebugLoaded(true);
+        setLoaded(true);
       });
   }, [isAdmin]);
 
-  const handleDebugToggle = useCallback(async (checked: boolean) => {
-    setDebugEnabled(checked);
+  const toggle = useCallback(async (checked: boolean) => {
+    setEnabled(checked);
     try {
       await settingServiceClient.updateDebugConfig(
         create(UpdateDebugConfigRequestSchema, { enabled: checked })
       );
     } catch {
-      setDebugEnabled(!checked);
+      setEnabled(!checked);
     }
   }, []);
 
-  async function handleLogout() {
-    setOpen(false);
+  return { isAdmin, enabled, loaded, toggle };
+}
+
+// Sign-out + redirect to the sign-in page, shared by the sidebar user menu and
+// the settings account section.
+export function useLogout() {
+  const logout = useAppStore((s) => s.logout);
+  const navigate = useNavigate();
+  return useCallback(async () => {
     await logout();
     navigate("/auth/signin", { replace: true });
+  }, [logout, navigate]);
+}
+
+export function UserMenu({ collapsed = false }: { collapsed?: boolean }) {
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const currentUser = useAppStore((s) => s.currentUser);
+  const [open, setOpen] = useState(false);
+  const {
+    isAdmin,
+    enabled: debugEnabled,
+    loaded: debugLoaded,
+    toggle: handleDebugToggle,
+  } = useDebugConfig();
+  const signOut = useLogout();
+
+  async function handleLogout() {
+    setOpen(false);
+    await signOut();
   }
 
   if (!currentUser) return null;
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-sm px-2 py-1 text-sm text-control-light hover:bg-control-bg hover:text-control">
-        {currentUser.title || currentUser.email}
+      <DropdownMenuTrigger
+        aria-label={currentUser.title || currentUser.email}
+        className={cn(
+          "flex items-center text-sm text-control-light hover:bg-link-hover hover:text-control",
+          collapsed
+            ? "mx-auto size-8 justify-center rounded-full bg-control-bg font-semibold"
+            : "w-full gap-1.5 rounded-md px-2 py-2"
+        )}
+      >
+        {collapsed ? (
+          <span>
+            {(currentUser.title || currentUser.email).charAt(0).toUpperCase()}
+          </span>
+        ) : (
+          <span className="min-w-0 flex-1 truncate text-left">
+            {currentUser.title || currentUser.email}
+          </span>
+        )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-48">
+      <DropdownMenuContent className="w-48" side={collapsed ? "right" : "top"}>
         {/* User info */}
         <div className="px-3 py-2">
           <div className="truncate text-sm font-medium text-control">

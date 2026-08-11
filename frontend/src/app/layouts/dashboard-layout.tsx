@@ -3,7 +3,6 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { MobileHeader } from "@/components/mobile-header";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { DesktopSidebar } from "@/components/sidebar";
-import { UserMenu } from "@/components/user-menu";
 import { toastManager } from "@/lib/toast";
 import { reconcilePushSubscription, suppressRoute } from "@/lib/web-push";
 import { useAppStore } from "@/stores";
@@ -131,11 +130,6 @@ export function DashboardLayout() {
         onToggleCollapse={toggleCollapsed}
       />
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Desktop header. */}
-        <header className="hidden lg:flex h-12 shrink-0 items-center gap-4 border-b border-control-border px-4">
-          <div className="flex-1" />
-          <UserMenu />
-        </header>
         {/* Mobile header. */}
         <div className="fixed left-0 right-0 top-0 z-chrome lg:hidden">
           <MobileHeader />

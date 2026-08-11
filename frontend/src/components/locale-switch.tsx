@@ -1,15 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { setLocale } from "@/lib/i18n";
-
-type LocaleOption = {
-  value: string;
-  label: string;
-};
-
-const LOCALES: LocaleOption[] = [
-  { value: "en-US", label: "English" },
-  { value: "zh-CN", label: "中文" },
-];
+import { LOCALES, setLocale } from "@/lib/i18n";
 
 export function LocaleSwitch() {
   const { i18n } = useTranslation();

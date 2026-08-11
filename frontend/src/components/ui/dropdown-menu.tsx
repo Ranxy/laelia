@@ -21,17 +21,20 @@ const DropdownMenuSubmenu = BaseMenu.SubmenuRoot;
 function DropdownMenuContent({
   className,
   children,
+  side = "bottom",
   sideOffset = 4,
   align = "end",
   ref,
   ...props
 }: ComponentProps<typeof BaseMenu.Popup> & {
+  side?: ComponentProps<typeof BaseMenu.Positioner>["side"];
   sideOffset?: ComponentProps<typeof BaseMenu.Positioner>["sideOffset"];
   align?: ComponentProps<typeof BaseMenu.Positioner>["align"];
 }) {
   return (
     <BaseMenu.Portal container={getLayerRoot("overlay")}>
       <BaseMenu.Positioner
+        side={side}
         sideOffset={sideOffset}
         align={align}
         className={LAYER_SURFACE_CLASS}

@@ -11,6 +11,16 @@ const STORAGE_KEY = "laelia.language";
 const KNOWN_LOCALES = ["en-US", "zh-CN"] as const;
 type Locale = (typeof KNOWN_LOCALES)[number];
 
+export type LocaleOption = {
+  value: string;
+  label: string;
+};
+
+export const LOCALES: LocaleOption[] = [
+  { value: "en-US", label: "English" },
+  { value: "zh-CN", label: "中文" },
+];
+
 const localeLoaders: Record<Locale, () => Promise<{ default: unknown }>> = {
   "en-US": async () => ({ default: enUS }),
   "zh-CN": () => import("@/locales/zh-CN.json"),

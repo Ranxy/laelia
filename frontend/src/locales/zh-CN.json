@@ -6,6 +6,8 @@
     "sign-in": "登录",
     "sign-up": "注册",
     "sign-out": "退出登录",
+    "sign-out-confirm-title": "退出登录？",
+    "sign-out-confirm-description": "确定要退出登录吗？",
     "or": "或",
     "close": "关闭",
     "language": "语言",
@@ -83,6 +85,7 @@
   },
   "settings": {
     "title": "设置",
+    "account": "账号",
     "profile": {
       "title": "个人资料",
       "description": "你在 agent 和其他成员眼中的样子。描述能帮助 agent 感知你的角色,把合适的任务交给你。",

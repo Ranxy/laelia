@@ -3,7 +3,6 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 import {
   ACTIVITY_ROUTE,
@@ -163,9 +162,6 @@ export function MobileHeader() {
       <h1 className="min-w-0 flex-1 truncate text-center text-base font-semibold text-main">
         {title}
       </h1>
-      <div className="shrink-0">
-        <UserMenu />
-      </div>
     </header>
   );
 }

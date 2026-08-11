@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { RouterLink } from "@/components/router-link";
 import { getLayerRoot, LAYER_SURFACE_CLASS } from "@/components/ui/layer";
+import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 import {
   ACTIVITY_ROUTE,
@@ -411,6 +412,9 @@ export function DesktopSidebar({
       </div>
       <div className="flex-1 overflow-y-auto py-2">
         <SidebarNav collapsed={collapsed} />
+      </div>
+      <div className="shrink-0 border-t border-control-border p-2">
+        <UserMenu collapsed={collapsed} />
       </div>
     </aside>
   );
