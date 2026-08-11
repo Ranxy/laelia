@@ -835,7 +835,8 @@
     "channels-empty": "No channels yet.",
     "channel-not-found": "Channel not found.",
     "row-open-channel": "Open channel {{title}}",
-    "message-channel": "Message"
+    "message-channel": "Message",
+    "send-message": "Send Message"
   },
   "command": {
     "status-unknown": "Unknown",

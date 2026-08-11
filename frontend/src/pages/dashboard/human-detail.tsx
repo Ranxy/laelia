@@ -326,7 +326,7 @@ export function HumanDetailPage() {
             size="sm"
             onClick={startChat}
             disabled={startingChat}
-            className="shrink-0"
+            className="hidden shrink-0 lg:inline-flex"
           >
             {startingChat ? (
               <Loader2 className="size-4 animate-spin" />
@@ -485,6 +485,22 @@ export function HumanDetailPage() {
           </div>
         )}
       </div>
+      {/* Mobile send-message FAB: replaces the header Message button on touch
+          layouts, styled like the chat list's create-channel FAB. */}
+      {!isSelf && (
+        <button
+          type="button"
+          onClick={() => void startChat()}
+          disabled={startingChat}
+          className="fixed right-4 bottom-[calc(var(--mobile-tab-height)+var(--mobile-safe-bottom)+0.75rem)] z-chrome flex h-14 items-center justify-center rounded-full bg-accent px-6 text-sm font-semibold whitespace-nowrap text-accent-text shadow-lg transition-all duration-200 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50 lg:hidden"
+        >
+          {startingChat ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            t("members.send-message")
+          )}
+        </button>
+      )}
     </div>
   );
 }

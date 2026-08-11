@@ -835,7 +835,8 @@
     "channels-empty": "还没有频道。",
     "channel-not-found": "频道不存在。",
     "row-open-channel": "打开频道 {{title}}",
-    "message-channel": "发消息"
+    "message-channel": "发消息",
+    "send-message": "发送消息"
   },
   "command": {
     "status-unknown": "未知",
