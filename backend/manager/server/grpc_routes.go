@@ -94,6 +94,12 @@ func configureV1Routers(
 
 	auditInterceptor := apiv1.NewAuditInterceptor(stores)
 
+	// CSRF note: the Connect protocol can serve unary RPCs over GET, which
+	// browsers send without CORS preflight. connect-go only enables GET for
+	// procedures marked idempotency_level=NO_SIDE_EFFECTS, and none of the v1
+	// services are annotated, so GET unary is disabled here. Do not add
+	// NO_SIDE_EFFECTS annotations or connect.WithHTTPGet without re-auditing
+	// the CSRF posture (cookie auth + SameSite + Origin validation).
 	handlerOpts := connect.WithHandlerOptions(
 		// Interceptors execute in the listed order. The rate limiter MUST run
 		// after auth: it keys per-user/per-agent buckets on the principal that auth

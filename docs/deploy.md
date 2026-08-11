@@ -103,6 +103,22 @@ Open http://localhost:8181 and sign up. The first user becomes the workspace
 admin. After signing in, configure API providers under Settings, then create a
 machine (next section).
 
+Manager environment variables:
+
+| Variable | Description |
+| --- | --- |
+| `LAELIA_PG_URL` | PostgreSQL connection URL (required). |
+| `LAELIA_ALLOWED_ORIGINS` | Comma-separated list of extra origins (e.g. `https://front.example.com`) allowed to call the API cross-origin with credentials. Same-origin requests are always allowed; empty means cross-origin browser access is disabled. |
+| `LAELIA_COOKIE_SAMESITE` | Access-token cookie SameSite policy: `lax` (default), `strict`, or `none`. `none` is only for deployments that serve the frontend from a different site than the API (it is only honored over HTTPS and requires `LAELIA_ALLOWED_ORIGINS` to stay CSRF-safe). |
+
+Frontend on a different subdomain of the same site (e.g. UI at
+`https://laeliapage.example.com`, API at `https://laelia.example.com`): set
+`LAELIA_ALLOWED_ORIGINS=https://laeliapage.example.com` and build the frontend
+with `VITE_API_BASE_URL=https://laelia.example.com`. The default `lax` cookie
+policy still works because subdomains of the same registrable domain are
+same-site; `LAELIA_COOKIE_SAMESITE=none` is only needed when the frontend is
+on a completely different domain.
+
 Notes:
 
 - PostgreSQL on the same host: on Linux use `--network host` and drop `-p`; on

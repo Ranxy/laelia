@@ -24,17 +24,10 @@ func configureEchoRouters(
 ) {
 	e.Use(recoverMiddleware)
 	e.Use(securityHeadersMiddleware())
+	e.Use(originValidationMiddleware(profile))
 
-	if profile.Mode == common.ReleaseModeDev {
-		e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-			UnsafeAllowOriginFunc: func(_ *echo.Context, origin string) (string, bool, error) {
-				return origin, true, nil
-			},
-			AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch, http.MethodOptions},
-			AllowHeaders:     connectcors.AllowedHeaders(),
-			ExposeHeaders:    connectcors.ExposedHeaders(),
-			AllowCredentials: true,
-		}))
+	if mw := corsMiddleware(profile); mw != nil {
+		e.Use(mw)
 	}
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
@@ -122,4 +115,39 @@ func securityHeadersMiddleware() echo.MiddlewareFunc {
 			return next(c)
 		}
 	}
+}
+
+// corsMiddleware returns the CORS middleware for the profile, or nil when no
+// cross-origin access is configured. Dev mode reflects localhost origins (the
+// vite dev server) plus explicitly configured origins; production only allows
+// configured origins. Same-origin requests never need CORS headers, so an
+// empty allowlist means no CORS middleware at all.
+func corsMiddleware(profile *config.Profile) echo.MiddlewareFunc {
+	config := middleware.CORSConfig{
+		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch, http.MethodOptions},
+		AllowHeaders:     connectcors.AllowedHeaders(),
+		ExposeHeaders:    connectcors.ExposedHeaders(),
+		AllowCredentials: true,
+	}
+	if profile.Mode == common.ReleaseModeDev {
+		allowed := make(map[string]struct{}, len(profile.AllowedOrigins))
+		for _, origin := range profile.AllowedOrigins {
+			allowed[normalizeOrigin(origin)] = struct{}{}
+		}
+		config.UnsafeAllowOriginFunc = func(_ *echo.Context, origin string) (string, bool, error) {
+			if isLocalhostOrigin(origin) {
+				return origin, true, nil
+			}
+			if _, ok := allowed[normalizeOrigin(origin)]; ok {
+				return origin, true, nil
+			}
+			return "", false, nil
+		}
+		return middleware.CORSWithConfig(config)
+	}
+	if len(profile.AllowedOrigins) == 0 {
+		return nil
+	}
+	config.AllowOrigins = profile.AllowedOrigins
+	return middleware.CORSWithConfig(config)
 }

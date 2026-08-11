@@ -6,23 +6,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Ranxy/laelia/backend/manager/config"
 	"github.com/Ranxy/laelia/backend/manager/store"
 )
 
 // token="" => unset
-func GetTokenCookie(ctx context.Context, stores *store.Store, origin, token string) *http.Cookie {
+func GetTokenCookie(ctx context.Context, stores *store.Store, profile *config.Profile, origin, token string) *http.Cookie {
+	isHTTPS := strings.HasPrefix(origin, "https")
+	sameSite := cookieSameSite(profile, isHTTPS)
 	if token == "" {
 		return &http.Cookie{
-			Name:    AccessTokenCookieName,
-			Value:   "",
-			Expires: time.Unix(0, 0),
-			Path:    "/",
+			Name:     AccessTokenCookieName,
+			Value:    "",
+			Expires:  time.Unix(0, 0),
+			Path:     "/",
+			Secure:   isHTTPS,
+			SameSite: sameSite,
 		}
-	}
-	isHTTPS := strings.HasPrefix(origin, "https")
-	sameSite := http.SameSiteStrictMode
-	if isHTTPS {
-		sameSite = http.SameSiteNoneMode
 	}
 	tokenDuration := GetTokenDuration(ctx, stores)
 	return &http.Cookie{
@@ -40,6 +40,29 @@ func GetTokenCookie(ctx context.Context, stores *store.Store, origin, token stri
 		Secure:   isHTTPS,
 		SameSite: sameSite,
 	}
+}
+
+// cookieSameSite returns the SameSite policy for the access-token cookie.
+// Lax is the safe default: it blocks cross-site subresource requests (the
+// CSRF vector) while keeping same-site deployments (including frontend and
+// API on different subdomains) and top-level SSO redirects working. "strict"
+// and "none" can be opted into via LAELIA_COOKIE_SAMESITE; "none" is only
+// honored over HTTPS (browsers reject SameSite=None without Secure) and is
+// meant for deployments that serve the frontend from a different site than
+// the API.
+func cookieSameSite(profile *config.Profile, isHTTPS bool) http.SameSite {
+	sameSite := http.SameSiteLaxMode
+	switch strings.ToLower(profile.CookieSameSite) {
+	case "strict":
+		sameSite = http.SameSiteStrictMode
+	case "none":
+		if isHTTPS {
+			sameSite = http.SameSiteNoneMode
+		}
+	default:
+		sameSite = http.SameSiteLaxMode
+	}
+	return sameSite
 }
 
 func GetTokenDuration(_ context.Context, _ *store.Store) time.Duration {
