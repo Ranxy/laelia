@@ -24,7 +24,7 @@ MCP 工具加载进 LLM runtime（ACP runtime 与内置 pi runtime 都支持）�
 | 工作区服务作用域 | workspace 全局，members 授权（users/groups/allUsers） |
 | 个人服务作用域 | owner 独占：仅创建者本人可用，管理员也不能绕过 |
 | 系统开关 | `allow_user_mcp_servers` 默认开启；关闭后个人服务对所有 Agent 立即失效、禁止新建/编辑，数据保留，重新开启后恢复 |
-| 个人服务 URL | 暂不限制内网/私网地址 |
+| 个人服务 URL | 受管理员配置的 MCP 目标 IP 黑白名单策略约束（默认关闭，开启后黑名单优先、白名单非空则仅允许命中段；全局或仅个人 MCP 生效），见 [MCP 目标 IP 策略设计](mcp-ssrf-ip-policy-design.md) |
 | 管理员视角 | 可在只读 Tab 查看所有用户的个人服务，按创建人搜索，不与工作区服务混排 |
 
 ## 3. 总体架构
@@ -210,7 +210,7 @@ message McpTool {
    `mcp_stale_catalog`（fail closed）。
 3. 校验 `tool_name` 属于该服务当前工具列表（allowlist）。
 4. 调真实 MCP 服务，把结果规范化为 text/image content block。
-5. 限制：单次调用超时 25s、响应 ≤ 512KB；**当前未限制 URL 目标地址**（决策 2）。
+5. 限制：单次调用超时 25s、响应 ≤ 512KB；URL 目标地址受 IP 黑白名单策略约束：保存时逐 IP 校验、连接时经自定义 `DialContext` 复检（防 DNS rebinding），见 [mcp-ssrf-ip-policy-design.md](mcp-ssrf-ip-policy-design.md)。
 
 ### 6.3 MCP client 组件
 
@@ -342,7 +342,8 @@ daemon 是机器侧唯一出口，统一输出 **MCP wire JSON**（
 
 ## 12. 风险与后续
 
-- **SSRF 面扩大**：个人服务 URL 暂不限制内网/私网地址，等于把 manager 的出网能力开放
-  给普通用户；后续可对个人服务增加回环/私网/云元数据地址校验。
+- **SSRF 面**：管理员开启「用户可配个人 MCP」时二次确认 SSRF 风险（可打内网/云元数据）；
+  默认不限制目标地址，管理员可配置 IP 黑白名单策略（默认关闭，全局或仅个人 MCP 生效）收紧，
+  见 [MCP 目标 IP 策略设计](mcp-ssrf-ip-policy-design.md)。
 - 网关是单点：MCP 调用经过 manager，需监控超时与错误；后续如需直连可加 per-server
   routing 开关。
