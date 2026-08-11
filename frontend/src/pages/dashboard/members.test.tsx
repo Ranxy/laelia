@@ -130,6 +130,7 @@ describe("MembersPage search", () => {
     expect(screen.getByText("Alice")).toBeTruthy();
     expect(screen.queryByText("members.section-agents")).toBeNull();
     expect(screen.getByText("members.section-humans")).toBeTruthy();
+    expect(screen.queryByText("members.section-channels")).toBeNull();
   });
 
   it("shows a no-results message when nothing matches", () => {
@@ -141,6 +142,7 @@ describe("MembersPage search", () => {
     expect(screen.queryByText("Alpha Agent")).toBeNull();
     expect(screen.queryByText("members.section-agents")).toBeNull();
     expect(screen.queryByText("members.section-humans")).toBeNull();
+    expect(screen.queryByText("members.section-channels")).toBeNull();
   });
 
   it("restores the full roster when the query is cleared", () => {
@@ -185,5 +187,29 @@ describe("MembersPage channels roster", () => {
     fireEvent.click(screen.getByText("Design"));
 
     expect(screen.getByText("channel-detail-route")).toBeTruthy();
+  });
+
+  it("filters channels by title while searching", () => {
+    renderPage();
+    fireEvent.change(searchInput(), { target: { value: "design" } });
+
+    expect(screen.getByText("members.section-channels")).toBeTruthy();
+    expect(screen.queryByText("members.section-agents")).toBeNull();
+    expect(screen.queryByText("members.section-humans")).toBeNull();
+
+    fireEvent.click(screen.getByText("members.section-channels"));
+
+    expect(screen.getByText("Design")).toBeTruthy();
+    expect(screen.queryByText("Retired")).toBeNull();
+  });
+
+  it("filters channels by conversation id while searching", () => {
+    renderPage();
+    fireEvent.change(searchInput(), { target: { value: "c2" } });
+
+    fireEvent.click(screen.getByText("members.section-channels"));
+
+    expect(screen.getByText("Retired")).toBeTruthy();
+    expect(screen.queryByText("Design")).toBeNull();
   });
 });

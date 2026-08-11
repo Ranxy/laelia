@@ -107,13 +107,24 @@ export function MembersPage() {
       .replace(/^(agents|users)\//, "")
       .toLowerCase()
       .includes(normalizedQuery);
+  const matchesChannelQuery = (c: Conversation) =>
+    !searching ||
+    c.title.toLowerCase().includes(normalizedQuery) ||
+    c.name
+      .replace(/^conversations\//, "")
+      .toLowerCase()
+      .includes(normalizedQuery);
 
   const agents = members.filter((m) => m.kind === "agent" && matchesQuery(m));
   const humans = members.filter((m) => m.kind === "user" && matchesQuery(m));
+  const channels = myChannels.filter(matchesChannelQuery);
   // While searching, hide sections that have no matches instead of showing an
   // empty group; when nothing matches at all, a dedicated message appears.
   const showAgents = !searching || agents.length > 0;
   const showHumans = !searching || humans.length > 0;
+  // The channels roster has its own fetch state: while it is still loading we
+  // can't know whether a match exists, so keep the section visible.
+  const showChannels = !searching || myChannelsLoading || channels.length > 0;
 
   return (
     <div className="flex h-full w-full overflow-hidden">
@@ -160,7 +171,11 @@ export function MembersPage() {
             <p className="px-3 py-2 text-sm text-control-light">
               {t("members.no-data")}
             </p>
-          ) : searching && agents.length === 0 && humans.length === 0 ? (
+          ) : searching &&
+            !myChannelsLoading &&
+            agents.length === 0 &&
+            humans.length === 0 &&
+            channels.length === 0 ? (
             <p className="px-3 py-2 text-sm text-control-light">
               {t("members.no-search-results", { query: query.trim() })}
             </p>
@@ -229,41 +244,43 @@ export function MembersPage() {
 
           {/* Channels roster — all joined/created channels including closed
               ones, so a closed conversation always has an entry point back.
-              Independent of the member directory: it has its own fetch/loading
-              state and is unaffected by the member search. */}
-          <div className="flex flex-col">
-            <SectionHeader
-              label={t("members.section-channels")}
-              count={myChannels.length}
-              open={sections.channels}
-              onToggle={() => toggleSection("channels")}
-            />
-            {myChannelsLoading && sections.channels && (
-              <p className="px-3 py-2 text-sm text-control-light">
-                {t("common.loading")}
-              </p>
-            )}
-            {!myChannelsLoading &&
-              sections.channels &&
-              (myChannels.length === 0 ? (
+              It has its own fetch/loading state; the member search filters it
+              like the agent/human sections. */}
+          {showChannels && (
+            <div className="flex flex-col">
+              <SectionHeader
+                label={t("members.section-channels")}
+                count={channels.length}
+                open={sections.channels}
+                onToggle={() => toggleSection("channels")}
+              />
+              {myChannelsLoading && sections.channels && (
                 <p className="px-3 py-2 text-sm text-control-light">
-                  {t("members.channels-empty")}
+                  {t("common.loading")}
                 </p>
-              ) : (
-                <div className="divide-y divide-control-border/50">
-                  {myChannels.map((channel) => (
-                    <ChannelRow
-                      key={channel.name}
-                      channel={channel}
-                      selected={
-                        selectedChannelId ===
-                        channel.name.replace(/^conversations\//, "")
-                      }
-                    />
-                  ))}
-                </div>
-              ))}
-          </div>
+              )}
+              {!myChannelsLoading &&
+                sections.channels &&
+                (channels.length === 0 ? (
+                  <p className="px-3 py-2 text-sm text-control-light">
+                    {t("members.channels-empty")}
+                  </p>
+                ) : (
+                  <div className="divide-y divide-control-border/50">
+                    {channels.map((channel) => (
+                      <ChannelRow
+                        key={channel.name}
+                        channel={channel}
+                        selected={
+                          selectedChannelId ===
+                          channel.name.replace(/^conversations\//, "")
+                        }
+                      />
+                    ))}
+                  </div>
+                ))}
+            </div>
+          )}
         </div>
       </aside>
 
