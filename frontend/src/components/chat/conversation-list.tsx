@@ -113,7 +113,7 @@ export function ConversationList() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("chat.search-placeholder")}
-          className="h-8 text-sm"
+          className="h-8 rounded-full text-sm"
         />
       </div>
 

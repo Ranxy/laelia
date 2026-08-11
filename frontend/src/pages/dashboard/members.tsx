@@ -105,7 +105,7 @@ export function MembersPage() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("members.search-placeholder")}
             aria-label={t("members.search-placeholder")}
-            className="h-8 text-sm"
+            className="h-8 rounded-full text-sm"
           />
         </div>
 
