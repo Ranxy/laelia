@@ -4,6 +4,7 @@ import { MobileHeader } from "@/components/mobile-header";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { DesktopSidebar } from "@/components/sidebar";
 import { toastManager } from "@/lib/toast";
+import { useSwipeBack } from "@/lib/use-swipe-back";
 import { reconcilePushSubscription, suppressRoute } from "@/lib/web-push";
 import { useAppStore } from "@/stores";
 
@@ -71,6 +72,9 @@ export function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const location = useLocation();
   const navigate = useNavigate();
+  // Mobile swipe-back: drag from the left edge to go back one level (thread
+  // panel first, then the route's backTo target). Inert on desktop.
+  const swipeBackRef = useSwipeBack();
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => {
@@ -124,7 +128,10 @@ export function DashboardLayout() {
   }, [navigate]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div
+      ref={swipeBackRef}
+      className="flex h-screen overflow-hidden bg-background"
+    >
       <DesktopSidebar
         collapsed={collapsed}
         onToggleCollapse={toggleCollapsed}

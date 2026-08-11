@@ -13,3 +13,19 @@ if (
 ) {
   Element.prototype.scrollIntoView = function scrollIntoView() {};
 }
+
+// jsdom does not implement window.matchMedia (used by useIsDesktop). Polyfill
+// it as a non-matching query so components using the hook render in tests
+// (mobile by default; tests that care mock the hook explicitly).
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
+  window.matchMedia = (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  });
+}
