@@ -54,6 +54,7 @@ export function SignUpPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const register = useAppStore((s) => s.register);
+  const login = useAppStore((s) => s.login);
   const resendVerificationEmail = useAppStore((s) => s.resendVerificationEmail);
 
   const [email, setEmail] = useState("");
@@ -129,6 +130,10 @@ export function SignUpPage() {
       if (requireVerification) {
         setRegistered(true);
       } else {
+        // Verification is off, so the account is created verified and can
+        // sign in immediately: restore the pre-verification auto-login UX
+        // instead of bouncing the user to the sign-in page.
+        await login(email, password);
         navigate("/", { replace: true });
       }
     } catch (err) {
