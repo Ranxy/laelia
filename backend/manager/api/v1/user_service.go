@@ -83,7 +83,11 @@ func (s *UserService) GetUser(ctx context.Context, request *connect.Request[v1pb
 	if user.Type == storepb.PrincipalType_SYSTEM_BOT {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("user %d not found", userID))
 	}
-	return connect.NewResponse(convertToUser(user)), nil
+	callerID, isAdmin, err := callerPhoneVisibility(ctx, s.store)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(convertToUser(user, !isAdmin && user.ID != callerID)), nil
 }
 
 // BatchGetUsers get users in batch.
@@ -105,7 +109,7 @@ func (s *UserService) GetCurrentUser(ctx context.Context, _ *connect.Request[emp
 	if !ok || user == nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.Errorf("authenticated user not found"))
 	}
-	out := convertToUser(user)
+	out := convertToUser(user, false)
 	// Expose the caller's effective workspace-scope permission set so the
 	// frontend can gate actions (laelia.users.update, laelia.agents.create, the
 	// review perms, etc.) without re-deriving roles client-side. workspace_admin
@@ -160,6 +164,11 @@ func (s *UserService) ListUsers(ctx context.Context, request *connect.Request[v1
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to list user, error: %v", err))
 	}
 
+	callerID, isAdmin, err := callerPhoneVisibility(ctx, s.store)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
 	nextPageToken := ""
 	if len(users) == limitPlusOne {
 		users = users[:offset.limit]
@@ -172,7 +181,7 @@ func (s *UserService) ListUsers(ctx context.Context, request *connect.Request[v1
 		NextPageToken: nextPageToken,
 	}
 	for _, user := range users {
-		response.Users = append(response.Users, convertToUser(user))
+		response.Users = append(response.Users, convertToUser(user, !isAdmin && user.ID != callerID))
 	}
 	return connect.NewResponse(response), nil
 }
@@ -438,7 +447,7 @@ func (s *UserService) CreateUser(ctx context.Context, request *connect.Request[v
 	// 	},
 	// })
 
-	userResponse := convertToUser(user)
+	userResponse := convertToUser(user, false)
 	if request.Msg.User.UserType == v1pb.UserType_SERVICE_ACCOUNT {
 		userResponse.ServiceKey = password
 	}
@@ -598,7 +607,7 @@ func (s *UserService) UpdateUser(ctx context.Context, request *connect.Request[v
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to update user, error: %v", err))
 	}
 
-	userResponse := convertToUser(user)
+	userResponse := convertToUser(user, false)
 	if request.Msg.User.UserType == v1pb.UserType_SERVICE_ACCOUNT && passwordPatch != nil {
 		userResponse.ServiceKey = *passwordPatch
 	}
@@ -698,7 +707,46 @@ func (s *UserService) UndeleteUser(ctx context.Context, request *connect.Request
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	return connect.NewResponse(convertToUser(user)), nil
+	return connect.NewResponse(convertToUser(user, false)), nil
+}
+
+// maskPhoneNumber returns a masked form of a phone number (e.g. "138****8000"),
+// keeping the first 3 and last 4 digits. Shorter numbers keep only the last 4
+// digits; empty stays empty.
+func maskPhoneNumber(phone string) string {
+	if phone == "" {
+		return ""
+	}
+	r := []rune(phone)
+	n := len(r)
+	if n <= 4 {
+		return strings.Repeat("*", n)
+	}
+	head := 3
+	if n < 8 {
+		head = 0
+	}
+	masked := append([]rune(nil), r[:head]...)
+	for i := head; i < n-4; i++ {
+		masked = append(masked, '*')
+	}
+	masked = append(masked, r[n-4:]...)
+	return string(masked)
+}
+
+// callerPhoneVisibility resolves the caller's user id and workspace-admin
+// status — the two conditions that allow seeing a full phone number. A nil
+// caller (agent or unauthenticated) yields zero values.
+func callerPhoneVisibility(ctx context.Context, stores *store.Store) (callerID int, isAdmin bool, err error) {
+	caller, ok := GetUserFromContext(ctx)
+	if !ok || caller == nil {
+		return 0, false, nil
+	}
+	admin, err := isUserWorkspaceAdmin(ctx, stores, caller)
+	if err != nil {
+		return 0, false, err
+	}
+	return caller.ID, admin, nil
 }
 
 func convertToV1UserType(userType storepb.PrincipalType) v1pb.UserType {
@@ -714,7 +762,7 @@ func convertToV1UserType(userType storepb.PrincipalType) v1pb.UserType {
 	}
 }
 
-func convertToUser(user *store.UserMessage) *v1pb.User {
+func convertToUser(user *store.UserMessage, maskPhone bool) *v1pb.User {
 	convertedUser := &v1pb.User{
 		Name:        common.FormatUserUID(user.ID),
 		State:       convertDeletedToState(user.MemberDeleted),
@@ -728,6 +776,11 @@ func convertToUser(user *store.UserMessage) *v1pb.User {
 			LastChangePasswordTime: user.Profile.LastChangePasswordTime,
 			Source:                 user.Profile.Source,
 		},
+	}
+	// Phone is PII: only the target user themself and workspace admins see the
+	// full number; everyone else (including agents) gets a masked form.
+	if maskPhone {
+		convertedUser.Phone = maskPhoneNumber(user.Phone)
 	}
 	if user.AvatarS3Key != "" {
 		convertedUser.Avatar = common.FormatUserAvatar(user.ID)

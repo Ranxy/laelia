@@ -113,7 +113,7 @@ func (s *UserService) UploadAvatar(ctx context.Context, req *connect.Request[v1p
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	return connect.NewResponse(convertToUser(updated)), nil
+	return connect.NewResponse(convertToUser(updated, false)), nil
 }
 
 // DownloadAvatar fetches a user's avatar image bytes. Any authenticated user
@@ -182,7 +182,7 @@ func (s *UserService) DeleteAvatar(ctx context.Context, req *connect.Request[v1p
 	}
 	if user.AvatarS3Key == "" {
 		// Already cleared; return the user as-is.
-		return connect.NewResponse(convertToUser(user)), nil
+		return connect.NewResponse(convertToUser(user, false)), nil
 	}
 
 	s3Cli, cfg, err := s.s3client.Get(ctx)
@@ -205,7 +205,7 @@ func (s *UserService) DeleteAvatar(ctx context.Context, req *connect.Request[v1p
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	return connect.NewResponse(convertToUser(updated)), nil
+	return connect.NewResponse(convertToUser(updated, false)), nil
 }
 
 // deleteS3Object is a best-effort helper that swallows object-not-found errors
